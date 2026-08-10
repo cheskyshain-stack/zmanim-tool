@@ -22,7 +22,12 @@ export function renderRules(container, state, onChange) {
         ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS)}
         ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS)}
       </fieldset>
-      <label>Replacement text<textarea name="value" rows="2" placeholder="לפי הדרשה"></textarea></label>
+      <fieldset>
+        <legend>What to do to the cell</legend>
+        <label><input type="radio" name="mode" value="append" checked> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
+        <label><input type="radio" name="mode" value="replace"> Replace the cell's computed value entirely with this text</label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required></textarea></label>
+      </fieldset>
       <div class="actions"><button type="submit">Add rule</button></div>
     </form>
   `;
@@ -36,7 +41,7 @@ export function renderRules(container, state, onChange) {
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
           <strong>${esc(r.name)}</strong> — columns <code>${esc(columnsOf(r).map(prettyColumn).join(', '))}</code>
-          <div class="hint">${conditionSummary(r.condition)} → "${esc(r.value)}"</div>
+          <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
         <button class="rule-delete" title="Delete rule">Delete</button>
       </div>`
@@ -80,6 +85,7 @@ export function renderRules(container, state, onChange) {
       enabled: true,
       condition,
       columnKeys,
+      mode: fd.get('mode') || 'append',
       value: fd.get('value'),
     });
     onChange();

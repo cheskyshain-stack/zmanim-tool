@@ -39,8 +39,12 @@ function targetColumnsForSeason(rule, season) {
 }
 
 /** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced. `appliedColumns` (a Set) collects which *column
- *  keys* were touched by a rule, so the UI can flag those specific cells. */
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
 export function applyRules(row, week, rules, season, appliedColumns) {
   let out = row;
   for (const rule of rules) {
@@ -49,7 +53,7 @@ export function applyRules(row, week, rules, season, appliedColumns) {
     for (const col of targetColumnsForSeason(rule, season)) {
       if (!(col in out)) continue;
       if (out === row) out = { ...row };
-      out[col] = rule.value;
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
       if (appliedColumns) appliedColumns.add(col);
     }
   }
