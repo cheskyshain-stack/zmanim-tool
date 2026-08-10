@@ -216,7 +216,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.innerHTML = `
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="assets/logo-building-icon.png" alt="">
+        <img class="header-icon" src="${state.settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
           <img class="header-logo" src="assets/logo-text.png" alt="${esc(state.settings.shulName)}">
           ${state.settings.headerSubtitle ? `<div class="header-subtitle">${esc(state.settings.headerSubtitle)}</div>` : ''}

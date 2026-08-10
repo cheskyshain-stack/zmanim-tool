@@ -1,4 +1,5 @@
 import { TIMEZONES } from '../settings.js';
+import { renderImageCropper } from './image-crop.js';
 
 export function renderSettings(container, state, onSave) {
   const s = state.settings;
@@ -8,7 +9,8 @@ export function renderSettings(container, state, onSave) {
     <form id="settings-form" class="form-grid">
       <fieldset>
         <legend>Header &amp; footer</legend>
-        <p class="hint">The logo (assets/logo-text.png + assets/logo-building-icon.png in the app folder, pulled from the workbook) prints at the top of every page. Replace those image files any time to change the logo. Everything else here is plain editable text.</p>
+        <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is — replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
+        <div id="header-photo-cropper"></div>
         <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${esc(s.shulName)}"></label>
         <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${esc(s.headerSubtitle)}"></label>
         <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${esc(s.headerRabbiLine)}</textarea></label>
@@ -45,6 +47,10 @@ export function renderSettings(container, state, onSave) {
       <div class="actions"><button type="submit">Save settings</button></div>
     </form>
   `;
+  renderImageCropper(container.querySelector('#header-photo-cropper'), s.headerIconImage, (headerIconImage) => {
+    onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
+  });
+
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);

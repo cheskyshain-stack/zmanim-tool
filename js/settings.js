@@ -21,6 +21,10 @@ export const DEFAULT_SETTINGS = {
   // headerSubtitle under the logo, headerRabbiLine on the opposite side.
   headerSubtitle: 'ליקוואוד קאמענס',
   headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
+  // Custom header photo (top-left of the printed page), as a cropped data: URL saved
+  // via the image-crop tool in Settings — null means "use the bundled default",
+  // assets/logo-building-icon.png (see sheet-view.js).
+  headerIconImage: null,
   // Printed footer: a note line (as in the workbook — underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
