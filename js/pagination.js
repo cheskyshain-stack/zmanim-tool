@@ -1,4 +1,5 @@
-// Splits a generated week list across 3 printable pages by user-chosen counts.
+// Splits a generated week list across however many printable pages the user chooses
+// (3, 4, or any other count), by user-chosen per-page counts.
 export function validatePageSizes(total, sizes) {
   const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
   if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
@@ -6,12 +7,12 @@ export function validatePageSizes(total, sizes) {
   return null;
 }
 
-/** Even 3-way default split (last page absorbs the remainder), used to pre-fill the
- *  page-size inputs before the user adjusts them. */
-export function defaultPageSizes(total) {
-  const base = Math.floor(total / 3);
-  const rem = total % 3;
-  return [base + (rem > 0 ? 1 : 0), base + (rem > 1 ? 1 : 0), base];
+/** Even default split across `numPages` pages (earlier pages absorb the remainder one
+ *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
+export function defaultPageSizes(total, numPages) {
+  const base = Math.floor(total / numPages);
+  const rem = total % numPages;
+  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
 export function splitWeeksIntoPages(weeks, sizes) {

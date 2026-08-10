@@ -23,7 +23,7 @@ function applyOverrideValue(sheet, serial, col, value) {
 
 export function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
-  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#2a5d8f'; // sheets saved before this control existed
+  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#54595f'; // sheets saved before this control existed
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const settings = resolveSettings(state.settings);
   const isKayitz = sheet.season === 'kayitz';
@@ -158,7 +158,7 @@ export function renderSheet(container, state, sheet, onChange) {
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'David', fontSizePt: 10, headerScale: 1, accentColor: '#2a5d8f' };
+    sheet.style = { fontFamily: 'David', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' };
     commit(); // app.js re-renders the whole sheet view on save
   });
 }

@@ -37,25 +37,41 @@ function renderPreview(el, season, hebrewYear, weeks, state, onGenerate) {
     el.innerHTML = `<p class="hint">No qualifying Shabbosim found for that range — double check the Hebrew year.</p>`;
     return;
   }
-  const defaults = defaultPageSizes(weeks.length);
   el.innerHTML = `
     <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
     <ol class="week-list">${weeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     <form id="page-form" class="form-grid">
       <fieldset>
-        <legend>Split across 3 printable pages (must add up to ${weeks.length})</legend>
-        <label>Page 1 weeks<input type="number" name="p1" min="0" value="${defaults[0]}"></label>
-        <label>Page 2 weeks<input type="number" name="p2" min="0" value="${defaults[1]}"></label>
-        <label>Page 3 weeks<input type="number" name="p3" min="0" value="${defaults[2]}"></label>
+        <legend>How many printable pages?</legend>
+        <label style="max-width:120px">Number of pages<input type="number" id="num-pages" min="1" max="8" value="3"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Weeks per page (must add up to ${weeks.length})</legend>
+        <div id="page-size-inputs"></div>
         <div id="page-error" class="error"></div>
         <div class="actions"><button type="submit">Generate sheet</button></div>
       </fieldset>
     </form>
   `;
+
+  const inputsEl = el.querySelector('#page-size-inputs');
+  const numPagesInput = el.querySelector('#num-pages');
+
+  function renderSizeInputs(numPages) {
+    const defaults = defaultPageSizes(weeks.length, numPages);
+    inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks<input type="number" class="page-size" min="0" value="${size}"></label>`).join('');
+  }
+  renderSizeInputs(3);
+
+  numPagesInput.addEventListener('change', () => {
+    const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
+    numPagesInput.value = n;
+    renderSizeInputs(n);
+  });
+
   el.querySelector('#page-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const sizes = [Number(fd.get('p1')), Number(fd.get('p2')), Number(fd.get('p3'))];
+    const sizes = [...el.querySelectorAll('.page-size')].map((input) => Number(input.value));
     const err = validatePageSizes(weeks.length, sizes);
     const errEl = el.querySelector('#page-error');
     if (err) {
