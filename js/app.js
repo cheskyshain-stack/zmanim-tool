@@ -11,6 +11,22 @@ let tables = null;
 let currentTab = 'generate';
 let currentSheetId = null;
 
+// Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
+// changes its value instead of scrolling the page) — on a long form like Generate, that
+// makes the page feel "stuck" if the cursor happens to be over a number field like Number
+// of pages/Hebrew year when the user tries to scroll back up. Blur the field the moment a
+// wheel event reaches it so the page scrolls normally instead; the field is still fully
+// editable by typing or clicking its up/down arrows.
+document.addEventListener(
+  'wheel',
+  (e) => {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') {
+      document.activeElement.blur();
+    }
+  },
+  { passive: true }
+);
+
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 const tabs = ['generate', 'settings', 'rules', 'saved'];
