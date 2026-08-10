@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) — new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'David', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */

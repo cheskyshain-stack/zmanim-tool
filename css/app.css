@@ -63,7 +63,7 @@ main { padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
 .style-toolbar button { margin-left: auto; background: #eee; border: 1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.7rem; cursor: pointer; }
 
 #pages {
-  --sheet-font-family: "David", "David Libre", "Times New Roman", serif;
+  --sheet-font-family: "Times New Roman", "David", "David Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 1;
 }
@@ -117,7 +117,8 @@ tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, v
 .cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.2; direction: ltr; overflow-wrap: normal; word-break: normal; }
 .cell:focus { background: #fffbe6; }
 td.ruled .cell { background: var(--ruled); }
-td.overridden .cell { background: var(--overridden); }
+/* Manually-edited cells no longer get a persistent background tint — only the brief
+   yellow flash while actively focused (above) shows anything changed. */
 .ul, .cell u { text-decoration: underline; text-underline-offset: 2px; }
 
 .col-width-panel { margin-bottom: 1rem; background: white; border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.9rem; font-size: 0.85rem; }

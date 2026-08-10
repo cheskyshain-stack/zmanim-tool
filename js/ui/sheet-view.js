@@ -42,7 +42,7 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="print-btn">Print</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells are marked ★, manually-overridden cells are marked ✎.</span>
+      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.</span>
     </div>
     <div class="style-toolbar no-print">
       <label>Font
@@ -158,7 +158,7 @@ export function renderSheet(container, state, sheet, onChange) {
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'David', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' };
+    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' };
     commit(); // app.js re-renders the whole sheet view on save
   });
 }
