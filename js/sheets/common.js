@@ -8,14 +8,25 @@ import { flattenNonEmpty, splitLinesInHalf, NBSP, SLASH } from '../util.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
-/** ((DST active AND month<6) OR Hebrew day-of-year<192): the window in which the
- *  Plag-Hamincha-based early minyanim are offered at all. */
+/** DST active AND month<6 — specifically the *spring* DST window (roughly the 2nd
+ *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
+ *  (Sukkos through the 1st Sunday of November), which is also nominally "DST active"
+ *  but must NOT count here: this same test doubles as the switch-point for a שבת חורף
+ *  sheet to widen into שבת קיץ's column layout once the season reaches spring (see
+ *  choref.js) — that widening must only happen once, near the season's end, not at
+ *  Sukkos just because the clock happens to still read DST there too. */
+export function inSpringDstWindow(date, settings) {
+  return Z.dstLocal(date, settings) && date.getUTCMonth() + 1 < 6;
+}
+
+/** (spring DST window) OR (Hebrew day-of-year<192): the window in which the
+ *  Plag-Hamincha-based early minyanim are offered at all. The day-of-year branch
+ *  additionally covers שבת קיץ's own late-season stretch (Elul into Tishrei/Sukkos),
+ *  which has nothing to do with DST. */
 export function inPlagWindow(serial, settings) {
   const d = dateFromSerial(serial);
-  const dst = Z.dstLocal(d, settings);
-  const month = d.getUTCMonth() + 1;
   const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
-  return (dst && month < 6) || doy < 192;
+  return inSpringDstWindow(d, settings) || doy < 192;
 }
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) — identical
