@@ -1,0 +1,40 @@
+// Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
+// CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
+// marks an "alternate" time on the printed sheet by underlining it).
+const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
+
+export function ceilToMinute(dayFraction) {
+  return Math.ceil(dayFraction * 1440 - EPS) / 1440;
+}
+export function floorToMinute(dayFraction) {
+  return Math.floor(dayFraction * 1440 + EPS) / 1440;
+}
+export function roundToMinute(dayFraction) {
+  return Math.round(dayFraction * 1440) / 1440;
+}
+
+/** TEXT(time,"h:mm") — 12-hour clock, no AM/PM, hour 0 displayed as 12. */
+export function formatTime(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')}`;
+}
+
+// Sentinel markers wrapping "this should render underlined" spans (Private Use Area
+// code points, so they can never collide with real content). Kept as plain characters
+// through all the string-building/TEXTJOIN-style formula ports, then converted to real
+// <span class="ul"> elements at render time in ui/sheet-view.js. This keeps this module
+// free of any HTML concerns.
+export const UL_START = '';
+export const UL_END = '';
+
+/** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
+ *  string (both forms appear in the workbook's formulas) and marks it to render
+ *  underlined — the printed sheet's way of flagging an "alternate" time. */
+export function underlineTime(value) {
+  const text = typeof value === 'number' ? formatTime(value) : value;
+  return UL_START + ' ' + text + UL_END;
+}

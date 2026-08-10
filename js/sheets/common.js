@@ -1,0 +1,66 @@
+// Helpers shared between שבת קיץ and שבת חורף — both sheets use the exact same
+// "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
+import { dateFromSerial } from '../zmanim/solar.js';
+import * as Z from '../zmanim/zmanim.js';
+import { hebrewDateExtended } from '../hebrew-calendar.js';
+import { formatTime, underlineTime } from '../format.js';
+import { flattenNonEmpty, splitLinesInHalf, NBSP, SLASH } from '../util.js';
+
+export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
+
+/** ((DST active AND month<6) OR Hebrew day-of-year<192): the window in which the
+ *  Plag-Hamincha-based early minyanim are offered at all. */
+export function inPlagWindow(serial, settings) {
+  const d = dateFromSerial(serial);
+  const dst = Z.dstLocal(d, settings);
+  const month = d.getUTCMonth() + 1;
+  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
+  return (dst && month < 6) || doy < 192;
+}
+
+/** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) — identical
+ *  formula in both sheets. Printed across two lines, split as evenly as possible
+ *  (more options on the second line when the count is odd). */
+export function fridayMainMinchaMenu(fridayDate, settings) {
+  const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
+  const items = flattenNonEmpty([
+    !Z.dstLocal(fridayDate, settings) ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
+    mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
+    underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
+    '1:50',
+    '2:15',
+    '3:00',
+  ]);
+  return splitLinesInHalf(items);
+}
+
+/** Shabbos-day Mincha menu (קיץ column C / חורף column C) — identical formula.
+ *  Also printed across two lines, split the same way. */
+export function shabbosMinchaMenu(shabbosDate, settings) {
+  const sunsetVal = Z.sunset(shabbosDate, settings);
+  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
+  const gates = [T(17, 30), T(18, 0), T(18, 30)];
+  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+  const items = flattenNonEmpty([
+    Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20',
+    kept,
+    formatTime(Math.min(floorMin(sunsetVal - 45 / 1440), T(19, 0))),
+    underlineTime(Math.min(floorMin(sunsetVal - 30 / 1440), T(19, 30))),
+  ]);
+  return splitLinesInHalf(items);
+}
+function floorMin(x) {
+  return Math.floor(x * 1440 + 1e-7) / 1440;
+}
+
+/** Fixed Shacharis line (קיץ column E / חורף column E) — identical, not date-dependent.
+ *  Uses NBSP around the "/" so it can never wrap onto a second line. */
+export function shacharisLine() {
+  return `${underlineTime(T(7, 30))}${SLASH}8:15`;
+}
+
+/** Candle lighting + sunset (קיץ column H / חורף column H) — identical formula. */
+export function candleLightingCell(fridayDate, settings) {
+  const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
+  return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
+}
