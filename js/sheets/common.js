@@ -3,7 +3,7 @@
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
-import { formatTime, underlineTime } from '../format.js';
+import { formatTime, underlineTime, ceilToMinute } from '../format.js';
 import { flattenNonEmpty, splitLinesInHalf, NBSP, SLASH } from '../util.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
@@ -44,8 +44,10 @@ export function shabbosMinchaMenu(shabbosDate, settings) {
   const items = flattenNonEmpty([
     Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20',
     kept,
-    formatTime(Math.min(floorMin(sunsetVal - 45 / 1440), T(19, 0))),
-    underlineTime(Math.min(floorMin(sunsetVal - 30 / 1440), T(19, 30))),
+    // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) —
+    // ceilToMinute matches that.
+    formatTime(Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0))),
+    underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30))),
   ]);
   return splitLinesInHalf(items);
 }
