@@ -1,7 +1,7 @@
 import { resolveSettings } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
-import { inSpringDstWindow } from '../sheets/common.js';
+import { inSpringDstWindow, applyTishaBavNote } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -212,7 +212,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   const rows = pageWeeks
     .map((week) => {
-      const computed = buildRow(week, settings);
+      const computed = applyTishaBavNote(buildRow(week, settings), week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
       // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
@@ -277,7 +277,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const weekSeason = cellEl.dataset.season;
       const week = sheet.weeks.find((w) => w.serial === serial);
       const settingsResolved = resolveSettings(state.settings);
-      const computed = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
+      const computed = applyTishaBavNote(splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved), week, settingsResolved);
       const ruled = applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
       const baselineHtml = nl2br(ruled[col] ?? '');
       const newHtml = normalizeCellHtml(cellEl.innerHTML);

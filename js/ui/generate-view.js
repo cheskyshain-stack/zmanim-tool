@@ -1,32 +1,42 @@
-import { computeSeasonWeeks, splitChorefAtSpringCutover } from '../sheets/weeks.js';
+import { computeSeasonWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
 import { validatePageSizes, defaultPageSizes } from '../pagination.js';
-import { hebrewDateExtended } from '../hebrew-calendar.js';
-import { excelSerial } from '../zmanim/solar.js';
 import { newId } from '../storage.js';
 
 export function renderGenerate(container, state, tables, onGenerate) {
-  const todayHebrewYear = hebrewDateExtended(excelSerial(new Date())).year;
+  const settings = resolveSettings(state.settings);
+  const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   container.innerHTML = `
     <h2>Generate a sheet</h2>
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>
-        <label><input type="radio" name="season" value="kayitz" checked> שבת קיץ (Pesach → Sukkos)</label>
-        <label><input type="radio" name="season" value="choref"> שבת חורף (Sukkos → Pesach)</label>
-        <label>Hebrew year<input type="number" name="hebrewYear" value="${todayHebrewYear}"></label>
+        <label><input type="radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}> שבת קיץ (Pesach → Sukkos)</label>
+        <label><input type="radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}> שבת חורף (Sukkos → Pesach)</label>
+        <label>Hebrew year${stepper('hebrewYear', defaultYear)}</label>
         <div class="actions"><button type="submit">Compute weeks</button></div>
       </fieldset>
     </form>
     <div id="gen-preview"></div>
   `;
+  wireSteppers(container);
+
+  // Switching season re-defaults the year to the soonest occurrence of *that* season
+  // that hasn't already fully elapsed — e.g. picking חורף after its date range for the
+  // current cycle already passed jumps straight to next year's, never a past one.
+  container.querySelectorAll('input[name=season]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const yearInput = container.querySelector('input[name=hebrewYear]');
+      yearInput.value = nextAvailableYearFor(radio.value, settings);
+    });
+  });
 
   container.querySelector('#gen-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const season = fd.get('season');
     const hebrewYear = Number(fd.get('hebrewYear'));
-    const settings = resolveSettings(state.settings);
     const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
     renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, onGenerate);
   });
@@ -58,7 +68,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
     <form id="page-form" class="form-grid">
       <fieldset>
         <legend>How many printable pages?</legend>
-        <label style="max-width:120px">Number of pages<input type="number" id="num-pages" min="1" max="8" value="3"></label>
+        <label style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
       </fieldset>
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
@@ -70,13 +80,15 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   `;
 
   const inputsEl = el.querySelector('#page-size-inputs');
-  const numPagesInput = el.querySelector('#num-pages');
+  const numPagesInput = el.querySelector('input[name=numPages]');
 
   function renderSizeInputs(numPages) {
     const defaults = defaultPageSizes(weeks.length, numPages);
-    inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks<input type="number" class="page-size" min="0" value="${size}"></label>`).join('');
+    inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
+    wireSteppers(inputsEl);
   }
   renderSizeInputs(3);
+  wireSteppers(el);
 
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
@@ -105,6 +117,38 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
     };
     onGenerate(sheet);
+  });
+}
+
+/** A number input paired with clear − / + buttons instead of relying on the browser's
+ *  tiny native spinner (or worse, the scroll wheel). `opts.className` lets callers
+ *  (e.g. the per-page week-count fields) still find the underlying input the same way
+ *  a plain <input class="page-size"> would have been found before. */
+function stepper(name, value, opts = {}) {
+  const { min, max, className = '' } = opts;
+  return `
+    <span class="stepper">
+      <button type="button" class="step-btn step-down" aria-label="Decrease" tabindex="-1">−</button>
+      <input type="number" name="${name}" class="step-input ${className}" value="${value}" ${min !== undefined ? `min="${min}"` : ''} ${max !== undefined ? `max="${max}"` : ''}>
+      <button type="button" class="step-btn step-up" aria-label="Increase" tabindex="-1">+</button>
+    </span>`;
+}
+
+/** Wires every .stepper's −/+ buttons found within `root` to nudge their input by 1
+ *  (clamped to its own min/max, if set) and fire a real 'change' event, so any existing
+ *  listener on the input (e.g. the "Number of pages" handler above) reacts exactly as
+ *  if the number had been typed in directly. */
+function wireSteppers(root) {
+  root.querySelectorAll('.stepper').forEach((wrap) => {
+    const input = wrap.querySelector('.step-input');
+    const min = input.min !== '' ? Number(input.min) : -Infinity;
+    const max = input.max !== '' ? Number(input.max) : Infinity;
+    const nudge = (delta) => {
+      input.value = Math.min(max, Math.max(min, (Number(input.value) || 0) + delta));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    wrap.querySelector('.step-down').addEventListener('click', () => nudge(-1));
+    wrap.querySelector('.step-up').addEventListener('click', () => nudge(1));
   });
 }
 

@@ -78,3 +78,15 @@ export function candleLightingCell(fridayDate, settings) {
   const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
   return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
 }
+
+/** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) — Motzei
+ *  Shabbos's Maariv is really the start of Tisha B'Av. Flags it by appending "ט באב" to
+ *  the Mincha (C) and Motzei-Shabbos Maariv (B) cells, alongside whatever they already
+ *  computed — never replacing that content. Applies automatically to every week, not a
+ *  user-editable rule, since it's a fixed calendar fact rather than a shul preference. */
+export function applyTishaBavNote(row, week, settings) {
+  const jdate = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  if (jdate.month !== 5 || jdate.dayOfMonth !== 9) return row; // month 5 = Av (Nissan=1..Adar=12 numbering)
+  const withNote = (text) => [text, 'ט באב'].filter(Boolean).join('\n');
+  return { ...row, B: withNote(row.B), C: withNote(row.C) };
+}

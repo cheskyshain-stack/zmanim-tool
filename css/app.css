@@ -83,6 +83,20 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
 
 .week-list { columns: 2; column-gap: 2rem; font-size: 0.87rem; color: var(--muted); line-height: 1.7; }
 
+.stepper { display: inline-flex; align-items: stretch; margin-top: 0.3rem; }
+.stepper .step-btn {
+  width: 2.1rem; flex-shrink: 0; border: 1px solid var(--border-strong); background: var(--accent-soft); color: var(--accent-dark);
+  font-size: 1.1rem; font-weight: 700; line-height: 1; cursor: pointer; transition: background 0.15s ease;
+}
+.stepper .step-btn:hover { background: var(--border); }
+.stepper .step-btn:active { background: var(--accent); color: white; }
+.stepper .step-down { border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: none; }
+.stepper .step-up { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
+.stepper .step-input {
+  width: 4.5rem; text-align: center; border-radius: 0; margin-top: 0; -moz-appearance: textfield;
+}
+.stepper .step-input::-webkit-inner-spin-button, .stepper .step-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
 .col-group { margin-bottom: 0.75rem; }
 .col-group-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--accent); }
 .col-check { display: inline-flex; align-items: center; gap: 0.4rem; width: 48%; font-size: 0.85rem; font-weight: 400; margin-bottom: 0.4rem; }
@@ -204,11 +218,11 @@ th {
   font-size: calc(var(--sheet-font-size) + 2pt);
   white-space: pre-line;
   line-height: 1.2;
-  /* Header row cells otherwise end up shorter than the data rows below them (which
-     grow taller from multi-line time lists) — pad the header row so it's at least
-     as tall/prominent as the rest of the chart. */
-  padding-top: 0.14in;
-  padding-bottom: 0.14in;
+  /* min-height (not padding) so the header row is at least as tall as a typical
+     multi-line data row, while still growing naturally for its own longer headers —
+     scales with the header's own font-size instead of adding a fixed physical
+     padding amount regardless of text size. */
+  min-height: 2.6em;
 }
 .parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); }
 tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
