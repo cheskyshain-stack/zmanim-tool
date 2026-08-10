@@ -1,22 +1,21 @@
 import { resolveSettings } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
+import { inSpringDstWindow } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { UL_START, UL_END } from '../format.js';
 
-/** A שבת חורף sheet whose season reaches the spring DST cutover carries its tail
- *  weeks (sheet.springSplitIndex onward) as an actual שבת קיץ chart — not just extra
- *  columns — since the shul really is on the summer schedule by then. This resolves
- *  which "season" a given week INDEX in sheet.weeks should be treated as for every
- *  purpose (columns, row-building formulas, and which sheet-qualified rules apply):
- *  'choref' before the cutover, 'kayitz' from the cutover through Pesach. Sheets saved
- *  before this feature existed have no springSplitIndex, which defaults to "no split".*/
-function effectiveSeasonForIndex(sheet, index) {
+/** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
+ *  week). Whichever page ends up containing at least one week past the spring DST
+ *  cutover (2nd Sunday of March — not the fall one near Sukkos) prints as a real שבת
+ *  קיץ chart for its *entire* page — same columns, same formulas, same rule-matching
+ *  as an actual קיץ sheet — even for any earlier weeks sharing that page, which just
+ *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window). */
+function pageEffectiveSeason(sheet, pageWeeks, settings) {
   if (sheet.season !== 'choref') return sheet.season;
-  const cutover = sheet.springSplitIndex ?? sheet.weeks.length;
-  return index >= cutover ? 'kayitz' : 'choref';
+  return pageWeeks.some((w) => inSpringDstWindow(w.date, settings)) ? 'kayitz' : 'choref';
 }
 function columnsAndBuilderFor(effectiveSeason) {
   return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
@@ -43,19 +42,12 @@ export function renderSheet(container, state, sheet, onChange) {
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const settings = resolveSettings(state.settings);
   const weeks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-  // The core (חורף-layout) weeks are paginated per pageSizes as usual; any tail weeks
-  // past the spring DST cutover become one extra page, forced to hold together as a
-  // single real שבת קיץ chart rather than being split by the core page-size controls.
-  const cutover = sheet.season === 'choref' ? (sheet.springSplitIndex ?? weeks.length) : weeks.length;
-  const coreWeeks = weeks.slice(0, cutover);
-  const springWeeks = weeks.slice(cutover);
-  const corePages = splitWeeksIntoPages(coreWeeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: sheet.season === 'kayitz' ? 'kayitz' : 'choref' }));
-  const pages = springWeeks.length ? [...corePages, { weeks: springWeeks, effectiveSeason: 'kayitz' }] : corePages;
+  const pages = splitWeeksIntoPages(weeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: pageEffectiveSeason(sheet, pageWeeks, settings) }));
+  const anyKayitzPage = pages.some((p) => p.effectiveSeason === 'kayitz');
   const isEnglish = state.settings.language === 'en';
   // Column-width panel covers every column key actually used on any page — CHOREF's
-  // own columns plus (if there's a trailing קיץ page) any קיץ-only keys not already in
-  // that set.
-  const panelColumns = springWeeks.length ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))] : sheet.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
+  // own columns plus (if any page prints as קיץ) any קיץ-only keys not already in it.
+  const panelColumns = sheet.season === 'choref' && anyKayitzPage ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))] : sheet.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
   const colOrder = isEnglish ? [...panelColumns.map((c) => c.key), 'parsha'] : ['parsha', ...rtlOrdered(panelColumns).map((c) => c.key)];
   const colLabel = { parsha: isEnglish ? 'Parsha' : 'פרשה', ...Object.fromEntries(panelColumns.map((c) => [c.key, c.header.replace(/\n/g, ' ')])) };
 
@@ -66,7 +58,9 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="print-btn">Print</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.</span>
+      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.${
+        anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
+      }</span>
     </div>
     <div class="style-toolbar no-print">
       <label>Font
@@ -220,9 +214,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     .map((week) => {
       const computed = buildRow(week, settings);
       const appliedColumns = new Set();
-      // effectiveSeason (not sheet.season) — on a שבת חורף sheet's trailing
-      // spring-cutover page, these weeks are rendered as an actual שבת קיץ chart, so
-      // "kayitz:"-qualified rules should apply to them too, same as a real קיץ sheet.
+      // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
+      // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
+      // as a real קיץ sheet would for these weeks.
       const ruled = applyRules(computed, week, state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
       const cells = orderedColumns
@@ -231,7 +225,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           // Overridden cells already hold real HTML (captured from the editable div,
           // possibly with manual <u> underlining); computed cells still need nl2br().
           const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
-          return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}">${html}</div></td>`;
+          // data-season records which season this *page* rendered as, so a later edit
+          // (see the blur handler below) recomputes its "did this really change?"
+          // baseline the same way, without having to re-derive the page split.
+          return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         })
         .join('');
       const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
@@ -277,9 +274,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     cellEl.addEventListener('blur', () => {
       const serial = Number(cellEl.dataset.serial);
       const col = cellEl.dataset.col;
-      const weekIndex = sheet.weeks.findIndex((w) => w.serial === serial);
-      const week = sheet.weeks[weekIndex];
-      const weekSeason = effectiveSeasonForIndex(sheet, weekIndex);
+      const weekSeason = cellEl.dataset.season;
+      const week = sheet.weeks.find((w) => w.serial === serial);
       const settingsResolved = resolveSettings(state.settings);
       const computed = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
       const ruled = applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);

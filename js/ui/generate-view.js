@@ -39,29 +39,29 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   }
 
   // A שבת חורף season that reaches the spring DST cutover (2nd Sunday of March) needs
-  // its tail end as an actual שבת קיץ chart, not just a couple of extra columns — the
-  // shul davens on the summer schedule from the clock change through Pesach. That
-  // trailing stretch becomes one automatic extra page; the page-count/page-size
-  // controls below only cover the "core winter" weeks before it.
+  // its tail weeks to be an actual שבת קיץ chart, not just plain חורף — the shul really
+  // is on the summer schedule from the clock change through Pesach. You choose the page
+  // split yourself below (covering all the weeks, as usual); at render time, any page
+  // that ends up containing at least one of these weeks prints as a real קיץ chart —
+  // the other, earlier weeks on that same page just show blank Plag columns.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
-  const coreWeeks = weeks.slice(0, springSplitIndex);
-  const springWeeks = weeks.slice(springSplitIndex);
+  const kayitzWeekCount = weeks.length - springSplitIndex;
 
   el.innerHTML = `
     <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
-    <ol class="week-list">${weeks.map((w, i) => `<li>${i === springSplitIndex ? '<strong>— spring DST cutover: rest becomes a שבת קיץ page —</strong></li><li>' : ''}${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+    <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     ${
-      springWeeks.length
-        ? `<p class="hint"><strong>${springWeeks.length} week${springWeeks.length === 1 ? '' : 's'}</strong> from ${springWeeks[0].date.toDateString()} onward are past the spring DST cutover and will automatically print as one extra page using the שבת קיץ chart layout — they're not part of the "weeks per page" split below, which only covers the ${coreWeeks.length} core-winter weeks.</p>`
+      kayitzWeekCount > 0
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${weeks[springSplitIndex].date.toDateString()} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
         : ''
     }
     <form id="page-form" class="form-grid">
       <fieldset>
-        <legend>How many printable pages?${springWeeks.length ? ' (for the core-winter weeks — the שבת קיץ page is automatic and separate)' : ''}</legend>
+        <legend>How many printable pages?</legend>
         <label style="max-width:120px">Number of pages<input type="number" id="num-pages" min="1" max="8" value="3"></label>
       </fieldset>
       <fieldset>
-        <legend>Weeks per page (must add up to ${coreWeeks.length})</legend>
+        <legend>Weeks per page (must add up to ${weeks.length})</legend>
         <div id="page-size-inputs"></div>
         <div id="page-error" class="error"></div>
         <div class="actions"><button type="submit">Generate sheet</button></div>
@@ -73,7 +73,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   const numPagesInput = el.querySelector('#num-pages');
 
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(coreWeeks.length, numPages);
+    const defaults = defaultPageSizes(weeks.length, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks<input type="number" class="page-size" min="0" value="${size}"></label>`).join('');
   }
   renderSizeInputs(3);
@@ -87,7 +87,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   el.querySelector('#page-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const sizes = [...el.querySelectorAll('.page-size')].map((input) => Number(input.value));
-    const err = validatePageSizes(coreWeeks.length, sizes);
+    const err = validatePageSizes(weeks.length, sizes);
     const errEl = el.querySelector('#page-error');
     if (err) {
       errEl.textContent = err;
@@ -100,8 +100,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       hebrewYear,
       createdAt: new Date().toISOString(),
       weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
-      pageSizes: sizes, // covers weeks[0..springSplitIndex) only; see sheet-view.js
-      springSplitIndex, // weeks.length when there's no automatic trailing קיץ page
+      pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
     };
