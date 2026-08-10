@@ -100,11 +100,11 @@ th {
   background: var(--sheet-accent, var(--accent));
   color: white;
   font-weight: 700;
-  font-size: calc(var(--sheet-font-size) - 1pt);
+  font-size: calc(var(--sheet-font-size) + 2pt);
   white-space: pre-line;
-  line-height: 1.15;
+  line-height: 1.2;
 }
-.parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; }
+.parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); }
 tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
 /* Cell content is direction:ltr even inside the RTL table — without this, the Unicode
    bidi algorithm can visually reverse "/"-separated time lists (e.g. "9:03 / 9:15"
