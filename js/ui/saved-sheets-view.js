@@ -8,10 +8,10 @@ export function renderSavedSheets(container, state, onOpen, onDelete) {
         .map(
           (s) => `
         <tr data-id="${s.id}">
-          <td>${s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף'}</td>
-          <td>${s.hebrewYear}</td>
-          <td>${s.weeks.length}</td>
-          <td>${new Date(s.createdAt).toLocaleString()}</td>
+          <td data-label="Sheet">${s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף'}</td>
+          <td data-label="Hebrew year">${s.hebrewYear}</td>
+          <td data-label="Weeks">${s.weeks.length}</td>
+          <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
           <td><button class="open-btn">Open</button> <button class="delete-btn">Delete</button></td>
         </tr>`
         )
