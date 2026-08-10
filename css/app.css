@@ -103,6 +103,11 @@ th {
   font-size: calc(var(--sheet-font-size) + 2pt);
   white-space: pre-line;
   line-height: 1.2;
+  /* Header row cells otherwise end up shorter than the data rows below them (which
+     grow taller from multi-line time lists) — pad the header row so it's at least
+     as tall/prominent as the rest of the chart. */
+  padding-top: 0.14in;
+  padding-bottom: 0.14in;
 }
 .parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); }
 tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
