@@ -13,9 +13,21 @@ export function excelSerial(date) {
   return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
 }
 
-/** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date. */
+/** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date.
+ *  Uses Math.floor (not round): every whole-day serial in this app (shabbos/friday
+ *  Excel-style day numbers) is already an integer, so floor vs. round makes no
+ *  difference there — but the two DST-lookup call sites in this file and zmanim.js
+ *  pass a *fractional* serial (a whole day plus a UTC-time-of-day fraction, e.g. an
+ *  evening sunset's serial + eventUTC ≈ serial + 0.91). Excel's own calcDST_LOCAL/
+ *  calcTIMEZONE formulas extract the calendar day from such a value via YEAR()/DATE()
+ *  arithmetic, which truncates (floors) to the day the moment falls in — rounding
+ *  instead pushes any evening event (fraction > 0.5) into the *next* calendar day for
+ *  DST-lookup purposes. That's harmless almost all year (DST status rarely differs
+ *  between adjacent days) but silently breaks the one week each fall where that
+ *  rounded-up day crosses the real DST cutover a week early (e.g. an Oct 31 sunset
+ *  got misread as Nov 1 — already standard time — undercounting by an hour). */
 export function dateFromSerial(serial) {
-  return new Date(EXCEL_EPOCH_UTC + Math.round(serial) * 86400000);
+  return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
 }
 
 const D2R = Math.PI / 180;
