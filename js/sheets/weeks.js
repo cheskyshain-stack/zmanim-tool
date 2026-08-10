@@ -4,6 +4,7 @@
 // requiring a manually-entered start date or week count.
 import { dateFromHebrew, hasParsha, hasSpecialParsha, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
+import { inSpringDstWindow } from './common.js';
 
 const MAX_WEEKS = 60; // safety cap, well above any real season's length
 
@@ -39,4 +40,16 @@ export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
     guard++;
   }
   return { startSerial, endSerial, weeks };
+}
+
+/** Where a שבת חורף season's weeks cross the *spring* DST cutover (2nd Sunday of
+ *  March — not the fall one near Sukkos at the season's start). From that week on,
+ *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) —
+ *  the shul still davens on a "summer" schedule through Pesach once the clock springs
+ *  forward. Returns the index in `weeks` of the first week on/after the cutover
+ *  (weeks.length if the whole season is still before it — shouldn't happen in
+ *  practice, since Pesach always falls after the 2nd Sunday of March). */
+export function splitChorefAtSpringCutover(weeks, settings) {
+  const idx = weeks.findIndex((w) => inSpringDstWindow(w.date, settings));
+  return idx === -1 ? weeks.length : idx;
 }
