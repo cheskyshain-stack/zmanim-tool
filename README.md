@@ -23,6 +23,26 @@ Then open `http://localhost:8000/`. (Any other static file server works too.)
 To put it online later: upload this folder as-is to GitHub Pages, Netlify, or any
 static host — nothing needs to change.
 
+## Fully offline (USB drive / no internet / no local server)
+
+The `offline/` folder is a self-contained copy that needs **nothing** — no server,
+no internet, not even the `Start.bat` step above. Copy the whole `offline/` folder to
+a USB drive, plug it into any computer, and double-click `offline/index.html`; it opens
+straight in the default browser and works completely offline from then on (all your
+data still saves locally in that browser, same as the regular version).
+
+This works because `offline/bundle.js` has everything — every `.js` file and the
+Hebrew-calendar data tables — bundled into one plain script, instead of the ES modules
+and `fetch()` calls the regular version uses (both of those are blocked when a page is
+opened directly as a file instead of served over a URL).
+
+If you change anything under `js/`, `css/`, `data/`, or `assets/`, regenerate the
+offline copy before recopying it to a USB drive:
+
+```bash
+python build-offline.py
+```
+
 ## How your data is stored
 
 Everything (Settings, generated sheets with their per-cell overrides, and Rules) is
