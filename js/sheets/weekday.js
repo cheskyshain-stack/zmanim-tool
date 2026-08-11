@@ -5,9 +5,12 @@
 // "computed" default), and שחרית is one fixed schedule that's identical every week.
 export function buildWeekdayRow(week, settings) {
   return {
-    B: settings.weekdayDefaultMaariv || '',
-    C: settings.weekdayDefaultMincha || '',
-    E: settings.weekdayShacharis || '',
+    // A blank cell here (before any default is set in Settings) used to look
+    // indistinguishable from "nothing generated" — a placeholder makes clear the chart
+    // did generate and just needs its defaults filled in.
+    B: settings.weekdayDefaultMaariv || '(set default מעריב in Settings)',
+    C: settings.weekdayDefaultMincha || '(set default מנחה in Settings)',
+    E: settings.weekdayShacharis || '(set שחרית schedule in Settings)',
   };
 }
 

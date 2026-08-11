@@ -1066,6 +1066,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        ${
+          !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
+            ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
+            : ''
+        }
         <div id="weekday-page-section" hidden>
           <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
           <div id="weekday-page-size-inputs"></div>
@@ -1827,9 +1832,12 @@ function applyRules(row, week, rules, season, appliedColumns) {
 // "computed" default), and שחרית is one fixed schedule that's identical every week.
 function buildWeekdayRow(week, settings) {
   return {
-    B: settings.weekdayDefaultMaariv || '',
-    C: settings.weekdayDefaultMincha || '',
-    E: settings.weekdayShacharis || '',
+    // A blank cell here (before any default is set in Settings) used to look
+    // indistinguishable from "nothing generated" — a placeholder makes clear the chart
+    // did generate and just needs its defaults filled in.
+    B: settings.weekdayDefaultMaariv || '(set default מעריב in Settings)',
+    C: settings.weekdayDefaultMincha || '(set default מנחה in Settings)',
+    E: settings.weekdayShacharis || '(set שחרית schedule in Settings)',
   };
 }
 

@@ -84,6 +84,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        ${
+          !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
+            ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
+            : ''
+        }
         <div id="weekday-page-section" hidden>
           <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
           <div id="weekday-page-size-inputs"></div>
