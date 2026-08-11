@@ -8,15 +8,23 @@
 <link rel="stylesheet" href="css/print.css" media="print">
 </head>
 <body>
-<header class="app-header no-print">
-  <h1>Zmanim Sheet Generator</h1>
-  <div class="backup-controls">
-    <button id="export-btn">Export backup</button>
-    <label class="file-label">Import backup<input id="import-input" type="file" accept="application/json" hidden></label>
-  </div>
-</header>
-<nav id="nav" class="no-print"></nav>
-<main id="main"></main>
+<div class="app-shell">
+  <aside class="sidebar no-print">
+    <div class="sidebar-brand">
+      <img class="sidebar-mark" src="assets/logo-building-icon.png" alt="">
+      <span class="sidebar-title">Zmanim<small>Sheet Generator</small></span>
+    </div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">
+      <div class="backup-controls">
+        <button id="export-btn">Export backup</button>
+        <label class="file-label">Import backup<input id="import-input" type="file" accept="application/json" hidden></label>
+      </div>
+      <span class="sidebar-site">lczmanim.cjaffa.com</span>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
 <script src="bundle.js"></script>
 </body>
 </html>

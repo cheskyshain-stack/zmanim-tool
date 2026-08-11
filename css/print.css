@@ -5,6 +5,9 @@
 @media print {
   .no-print { display: none !important; }
   html, body { background: white; }
+  /* The sidebar is .no-print, so the shell has nothing left to lay out beside main —
+     collapse the flex row so main can't inherit a stray flex width. */
+  .app-shell { display: block; min-height: 0; }
   main { padding: 0; max-width: none; margin: 0; }
   #pages { margin: 0; }
   .page {

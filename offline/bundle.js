@@ -2681,7 +2681,10 @@ function renderNav() {
 
 function render() {
   renderNav();
-  nav.style.display = currentSheetId ? 'none' : '';
+  // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
+  // with the sheet's own toolbar). In the sidebar it just stays put — a persistent
+  // sidebar with its links blanked out reads as broken. Clicking one does exactly what
+  // the sheet's Back button does, and a pending cell edit still commits on blur first.
   if (currentSheetId) {
     const sheet = state.sheets.find((s) => s.id === currentSheetId);
     renderSheet(main, state, sheet, (evt) => {
