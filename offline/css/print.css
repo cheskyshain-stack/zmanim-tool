@@ -19,4 +19,8 @@
   }
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
+  /* Weekday chart's מנחה/מעריב dropdowns should print as plain text, not as form
+     controls — no hover tint (there's no cursor on paper) and no native arrow/box even
+     on engines that don't fully honor appearance:none on screen. */
+  .weekday-select, .weekday-other-input { background: none; appearance: none; -webkit-appearance: none; }
 }

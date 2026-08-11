@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis:
-    '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+    '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,

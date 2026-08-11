@@ -59,6 +59,9 @@ function render() {
       } else if (evt.save) {
         persist();
         render(); // re-render so the ✎ overridden-cell flag appears immediately
+      } else if (evt.openSheetId) {
+        currentSheetId = evt.openSheetId; // e.g. the Weekday chart <-> Shabbos sheet companion link
+        render();
       }
     });
     return;

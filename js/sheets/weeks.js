@@ -47,6 +47,27 @@ export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   return { startSerial, endSerial, weeks };
 }
 
+function isCholHamoedAnchor(day, settings, specialDaysTable) {
+  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(hasYomTov(day, settings, specialDaysTable));
+}
+
+function anyRegularDay(fromSerial, toSerial, settings, specialDaysTable) {
+  for (let day = fromSerial; day <= toSerial; day++) {
+    if (!isYomTovOrCholHamoed(day, settings, specialDaysTable)) return true;
+  }
+  return false;
+}
+
+/** "Chol Hamoed Pesach" / "חול המועד סוכות" / "Hoshana Rabbah" -> the plain holiday
+ *  name ("Pesach" / "סוכות" / "סוכות") — see the Chol Hamoed row below, which reuses
+ *  whatever this Shabbos's own hasYomTov() name is but without the "Chol Hamoed"/
+ *  "Hoshana Rabbah" framing, since the row is standing in for the holiday as a whole. */
+function holidayNameFor(day, settings, specialDaysTable) {
+  const name = hasYomTov(day, settings, specialDaysTable);
+  if (/^(Hoshana Rabbah|הושענה רבה)$/.test(name)) return /[֐-׿]/.test(name) ? 'סוכות' : 'Succos';
+  return name.replace(/^(Chol Hamoed |חול המועד )/, '');
+}
+
 /** Week list for a Weekday chart covering the same season date range as
  *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
  *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
@@ -56,38 +77,67 @@ export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
  *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
  *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
  *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
- *  "ראש השנה") when there's no regular parsha to label the row with. */
+ *  "ראש השנה") when there's no regular parsha to label the row with.
+ *
+ *  Season boundaries (Pesach/Sukkos) essentially never line up with the fixed 7-day
+ *  Saturday spacing this loop walks in, which leaves a "leftover" stretch of up to 6
+ *  regular days between the last Saturday-anchored week and the boundary itself (e.g.
+ *  the days between שבת הגדול and ליל פסח) — see the trailing-gap check after the main
+ *  loop, which folds that stretch onto *this* (the outgoing/earlier) season as one more
+ *  row, per "a week that falls between two charts belongs on the earlier one".
+ *
+ *  A Saturday that lands ON Chol Hamoed/Hoshana Rabbah (e.g. Shabbos Chol Hamoed Pesach)
+ *  is excluded from becoming its own row in the *incoming* season's own loop above (its
+ *  backward window would otherwise mix genuine pre-Yom-Tov regular days, already
+ *  claimed by the outgoing chart's trailing row, together with actual Chol Hamoed days)
+ *  — but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
+ *  the *outgoing* chart as one more row, labeled with the holiday's plain name (Pesach's
+ *  own Chol Hamoed row lands on the חורף chart; Sukkos's on the קיץ chart). */
 export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   const startSerial = seasonStartSerial(season, hebrewYear);
   const endSerial = seasonEndSerial(season, hebrewYear);
 
   let d = Math.ceil(startSerial);
   while (excelWeekday(d) !== 7) d++;
-  // If the season's own start boundary (Pesach/Sukkos) happens to land exactly on
-  // Shabbos, that Shabbos's backward-attached weekdays (its 6 days *before* it — see
-  // below) are still within the *outgoing* season, not this one: computeWeekdayWeeks
-  // for the outgoing season already picks it up as its own last row (its endSerial is
-  // the same date). Without this, both seasons' Weekday charts would independently
-  // print an identical row for it.
-  if (d === startSerial) d += 7;
 
   const weeks = [];
   let guard = 0;
   while (d <= endSerial && guard < MAX_WEEKS) {
-    let hasRegularDay = false;
-    for (let day = d - 6; day <= d - 1; day++) {
-      if (!isYomTovOrCholHamoed(day, settings, tables.specialDays)) {
-        hasRegularDay = true;
-        break;
-      }
-    }
-    if (hasRegularDay) {
+    // d === startSerial: the season's own start boundary landed exactly on Shabbos
+    // (e.g. Sukkos falling on a Saturday) — its backward-attached weekdays are still
+    // within the *outgoing* season's territory, already covered by its own trailing-gap
+    // row below. Without this, both seasons would independently print an identical row.
+    const isOwnStartBoundary = d === startSerial;
+    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 1, settings, tables.specialDays)) {
       const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
       weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
     }
     d += 7;
     guard++;
   }
+
+  // Trailing gap: the regular days (if any) between the last Saturday-anchored week
+  // above and the season's own end boundary — see the function comment. Anchored at
+  // endSerial itself (not a real Shabbos, just a stand-in date/key for this row) and
+  // labeled with whatever Yom Tov starts there, same fallback as any other
+  // Yom-Tov-only row above. When the boundary itself was exactly Shabbos, the main loop
+  // already picked it up directly and this gap comes out empty — no double-counting.
+  const gapStart = d - 7 + 1;
+  const gapEnd = endSerial - 1;
+  if (gapStart <= gapEnd && anyRegularDay(gapStart, gapEnd, settings, tables.specialDays)) {
+    const parsha = hasParsha(endSerial, settings, tables) || hasYomTov(endSerial, settings, tables.specialDays);
+    weeks.push({ serial: endSerial, date: dateFromSerial(endSerial), parsha, specialParsha: hasSpecialParsha(endSerial, settings) });
+  }
+
+  // `d` is now the first Saturday *after* the boundary (Saturdays fall on the same
+  // fixed 7-day cadence no matter which season's math found them, so this is exactly
+  // the same date the incoming season's own loop would land on as its own first
+  // candidate) — see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
+  // there becomes a row here instead of there.
+  if (isCholHamoedAnchor(d, settings, tables.specialDays)) {
+    weeks.push({ serial: d, date: dateFromSerial(d), parsha: holidayNameFor(d, settings, tables.specialDays), specialParsha: '' });
+  }
+
   return { startSerial, endSerial, weeks };
 }
 

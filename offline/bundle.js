@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis:
-    '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+    '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,
@@ -909,6 +909,27 @@ function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   return { startSerial, endSerial, weeks };
 }
 
+function isCholHamoedAnchor(day, settings, specialDaysTable) {
+  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(hasYomTov(day, settings, specialDaysTable));
+}
+
+function anyRegularDay(fromSerial, toSerial, settings, specialDaysTable) {
+  for (let day = fromSerial; day <= toSerial; day++) {
+    if (!isYomTovOrCholHamoed(day, settings, specialDaysTable)) return true;
+  }
+  return false;
+}
+
+/** "Chol Hamoed Pesach" / "חול המועד סוכות" / "Hoshana Rabbah" -> the plain holiday
+ *  name ("Pesach" / "סוכות" / "סוכות") — see the Chol Hamoed row below, which reuses
+ *  whatever this Shabbos's own hasYomTov() name is but without the "Chol Hamoed"/
+ *  "Hoshana Rabbah" framing, since the row is standing in for the holiday as a whole. */
+function holidayNameFor(day, settings, specialDaysTable) {
+  const name = hasYomTov(day, settings, specialDaysTable);
+  if (/^(Hoshana Rabbah|הושענה רבה)$/.test(name)) return /[֐-׿]/.test(name) ? 'סוכות' : 'Succos';
+  return name.replace(/^(Chol Hamoed |חול המועד )/, '');
+}
+
 /** Week list for a Weekday chart covering the same season date range as
  *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
  *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
@@ -918,38 +939,67 @@ function computeSeasonWeeks(season, hebrewYear, settings, tables) {
  *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
  *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
  *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
- *  "ראש השנה") when there's no regular parsha to label the row with. */
+ *  "ראש השנה") when there's no regular parsha to label the row with.
+ *
+ *  Season boundaries (Pesach/Sukkos) essentially never line up with the fixed 7-day
+ *  Saturday spacing this loop walks in, which leaves a "leftover" stretch of up to 6
+ *  regular days between the last Saturday-anchored week and the boundary itself (e.g.
+ *  the days between שבת הגדול and ליל פסח) — see the trailing-gap check after the main
+ *  loop, which folds that stretch onto *this* (the outgoing/earlier) season as one more
+ *  row, per "a week that falls between two charts belongs on the earlier one".
+ *
+ *  A Saturday that lands ON Chol Hamoed/Hoshana Rabbah (e.g. Shabbos Chol Hamoed Pesach)
+ *  is excluded from becoming its own row in the *incoming* season's own loop above (its
+ *  backward window would otherwise mix genuine pre-Yom-Tov regular days, already
+ *  claimed by the outgoing chart's trailing row, together with actual Chol Hamoed days)
+ *  — but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
+ *  the *outgoing* chart as one more row, labeled with the holiday's plain name (Pesach's
+ *  own Chol Hamoed row lands on the חורף chart; Sukkos's on the קיץ chart). */
 function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   const startSerial = seasonStartSerial(season, hebrewYear);
   const endSerial = seasonEndSerial(season, hebrewYear);
 
   let d = Math.ceil(startSerial);
   while (excelWeekday(d) !== 7) d++;
-  // If the season's own start boundary (Pesach/Sukkos) happens to land exactly on
-  // Shabbos, that Shabbos's backward-attached weekdays (its 6 days *before* it — see
-  // below) are still within the *outgoing* season, not this one: computeWeekdayWeeks
-  // for the outgoing season already picks it up as its own last row (its endSerial is
-  // the same date). Without this, both seasons' Weekday charts would independently
-  // print an identical row for it.
-  if (d === startSerial) d += 7;
 
   const weeks = [];
   let guard = 0;
   while (d <= endSerial && guard < MAX_WEEKS) {
-    let hasRegularDay = false;
-    for (let day = d - 6; day <= d - 1; day++) {
-      if (!isYomTovOrCholHamoed(day, settings, tables.specialDays)) {
-        hasRegularDay = true;
-        break;
-      }
-    }
-    if (hasRegularDay) {
+    // d === startSerial: the season's own start boundary landed exactly on Shabbos
+    // (e.g. Sukkos falling on a Saturday) — its backward-attached weekdays are still
+    // within the *outgoing* season's territory, already covered by its own trailing-gap
+    // row below. Without this, both seasons would independently print an identical row.
+    const isOwnStartBoundary = d === startSerial;
+    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 1, settings, tables.specialDays)) {
       const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
       weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
     }
     d += 7;
     guard++;
   }
+
+  // Trailing gap: the regular days (if any) between the last Saturday-anchored week
+  // above and the season's own end boundary — see the function comment. Anchored at
+  // endSerial itself (not a real Shabbos, just a stand-in date/key for this row) and
+  // labeled with whatever Yom Tov starts there, same fallback as any other
+  // Yom-Tov-only row above. When the boundary itself was exactly Shabbos, the main loop
+  // already picked it up directly and this gap comes out empty — no double-counting.
+  const gapStart = d - 7 + 1;
+  const gapEnd = endSerial - 1;
+  if (gapStart <= gapEnd && anyRegularDay(gapStart, gapEnd, settings, tables.specialDays)) {
+    const parsha = hasParsha(endSerial, settings, tables) || hasYomTov(endSerial, settings, tables.specialDays);
+    weeks.push({ serial: endSerial, date: dateFromSerial(endSerial), parsha, specialParsha: hasSpecialParsha(endSerial, settings) });
+  }
+
+  // `d` is now the first Saturday *after* the boundary (Saturdays fall on the same
+  // fixed 7-day cadence no matter which season's math found them, so this is exactly
+  // the same date the incoming season's own loop would land on as its own first
+  // candidate) — see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
+  // there becomes a row here instead of there.
+  if (isCholHamoedAnchor(d, settings, tables.specialDays)) {
+    weeks.push({ serial: d, date: dateFromSerial(d), parsha: holidayNameFor(d, settings, tables.specialDays), specialParsha: '' });
+  }
+
   return { startSerial, endSerial, weeks };
 }
 
@@ -1961,6 +2011,17 @@ function renderSheet(container, state, sheet, onChange) {
   const colOrder = isEnglish ? [...panelColumns.map((c) => c.key), 'parsha'] : ['parsha', ...rtlOrdered(panelColumns).map((c) => c.key)];
   const colLabel = { parsha: isEnglish ? 'Parsha' : 'פרשה', ...Object.fromEntries(panelColumns.map((c) => [c.key, c.header.replace(/\n/g, ' ')])) };
 
+  // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
+  // the Shabbos sheet it was generated alongside) — generating both saves both, but only
+  // one can be open at a time, so this link is how you actually get to see the other one
+  // right after generating instead of having to dig it up from Saved Sheets.
+  const companion =
+    sheet.season === 'weekday'
+      ? state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : state.sheets
+          .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
   const hist = getHistory(sheet.id);
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
@@ -1968,6 +2029,7 @@ function renderSheet(container, state, sheet, onChange) {
       <button id="print-btn">Print</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
+      ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
       <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
@@ -2007,6 +2069,7 @@ function renderSheet(container, state, sheet, onChange) {
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
   container.querySelector('#undo-btn').addEventListener('click', () => {
     const action = hist.undo.pop();
     if (!action) return;
@@ -2097,6 +2160,38 @@ function applyStyle(pagesEl, style) {
   pagesEl.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   pagesEl.style.setProperty('--sheet-header-scale', style.headerScale);
   pagesEl.style.setProperty('--sheet-accent', style.accentColor);
+  syncHeaderRowHeight(pagesEl);
+}
+
+/** Makes every row in a table — header included — exactly the same height.
+ *
+ *  Left alone, the header always comes out shorter: the table stretches to fill the page
+ *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
+ *  height in proportion to each row's *natural* content height, which for the header is
+ *  a single short line. Simply pinning the header to a measured data-row height doesn't
+ *  settle it either — the total is fixed, so growing the header shrinks the data rows it
+ *  was just matched against.
+ *
+ *  So instead of measuring one against the other, this splits the table's total height
+ *  evenly across all its rows, which is stable in one pass. The floor guards the case
+ *  where there are enough rows that an even share would be tighter than the content
+ *  actually needs — better to overflow the even split than to clip real text. Re-run on
+ *  every applyStyle(), since the font/size controls invalidate the measurements. */
+function syncHeaderRowHeight(pagesEl) {
+  pagesEl.querySelectorAll('table').forEach((table) => {
+    const headRow = table.querySelector('thead tr');
+    const bodyRows = [...table.querySelectorAll('tbody tr')];
+    if (!headRow || !bodyRows.length) return;
+    const allRows = [headRow, ...bodyRows];
+    allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
+    // Deliberately the plain even share with no minimum applied on top: `height` on a
+    // <tr> acts as a floor the browser already raises for any row whose own content
+    // needs more, so a row that genuinely runs two lines still gets its space. Taking a
+    // max() against the tallest row here instead would apply that one row's height to
+    // every row, pushing the table past the 8.5in page.
+    const target = table.getBoundingClientRect().height / allRows.length;
+    allRows.forEach((r) => (r.style.height = target + 'px'));
+  });
 }
 
 // Right-to-left reading order after the parsha column: the workbook's own B..L/B..I
@@ -2154,19 +2249,24 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
         // מנחה/מעריב on the Weekday chart: a dropdown of Settings-configured options
-        // (plus a free-text "Other…" escape hatch) instead of a freeform editable cell —
-        // see the .weekday-select/.weekday-other-input wiring below.
+        // (plus a free-text "Type your own…" escape hatch) instead of a freeform
+        // editable cell — see the .weekday-select/.weekday-other-input wiring below.
+        // A non-preset value gets injected as its own real (selected) option instead of
+        // showing a generic "Other…" label next to it, so the closed dropdown always
+        // reads as plain text — no different-looking from any other cell — until clicked.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           const options = c.key === 'B' ? maarivOptions : minchaOptions;
           const current = String(row[c.key] ?? '').replace(/<[^>]+>/g, ''); // strip any HTML from pre-dropdown-era overrides
           const matchesPreset = options.includes(current);
+          const customOptionHtml = !matchesPreset && current ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
           const optsHtml = options.map((opt) => `<option value="${esc(opt)}" ${opt === current ? 'selected' : ''}>${esc(opt)}</option>`).join('');
           return `<td>
             <select class="weekday-select" data-serial="${week.serial}" data-col="${c.key}">
+              ${customOptionHtml}
               ${optsHtml}
-              <option value="__other__" ${!matchesPreset ? 'selected' : ''}>✎ Other…</option>
+              <option value="__other__">✎ Type your own…</option>
             </select>
-            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" ${matchesPreset ? 'hidden' : ''}>
+            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" hidden>
           </td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -2353,6 +2453,9 @@ function render() {
       } else if (evt.save) {
         persist();
         render(); // re-render so the ✎ overridden-cell flag appears immediately
+      } else if (evt.openSheetId) {
+        currentSheetId = evt.openSheetId; // e.g. the Weekday chart <-> Shabbos sheet companion link
+        render();
       }
     });
     return;
