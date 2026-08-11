@@ -3,7 +3,7 @@
 const __TABLE_parshaChutz = {"headers": ["23P", "25P", "34P", "54P", "55P", "73P", "75P", "23M", "25M", "34M", "53M", "55M", "73M", "75M"], "rows": [[52, 52, 52, 53, 53, " ", " ", 52, 52, 52, 53, 53, " ", " "], [53, 53, 53, " ", " ", 53, 53, 53, 53, 53, " ", " ", 53, 53], [" ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "], [1, 1, 1, 1, 1, " ", " ", 1, 1, 1, 1, 1, " ", " "], [2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 1, 1], [3, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 3, 2, 2], [4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3], [5, 5, 5, 5, 5, 4, 4, 5, 5, 5, 5, 5, 4, 4], [6, 6, 6, 6, 6, 5, 5, 6, 6, 6, 6, 6, 5, 5], [7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 6, 6], [8, 8, 8, 8, 8, 7, 7, 8, 8, 8, 8, 8, 7, 7], [9, 9, 9, 9, 9, 8, 8, 9, 9, 9, 9, 9, 8, 8], [10, 10, 10, 10, 10, 9, 9, 10, 10, 10, 10, 10, 9, 9], [11, 11, 11, 11, 11, 10, 10, 11, 11, 11, 11, 11, 10, 10], [12, 12, 12, 12, 12, 11, 11, 12, 12, 12, 12, 12, 11, 11], [13, 13, 13, 13, 13, 12, 12, 13, 13, 13, 13, 13, 12, 12], [14, 14, 14, 14, 14, 13, 13, 14, 14, 14, 14, 14, 13, 13], [15, 15, 15, 15, 15, 14, 14, 15, 15, 15, 15, 15, 14, 14], [16, 16, 16, 16, 16, 15, 15, 16, 16, 16, 16, 16, 15, 15], [17, 17, 17, 17, 17, 16, 16, 17, 17, 17, 17, 17, 16, 16], [18, 18, 18, 18, 18, 17, 17, 18, 18, 18, 18, 18, 17, 17], [19, 19, 19, 19, 19, 18, 18, 19, 19, 19, 19, 19, 18, 18], [20, 20, 20, 20, 20, 19, 19, 20, 20, 20, 20, 20, 19, 19], [21, 21, 21, 21, 21, 20, 20, 21, 21, 21, 21, 21, 20, 20], [54, 54, 54, 54, 22, 21, 21, 22, 22, 22, 22, 22, 21, 21], [24, 24, 24, 24, 23, 54, 54, 23, 23, 23, 23, 23, 22, 22], [25, 25, 25, 25, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23], [" ", " ", " ", " ", 25, 25, 25, 25, 25, 25, 25, 25, 24, 24], [26, 26, 26, " ", " ", " ", " ", 26, 26, 26, 26, 26, 25, 25], [55, 55, 55, 26, 26, 26, 26, 27, 27, 27, 27, 27, 26, 26], [56, 56, 56, 55, 55, 55, 55, 28, 28, 28, 28, 28, 27, 27], [31, 31, 31, 56, 56, 56, 56, " ", " ", " ", 29, 29, 28, 28], [57, 57, 57, 31, 31, 31, 31, 29, " ", " ", " ", " ", " ", " "], [34, 34, 34, 57, 57, 57, 57, 30, 29, 29, 30, 30, 29, 29], [35, " ", " ", 34, 34, 34, 34, 31, 30, 30, 31, 31, 30, 30], [36, 35, 35, 35, 35, 35, 35, 32, 31, 31, 32, 32, 31, 31], [37, 36, 36, 36, 36, 36, 36, 33, 32, 32, 33, 33, 32, 32], [38, 37, 37, 37, 37, 37, 37, 34, 33, 33, 34, 34, 33, 33], [39, 38, 38, 38, 38, 38, 38, " ", 34, 34, 35, 35, 34, 34], [40, 58, 58, 39, 39, 39, 39, 35, 35, 35, 36, 36, 35, " "], [41, 41, 41, 40, 40, 40, 40, 36, 36, 36, 37, 37, 36, 35], [59, 59, 59, 41, 41, 41, 41, 37, 37, 37, 38, 38, 37, 36], [44, 44, 44, 59, 59, 59, 59, 38, 38, 38, 39, 39, 38, 37], [45, 45, 45, 44, 44, 44, 44, 58, 39, 39, 40, 40, 39, 38], [46, 46, 46, 45, 45, 45, 45, 41, 40, 40, 41, 41, 40, 58], [47, 47, 47, 46, 46, 46, 46, 59, 41, 41, 42, 42, 41, 41], [48, 48, 48, 47, 47, 47, 47, 44, 59, 59, 43, 43, 59, 59], [49, 49, 49, 48, 48, 48, 48, 45, 44, 44, 44, 44, 44, 44], [50, 50, 50, 49, 49, 49, 49, 46, 45, 45, 45, 45, 45, 45], [60, 60, 60, 50, 50, 50, 50, 47, 46, 46, 46, 46, 46, 46], [" ", " ", " ", 51, 51, 51, 60, 48, 47, 47, 47, 47, 47, 47], [" ", " ", " ", " ", " ", " ", " ", 49, 48, 48, 48, 48, 48, 48], [" ", " ", " ", " ", " ", " ", " ", 50, 49, 49, 49, 49, 49, 49], [" ", " ", " ", " ", " ", " ", " ", 60, 50, 50, 50, 50, 50, 50], [" ", " ", " ", " ", " ", " ", " ", " ", 51, 51, 51, 60, 60, 60]]};
 const __TABLE_parshaEY = {"headers": ["23P", "25P", "34P", "54P", "55P", "73P", "75P", "23M", "25M", "34M", "53M", "55M", "73M", "75M"], "rows": [[52, 52, 52, 53, 53, " ", " ", 52, 52, 52, 53, 53, " ", " "], [53, 53, 53, " ", " ", 53, 53, 53, 53, 53, " ", " ", 53, 53], [" ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "], [1, 1, 1, 1, 1, " ", " ", 1, 1, 1, 1, 1, " ", " "], [2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 1, 1], [3, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 3, 2, 2], [4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3], [5, 5, 5, 5, 5, 4, 4, 5, 5, 5, 5, 5, 4, 4], [6, 6, 6, 6, 6, 5, 5, 6, 6, 6, 6, 6, 5, 5], [7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 6, 6], [8, 8, 8, 8, 8, 7, 7, 8, 8, 8, 8, 8, 7, 7], [9, 9, 9, 9, 9, 8, 8, 9, 9, 9, 9, 9, 8, 8], [10, 10, 10, 10, 10, 9, 9, 10, 10, 10, 10, 10, 9, 9], [11, 11, 11, 11, 11, 10, 10, 11, 11, 11, 11, 11, 10, 10], [12, 12, 12, 12, 12, 11, 11, 12, 12, 12, 12, 12, 11, 11], [13, 13, 13, 13, 13, 12, 12, 13, 13, 13, 13, 13, 12, 12], [14, 14, 14, 14, 14, 13, 13, 14, 14, 14, 14, 14, 13, 13], [15, 15, 15, 15, 15, 14, 14, 15, 15, 15, 15, 15, 14, 14], [16, 16, 16, 16, 16, 15, 15, 16, 16, 16, 16, 16, 15, 15], [17, 17, 17, 17, 17, 16, 16, 17, 17, 17, 17, 17, 16, 16], [18, 18, 18, 18, 18, 17, 17, 18, 18, 18, 18, 18, 17, 17], [19, 19, 19, 19, 19, 18, 18, 19, 19, 19, 19, 19, 18, 18], [20, 20, 20, 20, 20, 19, 19, 20, 20, 20, 20, 20, 19, 19], [21, 21, 21, 21, 21, 20, 20, 21, 21, 21, 21, 21, 20, 20], [54, 54, 54, 54, 22, 21, 21, 22, 22, 22, 22, 22, 21, 21], [24, 24, 24, 24, 23, 54, 54, 23, 23, 23, 23, 23, 22, 22], [25, 25, 25, 25, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23], [" ", " ", " ", " ", 25, 25, 25, 25, 25, 25, 25, 25, 24, 24], [26, 26, 26, 26, " ", " ", " ", 26, 26, 26, 26, 26, 25, 25], [55, 55, 55, 55, 26, 26, 26, 27, 27, 27, 27, 27, 26, 26], [56, 56, 56, 56, 55, 55, 55, 28, 28, 28, 28, 28, 27, 27], [31, 31, 31, 31, 56, 56, 56, " ", " ", " ", 29, 29, 28, 28], [57, 57, 57, 32, 31, 31, 31, 29, 29, 29, " ", " ", " ", " "], [34, 34, 34, 33, 57, 57, 57, 30, 30, 30, 30, 30, 29, 29], [35, 35, 35, 34, 34, 34, 34, 31, 31, 31, 31, 31, 30, 30], [36, 36, 36, 35, 35, 35, 35, 32, 32, 32, 32, 32, 31, 31], [37, 37, 37, 36, 36, 36, 36, 33, 33, 33, 33, 33, 32, 32], [38, 38, 38, 37, 37, 37, 37, 34, 34, 34, 34, 34, 33, 33], [39, 39, 39, 38, 38, 38, 38, 35, 35, 35, 35, 35, 34, 34], [40, 40, 40, 39, 39, 39, 39, 36, 36, 36, 36, 36, 35, 35], [41, 41, 41, 40, 40, 40, 40, 37, 37, 37, 37, 37, 36, 36], [59, 59, 59, 41, 41, 41, 41, 38, 38, 38, 38, 38, 37, 37], [44, 44, 44, 59, 59, 59, 59, 39, 39, 39, 39, 39, 38, 38], [45, 45, 45, 44, 44, 44, 44, 40, 40, 40, 40, 40, 39, 39], [46, 46, 46, 45, 45, 45, 45, 41, 41, 41, 41, 41, 40, 40], [47, 47, 47, 46, 46, 46, 46, 59, 42, 42, 42, 42, 41, 41], [48, 48, 48, 47, 47, 47, 47, 44, 43, 43, 43, 43, 59, 59], [49, 49, 49, 48, 48, 48, 48, 45, 44, 44, 44, 44, 44, 44], [50, 50, 50, 49, 49, 49, 49, 46, 45, 45, 45, 45, 45, 45], [60, 60, 60, 50, 50, 50, 50, 47, 46, 46, 46, 46, 46, 46], [" ", " ", " ", 51, 51, 51, 60, 48, 47, 47, 47, 47, 47, 47], [" ", " ", " ", " ", " ", " ", " ", 49, 48, 48, 48, 48, 48, 48], [" ", " ", " ", " ", " ", " ", " ", 50, 49, 49, 49, 49, 49, 49], [" ", " ", " ", " ", " ", " ", " ", 60, 50, 50, 50, 50, 50, 50], [" ", " ", " ", " ", " ", " ", " ", " ", 51, 51, 51, 60, 60, 60]]};
 const __TABLE_parshaNames = {"headers": ["עברית", "ENGLISH"], "rows": [["בראשית", "Bereshis"], ["נח", "Noach"], ["לך לך", "Lech Lecha"], ["וירא", "Vayera"], ["חיי שרה", "Chayei Sara"], ["תולדות", "Toldos"], ["ויצא", "Vayetzei"], ["וישלח", "Vayishlach"], ["וישב", "Vayeshev"], ["מקץ", "Miketz"], ["ויגש", "Vayigash"], ["ויחי", "Vayechi"], ["שמות", "Shemos"], ["וארא", "Vaera"], ["בא", "Bo"], ["בשלח", "Beshalach"], ["יתרו", "Yisro"], ["משפטים", "Mishpatim"], ["תרומה", "Terumah"], ["תצוה", "Tetzaveh"], ["כי תשא", "Ki Sisa"], ["ויקהל", "Vayakhel"], ["פקודי", "Pekudei"], ["ויקרא", "Vayikra"], ["צו", "Tzav"], ["שמיני", "Shmini"], ["תזריע", "Tazria"], ["מצורע", "Metzora"], ["אחרי מות", "Achrei Mos"], ["קדושים", "Kedoshim"], ["אמור", "Emor"], ["בהר", "Behar"], ["בחוקותי", "Bechukosai"], ["במדבר", "Bamidbar"], ["נשא", "Nasso"], ["בהעלותך", "Beha'aloscha"], ["שלח", "Sh'lach"], ["קרח", "Korach"], ["חקת", "Chukas"], ["בלק", "Balak"], ["פינחס", "Pinchas"], ["מטות", "Matos"], ["מסעי", "Masei"], ["דברים", "Devarim"], ["ואתחנן", "Vaeschanan"], ["עקב", "Eikev"], ["ראה", "Re'eh"], ["שופטים", "Shoftim"], ["כי תצא", "Ki Seitzei"], ["כי תבא", "Ki Savo"], ["נצבים", "Nitzavim"], ["וילך", "Vayeilech"], ["האזינו", "Ha'azinu"], ["ויקהל - פקודי", "Vayakhel Pekudei"], ["תזריע - מצורע", "Tazria Metzora"], ["אחרי מות - קדושים", "Achrei Mos Kedoshim"], ["בהר - בחוקתי", "Behar Bechukosai"], ["חקת - בלק", "Chukas Balak"], ["מטות - מסעי", "Matos Masei"], ["נצבים - וילך", "Nitzavim Vayeilech"]]};
-const __TABLE_specialDays = {"headers": ["DAY OF YEAR", "REGULAR", "LEAP", "ISRAEL REGULAR", "ISRAEL LEAP", "פשוטה", "מעוברת", "פשוטה בישראל", "מעוברת בישראל"], "rows": [[15, "Pesach", "Pesach", "Pesach", "Pesach", "פסח", "פסח", "פסח", "פסח"], [16, "Pesach", "Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "פסח", "פסח", "חול המועד פסח", "חול המועד פסח"], [17, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [18, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [19, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [20, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [21, "Pesach", "Pesach", "Pesach", "Pesach", "פסח", "פסח", "פסח", "פסח"], [22, "Pesach", "Pesach", null, null, "פסח", "פסח", null, null], [44, "Pesach Sheni", "Pesach Sheni", "Pesach Sheni", "Pesach Sheni", "פסח שני", "פסח שני", "פסח שני", "פסח שני"], [48, "Lag B'Omer", "Lag B'Omer", "Lag B'Omer", "Lag B'Omer", "לג בעומר", "לג בעומר", "לג בעומר", "לג בעומר"], [65, "Shavuos", "Shavuos", "Shavuos", "Shavuos", "שבועות", "שבועות", "שבועות", "שבועות"], [66, "Shavuos", "Shavuos", null, null, "שבועות", "שבועות", null, null], [133, "Tu B'Av", "Tu B'Av", "Tu B'Av", "Tu B'Av", "ט״ו באב", "ט״ו באב", "ט״ו באב", "ט״ו באב"], [178, "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "ראש השנה", "ראש השנה", "ראש השנה", "ראש השנה"], [179, "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "ראש השנה", "ראש השנה", "ראש השנה", "ראש השנה"], [187, "Yom Kippur", "Yom Kippur", "Yom Kippur", "Yom Kippur", "יום כפור", "יום כפור", "יום כפור", "יום כפור"], [192, "Succos", "Succos", "Succos", "Succos", "סכות", "סכות", "סכות", "סכות"], [193, "Succos", "Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "סכות", "סכות", "חול המועד סכות", "חול המועד סכות"], [194, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות"], [195, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות"], [196, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות"], [197, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות", "חול המועד סכות"], [198, "Hoshana Rabbah", "Hoshana Rabbah", "Hoshana Rabbah", "Hoshana Rabbah", "הושענה רבה", "הושענה רבה", "הושענה רבה", "הושענה רבה"], [199, "Shemini Atzeres", "Shemini Atzeres", "Simchas Torah", "Simchas Torah", "שמיני עצרת", "שמיני עצרת", "שמחת תורה", "שמחת תורה"], [200, "Simchas Torah", "Simchas Torah", null, null, "שמחת תורה", "שמחת תורה", null, null], [261, "Chanukah 1", "Chanukah 1", "Chanukah 1", "Chanukah 1", "א׳ חנוכה", "א׳ חנוכה", "א׳ חנוכה", "א׳ חנוכה"], [262, "Chanukah 2", "Chanukah 2", "Chanukah 2", "Chanukah 2", "ב׳ חנוכה", "ב׳ חנוכה", "ב׳ חנוכה", "ב׳ חנוכה"], [263, "Chanukah 3", "Chanukah 3", "Chanukah 3", "Chanukah 3", "ג׳ חנוכה", "ג׳ חנוכה", "ג׳ חנוכה", "ג׳ חנוכה"], [264, "Chanukah 4", "Chanukah 4", "Chanukah 4", "Chanukah 4", "ד׳ חנוכה", "ד׳ חנוכה", "ד׳ חנוכה", "ד׳ חנוכה"], [265, "Chanukah 5", "Chanukah 5", "Chanukah 5", "Chanukah 5", "ה׳ חנוכה", "ה׳ חנוכה", "ה׳ חנוכה", "ה׳ חנוכה"], [266, "Chanukah 6", "Chanukah 6", "Chanukah 6", "Chanukah 6", "ו׳ חנוכה", "ו׳ חנוכה", "ו׳ חנוכה", "ו׳ חנוכה"], [267, "Chanukah 7", "Chanukah 7", "Chanukah 7", "Chanukah 7", "ז׳ חנוכה", "ז׳ חנוכה", "ז׳ חנוכה", "ז׳ חנוכה"], [268, "Chanukah 8", "Chanukah 8", "Chanukah 8", "Chanukah 8", "ח׳ חנוכה", "ח׳ חנוכה", "ח׳ חנוכה", "ח׳ חנוכה"], [310, "Tu B'Shvat", "Tu B'Shvat", "Tu B'Shvat", "Tu B'Shvat", "ט״ו בשבט", "ט״ו בשבט", "ט״ו בשבט", "ט״ו בשבט"], [339, "Purim", "Purim Katan", "Purim", "Purim Katan", "פורים", "פורים קטן", "פורים", "פורים קטן"], [340, "Shushan Purim", "Shushan Purim Katan", "Shushan Purim", "Shushan Purim Katan", "שושן פורים", "שושן פורים קטן", "שושן פורים", "שושן פורים קטן"], [369, null, "Purim", null, "Purim", null, "פורים", null, "פורים"], [370, null, "Shushan Purim", null, "Shushan Purim", null, "שושן פורים", null, "שושן פורים"]]};
+const __TABLE_specialDays = {"headers": ["DAY OF YEAR", "REGULAR", "LEAP", "ISRAEL REGULAR", "ISRAEL LEAP", "פשוטה", "מעוברת", "פשוטה בישראל", "מעוברת בישראל"], "rows": [[15, "Pesach", "Pesach", "Pesach", "Pesach", "פסח", "פסח", "פסח", "פסח"], [16, "Pesach", "Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "פסח", "פסח", "חול המועד פסח", "חול המועד פסח"], [17, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [18, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [19, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [20, "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "Chol Hamoed Pesach", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח", "חול המועד פסח"], [21, "Pesach", "Pesach", "Pesach", "Pesach", "פסח", "פסח", "פסח", "פסח"], [22, "Pesach", "Pesach", null, null, "פסח", "פסח", null, null], [44, "Pesach Sheni", "Pesach Sheni", "Pesach Sheni", "Pesach Sheni", "פסח שני", "פסח שני", "פסח שני", "פסח שני"], [48, "Lag B'Omer", "Lag B'Omer", "Lag B'Omer", "Lag B'Omer", "לג בעומר", "לג בעומר", "לג בעומר", "לג בעומר"], [65, "Shavuos", "Shavuos", "Shavuos", "Shavuos", "שבועות", "שבועות", "שבועות", "שבועות"], [66, "Shavuos", "Shavuos", null, null, "שבועות", "שבועות", null, null], [133, "Tu B'Av", "Tu B'Av", "Tu B'Av", "Tu B'Av", "ט״ו באב", "ט״ו באב", "ט״ו באב", "ט״ו באב"], [178, "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "ראש השנה", "ראש השנה", "ראש השנה", "ראש השנה"], [179, "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "Rosh Hashana", "ראש השנה", "ראש השנה", "ראש השנה", "ראש השנה"], [187, "Yom Kippur", "Yom Kippur", "Yom Kippur", "Yom Kippur", "יום כפור", "יום כפור", "יום כפור", "יום כפור"], [192, "Succos", "Succos", "Succos", "Succos", "סוכות", "סוכות", "סוכות", "סוכות"], [193, "Succos", "Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "סוכות", "סוכות", "חול המועד סוכות", "חול המועד סוכות"], [194, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות"], [195, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות"], [196, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות"], [197, "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "Chol Hamoed Succos", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות", "חול המועד סוכות"], [198, "Hoshana Rabbah", "Hoshana Rabbah", "Hoshana Rabbah", "Hoshana Rabbah", "הושענה רבה", "הושענה רבה", "הושענה רבה", "הושענה רבה"], [199, "Shemini Atzeres", "Shemini Atzeres", "Simchas Torah", "Simchas Torah", "שמיני עצרת", "שמיני עצרת", "שמחת תורה", "שמחת תורה"], [200, "Simchas Torah", "Simchas Torah", null, null, "שמחת תורה", "שמחת תורה", null, null], [261, "Chanukah 1", "Chanukah 1", "Chanukah 1", "Chanukah 1", "א׳ חנוכה", "א׳ חנוכה", "א׳ חנוכה", "א׳ חנוכה"], [262, "Chanukah 2", "Chanukah 2", "Chanukah 2", "Chanukah 2", "ב׳ חנוכה", "ב׳ חנוכה", "ב׳ חנוכה", "ב׳ חנוכה"], [263, "Chanukah 3", "Chanukah 3", "Chanukah 3", "Chanukah 3", "ג׳ חנוכה", "ג׳ חנוכה", "ג׳ חנוכה", "ג׳ חנוכה"], [264, "Chanukah 4", "Chanukah 4", "Chanukah 4", "Chanukah 4", "ד׳ חנוכה", "ד׳ חנוכה", "ד׳ חנוכה", "ד׳ חנוכה"], [265, "Chanukah 5", "Chanukah 5", "Chanukah 5", "Chanukah 5", "ה׳ חנוכה", "ה׳ חנוכה", "ה׳ חנוכה", "ה׳ חנוכה"], [266, "Chanukah 6", "Chanukah 6", "Chanukah 6", "Chanukah 6", "ו׳ חנוכה", "ו׳ חנוכה", "ו׳ חנוכה", "ו׳ חנוכה"], [267, "Chanukah 7", "Chanukah 7", "Chanukah 7", "Chanukah 7", "ז׳ חנוכה", "ז׳ חנוכה", "ז׳ חנוכה", "ז׳ חנוכה"], [268, "Chanukah 8", "Chanukah 8", "Chanukah 8", "Chanukah 8", "ח׳ חנוכה", "ח׳ חנוכה", "ח׳ חנוכה", "ח׳ חנוכה"], [310, "Tu B'Shvat", "Tu B'Shvat", "Tu B'Shvat", "Tu B'Shvat", "ט״ו בשבט", "ט״ו בשבט", "ט״ו בשבט", "ט״ו בשבט"], [339, "Purim", "Purim Katan", "Purim", "Purim Katan", "פורים", "פורים קטן", "פורים", "פורים קטן"], [340, "Shushan Purim", "Shushan Purim Katan", "Shushan Purim", "Shushan Purim Katan", "שושן פורים", "שושן פורים קטן", "שושן פורים", "שושן פורים קטן"], [369, null, "Purim", null, "Purim", null, "פורים", null, "פורים"], [370, null, "Shushan Purim", null, "Shushan Purim", null, "שושן פורים", null, "שושן פורים"]]};
 let cached = null;
 async function loadTables() {
   if (cached) return cached;
@@ -43,13 +43,16 @@ const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  // Weekday chart defaults — Mincha/Maariv are plain editable text per week (these
-  // values just pre-fill every week's cell when a Weekday chart is generated;
-  // individual weeks are then adjusted the same way any Shabbos-sheet cell is).
-  // Shacharis is one fixed schedule printed identically on every week's row.
+  // Weekday chart defaults — Mincha/Maariv are each a list of dropdown options (one per
+  // line) offered on every week's cell when a Weekday chart is generated; individual
+  // weeks are then adjusted by picking a different option (or "Other…" for a one-off
+  // value). Shacharis is one fixed schedule printed identically on every week's row —
+  // stored as real HTML (not plain text) since it's edited via a rich-text box in
+  // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
-  weekdayShacharis: '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
+  weekdayShacharis:
+    '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,
@@ -605,6 +608,18 @@ function underlineTime(value) {
   return UL_START + ' ' + text + UL_END;
 }
 
+/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
+ *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
+ *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
+ *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+ *  &nbsp; to a plain space. */
+function normalizeRichText(html) {
+  return html
+    .replace(/(<br\s*\/?>)+\s*$/i, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
 // ==== util.js ====
 // Small Excel-semantics helpers shared by the sheet column ports.
 
@@ -910,6 +925,13 @@ function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
 
   let d = Math.ceil(startSerial);
   while (excelWeekday(d) !== 7) d++;
+  // If the season's own start boundary (Pesach/Sukkos) happens to land exactly on
+  // Shabbos, that Shabbos's backward-attached weekdays (its 6 days *before* it — see
+  // below) are still within the *outgoing* season, not this one: computeWeekdayWeeks
+  // for the outgoing season already picks it up as its own last row (its endSerial is
+  // the same date). Without this, both seasons' Weekday charts would independently
+  // print an identical row for it.
+  if (d === startSerial) d += 7;
 
   const weeks = [];
   let guard = 0;
@@ -1045,11 +1067,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
-    <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
+    <p><strong>${weeks.length} weeks</strong> found (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)}).</p>
     <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     ${
       kayitzWeekCount > 0
-        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${weeks[springSplitIndex].date.toDateString()} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
         : ''
     }
     <form id="page-form" class="form-grid">
@@ -1066,6 +1088,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${
           !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
             ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
@@ -1195,6 +1218,14 @@ function wireSteppers(root) {
     wrap.querySelector('.step-down').addEventListener('click', () => nudge(-1));
     wrap.querySelector('.step-up').addEventListener('click', () => nudge(1));
   });
+}
+
+// dateFromSerial (zmanim/solar.js) returns a UTC-midnight Date; formatting it with
+// .toDateString() would run it through the *local* timezone instead, which for any
+// timezone behind UTC (e.g. US Eastern) rolls the displayed calendar day back by one.
+// This keeps the "weeks found" summary matching the actual dates in the list below.
+function fmtDate(date) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
 
 function esc(str) {
@@ -1653,10 +1684,13 @@ function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart are plain editable text, not computed — these values just pre-fill every week's cell when you generate one; adjust individual weeks afterward the same way you'd edit any Shabbos-sheet cell. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <label>Default מנחה text (pre-fills every week)<textarea name="weekdayDefaultMincha" rows="2">${esc(s.weekdayDefaultMincha)}</textarea></label>
-        <label>Default מעריב text (pre-fills every week)<textarea name="weekdayDefaultMaariv" rows="2">${esc(s.weekdayDefaultMaariv)}</textarea></label>
-        <label>שחרית schedule (same every week)<textarea name="weekdayShacharis" rows="5">${esc(s.weekdayShacharis)}</textarea></label>
+        <p class="hint">מנחה and מעריב on the Weekday chart are each a dropdown on every week's cell, not computed — list one option per line below (the first line is what a fresh week starts on); picking "Other…" on the sheet itself lets you type a one-off value for just that week. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <label>Default מנחה options (one per line)<textarea name="weekdayDefaultMincha" rows="4">${esc(s.weekdayDefaultMincha)}</textarea></label>
+        <label>Default מעריב options (one per line)<textarea name="weekdayDefaultMaariv" rows="4">${esc(s.weekdayDefaultMaariv)}</textarea></label>
+        <label>שחרית schedule (same every week)
+          <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
+        </label>
+        <p class="hint">Click into the שחרית box above to edit it — select text + Ctrl/Cmd+U to underline or un-underline, same as on a printed sheet.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </fieldset>
       <fieldset>
@@ -1693,6 +1727,14 @@ function renderSettings(container, state, onSave) {
     onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
   });
 
+  const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
+  shacharisEditor.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+      e.preventDefault();
+      document.execCommand('underline');
+    }
+  });
+
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -1705,7 +1747,7 @@ function renderSettings(container, state, onSave) {
       footerAddress: fd.get('footerAddress'),
       weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
       weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
-      weekdayShacharis: fd.get('weekdayShacharis'),
+      weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
@@ -1826,18 +1868,36 @@ function applyRules(row, week, rules, season, appliedColumns) {
 
 // ==== sheets/weekday.js ====
 // Weekday Zmanim chart — unlike שבת קיץ/חורף, nothing here is computed from
-// sunrise/sunset: מנחה and מעריב are plain editable text per week (pre-filled from a
-// shul-wide default set in Settings, then adjusted per week the same way any Shabbos
-// sheet cell is — click to edit, which stores a per-cell override on top of this
-// "computed" default), and שחרית is one fixed schedule that's identical every week.
+// sunrise/sunset: מנחה and מעריב are chosen per week from a shul-wide list of options
+// set in Settings (rendered as a dropdown on the sheet, with a free-text "Other" escape
+// hatch), and שחרית is one fixed schedule that's identical every week, sourced directly
+// from Settings at render time (see sheet-view.js) rather than through this row builder.
+
+/** Settings.weekdayDefaultMincha/weekdayDefaultMaariv are one dropdown option per line
+ *  — blank lines ignored. The first option is the default a fresh (unedited) week's
+ *  cell starts on. */
+function weekdayMinchaOptions(settings) {
+  return String(settings.weekdayDefaultMincha || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+function weekdayMaarivOptions(settings) {
+  return String(settings.weekdayDefaultMaariv || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function buildWeekdayRow(week, settings) {
+  const minchaOptions = weekdayMinchaOptions(settings);
+  const maarivOptions = weekdayMaarivOptions(settings);
   return {
-    // A blank cell here (before any default is set in Settings) used to look
+    // A blank cell here (before any option is set in Settings) used to look
     // indistinguishable from "nothing generated" — a placeholder makes clear the chart
-    // did generate and just needs its defaults filled in.
-    B: settings.weekdayDefaultMaariv || '(set default מעריב in Settings)',
-    C: settings.weekdayDefaultMincha || '(set default מנחה in Settings)',
-    E: settings.weekdayShacharis || '(set שחרית schedule in Settings)',
+    // did generate and just needs its options filled in.
+    B: maarivOptions[0] || '(set default מעריב in Settings)',
+    C: minchaOptions[0] || '(set default מנחה in Settings)',
   };
 }
 
@@ -2068,6 +2128,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
   const isWeekday = effectiveSeason === 'weekday';
+  const minchaOptions = isWeekday ? weekdayMinchaOptions(settings) : [];
+  const maarivOptions = isWeekday ? weekdayMaarivOptions(settings) : [];
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -2084,8 +2146,28 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const cellHtml = (c) => {
         // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
         // first row (browsers naturally leave that column slot filled on later rows).
+        // Stored as real HTML straight from Settings' rich-text editor (see
+        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
         if (isWeekday && c.key === 'E') {
-          return rowIndex === 0 ? `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${nl2br(esc(state.settings.weekdayShacharis))}</td>` : '';
+          if (rowIndex !== 0) return '';
+          const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
+          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
+        }
+        // מנחה/מעריב on the Weekday chart: a dropdown of Settings-configured options
+        // (plus a free-text "Other…" escape hatch) instead of a freeform editable cell —
+        // see the .weekday-select/.weekday-other-input wiring below.
+        if (isWeekday && (c.key === 'B' || c.key === 'C')) {
+          const options = c.key === 'B' ? maarivOptions : minchaOptions;
+          const current = String(row[c.key] ?? '').replace(/<[^>]+>/g, ''); // strip any HTML from pre-dropdown-era overrides
+          const matchesPreset = options.includes(current);
+          const optsHtml = options.map((opt) => `<option value="${esc(opt)}" ${opt === current ? 'selected' : ''}>${esc(opt)}</option>`).join('');
+          return `<td>
+            <select class="weekday-select" data-serial="${week.serial}" data-col="${c.key}">
+              ${optsHtml}
+              <option value="__other__" ${!matchesPreset ? 'selected' : ''}>✎ Other…</option>
+            </select>
+            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" ${matchesPreset ? 'hidden' : ''}>
+          </td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -2115,7 +2197,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         <div class="header-rabbi">${nl2br(esc(state.settings.headerRabbiLine))}</div>
       </div>
     </div>
-    <table dir="${dir}">
+    <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
       ${colgroup}
       <thead><tr>${theadRow}</tr></thead>
       <tbody>${rows}</tbody>
@@ -2147,7 +2229,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
       const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
       const baselineHtml = nl2br(ruled[col] ?? '');
-      const newHtml = normalizeCellHtml(cellEl.innerHTML);
+      const newHtml = normalizeRichText(cellEl.innerHTML);
       const before = getOverride(sheet, serial, col); // undefined = "no override"
       const after = newHtml === baselineHtml ? undefined : newHtml;
       if (before === after) return; // no real change (e.g. just clicked in and out)
@@ -2159,22 +2241,45 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     });
   });
 
+  // Weekday chart's מנחה/מעריב dropdowns (see cellHtml above): picking a preset commits
+  // immediately; picking "Other…" reveals the paired text input instead and commits
+  // whatever's typed there on blur.
+  page.querySelectorAll('.weekday-select').forEach((selectEl) => {
+    const serial = Number(selectEl.dataset.serial);
+    const col = selectEl.dataset.col;
+    const otherInput = page.querySelector(`.weekday-other-input[data-serial="${serial}"][data-col="${col}"]`);
+    const commit = (value) => {
+      const week = sheet.weeks.find((w) => w.serial === serial);
+      const settingsResolved = resolveSettings(state.settings);
+      const baseline = buildWeekdayRow({ ...week, date: new Date(week.date) }, settingsResolved)[col] ?? '';
+      const before = getOverride(sheet, serial, col);
+      const after = value === baseline ? undefined : value;
+      if (before === after) return;
+      applyOverrideValue(sheet, serial, col, after);
+      const hist = getHistory(sheet.id);
+      hist.undo.push({ serial, col, before, after });
+      hist.redo = [];
+      onChange({ save: true });
+    };
+    selectEl.addEventListener('change', () => {
+      if (selectEl.value === '__other__') {
+        otherInput.hidden = false;
+        otherInput.focus();
+        otherInput.select();
+        return;
+      }
+      otherInput.hidden = true;
+      commit(selectEl.value);
+    });
+    otherInput?.addEventListener('blur', () => commit(otherInput.value));
+  });
+
   return page;
 }
 
 function splitBuild(season) {
   if (season === 'weekday') return buildWeekdayRow;
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
-}
-
-// Light contenteditable HTML cleanup so a trivial click-in/click-out doesn't register
-// as a change: trims a trailing <br> (left behind by pressing Enter at the end) and
-// normalizes &nbsp; to a plain space.
-function normalizeCellHtml(html) {
-  return html
-    .replace(/(<br\s*\/?>)+\s*$/i, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <span class="ul">

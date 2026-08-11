@@ -63,11 +63,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
-    <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
+    <p><strong>${weeks.length} weeks</strong> found (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)}).</p>
     <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     ${
       kayitzWeekCount > 0
-        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${weeks[springSplitIndex].date.toDateString()} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
         : ''
     }
     <form id="page-form" class="form-grid">
@@ -84,6 +84,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${
           !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
             ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
@@ -213,6 +214,14 @@ function wireSteppers(root) {
     wrap.querySelector('.step-down').addEventListener('click', () => nudge(-1));
     wrap.querySelector('.step-up').addEventListener('click', () => nudge(1));
   });
+}
+
+// dateFromSerial (zmanim/solar.js) returns a UTC-midnight Date; formatting it with
+// .toDateString() would run it through the *local* timezone instead, which for any
+// timezone behind UTC (e.g. US Eastern) rolls the displayed calendar day back by one.
+// This keeps the "weeks found" summary matching the actual dates in the list below.
+function fmtDate(date) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
 
 function esc(str) {

@@ -63,6 +63,13 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
 
   let d = Math.ceil(startSerial);
   while (excelWeekday(d) !== 7) d++;
+  // If the season's own start boundary (Pesach/Sukkos) happens to land exactly on
+  // Shabbos, that Shabbos's backward-attached weekdays (its 6 days *before* it — see
+  // below) are still within the *outgoing* season, not this one: computeWeekdayWeeks
+  // for the outgoing season already picks it up as its own last row (its endSerial is
+  // the same date). Without this, both seasons' Weekday charts would independently
+  // print an identical row for it.
+  if (d === startSerial) d += 7;
 
   const weeks = [];
   let guard = 0;

@@ -38,3 +38,15 @@ export function underlineTime(value) {
   const text = typeof value === 'number' ? formatTime(value) : value;
   return UL_START + ' ' + text + UL_END;
 }
+
+/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
+ *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
+ *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
+ *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+ *  &nbsp; to a plain space. */
+export function normalizeRichText(html) {
+  return html
+    .replace(/(<br\s*\/?>)+\s*$/i, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}

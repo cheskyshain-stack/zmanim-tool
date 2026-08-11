@@ -1,12 +1,12 @@
 import { resolveSettings } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
-import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
+import { buildWeekdayRow, WEEKDAY_COLUMNS, weekdayMinchaOptions, weekdayMaarivOptions } from '../sheets/weekday.js';
 import { inSpringDstWindow, applyTishaBavNote } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
-import { UL_START, UL_END } from '../format.js';
+import { UL_START, UL_END, normalizeRichText } from '../format.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -228,6 +228,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
   const isWeekday = effectiveSeason === 'weekday';
+  const minchaOptions = isWeekday ? weekdayMinchaOptions(settings) : [];
+  const maarivOptions = isWeekday ? weekdayMaarivOptions(settings) : [];
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -244,8 +246,28 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const cellHtml = (c) => {
         // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
         // first row (browsers naturally leave that column slot filled on later rows).
+        // Stored as real HTML straight from Settings' rich-text editor (see
+        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
         if (isWeekday && c.key === 'E') {
-          return rowIndex === 0 ? `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${nl2br(esc(state.settings.weekdayShacharis))}</td>` : '';
+          if (rowIndex !== 0) return '';
+          const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
+          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
+        }
+        // מנחה/מעריב on the Weekday chart: a dropdown of Settings-configured options
+        // (plus a free-text "Other…" escape hatch) instead of a freeform editable cell —
+        // see the .weekday-select/.weekday-other-input wiring below.
+        if (isWeekday && (c.key === 'B' || c.key === 'C')) {
+          const options = c.key === 'B' ? maarivOptions : minchaOptions;
+          const current = String(row[c.key] ?? '').replace(/<[^>]+>/g, ''); // strip any HTML from pre-dropdown-era overrides
+          const matchesPreset = options.includes(current);
+          const optsHtml = options.map((opt) => `<option value="${esc(opt)}" ${opt === current ? 'selected' : ''}>${esc(opt)}</option>`).join('');
+          return `<td>
+            <select class="weekday-select" data-serial="${week.serial}" data-col="${c.key}">
+              ${optsHtml}
+              <option value="__other__" ${!matchesPreset ? 'selected' : ''}>✎ Other…</option>
+            </select>
+            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" ${matchesPreset ? 'hidden' : ''}>
+          </td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -275,7 +297,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         <div class="header-rabbi">${nl2br(esc(state.settings.headerRabbiLine))}</div>
       </div>
     </div>
-    <table dir="${dir}">
+    <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
       ${colgroup}
       <thead><tr>${theadRow}</tr></thead>
       <tbody>${rows}</tbody>
@@ -307,7 +329,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
       const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
       const baselineHtml = nl2br(ruled[col] ?? '');
-      const newHtml = normalizeCellHtml(cellEl.innerHTML);
+      const newHtml = normalizeRichText(cellEl.innerHTML);
       const before = getOverride(sheet, serial, col); // undefined = "no override"
       const after = newHtml === baselineHtml ? undefined : newHtml;
       if (before === after) return; // no real change (e.g. just clicked in and out)
@@ -319,22 +341,45 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     });
   });
 
+  // Weekday chart's מנחה/מעריב dropdowns (see cellHtml above): picking a preset commits
+  // immediately; picking "Other…" reveals the paired text input instead and commits
+  // whatever's typed there on blur.
+  page.querySelectorAll('.weekday-select').forEach((selectEl) => {
+    const serial = Number(selectEl.dataset.serial);
+    const col = selectEl.dataset.col;
+    const otherInput = page.querySelector(`.weekday-other-input[data-serial="${serial}"][data-col="${col}"]`);
+    const commit = (value) => {
+      const week = sheet.weeks.find((w) => w.serial === serial);
+      const settingsResolved = resolveSettings(state.settings);
+      const baseline = buildWeekdayRow({ ...week, date: new Date(week.date) }, settingsResolved)[col] ?? '';
+      const before = getOverride(sheet, serial, col);
+      const after = value === baseline ? undefined : value;
+      if (before === after) return;
+      applyOverrideValue(sheet, serial, col, after);
+      const hist = getHistory(sheet.id);
+      hist.undo.push({ serial, col, before, after });
+      hist.redo = [];
+      onChange({ save: true });
+    };
+    selectEl.addEventListener('change', () => {
+      if (selectEl.value === '__other__') {
+        otherInput.hidden = false;
+        otherInput.focus();
+        otherInput.select();
+        return;
+      }
+      otherInput.hidden = true;
+      commit(selectEl.value);
+    });
+    otherInput?.addEventListener('blur', () => commit(otherInput.value));
+  });
+
   return page;
 }
 
 function splitBuild(season) {
   if (season === 'weekday') return buildWeekdayRow;
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
-}
-
-// Light contenteditable HTML cleanup so a trivial click-in/click-out doesn't register
-// as a change: trims a trailing <br> (left behind by pressing Enter at the end) and
-// normalizes &nbsp; to a plain space.
-function normalizeCellHtml(html) {
-  return html
-    .replace(/(<br\s*\/?>)+\s*$/i, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <span class="ul">

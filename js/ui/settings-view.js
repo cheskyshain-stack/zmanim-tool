@@ -1,5 +1,6 @@
 import { TIMEZONES } from '../settings.js';
 import { renderImageCropper } from './image-crop.js';
+import { normalizeRichText } from '../format.js';
 
 export function renderSettings(container, state, onSave) {
   const s = state.settings;
@@ -19,10 +20,13 @@ export function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart are plain editable text, not computed — these values just pre-fill every week's cell when you generate one; adjust individual weeks afterward the same way you'd edit any Shabbos-sheet cell. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <label>Default מנחה text (pre-fills every week)<textarea name="weekdayDefaultMincha" rows="2">${esc(s.weekdayDefaultMincha)}</textarea></label>
-        <label>Default מעריב text (pre-fills every week)<textarea name="weekdayDefaultMaariv" rows="2">${esc(s.weekdayDefaultMaariv)}</textarea></label>
-        <label>שחרית schedule (same every week)<textarea name="weekdayShacharis" rows="5">${esc(s.weekdayShacharis)}</textarea></label>
+        <p class="hint">מנחה and מעריב on the Weekday chart are each a dropdown on every week's cell, not computed — list one option per line below (the first line is what a fresh week starts on); picking "Other…" on the sheet itself lets you type a one-off value for just that week. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <label>Default מנחה options (one per line)<textarea name="weekdayDefaultMincha" rows="4">${esc(s.weekdayDefaultMincha)}</textarea></label>
+        <label>Default מעריב options (one per line)<textarea name="weekdayDefaultMaariv" rows="4">${esc(s.weekdayDefaultMaariv)}</textarea></label>
+        <label>שחרית schedule (same every week)
+          <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
+        </label>
+        <p class="hint">Click into the שחרית box above to edit it — select text + Ctrl/Cmd+U to underline or un-underline, same as on a printed sheet.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </fieldset>
       <fieldset>
@@ -59,6 +63,14 @@ export function renderSettings(container, state, onSave) {
     onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
   });
 
+  const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
+  shacharisEditor.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+      e.preventDefault();
+      document.execCommand('underline');
+    }
+  });
+
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -71,7 +83,7 @@ export function renderSettings(container, state, onSave) {
       footerAddress: fd.get('footerAddress'),
       weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
       weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
-      weekdayShacharis: fd.get('weekdayShacharis'),
+      weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
