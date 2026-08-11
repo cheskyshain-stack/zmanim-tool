@@ -21,6 +21,7 @@ How it works:
 
 Re-run this any time the js/ source changes to refresh offline/.
 """
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -127,6 +128,31 @@ def build_data_loader_replacement():
     return "\n".join(lines)
 
 
+def stamp_css_versions():
+    """Rewrite index.html's stylesheet links to css/x.css?v=<hash of that file>.
+
+    GitHub Pages serves everything with a 10-minute max-age, so after a deploy the
+    browser keeps showing the previous stylesheet until it expires — a design change
+    looks like it simply didn't ship. The hash changes only when the CSS does, so the
+    new URL is fetched immediately while an unchanged file stays cached.
+
+    Only the CSS is stamped. The JS is ES modules that import each other by bare
+    relative path, so versioning the entry alone wouldn't reach them, and rewriting
+    every import is more machinery than this is worth — JS changes ride along with the
+    10-minute expiry.
+    """
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+
+    def stamp(match):
+        name = match.group(1)
+        digest = hashlib.md5((ROOT / "css" / name).read_bytes()).hexdigest()[:8]
+        return f'href="css/{name}?v={digest}"'
+
+    stamped = re.sub(r'href="css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
+    if stamped != html:
+        (ROOT / "index.html").write_text(stamped, encoding="utf-8", newline="\n")
+
+
 def main():
     files = all_js_files()
     texts, deps = build_dep_graph(files)
@@ -152,6 +178,8 @@ def main():
 
     OUT_DIR.mkdir(exist_ok=True)
     (OUT_DIR / "bundle.js").write_text(bundle, encoding="utf-8")
+
+    stamp_css_versions()
 
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     html = html.replace('<script type="module" src="js/app.js"></script>', '<script src="bundle.js"></script>')
