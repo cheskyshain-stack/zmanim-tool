@@ -12,8 +12,18 @@ export function renderGenerate(container, state, tables, onGenerate) {
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>
-        <label><input type="radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}> שבת קיץ (Pesach → Sukkos)</label>
-        <label><input type="radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}> שבת חורף (Sukkos → Pesach)</label>
+        <div class="season-picker">
+          <input type="radio" id="season-kayitz" class="season-radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}>
+          <label class="season-option" for="season-kayitz">
+            <span class="season-name">שבת קיץ</span>
+            <span class="season-range">Pesach → Sukkos</span>
+          </label>
+          <input type="radio" id="season-choref" class="season-radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}>
+          <label class="season-option" for="season-choref">
+            <span class="season-name">שבת חורף</span>
+            <span class="season-range">Sukkos → Pesach</span>
+          </label>
+        </div>
         <label>Hebrew year${stepper('hebrewYear', defaultYear)}</label>
         <div class="actions"><button type="submit">Compute weeks</button></div>
       </fieldset>
@@ -22,11 +32,23 @@ export function renderGenerate(container, state, tables, onGenerate) {
   `;
   wireSteppers(container);
 
+  // Which season card reads as selected. The CSS also has a :checked + label rule, but
+  // it was observed not re-evaluating when the checked state changed — leaving the
+  // highlight on the previously chosen card — so the class is set explicitly here and
+  // is what the styling actually keys off.
+  const syncSeasonCards = () => {
+    container.querySelectorAll('.season-radio').forEach((radio) => {
+      container.querySelector(`label[for="${radio.id}"]`).classList.toggle('is-selected', radio.checked);
+    });
+  };
+  syncSeasonCards();
+
   // Switching season re-defaults the year to the soonest occurrence of *that* season
   // that hasn't already fully elapsed — e.g. picking חורף after its date range for the
   // current cycle already passed jumps straight to next year's, never a past one.
   container.querySelectorAll('input[name=season]').forEach((radio) => {
     radio.addEventListener('change', () => {
+      syncSeasonCards();
       if (!radio.checked) return;
       const yearInput = container.querySelector('input[name=hebrewYear]');
       yearInput.value = nextAvailableYearFor(radio.value, settings);

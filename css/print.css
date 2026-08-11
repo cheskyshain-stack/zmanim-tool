@@ -22,7 +22,8 @@
   }
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
-  /* The Weekday chart's preset picker is .no-print already; this makes sure an open
-     menu can't leave a gap or a stray box behind in the printed cell either. */
-  .weekday-pick, .weekday-pick-menu { display: none !important; }
+  /* Browsers drop background colours when printing unless told otherwise, which would
+     wipe the dark header row, the tinted parsha column and the striped body rows — the
+     things that make the printed board readable at a glance. */
+  .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

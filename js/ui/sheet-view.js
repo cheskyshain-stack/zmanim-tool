@@ -1,7 +1,7 @@
 import { resolveSettings } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
-import { buildWeekdayRow, WEEKDAY_COLUMNS, weekdayMinchaOptions, weekdayMaarivOptions } from '../sheets/weekday.js';
+import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow, applyTishaBavNote } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
@@ -297,8 +297,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
   const isWeekday = effectiveSeason === 'weekday';
-  const minchaOptions = isWeekday ? weekdayMinchaOptions(settings) : [];
-  const maarivOptions = isWeekday ? weekdayMaarivOptions(settings) : [];
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -322,22 +320,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: an ordinary editable cell (so underlining and
-        // the size buttons work on it exactly as they do anywhere else, and it prints as
-        // plain text), plus a hover-only ▾ that drops down the Settings-configured
-        // presets. It was a native <select> before, which couldn't carry the underlining
-        // the printed board uses — <option> renders its text flat, markup and all.
+        // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
+        // times into it — "1220 130" becomes "12:20/1:30" on blur, same shorthand every
+        // other cell takes (see applyTimeShorthand below) — which turned out to be
+        // quicker than picking from the dropdown that used to live here.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const options = c.key === 'B' ? maarivOptions : minchaOptions;
-          const html = row[c.key] ?? ''; // already HTML — the presets are rich text
-          const menu = options.length
-            ? `<button type="button" class="weekday-pick no-print" title="Choose one of the times set in Settings">&#9662;</button>
-               <div class="weekday-pick-menu no-print" hidden>${options.map((opt) => `<button type="button" class="weekday-pick-option">${opt}</button>`).join('')}</div>`
-            : '';
-          return `<td class="weekday-pick-cell">
-            <div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div>
-            ${menu}
-          </td>`;
+          const html = row[c.key] ?? ''; // already HTML — the Settings default is rich text
+          return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -427,27 +416,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     cellEl.addEventListener('blur', () => {
       applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
       commitCell(cellEl);
-    });
-  });
-
-  // Weekday chart's מנחה/מעריב preset picker (see cellHtml above) — the ▾ next to the
-  // cell. Choosing an option drops its HTML (underlining and all) straight into the
-  // cell and commits it through the same path a typed edit takes.
-  page.querySelectorAll('.weekday-pick').forEach((pickBtn) => {
-    const td = pickBtn.closest('td');
-    const menu = td.querySelector('.weekday-pick-menu');
-    const cellEl = td.querySelector('.cell');
-    pickBtn.addEventListener('click', () => {
-      // Close any other open menu first, so only one is ever showing.
-      page.querySelectorAll('.weekday-pick-menu').forEach((m) => m !== menu && (m.hidden = true));
-      menu.hidden = !menu.hidden;
-    });
-    menu.querySelectorAll('.weekday-pick-option').forEach((optBtn) => {
-      optBtn.addEventListener('click', () => {
-        menu.hidden = true;
-        cellEl.innerHTML = optBtn.innerHTML;
-        commitCell(cellEl);
-      });
     });
   });
 

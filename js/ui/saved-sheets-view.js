@@ -5,7 +5,10 @@ export function renderSavedSheets(container, state, onOpen, onDelete) {
     ${
       state.sheets.length
         ? `<table class="saved-list"><thead><tr><th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th></th></tr></thead><tbody>
-      ${state.sheets
+      ${[...state.sheets]
+        // Newest first — the one you just generated is the one you want. Copied before
+        // sorting so the stored order (which nothing else depends on) is left alone.
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
         .map(
           (s) => `
         <tr data-id="${s.id}">

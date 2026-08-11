@@ -1147,8 +1147,18 @@ function renderGenerate(container, state, tables, onGenerate) {
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>
-        <label><input type="radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}> שבת קיץ (Pesach → Sukkos)</label>
-        <label><input type="radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}> שבת חורף (Sukkos → Pesach)</label>
+        <div class="season-picker">
+          <input type="radio" id="season-kayitz" class="season-radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}>
+          <label class="season-option" for="season-kayitz">
+            <span class="season-name">שבת קיץ</span>
+            <span class="season-range">Pesach → Sukkos</span>
+          </label>
+          <input type="radio" id="season-choref" class="season-radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}>
+          <label class="season-option" for="season-choref">
+            <span class="season-name">שבת חורף</span>
+            <span class="season-range">Sukkos → Pesach</span>
+          </label>
+        </div>
         <label>Hebrew year${stepper('hebrewYear', defaultYear)}</label>
         <div class="actions"><button type="submit">Compute weeks</button></div>
       </fieldset>
@@ -1157,11 +1167,23 @@ function renderGenerate(container, state, tables, onGenerate) {
   `;
   wireSteppers(container);
 
+  // Which season card reads as selected. The CSS also has a :checked + label rule, but
+  // it was observed not re-evaluating when the checked state changed — leaving the
+  // highlight on the previously chosen card — so the class is set explicitly here and
+  // is what the styling actually keys off.
+  const syncSeasonCards = () => {
+    container.querySelectorAll('.season-radio').forEach((radio) => {
+      container.querySelector(`label[for="${radio.id}"]`).classList.toggle('is-selected', radio.checked);
+    });
+  };
+  syncSeasonCards();
+
   // Switching season re-defaults the year to the soonest occurrence of *that* season
   // that hasn't already fully elapsed — e.g. picking חורף after its date range for the
   // current cycle already passed jumps straight to next year's, never a past one.
   container.querySelectorAll('input[name=season]').forEach((radio) => {
     radio.addEventListener('change', () => {
+      syncSeasonCards();
       if (!radio.checked) return;
       const yearInput = container.querySelector('input[name=hebrewYear]');
       yearInput.value = nextAvailableYearFor(radio.value, settings);
@@ -1587,7 +1609,10 @@ function renderSavedSheets(container, state, onOpen, onDelete) {
     ${
       state.sheets.length
         ? `<table class="saved-list"><thead><tr><th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th></th></tr></thead><tbody>
-      ${state.sheets
+      ${[...state.sheets]
+        // Newest first — the one you just generated is the one you want. Copied before
+        // sorting so the stored order (which nothing else depends on) is left alone.
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
         .map(
           (s) => `
         <tr data-id="${s.id}">
@@ -1887,15 +1912,15 @@ function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — each week's cell starts from the first option below, and you pick a different one (or type straight into the cell) per week on the sheet itself. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">Every box in this section takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
+        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — every week's cell starts from the <strong>first line</strong> below, and you edit it per week by typing straight into the cell on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">Every box here — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">Default מנחה options</div>
+        <div class="rt-field-label">Starting מנחה times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
         <div class="opt-list" id="mincha-options">${optionRows(s.weekdayDefaultMincha)}</div>
-        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה option</button>
-        <div class="rt-field-label">Default מעריב options</div>
+        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה line</button>
+        <div class="rt-field-label">Starting מעריב times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
         <div class="opt-list" id="maariv-options">${optionRows(s.weekdayDefaultMaariv)}</div>
-        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב option</button>
+        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב line</button>
         <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
@@ -2001,7 +2026,24 @@ function renderSettings(container, state, onSave) {
       useGregorianBefore1582: fd.get('useGregorianBefore1582') === 'on',
     };
     onSave(next);
+    showToast('Settings saved');
   });
+}
+
+/** Saving re-renders this whole view, so any "saved!" state put on the button itself is
+ *  wiped the instant it appears — which is exactly why the button felt like it did
+ *  nothing. The confirmation lives on <body> instead, outside the part that re-renders. */
+function showToast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast no-print';
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-in'));
+  setTimeout(() => {
+    el.classList.remove('toast-in');
+    setTimeout(() => el.remove(), 300);
+  }, 2000);
 }
 
 /** One editable מנחה/מעריב option. These hold real HTML rather than plain text — the
@@ -2461,8 +2503,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
   const isWeekday = effectiveSeason === 'weekday';
-  const minchaOptions = isWeekday ? weekdayMinchaOptions(settings) : [];
-  const maarivOptions = isWeekday ? weekdayMaarivOptions(settings) : [];
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -2486,22 +2526,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: an ordinary editable cell (so underlining and
-        // the size buttons work on it exactly as they do anywhere else, and it prints as
-        // plain text), plus a hover-only ▾ that drops down the Settings-configured
-        // presets. It was a native <select> before, which couldn't carry the underlining
-        // the printed board uses — <option> renders its text flat, markup and all.
+        // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
+        // times into it — "1220 130" becomes "12:20/1:30" on blur, same shorthand every
+        // other cell takes (see applyTimeShorthand below) — which turned out to be
+        // quicker than picking from the dropdown that used to live here.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const options = c.key === 'B' ? maarivOptions : minchaOptions;
-          const html = row[c.key] ?? ''; // already HTML — the presets are rich text
-          const menu = options.length
-            ? `<button type="button" class="weekday-pick no-print" title="Choose one of the times set in Settings">&#9662;</button>
-               <div class="weekday-pick-menu no-print" hidden>${options.map((opt) => `<button type="button" class="weekday-pick-option">${opt}</button>`).join('')}</div>`
-            : '';
-          return `<td class="weekday-pick-cell">
-            <div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div>
-            ${menu}
-          </td>`;
+          const html = row[c.key] ?? ''; // already HTML — the Settings default is rich text
+          return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -2591,27 +2622,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     cellEl.addEventListener('blur', () => {
       applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
       commitCell(cellEl);
-    });
-  });
-
-  // Weekday chart's מנחה/מעריב preset picker (see cellHtml above) — the ▾ next to the
-  // cell. Choosing an option drops its HTML (underlining and all) straight into the
-  // cell and commits it through the same path a typed edit takes.
-  page.querySelectorAll('.weekday-pick').forEach((pickBtn) => {
-    const td = pickBtn.closest('td');
-    const menu = td.querySelector('.weekday-pick-menu');
-    const cellEl = td.querySelector('.cell');
-    pickBtn.addEventListener('click', () => {
-      // Close any other open menu first, so only one is ever showing.
-      page.querySelectorAll('.weekday-pick-menu').forEach((m) => m !== menu && (m.hidden = true));
-      menu.hidden = !menu.hidden;
-    });
-    menu.querySelectorAll('.weekday-pick-option').forEach((optBtn) => {
-      optBtn.addEventListener('click', () => {
-        menu.hidden = true;
-        cellEl.innerHTML = optBtn.innerHTML;
-        commitCell(cellEl);
-      });
     });
   });
 

@@ -21,15 +21,15 @@ export function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — each week's cell starts from the first option below, and you pick a different one (or type straight into the cell) per week on the sheet itself. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">Every box in this section takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
+        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — every week's cell starts from the <strong>first line</strong> below, and you edit it per week by typing straight into the cell on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">Every box here — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">Default מנחה options</div>
+        <div class="rt-field-label">Starting מנחה times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
         <div class="opt-list" id="mincha-options">${optionRows(s.weekdayDefaultMincha)}</div>
-        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה option</button>
-        <div class="rt-field-label">Default מעריב options</div>
+        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה line</button>
+        <div class="rt-field-label">Starting מעריב times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
         <div class="opt-list" id="maariv-options">${optionRows(s.weekdayDefaultMaariv)}</div>
-        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב option</button>
+        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב line</button>
         <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
@@ -135,7 +135,24 @@ export function renderSettings(container, state, onSave) {
       useGregorianBefore1582: fd.get('useGregorianBefore1582') === 'on',
     };
     onSave(next);
+    showToast('Settings saved');
   });
+}
+
+/** Saving re-renders this whole view, so any "saved!" state put on the button itself is
+ *  wiped the instant it appears — which is exactly why the button felt like it did
+ *  nothing. The confirmation lives on <body> instead, outside the part that re-renders. */
+function showToast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast no-print';
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('toast-in'));
+  setTimeout(() => {
+    el.classList.remove('toast-in');
+    setTimeout(() => el.remove(), 300);
+  }, 2000);
 }
 
 /** One editable מנחה/מעריב option. These hold real HTML rather than plain text — the
