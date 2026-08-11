@@ -82,7 +82,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       </fieldset>
       <fieldset>
         <legend>Weekday chart</legend>
-        <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
+        <label><input type="checkbox" id="include-weekday" checked> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${

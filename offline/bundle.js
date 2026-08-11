@@ -33,7 +33,7 @@ const TIMEZONES = [
  *  Plain HTML because it's edited through a rich-text box (see ui/settings-view.js) and
  *  printed as-is. */
 const DEFAULT_WEEKDAY_SHACHARIS =
-  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>';
+  '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>\n\n<u>ר"ח בה"ב ותענ"צ</u>\n6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
 
 /** Earlier shipped versions of the above, before the everyday times were set bigger (and
  *  before the field became rich text at all). A saved value still matching one of these
@@ -44,6 +44,7 @@ const LEGACY_WEEKDAY_SHACHARIS = [
   '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
   '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
 ];
 
 const DEFAULT_SETTINGS = {
@@ -67,13 +68,13 @@ const DEFAULT_SETTINGS = {
   // value). Shacharis is one fixed schedule printed identically on every week's row —
   // stored as real HTML (not plain text) since it's edited via a rich-text box in
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
-  weekdayDefaultMincha: '',
-  weekdayDefaultMaariv: '',
+  weekdayDefaultMincha: '1:40/1:50/6:35/7:30/8:00\n1:40/1:50/6:35/7:30/7:55\n1:40/1:50/6:35/7:30/7:50\n1:40/1:50/6:35/7:30\n1:40/1:50/4:15/6:35/7:30\n1:40/1:50/4:15/6:35/7:20\n1:40/1:50/4:15/6:35/7:10\n1:40/1:50/4:15/6:35/7:00\n1:40/1:50/4:15/6:35',
+  weekdayDefaultMaariv: '9:15/9:30/10:00/10:30/11:00\n9:15/9:30/10:00/10:30/11:00/11:30\n9:15/9:30/10:00/10:30/11:00/11:30/12:00',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
-  latitude: 40.067,
-  longitude: -74.202,
+  latitude: 40.068,
+  longitude: -74.205,
   elevation: 0,
   timezoneId: 'America/New_York',
   language: 'he', // 'he' | 'en'
@@ -1216,7 +1217,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       </fieldset>
       <fieldset>
         <legend>Weekday chart</legend>
-        <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
+        <label><input type="checkbox" id="include-weekday" checked> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${
