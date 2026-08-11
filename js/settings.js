@@ -29,6 +29,14 @@ export const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+  // Weekday chart defaults — Mincha/Maariv are plain editable text per week (these
+  // values just pre-fill every week's cell when a Weekday chart is generated;
+  // individual weeks are then adjusted the same way any Shabbos-sheet cell is).
+  // Shacharis is one fixed schedule printed identically on every week's row.
+  weekdayDefaultMincha: '',
+  weekdayDefaultMaariv: '',
+  weekdayShacharis: '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
+  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,
   longitude: -74.202,

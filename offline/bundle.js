@@ -43,6 +43,14 @@ const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+  // Weekday chart defaults — Mincha/Maariv are plain editable text per week (these
+  // values just pre-fill every week's cell when a Weekday chart is generated;
+  // individual weeks are then adjusted the same way any Shabbos-sheet cell is).
+  // Shacharis is one fixed schedule printed identically on every week's row.
+  weekdayDefaultMincha: '',
+  weekdayDefaultMaariv: '',
+  weekdayShacharis: '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
+  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,
   longitude: -74.202,
@@ -542,6 +550,19 @@ function isAssurMelacha(serial, settings) {
   return days.includes(jdate.dayOfYear);
 }
 
+/** True for a weekday (non-Shabbos) whose Mincha/Maariv/Shacharis wouldn't follow the
+ *  shul's regular weekday schedule — a full Yom Tov day, Chol Hamoed, or Hoshana
+ *  Rabbah. Deliberately NOT true for Chanukah, Purim, Tu B'Shvat, and similar
+ *  commemorative-but-unrestricted days — davening on those is still the regular
+ *  weekday schedule (just with an added paragraph), so they should still count as a
+ *  normal day for the Weekday chart's own week-inclusion rule (see
+ *  weeks.js/computeWeekdayWeeks). */
+function isYomTovOrCholHamoed(serial, settings, specialDaysTable) {
+  if (isAssurMelacha(serial, settings)) return true;
+  const name = hasYomTov(serial, settings, specialDaysTable);
+  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(name);
+}
+
 // ==== format.js ====
 // Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
 // CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
@@ -873,6 +894,43 @@ function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   return { startSerial, endSerial, weeks };
 }
 
+/** Week list for a Weekday chart covering the same season date range as
+ *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
+ *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
+ *  a normal day — not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
+ *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
+ *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
+ *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
+ *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
+ *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
+ *  "ראש השנה") when there's no regular parsha to label the row with. */
+function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
+  const startSerial = seasonStartSerial(season, hebrewYear);
+  const endSerial = seasonEndSerial(season, hebrewYear);
+
+  let d = Math.ceil(startSerial);
+  while (excelWeekday(d) !== 7) d++;
+
+  const weeks = [];
+  let guard = 0;
+  while (d <= endSerial && guard < MAX_WEEKS) {
+    let hasRegularDay = false;
+    for (let day = d - 6; day <= d - 1; day++) {
+      if (!isYomTovOrCholHamoed(day, settings, tables.specialDays)) {
+        hasRegularDay = true;
+        break;
+      }
+    }
+    if (hasRegularDay) {
+      const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
+      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+    }
+    d += 7;
+    guard++;
+  }
+  return { startSerial, endSerial, weeks };
+}
+
 /** Where a שבת חורף season's weeks cross the *spring* DST cutover (2nd Sunday of
  *  March — not the fall one near Sukkos at the season's start). From that week on,
  *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) —
@@ -962,11 +1020,11 @@ function renderGenerate(container, state, tables, onGenerate) {
     const season = fd.get('season');
     const hebrewYear = Number(fd.get('hebrewYear'));
     const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
-    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, onGenerate);
+    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
   });
 }
 
-function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerate) {
+function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, onGenerate) {
   if (weeks.length === 0) {
     el.innerHTML = `<p class="hint">No qualifying Shabbosim found for that range — double check the Hebrew year.</p>`;
     return;
@@ -980,6 +1038,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   // the other, earlier weeks on that same page just show blank Plag columns.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
   const kayitzWeekCount = weeks.length - springSplitIndex;
+
+  // The Weekday chart's own week list can include weeks the Shabbos list skips (a Yom
+  // Tov Shabbos whose week still has a regular weekday), so it's computed and paginated
+  // completely separately — see the "Also generate a Weekday chart" section below.
+  const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
     <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
@@ -998,27 +1061,54 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
         <div id="page-size-inputs"></div>
         <div id="page-error" class="error"></div>
-        <div class="actions"><button type="submit">Generate sheet</button></div>
       </fieldset>
+      <fieldset>
+        <legend>Weekday chart</legend>
+        <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
+        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <div id="weekday-page-section" hidden>
+          <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
+          <div id="weekday-page-size-inputs"></div>
+          <div id="weekday-page-error" class="error"></div>
+        </div>
+      </fieldset>
+      <div class="actions"><button type="submit">Generate sheet</button></div>
     </form>
   `;
 
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
-
   function renderSizeInputs(numPages) {
     const defaults = defaultPageSizes(weeks.length, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
   renderSizeInputs(3);
-  wireSteppers(el);
-
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
     numPagesInput.value = n;
     renderSizeInputs(n);
   });
+
+  const weekdaySection = el.querySelector('#weekday-page-section');
+  const wdInputsEl = el.querySelector('#weekday-page-size-inputs');
+  const wdNumPagesInput = el.querySelector('input[name=wdNumPages]');
+  function renderWeekdaySizeInputs(numPages) {
+    const defaults = defaultPageSizes(weekdayWeeks.length, numPages);
+    wdInputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`wdPageSize${i}`, size, { min: 0, className: 'wd-page-size' })}</label>`).join('');
+    wireSteppers(wdInputsEl);
+  }
+  renderWeekdaySizeInputs(3);
+  wdNumPagesInput.addEventListener('change', () => {
+    const n = Math.max(1, Math.min(8, Number(wdNumPagesInput.value) || 1));
+    wdNumPagesInput.value = n;
+    renderWeekdaySizeInputs(n);
+  });
+  el.querySelector('#include-weekday').addEventListener('change', (e) => {
+    weekdaySection.hidden = !e.target.checked;
+  });
+
+  wireSteppers(el);
 
   el.querySelector('#page-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1030,7 +1120,34 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       return;
     }
     errEl.textContent = '';
-    const sheet = {
+
+    const includeWeekday = el.querySelector('#include-weekday').checked;
+    let weekdaySizes = null;
+    if (includeWeekday) {
+      weekdaySizes = [...el.querySelectorAll('.wd-page-size')].map((input) => Number(input.value));
+      const wdErr = validatePageSizes(weekdayWeeks.length, weekdaySizes);
+      const wdErrEl = el.querySelector('#weekday-page-error');
+      if (wdErr) {
+        wdErrEl.textContent = wdErr;
+        return;
+      }
+      wdErrEl.textContent = '';
+    }
+
+    if (includeWeekday) {
+      onGenerate({
+        id: newId('sheet'),
+        season: 'weekday',
+        hebrewYear,
+        linkedSeason: season, // which Shabbos season this was generated alongside, for context only
+        createdAt: new Date().toISOString(),
+        weeks: weekdayWeeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
+        pageSizes: weekdaySizes,
+        overrides: {},
+        style: { ...state.settings.sheetStyle },
+      });
+    }
+    onGenerate({
       id: newId('sheet'),
       season,
       hebrewYear,
@@ -1039,8 +1156,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
-    };
-    onGenerate(sheet);
+    });
   });
 }
 
@@ -1336,7 +1452,7 @@ function renderSavedSheets(container, state, onOpen, onDelete) {
         .map(
           (s) => `
         <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף'}</td>
+          <td data-label="Sheet">${s.season === 'kayitz' ? 'שבת קיץ' : s.season === 'weekday' ? 'Weekday' : 'שבת חורף'}</td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}</td>
           <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
@@ -1531,6 +1647,14 @@ function renderSettings(container, state, onSave) {
         <label>Footer address<input name="footerAddress" value="${esc(s.footerAddress)}"></label>
       </fieldset>
       <fieldset>
+        <legend>Weekday chart defaults</legend>
+        <p class="hint">מנחה and מעריב on the Weekday chart are plain editable text, not computed — these values just pre-fill every week's cell when you generate one; adjust individual weeks afterward the same way you'd edit any Shabbos-sheet cell. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <label>Default מנחה text (pre-fills every week)<textarea name="weekdayDefaultMincha" rows="2">${esc(s.weekdayDefaultMincha)}</textarea></label>
+        <label>Default מעריב text (pre-fills every week)<textarea name="weekdayDefaultMaariv" rows="2">${esc(s.weekdayDefaultMaariv)}</textarea></label>
+        <label>שחרית schedule (same every week)<textarea name="weekdayShacharis" rows="5">${esc(s.weekdayShacharis)}</textarea></label>
+        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
+      </fieldset>
+      <fieldset>
         <legend>Location</legend>
         <label>Location name<input name="locationName" value="${esc(s.locationName)}"></label>
         <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
@@ -1574,6 +1698,10 @@ function renderSettings(container, state, onSave) {
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
+      weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
+      weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
+      weekdayShacharis: fd.get('weekdayShacharis'),
+      weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
       longitude: Number(fd.get('longitude')),
@@ -1691,18 +1819,40 @@ function applyRules(row, week, rules, season, appliedColumns) {
   return out;
 }
 
+// ==== sheets/weekday.js ====
+// Weekday Zmanim chart — unlike שבת קיץ/חורף, nothing here is computed from
+// sunrise/sunset: מנחה and מעריב are plain editable text per week (pre-filled from a
+// shul-wide default set in Settings, then adjusted per week the same way any Shabbos
+// sheet cell is — click to edit, which stores a per-cell override on top of this
+// "computed" default), and שחרית is one fixed schedule that's identical every week.
+function buildWeekdayRow(week, settings) {
+  return {
+    B: settings.weekdayDefaultMaariv || '',
+    C: settings.weekdayDefaultMincha || '',
+    E: settings.weekdayShacharis || '',
+  };
+}
+
+const WEEKDAY_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'E', header: 'שחרית' },
+];
+
 // ==== ui/sheet-view.js ====
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
  *  cutover (2nd Sunday of March — not the fall one near Sukkos) prints as a real שבת
  *  קיץ chart for its *entire* page — same columns, same formulas, same rule-matching
  *  as an actual קיץ sheet — even for any earlier weeks sharing that page, which just
- *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window). */
+ *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window).
+ *  A Weekday chart has no such split — it's always 'weekday'. */
 function pageEffectiveSeason(sheet, pageWeeks, settings) {
   if (sheet.season !== 'choref') return sheet.season;
   return pageWeeks.some((w) => inSpringDstWindow(w.date, settings)) ? 'kayitz' : 'choref';
 }
 function columnsAndBuilderFor(effectiveSeason) {
+  if (effectiveSeason === 'weekday') return { columns: WEEKDAY_COLUMNS, buildRow: buildWeekdayRow };
   return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
 }
 
@@ -1732,7 +1882,14 @@ function renderSheet(container, state, sheet, onChange) {
   const isEnglish = state.settings.language === 'en';
   // Column-width panel covers every column key actually used on any page — CHOREF's
   // own columns plus (if any page prints as קיץ) any קיץ-only keys not already in it.
-  const panelColumns = sheet.season === 'choref' && anyKayitzPage ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))] : sheet.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
+  const panelColumns =
+    sheet.season === 'weekday'
+      ? WEEKDAY_COLUMNS
+      : sheet.season === 'choref' && anyKayitzPage
+        ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))]
+        : sheet.season === 'kayitz'
+          ? KAYITZ_COLUMNS
+          : CHOREF_COLUMNS;
   const colOrder = isEnglish ? [...panelColumns.map((c) => c.key), 'parsha'] : ['parsha', ...rtlOrdered(panelColumns).map((c) => c.key)];
   const colLabel = { parsha: isEnglish ? 'Parsha' : 'פרשה', ...Object.fromEntries(panelColumns.map((c) => [c.key, c.header.replace(/\n/g, ' ')])) };
 
@@ -1887,6 +2044,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
+  const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
@@ -1895,27 +2053,42 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
   const parshaHeader = isEnglish ? 'Parsha' : ' ';
 
+  // On the Weekday chart, שחרית ("1 schedule for all days" — see settings-view.js) is
+  // one shul-wide value straight from Settings, not per-week: instead of repeating it
+  // in every row (which would make a multi-line schedule absurdly tall over many
+  // weeks), it prints once as a single cell spanning the whole page's rows, matching
+  // how it looks in the original printed chart. It's sourced live from Settings with
+  // no per-cell override — change it in Settings and it updates everywhere at once.
+  const isWeekday = effectiveSeason === 'weekday';
+
   const rows = pageWeeks
-    .map((week) => {
-      const computed = applyTishaBavNote(buildRow(week, settings), week, settings);
+    .map((week, rowIndex) => {
+      // The Weekday chart's Mincha/Maariv are plain Settings-driven default text, not
+      // computed zmanim, so neither the Tisha B'Av note nor the Rules engine (both
+      // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
+      const computed = isWeekday ? buildRow(week, settings) : applyTishaBavNote(buildRow(week, settings), week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
       // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
       // as a real קיץ sheet would for these weeks.
-      const ruled = applyRules(computed, week, state.rules, effectiveSeason, appliedColumns);
+      const ruled = isWeekday ? computed : applyRules(computed, week, state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-      const cells = orderedColumns
-        .map((c) => {
-          const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
-          // Overridden cells already hold real HTML (captured from the editable div,
-          // possibly with manual <u> underlining); computed cells still need nl2br().
-          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
-          // data-season records which season this *page* rendered as, so a later edit
-          // (see the blur handler below) recomputes its "did this really change?"
-          // baseline the same way, without having to re-derive the page split.
-          return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
-        })
-        .join('');
+      const cellHtml = (c) => {
+        // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
+        // first row (browsers naturally leave that column slot filled on later rows).
+        if (isWeekday && c.key === 'E') {
+          return rowIndex === 0 ? `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${nl2br(esc(state.settings.weekdayShacharis))}</td>` : '';
+        }
+        const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
+        // Overridden cells already hold real HTML (captured from the editable div,
+        // possibly with manual <u> underlining); computed cells still need nl2br().
+        const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
+        // data-season records which season this *page* rendered as, so a later edit
+        // (see the blur handler below) recomputes its "did this really change?"
+        // baseline the same way, without having to re-derive the page split.
+        return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+      };
+      const cells = orderedColumns.map(cellHtml).join('');
       const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
       const parshaTd = `<td class="parsha-cell">${nl2br(parshaCell)}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
@@ -1942,7 +2115,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
-        ${state.settings.footerNote ? nl2br(esc(state.settings.footerNote)) + '<br>' : ''}
+        ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
         <span class="footer-address">${esc(state.settings.footerAddress)}</span>
       </div>
       <span class="footer-line"></span>
@@ -1962,8 +2135,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const weekSeason = cellEl.dataset.season;
       const week = sheet.weeks.find((w) => w.serial === serial);
       const settingsResolved = resolveSettings(state.settings);
-      const computed = applyTishaBavNote(splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved), week, settingsResolved);
-      const ruled = applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
+      const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
+      const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
+      const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
       const baselineHtml = nl2br(ruled[col] ?? '');
       const newHtml = normalizeCellHtml(cellEl.innerHTML);
       const before = getOverride(sheet, serial, col); // undefined = "no override"
@@ -1981,6 +2155,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 }
 
 function splitBuild(season) {
+  if (season === 'weekday') return buildWeekdayRow;
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 

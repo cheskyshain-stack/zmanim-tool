@@ -173,3 +173,16 @@ export function isAssurMelacha(serial, settings) {
   const days = [21, 65, 178, 179, 187, 192, 199].concat(settings.inIsrael ? [15] : [15, 16, 22, 66, 193, 200]);
   return days.includes(jdate.dayOfYear);
 }
+
+/** True for a weekday (non-Shabbos) whose Mincha/Maariv/Shacharis wouldn't follow the
+ *  shul's regular weekday schedule — a full Yom Tov day, Chol Hamoed, or Hoshana
+ *  Rabbah. Deliberately NOT true for Chanukah, Purim, Tu B'Shvat, and similar
+ *  commemorative-but-unrestricted days — davening on those is still the regular
+ *  weekday schedule (just with an added paragraph), so they should still count as a
+ *  normal day for the Weekday chart's own week-inclusion rule (see
+ *  weeks.js/computeWeekdayWeeks). */
+export function isYomTovOrCholHamoed(serial, settings, specialDaysTable) {
+  if (isAssurMelacha(serial, settings)) return true;
+  const name = hasYomTov(serial, settings, specialDaysTable);
+  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(name);
+}

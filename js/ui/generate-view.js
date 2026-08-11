@@ -1,4 +1,4 @@
-import { computeSeasonWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
+import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
 import { validatePageSizes, defaultPageSizes } from '../pagination.js';
 import { newId } from '../storage.js';
@@ -38,11 +38,11 @@ export function renderGenerate(container, state, tables, onGenerate) {
     const season = fd.get('season');
     const hebrewYear = Number(fd.get('hebrewYear'));
     const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
-    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, onGenerate);
+    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
   });
 }
 
-function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerate) {
+function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, onGenerate) {
   if (weeks.length === 0) {
     el.innerHTML = `<p class="hint">No qualifying Shabbosim found for that range — double check the Hebrew year.</p>`;
     return;
@@ -56,6 +56,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
   // the other, earlier weeks on that same page just show blank Plag columns.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
   const kayitzWeekCount = weeks.length - springSplitIndex;
+
+  // The Weekday chart's own week list can include weeks the Shabbos list skips (a Yom
+  // Tov Shabbos whose week still has a regular weekday), so it's computed and paginated
+  // completely separately — see the "Also generate a Weekday chart" section below.
+  const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
     <p><strong>${weeks.length} weeks</strong> found (${weeks[0].date.toDateString()} – ${weeks[weeks.length - 1].date.toDateString()}).</p>
@@ -74,27 +79,54 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
         <div id="page-size-inputs"></div>
         <div id="page-error" class="error"></div>
-        <div class="actions"><button type="submit">Generate sheet</button></div>
       </fieldset>
+      <fieldset>
+        <legend>Weekday chart</legend>
+        <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
+        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <div id="weekday-page-section" hidden>
+          <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
+          <div id="weekday-page-size-inputs"></div>
+          <div id="weekday-page-error" class="error"></div>
+        </div>
+      </fieldset>
+      <div class="actions"><button type="submit">Generate sheet</button></div>
     </form>
   `;
 
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
-
   function renderSizeInputs(numPages) {
     const defaults = defaultPageSizes(weeks.length, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
   renderSizeInputs(3);
-  wireSteppers(el);
-
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
     numPagesInput.value = n;
     renderSizeInputs(n);
   });
+
+  const weekdaySection = el.querySelector('#weekday-page-section');
+  const wdInputsEl = el.querySelector('#weekday-page-size-inputs');
+  const wdNumPagesInput = el.querySelector('input[name=wdNumPages]');
+  function renderWeekdaySizeInputs(numPages) {
+    const defaults = defaultPageSizes(weekdayWeeks.length, numPages);
+    wdInputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`wdPageSize${i}`, size, { min: 0, className: 'wd-page-size' })}</label>`).join('');
+    wireSteppers(wdInputsEl);
+  }
+  renderWeekdaySizeInputs(3);
+  wdNumPagesInput.addEventListener('change', () => {
+    const n = Math.max(1, Math.min(8, Number(wdNumPagesInput.value) || 1));
+    wdNumPagesInput.value = n;
+    renderWeekdaySizeInputs(n);
+  });
+  el.querySelector('#include-weekday').addEventListener('change', (e) => {
+    weekdaySection.hidden = !e.target.checked;
+  });
+
+  wireSteppers(el);
 
   el.querySelector('#page-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -106,7 +138,34 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       return;
     }
     errEl.textContent = '';
-    const sheet = {
+
+    const includeWeekday = el.querySelector('#include-weekday').checked;
+    let weekdaySizes = null;
+    if (includeWeekday) {
+      weekdaySizes = [...el.querySelectorAll('.wd-page-size')].map((input) => Number(input.value));
+      const wdErr = validatePageSizes(weekdayWeeks.length, weekdaySizes);
+      const wdErrEl = el.querySelector('#weekday-page-error');
+      if (wdErr) {
+        wdErrEl.textContent = wdErr;
+        return;
+      }
+      wdErrEl.textContent = '';
+    }
+
+    if (includeWeekday) {
+      onGenerate({
+        id: newId('sheet'),
+        season: 'weekday',
+        hebrewYear,
+        linkedSeason: season, // which Shabbos season this was generated alongside, for context only
+        createdAt: new Date().toISOString(),
+        weeks: weekdayWeeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
+        pageSizes: weekdaySizes,
+        overrides: {},
+        style: { ...state.settings.sheetStyle },
+      });
+    }
+    onGenerate({
       id: newId('sheet'),
       season,
       hebrewYear,
@@ -115,8 +174,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, onGenerat
       pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
-    };
-    onGenerate(sheet);
+    });
   });
 }
 

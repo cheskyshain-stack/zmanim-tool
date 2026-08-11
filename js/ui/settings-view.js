@@ -18,6 +18,14 @@ export function renderSettings(container, state, onSave) {
         <label>Footer address<input name="footerAddress" value="${esc(s.footerAddress)}"></label>
       </fieldset>
       <fieldset>
+        <legend>Weekday chart defaults</legend>
+        <p class="hint">מנחה and מעריב on the Weekday chart are plain editable text, not computed — these values just pre-fill every week's cell when you generate one; adjust individual weeks afterward the same way you'd edit any Shabbos-sheet cell. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <label>Default מנחה text (pre-fills every week)<textarea name="weekdayDefaultMincha" rows="2">${esc(s.weekdayDefaultMincha)}</textarea></label>
+        <label>Default מעריב text (pre-fills every week)<textarea name="weekdayDefaultMaariv" rows="2">${esc(s.weekdayDefaultMaariv)}</textarea></label>
+        <label>שחרית schedule (same every week)<textarea name="weekdayShacharis" rows="5">${esc(s.weekdayShacharis)}</textarea></label>
+        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
+      </fieldset>
+      <fieldset>
         <legend>Location</legend>
         <label>Location name<input name="locationName" value="${esc(s.locationName)}"></label>
         <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
@@ -61,6 +69,10 @@ export function renderSettings(container, state, onSave) {
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
+      weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
+      weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
+      weekdayShacharis: fd.get('weekdayShacharis'),
+      weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
       longitude: Number(fd.get('longitude')),

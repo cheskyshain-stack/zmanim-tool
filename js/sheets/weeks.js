@@ -2,7 +2,7 @@
 // Kayitz (summer) or Choref (winter) sheet for a given Hebrew year, mirroring the
 // workbook's own P5 formula (SEQUENCE + FILTER on HAS_PARSHA<>"") but without
 // requiring a manually-entered start date or week count.
-import { dateFromHebrew, hasParsha, hasSpecialParsha, hebrewDateExtended, excelWeekday } from '../hebrew-calendar.js';
+import { dateFromHebrew, hasParsha, hasSpecialParsha, hasYomTov, isYomTovOrCholHamoed, hebrewDateExtended, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
 import { inSpringDstWindow } from './common.js';
 
@@ -39,6 +39,43 @@ export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   while (d <= endSerial && guard < MAX_WEEKS) {
     const parsha = hasParsha(d, settings, tables);
     if (parsha) {
+      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+    }
+    d += 7;
+    guard++;
+  }
+  return { startSerial, endSerial, weeks };
+}
+
+/** Week list for a Weekday chart covering the same season date range as
+ *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
+ *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
+ *  a normal day — not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
+ *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
+ *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
+ *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
+ *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
+ *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
+ *  "ראש השנה") when there's no regular parsha to label the row with. */
+export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
+  const startSerial = seasonStartSerial(season, hebrewYear);
+  const endSerial = seasonEndSerial(season, hebrewYear);
+
+  let d = Math.ceil(startSerial);
+  while (excelWeekday(d) !== 7) d++;
+
+  const weeks = [];
+  let guard = 0;
+  while (d <= endSerial && guard < MAX_WEEKS) {
+    let hasRegularDay = false;
+    for (let day = d - 6; day <= d - 1; day++) {
+      if (!isYomTovOrCholHamoed(day, settings, tables.specialDays)) {
+        hasRegularDay = true;
+        break;
+      }
+    }
+    if (hasRegularDay) {
+      const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
       weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
     }
     d += 7;
