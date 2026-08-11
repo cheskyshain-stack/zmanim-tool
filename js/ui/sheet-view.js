@@ -7,6 +7,7 @@ import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { UL_START, UL_END, normalizeRichText } from '../format.js';
+import { richTextToolbarHtml, wireRichTextToolbar } from './rich-text.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -65,10 +66,14 @@ export function renderSheet(container, state, sheet, onChange) {
   // the Shabbos sheet it was generated alongside) — generating both saves both, but only
   // one can be open at a time, so this link is how you actually get to see the other one
   // right after generating instead of having to dig it up from Saved Sheets.
+  // linkedSheetId is the exact pairing recorded at generation time; the season+year
+  // match after it is the fallback for pairs generated before that was stored.
   const companion =
     sheet.season === 'weekday'
-      ? state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : state.sheets
+      ? state.sheets.find((s) => s.id === sheet.linkedSheetId) ||
+        state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) ||
+        state.sheets
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
@@ -80,7 +85,8 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
-      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.${
+      ${richTextToolbarHtml('In the cell you\'re editing:')}
+      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
@@ -120,6 +126,16 @@ export function renderSheet(container, state, sheet, onChange) {
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
+
+  // The formatting buttons act on whichever cell was last being edited. Tracked on
+  // focusin rather than read from document.activeElement at click time because the
+  // buttons deliberately don't take focus (see wireRichTextToolbar) — but a click
+  // elsewhere on the page in between should still leave them pointing at that cell.
+  let lastFocusedCell = null;
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
+  });
+  wireRichTextToolbar(container, () => lastFocusedCell);
   container.querySelector('#undo-btn').addEventListener('click', () => {
     const action = hist.undo.pop();
     if (!action) return;
@@ -432,14 +448,13 @@ function splitBuild(season) {
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 
-// Converts UL_START/UL_END sentinels (see format.js) into real <span class="ul">
-// elements *after* HTML-escaping the rest of the text, and \n into <br>.
+// Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
+// HTML-escaping the rest of the text, and \n into <br>. Plain <u> rather than a styled
+// <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
+// go through execCommand, which only recognizes its own native markup and silently
+// no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
-  const escaped = esc(str)
-    .split(UL_START)
-    .join('<span class="ul">')
-    .split(UL_END)
-    .join('</span>');
+  const escaped = esc(str).split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 function esc(str) {

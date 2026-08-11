@@ -15,6 +15,28 @@ export function defaultPageSizes(total, numPages) {
   return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
+/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
+ *  `sourceWeeks` — so a Weekday chart's page 1 covers the same stretch of the year as
+ *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
+ *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
+ *  the gap between two source pages lands on the earlier one, matching how the season
+ *  boundaries themselves are assigned in sheets/weeks.js. */
+export function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
+  const cutoffs = []; // serial of the first source week on each page after the first
+  let idx = 0;
+  for (let i = 0; i < sourceSizes.length - 1; i++) {
+    idx += Number(sourceSizes[i]) || 0;
+    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
+  }
+  const counts = new Array(sourceSizes.length).fill(0);
+  for (const week of targetWeeks) {
+    let page = 0;
+    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
+    counts[page]++;
+  }
+  return counts;
+}
+
 export function splitWeeksIntoPages(weeks, sizes) {
   const pages = [];
   let i = 0;

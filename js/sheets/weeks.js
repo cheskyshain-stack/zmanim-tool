@@ -133,9 +133,13 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   // fixed 7-day cadence no matter which season's math found them, so this is exactly
   // the same date the incoming season's own loop would land on as its own first
   // candidate) — see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
-  // there becomes a row here instead of there.
-  if (isCholHamoedAnchor(d, settings, tables.specialDays)) {
-    weeks.push({ serial: d, date: dateFromSerial(d), parsha: holidayNameFor(d, settings, tables.specialDays), specialParsha: '' });
+  // there becomes a row here instead of there. It's folded into the trailing-gap row
+  // above rather than added separately whenever that row already carries the same
+  // holiday's name: the two stretches are the run-up to, and the middle of, one single
+  // Yom Tov, so the chart should carry one row for it, not a pair of identical ones.
+  const cholHamoedName = isCholHamoedAnchor(d, settings, tables.specialDays) ? holidayNameFor(d, settings, tables.specialDays) : '';
+  if (cholHamoedName && weeks[weeks.length - 1]?.parsha !== cholHamoedName) {
+    weeks.push({ serial: d, date: dateFromSerial(d), parsha: cholHamoedName, specialParsha: '' });
   }
 
   return { startSerial, endSerial, weeks };

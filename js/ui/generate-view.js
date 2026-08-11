@@ -1,6 +1,6 @@
 import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
-import { validatePageSizes, defaultPageSizes } from '../pagination.js';
+import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 
 export function renderGenerate(container, state, tables, onGenerate) {
@@ -83,18 +83,13 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       <fieldset>
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
-        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${
           !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
             ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
             : ''
         }
-        <div id="weekday-page-section" hidden>
-          <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
-          <div id="weekday-page-size-inputs"></div>
-          <div id="weekday-page-error" class="error"></div>
-        </div>
       </fieldset>
       <div class="actions"><button type="submit">Generate sheet</button></div>
     </form>
@@ -114,24 +109,6 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     renderSizeInputs(n);
   });
 
-  const weekdaySection = el.querySelector('#weekday-page-section');
-  const wdInputsEl = el.querySelector('#weekday-page-size-inputs');
-  const wdNumPagesInput = el.querySelector('input[name=wdNumPages]');
-  function renderWeekdaySizeInputs(numPages) {
-    const defaults = defaultPageSizes(weekdayWeeks.length, numPages);
-    wdInputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`wdPageSize${i}`, size, { min: 0, className: 'wd-page-size' })}</label>`).join('');
-    wireSteppers(wdInputsEl);
-  }
-  renderWeekdaySizeInputs(3);
-  wdNumPagesInput.addEventListener('change', () => {
-    const n = Math.max(1, Math.min(8, Number(wdNumPagesInput.value) || 1));
-    wdNumPagesInput.value = n;
-    renderWeekdaySizeInputs(n);
-  });
-  el.querySelector('#include-weekday').addEventListener('change', (e) => {
-    weekdaySection.hidden = !e.target.checked;
-  });
-
   wireSteppers(el);
 
   el.querySelector('#page-form').addEventListener('submit', (e) => {
@@ -146,33 +123,26 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     errEl.textContent = '';
 
     const includeWeekday = el.querySelector('#include-weekday').checked;
-    let weekdaySizes = null;
-    if (includeWeekday) {
-      weekdaySizes = [...el.querySelectorAll('.wd-page-size')].map((input) => Number(input.value));
-      const wdErr = validatePageSizes(weekdayWeeks.length, weekdaySizes);
-      const wdErrEl = el.querySelector('#weekday-page-error');
-      if (wdErr) {
-        wdErrEl.textContent = wdErr;
-        return;
-      }
-      wdErrEl.textContent = '';
-    }
+    const shabbosSheetId = newId('sheet');
 
     if (includeWeekday) {
       onGenerate({
         id: newId('sheet'),
         season: 'weekday',
         hebrewYear,
-        linkedSeason: season, // which Shabbos season this was generated alongside, for context only
+        linkedSeason: season, // which Shabbos season this was generated alongside
+        linkedSheetId: shabbosSheetId, // the exact sheet below, for the "View שבת sheet" link
         createdAt: new Date().toISOString(),
         weeks: weekdayWeeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
-        pageSizes: weekdaySizes,
+        // Page breaks fall on the same dates as the Shabbos sheet's, rather than being
+        // chosen separately — see alignPageSizesTo().
+        pageSizes: alignPageSizesTo(weeks, sizes, weekdayWeeks),
         overrides: {},
         style: { ...state.settings.sheetStyle },
       });
     }
     onGenerate({
-      id: newId('sheet'),
+      id: shabbosSheetId,
       season,
       hebrewYear,
       createdAt: new Date().toISOString(),

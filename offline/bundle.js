@@ -28,6 +28,24 @@ const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
+/** The שחרית schedule as it appears on the shul's printed board: the everyday times set
+ *  bigger than the ר"ח/בה"ב/תעני"צ block under them, with the alternate times underlined.
+ *  Plain HTML because it's edited through a rich-text box (see ui/settings-view.js) and
+ *  printed as-is. */
+const DEFAULT_WEEKDAY_SHACHARIS =
+  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>';
+
+/** Earlier shipped versions of the above, before the everyday times were set bigger (and
+ *  before the field became rich text at all). A saved value still matching one of these
+ *  verbatim was never actually edited by hand — it's just an old default sitting in
+ *  localStorage — so storage.js quietly upgrades it rather than leaving the schedule
+ *  stuck looking the way it did two versions ago. Anything else is left strictly alone. */
+const LEGACY_WEEKDAY_SHACHARIS = [
+  '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
+  '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+  '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+];
+
 const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
@@ -51,8 +69,7 @@ const DEFAULT_SETTINGS = {
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
-  weekdayShacharis:
-    '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+  weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,
@@ -99,7 +116,11 @@ const SEED_RULES = [];
 // mutating state.settings.sheetStyle in place would otherwise silently corrupt the
 // app's built-in defaults for the rest of the session.
 function normalizeSettings(raw) {
-  return { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
+  const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
+  // See LEGACY_WEEKDAY_SHACHARIS: carry a never-edited old default forward to the
+  // current one, so an existing install doesn't stay stuck on an outdated schedule.
+  if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
+  return merged;
 }
 
 function defaultState() {
@@ -165,6 +186,28 @@ function defaultPageSizes(total, numPages) {
   const base = Math.floor(total / numPages);
   const rem = total % numPages;
   return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
+ *  `sourceWeeks` — so a Weekday chart's page 1 covers the same stretch of the year as
+ *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
+ *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
+ *  the gap between two source pages lands on the earlier one, matching how the season
+ *  boundaries themselves are assigned in sheets/weeks.js. */
+function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
+  const cutoffs = []; // serial of the first source week on each page after the first
+  let idx = 0;
+  for (let i = 0; i < sourceSizes.length - 1; i++) {
+    idx += Number(sourceSizes[i]) || 0;
+    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
+  }
+  const counts = new Array(sourceSizes.length).fill(0);
+  for (const week of targetWeeks) {
+    let page = 0;
+    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
+    counts[page]++;
+  }
+  return counts;
 }
 
 function splitWeeksIntoPages(weeks, sizes) {
@@ -595,8 +638,8 @@ function formatTime(dayFraction) {
 // Sentinel markers wrapping "this should render underlined" spans (Private Use Area
 // code points, so they can never collide with real content). Kept as plain characters
 // through all the string-building/TEXTJOIN-style formula ports, then converted to real
-// <span class="ul"> elements at render time in ui/sheet-view.js. This keeps this module
-// free of any HTML concerns.
+// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
+// HTML concerns.
 const UL_START = '';
 const UL_END = '';
 
@@ -995,9 +1038,13 @@ function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   // fixed 7-day cadence no matter which season's math found them, so this is exactly
   // the same date the incoming season's own loop would land on as its own first
   // candidate) — see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
-  // there becomes a row here instead of there.
-  if (isCholHamoedAnchor(d, settings, tables.specialDays)) {
-    weeks.push({ serial: d, date: dateFromSerial(d), parsha: holidayNameFor(d, settings, tables.specialDays), specialParsha: '' });
+  // there becomes a row here instead of there. It's folded into the trailing-gap row
+  // above rather than added separately whenever that row already carries the same
+  // holiday's name: the two stretches are the run-up to, and the middle of, one single
+  // Yom Tov, so the chart should carry one row for it, not a pair of identical ones.
+  const cholHamoedName = isCholHamoedAnchor(d, settings, tables.specialDays) ? holidayNameFor(d, settings, tables.specialDays) : '';
+  if (cholHamoedName && weeks[weeks.length - 1]?.parsha !== cholHamoedName) {
+    weeks.push({ serial: d, date: dateFromSerial(d), parsha: cholHamoedName, specialParsha: '' });
   }
 
   return { startSerial, endSerial, weeks };
@@ -1137,18 +1184,13 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       <fieldset>
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday"> Also generate a Weekday chart (separate file) for these weeks</label>
-        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it.</p>
+        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         ${
           !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
             ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
             : ''
         }
-        <div id="weekday-page-section" hidden>
-          <label style="max-width:160px">Number of pages${stepper('wdNumPages', 3, { min: 1, max: 8 })}</label>
-          <div id="weekday-page-size-inputs"></div>
-          <div id="weekday-page-error" class="error"></div>
-        </div>
       </fieldset>
       <div class="actions"><button type="submit">Generate sheet</button></div>
     </form>
@@ -1168,24 +1210,6 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     renderSizeInputs(n);
   });
 
-  const weekdaySection = el.querySelector('#weekday-page-section');
-  const wdInputsEl = el.querySelector('#weekday-page-size-inputs');
-  const wdNumPagesInput = el.querySelector('input[name=wdNumPages]');
-  function renderWeekdaySizeInputs(numPages) {
-    const defaults = defaultPageSizes(weekdayWeeks.length, numPages);
-    wdInputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`wdPageSize${i}`, size, { min: 0, className: 'wd-page-size' })}</label>`).join('');
-    wireSteppers(wdInputsEl);
-  }
-  renderWeekdaySizeInputs(3);
-  wdNumPagesInput.addEventListener('change', () => {
-    const n = Math.max(1, Math.min(8, Number(wdNumPagesInput.value) || 1));
-    wdNumPagesInput.value = n;
-    renderWeekdaySizeInputs(n);
-  });
-  el.querySelector('#include-weekday').addEventListener('change', (e) => {
-    weekdaySection.hidden = !e.target.checked;
-  });
-
   wireSteppers(el);
 
   el.querySelector('#page-form').addEventListener('submit', (e) => {
@@ -1200,33 +1224,26 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     errEl.textContent = '';
 
     const includeWeekday = el.querySelector('#include-weekday').checked;
-    let weekdaySizes = null;
-    if (includeWeekday) {
-      weekdaySizes = [...el.querySelectorAll('.wd-page-size')].map((input) => Number(input.value));
-      const wdErr = validatePageSizes(weekdayWeeks.length, weekdaySizes);
-      const wdErrEl = el.querySelector('#weekday-page-error');
-      if (wdErr) {
-        wdErrEl.textContent = wdErr;
-        return;
-      }
-      wdErrEl.textContent = '';
-    }
+    const shabbosSheetId = newId('sheet');
 
     if (includeWeekday) {
       onGenerate({
         id: newId('sheet'),
         season: 'weekday',
         hebrewYear,
-        linkedSeason: season, // which Shabbos season this was generated alongside, for context only
+        linkedSeason: season, // which Shabbos season this was generated alongside
+        linkedSheetId: shabbosSheetId, // the exact sheet below, for the "View שבת sheet" link
         createdAt: new Date().toISOString(),
         weeks: weekdayWeeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
-        pageSizes: weekdaySizes,
+        // Page breaks fall on the same dates as the Shabbos sheet's, rather than being
+        // chosen separately — see alignPageSizesTo().
+        pageSizes: alignPageSizesTo(weeks, sizes, weekdayWeeks),
         overrides: {},
         style: { ...state.settings.sheetStyle },
       });
     }
     onGenerate({
-      id: newId('sheet'),
+      id: shabbosSheetId,
       season,
       hebrewYear,
       createdAt: new Date().toISOString(),
@@ -1715,6 +1732,82 @@ function renderImageCropper(container, currentDataUrl, onSave) {
   container.querySelector('#crop-remove')?.addEventListener('click', () => onSave(null));
 }
 
+// ==== ui/rich-text.js ====
+// Shared formatting toolbar for the app's contenteditable fields — the sheet's own cells
+// (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
+// Underline goes through execCommand, which already handles the add/remove toggle and
+// partial selections correctly; text size is a plain <span class="big"> wrap, so what's
+// stored stays readable HTML rather than the <font size> tags execCommand would emit.
+
+/** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
+ *  it acts on. */
+function richTextToolbarHtml(label = '') {
+  return `<span class="rt-toolbar no-print">
+    ${label ? `<span class="rt-label">${label}</span>` : ''}
+    <button type="button" data-rt="underline" title="Underline / remove underline from the selected text"><u>U</u></button>
+    <button type="button" data-rt="big" title="Make the selected text bigger">A&plus;</button>
+    <button type="button" data-rt="unbig" title="Put the selected text back to normal size">A&minus;</button>
+  </span>`;
+}
+
+/** `getEditor()` is called per click so callers whose target moves (the sheet's toolbar
+ *  acts on whichever cell was last focused) can resolve it late. */
+function wireRichTextToolbar(root, getEditor) {
+  root.querySelectorAll('[data-rt]').forEach((btn) => {
+    // Without this the button steals focus on press, which collapses the selection in
+    // the editor before the click handler ever runs — leaving nothing to format.
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const editor = getEditor();
+      if (!editor) return;
+      applyRichTextCommand(btn.dataset.rt, editor);
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+}
+
+function applyRichTextCommand(cmd, editor) {
+  if (cmd === 'underline') {
+    document.execCommand('underline');
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return;
+
+  if (cmd === 'big') {
+    const span = document.createElement('span');
+    span.className = 'big';
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    reselect(sel, span);
+    return;
+  }
+  if (cmd === 'unbig') {
+    // Selection sitting *inside* one big span (the common case — you enlarged a line,
+    // then selected part of it): unwrap that whole span rather than splitting it.
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    const enclosing = node.closest?.('span.big');
+    if (enclosing && editor.contains(enclosing)) {
+      enclosing.replaceWith(...enclosing.childNodes);
+      return;
+    }
+    // Otherwise the selection spans several — strip any it fully contains.
+    const frag = range.extractContents();
+    frag.querySelectorAll('span.big').forEach((s) => s.replaceWith(...s.childNodes));
+    range.insertNode(frag);
+  }
+}
+
+function reselect(sel, node) {
+  sel.removeAllRanges();
+  const r = document.createRange();
+  r.selectNodeContents(node);
+  sel.addRange(r);
+}
+
 // ==== ui/settings-view.js ====
 function renderSettings(container, state, onSave) {
   const s = state.settings;
@@ -1737,10 +1830,10 @@ function renderSettings(container, state, onSave) {
         <p class="hint">מנחה and מעריב on the Weekday chart are each a dropdown on every week's cell, not computed — list one option per line below (the first line is what a fresh week starts on); picking "Other…" on the sheet itself lets you type a one-off value for just that week. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
         <label>Default מנחה options (one per line)<textarea name="weekdayDefaultMincha" rows="4">${esc(s.weekdayDefaultMincha)}</textarea></label>
         <label>Default מעריב options (one per line)<textarea name="weekdayDefaultMaariv" rows="4">${esc(s.weekdayDefaultMaariv)}</textarea></label>
-        <label>שחרית schedule (same every week)
-          <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
-        </label>
-        <p class="hint">Click into the שחרית box above to edit it — select text + Ctrl/Cmd+U to underline or un-underline, same as on a printed sheet.</p>
+        <div class="rt-field-label">שחרית schedule (same every week)</div>
+        ${richTextToolbarHtml('Selected text:')}
+        <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
+        <p class="hint">Click into the שחרית box to edit it. Select some text first, then use the buttons above to underline it or change its size (Ctrl/Cmd+U also toggles underline).</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </fieldset>
       <fieldset>
@@ -1784,6 +1877,7 @@ function renderSettings(container, state, onSave) {
       document.execCommand('underline');
     }
   });
+  wireRichTextToolbar(container, () => shacharisEditor);
 
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2015,10 +2109,14 @@ function renderSheet(container, state, sheet, onChange) {
   // the Shabbos sheet it was generated alongside) — generating both saves both, but only
   // one can be open at a time, so this link is how you actually get to see the other one
   // right after generating instead of having to dig it up from Saved Sheets.
+  // linkedSheetId is the exact pairing recorded at generation time; the season+year
+  // match after it is the fallback for pairs generated before that was stored.
   const companion =
     sheet.season === 'weekday'
-      ? state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : state.sheets
+      ? state.sheets.find((s) => s.id === sheet.linkedSheetId) ||
+        state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) ||
+        state.sheets
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
@@ -2030,7 +2128,8 @@ function renderSheet(container, state, sheet, onChange) {
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
-      <span class="hint">Click a cell to edit it (select text + Ctrl/Cmd+U to underline/un-underline). Rule-affected cells show a light yellow background.${
+      ${richTextToolbarHtml('In the cell you\'re editing:')}
+      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
@@ -2070,6 +2169,16 @@ function renderSheet(container, state, sheet, onChange) {
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
+
+  // The formatting buttons act on whichever cell was last being edited. Tracked on
+  // focusin rather than read from document.activeElement at click time because the
+  // buttons deliberately don't take focus (see wireRichTextToolbar) — but a click
+  // elsewhere on the page in between should still leave them pointing at that cell.
+  let lastFocusedCell = null;
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
+  });
+  wireRichTextToolbar(container, () => lastFocusedCell);
   container.querySelector('#undo-btn').addEventListener('click', () => {
     const action = hist.undo.pop();
     if (!action) return;
@@ -2382,14 +2491,13 @@ function splitBuild(season) {
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 
-// Converts UL_START/UL_END sentinels (see format.js) into real <span class="ul">
-// elements *after* HTML-escaping the rest of the text, and \n into <br>.
+// Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
+// HTML-escaping the rest of the text, and \n into <br>. Plain <u> rather than a styled
+// <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
+// go through execCommand, which only recognizes its own native markup and silently
+// no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
-  const escaped = esc(str)
-    .split(UL_START)
-    .join('<span class="ul">')
-    .split(UL_END)
-    .join('</span>');
+  const escaped = esc(str).split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 function esc(str) {

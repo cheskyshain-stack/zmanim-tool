@@ -14,6 +14,24 @@ export const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
+/** The שחרית schedule as it appears on the shul's printed board: the everyday times set
+ *  bigger than the ר"ח/בה"ב/תעני"צ block under them, with the alternate times underlined.
+ *  Plain HTML because it's edited through a rich-text box (see ui/settings-view.js) and
+ *  printed as-is. */
+export const DEFAULT_WEEKDAY_SHACHARIS =
+  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>';
+
+/** Earlier shipped versions of the above, before the everyday times were set bigger (and
+ *  before the field became rich text at all). A saved value still matching one of these
+ *  verbatim was never actually edited by hand — it's just an old default sitting in
+ *  localStorage — so storage.js quietly upgrades it rather than leaving the schedule
+ *  stuck looking the way it did two versions ago. Anything else is left strictly alone. */
+export const LEGACY_WEEKDAY_SHACHARIS = [
+  '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
+  '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+  '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+];
+
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
@@ -37,8 +55,7 @@ export const DEFAULT_SETTINGS = {
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
-  weekdayShacharis:
-    '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
+  weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
   latitude: 40.067,

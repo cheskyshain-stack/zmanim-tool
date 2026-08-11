@@ -26,8 +26,8 @@ export function formatTime(dayFraction) {
 // Sentinel markers wrapping "this should render underlined" spans (Private Use Area
 // code points, so they can never collide with real content). Kept as plain characters
 // through all the string-building/TEXTJOIN-style formula ports, then converted to real
-// <span class="ul"> elements at render time in ui/sheet-view.js. This keeps this module
-// free of any HTML concerns.
+// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
+// HTML concerns.
 export const UL_START = '';
 export const UL_END = '';
 

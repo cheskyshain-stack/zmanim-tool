@@ -1,7 +1,7 @@
 // localStorage persistence + JSON export/import. Everything (settings, saved sheet
 // instances with their per-cell overrides, and rules) lives in one namespaced key —
 // this is the single-browser "local app" model the user chose over a hosted backend.
-import { DEFAULT_SETTINGS } from './settings.js';
+import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS } from './settings.js';
 
 const KEY = 'zmanim-app-state-v1';
 
@@ -15,7 +15,11 @@ const SEED_RULES = [];
 // mutating state.settings.sheetStyle in place would otherwise silently corrupt the
 // app's built-in defaults for the rest of the session.
 function normalizeSettings(raw) {
-  return { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
+  const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
+  // See LEGACY_WEEKDAY_SHACHARIS: carry a never-edited old default forward to the
+  // current one, so an existing install doesn't stay stuck on an outdated schedule.
+  if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
+  return merged;
 }
 
 function defaultState() {
