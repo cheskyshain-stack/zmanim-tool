@@ -33,8 +33,10 @@
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { font-family: inherit; }
-h2 { font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; margin: 0 0 0.35rem; letter-spacing: -0.02em; font-weight: 700; }
 h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
+/* The lead paragraph each screen opens with, straight after its title. */
+#main > h2 + .hint { max-width: 70ch; margin: 0 0 1.4rem; font-size: 0.92rem; }
 
 /* App chrome (sidebar, panels, buttons) uses --ui-accent; the printed chart keeps its
    own --sheet-accent / --accent, which are deliberately left alone here. */
@@ -95,10 +97,17 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 
 .form-grid { display: flex; flex-direction: column; gap: 1rem; }
 .form-grid fieldset {
-  border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.15rem;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 1.15rem 1.25rem;
   background: var(--surface); box-shadow: var(--shadow-sm);
 }
-.form-grid legend { font-weight: 600; font-size: 0.9rem; color: var(--accent-dark); padding: 0 0.4rem; }
+/* float+full width takes the legend out of the notch it normally cuts in the top border,
+   so the card outline stays unbroken and the legend reads as its heading instead.
+   Following content clears it because it spans the full width. */
+.form-grid legend {
+  float: left; width: 100%; padding: 0 0 0.6rem; margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700; font-size: 0.95rem; color: var(--ink); letter-spacing: -0.01em;
+}
 .form-grid label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; }
 .form-grid fieldset label { font-weight: 400; }
 .form-grid label:has(input[type=checkbox]), .form-grid label:has(input[type=radio]) { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 400; }
@@ -149,7 +158,12 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .form-grid button:hover, .sheet-toolbar button:hover { background: var(--ui-accent-dark); }
 .form-grid button:active, .sheet-toolbar button:active { transform: translateY(1px); }
 
-.week-list { columns: 2; column-gap: 2rem; font-size: 0.87rem; color: var(--muted); line-height: 1.7; }
+.week-list {
+  columns: 2; column-gap: 2rem; font-size: 0.87rem; color: var(--muted); line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.9rem 1.1rem 0.9rem 2.4rem; margin: 0 0 1rem; box-shadow: var(--shadow-sm);
+}
+.week-list li::marker { color: var(--border-strong); }
 
 .stepper { display: inline-flex; align-items: stretch; margin-top: 0.3rem; }
 .stepper .step-btn {
@@ -170,10 +184,30 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .col-check { display: inline-flex; align-items: center; gap: 0.4rem; width: 48%; font-size: 0.85rem; font-weight: 400; margin-bottom: 0.4rem; }
 
 .rule-row {
-  display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.9rem; margin-bottom: 0.5rem;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem 1.1rem; margin-bottom: 0.6rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.rule-summary { flex: 1; }
+.rule-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.rule-summary { flex: 1; min-width: 0; }
+.rule-summary strong { font-size: 0.98rem; }
+.rule-summary code {
+  background: var(--ui-accent-soft); color: var(--ui-accent-dark); border-radius: 4px;
+  padding: 0.05rem 0.35rem; font-size: 0.8rem;
+}
+/* The per-rule enable checkbox drawn as a switch — same checkbox, same semantics, just
+   readable at a glance next to the rule it belongs to. */
+.rule-enabled {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer; flex-shrink: 0;
+  width: 2.1rem; height: 1.2rem; border-radius: 999px; background: var(--border-strong);
+  position: relative; transition: background 0.15s ease;
+}
+.rule-enabled::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: calc(1.2rem - 4px); height: calc(1.2rem - 4px);
+  border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform 0.15s ease;
+}
+.rule-enabled:checked { background: var(--ui-accent); }
+.rule-enabled:checked::after { transform: translateX(0.9rem); }
 .rule-delete {
   background: none; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, white);
   border-radius: var(--radius-sm); padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.85rem; font-weight: 500;
@@ -181,9 +215,10 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 }
 .rule-delete:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
 
-.saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
-.saved-list th, .saved-list td { text-align: left; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.saved-list th { background: var(--accent-soft); font-weight: 600; color: var(--accent-dark); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+.saved-list th, .saved-list td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.saved-list th { background: var(--bg); font-weight: 600; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.saved-list td:first-child { font-weight: 600; }
 .saved-list tr:last-child td { border-bottom: none; }
 .saved-list tbody tr:hover td { background: var(--accent-soft); }
 .saved-list button { margin-right: 0.4rem; background: var(--ui-accent); color: white; border: none; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.82rem; font-weight: 500; font-family: inherit; }
@@ -191,7 +226,12 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .saved-list button + button { background: none; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, white); }
 .saved-list button + button:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
 
-.sheet-toolbar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.sheet-toolbar {
+  display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.7rem 1rem; box-shadow: var(--shadow-sm);
+}
+.sheet-toolbar .hint { flex-basis: 100%; margin: 0.15rem 0 0; }
 .sheet-toolbar button { background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong); }
 .sheet-toolbar button:hover { background: var(--accent-soft); }
 .sheet-toolbar #print-btn { background: var(--ui-accent); color: white; border: none; }

@@ -1,6 +1,7 @@
 export function renderSavedSheets(container, state, onOpen, onDelete) {
   container.innerHTML = `
     <h2>Saved sheets</h2>
+    <p class="hint">Every sheet you've generated. Open one to edit or print it.</p>
     ${
       state.sheets.length
         ? `<table class="saved-list"><thead><tr><th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th></th></tr></thead><tbody>

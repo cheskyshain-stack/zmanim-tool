@@ -8,6 +8,7 @@ export function renderGenerate(container, state, tables, onGenerate) {
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   container.innerHTML = `
     <h2>Generate a sheet</h2>
+    <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>

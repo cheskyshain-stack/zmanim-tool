@@ -1143,6 +1143,7 @@ function renderGenerate(container, state, tables, onGenerate) {
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   container.innerHTML = `
     <h2>Generate a sheet</h2>
+    <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>
@@ -1582,6 +1583,7 @@ function esc(str) {
 function renderSavedSheets(container, state, onOpen, onDelete) {
   container.innerHTML = `
     <h2>Saved sheets</h2>
+    <p class="hint">Every sheet you've generated. Open one to edit or print it.</p>
     ${
       state.sheets.length
         ? `<table class="saved-list"><thead><tr><th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th></th></tr></thead><tbody>
