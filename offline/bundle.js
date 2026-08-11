@@ -2330,6 +2330,14 @@ function renderSheet(container, state, sheet, onChange) {
       pagesEl.querySelectorAll(`col[data-colkey="${key}"]`).forEach((col) => {
         col.style.width = px ? px + 'px' : '';
       });
+      // The parsha column carries a CSS min-width floor (see .parsha-cell in app.css),
+      // which a narrower typed value would otherwise lose to — so mirror it inline here
+      // as well, keeping the live preview honest as you type.
+      if (key === 'parsha') {
+        pagesEl.querySelectorAll('.parsha-cell').forEach((td) => {
+          td.style.minWidth = px ? px + 'px' : '';
+        });
+      }
       return px;
     };
     input.addEventListener('input', applyWidth);
@@ -2504,7 +2512,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       };
       const cells = orderedColumns.map(cellHtml).join('');
       const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
-      const parshaTd = `<td class="parsha-cell">${nl2br(parshaCell)}</td>`;
+      // An explicit width from the column-width panel has to beat the CSS min-width
+      // floor on .parsha-cell (see app.css) — otherwise setting a narrower one there
+      // would silently do nothing. Inline, so it outranks the stylesheet.
+      const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
+      const parshaTd = `<td class="parsha-cell"${parshaWidth}>${nl2br(parshaCell)}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');

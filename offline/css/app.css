@@ -256,6 +256,16 @@ th {
   min-height: 2.6em;
 }
 .parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); }
+/* A floor on the parsha column so it can't be crushed. With table-layout:auto the
+   browser shares out surplus width in proportion to how much content a column has, and
+   the time columns hold far more of it — so on a קיץ page (12 columns rather than
+   חורף's 9) the parsha column was being squeezed to ~59px, leaving a name like
+   "כי תשא" only a few pixels of margin, while the same column on a חורף page sat at a
+   comfortable ~86px. This just brings the tight pages up to match the roomy ones.
+   Only a floor: a genuinely long name ("אחרי מות - קדושים" needs ~112px) still widens
+   the column past it. In em, so it tracks the text-size slider. Excluded for the
+   Weekday chart, which is table-layout:fixed and sizes its columns by percentage. */
+table:not(.weekday-table) .parsha-cell { min-width: 5.5em; }
 tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
 /* Cell content is direction:ltr even inside the RTL table — without this, the Unicode
    bidi algorithm can visually reverse "/"-separated time lists (e.g. "9:03 / 9:15"
