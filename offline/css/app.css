@@ -441,12 +441,15 @@ td.ruled .cell { background: var(--ruled); }
    option can carry the underlining the printed board uses). */
 .opt-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
 .opt-row .opt-input { flex: 1; min-height: 1.6em; margin-top: 0; text-align: left; }
-.opt-remove {
+/* Scoped under .form-grid so it beats the blanket `.form-grid button` (solid blue) —
+   these sit inside the Settings form, and without the extra class they rendered as
+   solid blue primary buttons rather than a quiet remove control. */
+.form-grid .opt-remove {
   flex-shrink: 0; width: 1.7rem; height: 1.7rem; padding: 0; line-height: 1;
   background: none; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, white);
-  border-radius: var(--radius-sm); cursor: pointer; font-size: 1rem;
+  border-radius: var(--radius-sm); cursor: pointer; font-size: 1rem; font-weight: 600;
 }
-.opt-remove:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
+.form-grid .opt-remove:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
 .form-grid .opt-add {
   background: var(--accent-soft); color: var(--accent-dark); border: 1px solid var(--border);
   padding: 0.35rem 0.8rem; font-size: 0.82rem; margin-bottom: 0.9rem;
