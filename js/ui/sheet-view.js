@@ -7,7 +7,7 @@ import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { UL_START, UL_END, normalizeRichText } from '../format.js';
-import { richTextToolbarHtml, wireRichTextToolbar } from './rich-text.js';
+import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -314,25 +314,21 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: a dropdown of Settings-configured options
-        // (plus a free-text "Type your own…" escape hatch) instead of a freeform
-        // editable cell — see the .weekday-select/.weekday-other-input wiring below.
-        // A non-preset value gets injected as its own real (selected) option instead of
-        // showing a generic "Other…" label next to it, so the closed dropdown always
-        // reads as plain text — no different-looking from any other cell — until clicked.
+        // מנחה/מעריב on the Weekday chart: an ordinary editable cell (so underlining and
+        // the size buttons work on it exactly as they do anywhere else, and it prints as
+        // plain text), plus a hover-only ▾ that drops down the Settings-configured
+        // presets. It was a native <select> before, which couldn't carry the underlining
+        // the printed board uses — <option> renders its text flat, markup and all.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           const options = c.key === 'B' ? maarivOptions : minchaOptions;
-          const current = String(row[c.key] ?? '').replace(/<[^>]+>/g, ''); // strip any HTML from pre-dropdown-era overrides
-          const matchesPreset = options.includes(current);
-          const customOptionHtml = !matchesPreset && current ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
-          const optsHtml = options.map((opt) => `<option value="${esc(opt)}" ${opt === current ? 'selected' : ''}>${esc(opt)}</option>`).join('');
-          return `<td>
-            <select class="weekday-select" data-serial="${week.serial}" data-col="${c.key}">
-              ${customOptionHtml}
-              ${optsHtml}
-              <option value="__other__">✎ Type your own…</option>
-            </select>
-            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" hidden>
+          const html = row[c.key] ?? ''; // already HTML — the presets are rich text
+          const menu = options.length
+            ? `<button type="button" class="weekday-pick no-print" title="Choose one of the times set in Settings">&#9662;</button>
+               <div class="weekday-pick-menu no-print" hidden>${options.map((opt) => `<button type="button" class="weekday-pick-option">${opt}</button>`).join('')}</div>`
+            : '';
+          return `<td class="weekday-pick-cell">
+            <div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div>
+            ${menu}
           </td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -378,6 +374,37 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
+  /** What this cell would hold with no manual override — what an edit is diffed against
+   *  to decide whether it's a real change worth storing. */
+  const baselineHtmlFor = (cellEl) => {
+    const col = cellEl.dataset.col;
+    const weekSeason = cellEl.dataset.season;
+    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
+    const settingsResolved = resolveSettings(state.settings);
+    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
+    const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
+    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
+    const raw = ruled[col] ?? '';
+    // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
+    // list in Settings); every other column is plain text that nl2br has to mark up
+    // first, or the comparison would see markup-vs-none and store a bogus override.
+    return normalizeRichText(weekSeason === 'weekday' ? raw : nl2br(raw));
+  };
+
+  const commitCell = (cellEl) => {
+    const serial = Number(cellEl.dataset.serial);
+    const col = cellEl.dataset.col;
+    const newHtml = normalizeRichText(cellEl.innerHTML);
+    const before = getOverride(sheet, serial, col); // undefined = "no override"
+    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
+    if (before === after) return; // no real change (e.g. just clicked in and out)
+    applyOverrideValue(sheet, serial, col, after);
+    const hist = getHistory(sheet.id);
+    hist.undo.push({ serial, col, before, after });
+    hist.redo = []; // a fresh edit invalidates any redo history
+    onChange({ save: true });
+  };
+
   page.querySelectorAll('.cell').forEach((cellEl) => {
     cellEl.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
@@ -386,58 +413,30 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       }
     });
     cellEl.addEventListener('blur', () => {
-      const serial = Number(cellEl.dataset.serial);
-      const col = cellEl.dataset.col;
-      const weekSeason = cellEl.dataset.season;
-      const week = sheet.weeks.find((w) => w.serial === serial);
-      const settingsResolved = resolveSettings(state.settings);
-      const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-      const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
-      const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
-      const baselineHtml = nl2br(ruled[col] ?? '');
-      const newHtml = normalizeRichText(cellEl.innerHTML);
-      const before = getOverride(sheet, serial, col); // undefined = "no override"
-      const after = newHtml === baselineHtml ? undefined : newHtml;
-      if (before === after) return; // no real change (e.g. just clicked in and out)
-      applyOverrideValue(sheet, serial, col, after);
-      const hist = getHistory(sheet.id);
-      hist.undo.push({ serial, col, before, after });
-      hist.redo = []; // a fresh edit invalidates any redo history
-      onChange({ save: true });
+      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
+      commitCell(cellEl);
     });
   });
 
-  // Weekday chart's מנחה/מעריב dropdowns (see cellHtml above): picking a preset commits
-  // immediately; picking "Other…" reveals the paired text input instead and commits
-  // whatever's typed there on blur.
-  page.querySelectorAll('.weekday-select').forEach((selectEl) => {
-    const serial = Number(selectEl.dataset.serial);
-    const col = selectEl.dataset.col;
-    const otherInput = page.querySelector(`.weekday-other-input[data-serial="${serial}"][data-col="${col}"]`);
-    const commit = (value) => {
-      const week = sheet.weeks.find((w) => w.serial === serial);
-      const settingsResolved = resolveSettings(state.settings);
-      const baseline = buildWeekdayRow({ ...week, date: new Date(week.date) }, settingsResolved)[col] ?? '';
-      const before = getOverride(sheet, serial, col);
-      const after = value === baseline ? undefined : value;
-      if (before === after) return;
-      applyOverrideValue(sheet, serial, col, after);
-      const hist = getHistory(sheet.id);
-      hist.undo.push({ serial, col, before, after });
-      hist.redo = [];
-      onChange({ save: true });
-    };
-    selectEl.addEventListener('change', () => {
-      if (selectEl.value === '__other__') {
-        otherInput.hidden = false;
-        otherInput.focus();
-        otherInput.select();
-        return;
-      }
-      otherInput.hidden = true;
-      commit(selectEl.value);
+  // Weekday chart's מנחה/מעריב preset picker (see cellHtml above) — the ▾ next to the
+  // cell. Choosing an option drops its HTML (underlining and all) straight into the
+  // cell and commits it through the same path a typed edit takes.
+  page.querySelectorAll('.weekday-pick').forEach((pickBtn) => {
+    const td = pickBtn.closest('td');
+    const menu = td.querySelector('.weekday-pick-menu');
+    const cellEl = td.querySelector('.cell');
+    pickBtn.addEventListener('click', () => {
+      // Close any other open menu first, so only one is ever showing.
+      page.querySelectorAll('.weekday-pick-menu').forEach((m) => m !== menu && (m.hidden = true));
+      menu.hidden = !menu.hidden;
     });
-    otherInput?.addEventListener('blur', () => commit(otherInput.value));
+    menu.querySelectorAll('.weekday-pick-option').forEach((optBtn) => {
+      optBtn.addEventListener('click', () => {
+        menu.hidden = true;
+        cellEl.innerHTML = optBtn.innerHTML;
+        commitCell(cellEl);
+      });
+    });
   });
 
   return page;

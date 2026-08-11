@@ -3,6 +3,7 @@
 // Underline goes through execCommand, which already handles the add/remove toggle and
 // partial selections correctly; text size is a plain <span class="big"> wrap, so what's
 // stored stays readable HTML rather than the <font size> tags execCommand would emit.
+import { normalizeTimeList, normalizeTimeShorthand } from '../format.js';
 
 /** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
  *  it acts on. */
@@ -64,6 +65,30 @@ export function applyRichTextCommand(cmd, editor) {
     frag.querySelectorAll('span.big').forEach((s) => s.replaceWith(...s.childNodes));
     range.insertNode(frag);
   }
+}
+
+/** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
+ *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
+ *
+ *  With no markup in the field it can work on the text wholesale, separators included.
+ *  Once part of the text is underlined or resized, it only expands digits within each
+ *  text node and leaves separators alone: the spaces between times may then live in
+ *  different nodes than the times themselves, and rewriting across that boundary would
+ *  mean rebuilding the field's HTML — which would throw away exactly the formatting the
+ *  user just applied. */
+export function applyTimeShorthand(editorEl) {
+  if (!editorEl.children.length) {
+    const normalized = normalizeTimeList(editorEl.textContent);
+    if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
+    return;
+  }
+  const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach((node) => {
+    const normalized = normalizeTimeShorthand(node.nodeValue);
+    if (normalized !== node.nodeValue) node.nodeValue = normalized;
+  });
 }
 
 function reselect(sel, node) {

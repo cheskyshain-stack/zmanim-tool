@@ -39,6 +39,39 @@ export function underlineTime(value) {
   return UL_START + ' ' + text + UL_END;
 }
 
+/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
+ *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
+ *  the caller can leave those digits untouched rather than mangle them. */
+function expandTimeDigits(digits) {
+  let hour, minute;
+  if (digits.length <= 2) {
+    hour = Number(digits);
+    minute = '00';
+  } else {
+    const split = digits.length === 3 ? 1 : 2;
+    hour = Number(digits.slice(0, split));
+    minute = digits.slice(split);
+  }
+  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
+  return `${hour}:${minute}`;
+}
+
+/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
+ *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon —
+ *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
+export function normalizeTimeShorthand(text) {
+  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
+}
+
+/** normalizeTimeShorthand plus the separator: whitespace *between two times* becomes the
+ *  "/" these lists are written with. Spaces anywhere else (inside a Hebrew word, say)
+ *  are deliberately left alone. */
+export function normalizeTimeList(text) {
+  return normalizeTimeShorthand(text)
+    .trim()
+    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1/');
+}
+
 /** Light contenteditable HTML cleanup, shared by every rich-text field in the app
  *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
  *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:

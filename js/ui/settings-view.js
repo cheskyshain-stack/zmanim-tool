@@ -1,7 +1,7 @@
 import { TIMEZONES } from '../settings.js';
 import { renderImageCropper } from './image-crop.js';
 import { normalizeRichText } from '../format.js';
-import { richTextToolbarHtml, wireRichTextToolbar } from './rich-text.js';
+import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 
 export function renderSettings(container, state, onSave) {
   const s = state.settings;
@@ -21,13 +21,17 @@ export function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart are each a dropdown on every week's cell, not computed — list one option per line below (the first line is what a fresh week starts on); picking "Other…" on the sheet itself lets you type a one-off value for just that week. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <label>Default מנחה options (one per line)<textarea name="weekdayDefaultMincha" rows="4">${esc(s.weekdayDefaultMincha)}</textarea></label>
-        <label>Default מעריב options (one per line)<textarea name="weekdayDefaultMaariv" rows="4">${esc(s.weekdayDefaultMaariv)}</textarea></label>
-        <div class="rt-field-label">שחרית schedule (same every week)</div>
+        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — each week's cell starts from the first option below, and you pick a different one (or type straight into the cell) per week on the sheet itself. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">Every box in this section takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
+        <div class="rt-field-label">Default מנחה options</div>
+        <div class="opt-list" id="mincha-options">${optionRows(s.weekdayDefaultMincha)}</div>
+        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה option</button>
+        <div class="rt-field-label">Default מעריב options</div>
+        <div class="opt-list" id="maariv-options">${optionRows(s.weekdayDefaultMaariv)}</div>
+        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב option</button>
+        <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
-        <p class="hint">Click into the שחרית box to edit it. Select some text first, then use the buttons above to underline it or change its size (Ctrl/Cmd+U also toggles underline).</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </fieldset>
       <fieldset>
@@ -65,13 +69,42 @@ export function renderSettings(container, state, onSave) {
   });
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
-  shacharisEditor.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+
+  // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
+  // was last focused — tracked on focusin because the toolbar buttons deliberately don't
+  // take focus (see wireRichTextToolbar).
+  let lastRichField = shacharisEditor;
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList?.contains('richtext-field')) lastRichField = e.target;
+  });
+  wireRichTextToolbar(container, () => lastRichField);
+
+  // Shorthand times settle when you leave a box, and Ctrl/Cmd+U underlines, in every one
+  // of these boxes — including option rows added after this point, hence the delegation.
+  container.addEventListener(
+    'blur',
+    (e) => {
+      if (e.target.classList?.contains('richtext-field')) applyTimeShorthand(e.target);
+    },
+    true // blur doesn't bubble; capture is how a delegated listener sees it
+  );
+  container.addEventListener('keydown', (e) => {
+    if (e.target.classList?.contains('richtext-field') && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
       e.preventDefault();
       document.execCommand('underline');
     }
   });
-  wireRichTextToolbar(container, () => shacharisEditor);
+
+  container.querySelectorAll('.opt-add').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const list = container.querySelector('#' + btn.dataset.list);
+      list.insertAdjacentHTML('beforeend', optionRow(''));
+      list.lastElementChild.querySelector('.richtext-field').focus();
+    });
+  });
+  container.addEventListener('click', (e) => {
+    if (e.target.classList?.contains('opt-remove')) e.target.closest('.opt-row').remove();
+  });
 
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -83,8 +116,8 @@ export function renderSettings(container, state, onSave) {
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
-      weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
-      weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
+      weekdayDefaultMincha: readOptionList(container, 'mincha-options'),
+      weekdayDefaultMaariv: readOptionList(container, 'maariv-options'),
       weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
@@ -103,6 +136,34 @@ export function renderSettings(container, state, onSave) {
     };
     onSave(next);
   });
+}
+
+/** One editable מנחה/מעריב option. These hold real HTML rather than plain text — the
+ *  times on the printed board are partly underlined, and the sheet cells they fill in
+ *  need to carry that formatting with them. */
+function optionRow(html) {
+  return `<div class="opt-row">
+    <div class="cell richtext-field opt-input" contenteditable="true" dir="ltr">${html}</div>
+    <button type="button" class="opt-remove" title="Remove this option">&times;</button>
+  </div>`;
+}
+
+/** The stored settings value is one option per line (see sheets/weekday.js), so a blank
+ *  value still gets one empty row to type into. */
+function optionRows(stored) {
+  const rows = String(stored || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (rows.length ? rows : ['']).map(optionRow).join('');
+}
+
+/** Collects an option list back into the stored one-per-line form. */
+function readOptionList(container, id) {
+  return [...container.querySelectorAll(`#${id} .opt-input`)]
+    .map((el) => normalizeRichText(el.innerHTML))
+    .filter(Boolean)
+    .join('\n');
 }
 
 function esc(str) {

@@ -651,6 +651,39 @@ function underlineTime(value) {
   return UL_START + ' ' + text + UL_END;
 }
 
+/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
+ *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
+ *  the caller can leave those digits untouched rather than mangle them. */
+function expandTimeDigits(digits) {
+  let hour, minute;
+  if (digits.length <= 2) {
+    hour = Number(digits);
+    minute = '00';
+  } else {
+    const split = digits.length === 3 ? 1 : 2;
+    hour = Number(digits.slice(0, split));
+    minute = digits.slice(split);
+  }
+  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
+  return `${hour}:${minute}`;
+}
+
+/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
+ *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon —
+ *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
+function normalizeTimeShorthand(text) {
+  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
+}
+
+/** normalizeTimeShorthand plus the separator: whitespace *between two times* becomes the
+ *  "/" these lists are written with. Spaces anywhere else (inside a Hebrew word, say)
+ *  are deliberately left alone. */
+function normalizeTimeList(text) {
+  return normalizeTimeShorthand(text)
+    .trim()
+    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1/');
+}
+
 /** Light contenteditable HTML cleanup, shared by every rich-text field in the app
  *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
  *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
@@ -1801,6 +1834,30 @@ function applyRichTextCommand(cmd, editor) {
   }
 }
 
+/** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
+ *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
+ *
+ *  With no markup in the field it can work on the text wholesale, separators included.
+ *  Once part of the text is underlined or resized, it only expands digits within each
+ *  text node and leaves separators alone: the spaces between times may then live in
+ *  different nodes than the times themselves, and rewriting across that boundary would
+ *  mean rebuilding the field's HTML — which would throw away exactly the formatting the
+ *  user just applied. */
+function applyTimeShorthand(editorEl) {
+  if (!editorEl.children.length) {
+    const normalized = normalizeTimeList(editorEl.textContent);
+    if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
+    return;
+  }
+  const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach((node) => {
+    const normalized = normalizeTimeShorthand(node.nodeValue);
+    if (normalized !== node.nodeValue) node.nodeValue = normalized;
+  });
+}
+
 function reselect(sel, node) {
   sel.removeAllRanges();
   const r = document.createRange();
@@ -1827,13 +1884,17 @@ function renderSettings(container, state, onSave) {
       </fieldset>
       <fieldset>
         <legend>Weekday chart defaults</legend>
-        <p class="hint">מנחה and מעריב on the Weekday chart are each a dropdown on every week's cell, not computed — list one option per line below (the first line is what a fresh week starts on); picking "Other…" on the sheet itself lets you type a one-off value for just that week. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <label>Default מנחה options (one per line)<textarea name="weekdayDefaultMincha" rows="4">${esc(s.weekdayDefaultMincha)}</textarea></label>
-        <label>Default מעריב options (one per line)<textarea name="weekdayDefaultMaariv" rows="4">${esc(s.weekdayDefaultMaariv)}</textarea></label>
-        <div class="rt-field-label">שחרית schedule (same every week)</div>
+        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — each week's cell starts from the first option below, and you pick a different one (or type straight into the cell) per week on the sheet itself. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">Every box in this section takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
+        <div class="rt-field-label">Default מנחה options</div>
+        <div class="opt-list" id="mincha-options">${optionRows(s.weekdayDefaultMincha)}</div>
+        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה option</button>
+        <div class="rt-field-label">Default מעריב options</div>
+        <div class="opt-list" id="maariv-options">${optionRows(s.weekdayDefaultMaariv)}</div>
+        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב option</button>
+        <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
-        <p class="hint">Click into the שחרית box to edit it. Select some text first, then use the buttons above to underline it or change its size (Ctrl/Cmd+U also toggles underline).</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </fieldset>
       <fieldset>
@@ -1871,13 +1932,42 @@ function renderSettings(container, state, onSave) {
   });
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
-  shacharisEditor.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+
+  // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
+  // was last focused — tracked on focusin because the toolbar buttons deliberately don't
+  // take focus (see wireRichTextToolbar).
+  let lastRichField = shacharisEditor;
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList?.contains('richtext-field')) lastRichField = e.target;
+  });
+  wireRichTextToolbar(container, () => lastRichField);
+
+  // Shorthand times settle when you leave a box, and Ctrl/Cmd+U underlines, in every one
+  // of these boxes — including option rows added after this point, hence the delegation.
+  container.addEventListener(
+    'blur',
+    (e) => {
+      if (e.target.classList?.contains('richtext-field')) applyTimeShorthand(e.target);
+    },
+    true // blur doesn't bubble; capture is how a delegated listener sees it
+  );
+  container.addEventListener('keydown', (e) => {
+    if (e.target.classList?.contains('richtext-field') && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
       e.preventDefault();
       document.execCommand('underline');
     }
   });
-  wireRichTextToolbar(container, () => shacharisEditor);
+
+  container.querySelectorAll('.opt-add').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const list = container.querySelector('#' + btn.dataset.list);
+      list.insertAdjacentHTML('beforeend', optionRow(''));
+      list.lastElementChild.querySelector('.richtext-field').focus();
+    });
+  });
+  container.addEventListener('click', (e) => {
+    if (e.target.classList?.contains('opt-remove')) e.target.closest('.opt-row').remove();
+  });
 
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1889,8 +1979,8 @@ function renderSettings(container, state, onSave) {
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
-      weekdayDefaultMincha: fd.get('weekdayDefaultMincha'),
-      weekdayDefaultMaariv: fd.get('weekdayDefaultMaariv'),
+      weekdayDefaultMincha: readOptionList(container, 'mincha-options'),
+      weekdayDefaultMaariv: readOptionList(container, 'maariv-options'),
       weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
@@ -1909,6 +1999,34 @@ function renderSettings(container, state, onSave) {
     };
     onSave(next);
   });
+}
+
+/** One editable מנחה/מעריב option. These hold real HTML rather than plain text — the
+ *  times on the printed board are partly underlined, and the sheet cells they fill in
+ *  need to carry that formatting with them. */
+function optionRow(html) {
+  return `<div class="opt-row">
+    <div class="cell richtext-field opt-input" contenteditable="true" dir="ltr">${html}</div>
+    <button type="button" class="opt-remove" title="Remove this option">&times;</button>
+  </div>`;
+}
+
+/** The stored settings value is one option per line (see sheets/weekday.js), so a blank
+ *  value still gets one empty row to type into. */
+function optionRows(stored) {
+  const rows = String(stored || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (rows.length ? rows : ['']).map(optionRow).join('');
+}
+
+/** Collects an option list back into the stored one-per-line form. */
+function readOptionList(container, id) {
+  return [...container.querySelectorAll(`#${id} .opt-input`)]
+    .map((el) => normalizeRichText(el.innerHTML))
+    .filter(Boolean)
+    .join('\n');
 }
 
 function esc(str) {
@@ -2357,25 +2475,21 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: a dropdown of Settings-configured options
-        // (plus a free-text "Type your own…" escape hatch) instead of a freeform
-        // editable cell — see the .weekday-select/.weekday-other-input wiring below.
-        // A non-preset value gets injected as its own real (selected) option instead of
-        // showing a generic "Other…" label next to it, so the closed dropdown always
-        // reads as plain text — no different-looking from any other cell — until clicked.
+        // מנחה/מעריב on the Weekday chart: an ordinary editable cell (so underlining and
+        // the size buttons work on it exactly as they do anywhere else, and it prints as
+        // plain text), plus a hover-only ▾ that drops down the Settings-configured
+        // presets. It was a native <select> before, which couldn't carry the underlining
+        // the printed board uses — <option> renders its text flat, markup and all.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           const options = c.key === 'B' ? maarivOptions : minchaOptions;
-          const current = String(row[c.key] ?? '').replace(/<[^>]+>/g, ''); // strip any HTML from pre-dropdown-era overrides
-          const matchesPreset = options.includes(current);
-          const customOptionHtml = !matchesPreset && current ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
-          const optsHtml = options.map((opt) => `<option value="${esc(opt)}" ${opt === current ? 'selected' : ''}>${esc(opt)}</option>`).join('');
-          return `<td>
-            <select class="weekday-select" data-serial="${week.serial}" data-col="${c.key}">
-              ${customOptionHtml}
-              ${optsHtml}
-              <option value="__other__">✎ Type your own…</option>
-            </select>
-            <input type="text" class="weekday-other-input" data-serial="${week.serial}" data-col="${c.key}" value="${esc(current)}" hidden>
+          const html = row[c.key] ?? ''; // already HTML — the presets are rich text
+          const menu = options.length
+            ? `<button type="button" class="weekday-pick no-print" title="Choose one of the times set in Settings">&#9662;</button>
+               <div class="weekday-pick-menu no-print" hidden>${options.map((opt) => `<button type="button" class="weekday-pick-option">${opt}</button>`).join('')}</div>`
+            : '';
+          return `<td class="weekday-pick-cell">
+            <div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div>
+            ${menu}
           </td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -2421,6 +2535,37 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
+  /** What this cell would hold with no manual override — what an edit is diffed against
+   *  to decide whether it's a real change worth storing. */
+  const baselineHtmlFor = (cellEl) => {
+    const col = cellEl.dataset.col;
+    const weekSeason = cellEl.dataset.season;
+    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
+    const settingsResolved = resolveSettings(state.settings);
+    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
+    const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
+    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
+    const raw = ruled[col] ?? '';
+    // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
+    // list in Settings); every other column is plain text that nl2br has to mark up
+    // first, or the comparison would see markup-vs-none and store a bogus override.
+    return normalizeRichText(weekSeason === 'weekday' ? raw : nl2br(raw));
+  };
+
+  const commitCell = (cellEl) => {
+    const serial = Number(cellEl.dataset.serial);
+    const col = cellEl.dataset.col;
+    const newHtml = normalizeRichText(cellEl.innerHTML);
+    const before = getOverride(sheet, serial, col); // undefined = "no override"
+    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
+    if (before === after) return; // no real change (e.g. just clicked in and out)
+    applyOverrideValue(sheet, serial, col, after);
+    const hist = getHistory(sheet.id);
+    hist.undo.push({ serial, col, before, after });
+    hist.redo = []; // a fresh edit invalidates any redo history
+    onChange({ save: true });
+  };
+
   page.querySelectorAll('.cell').forEach((cellEl) => {
     cellEl.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
@@ -2429,58 +2574,30 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       }
     });
     cellEl.addEventListener('blur', () => {
-      const serial = Number(cellEl.dataset.serial);
-      const col = cellEl.dataset.col;
-      const weekSeason = cellEl.dataset.season;
-      const week = sheet.weeks.find((w) => w.serial === serial);
-      const settingsResolved = resolveSettings(state.settings);
-      const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-      const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
-      const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
-      const baselineHtml = nl2br(ruled[col] ?? '');
-      const newHtml = normalizeRichText(cellEl.innerHTML);
-      const before = getOverride(sheet, serial, col); // undefined = "no override"
-      const after = newHtml === baselineHtml ? undefined : newHtml;
-      if (before === after) return; // no real change (e.g. just clicked in and out)
-      applyOverrideValue(sheet, serial, col, after);
-      const hist = getHistory(sheet.id);
-      hist.undo.push({ serial, col, before, after });
-      hist.redo = []; // a fresh edit invalidates any redo history
-      onChange({ save: true });
+      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
+      commitCell(cellEl);
     });
   });
 
-  // Weekday chart's מנחה/מעריב dropdowns (see cellHtml above): picking a preset commits
-  // immediately; picking "Other…" reveals the paired text input instead and commits
-  // whatever's typed there on blur.
-  page.querySelectorAll('.weekday-select').forEach((selectEl) => {
-    const serial = Number(selectEl.dataset.serial);
-    const col = selectEl.dataset.col;
-    const otherInput = page.querySelector(`.weekday-other-input[data-serial="${serial}"][data-col="${col}"]`);
-    const commit = (value) => {
-      const week = sheet.weeks.find((w) => w.serial === serial);
-      const settingsResolved = resolveSettings(state.settings);
-      const baseline = buildWeekdayRow({ ...week, date: new Date(week.date) }, settingsResolved)[col] ?? '';
-      const before = getOverride(sheet, serial, col);
-      const after = value === baseline ? undefined : value;
-      if (before === after) return;
-      applyOverrideValue(sheet, serial, col, after);
-      const hist = getHistory(sheet.id);
-      hist.undo.push({ serial, col, before, after });
-      hist.redo = [];
-      onChange({ save: true });
-    };
-    selectEl.addEventListener('change', () => {
-      if (selectEl.value === '__other__') {
-        otherInput.hidden = false;
-        otherInput.focus();
-        otherInput.select();
-        return;
-      }
-      otherInput.hidden = true;
-      commit(selectEl.value);
+  // Weekday chart's מנחה/מעריב preset picker (see cellHtml above) — the ▾ next to the
+  // cell. Choosing an option drops its HTML (underlining and all) straight into the
+  // cell and commits it through the same path a typed edit takes.
+  page.querySelectorAll('.weekday-pick').forEach((pickBtn) => {
+    const td = pickBtn.closest('td');
+    const menu = td.querySelector('.weekday-pick-menu');
+    const cellEl = td.querySelector('.cell');
+    pickBtn.addEventListener('click', () => {
+      // Close any other open menu first, so only one is ever showing.
+      page.querySelectorAll('.weekday-pick-menu').forEach((m) => m !== menu && (m.hidden = true));
+      menu.hidden = !menu.hidden;
     });
-    otherInput?.addEventListener('blur', () => commit(otherInput.value));
+    menu.querySelectorAll('.weekday-pick-option').forEach((optBtn) => {
+      optBtn.addEventListener('click', () => {
+        menu.hidden = true;
+        cellEl.innerHTML = optBtn.innerHTML;
+        commitCell(cellEl);
+      });
+    });
   });
 
   return page;
