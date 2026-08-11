@@ -67,6 +67,19 @@ export function applyRichTextCommand(cmd, editor) {
   }
 }
 
+/** Whether a run of text is nothing but times and the punctuation that separates them,
+ *  so expanding bare digits in it is unambiguous.
+ *
+ *  Without this the expansion reaches into ordinary text: "10 דק׳" became "10:00 דק׳"
+ *  and "TEST123" became "TEST1:23" — and because it runs on blur, merely clicking into
+ *  a cell and back out was enough to rewrite it and save an override. Any letter in the
+ *  run means it isn't a bare time list, so leave it alone. In a formatted field this is
+ *  applied per text node, so times and words can still coexist there — a line of times
+ *  is expanded even when a Hebrew line right above it isn't. */
+function isBareTimeList(text) {
+  return /\d/.test(text) && !/\p{L}/u.test(text);
+}
+
 /** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
  *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
  *
@@ -78,6 +91,7 @@ export function applyRichTextCommand(cmd, editor) {
  *  user just applied. */
 export function applyTimeShorthand(editorEl) {
   if (!editorEl.children.length) {
+    if (!isBareTimeList(editorEl.textContent)) return;
     const normalized = normalizeTimeList(editorEl.textContent);
     if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
     return;
@@ -86,6 +100,7 @@ export function applyTimeShorthand(editorEl) {
   const textNodes = [];
   while (walker.nextNode()) textNodes.push(walker.currentNode);
   textNodes.forEach((node) => {
+    if (!isBareTimeList(node.nodeValue)) return;
     const normalized = normalizeTimeShorthand(node.nodeValue);
     if (normalized !== node.nodeValue) node.nodeValue = normalized;
   });

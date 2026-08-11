@@ -24,7 +24,7 @@ export function renderGenerate(container, state, tables, onGenerate) {
             <span class="season-range">Sukkos → Pesach</span>
           </label>
         </div>
-        <label>Hebrew year${stepper('hebrewYear', defaultYear)}</label>
+        <label for="step-hebrewYear">Hebrew year${stepper('hebrewYear', defaultYear)}</label>
         <div class="actions"><button type="submit">Compute weeks</button></div>
       </fieldset>
     </form>
@@ -96,7 +96,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     <form id="page-form" class="form-grid">
       <fieldset>
         <legend>How many printable pages?</legend>
-        <label style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
+        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
       </fieldset>
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
@@ -122,7 +122,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
     const defaults = defaultPageSizes(weeks.length, numPages);
-    inputsEl.innerHTML = defaults.map((size, i) => `<label>Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
+    inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
   renderSizeInputs(3);
@@ -183,10 +183,14 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
  *  a plain <input class="page-size"> would have been found before. */
 function stepper(name, value, opts = {}) {
   const { min, max, className = '' } = opts;
+  // The input carries an id and every wrapping <label> points at it with for= — without
+  // that, a label associates with its *first* form control, which here is the − button,
+  // and Chrome then mirrors the label's hover/pressed state onto it: pressing + lit −
+  // up as well, and clicking the label's text acted like pressing −.
   return `
     <span class="stepper">
       <button type="button" class="step-btn step-down" aria-label="Decrease" tabindex="-1">−</button>
-      <input type="number" name="${name}" class="step-input ${className}" value="${value}" ${min !== undefined ? `min="${min}"` : ''} ${max !== undefined ? `max="${max}"` : ''}>
+      <input type="number" id="step-${name}" name="${name}" class="step-input ${className}" value="${value}" ${min !== undefined ? `min="${min}"` : ''} ${max !== undefined ? `max="${max}"` : ''}>
       <button type="button" class="step-btn step-up" aria-label="Increase" tabindex="-1">+</button>
     </span>`;
 }
@@ -197,6 +201,12 @@ function stepper(name, value, opts = {}) {
  *  if the number had been typed in directly. */
 function wireSteppers(root) {
   root.querySelectorAll('.stepper').forEach((wrap) => {
+    // Guard against double-wiring: the page-size steppers sit inside the preview, so
+    // they were reached both by their own renderSizeInputs() call and by the later
+    // wireSteppers(el) over the whole preview — two listeners, and every click moved
+    // the number by 2.
+    if (wrap.dataset.wired) return;
+    wrap.dataset.wired = '1';
     const input = wrap.querySelector('.step-input');
     const min = input.min !== '' ? Number(input.min) : -Infinity;
     const max = input.max !== '' ? Number(input.max) : Infinity;

@@ -81,8 +81,11 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 
 @media (max-width: 900px) {
   /* Sidebar becomes a normal bar above the content — no off-canvas drawer, since that
-     would be new behavior rather than restyling. */
-  .app-shell { flex-direction: column; }
+     would be new behavior rather than restyling. align-items reset to stretch: the
+     desktop flex-start is about not stretching the sidebar to full page height, but in
+     a column it acts on *width*, letting main shrink-wrap to its widest content (a
+     420px field, an 11in sheet page) and overflow the phone's viewport. */
+  .app-shell { flex-direction: column; align-items: stretch; }
   .sidebar { position: static; flex: none; width: 100%; height: auto; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
   .sidebar-brand { padding: 0; }
   #nav { flex-direction: row; flex-wrap: wrap; gap: 0.25rem; }
@@ -99,15 +102,23 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .form-grid fieldset {
   border: 1px solid var(--border); border-radius: var(--radius); padding: 1.15rem 1.25rem;
   background: var(--surface); box-shadow: var(--shadow-sm);
+  /* Fieldsets refuse to shrink below their content's natural width by default
+     (min-inline-size: min-content), which on a phone pushed the season cards — and the
+     whole panel with them — off the right edge instead of letting them wrap. */
+  min-inline-size: 0; min-width: 0;
 }
 /* float+full width takes the legend out of the notch it normally cuts in the top border,
-   so the card outline stays unbroken and the legend reads as its heading instead.
-   Following content clears it because it spans the full width. */
+   so the card outline stays unbroken and the legend reads as its heading instead. */
 .form-grid legend {
   float: left; width: 100%; padding: 0 0 0.6rem; margin-bottom: 0.9rem;
   border-bottom: 1px solid var(--border);
   font-weight: 700; font-size: 0.95rem; color: var(--ink); letter-spacing: -0.01em;
 }
+/* Everything after the floated legend must clear it. Plain text wraps below a float on
+   its own, but a flex container (the season cards, the backup row) may not overlap a
+   float — without this it gets crushed into the zero width *beside* the legend and
+   pushed to the card's right edge. */
+.form-grid fieldset > :not(legend) { clear: both; }
 .form-grid label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; }
 .form-grid fieldset label { font-weight: 400; }
 .form-grid label:has(input[type=checkbox]), .form-grid label:has(input[type=radio]) { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 400; }
@@ -343,6 +354,11 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
   --sheet-font-family: "Times New Roman", "David", "David Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 1;
+  /* The printed page is a fixed 11in wide; on a narrow screen it scrolls sideways
+     *inside this container* instead of dragging the whole app (sidebar included) along.
+     No effect on wider screens, where it simply fits. Print is unaffected — print.css
+     lays the page out on its own. */
+  overflow-x: auto;
 }
 
 /* --- Printable page, styled to look like a real Letter (11x8.5in landscape) sheet
