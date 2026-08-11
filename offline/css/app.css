@@ -169,10 +169,28 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .form-grid button:hover, .sheet-toolbar button:hover { background: var(--ui-accent-dark); }
 .form-grid button:active, .sheet-toolbar button:active { transform: translateY(1px); }
 
+/* The week lists start collapsed — they run to 30 rows and pushed the page controls
+   well below the fold. The card chrome lives on the <details> so the closed state is
+   still a proper panel, not a bare line of text. */
+.week-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); margin: 0 0 1rem; padding: 0 1.1rem;
+}
+.week-panel > summary {
+  cursor: pointer; padding: 0.75rem 0; font-size: 0.92rem; list-style: none;
+}
+.week-panel > summary::-webkit-details-marker { display: none; }
+.week-panel > summary::before {
+  content: '▸'; display: inline-block; width: 1em; margin-right: 0.3rem;
+  color: var(--muted); transition: transform 0.15s ease;
+}
+.week-panel[open] > summary::before { transform: rotate(90deg); }
+.week-panel[open] > summary { border-bottom: 1px solid var(--border); }
+.week-panel > summary:hover { color: var(--ui-accent-dark); }
+
 .week-list {
   columns: 2; column-gap: 2rem; font-size: 0.87rem; color: var(--muted); line-height: 1.75;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 0.9rem 1.1rem 0.9rem 2.4rem; margin: 0 0 1rem; box-shadow: var(--shadow-sm);
+  padding: 0.9rem 0 0.9rem 1.4rem; margin: 0;
 }
 .week-list li::marker { color: var(--border-strong); }
 
