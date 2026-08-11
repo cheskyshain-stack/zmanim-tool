@@ -63,15 +63,17 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 .nav-btn:not(.active):hover { background: rgba(255,255,255,0.09); color: #fff; }
 
 .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
-.backup-controls { display: flex; flex-direction: column; gap: 0.4rem; }
-.backup-controls button, .backup-controls .file-label {
-  display: block; width: 100%; text-align: center; box-sizing: border-box;
-  background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18);
-  border-radius: var(--radius-sm); padding: 0.45rem 0.75rem; cursor: pointer;
-  font-size: 0.8rem; font-weight: 500; font-family: inherit; transition: background 0.15s ease, border-color 0.15s ease;
-}
-.backup-controls button:hover, .backup-controls .file-label:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.34); }
 .sidebar-site { font-size: 0.7rem; color: rgba(255,255,255,0.45); text-align: center; }
+
+/* Backup section in Settings (moved out of the sidebar). The Import "button" is really
+   the file input's label, so it needs the button look applied by hand. */
+.backup-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.backup-row .file-label {
+  display: inline-block; background: var(--accent-soft); color: var(--accent-dark);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 1.15rem;
+  cursor: pointer; font-size: 0.9rem; font-weight: 600; margin: 0;
+}
+.backup-row .file-label:hover { background: var(--border); }
 
 /* min-width:0 so a wide sheet page can't stretch the flex item and push the sidebar
    off-screen — it scrolls inside main instead. */
@@ -86,8 +88,6 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
   #nav { flex-direction: row; flex-wrap: wrap; gap: 0.25rem; }
   .nav-btn { width: auto; padding: 0.45rem 0.85rem; }
   .sidebar-foot { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; gap: 0.5rem; }
-  .backup-controls { flex-direction: row; }
-  .backup-controls button, .backup-controls .file-label { width: auto; }
   .sidebar-site { display: none; }
   main { padding: 1rem 0.9rem; }
 }
@@ -196,18 +196,25 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 /* Keyboard focus still needs to show, even though the dot itself is hidden. */
 .form-grid .season-picker .season-radio:focus-visible + .season-option { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 45%, transparent); }
 
-.stepper { display: inline-flex; align-items: stretch; margin-top: 0.3rem; }
-.stepper .step-btn {
-  width: 2.1rem; flex-shrink: 0; border: 1px solid var(--border-strong); background: var(--accent-soft); color: var(--accent-dark);
-  font-size: 1.1rem; font-weight: 700; line-height: 1; cursor: pointer; transition: background 0.15s ease;
+/* Compact one-piece pill — the previous version let the input pick up the full form-
+   field sizing, which made the whole control read as an oversized box. */
+.stepper {
+  display: inline-flex; align-items: stretch; margin-top: 0.3rem; height: 2rem;
+  border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; background: var(--surface);
 }
-.stepper .step-btn:hover { background: var(--border); }
-.stepper .step-btn:active { background: var(--accent); color: white; }
-.stepper .step-down { border-radius: var(--radius-sm) 0 0 var(--radius-sm); border-right: none; }
-.stepper .step-up { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
-.stepper .step-input {
-  width: 4.5rem; text-align: center; border-radius: 0; margin-top: 0; -moz-appearance: textfield;
+.form-grid .stepper .step-btn {
+  width: 2rem; flex-shrink: 0; border: none; background: transparent; color: var(--accent-dark);
+  font-size: 1rem; font-weight: 700; line-height: 1; cursor: pointer; padding: 0;
+  border-radius: 0; transition: background 0.15s ease;
 }
+.form-grid .stepper .step-btn:hover { background: var(--accent-soft); }
+.form-grid .stepper .step-btn:active { background: var(--ui-accent); color: white; }
+.form-grid .stepper .step-input {
+  width: 3.4rem; min-width: 0; max-width: none; text-align: center; border: none;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  border-radius: 0; margin: 0; padding: 0 0.2rem; font-size: 0.9rem; -moz-appearance: textfield;
+}
+.form-grid .stepper .step-input:focus { box-shadow: none; outline: none; background: #fffbe6; }
 .stepper .step-input::-webkit-inner-spin-button, .stepper .step-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* Save confirmation (js/ui/settings-view.js) — sits on <body> so re-rendering the view
@@ -249,12 +256,21 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 }
 .rule-enabled:checked { background: var(--ui-accent); }
 .rule-enabled:checked::after { transform: translateX(0.9rem); }
+.rule-edit {
+  background: none; color: var(--ui-accent-dark); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  font-family: inherit; transition: background 0.15s ease;
+}
+.rule-edit:hover { background: var(--ui-accent-soft); }
 .rule-delete {
   background: none; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, white);
   border-radius: var(--radius-sm); padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.85rem; font-weight: 500;
-  transition: background 0.15s ease;
+  font-family: inherit; transition: background 0.15s ease;
 }
 .rule-delete:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
+/* Plain second-rank button (e.g. Cancel next to Save changes). */
+.form-grid .secondary-btn { background: var(--accent-soft); color: var(--accent-dark); border: 1px solid var(--border); margin-left: 0.5rem; }
+.form-grid .secondary-btn:hover { background: var(--border); }
 
 .saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
 .saved-list th, .saved-list td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }

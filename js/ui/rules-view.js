@@ -2,35 +2,44 @@ import { newId } from '../storage.js';
 import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
 
-export function renderRules(container, state, onChange) {
+export function renderRules(container, state, onChange, editingRuleId = null) {
+  // Editing loads the rule's values into the same form used for adding; submitting
+  // then updates that rule in place (keeping its id and enabled state) instead of
+  // appending a new one.
+  const editing = editingRuleId ? state.rules.find((r) => r.id === editingRuleId) : null;
   container.innerHTML = `
     <h2>Rules</h2>
     <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
-    <h3>Add a rule</h3>
+    <h3 id="rule-form-title">${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid">
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always"> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional"></label>
+        <label><input type="checkbox" name="always" ${editing?.condition.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${editing ? esc((editing.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${editing ? esc((editing.condition.parsha || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
         <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף) — one rule then covers both, without touching any other cell.</p>
-        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS)}
-        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS)}
+        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, editing)}
+        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, editing)}
       </fieldset>
       <fieldset>
         <legend>What to do to the cell</legend>
-        <label><input type="radio" name="mode" value="append" checked> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
-        <label><input type="radio" name="mode" value="replace"> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required></textarea></label>
+        <label><input type="radio" name="mode" value="append" ${!editing || editing.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
+        <label><input type="radio" name="mode" value="replace" ${editing?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${editing ? esc(editing.value) : ''}</textarea></label>
       </fieldset>
-      <div class="actions"><button type="submit">Add rule</button></div>
+      <div class="actions">
+        <button type="submit">${editing ? 'Save changes' : 'Add rule'}</button>
+        ${editing ? '<button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>' : ''}
+      </div>
     </form>
   `;
+
+  container.querySelector('#rule-edit-cancel')?.addEventListener('click', () => renderRules(container, state, onChange));
 
   const list = container.querySelector('#rules-list');
   list.innerHTML = state.rules.length
@@ -43,6 +52,7 @@ export function renderRules(container, state, onChange) {
           <strong>${esc(r.name)}</strong> — columns <code>${esc(columnsOf(r).map(prettyColumn).join(', '))}</code>
           <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
+        <button class="rule-edit" title="Edit this rule">Edit</button>
         <button class="rule-delete" title="Delete rule">Delete</button>
       </div>`
         )
@@ -56,9 +66,16 @@ export function renderRules(container, state, onChange) {
       onChange();
     });
   });
+  list.querySelectorAll('.rule-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      renderRules(container, state, onChange, e.target.closest('.rule-row').dataset.id);
+      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
   list.querySelectorAll('.rule-delete').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const id = e.target.closest('.rule-row').dataset.id;
+      if (!confirm('Delete this rule?')) return;
       state.rules = state.rules.filter((r) => r.id !== id);
       onChange();
       renderRules(container, state, onChange);
@@ -79,28 +96,32 @@ export function renderRules(container, state, onChange) {
       alert('Pick at least one cell/column for this rule to affect.');
       return;
     }
-    state.rules.push({
-      id: newId('rule'),
+    const data = {
       name: fd.get('name'),
-      enabled: true,
       condition,
       columnKeys,
       mode: fd.get('mode') || 'append',
       value: fd.get('value'),
-    });
+    };
+    if (editing) {
+      Object.assign(editing, data); // id and enabled stay as they were
+    } else {
+      state.rules.push({ id: newId('rule'), enabled: true, ...data });
+    }
     onChange();
     renderRules(container, state, onChange);
   });
 }
 
-function columnChecklist(sheetLabel, seasonKey, columns) {
+function columnChecklist(sheetLabel, seasonKey, columns, editing) {
+  const checkedKeys = editing ? columnsOf(editing) : [];
   return `
     <div class="col-group">
       <div class="col-group-title">${sheetLabel}</div>
       ${columns
         .map(
           (c) =>
-            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}"> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
+            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
         )
         .join('')}
     </div>

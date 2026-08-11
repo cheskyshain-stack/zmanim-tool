@@ -1,4 +1,4 @@
-import { loadState, saveState, exportStateToFile, importStateFromText } from './storage.js';
+import { loadState, saveState } from './storage.js';
 import { loadTables } from './data-loader.js';
 import { renderSettings } from './ui/settings-view.js';
 import { renderGenerate } from './ui/generate-view.js';
@@ -70,11 +70,22 @@ function render() {
     return;
   }
   if (currentTab === 'settings') {
-    renderSettings(main, state, (next) => {
-      state.settings = next;
-      persist();
-      render();
-    });
+    renderSettings(
+      main,
+      state,
+      (next) => {
+        state.settings = next;
+        persist();
+        render();
+      },
+      // Called after an Import replaced the whole state object's contents (settings,
+      // sheets, and rules together) — persist it and re-render from scratch.
+      () => {
+        persist();
+        currentSheetId = null;
+        render();
+      }
+    );
   } else if (currentTab === 'generate') {
     renderGenerate(main, state, tables, (sheet) => {
       state.sheets.push(sheet);
@@ -100,24 +111,6 @@ function render() {
     );
   }
 }
-
-document.getElementById('export-btn').addEventListener('click', () => exportStateToFile(state));
-document.getElementById('import-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const text = await file.text();
-  try {
-    const imported = importStateFromText(text);
-    Object.assign(state, imported);
-    persist();
-    currentSheetId = null;
-    render();
-    alert('Backup restored.');
-  } catch (err) {
-    alert('Could not read that backup file: ' + err.message);
-  }
-  e.target.value = '';
-});
 
 loadTables()
   .then((t) => {

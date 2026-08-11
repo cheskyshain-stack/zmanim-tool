@@ -1,9 +1,10 @@
 import { TIMEZONES } from '../settings.js';
+import { exportStateToFile, importStateFromText } from '../storage.js';
 import { renderImageCropper } from './image-crop.js';
 import { normalizeRichText } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 
-export function renderSettings(container, state, onSave) {
+export function renderSettings(container, state, onSave, onStateReplaced) {
   const s = state.settings;
   container.innerHTML = `
     <h2>Settings</h2>
@@ -63,7 +64,34 @@ export function renderSettings(container, state, onSave) {
       </fieldset>
       <div class="actions"><button type="submit">Save settings</button></div>
     </form>
+    <form class="form-grid" onsubmit="return false" style="margin-top:1rem">
+      <fieldset>
+        <legend>Backup</legend>
+        <p class="hint">Everything lives in this browser only — settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone).</p>
+        <div class="backup-row">
+          <button type="button" id="export-btn">Export backup</button>
+          <label class="file-label" for="import-input">Import backup</label>
+          <input id="import-input" type="file" accept="application/json" hidden>
+        </div>
+      </fieldset>
+    </form>
   `;
+
+  container.querySelector('#export-btn').addEventListener('click', () => exportStateToFile(state));
+  container.querySelector('#import-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const imported = importStateFromText(text);
+      Object.assign(state, imported);
+      onStateReplaced();
+      showToast('Backup restored');
+    } catch (err) {
+      alert('Could not read that backup file: ' + err.message);
+    }
+    e.target.value = '';
+  });
   renderImageCropper(container.querySelector('#header-photo-cropper'), s.headerIconImage, (headerIconImage) => {
     onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
   });
