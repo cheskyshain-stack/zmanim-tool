@@ -1267,21 +1267,27 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
     <div id="step-one"></div>
     <form id="gen-form" class="form-grid">
       <fieldset>
-        <legend>Which sheet</legend>
+        <legend>Season</legend>
         <div class="season-picker">
           <input type="radio" id="season-kayitz" class="season-radio" name="season" value="kayitz" ${defaultSeason === 'kayitz' ? 'checked' : ''}>
           <label class="season-option" for="season-kayitz">
-            <span class="season-name">שבת קיץ</span>
-            <span class="season-range">Pesach → Sukkos</span>
+            ${SEASON_ICON.kayitz}
+            <span class="season-text">
+              <span class="season-name">שבת קיץ</span>
+              <span class="season-range">Pesach → Sukkos</span>
+            </span>
           </label>
           <input type="radio" id="season-choref" class="season-radio" name="season" value="choref" ${defaultSeason === 'choref' ? 'checked' : ''}>
           <label class="season-option" for="season-choref">
-            <span class="season-name">שבת חורף</span>
-            <span class="season-range">Sukkos → Pesach</span>
+            ${SEASON_ICON.choref}
+            <span class="season-text">
+              <span class="season-name">שבת חורף</span>
+              <span class="season-range">Sukkos → Pesach</span>
+            </span>
           </label>
         </div>
-        <label class="year-row" for="step-hebrewYear"><span class="year-label">Hebrew year</span>${stepper('hebrewYear', defaultYear)}</label>
-        <div class="actions"><button type="submit" class="btn-primary">Continue</button></div>
+        <label class="year-row" for="step-hebrewYear"><span class="year-label">Hebrew Year</span>${stepper('hebrewYear', defaultYear)}<span></span></label>
+        <div class="actions"><button type="submit" class="btn-primary">Continue <span aria-hidden="true">→</span></button></div>
       </fieldset>
     </form>
     <div id="gen-preview"></div>
@@ -1347,6 +1353,18 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
 
 const seasonLabel = (season) => (season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף');
 
+// Sun and snowflake, so the two cards are told apart at a glance rather than by reading.
+// Inline SVG in currentColor's place with their own colours, for the same reason the nav
+// icons are inline: the offline copy stays one self-contained folder.
+const SEASON_ICON = {
+  kayitz: `<svg class="season-icon is-summer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></svg>`,
+  choref: `<svg class="season-icon is-winter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 2.5v19M3.8 7.2l16.4 9.6M20.2 7.2 3.8 16.8"/>
+    <path d="M9.4 4.6 12 7.2l2.6-2.6M9.4 19.4 12 16.8l2.6 2.6"/>
+    <path d="M3.4 10.7 4.5 7.1 1 6M20.6 13.3l-1.1 3.6 3.5 1.1M20.6 10.7l-1.1-3.6L23 6M3.4 13.3l1.1 3.6L1 18"/></svg>`,
+};
+
 /** Two-step progress header, so it's clear up front that this is a short sequence and
  *  which part you're on - previously the second half simply appeared below the first
  *  with nothing marking it as a separate step. */
@@ -1355,7 +1373,7 @@ function stepsBar(current) {
     const state = n === current ? 'is-current' : n < current ? 'is-done' : '';
     return `<li class="${state}"><span class="step-num">${n < current ? '✓' : n}</span>${label}</li>`;
   };
-  return `<ol class="steps" id="gen-steps">${step(1, 'Which sheet')}${step(2, 'Pages')}</ol>`;
+  return `<ol class="steps" id="gen-steps">${step(1, 'Sheet setup')}${step(2, 'Pages')}</ol>`;
 }
 
 function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, onGenerate) {
