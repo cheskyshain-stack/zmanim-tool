@@ -39,6 +39,7 @@ export const LEGACY_WEEKDAY_SHACHARIS = [
 export const LEGACY_WEEKDAY_FOOTER = [
   'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים\n**באולם השמחות',
+  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
 ];
 
 export const DEFAULT_SETTINGS = {
@@ -65,7 +66,7 @@ export const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
-  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
+  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*',
   locationName: 'Lakewood',
   latitude: 40.068,
   longitude: -74.205,
