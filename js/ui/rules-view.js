@@ -64,12 +64,16 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
       <div class="rule-row" data-id="${r.id}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
-          <strong>${esc(r.name)}</strong> — columns <code>${esc(columnsOf(r).map(prettyColumn).join(', '))}</code>
-          <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
+          <strong>${esc(r.name)}</strong>
+          <div class="hint">columns ${columnsOf(r)
+            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
+            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
-        <button class="rule-edit" title="Edit this rule">Edit</button>
-        <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
-        <button class="rule-delete" title="Delete rule">Delete</button>
+        <div class="rule-actions">
+          <button class="rule-edit" title="Edit this rule">Edit</button>
+          <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
+          <button class="rule-delete" title="Delete rule">Delete</button>
+        </div>
       </div>`
         )
         .join('')

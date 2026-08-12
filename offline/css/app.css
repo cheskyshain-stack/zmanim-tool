@@ -364,6 +364,19 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 }
 .rule-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
 .rule-summary { flex: 1; min-width: 0; }
+.rule-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+/* On a phone the three buttons and the switch left the rule's name about 100px to live
+   in, so it wrapped one word per line. Give the name the full width and drop the buttons
+   onto their own row underneath. */
+@media (max-width: 640px) {
+  /* flex-start, so the switch sits against the rule's name instead of drifting to the
+     middle of a summary that is now several lines tall. */
+  .rule-row { flex-wrap: wrap; align-items: flex-start; gap: 0.6rem 0.7rem; }
+  .rule-row > label { margin-top: 0.2rem; }
+  .rule-summary { flex: 1 1 8rem; }
+  .rule-actions { flex: 1 0 100%; justify-content: flex-end; }
+  .rule-actions button { flex: 1; }
+}
 .rule-summary strong { font-size: var(--fs-lg); }
 .rule-summary code {
   background: var(--ui-accent-soft); color: var(--ui-accent-dark); border-radius: 4px;

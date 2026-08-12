@@ -135,8 +135,47 @@ const TISHA_BAV_RULE = {
   value: 'ט באב',
 };
 
+/** The two דרשה rules, seeded for the same reason the Lakewood settings are built in:
+ *  they're the shul's standing schedule, not one person's preference, so a new browser
+ *  (a phone, say) should have them without anyone re-entering them. Same seeded-flag
+ *  treatment as ט באב — installed once, and deleting one stays deleted. */
+const DRASHA_RULES = [
+  {
+    id: 'rule-shabbos-hagadol',
+    name: 'שבת הגדול — דרשה',
+    enabled: true,
+    condition: { specialParsha: ['הגדול', 'Hagadol'] },
+    columnKeys: ['kayitz:C', 'choref:C'],
+    mode: 'append',
+    value: 'דרשה',
+  },
+  {
+    id: 'rule-shabbos-shuva',
+    name: 'שבת שובה — דרשה',
+    enabled: true,
+    condition: { specialParsha: ['שובה', 'Shuva'] },
+    columnKeys: ['kayitz:C', 'choref:C'],
+    mode: 'append',
+    value: 'דרשה',
+  },
+];
+
+/** True if some rule already covers the same special Shabbos. These two were hand-made
+ *  before they were seeded, so on the browser they were made in they exist under their
+ *  own ids — seeding by id alone would sit a second "דרשה" on top of the first. */
+function alreadyCovered(rules, rule) {
+  const wanted = rule.condition.specialParsha;
+  return rules.some((r) => r.id === rule.id || (r.condition?.specialParsha || []).some((p) => wanted.includes(p)));
+}
+
 function applySeeds(state) {
   const seeded = state.seeded || {};
+  if (!seeded.drashos) {
+    for (const rule of DRASHA_RULES) {
+      if (!alreadyCovered(state.rules, rule)) state.rules.push({ ...rule });
+    }
+    seeded.drashos = true;
+  }
   if (!seeded.tishaBav) {
     if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
     seeded.tishaBav = true;
@@ -1653,12 +1692,16 @@ function renderRules(container, state, onChange, editingRuleId = null) {
       <div class="rule-row" data-id="${r.id}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
-          <strong>${esc(r.name)}</strong> — columns <code>${esc(columnsOf(r).map(prettyColumn).join(', '))}</code>
-          <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
+          <strong>${esc(r.name)}</strong>
+          <div class="hint">columns ${columnsOf(r)
+            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
+            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
-        <button class="rule-edit" title="Edit this rule">Edit</button>
-        <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
-        <button class="rule-delete" title="Delete rule">Delete</button>
+        <div class="rule-actions">
+          <button class="rule-edit" title="Edit this rule">Edit</button>
+          <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
+          <button class="rule-delete" title="Delete rule">Delete</button>
+        </div>
       </div>`
         )
         .join('')
