@@ -11,7 +11,9 @@
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
   main { padding: 0; max-width: none; margin: 0; }
-  .pages { margin: 0; }
+  /* !important because Fit to screen sets this inline — it's a way of reading the sheet
+     on a small screen and must never reach the paper. */
+  .pages { margin: 0; zoom: 1 !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
      already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
   #sheet-stack.is-side-by-side > .pages { display: block; }

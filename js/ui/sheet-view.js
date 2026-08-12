@@ -102,6 +102,7 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
       ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
+      <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
@@ -146,7 +147,15 @@ export function renderSheet(container, state, sheet, onChange) {
   container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
     const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
     e.target.classList.toggle('is-active', on);
+    if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
   });
+
+  // A page is a landscape letter sheet — about 1056px across — so on a phone it can only
+  // ever be read a column at a time by scrolling sideways. Fitting scales it down until
+  // a whole page is on screen at once: too small to edit in, but the point is seeing the
+  // page. It starts on whenever the page doesn't fit, which in practice means phones.
+  const fitBtn = container.querySelector('#fit-btn');
+  fitBtn.addEventListener('click', () => setFit(container, !fitOn));
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
   // focusin rather than read from document.activeElement at click time because the
@@ -206,6 +215,7 @@ export function renderSheet(container, state, sheet, onChange) {
   // sync to measure them (heights read 0 on a detached element).
   syncHeaderRowHeight(pagesEl);
   buildPagePicker(container);
+  autoFit(container);
 
 
   const restyleOwnPages = () => {
@@ -273,6 +283,59 @@ function buildPagePicker(container) {
 }
 
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
+
+// --- Fit to screen -----------------------------------------------------------------
+// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
+// the view shouldn't snap back to full size underneath you each time.
+let fitOn = false;
+let fitChosenByUser = false;
+let fitResizeHandler = null;
+
+/** Scales #pages down until its widest row fits across the screen. Uses `zoom` rather
+ *  than `transform: scale`, which only paints smaller and leaves the original footprint
+ *  behind — the same reason side-by-side uses it. */
+function applyFit(container, on) {
+  const pagesEl = container.querySelector('#pages');
+  if (!pagesEl) return;
+  pagesEl.style.zoom = ''; // always measure unscaled
+  if (!on) return;
+  const avail = pagesEl.clientWidth;
+  const content = pagesEl.scrollWidth;
+  if (!avail || content <= avail) return;
+  pagesEl.style.zoom = Math.max(0.15, avail / content);
+}
+
+function setFit(container, on) {
+  fitOn = on;
+  fitChosenByUser = true;
+  const btn = container.querySelector('#fit-btn');
+  btn?.classList.toggle('is-active', on);
+  applyFit(container, on);
+}
+
+/** Turns fitting on by itself the first time a sheet is opened on a screen too narrow to
+ *  show a page — otherwise a phone opens onto a wall of one column. Never overrides a
+ *  choice already made with the button. */
+function autoFit(container) {
+  const pagesEl = container.querySelector('#pages');
+  const decide = () => {
+    if (!fitChosenByUser) {
+      pagesEl.style.zoom = ''; // measure unscaled before asking whether it fits
+      fitOn = pagesEl.scrollWidth > pagesEl.clientWidth;
+      container.querySelector('#fit-btn')?.classList.toggle('is-active', fitOn);
+    }
+    applyFit(container, fitOn);
+  };
+  decide();
+
+  // Rotating a phone changes what fits. One listener, replaced each render so it always
+  // points at the container currently on screen.
+  if (fitResizeHandler) window.removeEventListener('resize', fitResizeHandler);
+  fitResizeHandler = () => {
+    if (document.body.contains(pagesEl)) decide();
+  };
+  window.addEventListener('resize', fitResizeHandler);
+}
 
 function applyStyle(target, style) {
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));

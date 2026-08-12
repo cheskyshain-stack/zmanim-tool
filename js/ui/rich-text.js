@@ -5,20 +5,50 @@
 // stored stays readable HTML rather than the <font size> tags execCommand would emit.
 import { normalizeTimeList, normalizeTimeShorthand } from '../format.js';
 
+/** The modifier key as this machine's user would write it, for the shortcut hints. */
+const MOD = /mac|iphone|ipad/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+
 /** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
- *  it acts on. */
+ *  it acts on. Each button's tooltip names its keyboard shortcut — the toolbar is the
+ *  only place they're discoverable. */
 export function richTextToolbarHtml(label = '') {
   return `<span class="rt-toolbar no-print">
     ${label ? `<span class="rt-label">${label}</span>` : ''}
-    <button type="button" data-rt="underline" title="Underline / remove underline from the selected text"><u>U</u></button>
-    <button type="button" data-rt="big" title="Make the selected text bigger">A&plus;</button>
-    <button type="button" data-rt="unbig" title="Put the selected text back to normal size">A&minus;</button>
+    <button type="button" data-rt="underline" title="Underline / remove underline from the selected text  (${MOD}+U)"><u>U</u></button>
+    <button type="button" data-rt="big" title="Make the selected text bigger  (${MOD}+Shift+&gt;)">A&plus;</button>
+    <button type="button" data-rt="unbig" title="Put the selected text back to normal size  (${MOD}+Shift+&lt;)">A&minus;</button>
   </span>`;
+}
+
+/** Ctrl+Shift+> / Ctrl+Shift+< for the size buttons, matching what Word and Google Docs
+ *  use. Underline needs nothing: Ctrl+U is already built into contenteditable, and it
+ *  fires an input event, so the edit saves the same way a toolbar click does.
+ *
+ *  One listener for the whole app, resolving the editor from whatever has focus — the
+ *  sheet's cells and the Settings שחרית editor both qualify, and neither can be reached
+ *  by a keystroke without being focused first. Registered once, since the views that use
+ *  the toolbar re-render freely. */
+let shortcutsWired = false;
+function wireShortcutsOnce() {
+  if (shortcutsWired) return;
+  shortcutsWired = true;
+  document.addEventListener('keydown', (e) => {
+    const editor = document.activeElement;
+    if (!editor?.isContentEditable || !(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+    // Reading both the shifted character and the unshifted key, since which one arrives
+    // depends on the keyboard layout.
+    const cmd = ['>', '.'].includes(e.key) ? 'big' : ['<', ','].includes(e.key) ? 'unbig' : null;
+    if (!cmd) return;
+    e.preventDefault();
+    applyRichTextCommand(cmd, editor);
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 /** `getEditor()` is called per click so callers whose target moves (the sheet's toolbar
  *  acts on whichever cell was last focused) can resolve it late. */
 export function wireRichTextToolbar(root, getEditor) {
+  wireShortcutsOnce();
   root.querySelectorAll('[data-rt]').forEach((btn) => {
     // Without this the button steals focus on press, which collapses the selection in
     // the editor before the click handler ever runs — leaving nothing to format.

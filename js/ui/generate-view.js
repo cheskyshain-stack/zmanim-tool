@@ -3,12 +3,16 @@ import { resolveSettings } from '../settings.js';
 import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 
-export function renderGenerate(container, state, tables, onGenerate) {
+export function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
+  // Generate is where the app opens, so it's where someone who has never seen it lands.
+  // The pointer shows only until there's a saved sheet — by then they've done it once.
+  const firstRun = !state.sheets.length;
   container.innerHTML = `
     <h2>Generate a sheet</h2>
     <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
+    ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button> — what this site does and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
     <form id="gen-form" class="form-grid">
@@ -33,6 +37,7 @@ export function renderGenerate(container, state, tables, onGenerate) {
     <div id="gen-preview"></div>
   `;
   wireSteppers(container);
+  container.querySelector('#open-guide')?.addEventListener('click', () => onOpenTab('guide'));
 
   // Which season card reads as selected. The CSS also has a :checked + label rule, but
   // it was observed not re-evaluating when the checked state changed — leaving the

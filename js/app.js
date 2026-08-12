@@ -5,6 +5,7 @@ import { renderGenerate } from './ui/generate-view.js';
 import { renderRules } from './ui/rules-view.js';
 import { renderSavedSheets } from './ui/saved-sheets-view.js';
 import { renderSheet } from './ui/sheet-view.js';
+import { renderGuide } from './ui/guide-view.js';
 
 const state = loadState();
 let tables = null;
@@ -29,10 +30,10 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-const tabs = ['generate', 'settings', 'rules', 'saved'];
+const tabs = ['generate', 'settings', 'rules', 'saved', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens — the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets' };
+const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets', guide: 'Guide' };
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -42,6 +43,7 @@ const tabIcons = {
   settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
   rules: '<path d="M3 6h14M3 10h14M3 14h14"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="6" cy="14" r="1.6"/>',
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
+  guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
 };
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
@@ -103,10 +105,24 @@ function render() {
       }
     );
   } else if (currentTab === 'generate') {
-    renderGenerate(main, state, tables, (sheet) => {
-      state.sheets.push(sheet);
-      persist();
-      currentSheetId = sheet.id;
+    renderGenerate(
+      main,
+      state,
+      tables,
+      (sheet) => {
+        state.sheets.push(sheet);
+        persist();
+        currentSheetId = sheet.id;
+        render();
+      },
+      (tab) => {
+        currentTab = tab;
+        render();
+      }
+    );
+  } else if (currentTab === 'guide') {
+    renderGuide(main, (tab) => {
+      currentTab = tab;
       render();
     });
   } else if (currentTab === 'rules') {

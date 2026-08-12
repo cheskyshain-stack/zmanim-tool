@@ -643,6 +643,30 @@ td.ruled .cell { background: var(--ruled); }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* --- Guide ------------------------------------------------------------------------ */
+.guide-lede {
+  background: var(--ui-accent-soft); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin-bottom: 1rem;
+}
+.guide-lede p { margin: 0 0 0.6rem; }
+.guide-lede p:last-child { margin-bottom: 0; }
+.guide-steps { margin: 0; padding-left: 1.3rem; }
+.guide-steps li { margin-bottom: 0.9rem; }
+.guide-steps li:last-child { margin-bottom: 0; }
+.guide-steps .hint { display: block; margin-top: 0.2rem; }
+kbd {
+  font-family: inherit; font-size: var(--fs-xs); border: 1px solid var(--border-strong);
+  border-bottom-width: 2px; border-radius: 4px; padding: 0.05rem 0.35rem; background: var(--bg);
+}
+.guide-nudge {
+  background: var(--ui-accent-soft); border-left: 3px solid var(--ui-accent);
+  padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: var(--fs-sm);
+}
+/* A button that reads as a link — it navigates rather than acting on anything. */
+.linkish {
+  background: none; border: none; padding: 0; font: inherit; color: var(--ui-accent-dark);
+  text-decoration: underline; cursor: pointer;
+}
 /* Marks a row as a Shabbos sheet + its Weekday chart, without reading as a second sheet. */
 .pair-chip {
   background: var(--ui-accent-soft); color: var(--ui-accent-dark); border-radius: 4px;
