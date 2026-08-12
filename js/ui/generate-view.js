@@ -9,6 +9,8 @@ export function renderGenerate(container, state, tables, onGenerate) {
   container.innerHTML = `
     <h2>Generate a sheet</h2>
     <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
+    ${stepsBar(1)}
+    <div id="step-one"></div>
     <form id="gen-form" class="form-grid">
       <fieldset>
         <legend>Which sheet</legend>
@@ -61,8 +63,36 @@ export function renderGenerate(container, state, tables, onGenerate) {
     const season = fd.get('season');
     const hebrewYear = Number(fd.get('hebrewYear'));
     const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
+
+    // Step one folds into a one-line summary once it's answered, so step two isn't
+    // competing with a form you've already finished — the page used to just keep
+    // growing downward with everything still on screen at once.
+    container.querySelector('#gen-form').hidden = true;
+    container.querySelector('#step-one').innerHTML = `
+      <div class="step-summary">
+        <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
+        <button type="button" id="change-sheet">Change</button>
+      </div>`;
+    container.querySelector('#gen-steps').outerHTML = stepsBar(2);
+    container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate));
+
+    // No scrolling into view: collapsing step one keeps step two roughly where step one
+    // was, and scrolling to it pushed the step indicator off the top of the screen.
     renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
   });
+}
+
+const seasonLabel = (season) => (season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף');
+
+/** Two-step progress header, so it's clear up front that this is a short sequence and
+ *  which part you're on — previously the second half simply appeared below the first
+ *  with nothing marking it as a separate step. */
+function stepsBar(current) {
+  const step = (n, label) => {
+    const state = n === current ? 'is-current' : n < current ? 'is-done' : '';
+    return `<li class="${state}"><span class="step-num">${n < current ? '✓' : n}</span>${label}</li>`;
+  };
+  return `<ol class="steps" id="gen-steps">${step(1, 'Which sheet')}${step(2, 'Pages')}</ol>`;
 }
 
 function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, onGenerate) {
@@ -87,7 +117,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
 
   el.innerHTML = `
     <details class="week-panel">
-      <summary><strong>${weeks.length} weeks</strong> found (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
+      <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
       <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
