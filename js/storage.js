@@ -4,6 +4,7 @@
 import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS } from './settings.js';
 
 const KEY = 'zmanim-app-state-v1';
+const SHEET_FILE_TYPE = 'zmanim-sheet';
 
 // No seed rules by default — add your own from the Rules tab (e.g. Shabbos Teshuva /
 // Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
@@ -94,6 +95,39 @@ export function exportStateToFile(state) {
   a.download = `zmanim-app-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Downloads a single sheet as its own file, so a copy can be kept in a folder (or
+ *  moved to another machine) without exporting everything. Tagged with a `type` so the
+ *  importer can tell it apart from a full backup — one replaces everything, the other
+ *  is added alongside what's already there. */
+export function exportSheetToFile(sheet) {
+  const label = sheet.season === 'weekday' ? 'weekday' : sheet.season;
+  const blob = new Blob([JSON.stringify({ type: SHEET_FILE_TYPE, sheet }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `zmanim-${label}-${sheet.hebrewYear}-${sheet.createdAt.slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** True for a file written by exportSheetToFile rather than a whole-app backup. */
+export function isSheetFile(text) {
+  try {
+    return JSON.parse(text)?.type === SHEET_FILE_TYPE;
+  } catch {
+    return false;
+  }
+}
+
+/** The sheet inside such a file, given a fresh id so importing the same copy twice (or
+ *  onto the machine it came from) adds a second sheet instead of colliding with the
+ *  original. Never locked on arrival — the lock belongs to the copy it came from. */
+export function importSheetFromText(text) {
+  const { sheet } = JSON.parse(text);
+  if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');
+  return { ...sheet, id: newId('sheet'), locked: false, linkedSheetId: undefined };
 }
 
 export function importStateFromText(text) {

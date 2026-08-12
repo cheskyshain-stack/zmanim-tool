@@ -106,6 +106,7 @@ function resolveSettings(raw) {
 // this is the single-browser "local app" model the user chose over a hosted backend.
 
 const KEY = 'zmanim-app-state-v1';
+const SHEET_FILE_TYPE = 'zmanim-sheet';
 
 // No seed rules by default — add your own from the Rules tab (e.g. Shabbos Teshuva /
 // Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
@@ -196,6 +197,39 @@ function exportStateToFile(state) {
   a.download = `zmanim-app-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Downloads a single sheet as its own file, so a copy can be kept in a folder (or
+ *  moved to another machine) without exporting everything. Tagged with a `type` so the
+ *  importer can tell it apart from a full backup — one replaces everything, the other
+ *  is added alongside what's already there. */
+function exportSheetToFile(sheet) {
+  const label = sheet.season === 'weekday' ? 'weekday' : sheet.season;
+  const blob = new Blob([JSON.stringify({ type: SHEET_FILE_TYPE, sheet }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `zmanim-${label}-${sheet.hebrewYear}-${sheet.createdAt.slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** True for a file written by exportSheetToFile rather than a whole-app backup. */
+function isSheetFile(text) {
+  try {
+    return JSON.parse(text)?.type === SHEET_FILE_TYPE;
+  } catch {
+    return false;
+  }
+}
+
+/** The sheet inside such a file, given a fresh id so importing the same copy twice (or
+ *  onto the machine it came from) adds a second sheet instead of colliding with the
+ *  original. Never locked on arrival — the lock belongs to the copy it came from. */
+function importSheetFromText(text) {
+  const { sheet } = JSON.parse(text);
+  if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');
+  return { ...sheet, id: newId('sheet'), locked: false, linkedSheetId: undefined };
 }
 
 function importStateFromText(text) {
@@ -1734,10 +1768,12 @@ function esc(str) {
 }
 
 // ==== ui/saved-sheets-view.js ====
-function renderSavedSheets(container, state, onOpen, onDelete) {
+const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
+
+function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
   container.innerHTML = `
     <h2>Saved sheets</h2>
-    <p class="hint">Every sheet you've generated. Open one to edit or print it.</p>
+    <p class="hint">Every sheet you've generated. Open one to edit or print it. Lock a sheet to protect it from being deleted, or save a copy as a file you can keep anywhere — that file can be brought back in from Settings → Backup.</p>
     ${
       state.sheets.length
         ? `<table class="saved-list"><thead><tr><th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th></th></tr></thead><tbody>
@@ -1748,11 +1784,16 @@ function renderSavedSheets(container, state, onOpen, onDelete) {
         .map(
           (s) => `
         <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.season === 'kayitz' ? 'שבת קיץ' : s.season === 'weekday' ? 'Weekday' : 'שבת חורף'}</td>
+          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABEL[s.season] || s.season}</td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}</td>
           <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
-          <td><button class="open-btn">Open</button> <button class="delete-btn btn-danger">Delete</button></td>
+          <td>
+            <button class="open-btn">Open</button>
+            <button class="copy-btn" title="Download this sheet as a file you can store anywhere">Save a copy</button>
+            <button class="lock-btn" title="${s.locked ? 'Allow this sheet to be deleted again' : 'Protect this sheet from being deleted'}">${s.locked ? 'Unlock' : 'Lock'}</button>
+            <button class="delete-btn btn-danger" ${s.locked ? 'disabled title="Unlock this sheet before deleting it"' : ''}>Delete</button>
+          </td>
         </tr>`
         )
         .join('')}
@@ -1760,13 +1801,26 @@ function renderSavedSheets(container, state, onOpen, onDelete) {
         : '<p class="hint">No saved sheets yet — use Generate to create one.</p>'
     }
   `;
+  const sheetOf = (e) => state.sheets.find((s) => s.id === e.target.closest('tr').dataset.id);
+
   container.querySelectorAll('.open-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => onOpen(e.target.closest('tr').dataset.id));
   });
+  container.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => exportSheetToFile(sheetOf(e)));
+  });
+  container.querySelectorAll('.lock-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const sheet = sheetOf(e);
+      sheet.locked = !sheet.locked;
+      onChange(); // persists and re-renders, so the row's buttons reflect the new state
+    });
+  });
   container.querySelectorAll('.delete-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
-      const id = e.target.closest('tr').dataset.id;
-      if (confirm('Delete this saved sheet?')) onDelete(id);
+      const sheet = sheetOf(e);
+      if (sheet.locked) return; // the button is disabled too; this is the belt-and-braces half
+      if (confirm('Delete this saved sheet?')) onDelete(sheet.id);
     });
   });
 }
@@ -2109,7 +2163,7 @@ function renderSettings(container, state, onSave, onStateReplaced) {
       <details class="panel">
         <summary>Backup</summary>
         <div class="panel-body">
-        <p class="hint">Everything lives in this browser only — settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone).</p>
+        <p class="hint">Everything lives in this browser only — settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone). Import also takes a single-sheet file saved with "Save a copy" in Saved sheets, and adds it to what you already have rather than replacing anything.</p>
         <div class="backup-row">
           <button type="button" id="export-btn">Export backup</button>
           <label class="file-label" for="import-input">Import backup</label>
@@ -2126,10 +2180,16 @@ function renderSettings(container, state, onSave, onStateReplaced) {
     if (!file) return;
     const text = await file.text();
     try {
-      const imported = importStateFromText(text);
-      Object.assign(state, imported);
-      onStateReplaced();
-      showToast('Backup restored');
+      // A single-sheet copy is added to what's already here; a full backup replaces it.
+      if (isSheetFile(text)) {
+        state.sheets.push(importSheetFromText(text));
+        onStateReplaced();
+        showToast('Sheet added');
+      } else {
+        Object.assign(state, importStateFromText(text));
+        onStateReplaced();
+        showToast('Backup restored');
+      }
     } catch (err) {
       alert('Could not read that backup file: ' + err.message);
     }
@@ -2400,8 +2460,7 @@ function renderSheet(container, state, sheet, onChange) {
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
-      <button id="print-btn" class="btn-primary">Print</button>
-      <button id="pdf-btn" title="Opens the print dialog — pick &quot;Save as PDF&quot; as the destination">Save as PDF</button>
+      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
@@ -2446,7 +2505,6 @@ function renderSheet(container, state, sheet, onChange) {
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  container.querySelector('#pdf-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
   container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
     const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
@@ -2650,12 +2708,15 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const dir = isEnglish ? 'ltr' : 'rtl';
   const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
+  const isWeekday = effectiveSeason === 'weekday';
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
 
   const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
-  const parshaHeader = isEnglish ? 'Parsha' : ' ';
+  // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
+  // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
+  const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
 
   // On the Weekday chart, שחרית ("1 schedule for all days" — see settings-view.js) is
   // one shul-wide value straight from Settings, not per-week: instead of repeating it
@@ -2663,7 +2724,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // weeks), it prints once as a single cell spanning the whole page's rows, matching
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
-  const isWeekday = effectiveSeason === 'weekday';
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -2933,6 +2993,11 @@ function render() {
       },
       (id) => {
         state.sheets = state.sheets.filter((s) => s.id !== id);
+        persist();
+        render();
+      },
+      // Lock/unlock mutates the sheet in place, so this just saves and redraws the list.
+      () => {
         persist();
         render();
       }

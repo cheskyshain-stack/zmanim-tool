@@ -123,6 +123,11 @@ function render() {
         state.sheets = state.sheets.filter((s) => s.id !== id);
         persist();
         render();
+      },
+      // Lock/unlock mutates the sheet in place, so this just saves and redraws the list.
+      () => {
+        persist();
+        render();
       }
     );
   }

@@ -70,8 +70,7 @@ export function renderSheet(container, state, sheet, onChange) {
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
-      <button id="print-btn" class="btn-primary">Print</button>
-      <button id="pdf-btn" title="Opens the print dialog — pick &quot;Save as PDF&quot; as the destination">Save as PDF</button>
+      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
@@ -116,7 +115,6 @@ export function renderSheet(container, state, sheet, onChange) {
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  container.querySelector('#pdf-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
   container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
     const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
@@ -320,12 +318,15 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const dir = isEnglish ? 'ltr' : 'rtl';
   const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
+  const isWeekday = effectiveSeason === 'weekday';
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
 
   const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
-  const parshaHeader = isEnglish ? 'Parsha' : ' ';
+  // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
+  // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
+  const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
 
   // On the Weekday chart, שחרית ("1 schedule for all days" — see settings-view.js) is
   // one shul-wide value straight from Settings, not per-week: instead of repeating it
@@ -333,7 +334,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // weeks), it prints once as a single cell spanning the whole page's rows, matching
   // how it looks in the original printed chart. It's sourced live from Settings with
   // no per-cell override — change it in Settings and it updates everywhere at once.
-  const isWeekday = effectiveSeason === 'weekday';
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
