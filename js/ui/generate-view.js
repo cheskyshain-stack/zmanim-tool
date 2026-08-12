@@ -113,10 +113,13 @@ const seasonLabel = (season) => (season === 'kayitz' ? 'שבת קיץ' : 'שבת
 const SEASON_ICON = {
   kayitz: `<svg class="season-icon is-summer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
     <circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.2M12 19.4v2.2M2.4 12h2.2M19.4 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></svg>`,
+  // One arm (the spine plus a V at each end) drawn three times, rotated 60 degrees apart,
+  // which is what makes it come out as an even six-pointed flake. Built by hand the first
+  // time and it showed: the barbs were at different angles on every arm.
   choref: `<svg class="season-icon is-winter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M12 2.5v19M3.8 7.2l16.4 9.6M20.2 7.2 3.8 16.8"/>
-    <path d="M9.4 4.6 12 7.2l2.6-2.6M9.4 19.4 12 16.8l2.6 2.6"/>
-    <path d="M3.4 10.7 4.5 7.1 1 6M20.6 13.3l-1.1 3.6 3.5 1.1M20.6 10.7l-1.1-3.6L23 6M3.4 13.3l1.1 3.6L1 18"/></svg>`,
+    <g><path d="M12 2.8v18.4M9.7 5.3 12 3l2.3 2.3M9.7 18.7 12 21l2.3-2.3"/></g>
+    <g transform="rotate(60 12 12)"><path d="M12 2.8v18.4M9.7 5.3 12 3l2.3 2.3M9.7 18.7 12 21l2.3-2.3"/></g>
+    <g transform="rotate(120 12 12)"><path d="M12 2.8v18.4M9.7 5.3 12 3l2.3 2.3M9.7 18.7 12 21l2.3-2.3"/></g></svg>`,
 };
 
 /** Two-step progress header, so it's clear up front that this is a short sequence and
