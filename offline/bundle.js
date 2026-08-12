@@ -1255,7 +1255,11 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
   // Generate is where the app opens, so it's where someone who has never seen it lands.
   // The pointer shows only until there's a saved sheet - by then they've done it once.
   const firstRun = !state.sheets.length;
+  // Held to a column rather than the full width of a desktop screen: this is a short
+  // form of small controls, and stretched across a wide monitor it read as a mostly
+  // empty page with a stray year field marooned on the right.
   container.innerHTML = `
+    <div class="gen-column">
     <h2>Generate a sheet</h2>
     <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
@@ -1281,6 +1285,7 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
       </fieldset>
     </form>
     <div id="gen-preview"></div>
+    </div>
   `;
   wireSteppers(container);
   container.querySelector('#open-guide')?.addEventListener('click', () => onOpenTab('guide'));

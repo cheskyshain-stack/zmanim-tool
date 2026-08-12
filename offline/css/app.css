@@ -308,6 +308,10 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
    sibling (`:checked + .season-option`). An earlier version wrapped the input inside
    the label and used :has(input:checked); Chrome didn't reliably re-evaluate that when
    the checked state changed, leaving the highlight on the previously selected card. */
+/* Roughly half a desktop screen, and the full width of anything narrower. Centred, so a
+   wide monitor leaves even margins instead of one empty half. */
+.gen-column { max-width: 42rem; margin-inline: auto; }
+
 .season-picker { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
 .season-radio { position: absolute; opacity: 0; pointer-events: none; }
 .form-grid .season-picker .season-option {
