@@ -33,7 +33,7 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
         <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${editing ? esc(editing.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
-        <button type="submit">${editing ? 'Save changes' : 'Add rule'}</button>
+        <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
         ${editing ? '<button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>' : ''}
       </div>
     </form>

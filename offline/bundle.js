@@ -1160,7 +1160,7 @@ function renderGenerate(container, state, tables, onGenerate) {
           </label>
         </div>
         <label for="step-hebrewYear">Hebrew year${stepper('hebrewYear', defaultYear)}</label>
-        <div class="actions"><button type="submit">Continue</button></div>
+        <div class="actions"><button type="submit" class="btn-primary">Continue</button></div>
       </fieldset>
     </form>
     <div id="gen-preview"></div>
@@ -1254,7 +1254,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
             : ''
         }
       </fieldset>
-      <div class="actions"><button type="submit">Generate sheet</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
     </form>
   `;
 
@@ -1520,7 +1520,7 @@ function renderRules(container, state, onChange, editingRuleId = null) {
         <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${editing ? esc(editing.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
-        <button type="submit">${editing ? 'Save changes' : 'Add rule'}</button>
+        <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
         ${editing ? '<button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>' : ''}
       </div>
     </form>
@@ -1659,7 +1659,7 @@ function renderSavedSheets(container, state, onOpen, onDelete) {
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}</td>
           <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
-          <td><button class="open-btn">Open</button> <button class="delete-btn">Delete</button></td>
+          <td><button class="open-btn">Open</button> <button class="delete-btn btn-danger">Delete</button></td>
         </tr>`
         )
         .join('')}
@@ -1703,7 +1703,7 @@ function renderImageCropper(container, currentDataUrl, onSave) {
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
-          ${currentDataUrl ? '<button type="button" id="crop-remove">Remove — use default</button>' : ''}
+          ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove — use default</button>' : ''}
         </div>
       </div>
       <div id="crop-editor" class="crop-editor" hidden>
@@ -1713,7 +1713,7 @@ function renderImageCropper(container, currentDataUrl, onSave) {
         <label class="crop-zoom">Zoom<input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1"></label>
         <p class="hint">Drag the photo to reposition it.</p>
         <div class="actions">
-          <button type="button" id="crop-save">Use this photo</button>
+          <button type="button" id="crop-save" class="btn-primary">Use this photo</button>
           <button type="button" id="crop-cancel">Cancel</button>
         </div>
       </div>
@@ -2006,7 +2006,7 @@ function renderSettings(container, state, onSave, onStateReplaced) {
         <label><input type="checkbox" name="useElevation" ${s.useElevation ? 'checked' : ''}> Use elevation for zmanim calculation</label>
         <label><input type="checkbox" name="useGregorianBefore1582" ${s.useGregorianBefore1582 ? 'checked' : ''}> Use Gregorian dates before Oct 15, 1582</label>
       </fieldset>
-      <div class="actions"><button type="submit">Save settings</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Save settings</button></div>
     </form>
     <form class="form-grid" onsubmit="return false" style="margin-top:1rem">
       <fieldset>
@@ -2368,7 +2368,7 @@ function renderSheet(container, state, sheet, onChange) {
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
-      <button id="print-btn">Print</button>
+      <button id="print-btn" class="btn-primary">Print</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
@@ -2755,14 +2755,30 @@ document.addEventListener(
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 const tabs = ['generate', 'settings', 'rules', 'saved'];
-const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved Sheets' };
+// "Saved sheets" in sentence case, matching the heading on the page it opens — the nav
+// said "Saved Sheets" and the page said "Saved sheets".
+const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets' };
+
+// Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
+// own colour and size. Inline rather than a font or sprite file so the offline/USB build
+// stays a single self-contained folder with no extra assets to load.
+const tabIcons = {
+  generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
+  settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
+  rules: '<path d="M3 6h14M3 10h14M3 14h14"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="6" cy="14" r="1.6"/>',
+  saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
+};
+const icon = (name) =>
+  `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
 
 function persist() {
   saveState(state);
 }
 
 function renderNav() {
-  nav.innerHTML = tabs.map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${tabLabels[t]}</button>`).join('');
+  nav.innerHTML = tabs
+    .map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${icon(t)}<span>${tabLabels[t]}</span></button>`)
+    .join('');
   nav.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;

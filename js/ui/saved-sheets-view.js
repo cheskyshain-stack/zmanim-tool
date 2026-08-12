@@ -16,7 +16,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete) {
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}</td>
           <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
-          <td><button class="open-btn">Open</button> <button class="delete-btn">Delete</button></td>
+          <td><button class="open-btn">Open</button> <button class="delete-btn btn-danger">Delete</button></td>
         </tr>`
         )
         .join('')}

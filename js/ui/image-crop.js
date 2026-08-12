@@ -22,7 +22,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
-          ${currentDataUrl ? '<button type="button" id="crop-remove">Remove — use default</button>' : ''}
+          ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove — use default</button>' : ''}
         </div>
       </div>
       <div id="crop-editor" class="crop-editor" hidden>
@@ -32,7 +32,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
         <label class="crop-zoom">Zoom<input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1"></label>
         <p class="hint">Drag the photo to reposition it.</p>
         <div class="actions">
-          <button type="button" id="crop-save">Use this photo</button>
+          <button type="button" id="crop-save" class="btn-primary">Use this photo</button>
           <button type="button" id="crop-cancel">Cancel</button>
         </div>
       </div>

@@ -30,14 +30,30 @@ document.addEventListener(
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 const tabs = ['generate', 'settings', 'rules', 'saved'];
-const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved Sheets' };
+// "Saved sheets" in sentence case, matching the heading on the page it opens — the nav
+// said "Saved Sheets" and the page said "Saved sheets".
+const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets' };
+
+// Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
+// own colour and size. Inline rather than a font or sprite file so the offline/USB build
+// stays a single self-contained folder with no extra assets to load.
+const tabIcons = {
+  generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
+  settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
+  rules: '<path d="M3 6h14M3 10h14M3 14h14"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="6" cy="14" r="1.6"/>',
+  saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
+};
+const icon = (name) =>
+  `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
 
 function persist() {
   saveState(state);
 }
 
 function renderNav() {
-  nav.innerHTML = tabs.map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${tabLabels[t]}</button>`).join('');
+  nav.innerHTML = tabs
+    .map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${icon(t)}<span>${tabLabels[t]}</span></button>`)
+    .join('');
   nav.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;

@@ -25,7 +25,7 @@ export function renderGenerate(container, state, tables, onGenerate) {
           </label>
         </div>
         <label for="step-hebrewYear">Hebrew year${stepper('hebrewYear', defaultYear)}</label>
-        <div class="actions"><button type="submit">Continue</button></div>
+        <div class="actions"><button type="submit" class="btn-primary">Continue</button></div>
       </fieldset>
     </form>
     <div id="gen-preview"></div>
@@ -119,7 +119,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
             : ''
         }
       </fieldset>
-      <div class="actions"><button type="submit">Generate sheet</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
     </form>
   `;
 

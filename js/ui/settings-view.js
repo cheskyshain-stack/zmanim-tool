@@ -62,7 +62,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
         <label><input type="checkbox" name="useElevation" ${s.useElevation ? 'checked' : ''}> Use elevation for zmanim calculation</label>
         <label><input type="checkbox" name="useGregorianBefore1582" ${s.useGregorianBefore1582 ? 'checked' : ''}> Use Gregorian dates before Oct 15, 1582</label>
       </fieldset>
-      <div class="actions"><button type="submit">Save settings</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Save settings</button></div>
     </form>
     <form class="form-grid" onsubmit="return false" style="margin-top:1rem">
       <fieldset>

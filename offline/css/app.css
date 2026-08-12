@@ -55,10 +55,13 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 
 #nav { display: flex; flex-direction: column; gap: 0.15rem; }
 .nav-btn {
-  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer;
   padding: 0.55rem 0.75rem; border-radius: var(--radius-sm); color: var(--nav-ink);
   font-size: 0.9rem; font-weight: 500; font-family: inherit; transition: background 0.15s ease, color 0.15s ease;
 }
+.nav-icon { width: 1.15em; height: 1.15em; flex-shrink: 0; opacity: 0.85; }
+.nav-btn.active .nav-icon { opacity: 1; }
 .nav-btn.active { background: var(--ui-accent); color: #fff; }
 .nav-btn:not(.active):hover { background: rgba(255,255,255,0.09); color: #fff; }
 
@@ -162,12 +165,25 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .rt-toolbar button[data-rt]:active { background: var(--accent); color: white; }
 
 .actions { margin-top: 0.5rem; }
-.form-grid button, .sheet-toolbar button {
-  background: var(--ui-accent); color: white; border: none; padding: 0.55rem 1.15rem; border-radius: var(--radius-sm);
-  cursor: pointer; font-size: 0.9rem; font-weight: 600; font-family: inherit; transition: background 0.15s ease, transform 0.05s ease;
+/* Button hierarchy: quiet by default, so the single .btn-primary on a screen is the
+   only thing competing for attention. Blue used to be the default, which put "Open" in
+   a table row at the same weight as "Generate sheet". */
+.form-grid button, .sheet-toolbar button, .saved-list button {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
+  padding: 0.55rem 1.15rem; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 0.9rem; font-weight: 600; font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
 }
-.form-grid button:hover, .sheet-toolbar button:hover { background: var(--ui-accent-dark); }
-.form-grid button:active, .sheet-toolbar button:active { transform: translateY(1px); }
+.form-grid button:hover, .sheet-toolbar button:hover, .saved-list button:hover { background: var(--accent-soft); border-color: var(--border-strong); }
+.form-grid button:active, .sheet-toolbar button:active, .saved-list button:active { transform: translateY(1px); }
+
+/* Element+class so these match the specificity of the rules above and win by order. */
+button.btn-primary { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
+button.btn-primary:hover { background: var(--ui-accent-dark); border-color: var(--ui-accent-dark); }
+button.btn-danger { background: none; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, white); }
+button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
+/* Row-level actions sit inside dense table rows, so they shed the full button padding. */
+.saved-list button { padding: 0.35rem 0.8rem; font-size: 0.82rem; font-weight: 500; }
 
 /* The week lists start collapsed — they run to 30 rows and pushed the page controls
    well below the fold. The card chrome lives on the <details> so the closed state is
@@ -307,10 +323,7 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 .saved-list td:first-child { font-weight: 600; }
 .saved-list tr:last-child td { border-bottom: none; }
 .saved-list tbody tr:hover td { background: var(--accent-soft); }
-.saved-list button { margin-right: 0.4rem; background: var(--ui-accent); color: white; border: none; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.82rem; font-weight: 500; font-family: inherit; }
-.saved-list button:hover { background: var(--ui-accent-dark); }
-.saved-list button + button { background: none; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, white); }
-.saved-list button + button:hover { background: color-mix(in srgb, var(--danger) 10%, white); }
+.saved-list button { margin-right: 0.4rem; }
 
 .sheet-toolbar {
   display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap;
