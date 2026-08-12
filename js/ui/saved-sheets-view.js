@@ -1,5 +1,3 @@
-import { exportSheetToFile } from '../storage.js';
-
 const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
@@ -32,8 +30,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
             </select>
           </td>
           <td>
-            <button class="open-btn">Open</button>
-            <button class="copy-btn" title="Download this sheet as a file you can store outside the app">Save a copy</button>
+            <button class="open-btn btn-primary">Open</button>
             <button class="lock-btn" title="${s.locked ? 'Allow this sheet to be deleted again' : 'Protect this sheet from being deleted'}">${s.locked ? 'Unlock' : 'Lock'}</button>
             <button class="delete-btn btn-danger" ${s.locked ? 'disabled title="Unlock this sheet before deleting it"' : ''}>Delete</button>
           </td>
@@ -69,9 +66,6 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
 
   container.querySelectorAll('.open-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => onOpen(e.target.closest('tr').dataset.id));
-  });
-  container.querySelectorAll('.copy-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => exportSheetToFile(sheetOf(e)));
   });
   container.querySelectorAll('.lock-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {

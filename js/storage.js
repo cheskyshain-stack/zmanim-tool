@@ -136,22 +136,11 @@ export function exportStateToFile(state) {
   URL.revokeObjectURL(url);
 }
 
-/** Downloads a single sheet as its own file, so a copy can be kept in a folder (or
- *  moved to another machine) without exporting everything. Tagged with a `type` so the
- *  importer can tell it apart from a full backup — one replaces everything, the other
- *  is added alongside what's already there. */
-export function exportSheetToFile(sheet) {
-  const label = sheet.season === 'weekday' ? 'weekday' : sheet.season;
-  const blob = new Blob([JSON.stringify({ type: SHEET_FILE_TYPE, sheet }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `zmanim-${label}-${sheet.hebrewYear}-${sheet.createdAt.slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** True for a file written by exportSheetToFile rather than a whole-app backup. */
+/** True for a single-sheet file rather than a whole-app backup.
+ *
+ *  Nothing writes these any more — Saved sheets used to have a "Save a copy" button that
+ *  downloaded one, and folders inside the app replaced it. Import still recognises them
+ *  so a file saved back then still opens. */
 export function isSheetFile(text) {
   try {
     return JSON.parse(text)?.type === SHEET_FILE_TYPE;
