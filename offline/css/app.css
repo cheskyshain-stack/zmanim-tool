@@ -720,6 +720,43 @@ td.ruled .cell { background: var(--ruled); }
 .alloc-msg { margin: 0.35rem 0 0; font-size: var(--fs-sm); color: var(--muted); }
 .alloc-msg.is-bad { color: var(--danger); font-weight: 500; }
 
+/* --- This week ---------------------------------------------------------------------
+   One week as a tall card meant to be read on a screen or handed out, rather than the
+   wide wall chart. It borrows .page-header and .page-footer from the printed sheet so
+   the logo, rabbi line and address are the same ones, not a second copy that drifts. */
+.week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.1rem; flex-wrap: wrap; }
+.week-when { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
+.week-card {
+  /* The printed-sheet variables are scoped to .pages, so the borrowed .page-header needs
+     its own copy here or its calc()s are invalid and the logo renders at full size. The
+     scale is turned down: this is a card, not an 11in page. */
+  --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  --sheet-font-size: 10pt;
+  --sheet-header-scale: 0.5;
+  max-width: 34rem;
+  background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); padding: 1.25rem 1.35rem 1rem; margin-bottom: 1.25rem;
+  font-family: var(--sheet-font-family); color: var(--ink);
+}
+.week-card .page-header { margin-bottom: 0.5rem; }
+.week-title {
+  margin: 0.6rem 0 0; text-align: center; font-size: 1.6rem; font-weight: 700;
+  direction: rtl; color: var(--ink);
+}
+.week-subtitle { margin: 0.15rem 0 0; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
+.week-lines { margin: 1.1rem 0 0.4rem; }
+/* Name on the right, time on the left, which is how the board reads. row-reverse rather
+   than dir=rtl so the time keeps its own left-to-right run and "7:30 / 8:15" is not
+   reordered. */
+.week-line {
+  display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 0.6rem 0.9rem; margin-bottom: 0.4rem;
+  background: var(--bg); border-radius: var(--radius-sm);
+}
+.week-label { direction: rtl; font-weight: 600; font-size: 1.05rem; text-align: right; }
+.week-time { direction: ltr; font-weight: 700; font-size: 1.15rem; text-align: left; white-space: nowrap; }
+.week-card .page-footer { margin-top: 1rem; }
+
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {
   background: var(--ui-accent-soft); border: 1px solid var(--border); border-radius: var(--radius);
