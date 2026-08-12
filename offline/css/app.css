@@ -597,3 +597,11 @@ td.ruled .cell { background: var(--ruled); }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }
 .lock-mark { font-size: var(--fs-sm); }
+/* Folder select sits inside a table row, so it needs to stay compact rather than take
+   the full-width form-field styling. */
+.folder-select {
+  padding: 0.25rem 0.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: var(--fs-sm); background: var(--surface); color: var(--ink); max-width: 11rem;
+}
+/* A folder's table sits flush inside its panel. */
+.panel-body > .saved-list { margin: 0; }
