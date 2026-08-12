@@ -123,6 +123,12 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 /* min-width:0 so a wide sheet page can't stretch the flex item and push the sidebar
    off-screen - it scrolls inside main instead. */
 main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
+/* Everything except a sheet stays in a column beside the sidebar rather than spanning
+   the monitor. On a wide screen the full-width version put a row's controls (the Rules
+   buttons, the Saved sheets buttons) a whole screen away from the row they belong to,
+   so using the app meant dragging the mouse from one edge to the other. A sheet is
+   exempt: a page is a fixed 11in wide and has to be shown at that size. */
+main:not(.is-sheet-view) { max-width: 62rem; }
 
 @media (max-width: 900px) {
   /* Sidebar becomes a normal bar above the content - no off-canvas drawer, since that
@@ -308,9 +314,10 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
    sibling (`:checked + .season-option`). An earlier version wrapped the input inside
    the label and used :has(input:checked); Chrome didn't reliably re-evaluate that when
    the checked state changed, leaving the highlight on the previously selected card. */
-/* Roughly half a desktop screen, and the full width of anything narrower. Centred, so a
-   wide monitor leaves even margins instead of one empty half. */
-.gen-column { max-width: 42rem; margin-inline: auto; }
+/* Roughly half a desktop screen, and the full width of anything narrower. Left aligned,
+   against the sidebar: centring it looked tidier but put the form a screen's width away
+   from the nav you just clicked. */
+.gen-column { max-width: 42rem; }
 
 .season-picker { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
 .season-radio { position: absolute; opacity: 0; pointer-events: none; }
