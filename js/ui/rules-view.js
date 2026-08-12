@@ -9,33 +9,39 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
-  const editing = editingRuleId && editingRuleId !== 'new' ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const cloneOf = typeof editingRuleId === 'string' && editingRuleId.startsWith('clone:') ? editingRuleId.slice(6) : null;
+  const source = cloneOf ? state.rules.find((r) => r.id === cloneOf) : null;
+  const editing = editingRuleId && editingRuleId !== 'new' && !cloneOf ? state.rules.find((r) => r.id === editingRuleId) : null;
+  // Editing writes back to an existing rule; cloning only *prefills* from one and saves
+  // as a new rule, so the two share every field below but differ on submit.
+  const prefill = editing || source;
   const formOpen = editingRuleId !== null;
   container.innerHTML = `
     <h2>Rules</h2>
     <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
-    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always" ${editing?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${editing ? esc((editing.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${editing ? esc((editing.condition.parsha || []).join(', ')) : ''}"></label>
+        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">— month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
         <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף) — one rule then covers both, without touching any other cell.</p>
-        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, editing)}
-        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, editing)}
+        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, prefill)}
+        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, prefill)}
       </fieldset>
       <fieldset>
         <legend>What to do to the cell</legend>
-        <label><input type="radio" name="mode" value="append" ${!editing || editing.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
-        <label><input type="radio" name="mode" value="replace" ${editing?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${editing ? esc(editing.value) : ''}</textarea></label>
+        <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
+        <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
@@ -62,6 +68,7 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
           <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
         <button class="rule-edit" title="Edit this rule">Edit</button>
+        <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
         <button class="rule-delete" title="Delete rule">Delete</button>
       </div>`
         )
@@ -81,6 +88,12 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
       container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+  list.querySelectorAll('.rule-clone').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
+      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
   list.querySelectorAll('.rule-delete').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const id = e.target.closest('.rule-row').dataset.id;
@@ -98,8 +111,10 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
     if (fd.get('always') === 'on') condition.always = true;
     const specialParsha = splitCsv(fd.get('specialParsha'));
     const parsha = splitCsv(fd.get('parsha'));
+    const hebrewDate = splitCsv(fd.get('hebrewDate'));
     if (specialParsha.length) condition.specialParsha = specialParsha;
     if (parsha.length) condition.parsha = parsha;
+    if (hebrewDate.length) condition.hebrewDate = hebrewDate;
     const columnKeys = fd.getAll('columnKeys');
     if (!columnKeys.length) {
       alert('Pick at least one cell/column for this rule to affect.');
@@ -156,6 +171,7 @@ function conditionSummary(c) {
   if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
   if (c.parsha) parts.push('parsha: ' + c.parsha.join(', '));
   if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
+  if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
   return parts.join(' or ') || '(no condition — never matches)';
 }
 function esc(str) {

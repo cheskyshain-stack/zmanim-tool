@@ -48,14 +48,14 @@ export const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  // Weekday chart defaults — Mincha/Maariv are each a list of dropdown options (one per
-  // line) offered on every week's cell when a Weekday chart is generated; individual
-  // weeks are then adjusted by picking a different option (or "Other…" for a one-off
-  // value). Shacharis is one fixed schedule printed identically on every week's row —
+  // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
+  // field: those times differ every week, so every cell starts empty and is typed in on
+  // the sheet. The keys are kept so older saved backups still load cleanly.
+  // Shacharis is one fixed schedule printed identically on every week's row —
   // stored as real HTML (not plain text) since it's edited via a rich-text box in
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
-  weekdayDefaultMincha: '1:40/1:50/6:35/7:30/8:00\n1:40/1:50/6:35/7:30/7:55\n1:40/1:50/6:35/7:30/7:50\n1:40/1:50/6:35/7:30\n1:40/1:50/4:15/6:35/7:30\n1:40/1:50/4:15/6:35/7:20\n1:40/1:50/4:15/6:35/7:10\n1:40/1:50/4:15/6:35/7:00\n1:40/1:50/4:15/6:35',
-  weekdayDefaultMaariv: '9:15/9:30/10:00/10:30/11:00\n9:15/9:30/10:00/10:30/11:00/11:30\n9:15/9:30/10:00/10:30/11:00/11:30/12:00',
+  weekdayDefaultMincha: '',
+  weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',

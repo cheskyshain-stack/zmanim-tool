@@ -143,11 +143,6 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
           <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         </details>
-        ${
-          !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
-            ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
-            : ''
-        }
       </fieldset>
       <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
     </form>

@@ -1,8 +1,9 @@
 import { resolveSettings } from '../settings.js';
+import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
-import { inSpringDstWindow, applyTishaBavNote } from '../sheets/common.js';
+import { inSpringDstWindow } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -49,18 +50,6 @@ export function renderSheet(container, state, sheet, onChange) {
   const pages = splitWeeksIntoPages(weeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: pageEffectiveSeason(sheet, pageWeeks, settings) }));
   const anyKayitzPage = pages.some((p) => p.effectiveSeason === 'kayitz');
   const isEnglish = state.settings.language === 'en';
-  // Column-width panel covers every column key actually used on any page — CHOREF's
-  // own columns plus (if any page prints as קיץ) any קיץ-only keys not already in it.
-  const panelColumns =
-    sheet.season === 'weekday'
-      ? WEEKDAY_COLUMNS
-      : sheet.season === 'choref' && anyKayitzPage
-        ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))]
-        : sheet.season === 'kayitz'
-          ? KAYITZ_COLUMNS
-          : CHOREF_COLUMNS;
-  const colOrder = isEnglish ? [...panelColumns.map((c) => c.key), 'parsha'] : ['parsha', ...rtlOrdered(panelColumns).map((c) => c.key)];
-  const colLabel = { parsha: isEnglish ? 'Parsha' : 'פרשה', ...Object.fromEntries(panelColumns.map((c) => [c.key, c.header.replace(/\n/g, ' ')])) };
 
   // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
   // the Shabbos sheet it was generated alongside) — generating both saves both, but only
@@ -85,13 +74,14 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
+      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
     <details class="panel no-print">
-      <summary>Layout &amp; style — font, sizes, colour, column widths</summary>
+      <summary>Layout &amp; style — font, sizes, colour</summary>
       <div class="panel-body">
         <div class="style-toolbar">
           <label>Font
@@ -109,28 +99,21 @@ export function renderSheet(container, state, sheet, onChange) {
           </label>
           <button id="style-reset" type="button">Reset style</button>
         </div>
-        <div class="panel-section">
-          <div class="panel-section-title">Column widths <span class="hint">— auto by default; set a number to override, clear it to go back to auto</span></div>
-          <div class="col-width-grid">
-            ${colOrder
-              .map(
-                (key) => `
-              <label class="col-width-input">
-                <span>${esc(colLabel[key] || key)}</span>
-                <input type="number" min="20" max="400" step="5" data-colkey="${key}" placeholder="auto" value="${sheet.columnWidths[key] ?? ''}">
-              </label>`
-              )
-              .join('')}
-            <button id="col-width-reset" type="button">Reset all to auto</button>
-          </div>
-        </div>
       </div>
     </details>
-    <div id="pages"></div>
+    <div id="sheet-stack">
+      <div id="pages" class="pages"></div>
+      ${companion ? `<h3 class="companion-heading no-print">${sheet.season === 'weekday' ? 'שבת sheet' : 'Weekday chart'} — generated with this one</h3>
+      <div id="pages-companion" class="pages"></div>` : ''}
+    </div>
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
+  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
+    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
+    e.target.classList.toggle('is-active', on);
+  });
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
   // focusin rather than read from document.activeElement at click time because the
@@ -165,36 +148,23 @@ export function renderSheet(container, state, sheet, onChange) {
 
   applyStyle(pagesEl, sheet.style);
 
-  // Column-width controls: update every page's <col> live as you type, commit (save) on change.
-  container.querySelectorAll('.col-width-input input').forEach((input) => {
-    const key = input.dataset.colkey;
-    const applyWidth = () => {
-      const px = input.value === '' ? undefined : Number(input.value);
-      pagesEl.querySelectorAll(`col[data-colkey="${key}"]`).forEach((col) => {
-        col.style.width = px ? px + 'px' : '';
-      });
-      // The parsha column carries a CSS min-width floor (see .parsha-cell in app.css),
-      // which a narrower typed value would otherwise lose to — so mirror it inline here
-      // as well, keeping the live preview honest as you type.
-      if (key === 'parsha') {
-        pagesEl.querySelectorAll('.parsha-cell').forEach((td) => {
-          td.style.minWidth = px ? px + 'px' : '';
-        });
-      }
-      return px;
-    };
-    input.addEventListener('input', applyWidth);
-    input.addEventListener('change', () => {
-      const px = applyWidth();
-      if (px === undefined) delete sheet.columnWidths[key];
-      else sheet.columnWidths[key] = px;
-      onChange({ save: true });
+  // The paired chart renders below the primary one so both are reachable by scrolling
+  // instead of only through the toolbar link (which stays, for jumping the other way).
+  // It gets its own container and its own applyStyle call, because each sheet carries
+  // its own font/size/colour and the style variables are set per container.
+  const companionEl = container.querySelector('#pages-companion');
+  if (companionEl && companion) {
+    if (!companion.style) companion.style = { ...state.settings.sheetStyle };
+    if (!companion.columnWidths) companion.columnWidths = {};
+    const cWeeks = companion.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+    const cPages = splitWeeksIntoPages(cWeeks, companion.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(companion, pw, settings) }));
+    cPages.forEach(({ weeks: pw, effectiveSeason }, i) => {
+      const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
+      companionEl.appendChild(renderPage(pw, i, cPages.length, columns, buildRow, settings, companion, state, onChange, effectiveSeason));
     });
-  });
-  container.querySelector('#col-width-reset').addEventListener('click', () => {
-    sheet.columnWidths = {};
-    onChange({ save: true });
-  });
+    applyStyle(companionEl, companion.style);
+  }
+
 
   const fontSel = container.querySelector('#style-font');
   const sizeInput = container.querySelector('#style-size');
@@ -308,12 +278,12 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // The Weekday chart's Mincha/Maariv are plain Settings-driven default text, not
       // computed zmanim, so neither the Tisha B'Av note nor the Rules engine (both
       // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
-      const computed = isWeekday ? buildRow(week, settings) : applyTishaBavNote(buildRow(week, settings), week, settings);
+      const computed = buildRow(week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
       // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
       // as a real קיץ sheet would for these weeks.
-      const ruled = isWeekday ? computed : applyRules(computed, week, state.rules, effectiveSeason, appliedColumns);
+      const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
       const cellHtml = (c) => {
         // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
@@ -388,8 +358,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
     const settingsResolved = resolveSettings(state.settings);
     const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
+    const computed = builtRow;
+    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
     const raw = ruled[col] ?? '';
     // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
     // list in Settings); every other column is plain text that nl2br has to mark up
@@ -425,6 +395,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   });
 
   return page;
+}
+
+/** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed
+ *  here rather than stored on the sheet, so it works for sheets saved before hebrewDate
+ *  conditions existed. */
+function withHebrewDate(week, settings) {
+  return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
 }
 
 function splitBuild(season) {

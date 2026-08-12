@@ -9,7 +9,10 @@
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
   main { padding: 0; max-width: none; margin: 0; }
-  #pages { margin: 0; }
+  .pages { margin: 0; }
+  /* Stacked for print even if the side-by-side view is on screen. */
+  #sheet-stack.is-side-by-side { display: block; overflow: visible; }
+  #sheet-stack.is-side-by-side > .pages { transform: none; width: auto; margin-right: 0; }
   .page {
     width: 11in;
     height: 8.5in;

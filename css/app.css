@@ -429,7 +429,23 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   .saved-list td:last-child { justify-content: flex-start; margin-top: 0.4rem; }
 }
 
-#pages {
+/* Heading above the paired chart that renders below the primary one. */
+.companion-heading { margin: 2rem 0 0.75rem; font-size: var(--fs-lg); color: var(--muted); font-weight: 600; }
+
+/* Side-by-side view: the two charts scaled down to sit next to each other for a quick
+   comparison. transform scales visually only — each page keeps its true 11in geometry,
+   so print is completely unaffected (and the whole thing is .no-print-irrelevant since
+   print.css lays pages out itself). transform-origin top-left plus a matching negative
+   margin stops the shrunk page leaving a large empty gap where its full size used to be. */
+#sheet-stack.is-side-by-side { display: flex; align-items: flex-start; gap: 1rem; overflow-x: auto; }
+#sheet-stack.is-side-by-side > .pages { flex: 0 0 auto; transform: scale(0.48); transform-origin: top left; }
+#sheet-stack.is-side-by-side > .pages > .page { margin-bottom: 1rem; }
+#sheet-stack.is-side-by-side .companion-heading { display: none; }
+/* Each scaled column only takes 48% of its laid-out width, so claw the rest back. */
+#sheet-stack.is-side-by-side > .pages { width: 11in; margin-right: calc(-11in * 0.52); }
+#side-by-side-btn.is-active { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
+
+.pages {
   --sheet-font-family: "Times New Roman", "David", "David Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 1;

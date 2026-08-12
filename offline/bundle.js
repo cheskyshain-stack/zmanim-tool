@@ -62,14 +62,14 @@ const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  // Weekday chart defaults — Mincha/Maariv are each a list of dropdown options (one per
-  // line) offered on every week's cell when a Weekday chart is generated; individual
-  // weeks are then adjusted by picking a different option (or "Other…" for a one-off
-  // value). Shacharis is one fixed schedule printed identically on every week's row —
+  // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
+  // field: those times differ every week, so every cell starts empty and is typed in on
+  // the sheet. The keys are kept so older saved backups still load cleanly.
+  // Shacharis is one fixed schedule printed identically on every week's row —
   // stored as real HTML (not plain text) since it's edited via a rich-text box in
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
-  weekdayDefaultMincha: '1:40/1:50/6:35/7:30/8:00\n1:40/1:50/6:35/7:30/7:55\n1:40/1:50/6:35/7:30/7:50\n1:40/1:50/6:35/7:30\n1:40/1:50/4:15/6:35/7:30\n1:40/1:50/4:15/6:35/7:20\n1:40/1:50/4:15/6:35/7:10\n1:40/1:50/4:15/6:35/7:00\n1:40/1:50/4:15/6:35',
-  weekdayDefaultMaariv: '9:15/9:30/10:00/10:30/11:00\n9:15/9:30/10:00/10:30/11:00/11:30\n9:15/9:30/10:00/10:30/11:00/11:30/12:00',
+  weekdayDefaultMincha: '',
+  weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
   locationName: 'Lakewood',
@@ -112,6 +112,32 @@ const KEY = 'zmanim-app-state-v1';
 // ready to fill in the real wording/times.
 const SEED_RULES = [];
 
+/** ט' באב used to be hardcoded into the sheet builders. It's an ordinary rule now, so
+ *  it can be seen, edited, disabled or deleted like any other — matching on the Hebrew
+ *  date (Av 9), which recurs every year, unlike a fixed Gregorian date.
+ *
+ *  Installed once per browser and recorded in state.seeded, so deleting it sticks
+ *  instead of having it reappear on the next load. */
+const TISHA_BAV_RULE = {
+  id: 'rule-tisha-bav',
+  name: 'ט באב — מוצאי שבת',
+  enabled: true,
+  condition: { hebrewDate: ['5-9'] },
+  columnKeys: ['kayitz:B', 'kayitz:C', 'choref:B', 'choref:C'],
+  mode: 'append',
+  value: 'ט באב',
+};
+
+function applySeeds(state) {
+  const seeded = state.seeded || {};
+  if (!seeded.tishaBav) {
+    if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
+    seeded.tishaBav = true;
+  }
+  state.seeded = seeded;
+  return state;
+}
+
 // Merges saved settings over the defaults, cloning nested objects (sheetStyle) so
 // nothing ever ends up sharing a reference with the DEFAULT_SETTINGS constant —
 // mutating state.settings.sheetStyle in place would otherwise silently corrupt the
@@ -125,7 +151,7 @@ function normalizeSettings(raw) {
 }
 
 function defaultState() {
-  return { settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })) };
+  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {} });
 }
 
 function loadState() {
@@ -133,11 +159,12 @@ function loadState() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    return {
+    return applySeeds({
       settings: normalizeSettings(parsed.settings),
       sheets: parsed.sheets || [],
       rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
-    };
+      seeded: parsed.seeded || {},
+    });
   } catch (e) {
     console.error('Failed to load saved state, starting fresh.', e);
     return defaultState();
@@ -160,11 +187,14 @@ function exportStateToFile(state) {
 
 function importStateFromText(text) {
   const parsed = JSON.parse(text);
-  return {
+  // `seeded` comes across too: without it, restoring a backup made after deliberately
+  // deleting a seeded rule would hand it straight back on the next load.
+  return applySeeds({
     settings: normalizeSettings(parsed.settings),
     sheets: parsed.sheets || [],
     rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
-  };
+    seeded: parsed.seeded || {},
+  });
 }
 
 function newId(prefix) {
@@ -1278,11 +1308,6 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
           <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         </details>
-        ${
-          !settings.weekdayDefaultMincha || !settings.weekdayDefaultMaariv
-            ? `<p class="error">Default מנחה/מעריב text isn't set in Settings yet — the chart will still generate, but those cells will show a placeholder instead of real times until you fill them in (Settings → Weekday chart defaults).</p>`
-            : ''
-        }
       </fieldset>
       <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
     </form>
@@ -1526,33 +1551,39 @@ function renderRules(container, state, onChange, editingRuleId = null) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
-  const editing = editingRuleId && editingRuleId !== 'new' ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const cloneOf = typeof editingRuleId === 'string' && editingRuleId.startsWith('clone:') ? editingRuleId.slice(6) : null;
+  const source = cloneOf ? state.rules.find((r) => r.id === cloneOf) : null;
+  const editing = editingRuleId && editingRuleId !== 'new' && !cloneOf ? state.rules.find((r) => r.id === editingRuleId) : null;
+  // Editing writes back to an existing rule; cloning only *prefills* from one and saves
+  // as a new rule, so the two share every field below but differ on submit.
+  const prefill = editing || source;
   const formOpen = editingRuleId !== null;
   container.innerHTML = `
     <h2>Rules</h2>
     <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
-    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always" ${editing?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${editing ? esc((editing.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${editing ? esc((editing.condition.parsha || []).join(', ')) : ''}"></label>
+        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">— month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
         <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף) — one rule then covers both, without touching any other cell.</p>
-        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, editing)}
-        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, editing)}
+        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, prefill)}
+        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, prefill)}
       </fieldset>
       <fieldset>
         <legend>What to do to the cell</legend>
-        <label><input type="radio" name="mode" value="append" ${!editing || editing.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
-        <label><input type="radio" name="mode" value="replace" ${editing?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${editing ? esc(editing.value) : ''}</textarea></label>
+        <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
+        <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
@@ -1579,6 +1610,7 @@ function renderRules(container, state, onChange, editingRuleId = null) {
           <div class="hint">${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
         </div>
         <button class="rule-edit" title="Edit this rule">Edit</button>
+        <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
         <button class="rule-delete" title="Delete rule">Delete</button>
       </div>`
         )
@@ -1598,6 +1630,12 @@ function renderRules(container, state, onChange, editingRuleId = null) {
       container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+  list.querySelectorAll('.rule-clone').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
+      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
   list.querySelectorAll('.rule-delete').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const id = e.target.closest('.rule-row').dataset.id;
@@ -1615,8 +1653,10 @@ function renderRules(container, state, onChange, editingRuleId = null) {
     if (fd.get('always') === 'on') condition.always = true;
     const specialParsha = splitCsv(fd.get('specialParsha'));
     const parsha = splitCsv(fd.get('parsha'));
+    const hebrewDate = splitCsv(fd.get('hebrewDate'));
     if (specialParsha.length) condition.specialParsha = specialParsha;
     if (parsha.length) condition.parsha = parsha;
+    if (hebrewDate.length) condition.hebrewDate = hebrewDate;
     const columnKeys = fd.getAll('columnKeys');
     if (!columnKeys.length) {
       alert('Pick at least one cell/column for this rule to affect.');
@@ -1673,6 +1713,7 @@ function conditionSummary(c) {
   if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
   if (c.parsha) parts.push('parsha: ' + c.parsha.join(', '));
   if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
+  if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
   return parts.join(' or ') || '(no condition — never matches)';
 }
 function esc(str) {
@@ -2008,15 +2049,9 @@ function renderSettings(container, state, onSave, onStateReplaced) {
       <details class="panel">
         <summary>Weekday chart defaults</summary>
         <div class="panel-body">
-        <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — every week's cell starts from the <strong>first line</strong> below, and you edit it per week by typing straight into the cell on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">Every box here — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
+        <p class="hint">מנחה and מעריב on the Weekday chart start blank — those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">This box — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">Starting מנחה times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
-        <div class="opt-list" id="mincha-options">${optionRows(s.weekdayDefaultMincha)}</div>
-        <button type="button" class="opt-add" data-list="mincha-options">+ Add a מנחה line</button>
-        <div class="rt-field-label">Starting מעריב times <span class="hint">— first line is what a new week starts on; the rest are kept as a handy list</span></div>
-        <div class="opt-list" id="maariv-options">${optionRows(s.weekdayDefaultMaariv)}</div>
-        <button type="button" class="opt-add" data-list="maariv-options">+ Add a מעריב line</button>
         <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
@@ -2118,16 +2153,6 @@ function renderSettings(container, state, onSave, onStateReplaced) {
     }
   });
 
-  container.querySelectorAll('.opt-add').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const list = container.querySelector('#' + btn.dataset.list);
-      list.insertAdjacentHTML('beforeend', optionRow(''));
-      list.lastElementChild.querySelector('.richtext-field').focus();
-    });
-  });
-  container.addEventListener('click', (e) => {
-    if (e.target.classList?.contains('opt-remove')) e.target.closest('.opt-row').remove();
-  });
 
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2139,8 +2164,6 @@ function renderSettings(container, state, onSave, onStateReplaced) {
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
-      weekdayDefaultMincha: readOptionList(container, 'mincha-options'),
-      weekdayDefaultMaariv: readOptionList(container, 'maariv-options'),
       weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
@@ -2176,34 +2199,6 @@ function showToast(message) {
     el.classList.remove('toast-in');
     setTimeout(() => el.remove(), 300);
   }, 2000);
-}
-
-/** One editable מנחה/מעריב option. These hold real HTML rather than plain text — the
- *  times on the printed board are partly underlined, and the sheet cells they fill in
- *  need to carry that formatting with them. */
-function optionRow(html) {
-  return `<div class="opt-row">
-    <div class="cell richtext-field opt-input" contenteditable="true" dir="ltr">${html}</div>
-    <button type="button" class="opt-remove" title="Remove this option">&times;</button>
-  </div>`;
-}
-
-/** The stored settings value is one option per line (see sheets/weekday.js), so a blank
- *  value still gets one empty row to type into. */
-function optionRows(stored) {
-  const rows = String(stored || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return (rows.length ? rows : ['']).map(optionRow).join('');
-}
-
-/** Collects an option list back into the stored one-per-line form. */
-function readOptionList(container, id) {
-  return [...container.querySelectorAll(`#${id} .opt-input`)]
-    .map((el) => normalizeRichText(el.innerHTML))
-    .filter(Boolean)
-    .join('\n');
 }
 
 function esc(str) {
@@ -2259,12 +2254,19 @@ function mergeRow(computedRow, sheet, weekSerial) {
 //   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
 //   parsha:        [names]      - matches week.parsha
 //   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
 //   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller — see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
 function conditionMatches(condition, week) {
   if (condition.always) return true;
   if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
   if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
   if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
   return false;
 }
 
@@ -2307,37 +2309,15 @@ function applyRules(row, week, rules, season, appliedColumns) {
 
 // ==== sheets/weekday.js ====
 // Weekday Zmanim chart — unlike שבת קיץ/חורף, nothing here is computed from
-// sunrise/sunset: מנחה and מעריב are chosen per week from a shul-wide list of options
-// set in Settings (rendered as a dropdown on the sheet, with a free-text "Other" escape
-// hatch), and שחרית is one fixed schedule that's identical every week, sourced directly
-// from Settings at render time (see sheet-view.js) rather than through this row builder.
-
-/** Settings.weekdayDefaultMincha/weekdayDefaultMaariv are one dropdown option per line
- *  — blank lines ignored. The first option is the default a fresh (unedited) week's
- *  cell starts on. */
-function weekdayMinchaOptions(settings) {
-  return String(settings.weekdayDefaultMincha || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-function weekdayMaarivOptions(settings) {
-  return String(settings.weekdayDefaultMaariv || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function buildWeekdayRow(week, settings) {
-  const minchaOptions = weekdayMinchaOptions(settings);
-  const maarivOptions = weekdayMaarivOptions(settings);
-  return {
-    // A blank cell here (before any option is set in Settings) used to look
-    // indistinguishable from "nothing generated" — a placeholder makes clear the chart
-    // did generate and just needs its options filled in.
-    B: maarivOptions[0] || '(set default מעריב in Settings)',
-    C: minchaOptions[0] || '(set default מנחה in Settings)',
-  };
+// sunrise/sunset: מנחה and מעריב start blank and are typed in per week (they differ
+// every week, so there's no sensible default to seed them with), and שחרית is one fixed
+// schedule that's identical every week, sourced directly from Settings at render time
+// (see sheet-view.js) rather than through this row builder.
+//
+// Typing into those cells still takes the time shorthand every other cell does —
+// "1220 130" becomes "12:20/1:30" on blur (see ui/rich-text.js).
+function buildWeekdayRow() {
+  return { B: '', C: '' };
 }
 
 const WEEKDAY_COLUMNS = [
@@ -2387,18 +2367,6 @@ function renderSheet(container, state, sheet, onChange) {
   const pages = splitWeeksIntoPages(weeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: pageEffectiveSeason(sheet, pageWeeks, settings) }));
   const anyKayitzPage = pages.some((p) => p.effectiveSeason === 'kayitz');
   const isEnglish = state.settings.language === 'en';
-  // Column-width panel covers every column key actually used on any page — CHOREF's
-  // own columns plus (if any page prints as קיץ) any קיץ-only keys not already in it.
-  const panelColumns =
-    sheet.season === 'weekday'
-      ? WEEKDAY_COLUMNS
-      : sheet.season === 'choref' && anyKayitzPage
-        ? [...CHOREF_COLUMNS, ...KAYITZ_COLUMNS.filter((c) => !CHOREF_COLUMNS.some((cc) => cc.key === c.key))]
-        : sheet.season === 'kayitz'
-          ? KAYITZ_COLUMNS
-          : CHOREF_COLUMNS;
-  const colOrder = isEnglish ? [...panelColumns.map((c) => c.key), 'parsha'] : ['parsha', ...rtlOrdered(panelColumns).map((c) => c.key)];
-  const colLabel = { parsha: isEnglish ? 'Parsha' : 'פרשה', ...Object.fromEntries(panelColumns.map((c) => [c.key, c.header.replace(/\n/g, ' ')])) };
 
   // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
   // the Shabbos sheet it was generated alongside) — generating both saves both, but only
@@ -2423,13 +2391,14 @@ function renderSheet(container, state, sheet, onChange) {
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
+      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
     <details class="panel no-print">
-      <summary>Layout &amp; style — font, sizes, colour, column widths</summary>
+      <summary>Layout &amp; style — font, sizes, colour</summary>
       <div class="panel-body">
         <div class="style-toolbar">
           <label>Font
@@ -2447,28 +2416,21 @@ function renderSheet(container, state, sheet, onChange) {
           </label>
           <button id="style-reset" type="button">Reset style</button>
         </div>
-        <div class="panel-section">
-          <div class="panel-section-title">Column widths <span class="hint">— auto by default; set a number to override, clear it to go back to auto</span></div>
-          <div class="col-width-grid">
-            ${colOrder
-              .map(
-                (key) => `
-              <label class="col-width-input">
-                <span>${esc(colLabel[key] || key)}</span>
-                <input type="number" min="20" max="400" step="5" data-colkey="${key}" placeholder="auto" value="${sheet.columnWidths[key] ?? ''}">
-              </label>`
-              )
-              .join('')}
-            <button id="col-width-reset" type="button">Reset all to auto</button>
-          </div>
-        </div>
       </div>
     </details>
-    <div id="pages"></div>
+    <div id="sheet-stack">
+      <div id="pages" class="pages"></div>
+      ${companion ? `<h3 class="companion-heading no-print">${sheet.season === 'weekday' ? 'שבת sheet' : 'Weekday chart'} — generated with this one</h3>
+      <div id="pages-companion" class="pages"></div>` : ''}
+    </div>
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
+  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
+    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
+    e.target.classList.toggle('is-active', on);
+  });
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
   // focusin rather than read from document.activeElement at click time because the
@@ -2503,36 +2465,23 @@ function renderSheet(container, state, sheet, onChange) {
 
   applyStyle(pagesEl, sheet.style);
 
-  // Column-width controls: update every page's <col> live as you type, commit (save) on change.
-  container.querySelectorAll('.col-width-input input').forEach((input) => {
-    const key = input.dataset.colkey;
-    const applyWidth = () => {
-      const px = input.value === '' ? undefined : Number(input.value);
-      pagesEl.querySelectorAll(`col[data-colkey="${key}"]`).forEach((col) => {
-        col.style.width = px ? px + 'px' : '';
-      });
-      // The parsha column carries a CSS min-width floor (see .parsha-cell in app.css),
-      // which a narrower typed value would otherwise lose to — so mirror it inline here
-      // as well, keeping the live preview honest as you type.
-      if (key === 'parsha') {
-        pagesEl.querySelectorAll('.parsha-cell').forEach((td) => {
-          td.style.minWidth = px ? px + 'px' : '';
-        });
-      }
-      return px;
-    };
-    input.addEventListener('input', applyWidth);
-    input.addEventListener('change', () => {
-      const px = applyWidth();
-      if (px === undefined) delete sheet.columnWidths[key];
-      else sheet.columnWidths[key] = px;
-      onChange({ save: true });
+  // The paired chart renders below the primary one so both are reachable by scrolling
+  // instead of only through the toolbar link (which stays, for jumping the other way).
+  // It gets its own container and its own applyStyle call, because each sheet carries
+  // its own font/size/colour and the style variables are set per container.
+  const companionEl = container.querySelector('#pages-companion');
+  if (companionEl && companion) {
+    if (!companion.style) companion.style = { ...state.settings.sheetStyle };
+    if (!companion.columnWidths) companion.columnWidths = {};
+    const cWeeks = companion.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+    const cPages = splitWeeksIntoPages(cWeeks, companion.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(companion, pw, settings) }));
+    cPages.forEach(({ weeks: pw, effectiveSeason }, i) => {
+      const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
+      companionEl.appendChild(renderPage(pw, i, cPages.length, columns, buildRow, settings, companion, state, onChange, effectiveSeason));
     });
-  });
-  container.querySelector('#col-width-reset').addEventListener('click', () => {
-    sheet.columnWidths = {};
-    onChange({ save: true });
-  });
+    applyStyle(companionEl, companion.style);
+  }
+
 
   const fontSel = container.querySelector('#style-font');
   const sizeInput = container.querySelector('#style-size');
@@ -2646,12 +2595,12 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // The Weekday chart's Mincha/Maariv are plain Settings-driven default text, not
       // computed zmanim, so neither the Tisha B'Av note nor the Rules engine (both
       // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
-      const computed = isWeekday ? buildRow(week, settings) : applyTishaBavNote(buildRow(week, settings), week, settings);
+      const computed = buildRow(week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
       // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
       // as a real קיץ sheet would for these weeks.
-      const ruled = isWeekday ? computed : applyRules(computed, week, state.rules, effectiveSeason, appliedColumns);
+      const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
       const cellHtml = (c) => {
         // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
@@ -2726,8 +2675,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
     const settingsResolved = resolveSettings(state.settings);
     const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = weekSeason === 'weekday' ? builtRow : applyTishaBavNote(builtRow, week, settingsResolved);
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, { ...week, date: new Date(week.date) }, state.rules, weekSeason);
+    const computed = builtRow;
+    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
     const raw = ruled[col] ?? '';
     // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
     // list in Settings); every other column is plain text that nl2br has to mark up
@@ -2763,6 +2712,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   });
 
   return page;
+}
+
+/** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed
+ *  here rather than stored on the sheet, so it works for sheets saved before hebrewDate
+ *  conditions existed. */
+function withHebrewDate(week, settings) {
+  return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
 }
 
 function splitBuild(season) {

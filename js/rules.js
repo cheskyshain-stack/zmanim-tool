@@ -14,12 +14,19 @@
 //   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
 //   parsha:        [names]      - matches week.parsha
 //   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
 //   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller — see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
 function conditionMatches(condition, week) {
   if (condition.always) return true;
   if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
   if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
   if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
   return false;
 }
 
