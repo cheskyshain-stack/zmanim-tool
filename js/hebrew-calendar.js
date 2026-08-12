@@ -186,3 +186,81 @@ export function isYomTovOrCholHamoed(serial, settings, specialDaysTable) {
   const name = hasYomTov(serial, settings, specialDaysTable);
   return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(name);
 }
+
+/** HAS_ROSH_CHODESH: "ראש חדש <month>" on Rosh Chodesh, else "".
+ *
+ *  Ported from the workbook's own LAMBDA, including its two quirks: 1 Tishrei is
+ *  excluded (that day is Rosh Hashana, not Rosh Chodesh), and the 30th of a full month
+ *  is the *first* day of the next month's Rosh Chodesh, so it is named for the month
+ *  that is starting. In a leap year the month after Shevat is Adar I, hence the +2. */
+export function hasRoshChodesh(serial, settings) {
+  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const months = settings.english ? JEWISH_MONTHS_EN : JEWISH_MONTHS_HE;
+  const label = settings.english ? 'Rosh Chodesh ' : 'ראש חדש ';
+  if (j.dayOfMonth === 1 && j.month !== 7) return label + months[j.month - 1];
+  if (j.dayOfMonth === 30) return label + months[j.month + (j.leap && j.month === 11 ? 2 : 1) - 1];
+  return '';
+}
+
+/** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
+ *  Cheshvan, else "".
+ *
+ *  The workbook expresses the custom as day-of-month windows rather than as "the first
+ *  Monday after...": Iyar or Cheshvan only, Monday between the 4th and 17th, Thursday
+ *  between the 7th and 13th. Each window holds exactly the intended days, two Mondays
+ *  and the one Thursday between them. */
+export function hasBehab(serial, settings) {
+  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (j.month !== 2 && j.month !== 8) return '';
+  const weekday = excelWeekday(serial);
+  const label = settings.english ? 'BeHaB' : 'בה״ב';
+  if (weekday === 2 && j.dayOfMonth >= 4 && j.dayOfMonth <= 17) return label;
+  if (weekday === 5 && j.dayOfMonth >= 7 && j.dayOfMonth <= 13) return label;
+  return '';
+}
+
+/** HAS_TAANIS: the name of the fast falling on this date, else "".
+ *
+ *  Ported from the workbook, deferrals included: a fast that would fall on Shabbos moves
+ *  to Sunday (the 18th of Tammuz, 10th of Av, 4th of Tishrei), except תענית אסתר, which
+ *  moves back to the Thursday before (the 11th of Adar). Asara B'Teves can never fall on
+ *  Shabbos, so it has no deferral. Yom Kippur is included, as the workbook counts it
+ *  among the fasts. */
+export function hasTaanis(serial, settings) {
+  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const weekday = excelWeekday(serial);
+  const en = settings.english;
+  const d = j.dayOfMonth;
+  const name = {
+    tammuz: en ? 'Seventeenth of Tammuz' : 'שבעה עשר בתמוז',
+    av: en ? "Tishah B'Av" : 'תשעה באב',
+    gedalyah: en ? 'Fast of Gedalyah' : 'צום גדליה',
+    kippur: en ? 'Yom Kippur' : 'יום כפור',
+    teves: en ? 'Tenth of Teves' : 'עשרה בטבת',
+    esther: en ? 'Fast of Esther' : 'תענית אסתר',
+  };
+  switch (j.month) {
+    case 4:
+      if (d === 17 && weekday !== 7) return name.tammuz;
+      if (d === 18 && weekday === 1) return name.tammuz;
+      return '';
+    case 5:
+      if (d === 9 && weekday !== 7) return name.av;
+      if (d === 10 && weekday === 1) return name.av;
+      return '';
+    case 7:
+      if (d === 3 && weekday !== 7) return name.gedalyah;
+      if (d === 4 && weekday === 1) return name.gedalyah;
+      if (d === 10) return name.kippur;
+      return '';
+    case 10:
+      return d === 10 ? name.teves : '';
+    case 12:
+    case 14:
+      if (d === 13 && weekday !== 7) return name.esther;
+      if (d === 11 && weekday === 5) return name.esther;
+      return '';
+    default:
+      return '';
+  }
+}
