@@ -33,6 +33,14 @@ export const LEGACY_WEEKDAY_SHACHARIS = [
   '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
 ];
 
+/** The three-line version of the Weekday footer, carried forward to the two-line one the
+ *  same way as LEGACY_WEEKDAY_SHACHARIS: an install that never edited it should not stay
+ *  on wording that has since changed. Anything typed by hand is left alone. */
+export const LEGACY_WEEKDAY_FOOTER = [
+  'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
+  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים\n**באולם השמחות',
+];
+
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
@@ -57,7 +65,7 @@ export const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
-  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
+  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
   locationName: 'Lakewood',
   latitude: 40.068,
   longitude: -74.205,

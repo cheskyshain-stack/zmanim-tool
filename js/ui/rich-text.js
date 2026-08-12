@@ -84,10 +84,16 @@ function floatingToolbarOnce() {
     floatEl.hidden = false;
     // Measured after unhiding, since a hidden element has no size to centre on.
     const { width, height } = floatEl.getBoundingClientRect();
-    const gap = 8;
-    const above = rect.top - height - gap;
-    floatEl.style.top = `${above > 0 ? above : rect.bottom + gap}px`;
-    floatEl.style.left = `${Math.max(gap, Math.min(window.innerWidth - width - gap, rect.left + rect.width / 2 - width / 2))}px`;
+    const edge = 8;
+    // Below the selection, not above: a phone puts its own Cut/Copy/Paste bar above the
+    // text you just selected, and the two landed on top of each other. The gap clears the
+    // drag handles that hang under the selection on a touch screen. Above only as a
+    // fallback, when there is no room underneath.
+    const BELOW_GAP = 26;
+    const below = rect.bottom + BELOW_GAP;
+    const fitsBelow = below + height <= window.innerHeight - edge;
+    floatEl.style.top = `${fitsBelow ? below : Math.max(edge, rect.top - height - edge)}px`;
+    floatEl.style.left = `${Math.max(edge, Math.min(window.innerWidth - width - edge, rect.left + rect.width / 2 - width / 2))}px`;
   };
 
   // selectionchange fires for every caret move, so the work is deferred and collapsed
