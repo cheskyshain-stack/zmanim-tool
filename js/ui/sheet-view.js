@@ -71,6 +71,7 @@ export function renderSheet(container, state, sheet, onChange) {
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
       <button id="print-btn" class="btn-primary">Print</button>
+      <button id="pdf-btn" title="Opens the print dialog — pick &quot;Save as PDF&quot; as the destination">Save as PDF</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
@@ -80,6 +81,14 @@ export function renderSheet(container, state, sheet, onChange) {
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
+    <details class="panel no-print">
+      <summary>Which pages to print or save</summary>
+      <div class="panel-body">
+        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF — excluded pages stay on screen, dimmed, so you can still read them.</p>
+        <div class="page-picker" id="page-picker"></div>
+        <div class="actions"><button type="button" id="pages-all">Include all</button></div>
+      </div>
+    </details>
     <details class="panel no-print">
       <summary>Layout &amp; style — font, sizes, colour</summary>
       <div class="panel-body">
@@ -103,12 +112,11 @@ export function renderSheet(container, state, sheet, onChange) {
     </details>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
-      ${companion ? `<h3 class="companion-heading no-print">${sheet.season === 'weekday' ? 'שבת sheet' : 'Weekday chart'} — generated with this one</h3>
-      <div id="pages-companion" class="pages"></div>` : ''}
     </div>
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  container.querySelector('#pdf-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
   container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
     const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
@@ -139,31 +147,38 @@ export function renderSheet(container, state, sheet, onChange) {
     onChange({ save: true });
   });
 
+  // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
+  // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
+  // so each pair covers the same weeks — which is the order you want to print in, and
+  // also what makes the side-by-side view line up pair-per-row.
+  //
+  // Style variables are set per *page* rather than per container, because the two sheets
+  // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const totalPages = pages.length;
-  pages.forEach(({ weeks: pageWeeks, effectiveSeason }, pageIndex) => {
-    const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    pagesEl.appendChild(renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason));
-  });
-
-  applyStyle(pagesEl, sheet.style);
-
-  // The paired chart renders below the primary one so both are reachable by scrolling
-  // instead of only through the toolbar link (which stays, for jumping the other way).
-  // It gets its own container and its own applyStyle call, because each sheet carries
-  // its own font/size/colour and the style variables are set per container.
-  const companionEl = container.querySelector('#pages-companion');
-  if (companionEl && companion) {
-    if (!companion.style) companion.style = { ...state.settings.sheetStyle };
-    if (!companion.columnWidths) companion.columnWidths = {};
-    const cWeeks = companion.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-    const cPages = splitWeeksIntoPages(cWeeks, companion.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(companion, pw, settings) }));
-    cPages.forEach(({ weeks: pw, effectiveSeason }, i) => {
+  const buildPagesFor = (sh) => {
+    if (!sh) return [];
+    if (!sh.style) sh.style = { ...state.settings.sheetStyle };
+    if (!sh.columnWidths) sh.columnWidths = {};
+    const wks = sh.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+    const split = splitWeeksIntoPages(wks, sh.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sh, pw, settings) }));
+    return split.map(({ weeks: pw, effectiveSeason }, i) => {
       const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-      companionEl.appendChild(renderPage(pw, i, cPages.length, columns, buildRow, settings, companion, state, onChange, effectiveSeason));
+      const el = renderPage(pw, i, split.length, columns, buildRow, settings, sh, state, onChange, effectiveSeason);
+      el.dataset.sheetLabel = sheetLabel(sh);
+      el.dataset.pageIndex = i;
+      applyStyle(el, sh.style);
+      return el;
     });
-    applyStyle(companionEl, companion.style);
+  };
+  const primaryPages = buildPagesFor(sheet);
+  const companionPages = buildPagesFor(companion);
+  for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
+    if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
+    if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
+
+  // After both charts are mounted, so the picker can count the pages that exist.
+  buildPagePicker(container);
 
 
   const fontSel = container.querySelector('#style-font');
@@ -178,24 +193,24 @@ export function renderSheet(container, state, sheet, onChange) {
   };
   fontSel.addEventListener('change', () => {
     sheet.style.fontFamily = fontSel.value;
-    applyStyle(pagesEl, sheet.style);
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
     commit();
   });
   sizeInput.addEventListener('input', () => {
     sheet.style.fontSizePt = Number(sizeInput.value);
     sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
-    applyStyle(pagesEl, sheet.style);
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
   });
   sizeInput.addEventListener('change', commit);
   headerInput.addEventListener('input', () => {
     sheet.style.headerScale = Number(headerInput.value);
-    applyStyle(pagesEl, sheet.style);
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
   });
   headerInput.addEventListener('change', commit);
   const colorInput = container.querySelector('#style-color');
   colorInput.addEventListener('input', () => {
     sheet.style.accentColor = colorInput.value;
-    applyStyle(pagesEl, sheet.style);
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
@@ -204,12 +219,35 @@ export function renderSheet(container, state, sheet, onChange) {
   });
 }
 
-function applyStyle(pagesEl, style) {
-  pagesEl.style.setProperty('--sheet-font-family', `"${style.fontFamily}", "David Libre", "Times New Roman", serif`);
-  pagesEl.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
-  pagesEl.style.setProperty('--sheet-header-scale', style.headerScale);
-  pagesEl.style.setProperty('--sheet-accent', style.accentColor);
-  syncHeaderRowHeight(pagesEl);
+/** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
+ *  print.css drops from the output — the page stays visible on screen (dimmed) so you
+ *  can still see what you left out. */
+function buildPagePicker(container) {
+  const picker = container.querySelector('#page-picker');
+  if (!picker) return;
+  const pages = [...container.querySelectorAll('#pages > .page')];
+  picker.innerHTML = pages
+    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${esc(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
+    .join('');
+  picker.querySelectorAll('input').forEach((cb) => {
+    cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
+  });
+  container.querySelector('#pages-all').addEventListener('click', () => {
+    picker.querySelectorAll('input').forEach((cb) => {
+      cb.checked = true;
+      pages[Number(cb.dataset.i)].classList.remove('page-excluded');
+    });
+  });
+}
+
+const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
+
+function applyStyle(target, style) {
+  target.style.setProperty('--sheet-font-family', `"${style.fontFamily}", "David Libre", "Times New Roman", serif`);
+  target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
+  target.style.setProperty('--sheet-header-scale', style.headerScale);
+  target.style.setProperty('--sheet-accent', style.accentColor);
+  syncHeaderRowHeight(target);
 }
 
 /** Makes every row in a table — header included — exactly the same height.

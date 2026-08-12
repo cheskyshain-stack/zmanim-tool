@@ -429,20 +429,25 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   .saved-list td:last-child { justify-content: flex-start; margin-top: 0.4rem; }
 }
 
-/* Heading above the paired chart that renders below the primary one. */
-.companion-heading { margin: 2rem 0 0.75rem; font-size: var(--fs-lg); color: var(--muted); font-weight: 600; }
+/* Page tick-list for print/PDF (see buildPagePicker in sheet-view.js). */
+.page-picker { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.page-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin: 0;
+  padding: 0.35rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 999px;
+  font-size: var(--fs-sm); cursor: pointer; background: var(--surface);
+}
+.page-chip:hover { border-color: var(--ui-accent); }
+.page-chip:has(input:checked) { background: var(--ui-accent-soft); border-color: var(--ui-accent); }
+/* An excluded page stays readable on screen, just visibly out of the print run. */
+.page-excluded { opacity: 0.45; outline: 2px dashed var(--border-strong); outline-offset: -2px; }
 
-/* Side-by-side view: the two charts scaled down to sit next to each other for a quick
-   comparison. transform scales visually only — each page keeps its true 11in geometry,
-   so print is completely unaffected (and the whole thing is .no-print-irrelevant since
-   print.css lays pages out itself). transform-origin top-left plus a matching negative
-   margin stops the shrunk page leaving a large empty gap where its full size used to be. */
-#sheet-stack.is-side-by-side { display: flex; align-items: flex-start; gap: 1rem; overflow-x: auto; }
-#sheet-stack.is-side-by-side > .pages { flex: 0 0 auto; transform: scale(0.48); transform-origin: top left; }
-#sheet-stack.is-side-by-side > .pages > .page { margin-bottom: 1rem; }
-#sheet-stack.is-side-by-side .companion-heading { display: none; }
-/* Each scaled column only takes 48% of its laid-out width, so claw the rest back. */
-#sheet-stack.is-side-by-side > .pages { width: 11in; margin-right: calc(-11in * 0.52); }
+
+/* Side-by-side view: the interleaved pages laid out two per row, so each שבת page sits
+   next to its matching Weekday page, scaled down to fit. zoom (rather than transform)
+   because it affects layout — a transform would leave each page's full-size footprint
+   behind as empty space. Print overrides it back to full size in print.css. */
+#sheet-stack.is-side-by-side > .pages { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; }
+#sheet-stack.is-side-by-side > .pages > .page { zoom: 0.5; margin: 0 0 0.75rem; }
 #side-by-side-btn.is-active { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
 
 .pages {

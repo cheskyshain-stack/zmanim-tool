@@ -4,15 +4,18 @@
 }
 @media print {
   .no-print { display: none !important; }
+  /* Pages unticked in the page picker are left out of the print/PDF run. */
+  .page-excluded { display: none !important; }
   html, body { background: white; }
   /* The sidebar is .no-print, so the shell has nothing left to lay out beside main —
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
   main { padding: 0; max-width: none; margin: 0; }
   .pages { margin: 0; }
-  /* Stacked for print even if the side-by-side view is on screen. */
-  #sheet-stack.is-side-by-side { display: block; overflow: visible; }
-  #sheet-stack.is-side-by-side > .pages { transform: none; width: auto; margin-right: 0; }
+  /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
+     already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
+  #sheet-stack.is-side-by-side > .pages { display: block; }
+  #sheet-stack.is-side-by-side > .pages > .page { zoom: 1; }
   .page {
     width: 11in;
     height: 8.5in;
