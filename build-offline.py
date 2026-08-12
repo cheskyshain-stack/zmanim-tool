@@ -16,11 +16,14 @@ How it works:
     data-loader.js's fetch()-based loadTables() is replaced with a version
     that just returns them directly — fetch() of local files is blocked
     under file:// in most browsers, same reason ES modules are.
-  - assets/*.png are copied alongside index.html (plain <img src="..."> to
-    a relative file works fine under file://, unlike fetch/modules).
+  - assets/ is copied alongside index.html (plain <img src="..."> to a
+    relative file works fine under file://, unlike fetch/modules). The
+    Hebrew webfont is the exception: a font file is subject to CORS even
+    from file://, so it's inlined into the CSS as a data: URI instead.
 
 Re-run this any time the js/ source changes to refresh offline/.
 """
+import base64
 import hashlib
 import json
 import re
@@ -128,6 +131,23 @@ def build_data_loader_replacement():
     return "\n".join(lines)
 
 
+def inline_fonts(css: str) -> str:
+    """Replace url(../assets/fonts/x.woff2) with a base64 data: URI.
+
+    Chrome treats a font fetched from file:// as cross-origin and refuses to use it, so
+    the copied .woff2 files would be ignored in exactly the offline case they exist for.
+    A data: URI is part of the stylesheet itself, so there is no fetch to block. The two
+    Hebrew subsets are ~25KB total, small enough that inlining costs nothing.
+    """
+
+    def sub(match):
+        path = ROOT / "assets" / "fonts" / match.group(1)
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"url('data:font/woff2;base64,{b64}')"
+
+    return re.sub(r"url\('\.\./assets/fonts/([\w.-]+)'\)", sub, css)
+
+
 def stamp_css_versions():
     """Rewrite index.html's stylesheet links to css/x.css?v=<hash of that file>.
 
@@ -185,15 +205,21 @@ def main():
     html = html.replace('<script type="module" src="js/app.js"></script>', '<script src="bundle.js"></script>')
     (OUT_DIR / "index.html").write_text(html, encoding="utf-8")
 
+    # rglob + mkdir so subdirectories come across too (assets/fonts/) — a flat glob
+    # copied only top-level files and choked the moment a folder appeared.
     assets_out = OUT_DIR / "assets"
     assets_out.mkdir(exist_ok=True)
-    for f in (ROOT / "assets").glob("*"):
-        (assets_out / f.name).write_bytes(f.read_bytes())
+    for f in (ROOT / "assets").rglob("*"):
+        if not f.is_file():
+            continue
+        dest = assets_out / f.relative_to(ROOT / "assets")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(f.read_bytes())
 
     css_out = OUT_DIR / "css"
     css_out.mkdir(exist_ok=True)
     for f in (ROOT / "css").glob("*.css"):
-        (css_out / f.name).write_bytes(f.read_bytes())
+        (css_out / f.name).write_text(inline_fonts(f.read_text(encoding="utf-8")), encoding="utf-8")
 
     print(f"Built {OUT_DIR} ({len(order)} modules, {len(bundle.splitlines())} lines)")
 

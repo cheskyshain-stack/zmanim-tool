@@ -1,3 +1,24 @@
+/* David Libre, shipped with the app rather than assumed to be installed. Phones have
+   none of David / David Libre / Times New Roman, so Hebrew on the printed chart fell
+   back to the system UI font and looked nothing like it does on the desktop. Self-hosted
+   (not a font CDN) so the offline build works with no network at all.
+   Hebrew subset only, ~12KB per weight. SIL Open Font License 1.1 — see
+   assets/fonts/OFL.txt. */
+@font-face {
+  font-family: 'David Libre';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/david-libre-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'David Libre';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/david-libre-700.woff2') format('woff2');
+}
+
 :root {
   /* --accent/--ink/--ruled/--overridden/--paper are also read by the printed-chart
      CSS below (and by sheet-view.js's inline --sheet-accent fallback) — their
