@@ -24,5 +24,24 @@
   <main id="main"></main>
 </div>
 <script type="module" src="js/app.js?v=f383749f"></script>
+<script>
+// Opening this file straight off the disk gives a blank page and no clue why: under
+// file:// the browser refuses both ES modules and fetch(), so none of the app's code
+// runs at all and there is nothing left to report the problem. The offline/ build exists
+// for exactly that case. Deliberately a plain script, since a module would be blocked
+// alongside everything else, and it only speaks up if the app really did fail to start.
+window.addEventListener('DOMContentLoaded', function () {
+  if (location.protocol !== 'file:') return;
+  setTimeout(function () {
+    var main = document.getElementById('main');
+    if (!main || main.children.length) return; // it booted (the offline build does)
+    main.innerHTML =
+      '<h2>Open the offline copy instead</h2>' +
+      '<p class="hint">This is the version of the site meant to be served over the web, and a browser will not run it straight off the disk. There is a copy built to work this way.</p>' +
+      '<p class="hint">Go up one folder and open <strong>offline</strong>, then <strong>index.html</strong> inside it. Everything works the same there, with no internet needed.</p>' +
+      '<p class="hint">Or use the live site: <strong>lczmanim.cjaffa.com</strong></p>';
+  }, 500);
+});
+</script>
 </body>
 </html>
