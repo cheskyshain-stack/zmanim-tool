@@ -188,24 +188,29 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 /* Row-level actions sit inside dense table rows, so they shed the full button padding. */
 .saved-list button { padding: 0.35rem 0.8rem; font-size: 0.82rem; font-weight: 500; }
 
-/* The week lists start collapsed — they run to 30 rows and pushed the page controls
-   well below the fold. The card chrome lives on the <details> so the closed state is
-   still a proper panel, not a bare line of text. */
-.week-panel {
+/* One collapsible panel style, shared by the Generate week lists and the sheet view's
+   Layout & style section — there used to be two disclosure widgets that looked
+   different from each other. Closed by default; the card chrome sits on the <details>
+   so the shut state still reads as a panel rather than a stray line of text. */
+.panel {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); margin: 0 0 1rem; padding: 0 1.1rem;
 }
-.week-panel > summary {
+.panel > summary {
   cursor: pointer; padding: 0.75rem 0; font-size: 0.92rem; list-style: none;
 }
-.week-panel > summary::-webkit-details-marker { display: none; }
-.week-panel > summary::before {
+.panel > summary::-webkit-details-marker { display: none; }
+.panel > summary::before {
   content: '▸'; display: inline-block; width: 1em; margin-right: 0.3rem;
   color: var(--muted); transition: transform 0.15s ease;
 }
-.week-panel[open] > summary::before { transform: rotate(90deg); }
-.week-panel[open] > summary { border-bottom: 1px solid var(--border); }
-.week-panel > summary:hover { color: var(--ui-accent-dark); }
+.panel[open] > summary::before { transform: rotate(90deg); }
+.panel[open] > summary { border-bottom: 1px solid var(--border); }
+.panel > summary:hover { color: var(--ui-accent-dark); }
+.panel-body { padding: 0.9rem 0 1rem; }
+.panel-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.panel-section-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.6rem; }
+.panel-section-title .hint { font-weight: 400; }
 
 .week-list {
   columns: 2; column-gap: 2rem; font-size: 0.87rem; color: var(--muted); line-height: 1.75;
@@ -365,10 +370,9 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .sheet-toolbar #print-btn { background: var(--ui-accent); color: white; border: none; }
 .sheet-toolbar #print-btn:hover { background: var(--ui-accent-dark); }
 .sheet-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Sits inside the Layout & style panel now, so it carries no card chrome of its own. */
 .style-toolbar {
-  display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.65rem 1rem; font-size: 0.85rem;
-  box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; font-size: 0.85rem;
 }
 .style-toolbar label { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; }
 .style-toolbar select { padding: 0.3rem 0.5rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; }
@@ -535,11 +539,6 @@ td.ruled .cell { background: var(--ruled); }
    syncHeaderRowHeight() in sheet-view.js — see there for why that can't be pure CSS. */
 .weekday-table tbody tr { height: calc(var(--sheet-font-size) * 2.6); }
 
-.col-width-panel { margin-bottom: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.3rem 1rem; font-size: 0.85rem; box-shadow: var(--shadow-sm); }
-.col-width-panel summary { cursor: pointer; padding: 0.55rem 0; color: var(--accent); font-weight: 600; list-style: none; }
-.col-width-panel summary::-webkit-details-marker { display: none; }
-.col-width-panel summary::before { content: '▸'; display: inline-block; margin-right: 0.4rem; transition: transform 0.15s ease; }
-.col-width-panel[open] summary::before { transform: rotate(90deg); }
 .col-width-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.5rem 0 0.9rem; align-items: flex-end; }
 .col-width-input { display: flex; flex-direction: column; font-size: 0.75rem; color: var(--muted); gap: 0.2rem; }
 .col-width-input input { width: 74px; padding: 0.25rem 0.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; }

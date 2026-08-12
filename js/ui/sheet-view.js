@@ -90,35 +90,40 @@ export function renderSheet(container, state, sheet, onChange) {
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
-    <div class="style-toolbar no-print">
-      <label>Font
-        <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
-      </label>
-      <label>Text size
-        <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
-        <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
-      </label>
-      <label>Logo size
-        <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
-      </label>
-      <label>Page color
-        <input id="style-color" type="color" value="${sheet.style.accentColor}">
-      </label>
-      <button id="style-reset" type="button">Reset style</button>
-    </div>
-    <details class="col-width-panel no-print">
-      <summary>Column widths (auto by default — set a number to override, clear it to go back to auto)</summary>
-      <div class="col-width-grid">
-        ${colOrder
-          .map(
-            (key) => `
-          <label class="col-width-input">
-            <span>${esc(colLabel[key] || key)}</span>
-            <input type="number" min="20" max="400" step="5" data-colkey="${key}" placeholder="auto" value="${sheet.columnWidths[key] ?? ''}">
-          </label>`
-          )
-          .join('')}
-        <button id="col-width-reset" type="button">Reset all to auto</button>
+    <details class="panel no-print">
+      <summary>Layout &amp; style — font, sizes, colour, column widths</summary>
+      <div class="panel-body">
+        <div class="style-toolbar">
+          <label>Font
+            <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
+          </label>
+          <label>Text size
+            <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
+            <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
+          </label>
+          <label>Logo size
+            <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
+          </label>
+          <label>Page color
+            <input id="style-color" type="color" value="${sheet.style.accentColor}">
+          </label>
+          <button id="style-reset" type="button">Reset style</button>
+        </div>
+        <div class="panel-section">
+          <div class="panel-section-title">Column widths <span class="hint">— auto by default; set a number to override, clear it to go back to auto</span></div>
+          <div class="col-width-grid">
+            ${colOrder
+              .map(
+                (key) => `
+              <label class="col-width-input">
+                <span>${esc(colLabel[key] || key)}</span>
+                <input type="number" min="20" max="400" step="5" data-colkey="${key}" placeholder="auto" value="${sheet.columnWidths[key] ?? ''}">
+              </label>`
+              )
+              .join('')}
+            <button id="col-width-reset" type="button">Reset all to auto</button>
+          </div>
+        </div>
       </div>
     </details>
     <div id="pages"></div>

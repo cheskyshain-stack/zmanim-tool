@@ -116,7 +116,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
-    <details class="week-panel">
+    <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
       <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
@@ -139,7 +139,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday" checked> Also generate a Weekday chart (separate file) for these weeks</label>
         <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
-        <details class="week-panel">
+        <details class="panel">
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
           <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
         </details>
