@@ -28,6 +28,33 @@ function columnsAndBuilderFor(effectiveSeason) {
 
 const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Times New Roman', 'Arial', 'Segoe UI'];
 
+/** Which shipped webfont stands in for each choice when the real one isn't installed.
+ *
+ *  A phone has none of these fonts, so without a stand-in every Hebrew column falls back
+ *  to the system sans — and with a single stand-in for all of them, picking Times New
+ *  Roman still got you David's Hebrew, which looks nothing like it. Times New Roman and
+ *  Frank Ruehl are both traditional high-contrast Hebrew serifs, so one covers the other
+ *  closely; David is a lighter semi-serif and only matches itself.
+ *
+ *  Arial and Segoe UI are deliberately absent: they fall back to the device's own Hebrew
+ *  sans (Noto on Android, Segoe on Windows), which is already the right shape — no point
+ *  downloading a font to say the same thing. */
+const HEBREW_STAND_IN = {
+  'Times New Roman': 'Frank Ruhl Libre',
+  'Frank Ruehl': 'Frank Ruhl Libre',
+  'Guttman Yad': 'Frank Ruhl Libre',
+  David: 'David Libre',
+  'David Libre': 'David Libre',
+};
+
+/** The full CSS stack for a chosen font: the real font first (installed on the machines
+ *  these sheets are printed from), then the shipped stand-in, then a generic. */
+export function fontStackFor(fontFamily) {
+  const standIn = HEBREW_STAND_IN[fontFamily];
+  const generic = fontFamily === 'Arial' || fontFamily === 'Segoe UI' ? 'sans-serif' : 'serif';
+  return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
+}
+
 // Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) —
 // intentionally not persisted to localStorage; it lives for as long as the app tab is
 // open, same as undo history in most editors.
@@ -248,7 +275,7 @@ function buildPagePicker(container) {
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
 
 function applyStyle(target, style) {
-  target.style.setProperty('--sheet-font-family', `"${style.fontFamily}", "David Libre", "Times New Roman", serif`);
+  target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
   target.style.setProperty('--sheet-accent', style.accentColor);

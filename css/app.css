@@ -1,9 +1,11 @@
-/* David Libre, shipped with the app rather than assumed to be installed. Phones have
-   none of David / David Libre / Times New Roman, so Hebrew on the printed chart fell
-   back to the system UI font and looked nothing like it does on the desktop. Self-hosted
-   (not a font CDN) so the offline build works with no network at all.
-   Hebrew subset only, ~12KB per weight. SIL Open Font License 1.1 — see
-   assets/fonts/OFL.txt. */
+/* Two Hebrew serifs shipped with the app rather than assumed to be installed. Phones
+   have none of David / Frank Ruehl / Times New Roman, so Hebrew on the printed chart
+   fell back to the system UI font and looked nothing like it does on the desktop.
+   Which one stands in for which choice is decided in sheet-view.js (HEBREW_STAND_IN) —
+   Frank Ruhl Libre covers Times New Roman's Hebrew, David Libre covers David's.
+   Self-hosted (not a font CDN) so the offline build works with no network at all.
+   Hebrew subsets only, ~12-19KB each. SIL Open Font License 1.1 — see
+   assets/fonts/OFL-david-libre.txt and assets/fonts/OFL-frank-ruhl-libre.txt. */
 @font-face {
   font-family: 'David Libre';
   font-style: normal;
@@ -17,6 +19,15 @@
   font-weight: 700;
   font-display: swap;
   src: url('../assets/fonts/david-libre-700.woff2') format('woff2');
+}
+/* One variable file spanning the whole weight range, so bold headers come from the same
+   font rather than being synthesised by the browser. */
+@font-face {
+  font-family: 'Frank Ruhl Libre';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../assets/fonts/frank-ruhl-libre.woff2') format('woff2');
 }
 
 :root {
@@ -472,7 +483,9 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 #side-by-side-btn.is-active { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
 
 .pages {
-  --sheet-font-family: "Times New Roman", "David", "David Libre", serif;
+  /* Kept in step with fontStackFor('Times New Roman') in sheet-view.js — this is only
+     the value before a sheet's own style is applied. */
+  --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 1;
   /* The printed page is a fixed 11in wide; on a narrow screen it scrolls sideways
