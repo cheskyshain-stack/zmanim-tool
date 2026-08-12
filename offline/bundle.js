@@ -114,7 +114,13 @@ const SEED_RULES = [];
 
 /** ט' באב used to be hardcoded into the sheet builders. It's an ordinary rule now, so
  *  it can be seen, edited, disabled or deleted like any other — matching on the Hebrew
- *  date (Av 9), which recurs every year, unlike a fixed Gregorian date.
+ *  date, which recurs every year, unlike a fixed Gregorian date.
+ *
+ *  It fires on the two Shabbosim where the fast begins מוצאי שבת. Weeks are anchored on
+ *  their Shabbos, so that's the Shabbos of 8 Av (the fast is the next day, 9 Av on a
+ *  Sunday) and the Shabbos of 9 Av (9 Av itself is Shabbos, so the fast is נדחה to
+ *  Sunday, 10 Av). Checked against real years: 5805 is the 8 Av case, 5789/5792/5796/
+ *  5799 the 9 Av one.
  *
  *  Installed once per browser and recorded in state.seeded, so deleting it sticks
  *  instead of having it reappear on the next load. */
@@ -122,7 +128,7 @@ const TISHA_BAV_RULE = {
   id: 'rule-tisha-bav',
   name: 'ט באב — מוצאי שבת',
   enabled: true,
-  condition: { hebrewDate: ['5-9'] },
+  condition: { hebrewDate: ['5-8', '5-9'] },
   columnKeys: ['kayitz:B', 'kayitz:C', 'choref:B', 'choref:C'],
   mode: 'append',
   value: 'ט באב',
@@ -133,6 +139,13 @@ function applySeeds(state) {
   if (!seeded.tishaBav) {
     if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
     seeded.tishaBav = true;
+  }
+  // The first version of this rule only matched 9 Av, missing the years where 9 Av lands
+  // on a Sunday (the Shabbos before it is 8 Av). Widen a copy that still carries exactly
+  // the old condition — an untouched seed — and leave any hand-edited one alone.
+  const existing = state.rules.find((r) => r.id === TISHA_BAV_RULE.id);
+  if (existing && JSON.stringify(existing.condition) === JSON.stringify({ hebrewDate: ['5-9'] })) {
+    existing.condition = { hebrewDate: ['5-8', '5-9'] };
   }
   state.seeded = seeded;
   return state;
