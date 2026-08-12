@@ -59,7 +59,9 @@ export const KAYITZ_COLUMNS = [
   { key: 'F', header: ' מעריב ' },
   { key: 'G', header: 'מנחה\nמעריב' },
   { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nפלג מ"א' },
+  // Both I and J are פלג מ"א; the difference is the tzais the day is measured to — 72
+  // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which.
+  { key: 'I', header: 'מנחה\n72 פלג מ"א' },
   { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
   { key: 'K', header: 'מנחה\nפלג גר"א' },
   { key: 'L', header: 'מנחה\nערב שבת' },
