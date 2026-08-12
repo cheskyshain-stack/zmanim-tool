@@ -754,7 +754,22 @@ td.ruled .cell { background: var(--ruled); }
   background: var(--bg); border-radius: var(--radius-sm);
 }
 .week-label { direction: rtl; font-weight: 600; font-size: 1.05rem; text-align: right; }
-.week-time { direction: ltr; font-weight: 700; font-size: 1.15rem; text-align: left; white-space: nowrap; }
+/* pre-line, because the שחרית schedule stores its breaks as real newlines inside its
+   HTML (see DEFAULT_WEEKDAY_SHACHARIS) and nowrap collapsed them into one long line.
+   Centred so a two- or three-line time block stacks tidily instead of ragged. */
+.week-time {
+  direction: ltr; font-weight: 700; font-size: 1.15rem;
+  text-align: center; white-space: pre-line; line-height: 1.35;
+}
+/* Three columns with equal sides, so the logo sits on the card's centre line. The flex
+   version let the wider rabbi line push it off centre. */
+.week-card .header-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.week-card .header-icon { justify-self: start; }
+/* nowrap: the equal side columns are narrower than the flex version, and the rabbi
+   line was breaking mid-title. Smaller here than on the printed page, where it has an
+   11in width to sit in. */
+.week-card .header-rabbi { justify-self: end; white-space: nowrap; font-size: 8.5pt; }
+.week-card .header-subtitle { font-size: calc(var(--sheet-font-size) + 0.5pt); }
 .week-card .page-footer { margin-top: 1rem; }
 
 /* --- Guide ------------------------------------------------------------------------ */

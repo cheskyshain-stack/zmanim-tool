@@ -3467,9 +3467,9 @@ const fmtDate = (date) =>
 
 /** A label/time line. The label keeps its line breaks as spaces, since a column header
  *  is wrapped to fit a narrow column and has no reason to wrap here. */
-function line(label, value, isHtml = false) {
+function line(label, value, isHtml = false, keepEmpty = false) {
   const text = String(value ?? '').trim();
-  if (!text) return '';
+  if (!text && !keepEmpty) return '';
   return `<div class="week-line">
     <span class="week-label">${weekEsc(label.replace(/\n/g, ' ').trim())}</span>
     <span class="week-time">${isHtml ? text : weekNl2br(text)}</span>
@@ -3529,7 +3529,10 @@ function renderWeek(container, state, onSerialChange, serial = null) {
     const wdRow = mergeRow({ B: '', C: '' }, weekday, showing).row;
     weekdayLines = [...WEEKDAY_COLUMNS]
       .reverse()
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true))
+      // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
+      // even before anyone has filled it, or the card looks like the minyan does not
+      // exist rather than like the time is not set yet.
+      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'))
       .join('');
   }
 
