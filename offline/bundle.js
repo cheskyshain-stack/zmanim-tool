@@ -1519,17 +1519,22 @@ const KAYITZ_COLUMNS = [
 ];
 
 // ==== ui/rules-view.js ====
+/** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
+ *  Null (the default) shows just the list — most visits here are to glance at the
+ *  rules, not write one, and the creation form used to sit open below them permanently. */
 function renderRules(container, state, onChange, editingRuleId = null) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
-  const editing = editingRuleId ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const editing = editingRuleId && editingRuleId !== 'new' ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const formOpen = editingRuleId !== null;
   container.innerHTML = `
     <h2>Rules</h2>
     <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
-    <h3 id="rule-form-title">${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
-    <form id="rule-form" class="form-grid">
+    <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
+    <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
       <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
@@ -1551,12 +1556,16 @@ function renderRules(container, state, onChange, editingRuleId = null) {
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
-        ${editing ? '<button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>' : ''}
+        <button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>
       </div>
     </form>
   `;
 
-  container.querySelector('#rule-edit-cancel')?.addEventListener('click', () => renderRules(container, state, onChange));
+  container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
+  container.querySelector('#rule-add').addEventListener('click', () => {
+    renderRules(container, state, onChange, 'new');
+    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
 
   const list = container.querySelector('#rules-list');
   list.innerHTML = state.rules.length
@@ -1984,8 +1993,9 @@ function renderSettings(container, state, onSave, onStateReplaced) {
     <h2>Settings</h2>
     <p class="hint">Mirrors the workbook's SETTINGS sheet. Saved in this browser.</p>
     <form id="settings-form" class="form-grid">
-      <fieldset>
-        <legend>Header &amp; footer</legend>
+      <details class="panel" open>
+        <summary>Header &amp; footer</summary>
+        <div class="panel-body">
         <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is — replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
         <div id="header-photo-cropper"></div>
         <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${esc(s.shulName)}"></label>
@@ -1993,9 +2003,11 @@ function renderSettings(container, state, onSave, onStateReplaced) {
         <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${esc(s.headerRabbiLine)}</textarea></label>
         <label>Footer note<textarea name="footerNote" rows="2">${esc(s.footerNote)}</textarea></label>
         <label>Footer address<input name="footerAddress" value="${esc(s.footerAddress)}"></label>
-      </fieldset>
-      <fieldset>
-        <legend>Weekday chart defaults</legend>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Weekday chart defaults</summary>
+        <div class="panel-body">
         <p class="hint">מנחה and מעריב on the Weekday chart aren't computed — every week's cell starts from the <strong>first line</strong> below, and you edit it per week by typing straight into the cell on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
         <p class="hint">Every box here — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
@@ -2008,17 +2020,21 @@ function renderSettings(container, state, onSave, onStateReplaced) {
         <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
-      </fieldset>
-      <fieldset>
-        <legend>Location</legend>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Location</summary>
+        <div class="panel-body">
         <label>Location name<input name="locationName" value="${esc(s.locationName)}"></label>
         <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
         <label>Longitude<input name="longitude" type="number" step="any" value="${s.longitude}"></label>
         <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${s.elevation}"></label>
         <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${esc(tz.label)}</option>`).join('')}</select></label>
-      </fieldset>
-      <fieldset>
-        <legend>Display</legend>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Display</summary>
+        <div class="panel-body">
         <label>Language
           <select name="language">
             <option value="he" ${s.language === 'he' ? 'selected' : ''}>עברית</option>
@@ -2026,28 +2042,33 @@ function renderSettings(container, state, onSave, onStateReplaced) {
           </select>
         </label>
         <label><input type="checkbox" name="inIsrael" ${s.inIsrael ? 'checked' : ''}> Zmanim used in Eretz Yisroel</label>
-      </fieldset>
-      <fieldset>
-        <legend>Advanced zmanim settings — leave alone unless you know what you're doing</legend>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Advanced zmanim settings — leave alone unless you know what you're doing</summary>
+        <div class="panel-body">
         <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${s.horizon}"></label>
         <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${s.candleLightingMinutes}"></label>
         <label>Ateret Torah Tzais offset (minutes)<input name="ateretTorahTzaisOffset" type="number" step="any" value="${s.ateretTorahTzaisOffset}"></label>
         <label><input type="checkbox" name="useAstronomicalChatzos" ${s.useAstronomicalChatzos ? 'checked' : ''}> Use astronomical chatzos for zmanim</label>
         <label><input type="checkbox" name="useElevation" ${s.useElevation ? 'checked' : ''}> Use elevation for zmanim calculation</label>
         <label><input type="checkbox" name="useGregorianBefore1582" ${s.useGregorianBefore1582 ? 'checked' : ''}> Use Gregorian dates before Oct 15, 1582</label>
-      </fieldset>
+      </div>
+      </details>
       <div class="actions"><button type="submit" class="btn-primary">Save settings</button></div>
     </form>
-    <form class="form-grid" onsubmit="return false" style="margin-top:1rem">
-      <fieldset>
-        <legend>Backup</legend>
+    <form class="form-grid" id="settings-backup" onsubmit="return false">
+      <details class="panel">
+        <summary>Backup</summary>
+        <div class="panel-body">
         <p class="hint">Everything lives in this browser only — settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone).</p>
         <div class="backup-row">
           <button type="button" id="export-btn">Export backup</button>
           <label class="file-label" for="import-input">Import backup</label>
           <input id="import-input" type="file" accept="application/json" hidden>
         </div>
-      </fieldset>
+      </div>
+      </details>
     </form>
   `;
 

@@ -171,7 +171,10 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 /* Button hierarchy: quiet by default, so the single .btn-primary on a screen is the
    only thing competing for attention. Blue used to be the default, which put "Open" in
    a table row at the same weight as "Generate sheet". */
-.form-grid button, .sheet-toolbar button, .saved-list button {
+/* .btn-primary/.btn-danger are in this list so they carry the full button styling
+   wherever they're used — otherwise a primary button outside a form or toolbar (the
+   "+ Add a rule" one) got the colour but none of the size or padding. */
+.form-grid button, .sheet-toolbar button, .saved-list button, button.btn-primary, button.btn-danger {
   background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
   padding: 0.55rem 1.15rem; border-radius: var(--radius-sm);
   cursor: pointer; font-size: 0.9rem; font-weight: 600; font-family: inherit;
@@ -208,6 +211,11 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .panel[open] > summary { border-bottom: 1px solid var(--border); }
 .panel > summary:hover { color: var(--ui-accent-dark); }
 .panel-body { padding: 0.9rem 0 1rem; }
+/* .form-grid already spaces its children with gap, so the panel's own margin would
+   double it up in Settings, where the sections are panels inside the form. */
+.form-grid > .panel { margin-bottom: 0; }
+/* Backup sits in its own form; keep it clear of the Save button above it. */
+#settings-backup { margin-top: 1rem; }
 .panel-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 .panel-section-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.6rem; }
 .panel-section-title .hint { font-weight: 400; }

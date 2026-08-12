@@ -2,17 +2,22 @@ import { newId } from '../storage.js';
 import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
 
+/** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
+ *  Null (the default) shows just the list — most visits here are to glance at the
+ *  rules, not write one, and the creation form used to sit open below them permanently. */
 export function renderRules(container, state, onChange, editingRuleId = null) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
-  const editing = editingRuleId ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const editing = editingRuleId && editingRuleId !== 'new' ? state.rules.find((r) => r.id === editingRuleId) : null;
+  const formOpen = editingRuleId !== null;
   container.innerHTML = `
     <h2>Rules</h2>
     <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
-    <h3 id="rule-form-title">${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
-    <form id="rule-form" class="form-grid">
+    <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : 'Add a rule'}</h3>
+    <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
       <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
@@ -34,12 +39,16 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
-        ${editing ? '<button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>' : ''}
+        <button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>
       </div>
     </form>
   `;
 
-  container.querySelector('#rule-edit-cancel')?.addEventListener('click', () => renderRules(container, state, onChange));
+  container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
+  container.querySelector('#rule-add').addEventListener('click', () => {
+    renderRules(container, state, onChange, 'new');
+    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
 
   const list = container.querySelector('#rules-list');
   list.innerHTML = state.rules.length
