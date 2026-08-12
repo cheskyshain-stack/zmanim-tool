@@ -129,6 +129,7 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
    so using the app meant dragging the mouse from one edge to the other. A sheet is
    exempt: a page is a fixed 11in wide and has to be shown at that size. */
 main:not(.is-sheet-view) { max-width: 62rem; }
+main.is-wide { max-width: 78rem; }
 
 @media (max-width: 900px) {
   /* Sidebar becomes a normal bar above the content - no off-canvas drawer, since that
@@ -463,9 +464,12 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .form-grid .secondary-btn:hover { background: var(--border); }
 
 .saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
-.saved-list th, .saved-list td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: var(--fs-md); }
+/* nowrap because a wrapped row is unreadable here: the buttons broke onto a second line,
+   "Hebrew year" split across two, and a timestamp wrapped mid-date. The Sheet column is
+   the exception, being the one cell whose content varies in length. */
+.saved-list th, .saved-list td { text-align: left; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); font-size: var(--fs-md); white-space: nowrap; }
 .saved-list th { background: var(--bg); font-weight: 600; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; }
-.saved-list td:first-child { font-weight: 600; }
+.saved-list td:first-child { font-weight: 600; white-space: normal; }
 .saved-list tr:last-child td { border-bottom: none; }
 .saved-list tbody tr:hover td { background: var(--accent-soft); }
 .saved-list button { margin-right: 0.4rem; }

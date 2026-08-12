@@ -2028,7 +2028,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
           }</td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
-          <td data-label="Created">${new Date(s.createdAt).toLocaleString()}</td>
+          <td data-label="Created">${created(s.createdAt)}</td>
           <td data-label="Folder">
             <select class="folder-select" title="Move this sheet to a folder">
               <option value="${NO_FOLDER}" ${!s.folder ? 'selected' : ''}>No folder</option>
@@ -2106,6 +2106,16 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
       if (confirm(`Delete ${what}?`)) onDelete(sheetsOf(e).map((s) => s.id));
     });
   });
+}
+
+/** "12 Aug 2026, 12:34 AM". toLocaleString() gives "8/12/2026, 12:34:30 AM", which is
+ *  wide enough to wrap mid-date, and the seconds are noise: two sheets generated in the
+ *  same minute are the pair from one run. */
+function created(iso) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${date}, ${time}`;
 }
 
 function esc(str) {
@@ -3421,8 +3431,10 @@ function renderNav() {
 function render() {
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
-  // a column next to the sidebar. See main:not(.is-sheet-view) in app.css.
+  // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
+  // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
+  main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
