@@ -275,11 +275,21 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .panel-section-title { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.6rem; }
 .panel-section-title .hint { font-weight: 400; }
 
+/* Numbered with a counter rather than the browser's own list numbering, because the DST
+   cutover line is an item in this list without being a week: left to number itself, the
+   list ran to 25 for 24 weeks and every week after the marker was labelled with the
+   number of the one before it. */
 .week-list {
   columns: 2; column-gap: 2rem; font-size: var(--fs-sm); color: var(--muted); line-height: 1.75;
-  padding: 0.9rem 0 0.9rem 1.4rem; margin: 0;
+  padding: 0.9rem 0; margin: 0; list-style: none; counter-reset: week;
 }
-.week-list li::marker { color: var(--border-strong); }
+.week-list li { padding-left: 2.2rem; text-indent: -2.2rem; }
+.week-list li:not(.week-marker) { counter-increment: week; }
+.week-list li:not(.week-marker)::before {
+  content: counter(week) ". "; color: var(--border-strong);
+  display: inline-block; width: 2.2rem; text-indent: 0; text-align: right; padding-right: 0.45rem;
+}
+.week-list .week-marker { padding-left: 0; text-indent: 0; margin: 0.35rem 0; }
 
 /* Two-step progress header on Generate (see stepsBar in generate-view.js). */
 .steps { display: flex; align-items: center; gap: 0.5rem; list-style: none; padding: 0; margin: 0 0 1.1rem; flex-wrap: wrap; }
