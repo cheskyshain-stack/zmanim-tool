@@ -166,7 +166,7 @@ export function renderSheet(container, state, sheet, onChange) {
       const el = renderPage(pw, i, split.length, columns, buildRow, settings, sh, state, onChange, effectiveSeason);
       el.dataset.sheetLabel = sheetLabel(sh);
       el.dataset.pageIndex = i;
-      applyStyle(el, sh.style);
+      applyStyle(el, sh.style); // variables only — row heights need the page in the document
       return el;
     });
   };
@@ -177,9 +177,16 @@ export function renderSheet(container, state, sheet, onChange) {
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
 
-  // After both charts are mounted, so the picker can count the pages that exist.
+  // Both of these need the pages in the document: the picker to count them, and the row
+  // sync to measure them (heights read 0 on a detached element).
+  syncHeaderRowHeight(pagesEl);
   buildPagePicker(container);
 
+
+  const restyleOwnPages = () => {
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    syncHeaderRowHeight(pagesEl);
+  };
 
   const fontSel = container.querySelector('#style-font');
   const sizeInput = container.querySelector('#style-size');
@@ -193,24 +200,24 @@ export function renderSheet(container, state, sheet, onChange) {
   };
   fontSel.addEventListener('change', () => {
     sheet.style.fontFamily = fontSel.value;
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    restyleOwnPages();
     commit();
   });
   sizeInput.addEventListener('input', () => {
     sheet.style.fontSizePt = Number(sizeInput.value);
     sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    restyleOwnPages();
   });
   sizeInput.addEventListener('change', commit);
   headerInput.addEventListener('input', () => {
     sheet.style.headerScale = Number(headerInput.value);
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    restyleOwnPages();
   });
   headerInput.addEventListener('change', commit);
   const colorInput = container.querySelector('#style-color');
   colorInput.addEventListener('input', () => {
     sheet.style.accentColor = colorInput.value;
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    restyleOwnPages();
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
@@ -247,7 +254,6 @@ function applyStyle(target, style) {
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
   target.style.setProperty('--sheet-accent', style.accentColor);
-  syncHeaderRowHeight(target);
 }
 
 /** Makes every row in a table — header included — exactly the same height.
@@ -271,15 +277,33 @@ function syncHeaderRowHeight(pagesEl) {
     if (!headRow || !bodyRows.length) return;
     const allRows = [headRow, ...bodyRows];
     allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
-    // Deliberately the plain even share with no minimum applied on top: `height` on a
-    // <tr> acts as a floor the browser already raises for any row whose own content
-    // needs more, so a row that genuinely runs two lines still gets its space. Taking a
-    // max() against the tallest row here instead would apply that one row's height to
-    // every row, pushing the table past the 8.5in page.
-    const target = table.getBoundingClientRect().height / allRows.length;
-    allRows.forEach((r) => (r.style.height = target + 'px'));
+
+    // Every row gets an equal share of the table's height. Measuring the tallest row and
+    // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
+    // cell spans every row, so its height is what the browser divides between them, and
+    // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
+    // the distribution, not the row's own requirement — pinning to it inflated the whole
+    // table past the 8.5in page. The even share is the real target; the row only stays
+    // taller if its own content genuinely needs more, which the tightened parsha
+    // line-height now avoids.
+    // The header is never shorter than a body row, so there are two cases and the table
+    // has to end up exactly its own height either way:
+    //   header fits in an equal share  -> every row (header included) takes that share
+    //   header needs more than a share -> it keeps its height, the rest split what's left
+    // Using one formula for both overflowed the page: the first case pushed a tall header
+    // down to a share it couldn't fit in, the second handed a short header a share bigger
+    // than it needed.
+    const tableHeight = table.getBoundingClientRect().height;
+    const headNatural = headRow.getBoundingClientRect().height;
+    const evenShare = tableHeight / allRows.length;
+    const target = headNatural <= evenShare ? evenShare : (tableHeight - headNatural) / bodyRows.length;
+    bodyRows.forEach((r) => (r.style.height = target + 'px'));
+    // The header never comes out shorter than a body row, and keeps its own greater
+    // height where its text needs it.
+    headRow.style.height = Math.max(target, headNatural) + 'px';
   });
 }
+
 
 // Right-to-left reading order after the parsha column: the workbook's own B..L/B..I
 // order is "latest event of the week first" (Motzei Shabbos Maariv is column B) —

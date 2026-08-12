@@ -502,7 +502,11 @@ th {
      padding amount regardless of text size. */
   min-height: 2.6em;
 }
-.parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); }
+/* Explicit line-height: at `normal`, the Hebrew face resolves to roughly 1.8, so a
+   two-line cell (a parsha with a special-Shabbos name under it) ran ~29px per line and
+   became the tallest row on the page. Since every row is pinned to the tallest one
+   (see syncHeaderRowHeight), that one cell was dragging the whole table past 8.5in. */
+.parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it — so on a קיץ page (12 columns rather than
