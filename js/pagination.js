@@ -16,7 +16,7 @@ export function defaultPageSizes(total, numPages) {
 }
 
 /** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
- *  `sourceWeeks` — so a Weekday chart's page 1 covers the same stretch of the year as
+ *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
  *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
  *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
  *  the gap between two source pages lands on the earlier one, matching how the season

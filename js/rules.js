@@ -1,12 +1,12 @@
 // Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
 // HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides — that's
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
 // the intended distinction between rules (recurring, reapplies every year) and
 // overrides (tied to one generated sheet instance).
 //
 // A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
 // bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) — qualifying by
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
 // sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
 // touching the wrong column on the other sheet.
 //
@@ -18,7 +18,7 @@
 //                                 (month 5 = Av). Recurs every year, unlike dateISO.
 //   always:        true         - matches every week (for a blanket override)
 //
-// week.hebrew ({month, dayOfMonth}) is attached by the caller — see sheet-view.js. It
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
 // isn't stored on saved sheets, so it's computed at render time and works for sheets
 // generated before hebrewDate conditions existed.
 function conditionMatches(condition, week) {
@@ -38,7 +38,7 @@ function targetColumnsForSeason(rule, season) {
   const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
   return raw
     .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key — applies on any sheet
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
       const [entrySeason, key] = entry.split(':');
       return entrySeason === season ? key : null;
     })

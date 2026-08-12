@@ -3,7 +3,7 @@ import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
 
 /** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
- *  Null (the default) shows just the list — most visits here are to glance at the
+ *  Null (the default) shows just the list - most visits here are to glance at the
  *  rules, not write one, and the creation form used to sit open below them permanently. */
 export function renderRules(container, state, onChange, editingRuleId = null) {
   // Editing loads the rule's values into the same form used for adding; submitting
@@ -18,22 +18,22 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
   const formOpen = editingRuleId !== null;
   container.innerHTML = `
     <h2>Rules</h2>
-    <p class="hint">Reusable, recurring overrides — they apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text — pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
+    <p class="hint">Reusable, recurring overrides. They apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text. Pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
     <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו — מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
         <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
         <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
         <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">— month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
-        <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף) — one rule then covers both, without touching any other cell.</p>
+        <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף). One rule then covers both, without touching any other cell.</p>
         ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, prefill)}
         ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, prefill)}
       </fieldset>
@@ -176,7 +176,7 @@ function conditionSummary(c) {
   if (c.parsha) parts.push('parsha: ' + c.parsha.join(', '));
   if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
   if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
-  return parts.join(' or ') || '(no condition — never matches)';
+  return parts.join(' or ') || '(no condition, never matches)';
 }
 function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

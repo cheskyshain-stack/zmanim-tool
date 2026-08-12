@@ -13,7 +13,7 @@ export function roundToMinute(dayFraction) {
   return Math.round(dayFraction * 1440) / 1440;
 }
 
-/** TEXT(time,"h:mm") — 12-hour clock, no AM/PM, hour 0 displayed as 12. */
+/** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
 export function formatTime(dayFraction) {
   const frac = ((dayFraction % 1) + 1) % 1;
   const totalMinutes = Math.round(frac * 1440) % 1440;
@@ -33,7 +33,7 @@ export const UL_END = '';
 
 /** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
  *  string (both forms appear in the workbook's formulas) and marks it to render
- *  underlined — the printed sheet's way of flagging an "alternate" time. */
+ *  underlined - the printed sheet's way of flagging an "alternate" time. */
 export function underlineTime(value) {
   const text = typeof value === 'number' ? formatTime(value) : value;
   return UL_START + ' ' + text + UL_END;
@@ -57,7 +57,7 @@ function expandTimeDigits(digits) {
 }
 
 /** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
- *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon —
+ *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon -
  *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
 export function normalizeTimeShorthand(text) {
   return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);

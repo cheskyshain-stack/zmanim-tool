@@ -13,7 +13,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       <details class="panel" open>
         <summary>Header &amp; footer</summary>
         <div class="panel-body">
-        <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is — replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
+        <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is. Replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
         <div id="header-photo-cropper"></div>
         <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${esc(s.shulName)}"></label>
         <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${esc(s.headerSubtitle)}"></label>
@@ -25,8 +25,8 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       <details class="panel">
         <summary>Weekday chart defaults</summary>
         <div class="panel-body">
-        <p class="hint">מנחה and מעריב on the Weekday chart start blank — those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">This box — and every cell on a sheet — takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
+        <p class="hint">מנחה and מעריב on the Weekday chart start blank, because those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
+        <p class="hint">This box, and every cell on a sheet, takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
         <div class="rt-field-label">שחרית schedule (same every week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
@@ -56,7 +56,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       </div>
       </details>
       <details class="panel">
-        <summary>Advanced zmanim settings — leave alone unless you know what you're doing</summary>
+        <summary>Advanced zmanim settings (leave alone unless you know what you're doing)</summary>
         <div class="panel-body">
         <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${s.horizon}"></label>
         <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${s.candleLightingMinutes}"></label>
@@ -72,7 +72,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       <details class="panel">
         <summary>Backup</summary>
         <div class="panel-body">
-        <p class="hint">Everything lives in this browser only — settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone). Import also takes a single-sheet file saved with "Save a copy" in Saved sheets, and adds it to what you already have rather than replacing anything.</p>
+        <p class="hint">Everything lives in this browser only: settings, saved sheets, and rules. Export downloads it all as one file; Import restores it (e.g. to move to another computer or your phone). Import also takes a single-sheet file saved with "Save a copy" in Saved sheets, and adds it to what you already have rather than replacing anything.</p>
         <div class="backup-row">
           <button type="button" id="export-btn">Export backup</button>
           <label class="file-label" for="import-input">Import backup</label>
@@ -111,7 +111,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
 
   // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
-  // was last focused — tracked on focusin because the toolbar buttons deliberately don't
+  // was last focused - tracked on focusin because the toolbar buttons deliberately don't
   // take focus (see wireRichTextToolbar).
   let lastRichField = shacharisEditor;
   container.addEventListener('focusin', (e) => {
@@ -120,7 +120,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
   wireRichTextToolbar(container, () => lastRichField);
 
   // Shorthand times settle when you leave a box, and Ctrl/Cmd+U underlines, in every one
-  // of these boxes — including option rows added after this point, hence the delegation.
+  // of these boxes - including option rows added after this point, hence the delegation.
   container.addEventListener(
     'blur',
     (e) => {
@@ -168,7 +168,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
 }
 
 /** Saving re-renders this whole view, so any "saved!" state put on the button itself is
- *  wiped the instant it appears — which is exactly why the button felt like it did
+ *  wiped the instant it appears - which is exactly why the button felt like it did
  *  nothing. The confirmation lives on <body> instead, outside the part that re-renders. */
 function showToast(message) {
   document.querySelector('.toast')?.remove();

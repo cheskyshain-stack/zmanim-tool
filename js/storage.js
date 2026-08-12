@@ -1,18 +1,18 @@
 // localStorage persistence + JSON export/import. Everything (settings, saved sheet
-// instances with their per-cell overrides, and rules) lives in one namespaced key —
+// instances with their per-cell overrides, and rules) lives in one namespaced key -
 // this is the single-browser "local app" model the user chose over a hosted backend.
 import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS } from './settings.js';
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
 
-// No seed rules by default — add your own from the Rules tab (e.g. Shabbos Teshuva /
+// No seed rules by default - add your own from the Rules tab (e.g. Shabbos Teshuva /
 // Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
 // ready to fill in the real wording/times.
 const SEED_RULES = [];
 
 /** ט' באב used to be hardcoded into the sheet builders. It's an ordinary rule now, so
- *  it can be seen, edited, disabled or deleted like any other — matching on the Hebrew
+ *  it can be seen, edited, disabled or deleted like any other - matching on the Hebrew
  *  date, which recurs every year, unlike a fixed Gregorian date.
  *
  *  It fires on the two Shabbosim where the fast begins מוצאי שבת. Weeks are anchored on
@@ -25,7 +25,7 @@ const SEED_RULES = [];
  *  instead of having it reappear on the next load. */
 const TISHA_BAV_RULE = {
   id: 'rule-tisha-bav',
-  name: 'ט באב — מוצאי שבת',
+  name: 'ט באב: מוצאי שבת',
   enabled: true,
   condition: { hebrewDate: ['5-8', '5-9'] },
   columnKeys: ['kayitz:B', 'kayitz:C', 'choref:B', 'choref:C'],
@@ -36,11 +36,11 @@ const TISHA_BAV_RULE = {
 /** The two דרשה rules, seeded for the same reason the Lakewood settings are built in:
  *  they're the shul's standing schedule, not one person's preference, so a new browser
  *  (a phone, say) should have them without anyone re-entering them. Same seeded-flag
- *  treatment as ט באב — installed once, and deleting one stays deleted. */
+ *  treatment as ט באב - installed once, and deleting one stays deleted. */
 const DRASHA_RULES = [
   {
     id: 'rule-shabbos-hagadol',
-    name: 'שבת הגדול — דרשה',
+    name: 'שבת הגדול: דרשה',
     enabled: true,
     condition: { specialParsha: ['הגדול', 'Hagadol'] },
     columnKeys: ['kayitz:C', 'choref:C'],
@@ -49,7 +49,7 @@ const DRASHA_RULES = [
   },
   {
     id: 'rule-shabbos-shuva',
-    name: 'שבת שובה — דרשה',
+    name: 'שבת שובה: דרשה',
     enabled: true,
     condition: { specialParsha: ['שובה', 'Shuva'] },
     columnKeys: ['kayitz:C', 'choref:C'],
@@ -60,7 +60,7 @@ const DRASHA_RULES = [
 
 /** True if some rule already covers the same special Shabbos. These two were hand-made
  *  before they were seeded, so on the browser they were made in they exist under their
- *  own ids — seeding by id alone would sit a second "דרשה" on top of the first. */
+ *  own ids - seeding by id alone would sit a second "דרשה" on top of the first. */
 function alreadyCovered(rules, rule) {
   const wanted = rule.condition.specialParsha;
   return rules.some((r) => r.id === rule.id || (r.condition?.specialParsha || []).some((p) => wanted.includes(p)));
@@ -80,17 +80,23 @@ function applySeeds(state) {
   }
   // The first version of this rule only matched 9 Av, missing the years where 9 Av lands
   // on a Sunday (the Shabbos before it is 8 Av). Widen a copy that still carries exactly
-  // the old condition — an untouched seed — and leave any hand-edited one alone.
+  // the old condition - an untouched seed - and leave any hand-edited one alone.
   const existing = state.rules.find((r) => r.id === TISHA_BAV_RULE.id);
   if (existing && JSON.stringify(existing.condition) === JSON.stringify({ hebrewDate: ['5-9'] })) {
     existing.condition = { hebrewDate: ['5-8', '5-9'] };
+  }
+  // Rule names written with an em dash, back when the seeds used one. Rewritten to a
+  // colon so no dash of that kind is left anywhere in the app, including names already
+  // saved in a browser.
+  for (const rule of state.rules) {
+    if (rule.name?.includes('—')) rule.name = rule.name.replace(/\s*—\s*/g, ': ');
   }
   state.seeded = seeded;
   return state;
 }
 
 // Merges saved settings over the defaults, cloning nested objects (sheetStyle) so
-// nothing ever ends up sharing a reference with the DEFAULT_SETTINGS constant —
+// nothing ever ends up sharing a reference with the DEFAULT_SETTINGS constant -
 // mutating state.settings.sheetStyle in place would otherwise silently corrupt the
 // app's built-in defaults for the rest of the session.
 function normalizeSettings(raw) {
@@ -138,7 +144,7 @@ export function exportStateToFile(state) {
 
 /** True for a single-sheet file rather than a whole-app backup.
  *
- *  Nothing writes these any more — Saved sheets used to have a "Save a copy" button that
+ *  Nothing writes these any more - Saved sheets used to have a "Save a copy" button that
  *  downloaded one, and folders inside the app replaced it. Import still recognises them
  *  so a file saved back then still opens. */
 export function isSheetFile(text) {
@@ -151,7 +157,7 @@ export function isSheetFile(text) {
 
 /** The sheet inside such a file, given a fresh id so importing the same copy twice (or
  *  onto the machine it came from) adds a second sheet instead of colliding with the
- *  original. Never locked on arrival — the lock belongs to the copy it came from. */
+ *  original. Never locked on arrival - the lock belongs to the copy it came from. */
 export function importSheetFromText(text) {
   const { sheet } = JSON.parse(text);
   if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');

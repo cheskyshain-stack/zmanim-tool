@@ -8,7 +8,7 @@ import { inSpringDstWindow } from './common.js';
 
 const MAX_WEEKS = 60; // safety cap, well above any real season's length
 
-/** Season(hebrewYear) date-range boundaries — Kayitz(Y): Pesach(Y) -> Sukkos(Y+1);
+/** Season(hebrewYear) date-range boundaries - Kayitz(Y): Pesach(Y) -> Sukkos(Y+1);
  *  Choref(Y): Sukkos(Y) -> Pesach(Y), both within AM year Y. Factored out of
  *  computeSeasonWeeks so the "which year is next" helpers below can use the same
  *  boundaries without needing a parsha table. */
@@ -59,7 +59,7 @@ function anyRegularDay(fromSerial, toSerial, settings, specialDaysTable) {
 }
 
 /** "Chol Hamoed Pesach" / "חול המועד סוכות" / "Hoshana Rabbah" -> the plain holiday
- *  name ("Pesach" / "סוכות" / "סוכות") — see the Chol Hamoed row below, which reuses
+ *  name ("Pesach" / "סוכות" / "סוכות") - see the Chol Hamoed row below, which reuses
  *  whatever this Shabbos's own hasYomTov() name is but without the "Chol Hamoed"/
  *  "Hoshana Rabbah" framing, since the row is standing in for the holiday as a whole. */
 function holidayNameFor(day, settings, specialDaysTable) {
@@ -71,7 +71,7 @@ function holidayNameFor(day, settings, specialDaysTable) {
 /** Week list for a Weekday chart covering the same season date range as
  *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
  *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
- *  a normal day — not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
+ *  a normal day - not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
  *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
  *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
  *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
@@ -82,7 +82,7 @@ function holidayNameFor(day, settings, specialDaysTable) {
  *  Season boundaries (Pesach/Sukkos) essentially never line up with the fixed 7-day
  *  Saturday spacing this loop walks in, which leaves a "leftover" stretch of up to 6
  *  regular days between the last Saturday-anchored week and the boundary itself (e.g.
- *  the days between שבת הגדול and ליל פסח) — see the trailing-gap check after the main
+ *  the days between שבת הגדול and ליל פסח) - see the trailing-gap check after the main
  *  loop, which folds that stretch onto *this* (the outgoing/earlier) season as one more
  *  row, per "a week that falls between two charts belongs on the earlier one".
  *
@@ -90,7 +90,7 @@ function holidayNameFor(day, settings, specialDaysTable) {
  *  is excluded from becoming its own row in the *incoming* season's own loop above (its
  *  backward window would otherwise mix genuine pre-Yom-Tov regular days, already
  *  claimed by the outgoing chart's trailing row, together with actual Chol Hamoed days)
- *  — but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
+ *  - but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
  *  the *outgoing* chart as one more row, labeled with the holiday's plain name (Pesach's
  *  own Chol Hamoed row lands on the חורף chart; Sukkos's on the קיץ chart). */
 export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
@@ -104,7 +104,7 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   let guard = 0;
   while (d <= endSerial && guard < MAX_WEEKS) {
     // d === startSerial: the season's own start boundary landed exactly on Shabbos
-    // (e.g. Sukkos falling on a Saturday) — its backward-attached weekdays are still
+    // (e.g. Sukkos falling on a Saturday) - its backward-attached weekdays are still
     // within the *outgoing* season's territory, already covered by its own trailing-gap
     // row below. Without this, both seasons would independently print an identical row.
     const isOwnStartBoundary = d === startSerial;
@@ -117,11 +117,11 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   }
 
   // Trailing gap: the regular days (if any) between the last Saturday-anchored week
-  // above and the season's own end boundary — see the function comment. Anchored at
+  // above and the season's own end boundary - see the function comment. Anchored at
   // endSerial itself (not a real Shabbos, just a stand-in date/key for this row) and
   // labeled with whatever Yom Tov starts there, same fallback as any other
   // Yom-Tov-only row above. When the boundary itself was exactly Shabbos, the main loop
-  // already picked it up directly and this gap comes out empty — no double-counting.
+  // already picked it up directly and this gap comes out empty - no double-counting.
   const gapStart = d - 7 + 1;
   const gapEnd = endSerial - 1;
   if (gapStart <= gapEnd && anyRegularDay(gapStart, gapEnd, settings, tables.specialDays)) {
@@ -132,7 +132,7 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
   // `d` is now the first Saturday *after* the boundary (Saturdays fall on the same
   // fixed 7-day cadence no matter which season's math found them, so this is exactly
   // the same date the incoming season's own loop would land on as its own first
-  // candidate) — see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
+  // candidate) - see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
   // there becomes a row here instead of there. It's folded into the trailing-gap row
   // above rather than added separately whenever that row already carries the same
   // holiday's name: the two stretches are the run-up to, and the middle of, one single
@@ -146,11 +146,11 @@ export function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
 }
 
 /** Where a שבת חורף season's weeks cross the *spring* DST cutover (2nd Sunday of
- *  March — not the fall one near Sukkos at the season's start). From that week on,
- *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) —
+ *  March - not the fall one near Sukkos at the season's start). From that week on,
+ *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) -
  *  the shul still davens on a "summer" schedule through Pesach once the clock springs
  *  forward. Returns the index in `weeks` of the first week on/after the cutover
- *  (weeks.length if the whole season is still before it — shouldn't happen in
+ *  (weeks.length if the whole season is still before it - shouldn't happen in
  *  practice, since Pesach always falls after the 2nd Sunday of March). */
 export function splitChorefAtSpringCutover(weeks, settings) {
   const idx = weeks.findIndex((w) => inSpringDstWindow(w.date, settings));
@@ -158,7 +158,7 @@ export function splitChorefAtSpringCutover(weeks, settings) {
 }
 
 /** The smallest hebrewYear for `season` whose date range hasn't already fully elapsed
- *  (its end is still today or later) — i.e. the soonest occurrence of that season still
+ *  (its end is still today or later) - i.e. the soonest occurrence of that season still
  *  worth preparing a schedule for. Used to keep the Generate form's year field from
  *  ever defaulting to an already-passed season. */
 export function nextAvailableYearFor(season, settings) {
@@ -169,7 +169,7 @@ export function nextAvailableYearFor(season, settings) {
 }
 
 /** Which season+year the Generate form should default to: the *next* season
- *  chronologically after whichever one contains today — a schedule is always being
+ *  chronologically after whichever one contains today - a schedule is always being
  *  prepared ahead of time for the upcoming season, not the one currently in progress.
  *  E.g. if today falls within a קיץ season, default to the חורף season right after it
  *  (never the קיץ season itself, and never a season that's already over). */
@@ -183,7 +183,7 @@ export function defaultSeasonAndYear(settings) {
   let currentSeason, currentYear;
   if (today < sukkosY0) {
     currentSeason = 'kayitz';
-    currentYear = y0 - 1; // still in last cycle's קיץ — Sukkos(y0) hasn't happened yet
+    currentYear = y0 - 1; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
   } else if (today < pesachY0) {
     currentSeason = 'choref';
     currentYear = y0;

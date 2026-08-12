@@ -7,12 +7,12 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
   const settings = resolveSettings(state.settings);
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   // Generate is where the app opens, so it's where someone who has never seen it lands.
-  // The pointer shows only until there's a saved sheet — by then they've done it once.
+  // The pointer shows only until there's a saved sheet - by then they've done it once.
   const firstRun = !state.sheets.length;
   container.innerHTML = `
     <h2>Generate a sheet</h2>
     <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
-    ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button> — what this site does and how to print a board.</p>' : ''}
+    ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
     <form id="gen-form" class="form-grid">
@@ -30,7 +30,7 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
             <span class="season-range">Sukkos → Pesach</span>
           </label>
         </div>
-        <label for="step-hebrewYear">Hebrew year${stepper('hebrewYear', defaultYear)}</label>
+        <label class="year-row" for="step-hebrewYear"><span class="year-label">Hebrew year</span>${stepper('hebrewYear', defaultYear)}</label>
         <div class="actions"><button type="submit" class="btn-primary">Continue</button></div>
       </fieldset>
     </form>
@@ -40,8 +40,8 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
   container.querySelector('#open-guide')?.addEventListener('click', () => onOpenTab('guide'));
 
   // Which season card reads as selected. The CSS also has a :checked + label rule, but
-  // it was observed not re-evaluating when the checked state changed — leaving the
-  // highlight on the previously chosen card — so the class is set explicitly here and
+  // it was observed not re-evaluating when the checked state changed - leaving the
+  // highlight on the previously chosen card - so the class is set explicitly here and
   // is what the styling actually keys off.
   const syncSeasonCards = () => {
     container.querySelectorAll('.season-radio').forEach((radio) => {
@@ -51,13 +51,20 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
   syncSeasonCards();
 
   // Switching season re-defaults the year to the soonest occurrence of *that* season
-  // that hasn't already fully elapsed — e.g. picking חורף after its date range for the
+  // that hasn't already fully elapsed - e.g. picking חורף after its date range for the
   // current cycle already passed jumps straight to next year's, never a past one.
+  //
+  // Only while the year is still the app's own default, though. Setting a year and then
+  // picking a season is a perfectly normal order to work in, and it used to throw the
+  // year away: an answer you gave being overwritten by one you didn't.
+  const yearInput = container.querySelector('input[name=hebrewYear]');
+  let yearChosenByUser = false;
+  yearInput.addEventListener('change', () => (yearChosenByUser = true));
+  yearInput.addEventListener('input', () => (yearChosenByUser = true));
   container.querySelectorAll('input[name=season]').forEach((radio) => {
     radio.addEventListener('change', () => {
       syncSeasonCards();
-      if (!radio.checked) return;
-      const yearInput = container.querySelector('input[name=hebrewYear]');
+      if (!radio.checked || yearChosenByUser) return;
       yearInput.value = nextAvailableYearFor(radio.value, settings);
     });
   });
@@ -70,7 +77,7 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
     const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
 
     // Step one folds into a one-line summary once it's answered, so step two isn't
-    // competing with a form you've already finished — the page used to just keep
+    // competing with a form you've already finished - the page used to just keep
     // growing downward with everything still on screen at once.
     container.querySelector('#gen-form').hidden = true;
     container.querySelector('#step-one').innerHTML = `
@@ -90,7 +97,7 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
 const seasonLabel = (season) => (season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף');
 
 /** Two-step progress header, so it's clear up front that this is a short sequence and
- *  which part you're on — previously the second half simply appeared below the first
+ *  which part you're on - previously the second half simply appeared below the first
  *  with nothing marking it as a separate step. */
 function stepsBar(current) {
   const step = (n, label) => {
@@ -102,32 +109,32 @@ function stepsBar(current) {
 
 function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, onGenerate) {
   if (weeks.length === 0) {
-    el.innerHTML = `<p class="hint">No qualifying Shabbosim found for that range — double check the Hebrew year.</p>`;
+    el.innerHTML = `<p class="hint">No qualifying Shabbosim found for that range. Double check the Hebrew year.</p>`;
     return;
   }
 
   // A שבת חורף season that reaches the spring DST cutover (2nd Sunday of March) needs
-  // its tail weeks to be an actual שבת קיץ chart, not just plain חורף — the shul really
+  // its tail weeks to be an actual שבת קיץ chart, not just plain חורף - the shul really
   // is on the summer schedule from the clock change through Pesach. You choose the page
   // split yourself below (covering all the weeks, as usual); at render time, any page
-  // that ends up containing at least one of these weeks prints as a real קיץ chart —
+  // that ends up containing at least one of these weeks prints as a real קיץ chart -
   // the other, earlier weeks on that same page just show blank Plag columns.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
   const kayitzWeekCount = weeks.length - springSplitIndex;
 
   // The Weekday chart's own week list can include weeks the Shabbos list skips (a Yom
   // Tov Shabbos whose week still has a regular weekday), so it's computed and paginated
-  // completely separately — see the "Also generate a Weekday chart" section below.
+  // completely separately - see the "Also generate a Weekday chart" section below.
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, settings, tables).weeks;
 
   el.innerHTML = `
     <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
-      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>— spring DST cutover: any page from here on prints as שבת קיץ —</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
       kayitzWeekCount > 0
-        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout — keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout. Keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
         : ''
     }
     <form id="page-form" class="form-grid">
@@ -138,15 +145,19 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
         <div id="page-size-inputs"></div>
+        <div class="alloc" id="alloc">
+          <div class="alloc-bar" id="alloc-bar"></div>
+          <p class="alloc-msg" id="alloc-msg"></p>
+        </div>
         <div id="page-error" class="error"></div>
       </fieldset>
       <fieldset>
         <legend>Weekday chart</legend>
         <label><input type="checkbox" id="include-weekday" checked> Also generate a Weekday chart (separate file) for these weeks</label>
-        <p class="hint">Covers ${weekdayWeeks.length} weeks — a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
+        <p class="hint">Covers ${weekdayWeeks.length} weeks, a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <details class="panel">
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
-          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)} — ${esc(w.parsha)}</li>`).join('')}</ol>
+          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}</li>`).join('')}</ol>
         </details>
       </fieldset>
       <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
@@ -160,12 +171,46 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
+  // Live picture of the split: one block per page, sized to its share, plus what's left
+  // over or overflowing. The numbers alone made you add them up in your head to find out
+  // whether you were three weeks short.
+  const barEl = el.querySelector('#alloc-bar');
+  const msgEl = el.querySelector('#alloc-msg');
+  function renderAlloc() {
+    const sizes = [...el.querySelectorAll('.page-size')].map((i) => Number(i.value) || 0);
+    const placed = sizes.reduce((a, b) => a + b, 0);
+    const total = weeks.length;
+    const short = Math.max(0, total - placed);
+    const over = Math.max(0, placed - total);
+    // Widths are shares of the wider of the two, so going over pushes the pages along
+    // instead of the overflow appearing out of nowhere.
+    const scale = Math.max(total, placed) || 1;
+    const pct = (n) => (n / scale) * 100;
+    barEl.innerHTML = [
+      ...sizes.map((n, i) => `<span class="alloc-seg" style="width:${pct(n)}%" title="Page ${i + 1}: ${n} week${n === 1 ? '' : 's'}">${n || ''}</span>`),
+      short ? `<span class="alloc-seg is-short" style="width:${pct(short)}%" title="${short} not on any page yet">${short}</span>` : '',
+      over ? `<span class="alloc-seg is-over" style="width:${pct(over)}%" title="${over} more than there are weeks">+${over}</span>` : '',
+    ].join('');
+    msgEl.classList.toggle('is-bad', placed !== total);
+    msgEl.textContent = short
+      ? `${placed} of ${total} weeks placed, ${short} still to go.`
+      : over
+        ? `${placed} placed, ${over} more than the ${total} weeks there are.`
+        : `All ${total} weeks placed.`;
+  }
+
   renderSizeInputs(3);
+  renderAlloc();
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
     numPagesInput.value = n;
     renderSizeInputs(n);
+    renderAlloc();
   });
+  // 'change' covers the stepper buttons (they dispatch it) and 'input' catches typing as
+  // it happens, so the bar never lags behind the numbers.
+  inputsEl.addEventListener('change', renderAlloc);
+  inputsEl.addEventListener('input', renderAlloc);
 
   wireSteppers(el);
 
@@ -193,7 +238,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         createdAt: new Date().toISOString(),
         weeks: weekdayWeeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
         // Page breaks fall on the same dates as the Shabbos sheet's, rather than being
-        // chosen separately — see alignPageSizesTo().
+        // chosen separately - see alignPageSizesTo().
         pageSizes: alignPageSizesTo(weeks, sizes, weekdayWeeks),
         overrides: {},
         style: { ...state.settings.sheetStyle },
@@ -218,7 +263,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
  *  a plain <input class="page-size"> would have been found before. */
 function stepper(name, value, opts = {}) {
   const { min, max, className = '' } = opts;
-  // The input carries an id and every wrapping <label> points at it with for= — without
+  // The input carries an id and every wrapping <label> points at it with for= - without
   // that, a label associates with its *first* form control, which here is the − button,
   // and Chrome then mirrors the label's hover/pressed state onto it: pressing + lit −
   // up as well, and clicking the label's text acted like pressing −.
@@ -238,7 +283,7 @@ function wireSteppers(root) {
   root.querySelectorAll('.stepper').forEach((wrap) => {
     // Guard against double-wiring: the page-size steppers sit inside the preview, so
     // they were reached both by their own renderSizeInputs() call and by the later
-    // wireSteppers(el) over the whole preview — two listeners, and every click moved
+    // wireSteppers(el) over the whole preview - two listeners, and every click moved
     // the number by 2.
     if (wrap.dataset.wired) return;
     wrap.dataset.wired = '1';

@@ -1,4 +1,4 @@
-// Helpers shared between שבת קיץ and שבת חורף — both sheets use the exact same
+// Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
 // "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
@@ -8,12 +8,12 @@ import { flattenNonEmpty, splitLinesInHalf, NBSP, SLASH } from '../util.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
-/** DST active AND month<6 — specifically the *spring* DST window (roughly the 2nd
+/** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
  *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
  *  (Sukkos through the 1st Sunday of November), which is also nominally "DST active"
  *  but must NOT count here: this same test is also the cutover point at which a שבת
  *  חורף season needs its final page generated as an actual שבת קיץ chart instead (see
- *  weeks.js's splitChorefAtSpringCutover) — that switch must only happen once, near
+ *  weeks.js's splitChorefAtSpringCutover) - that switch must only happen once, near
  *  the season's end, not at Sukkos just because the clock happens to still read DST
  *  there too. */
 export function inSpringDstWindow(date, settings) {
@@ -30,7 +30,7 @@ export function inPlagWindow(serial, settings) {
   return inSpringDstWindow(d, settings) || doy < 192;
 }
 
-/** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) — identical
+/** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
  *  formula in both sheets. Printed across two lines, split as evenly as possible
  *  (more options on the second line when the count is odd). */
 export function fridayMainMinchaMenu(fridayDate, settings) {
@@ -46,7 +46,7 @@ export function fridayMainMinchaMenu(fridayDate, settings) {
   return splitLinesInHalf(items);
 }
 
-/** Shabbos-day Mincha menu (קיץ column C / חורף column C) — identical formula.
+/** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
  *  Also printed across two lines, split the same way. */
 export function shabbosMinchaMenu(shabbosDate, settings) {
   const sunsetVal = Z.sunset(shabbosDate, settings);
@@ -56,7 +56,7 @@ export function shabbosMinchaMenu(shabbosDate, settings) {
   const items = flattenNonEmpty([
     Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20',
     kept,
-    // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) —
+    // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
     // ceilToMinute matches that.
     formatTime(Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0))),
     underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30))),
@@ -67,22 +67,22 @@ function floorMin(x) {
   return Math.floor(x * 1440 + 1e-7) / 1440;
 }
 
-/** Fixed Shacharis line (קיץ column E / חורף column E) — identical, not date-dependent.
+/** Fixed Shacharis line (קיץ column E / חורף column E) - identical, not date-dependent.
  *  Uses NBSP around the "/" so it can never wrap onto a second line. */
 export function shacharisLine() {
   return `${underlineTime(T(7, 30))}${SLASH}8:15`;
 }
 
-/** Candle lighting + sunset (קיץ column H / חורף column H) — identical formula. */
+/** Candle lighting + sunset (קיץ column H / חורף column H) - identical formula. */
 export function candleLightingCell(fridayDate, settings) {
   const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
   return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
 }
 
-/** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) — Motzei
+/** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) - Motzei
  *  Shabbos's Maariv is really the start of Tisha B'Av. Flags it by appending "ט באב" to
  *  the Mincha (C) and Motzei-Shabbos Maariv (B) cells, alongside whatever they already
- *  computed — never replacing that content. Applies automatically to every week, not a
+ *  computed - never replacing that content. Applies automatically to every week, not a
  *  user-editable rule, since it's a fixed calendar fact rather than a shul preference. */
 export function applyTishaBavNote(row, week, settings) {
   const jdate = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);

@@ -24,7 +24,7 @@ function groupSheets(sheets) {
 
 export function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
   const groups = groupSheets(state.sheets);
-  // Folders are just a name stored on each sheet — there's no separate folder list, so a
+  // Folders are just a name stored on each sheet - there's no separate folder list, so a
   // folder exists exactly as long as something is in it and disappears when the last
   // sheet leaves. Nothing to create, rename or tidy up separately. A pair is filed by
   // its Shabbos sheet; the Weekday chart follows it.
@@ -34,14 +34,14 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
 
   const rowsHtml = (list) =>
     [...list]
-      // Newest first — the one you just generated is the one you want. Copied before
+      // Newest first - the one you just generated is the one you want. Copied before
       // sorting so the stored order (which nothing else depends on) is left alone.
       .sort((a, b) => String(b.primary.createdAt).localeCompare(String(a.primary.createdAt)))
       .map(
         ({ primary: s, companion }) => `
         <tr data-id="${s.id}">
           <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABEL[s.season] || s.season}${
-            companion ? ' <span class="pair-chip" title="Generated together — opening one gets you to the other">+ Weekday</span>' : ''
+            companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
           }</td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
@@ -68,7 +68,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
 
   container.innerHTML = `
     <h2>Saved sheets</h2>
-    <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry — open either from the same row, and locking, filing or deleting covers both.</p>
+    <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
     ${
       state.sheets.length
         ? `
@@ -77,12 +77,12 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
         .map(
           (f) => `
         <details class="panel" open>
-          <summary>📁 ${esc(f)} <span class="hint">— ${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'}</span></summary>
+          <summary>📁 ${esc(f)} <span class="hint">(${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'})</span></summary>
           <div class="panel-body">${tableHtml(inFolder(f))}</div>
         </details>`
         )
         .join('')}`
-        : '<p class="hint">No saved sheets yet — use Generate to create one.</p>'
+        : '<p class="hint">No saved sheets yet. Use Generate to create one.</p>'
     }
   `;
 
@@ -107,7 +107,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
       let folder;
       if (value === NEW_FOLDER) {
         folder = (prompt('Name for the new folder:') || '').trim();
-        if (!folder) return onChange(); // cancelled — redraw so the select snaps back
+        if (!folder) return onChange(); // cancelled - redraw so the select snaps back
       } else {
         folder = value === NO_FOLDER ? undefined : value;
       }

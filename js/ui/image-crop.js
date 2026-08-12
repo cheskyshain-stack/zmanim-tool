@@ -1,5 +1,5 @@
 // Basic pan-&-zoom image cropper for the header photo. No external library (this is a
-// static, build-step-free app) — just a fixed-aspect viewport, a drag-to-reposition
+// static, build-step-free app) - just a fixed-aspect viewport, a drag-to-reposition
 // image, and a zoom slider, rendered onto a canvas at a fixed output size on save.
 //
 // renderImageCropper(container, currentDataUrl, onSave):
@@ -22,7 +22,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
-          ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove — use default</button>' : ''}
+          ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove (use default)</button>' : ''}
         </div>
       </div>
       <div id="crop-editor" class="crop-editor" hidden>

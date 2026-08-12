@@ -2,7 +2,7 @@
 
 // Non-breaking space: used in every "/"-joined time list so the browser can never wrap
 // mid-pair (e.g. "7:30 / 8:15" splitting into "7:30 /" + "8:15") when a column is
-// narrow — only the sheet's own explicit \n line breaks should ever create a new line.
+// narrow - only the sheet's own explicit \n line breaks should ever create a new line.
 export const NBSP = ' ';
 export const SLASH = `${NBSP}/${NBSP}`;
 

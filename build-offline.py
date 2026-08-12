@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds a fully offline, dependency-free copy of the app into offline/ —
+"""Builds a fully offline, dependency-free copy of the app into offline/ -
 no ES modules, no fetch(), nothing that requires a local server: just
 double-click offline/index.html (via file://) in any modern browser, so it
 can be copied to a USB drive and run on a computer with no internet access.
@@ -7,14 +7,14 @@ can be copied to a USB drive and run on a computer with no internet access.
 How it works:
   - Every js/**/*.js module is concatenated into one plain <script> (no
     type="module"), in dependency order. `export` is stripped (everything
-    becomes a normal top-level declaration in one shared scope — verified
+    becomes a normal top-level declaration in one shared scope - verified
     there are no name collisions across modules) and `import {a,b} from`
     lines are dropped entirely, since after flattening the names already
     exist. `import * as X from '...'` becomes a generated `const X = {...}`
     object built from that module's own export names.
   - The four data/*.json lookup tables are inlined as JS constants and
     data-loader.js's fetch()-based loadTables() is replaced with a version
-    that just returns them directly — fetch() of local files is blocked
+    that just returns them directly - fetch() of local files is blocked
     under file:// in most browsers, same reason ES modules are.
   - assets/ is copied alongside index.html (plain <img src="..."> to a
     relative file works fine under file://, unlike fetch/modules). The
@@ -153,7 +153,7 @@ def stamp_css_versions():
     """Rewrite index.html's stylesheet links to css/x.css?v=<hash of that file>.
 
     GitHub Pages serves everything with a 10-minute max-age, so after a deploy the
-    browser keeps showing the previous stylesheet until it expires — a design change
+    browser keeps showing the previous stylesheet until it expires - a design change
     looks like it simply didn't ship. The hash changes only when the CSS does, so the
     new URL is fetched immediately while an unchanged file stays cached.
 
@@ -176,14 +176,14 @@ def stamp_js_versions():
 
     Same 10-minute GitHub Pages cache as the CSS, but the modules can't be stamped the
     same way: they import each other by relative path, so putting ?v= on the entry
-    doesn't reach anything it pulls in. That bit us for real — a fix that lived in JS
+    doesn't reach anything it pulls in. That bit us for real - a fix that lived in JS
     while its matching CSS shipped stamped meant phones ran new CSS against old JS and
     showed the wrong thing, which reads as "the fix didn't work".
 
     An import map rewrites those relative specifiers at load time without touching a
     single source file: `import './storage.js'` still resolves to /js/storage.js, and
     the map turns that into /js/storage.js?v=<hash>. The map lives in index.html, which
-    a page load revalidates anyway — the same reason the CSS stamps work. The entry
+    a page load revalidates anyway - the same reason the CSS stamps work. The entry
     itself is stamped directly, since a map applies to imports, not to <script src>.
     """
     html = (ROOT / "index.html").read_text(encoding="utf-8")
@@ -226,7 +226,7 @@ def main():
 
     # Namespace-object consts (from `import * as X`) are safe to declare anywhere
     # before the app actually starts running (see build-offline.py's module
-    # docstring) — putting them all together right before app.js keeps the output
+    # docstring) - putting them all together right before app.js keeps the output
     # readable without needing per-file interleaving.
     entry_idx = order.index(ENTRY)
     bundle = "\n\n".join(chunks[:entry_idx]) + "\n\n// ==== namespace shims for `import * as X` ====\n" + "\n".join(sorted(set(trailing_namespace_consts))) + "\n\n" + chunks[entry_idx]
@@ -250,7 +250,7 @@ def main():
         raise RuntimeError("offline build: failed to swap the module entry for bundle.js")
     (OUT_DIR / "index.html").write_text(html, encoding="utf-8")
 
-    # rglob + mkdir so subdirectories come across too (assets/fonts/) — a flat glob
+    # rglob + mkdir so subdirectories come across too (assets/fonts/) - a flat glob
     # copied only top-level files and choked the moment a folder appeared.
     assets_out = OUT_DIR / "assets"
     assets_out.mkdir(exist_ok=True)

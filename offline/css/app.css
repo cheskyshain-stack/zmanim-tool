@@ -1,10 +1,10 @@
 /* Two Hebrew serifs shipped with the app rather than assumed to be installed. Phones
    have none of David / Frank Ruehl / Times New Roman, so Hebrew on the printed chart
    fell back to the system UI font and looked nothing like it does on the desktop.
-   Which one stands in for which choice is decided in sheet-view.js (HEBREW_STAND_IN) —
+   Which one stands in for which choice is decided in sheet-view.js (HEBREW_STAND_IN) -
    Frank Ruhl Libre covers Times New Roman's Hebrew, David Libre covers David's.
    Self-hosted (not a font CDN) so the offline build works with no network at all.
-   Hebrew subsets only, ~12-19KB each. SIL Open Font License 1.1 — see
+   Hebrew subsets only, ~12-19KB each. SIL Open Font License 1.1 - see
    assets/fonts/OFL-david-libre.txt and assets/fonts/OFL-frank-ruhl-libre.txt. */
 @font-face {
   font-family: 'David Libre';
@@ -32,7 +32,7 @@
 
 :root {
   /* --accent/--ink/--ruled/--overridden/--paper are also read by the printed-chart
-     CSS below (and by sheet-view.js's inline --sheet-accent fallback) — their
+     CSS below (and by sheet-view.js's inline --sheet-accent fallback) - their
      *values* are load-bearing for the chart output and intentionally left as-is;
      everything else here is new/control-panel-only. */
   --border: #dde1e6;
@@ -48,7 +48,7 @@
   --surface: #ffffff;
   --bg: #f1f2f5;
   --danger: #b3261e;
-  /* App-chrome-only palette — the navy sidebar and the blue used for primary actions.
+  /* App-chrome-only palette - the navy sidebar and the blue used for primary actions.
      Kept separate from --accent above, which the printed chart falls back to. */
   --nav-bg: #101c36;
   --nav-bg-2: #1a2b4d;
@@ -56,7 +56,7 @@
   --ui-accent: #2563eb;
   --ui-accent-dark: #1d4ed8;
   --ui-accent-soft: #eef2ff;
-  /* Type scale for the app chrome only — there were 17 distinct rem sizes drifting
+  /* Type scale for the app chrome only - there were 17 distinct rem sizes drifting
      across these styles. The printed sheet is unaffected: it sizes off --sheet-font-size
      in pt. */
   --fs-xs: 0.75rem;
@@ -121,11 +121,11 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 .backup-row .file-label:hover { background: var(--border); }
 
 /* min-width:0 so a wide sheet page can't stretch the flex item and push the sidebar
-   off-screen — it scrolls inside main instead. */
+   off-screen - it scrolls inside main instead. */
 main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 
 @media (max-width: 900px) {
-  /* Sidebar becomes a normal bar above the content — no off-canvas drawer, since that
+  /* Sidebar becomes a normal bar above the content - no off-canvas drawer, since that
      would be new behavior rather than restyling. align-items reset to stretch: the
      desktop flex-start is about not stretching the sidebar to full page height, but in
      a column it acts on *width*, letting main shrink-wrap to its widest content (a
@@ -148,8 +148,8 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
   border: 1px solid var(--border); border-radius: var(--radius); padding: 1.15rem 1.25rem;
   background: var(--surface); box-shadow: var(--shadow-sm);
   /* Fieldsets refuse to shrink below their content's natural width by default
-     (min-inline-size: min-content), which on a phone pushed the season cards — and the
-     whole panel with them — off the right edge instead of letting them wrap. */
+     (min-inline-size: min-content), which on a phone pushed the season cards - and the
+     whole panel with them - off the right edge instead of letting them wrap. */
   min-inline-size: 0; min-width: 0;
 }
 /* float+full width takes the legend out of the notch it normally cuts in the top border,
@@ -161,7 +161,7 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
 }
 /* Everything after the floated legend must clear it. Plain text wraps below a float on
    its own, but a flex container (the season cards, the backup row) may not overlap a
-   float — without this it gets crushed into the zero width *beside* the legend and
+   float - without this it gets crushed into the zero width *beside* the legend and
    pushed to the card's right edge. */
 .form-grid fieldset > :not(legend) { clear: both; }
 .form-grid label { display: block; margin-bottom: 0.5rem; font-size: var(--fs-md); font-weight: 500; }
@@ -203,6 +203,16 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;
   font-size: var(--fs-sm); font-weight: 600; font-family: inherit; line-height: 1.2;
 }
+/* The copy that follows the selection. Fixed to the viewport so it needs no offset maths
+   against a scrolling page, and dark so it reads as an overlay rather than as part of
+   whatever it happens to be floating over. */
+.rt-float {
+  position: fixed; z-index: 200; margin: 0; padding: 0.25rem;
+  background: var(--nav-bg); border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+}
+.rt-float button[data-rt] { background: none; border-color: transparent; color: #fff; }
+.rt-float button[data-rt]:hover { background: rgba(255, 255, 255, 0.18); }
+.rt-float button[data-rt]:active { background: var(--ui-accent); }
 .rt-toolbar button[data-rt]:hover { background: var(--accent-soft); }
 .rt-toolbar button[data-rt]:active { background: var(--accent); color: white; }
 
@@ -211,7 +221,7 @@ main { flex: 1; min-width: 0; padding: 1.6rem 1.75rem; }
    only thing competing for attention. Blue used to be the default, which put "Open" in
    a table row at the same weight as "Generate sheet". */
 /* .btn-primary/.btn-danger are in this list so they carry the full button styling
-   wherever they're used — otherwise a primary button outside a form or toolbar (the
+   wherever they're used - otherwise a primary button outside a form or toolbar (the
    "+ Add a rule" one) got the colour but none of the size or padding. */
 .form-grid button, .sheet-toolbar button, .saved-list button, button.btn-primary, button.btn-danger {
   background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
@@ -231,7 +241,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .saved-list button { padding: 0.35rem 0.8rem; font-size: var(--fs-sm); font-weight: 500; }
 
 /* One collapsible panel style, shared by the Generate week lists and the sheet view's
-   Layout & style section — there used to be two disclosure widgets that looked
+   Layout & style section - there used to be two disclosure widgets that looked
    different from each other. Closed by default; the card chrome sits on the <details>
    so the shut state still reads as a panel rather than a stray line of text. */
 .panel {
@@ -292,7 +302,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .step-summary button:hover { background: var(--accent-soft); }
 
 /* Season choice as two selectable cards rather than radio dots. The radio is still the
-   real control — hidden, but still what the form reads and what the keyboard drives —
+   real control - hidden, but still what the form reads and what the keyboard drives -
    with its <label> rendered as the card.
    The radio sits *before* its label so the selected state can key off the adjacent
    sibling (`:checked + .season-option`). An earlier version wrapped the input inside
@@ -322,7 +332,22 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 /* Keyboard focus still needs to show, even though the dot itself is hidden. */
 .form-grid .season-picker .season-radio:focus-visible + .season-option { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 45%, transparent); }
 
-/* Compact one-piece pill — the previous version let the input pick up the full form-
+/* The year sits directly under the two season cards and is the other half of the same
+   question, so it gets the same card: full width, same border, same padding, with a
+   stepper scaled to match rather than a small control adrift under a big pair of cards. */
+.form-grid .year-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  margin: 0.6rem 0 0; padding: 0.7rem 0.95rem; cursor: pointer; background: var(--surface);
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius);
+}
+.form-grid .year-row:hover { border-color: var(--ui-accent); }
+.form-grid .year-row:focus-within { border-color: var(--ui-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 15%, transparent); }
+.year-label { font-size: var(--fs-lg); font-weight: 700; }
+.form-grid .year-row .stepper { margin: 0; height: 2.5rem; }
+.form-grid .year-row .step-btn { width: 2.5rem; }
+.form-grid .year-row .step-input { width: 4.6rem; font-size: var(--fs-lg); font-weight: 600; }
+
+/* Compact one-piece pill - the previous version let the input pick up the full form-
    field sizing, which made the whole control read as an oversized box. */
 .stepper {
   display: inline-flex; align-items: stretch; margin-top: 0.3rem; height: 2rem;
@@ -343,7 +368,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .form-grid .stepper .step-input:focus { box-shadow: none; outline: none; background: #fffbe6; }
 .stepper .step-input::-webkit-inner-spin-button, .stepper .step-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
-/* Save confirmation (js/ui/settings-view.js) — sits on <body> so re-rendering the view
+/* Save confirmation (js/ui/settings-view.js) - sits on <body> so re-rendering the view
    underneath it can't wipe it out. */
 .toast {
   position: fixed; left: 50%; bottom: 1.5rem; z-index: 100;
@@ -382,7 +407,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   background: var(--ui-accent-soft); color: var(--ui-accent-dark); border-radius: 4px;
   padding: 0.05rem 0.35rem; font-size: var(--fs-sm);
 }
-/* The per-rule enable checkbox drawn as a switch — same checkbox, same semantics, just
+/* The per-rule enable checkbox drawn as a switch - same checkbox, same semantics, just
    readable at a glance next to the rule it belongs to. */
 .rule-enabled {
   appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer; flex-shrink: 0;
@@ -489,21 +514,21 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 
 /* Side-by-side view: the interleaved pages laid out two per row, so each שבת page sits
    next to its matching Weekday page, scaled down to fit. zoom (rather than transform)
-   because it affects layout — a transform would leave each page's full-size footprint
+   because it affects layout - a transform would leave each page's full-size footprint
    behind as empty space. Print overrides it back to full size in print.css. */
 #sheet-stack.is-side-by-side > .pages { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; }
 #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.5; margin: 0 0 0.75rem; }
 #side-by-side-btn.is-active { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
 
 .pages {
-  /* Kept in step with fontStackFor('Times New Roman') in sheet-view.js — this is only
+  /* Kept in step with fontStackFor('Times New Roman') in sheet-view.js - this is only
      the value before a sheet's own style is applied. */
   --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 1;
   /* The printed page is a fixed 11in wide; on a narrow screen it scrolls sideways
      *inside this container* instead of dragging the whole app (sidebar included) along.
-     No effect on wider screens, where it simply fits. Print is unaffected — print.css
+     No effect on wider screens, where it simply fits. Print is unaffected - print.css
      lays the page out on its own. */
   overflow-x: auto;
 }
@@ -544,7 +569,7 @@ th {
   white-space: pre-line;
   line-height: 1.2;
   /* min-height (not padding) so the header row is at least as tall as a typical
-     multi-line data row, while still growing naturally for its own longer headers —
+     multi-line data row, while still growing naturally for its own longer headers -
      scales with the header's own font-size instead of adding a fixed physical
      padding amount regardless of text size. */
   min-height: 2.6em;
@@ -556,7 +581,7 @@ th {
 .parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
-   the time columns hold far more of it — so on a קיץ page (12 columns rather than
+   the time columns hold far more of it - so on a קיץ page (12 columns rather than
    חורף's 9) the parsha column was being squeezed to ~59px, leaving a name like
    "כי תשא" only a few pixels of margin, while the same column on a חורף page sat at a
    comfortable ~86px. This just brings the tight pages up to match the roomy ones.
@@ -565,34 +590,34 @@ th {
    Weekday chart, which is table-layout:fixed and sizes its columns by percentage. */
 table:not(.weekday-table) .parsha-cell { min-width: 5.5em; }
 tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
-/* Cell content is direction:ltr even inside the RTL table — without this, the Unicode
+/* Cell content is direction:ltr even inside the RTL table - without this, the Unicode
    bidi algorithm can visually reverse "/"-separated time lists (e.g. "9:03 / 9:15"
    rendering as "9:15 / 9:03") since bare numbers are directionally weak. Hebrew words
    inside a cell (e.g. "פלג 6:45") still render correctly as embedded RTL runs. */
 /* overflow-wrap/word-break reset to "normal": Chrome applies break-word to
    [contenteditable] elements by default, which breaks lines anywhere (even at a
-   non-breaking space) once content doesn't fit — defeating the NBSP protection above
+   non-breaking space) once content doesn't fit - defeating the NBSP protection above
    that keeps a time pair like "7:30 / 8:15" on one line. */
 .cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.2; direction: ltr; overflow-wrap: normal; word-break: normal; }
 .cell:focus { background: #fffbe6; }
 td.ruled .cell { background: var(--ruled); }
-/* Manually-edited cells no longer get a persistent background tint — only the brief
+/* Manually-edited cells no longer get a persistent background tint - only the brief
    yellow flash while actively focused (above) shows anything changed. */
 /* .ul is no longer emitted (see nl2br in sheet-view.js) but stays styled here so cells
    whose overrides were saved back when it was still in use keep their underlines. */
 .ul, u { text-decoration: underline; text-underline-offset: 2px; }
 /* Weekday chart's שחרית column: one shul-wide schedule spanning every row on the page
-   (see sheet-view.js) rather than a per-week editable cell — not contenteditable, so
+   (see sheet-view.js) rather than a per-week editable cell - not contenteditable, so
    style it as plainly distinct from the surrounding editable cells. direction:ltr for
-   the same reason as .cell above — without it the bidi algorithm visually reverses
+   the same reason as .cell above - without it the bidi algorithm visually reverses
    "/"-or-","-separated time lists. */
 .shacharis-merged { white-space: pre-line; line-height: 1.3; direction: ltr; }
 
-/* Settings' מנחה/מעריב option lists — one editable row per option (rich text, so an
+/* Settings' מנחה/מעריב option lists - one editable row per option (rich text, so an
    option can carry the underlining the printed board uses). */
 .opt-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
 .opt-row .opt-input { flex: 1; min-height: 1.6em; margin-top: 0; text-align: left; }
-/* Scoped under .form-grid so it beats the blanket `.form-grid button` (solid blue) —
+/* Scoped under .form-grid so it beats the blanket `.form-grid button` (solid blue) -
    these sit inside the Settings form, and without the extra class they rendered as
    solid blue primary buttons rather than a quiet remove control. */
 .form-grid .opt-remove {
@@ -611,10 +636,10 @@ td.ruled .cell { background: var(--ruled); }
    (table-layout:fixed instead of auto, which would otherwise let the multi-line שחרית
    schedule claim far more width than the one-line מנחה/מעריב cells) and a shared
    per-row minimum height generous enough that the merged שחרית cell's own content (see
-   .shacharis-merged) never needs to force extra height onto just one or two rows —
+   .shacharis-merged) never needs to force extra height onto just one or two rows -
    rows can still grow taller than this floor if their own content needs more room. */
 .weekday-table { table-layout: fixed; }
-/* Only the parsha/week-name column shrinks — שחרית/מנחה/מעריב (unset here) share the
+/* Only the parsha/week-name column shrinks - שחרית/מנחה/מעריב (unset here) share the
    rest equally between themselves, table-layout:fixed's default for columns with no
    explicit width. */
 .weekday-table col[data-colkey="parsha"] { width: 14%; }
@@ -623,7 +648,7 @@ td.ruled .cell { background: var(--ruled); }
    one or two rows happen to sit next to its text. calc() against the shared
    --sheet-font-size custom property rather than em, which would resolve against each
    row's own font-size. The *header* row is matched to the body separately, by
-   syncHeaderRowHeight() in sheet-view.js — see there for why that can't be pure CSS. */
+   syncHeaderRowHeight() in sheet-view.js - see there for why that can't be pure CSS. */
 .weekday-table tbody tr { height: calc(var(--sheet-font-size) * 2.6); }
 
 .col-width-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.5rem 0 0.9rem; align-items: flex-end; }
@@ -643,6 +668,28 @@ td.ruled .cell { background: var(--ruled); }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* --- Weeks-per-page allocation bar ------------------------------------------------ */
+.alloc { margin: 0.6rem 0 0.2rem; }
+.alloc-bar {
+  display: flex; height: 1.6rem; border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--border); border: 1px solid var(--border);
+}
+.alloc-seg {
+  display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden;
+  background: var(--ui-accent); color: #fff; font-size: var(--fs-xs); font-weight: 600;
+  border-right: 1px solid var(--surface); transition: width 0.15s ease;
+}
+.alloc-seg:last-child { border-right: none; }
+/* Weeks not on any page yet: hatched, so an empty stretch reads as "still to place"
+   rather than as a page that happens to be empty. */
+.alloc-seg.is-short {
+  background: repeating-linear-gradient(45deg, var(--border) 0 6px, var(--surface) 6px 12px);
+  color: var(--muted);
+}
+.alloc-seg.is-over { background: var(--danger); }
+.alloc-msg { margin: 0.35rem 0 0; font-size: var(--fs-sm); color: var(--muted); }
+.alloc-msg.is-bad { color: var(--danger); font-weight: 500; }
+
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {
   background: var(--ui-accent-soft); border: 1px solid var(--border); border-radius: var(--radius);
@@ -662,7 +709,7 @@ kbd {
   background: var(--ui-accent-soft); border-left: 3px solid var(--ui-accent);
   padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: var(--fs-sm);
 }
-/* A button that reads as a link — it navigates rather than acting on anything. */
+/* A button that reads as a link - it navigates rather than acting on anything. */
 .linkish {
   background: none; border: none; padding: 0; font: inherit; color: var(--ui-accent-dark);
   text-decoration: underline; cursor: pointer;

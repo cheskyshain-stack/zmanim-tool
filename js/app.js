@@ -13,7 +13,7 @@ let currentTab = 'generate';
 let currentSheetId = null;
 
 // Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
-// changes its value instead of scrolling the page) — on a long form like Generate, that
+// changes its value instead of scrolling the page) - on a long form like Generate, that
 // makes the page feel "stuck" if the cursor happens to be over a number field like Number
 // of pages/Hebrew year when the user tries to scroll back up. Blur the field the moment a
 // wheel event reaches it so the page scrolls normally instead; the field is still fully
@@ -31,7 +31,7 @@ document.addEventListener(
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 const tabs = ['generate', 'settings', 'rules', 'saved', 'guide'];
-// "Saved sheets" in sentence case, matching the heading on the page it opens — the nav
+// "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
 const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets', guide: 'Guide' };
 
@@ -68,7 +68,7 @@ function renderNav() {
 function render() {
   renderNav();
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
-  // with the sheet's own toolbar). In the sidebar it just stays put — a persistent
+  // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
   // the sheet's Back button does, and a pending cell edit still commits on blur first.
   if (currentSheetId) {
@@ -97,7 +97,7 @@ function render() {
         render();
       },
       // Called after an Import replaced the whole state object's contents (settings,
-      // sheets, and rules together) — persist it and re-render from scratch.
+      // sheets, and rules together) - persist it and re-render from scratch.
       () => {
         persist();
         currentSheetId = null;

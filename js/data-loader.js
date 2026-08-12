@@ -1,4 +1,4 @@
-// Loads the ported Hebrew-calendar lookup tables (data/*.json — exact copies of the
+// Loads the ported Hebrew-calendar lookup tables (data/*.json - exact copies of the
 // workbook's PARSHA_TABLE_CHUTZ / PARSHA_TABLE_EY / PARSHA_NAMES_TABLE / SPECIAL_DAYS_TABLE).
 let cached = null;
 

@@ -12,11 +12,11 @@ import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
- *  cutover (2nd Sunday of March — not the fall one near Sukkos) prints as a real שבת
- *  קיץ chart for its *entire* page — same columns, same formulas, same rule-matching
- *  as an actual קיץ sheet — even for any earlier weeks sharing that page, which just
+ *  cutover (2nd Sunday of March - not the fall one near Sukkos) prints as a real שבת
+ *  קיץ chart for its *entire* page - same columns, same formulas, same rule-matching
+ *  as an actual קיץ sheet - even for any earlier weeks sharing that page, which just
  *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window).
- *  A Weekday chart has no such split — it's always 'weekday'. */
+ *  A Weekday chart has no such split - it's always 'weekday'. */
 function pageEffectiveSeason(sheet, pageWeeks, settings) {
   if (sheet.season !== 'choref') return sheet.season;
   return pageWeeks.some((w) => inSpringDstWindow(w.date, settings)) ? 'kayitz' : 'choref';
@@ -31,13 +31,13 @@ const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Tim
 /** Which shipped webfont stands in for each choice when the real one isn't installed.
  *
  *  A phone has none of these fonts, so without a stand-in every Hebrew column falls back
- *  to the system sans — and with a single stand-in for all of them, picking Times New
+ *  to the system sans - and with a single stand-in for all of them, picking Times New
  *  Roman still got you David's Hebrew, which looks nothing like it. Times New Roman and
  *  Frank Ruehl are both traditional high-contrast Hebrew serifs, so one covers the other
  *  closely; David is a lighter semi-serif and only matches itself.
  *
  *  Arial and Segoe UI are deliberately absent: they fall back to the device's own Hebrew
- *  sans (Noto on Android, Segoe on Windows), which is already the right shape — no point
+ *  sans (Noto on Android, Segoe on Windows), which is already the right shape - no point
  *  downloading a font to say the same thing. */
 const HEBREW_STAND_IN = {
   'Times New Roman': 'Frank Ruhl Libre',
@@ -55,7 +55,7 @@ export function fontStackFor(fontFamily) {
   return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
 }
 
-// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) —
+// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
 // intentionally not persisted to localStorage; it lives for as long as the app tab is
 // open, same as undo history in most editors.
 const histories = new Map();
@@ -79,7 +79,7 @@ export function renderSheet(container, state, sheet, onChange) {
   const isEnglish = state.settings.language === 'en';
 
   // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
-  // the Shabbos sheet it was generated alongside) — generating both saves both, but only
+  // the Shabbos sheet it was generated alongside) - generating both saves both, but only
   // one can be open at a time, so this link is how you actually get to see the other one
   // right after generating instead of having to dig it up from Saved Sheets.
   // linkedSheetId is the exact pairing recorded at generation time; the season+year
@@ -111,13 +111,13 @@ export function renderSheet(container, state, sheet, onChange) {
     <details class="panel no-print">
       <summary>Which pages to print or save</summary>
       <div class="panel-body">
-        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF — excluded pages stay on screen, dimmed, so you can still read them.</p>
+        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF. Excluded pages stay on screen, dimmed, so you can still read them.</p>
         <div class="page-picker" id="page-picker"></div>
         <div class="actions"><button type="button" id="pages-all">Include all</button></div>
       </div>
     </details>
     <details class="panel no-print">
-      <summary>Layout &amp; style — font, sizes, colour</summary>
+      <summary>Layout &amp; style: font, sizes, colour</summary>
       <div class="panel-body">
         <div class="style-toolbar">
           <label>Font
@@ -150,7 +150,7 @@ export function renderSheet(container, state, sheet, onChange) {
     if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
   });
 
-  // A page is a landscape letter sheet — about 1056px across — so on a phone it can only
+  // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
   // ever be read a column at a time by scrolling sideways. Fitting scales it down until
   // a whole page is on screen at once: too small to edit in, but the point is seeing the
   // page. It starts on whenever the page doesn't fit, which in practice means phones.
@@ -159,7 +159,7 @@ export function renderSheet(container, state, sheet, onChange) {
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
   // focusin rather than read from document.activeElement at click time because the
-  // buttons deliberately don't take focus (see wireRichTextToolbar) — but a click
+  // buttons deliberately don't take focus (see wireRichTextToolbar) - but a click
   // elsewhere on the page in between should still leave them pointing at that cell.
   let lastFocusedCell = null;
   container.addEventListener('focusin', (e) => {
@@ -183,7 +183,7 @@ export function renderSheet(container, state, sheet, onChange) {
 
   // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
   // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
-  // so each pair covers the same weeks — which is the order you want to print in, and
+  // so each pair covers the same weeks - which is the order you want to print in, and
   // also what makes the side-by-side view line up pair-per-row.
   //
   // Style variables are set per *page* rather than per container, because the two sheets
@@ -200,7 +200,7 @@ export function renderSheet(container, state, sheet, onChange) {
       const el = renderPage(pw, i, split.length, columns, buildRow, settings, sh, state, onChange, effectiveSeason);
       el.dataset.sheetLabel = sheetLabel(sh);
       el.dataset.pageIndex = i;
-      applyStyle(el, sh.style); // variables only — row heights need the page in the document
+      applyStyle(el, sh.style); // variables only - row heights need the page in the document
       return el;
     });
   };
@@ -262,7 +262,7 @@ export function renderSheet(container, state, sheet, onChange) {
 }
 
 /** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
- *  print.css drops from the output — the page stays visible on screen (dimmed) so you
+ *  print.css drops from the output - the page stays visible on screen (dimmed) so you
  *  can still see what you left out. */
 function buildPagePicker(container) {
   const picker = container.querySelector('#page-picker');
@@ -293,7 +293,7 @@ let fitResizeHandler = null;
 
 /** Scales #pages down until its widest row fits across the screen. Uses `zoom` rather
  *  than `transform: scale`, which only paints smaller and leaves the original footprint
- *  behind — the same reason side-by-side uses it. */
+ *  behind - the same reason side-by-side uses it. */
 function applyFit(container, on) {
   const pagesEl = container.querySelector('#pages');
   if (!pagesEl) return;
@@ -314,7 +314,7 @@ function setFit(container, on) {
 }
 
 /** Turns fitting on by itself the first time a sheet is opened on a screen too narrow to
- *  show a page — otherwise a phone opens onto a wall of one column. Never overrides a
+ *  show a page - otherwise a phone opens onto a wall of one column. Never overrides a
  *  choice already made with the button. */
 function autoFit(container) {
   const pagesEl = container.querySelector('#pages');
@@ -344,19 +344,19 @@ function applyStyle(target, style) {
   target.style.setProperty('--sheet-accent', style.accentColor);
 }
 
-/** Makes every row in a table — header included — exactly the same height.
+/** Makes every row in a table - header included - exactly the same height.
  *
  *  Left alone, the header always comes out shorter: the table stretches to fill the page
  *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
  *  height in proportion to each row's *natural* content height, which for the header is
  *  a single short line. Simply pinning the header to a measured data-row height doesn't
- *  settle it either — the total is fixed, so growing the header shrinks the data rows it
+ *  settle it either - the total is fixed, so growing the header shrinks the data rows it
  *  was just matched against.
  *
  *  So instead of measuring one against the other, this splits the table's total height
  *  evenly across all its rows, which is stable in one pass. The floor guards the case
  *  where there are enough rows that an even share would be tighter than the content
- *  actually needs — better to overflow the even split than to clip real text. Re-run on
+ *  actually needs - better to overflow the even split than to clip real text. Re-run on
  *  every applyStyle(), since the font/size controls invalidate the measurements. */
 function syncHeaderRowHeight(pagesEl) {
   pagesEl.querySelectorAll('table').forEach((table) => {
@@ -370,7 +370,7 @@ function syncHeaderRowHeight(pagesEl) {
     // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
     // cell spans every row, so its height is what the browser divides between them, and
     // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
-    // the distribution, not the row's own requirement — pinning to it inflated the whole
+    // the distribution, not the row's own requirement - pinning to it inflated the whole
     // table past the 8.5in page. The even share is the real target; the row only stays
     // taller if its own content genuinely needs more, which the tightened parsha
     // line-height now avoids.
@@ -394,7 +394,7 @@ function syncHeaderRowHeight(pagesEl) {
 
 
 // Right-to-left reading order after the parsha column: the workbook's own B..L/B..I
-// order is "latest event of the week first" (Motzei Shabbos Maariv is column B) —
+// order is "latest event of the week first" (Motzei Shabbos Maariv is column B) -
 // reversed here so reading right-to-left after the parsha actually follows the week
 // chronologically (Friday's Mincha/candle-lighting first, Motzei Shabbos Maariv last).
 function rtlOrdered(columns) {
@@ -418,12 +418,12 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
 
-  // On the Weekday chart, שחרית ("1 schedule for all days" — see settings-view.js) is
+  // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
   // one shul-wide value straight from Settings, not per-week: instead of repeating it
   // in every row (which would make a multi-line schedule absurdly tall over many
   // weeks), it prints once as a single cell spanning the whole page's rows, matching
   // how it looks in the original printed chart. It's sourced live from Settings with
-  // no per-cell override — change it in Settings and it updates everywhere at once.
+  // no per-cell override - change it in Settings and it updates everywhere at once.
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -432,7 +432,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
       const computed = buildRow(week, settings);
       const appliedColumns = new Set();
-      // effectiveSeason (not sheet.season) — a חורף page that prints as קיץ (see
+      // effectiveSeason (not sheet.season) - a חורף page that prints as קיץ (see
       // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
       // as a real קיץ sheet would for these weeks.
       const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
@@ -448,11 +448,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
         // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
-        // times into it — "1220 130" becomes "12:20/1:30" on blur, same shorthand every
-        // other cell takes (see applyTimeShorthand below) — which turned out to be
+        // times into it - "1220 130" becomes "12:20/1:30" on blur, same shorthand every
+        // other cell takes (see applyTimeShorthand below) - which turned out to be
         // quicker than picking from the dropdown that used to live here.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const html = row[c.key] ?? ''; // already HTML — the Settings default is rich text
+          const html = row[c.key] ?? ''; // already HTML - the Settings default is rich text
           return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -467,7 +467,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const cells = orderedColumns.map(cellHtml).join('');
       const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
-      // floor on .parsha-cell (see app.css) — otherwise setting a narrower one there
+      // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
       const parshaTd = `<td class="parsha-cell"${parshaWidth}>${nl2br(parshaCell)}</td>`;
@@ -502,7 +502,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
-  /** What this cell would hold with no manual override — what an edit is diffed against
+  /** What this cell would hold with no manual override - what an edit is diffed against
    *  to decide whether it's a real change worth storing. */
   const baselineHtmlFor = (cellEl) => {
     const col = cellEl.dataset.col;

@@ -11,7 +11,7 @@ function mod(n, d) {
 }
 /** Excel WEEKDAY(serial) in its default mode: 1=Sunday .. 7=Saturday. Calibrated
  *  directly against this file's own excelSerial() numbering (verified against a known
- *  Saturday) rather than assumed — matches the same mod(x-1,7)+1 pattern the workbook
+ *  Saturday) rather than assumed - matches the same mod(x-1,7)+1 pattern the workbook
  *  itself uses inline for rhdow in HAS_PARSHA. */
 export function excelWeekday(serial) {
   return mod(Math.floor(serial) - 1, 7) + 1;
@@ -112,7 +112,7 @@ export function jewishDateString(serial, english, useGregorianBefore1582 = false
 /** HAS_PARSHA: the parsha read on the Shabbos containing `serial` (Hebrew calendar
  *  tables, `tables` = {parshaChutz, parshaEY, parshaNames} as loaded from data/*.json).
  *  Returns '' for any day that isn't a Saturday, and for Yom Tov Shabbosim (no parsha
- *  read) — this is exactly the signal weeks.js uses to skip Yom Tov weeks. */
+ *  read) - this is exactly the signal weeks.js uses to skip Yom Tov weeks. */
 export function hasParsha(serial, settings, tables) {
   if (excelWeekday(serial) !== 7) return '';
   const jdate = hebrewDateExtended(serial, settings.useGregorianBefore1582);
@@ -175,9 +175,9 @@ export function isAssurMelacha(serial, settings) {
 }
 
 /** True for a weekday (non-Shabbos) whose Mincha/Maariv/Shacharis wouldn't follow the
- *  shul's regular weekday schedule — a full Yom Tov day, Chol Hamoed, or Hoshana
+ *  shul's regular weekday schedule - a full Yom Tov day, Chol Hamoed, or Hoshana
  *  Rabbah. Deliberately NOT true for Chanukah, Purim, Tu B'Shvat, and similar
- *  commemorative-but-unrestricted days — davening on those is still the regular
+ *  commemorative-but-unrestricted days - davening on those is still the regular
  *  weekday schedule (just with an added paragraph), so they should still count as a
  *  normal day for the Weekday chart's own week-inclusion rule (see
  *  weeks.js/computeWeekdayWeeks). */

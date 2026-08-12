@@ -2,13 +2,13 @@
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
 // All "day" values are fractional days (0 = midnight, 0.5 = noon) unless noted.
 // Dates are represented as plain UTC-midnight JS Date objects (calendar day only,
-// no time-of-day) — the fractional time-of-day for an event is returned separately
+// no time-of-day) - the fractional time-of-day for an event is returned separately
 // as a number of days, exactly like an Excel serial's fractional part.
 
 const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30); // day 0 in Excel's serial system
 
 /** Excel-style serial date number for a UTC-midnight calendar date (no 1900 leap bug
- *  correction — irrelevant for any date this app will ever be used for). */
+ *  correction - irrelevant for any date this app will ever be used for). */
 export function excelSerial(date) {
   return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
 }
@@ -16,16 +16,16 @@ export function excelSerial(date) {
 /** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date.
  *  Uses Math.floor (not round): every whole-day serial in this app (shabbos/friday
  *  Excel-style day numbers) is already an integer, so floor vs. round makes no
- *  difference there — but the two DST-lookup call sites in this file and zmanim.js
+ *  difference there - but the two DST-lookup call sites in this file and zmanim.js
  *  pass a *fractional* serial (a whole day plus a UTC-time-of-day fraction, e.g. an
  *  evening sunset's serial + eventUTC ≈ serial + 0.91). Excel's own calcDST_LOCAL/
  *  calcTIMEZONE formulas extract the calendar day from such a value via YEAR()/DATE()
- *  arithmetic, which truncates (floors) to the day the moment falls in — rounding
+ *  arithmetic, which truncates (floors) to the day the moment falls in - rounding
  *  instead pushes any evening event (fraction > 0.5) into the *next* calendar day for
  *  DST-lookup purposes. That's harmless almost all year (DST status rarely differs
  *  between adjacent days) but silently breaks the one week each fall where that
  *  rounded-up day crosses the real DST cutover a week early (e.g. an Oct 31 sunset
- *  got misread as Nov 1 — already standard time — undercounting by an hour). */
+ *  got misread as Nov 1 - already standard time - undercounting by an hour). */
 export function dateFromSerial(serial) {
   return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
 }
@@ -124,7 +124,7 @@ export function elevAdjust(elevationMeters) {
 }
 // calcZENITH: horizonDeg is "degrees below the geometric horizon" (workbook default
 // 5/6°, i.e. solar radius + average refraction), so the zenith angle is 90 + horizonDeg
-// — NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
+// - NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
 // calcZENITH negates it back to +5/6 before adding 90; this function takes the
 // already-positive, human-readable value directly.)
 export function zenith(horizonDeg) {

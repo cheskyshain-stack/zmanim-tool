@@ -7,11 +7,11 @@
   /* Pages unticked in the page picker are left out of the print/PDF run. */
   .page-excluded { display: none !important; }
   html, body { background: white; }
-  /* The sidebar is .no-print, so the shell has nothing left to lay out beside main —
+  /* The sidebar is .no-print, so the shell has nothing left to lay out beside main -
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
   main { padding: 0; max-width: none; margin: 0; }
-  /* !important because Fit to screen sets this inline — it's a way of reading the sheet
+  /* !important because Fit to screen sets this inline - it's a way of reading the sheet
      on a small screen and must never reach the paper. */
   .pages { margin: 0; zoom: 1 !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
@@ -31,7 +31,7 @@
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
   /* Browsers drop background colours when printing unless told otherwise, which would
-     wipe the dark header row, the tinted parsha column and the striped body rows — the
+     wipe the dark header row, the tinted parsha column and the striped body rows - the
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

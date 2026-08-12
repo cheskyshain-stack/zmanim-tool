@@ -9,8 +9,8 @@ export const TIMEZONES = [
   { id: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)', utcOffset: -8, dstOffset: 1, rule: 'us' },
   { id: 'America/Anchorage', label: 'America/Anchorage', utcOffset: -9, dstOffset: 1, rule: 'us' },
   { id: 'Pacific/Honolulu', label: 'Pacific/Honolulu (no DST)', utcOffset: -10, dstOffset: 0, rule: 'none' },
-  { id: 'Asia/Jerusalem', label: 'Asia/Jerusalem (DST not modeled — matches source workbook)', utcOffset: 2, dstOffset: 0, rule: 'none' },
-  { id: 'Europe/London', label: 'Europe/London (DST not modeled — matches source workbook)', utcOffset: 0, dstOffset: 0, rule: 'none' },
+  { id: 'Asia/Jerusalem', label: 'Asia/Jerusalem (DST not modeled, matches source workbook)', utcOffset: 2, dstOffset: 0, rule: 'none' },
+  { id: 'Europe/London', label: 'Europe/London (DST not modeled, matches source workbook)', utcOffset: 0, dstOffset: 0, rule: 'none' },
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
@@ -23,8 +23,8 @@ export const DEFAULT_WEEKDAY_SHACHARIS =
 
 /** Earlier shipped versions of the above, before the everyday times were set bigger (and
  *  before the field became rich text at all). A saved value still matching one of these
- *  verbatim was never actually edited by hand — it's just an old default sitting in
- *  localStorage — so storage.js quietly upgrades it rather than leaving the schedule
+ *  verbatim was never actually edited by hand - it's just an old default sitting in
+ *  localStorage - so storage.js quietly upgrades it rather than leaving the schedule
  *  stuck looking the way it did two versions ago. Anything else is left strictly alone. */
 export const LEGACY_WEEKDAY_SHACHARIS = [
   '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
@@ -36,22 +36,22 @@ export const LEGACY_WEEKDAY_SHACHARIS = [
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
-  // actual logo, pulled straight from the workbook) plus this editable text —
+  // actual logo, pulled straight from the workbook) plus this editable text -
   // headerSubtitle under the logo, headerRabbiLine on the opposite side.
   headerSubtitle: 'ליקוואוד קאמענס',
   headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
   // Custom header photo (top-left of the printed page), as a cropped data: URL saved
-  // via the image-crop tool in Settings — null means "use the bundled default",
+  // via the image-crop tool in Settings - null means "use the bundled default",
   // assets/logo-building-icon.png (see sheet-view.js).
   headerIconImage: null,
-  // Printed footer: a note line (as in the workbook — underlined-minyan location,
+  // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
   // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
   // field: those times differ every week, so every cell starts empty and is typed in on
   // the sheet. The keys are kept so older saved backups still load cleanly.
-  // Shacharis is one fixed schedule printed identically on every week's row —
+  // Shacharis is one fixed schedule printed identically on every week's row -
   // stored as real HTML (not plain text) since it's edited via a rich-text box in
   // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
   weekdayDefaultMincha: '',
@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS = {
   useElevation: false,
   inIsrael: false,
   useGregorianBefore1582: false,
-  // Last-used sheet display style (font/size/logo scale) — new sheets start with
+  // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' },
 };
