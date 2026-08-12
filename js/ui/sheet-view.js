@@ -105,8 +105,13 @@ export function renderSheet(container, state, sheet, onChange) {
       ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
       <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
       ${
-        sheet.season === 'weekday'
-          ? '<button id="xlsx-btn" type="button" title="Download this chart as an Excel file, with the מנחה and מעריב cells empty to type into">&#8681; Download for Excel</button>'
+        // Reachable from either half of the pair. Opening a saved sheet lands on the
+        // Shabbos chart, so putting this only on the Weekday one hid it behind a click
+        // nobody knew to make.
+        xlsxSource(sheet, companion)
+          ? `<button id="xlsx-btn" type="button" title="Download the Weekday chart as an Excel file, with the מנחה and מעריב cells empty to type into">&#8681; ${
+              sheet.season === 'weekday' ? 'Download for Excel' : 'Weekday for Excel'
+            }</button>`
           : ''
       }
       ${richTextToolbarHtml('In the cell you\'re editing:')}
@@ -168,9 +173,10 @@ export function renderSheet(container, state, sheet, onChange) {
   // The times themselves are typed in, so they are exported as empty bordered cells
   // rather than as whatever happens to be in this copy.
   container.querySelector('#xlsx-btn')?.addEventListener('click', () => {
-    const pages = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes);
-    const blob = weekdayWorkbookBlob(sheet, state.settings, pages);
-    downloadBlob(blob, `weekday-zmanim-${sheet.hebrewYear}.xlsx`);
+    const target = xlsxSource(sheet, companion);
+    const pages = splitWeeksIntoPages(target.weeks, target.pageSizes);
+    const blob = weekdayWorkbookBlob(target, state.settings, pages);
+    downloadBlob(blob, `weekday-zmanim-${target.hebrewYear}.xlsx`);
   });
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
@@ -299,6 +305,14 @@ function buildPagePicker(container) {
 }
 
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
+
+/** Whichever of the two open sheets is the Weekday chart, since that is the one the
+ *  Excel export produces. Null when neither is, which is a Shabbos sheet with no Weekday
+ *  chart generated alongside it. */
+function xlsxSource(sheet, companion) {
+  if (sheet.season === 'weekday') return sheet;
+  return companion?.season === 'weekday' ? companion : null;
+}
 
 // --- Fit to screen -----------------------------------------------------------------
 // Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
