@@ -9,6 +9,7 @@ import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { UL_START, UL_END, normalizeRichText } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
+import { weekdayWorkbookBlob, downloadBlob } from '../xlsx.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -103,6 +104,11 @@ export function renderSheet(container, state, sheet, onChange) {
       ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
       ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
       <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
+      ${
+        sheet.season === 'weekday'
+          ? '<button id="xlsx-btn" type="button" title="Download this chart as an Excel file, with the מנחה and מעריב cells empty to type into">&#8681; Download for Excel</button>'
+          : ''
+      }
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
@@ -156,6 +162,16 @@ export function renderSheet(container, state, sheet, onChange) {
   // page. It starts on whenever the page doesn't fit, which in practice means phones.
   const fitBtn = container.querySelector('#fit-btn');
   fitBtn.addEventListener('click', () => setFit(container, !fitOn));
+
+  // The Weekday chart as an Excel file, one worksheet per printed page, so it can be
+  // filled in and printed by someone who doesn't have this app (or can't run a browser).
+  // The times themselves are typed in, so they are exported as empty bordered cells
+  // rather than as whatever happens to be in this copy.
+  container.querySelector('#xlsx-btn')?.addEventListener('click', () => {
+    const pages = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes);
+    const blob = weekdayWorkbookBlob(sheet, state.settings, pages);
+    downloadBlob(blob, `weekday-zmanim-${sheet.hebrewYear}.xlsx`);
+  });
 
   // The formatting buttons act on whichever cell was last being edited. Tracked on
   // focusin rather than read from document.activeElement at click time because the

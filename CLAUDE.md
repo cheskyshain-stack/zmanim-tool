@@ -51,6 +51,10 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 - Generates the JS **import map** in `index.html`, giving every module a content-hashed
   URL.
 
+The user has said the offline copy does not need to keep gaining new features, so do not
+contort a design to fit it. Keep running `build-offline.py` regardless: the cache
+stamping the live site depends on happens in the same script.
+
 The import map exists because GitHub Pages serves everything with a 10 minute max-age.
 Stamping only the entry would not reach the modules it imports, and the mismatch bit us
 for real: a phone ran new CSS against 10 minute old JS and showed the wrong thing, which
