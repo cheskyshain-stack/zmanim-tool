@@ -643,6 +643,11 @@ td.ruled .cell { background: var(--ruled); }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Marks a row as a Shabbos sheet + its Weekday chart, without reading as a second sheet. */
+.pair-chip {
+  background: var(--ui-accent-soft); color: var(--ui-accent-dark); border-radius: 4px;
+  padding: 0.05rem 0.4rem; font-size: var(--fs-xs); font-weight: 500; white-space: nowrap;
+}
 .lock-mark { font-size: var(--fs-sm); }
 /* Folder select sits inside a table row, so it needs to stay compact rather than take
    the full-width form-field styling. */

@@ -119,8 +119,10 @@ function render() {
         currentSheetId = id;
         render();
       },
-      (id) => {
-        state.sheets = state.sheets.filter((s) => s.id !== id);
+      // An array: a row in Saved sheets is a Shabbos sheet plus the Weekday chart made
+      // with it, and Delete takes the pair.
+      (ids) => {
+        state.sheets = state.sheets.filter((s) => !ids.includes(s.id));
         persist();
         render();
       },
