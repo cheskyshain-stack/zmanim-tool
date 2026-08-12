@@ -55,6 +55,16 @@ export function renderGuide(container, onOpenTab) {
     </details>
 
     <details class="panel">
+      <summary>Sending the Weekday chart to someone else</summary>
+      <div class="panel-body">
+        <p>Open the Weekday chart and press <strong>Download for Excel</strong>. You get a spreadsheet laid out like the board, one worksheet per printed page, with the week names down the side, the שחרית schedule already filled in, and the <strong>מנחה and מעריב cells empty</strong>.</p>
+        <p>Whoever receives it types the times straight into those cells in Excel and prints. They don't need this site, an account, or an internet connection, which matters on a computer where the browser is blocked but Office isn't.</p>
+        <p>The cells are set to text, so a typed <code>7:15</code> stays <code>7:15</code> instead of Excel turning it into a time.</p>
+        <p>If they only need the finished board rather than something to fill in, send a PDF instead: Print / Save as PDF, and choose Save as PDF as the destination.</p>
+      </div>
+    </details>
+
+    <details class="panel">
       <summary>Rules: the difference between a one-off and every year</summary>
       <div class="panel-body">
         <p>Editing a cell changes <em>that board</em>. A <strong>rule</strong> changes <em>every board you generate from now on</em>, which is what you want for something that comes back every year.</p>
