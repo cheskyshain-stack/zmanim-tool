@@ -3779,20 +3779,23 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   let weekdayLines = '';
   if (weekdayWeek) {
     const wdRow = mergeRow({ B: '', C: '' }, weekday, showing).row;
-    weekdayLines = [...WEEKDAY_COLUMNS]
+    const parts = [...WEEKDAY_COLUMNS]
       .reverse()
       // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
       // even before anyone has filled it, or the card looks like the minyan does not
       // exist rather than like the time is not set yet.
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'))
-      .join('');
+      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'));
+
     // The second שחרית schedule, only on weeks that actually have one of those days,
-    // labelled with which day it is rather than the chart's catch-all heading.
+    // labelled with which day it is rather than the chart's catch-all heading. It goes
+    // directly after the everyday schedule, not before it: most of the week still runs
+    // on the regular times, so those are what should be read first.
     const special = specialDaysInWeek(showing, settings);
     if (special.length && state.settings.weekdayShacharisSpecial) {
       const label = 'שחרית ' + special.map((d) => `${d.name} (${d.day})`).join(', ');
-      weekdayLines = line(label, htmlLines(state.settings.weekdayShacharisSpecial), true) + weekdayLines;
+      parts.splice(1, 0, line(label, htmlLines(state.settings.weekdayShacharisSpecial), true));
     }
+    weekdayLines = parts.join('');
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
@@ -3809,8 +3812,10 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       <span class="week-when">${fmtDate(week.date)}</span>
       <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
     </div>
-    ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
-    ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    <div class="week-cards">
+      ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
+      ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    </div>
     ${board ? '' : publishPanelHtml(sheet)}
   `;
 
@@ -3891,6 +3896,21 @@ const tabIcons = {
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
 
+/** A brief confirmation, bottom right. Generating a sheet saves it immediately and then
+ *  opens it, which looked like nothing had been saved at all: there is no Save button to
+ *  press, so nothing told you the sheet already exists in Saved sheets. */
+function toast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast no-print';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  // Long enough to read a sentence, and it fades rather than vanishing.
+  setTimeout(() => el.classList.add('is-leaving'), 4000);
+  setTimeout(() => el.remove(), 4600);
+}
+
 function persist() {
   saveState(state);
 }
@@ -3962,6 +3982,8 @@ function render() {
         persist();
         currentSheetId = sheet.id;
         render();
+        const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id);
+        toast(weekday ? 'Saved to Saved sheets, with its Weekday chart.' : 'Saved to Saved sheets.');
       },
       (tab) => {
         currentTab = tab;

@@ -180,20 +180,23 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   let weekdayLines = '';
   if (weekdayWeek) {
     const wdRow = mergeRow({ B: '', C: '' }, weekday, showing).row;
-    weekdayLines = [...WEEKDAY_COLUMNS]
+    const parts = [...WEEKDAY_COLUMNS]
       .reverse()
       // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
       // even before anyone has filled it, or the card looks like the minyan does not
       // exist rather than like the time is not set yet.
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'))
-      .join('');
+      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'));
+
     // The second שחרית schedule, only on weeks that actually have one of those days,
-    // labelled with which day it is rather than the chart's catch-all heading.
+    // labelled with which day it is rather than the chart's catch-all heading. It goes
+    // directly after the everyday schedule, not before it: most of the week still runs
+    // on the regular times, so those are what should be read first.
     const special = specialDaysInWeek(showing, settings);
     if (special.length && state.settings.weekdayShacharisSpecial) {
       const label = 'שחרית ' + special.map((d) => `${d.name} (${d.day})`).join(', ');
-      weekdayLines = line(label, htmlLines(state.settings.weekdayShacharisSpecial), true) + weekdayLines;
+      parts.splice(1, 0, line(label, htmlLines(state.settings.weekdayShacharisSpecial), true));
     }
+    weekdayLines = parts.join('');
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
@@ -210,8 +213,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       <span class="week-when">${fmtDate(week.date)}</span>
       <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
     </div>
-    ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
-    ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    <div class="week-cards">
+      ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
+      ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    </div>
     ${board ? '' : publishPanelHtml(sheet)}
   `;
 

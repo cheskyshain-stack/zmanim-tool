@@ -54,6 +54,21 @@ const tabIcons = {
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
 
+/** A brief confirmation, bottom right. Generating a sheet saves it immediately and then
+ *  opens it, which looked like nothing had been saved at all: there is no Save button to
+ *  press, so nothing told you the sheet already exists in Saved sheets. */
+function toast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast no-print';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  // Long enough to read a sentence, and it fades rather than vanishing.
+  setTimeout(() => el.classList.add('is-leaving'), 4000);
+  setTimeout(() => el.remove(), 4600);
+}
+
 function persist() {
   saveState(state);
 }
@@ -125,6 +140,8 @@ function render() {
         persist();
         currentSheetId = sheet.id;
         render();
+        const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id);
+        toast(weekday ? 'Saved to Saved sheets, with its Weekday chart.' : 'Saved to Saved sheets.');
       },
       (tab) => {
         currentTab = tab;
