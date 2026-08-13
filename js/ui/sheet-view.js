@@ -1,4 +1,4 @@
-import { resolveSettings } from '../settings.js';
+import { resolveSettings, SPECIAL_SHACHARIS_HEADING } from '../settings.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
@@ -446,7 +446,15 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // settings-view.js), so it prints out as-is instead of through nl2br/esc.
         if (isWeekday && c.key === 'E') {
           if (rowIndex !== 0) return '';
-          const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
+          // Both schedules on the printed chart, rebuilt from the two fields with the
+          // heading between them, so the wall chart looks exactly as it always has.
+          const special = state.settings.weekdayShacharisSpecial;
+          const html =
+            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
+            (special ? `
+
+<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
+${special}` : '');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
         // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the

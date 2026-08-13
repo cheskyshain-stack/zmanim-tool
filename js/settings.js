@@ -14,12 +14,32 @@ export const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
-/** The שחרית schedule as it appears on the shul's printed board: the everyday times set
- *  bigger than the ר"ח/בה"ב/תעני"צ block under them, with the alternate times underlined.
- *  Plain HTML because it's edited through a rich-text box (see ui/settings-view.js) and
- *  printed as-is. */
-export const DEFAULT_WEEKDAY_SHACHARIS =
-  '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>\n\n<u>ר"ח בה"ב ותענ"צ</u>\n6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
+/** The everyday שחרית schedule as it appears on the shul's printed board, with the
+ *  alternate times underlined. Plain HTML because it's edited through a rich-text box
+ *  (see ui/settings-view.js) and printed as-is. */
+export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>';
+
+/** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
+ *  week card can show it only on weeks that actually have one of those days and name
+ *  which it is (see ui/week-view.js). The printed chart still shows both together,
+ *  since it covers a whole season at once. */
+export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
+
+/** The heading printed above the second schedule on the wall chart. */
+export const SPECIAL_SHACHARIS_HEADING = 'ר"ח בה"ב ותענ"צ';
+
+/** Cuts a saved value that still holds both schedules in one field into the two the
+ *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
+ *  no heading to split at, in which case the whole value stays as the everyday one. */
+export function splitCombinedShacharis(html) {
+  const text = String(html ?? '');
+  const at = text.search(/<u>\s*ר["״]ח/);
+  if (at < 0) return null;
+  // The heading itself is generated now, not stored, so it is dropped here.
+  const special = text.slice(at).replace(/^<u>[^<]*<\/u>/, '');
+  const trim = (s) => s.replace(/^(?:\s|<br>)+/, '').replace(/(?:\s|<br>)+$/, '');
+  return { regular: trim(text.slice(0, at)), special: trim(special) };
+}
 
 /** Earlier shipped versions of the above, before the everyday times were set bigger (and
  *  before the field became rich text at all). A saved value still matching one of these
@@ -66,6 +86,7 @@ export const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
+  weekdayShacharisSpecial: DEFAULT_WEEKDAY_SHACHARIS_SPECIAL,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*',
   locationName: 'Lakewood',
   latitude: 40.068,

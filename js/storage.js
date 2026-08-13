@@ -1,7 +1,7 @@
 // localStorage persistence + JSON export/import. Everything (settings, saved sheet
 // instances with their per-cell overrides, and rules) lives in one namespaced key -
 // this is the single-browser "local app" model the user chose over a hosted backend.
-import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_FOOTER } from './settings.js';
+import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_FOOTER, splitCombinedShacharis } from './settings.js';
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
@@ -105,6 +105,17 @@ function normalizeSettings(raw) {
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
+  // שחרית used to be one field holding both schedules. Anything saved back then is cut
+  // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
+  // already set. Only when the saved value still carries that heading: a value already
+  // split has none, and is left alone.
+  if (raw?.weekdayShacharisSpecial === undefined) {
+    const parts = splitCombinedShacharis(merged.weekdayShacharis);
+    if (parts) {
+      merged.weekdayShacharis = parts.regular;
+      merged.weekdayShacharisSpecial = parts.special;
+    }
+  }
   return merged;
 }
 

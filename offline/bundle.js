@@ -28,12 +28,32 @@ const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
-/** The שחרית schedule as it appears on the shul's printed board: the everyday times set
- *  bigger than the ר"ח/בה"ב/תעני"צ block under them, with the alternate times underlined.
- *  Plain HTML because it's edited through a rich-text box (see ui/settings-view.js) and
- *  printed as-is. */
-const DEFAULT_WEEKDAY_SHACHARIS =
-  '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>\n\n<u>ר"ח בה"ב ותענ"צ</u>\n6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
+/** The everyday שחרית schedule as it appears on the shul's printed board, with the
+ *  alternate times underlined. Plain HTML because it's edited through a rich-text box
+ *  (see ui/settings-view.js) and printed as-is. */
+const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>';
+
+/** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
+ *  week card can show it only on weeks that actually have one of those days and name
+ *  which it is (see ui/week-view.js). The printed chart still shows both together,
+ *  since it covers a whole season at once. */
+const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
+
+/** The heading printed above the second schedule on the wall chart. */
+const SPECIAL_SHACHARIS_HEADING = 'ר"ח בה"ב ותענ"צ';
+
+/** Cuts a saved value that still holds both schedules in one field into the two the
+ *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
+ *  no heading to split at, in which case the whole value stays as the everyday one. */
+function splitCombinedShacharis(html) {
+  const text = String(html ?? '');
+  const at = text.search(/<u>\s*ר["״]ח/);
+  if (at < 0) return null;
+  // The heading itself is generated now, not stored, so it is dropped here.
+  const special = text.slice(at).replace(/^<u>[^<]*<\/u>/, '');
+  const trim = (s) => s.replace(/^(?:\s|<br>)+/, '').replace(/(?:\s|<br>)+$/, '');
+  return { regular: trim(text.slice(0, at)), special: trim(special) };
+}
 
 /** Earlier shipped versions of the above, before the everyday times were set bigger (and
  *  before the field became rich text at all). A saved value still matching one of these
@@ -80,6 +100,7 @@ const DEFAULT_SETTINGS = {
   weekdayDefaultMincha: '',
   weekdayDefaultMaariv: '',
   weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
+  weekdayShacharisSpecial: DEFAULT_WEEKDAY_SHACHARIS_SPECIAL,
   weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*',
   locationName: 'Lakewood',
   latitude: 40.068,
@@ -216,6 +237,17 @@ function normalizeSettings(raw) {
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
+  // שחרית used to be one field holding both schedules. Anything saved back then is cut
+  // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
+  // already set. Only when the saved value still carries that heading: a value already
+  // split has none, and is left alone.
+  if (raw?.weekdayShacharisSpecial === undefined) {
+    const parts = splitCombinedShacharis(merged.weekdayShacharis);
+    if (parts) {
+      merged.weekdayShacharis = parts.regular;
+      merged.weekdayShacharisSpecial = parts.special;
+    }
+  }
   return merged;
 }
 
@@ -2626,8 +2658,11 @@ function renderSettings(container, state, onSave, onStateReplaced) {
         <p class="hint">מנחה and מעריב on the Weekday chart start blank, because those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
         <p class="hint">This box, and every cell on a sheet, takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">שחרית schedule (same every week)</div>
+        <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
+        <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
+        <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
+        <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
@@ -2707,6 +2742,7 @@ function renderSettings(container, state, onSave, onStateReplaced) {
   });
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
+  const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');
 
   // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
   // was last focused - tracked on focusin because the toolbar buttons deliberately don't
@@ -2745,6 +2781,7 @@ function renderSettings(container, state, onSave, onStateReplaced) {
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
       weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
+      weekdayShacharisSpecial: normalizeRichText(shacharisSpecialEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
@@ -3343,7 +3380,15 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // settings-view.js), so it prints out as-is instead of through nl2br/esc.
         if (isWeekday && c.key === 'E') {
           if (rowIndex !== 0) return '';
-          const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
+          // Both schedules on the printed chart, rebuilt from the two fields with the
+          // heading between them, so the wall chart looks exactly as it always has.
+          const special = state.settings.weekdayShacharisSpecial;
+          const html =
+            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
+            (special ? `
+
+<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
+${special}` : '');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
         // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
@@ -3540,6 +3585,33 @@ function rowFor(week, sheet, state, settings) {
   return { row, columns, overriddenKeys };
 }
 
+/** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
+ *  with the day they fall on.
+ *
+ *  A week card is anchored on its Shabbos, and the weekday times are for the days before
+ *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
+ *  have their own schedule entirely, and listing them beside a regular שחרית time would
+ *  be worse than saying nothing. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+
+function specialDaysInWeek(shabbosSerial, settings) {
+  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
+  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
+  const byName = new Map();
+  for (let offset = 6; offset >= 1; offset--) {
+    const serial = shabbosSerial - offset;
+    // offset 6 is the Sunday of that week, offset 1 the Friday.
+    const day = DAY_NAMES[6 - offset];
+    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
+    for (const name of names) {
+      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(day);
+    }
+  }
+  return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
+}
+
 const fmtDate = (date) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
@@ -3612,6 +3684,13 @@ function renderWeek(container, state, onSerialChange, serial = null) {
       // exist rather than like the time is not set yet.
       .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'))
       .join('');
+    // The second שחרית schedule, only on weeks that actually have one of those days,
+    // labelled with which day it is rather than the chart's catch-all heading.
+    const special = specialDaysInWeek(showing, settings);
+    if (special.length && state.settings.weekdayShacharisSpecial) {
+      const label = 'שחרית ' + special.map((d) => `${d.name} (${d.day})`).join(', ');
+      weekdayLines = line(label, htmlLines(state.settings.weekdayShacharisSpecial), true) + weekdayLines;
+    }
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');

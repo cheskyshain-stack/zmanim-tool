@@ -15,7 +15,7 @@ import { WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 
@@ -63,6 +63,33 @@ function rowFor(week, sheet, state, settings) {
   const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
   const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
   return { row, columns, overriddenKeys };
+}
+
+/** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
+ *  with the day they fall on.
+ *
+ *  A week card is anchored on its Shabbos, and the weekday times are for the days before
+ *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
+ *  have their own schedule entirely, and listing them beside a regular שחרית time would
+ *  be worse than saying nothing. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+
+function specialDaysInWeek(shabbosSerial, settings) {
+  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
+  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
+  const byName = new Map();
+  for (let offset = 6; offset >= 1; offset--) {
+    const serial = shabbosSerial - offset;
+    // offset 6 is the Sunday of that week, offset 1 the Friday.
+    const day = DAY_NAMES[6 - offset];
+    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
+    for (const name of names) {
+      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(day);
+    }
+  }
+  return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
 }
 
 const fmtDate = (date) =>
@@ -137,6 +164,13 @@ export function renderWeek(container, state, onSerialChange, serial = null) {
       // exist rather than like the time is not set yet.
       .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'))
       .join('');
+    // The second שחרית schedule, only on weeks that actually have one of those days,
+    // labelled with which day it is rather than the chart's catch-all heading.
+    const special = specialDaysInWeek(showing, settings);
+    if (special.length && state.settings.weekdayShacharisSpecial) {
+      const label = 'שחרית ' + special.map((d) => `${d.name} (${d.day})`).join(', ');
+      weekdayLines = line(label, htmlLines(state.settings.weekdayShacharisSpecial), true) + weekdayLines;
+    }
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');

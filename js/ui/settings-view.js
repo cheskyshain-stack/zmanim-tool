@@ -28,8 +28,11 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
         <p class="hint">מנחה and מעריב on the Weekday chart start blank, because those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
         <p class="hint">This box, and every cell on a sheet, takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
         ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">שחרית schedule (same every week)</div>
+        <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
+        <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
+        <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
+        <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
@@ -109,6 +112,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
   });
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
+  const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');
 
   // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
   // was last focused - tracked on focusin because the toolbar buttons deliberately don't
@@ -147,6 +151,7 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
       weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
+      weekdayShacharisSpecial: normalizeRichText(shacharisSpecialEditor.innerHTML),
       weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
