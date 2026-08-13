@@ -115,3 +115,7 @@ CREATE TABLE IF NOT EXISTS property_payers (
   note        TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_payer_match ON property_payers(match_text);
+
+-- kind distinguishes the rent side from the mortgage side, so a property can
+-- match both its manager's deposits and its servicer's withdrawals.
+-- (added after initial release; ALTER is guarded by the seed script)

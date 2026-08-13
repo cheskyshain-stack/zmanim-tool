@@ -124,3 +124,58 @@ export function byEntity(from: string, to: string) {
     )
     .all(from, to) as Array<{ entity: string; inflow: number; outflow: number }>;
 }
+
+/**
+ * Actual cash movement per property, pulled from the transaction feed by
+ * matching the payer names recorded against each property.
+ *
+ * Rent is matched on the deposit side and mortgage on the withdrawal side,
+ * because a bank descriptor names a manager or a servicer, never an address.
+ */
+export function propertyActuals(from: string, to: string) {
+  const payers = db()
+    .prepare(
+      `SELECT y.property_id, y.match_text, y.kind, COALESCE(p.monthly_rent,0) rent
+         FROM property_payers y JOIN properties p ON p.id = y.property_id
+        WHERE y.active = 1`
+    )
+    .all() as Array<{ property_id: number; match_text: string; kind: string; rent: number }>;
+
+  // One manager can remit for several properties, so a match_text shared by N
+  // properties must be split between them, not counted N times. Split by
+  // expected rent where known, otherwise evenly.
+  const shareOf = new Map<string, number>();
+  for (const p of payers) {
+    const key = `${p.kind}|${p.match_text.toLowerCase()}`;
+    const peers = payers.filter(
+      (q) => q.kind === p.kind && q.match_text.toLowerCase() === p.match_text.toLowerCase()
+    );
+    const totalRent = peers.reduce((a, b) => a + b.rent, 0);
+    shareOf.set(
+      `${key}|${p.property_id}`,
+      totalRent > 0 ? p.rent / totalRent : 1 / peers.length
+    );
+  }
+
+  const out = new Map<number, { rent: number; mortgage: number; n: number; shared: boolean }>();
+  const stmt = db().prepare(
+    `SELECT COALESCE(SUM(amount),0) v, COUNT(*) n
+       FROM transactions
+      WHERE posted_date BETWEEN ? AND ?
+        AND raw_description LIKE ?
+        AND (CASE WHEN ? = 'rent' THEN amount > 0 ELSE amount < 0 END)`
+  );
+
+  for (const p of payers) {
+    const r = stmt.get(from, to, `%${p.match_text}%`, p.kind) as { v: number; n: number };
+    const key = `${p.kind}|${p.match_text.toLowerCase()}`;
+    const share = shareOf.get(`${key}|${p.property_id}`) ?? 1;
+    const cur = out.get(p.property_id) ?? { rent: 0, mortgage: 0, n: 0, shared: false };
+    if (p.kind === 'rent') cur.rent += r.v * share;
+    else cur.mortgage += -r.v * share;
+    cur.n += r.n;
+    if (share < 1) cur.shared = true;
+    out.set(p.property_id, cur);
+  }
+  return out;
+}

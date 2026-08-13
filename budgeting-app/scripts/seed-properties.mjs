@@ -10,6 +10,12 @@ import path from 'node:path';
 
 const d = new Database(path.join(process.env.DATA_DIR ?? 'data', 'budget.db'));
 
+// property_payers.kind was added after the first release; add it if missing.
+const cols = d.prepare('PRAGMA table_info(property_payers)').all().map((c) => c.name);
+if (!cols.includes('kind')) {
+  d.exec("ALTER TABLE property_payers ADD COLUMN kind TEXT NOT NULL DEFAULT 'rent'");
+}
+
 const PROPERTIES = [
   {
     name: '293 Coles Way, Lakewood NJ', kind: 'residence', occupancy: 'n/a',
@@ -29,7 +35,7 @@ const PROPERTIES = [
     monthly_payment: 2572.25, loan_balance: 300937,
   },
   {
-    name: '16717 Delia St', kind: 'rental', occupancy: 'unknown',
+    name: '16717 Delia St, Wimauma FL', kind: 'rental', occupancy: 'unknown',
     market_value: 334700, lender: 'Lakeview', rate: 0.03125,
     monthly_payment: 2256.34, loan_balance: 270985,
   },
@@ -64,6 +70,19 @@ const PROPERTIES = [
   },
 ];
 
+// Renaming a property must update the existing row, not create a second one.
+// The upsert keys on name, so retire the old name explicitly first.
+const RENAMES = [['16717 Delia St', '16717 Delia St, Wimauma FL']];
+for (const [oldName, newName] of RENAMES) {
+  const old = d.prepare('SELECT id FROM properties WHERE name=?').get(oldName);
+  const cur = d.prepare('SELECT id FROM properties WHERE name=?').get(newName);
+  if (old && !cur) d.prepare('UPDATE properties SET name=? WHERE id=?').run(newName, old.id);
+  else if (old && cur) {
+    d.prepare('DELETE FROM property_payers WHERE property_id=?').run(old.id);
+    d.prepare('DELETE FROM properties WHERE id=?').run(old.id);
+  }
+}
+
 const up = d.prepare(`
   INSERT INTO properties
     (name,kind,status,occupancy,purchased_on,purchase_price,market_value,sold_on,sold_price,
@@ -93,16 +112,24 @@ const id = Object.fromEntries(
 );
 
 const PAYERS = [
-  ['Mantoloking property A (rent $2,600)', 'Mantoloking', 'Manager covers two properties'],
-  ['Mantoloking property B (rent $2,500)', 'Mantoloking', 'Manager covers two properties'],
-  ['Wrightdavis property', 'Wrightdavis', 'Management changing; expect a new name'],
+  // rent side: who deposits money
+  ['Mantoloking property A (rent $2,600)', 'Mantoloking', 'rent', 'Manager covers two properties'],
+  ['Mantoloking property B (rent $2,500)', 'Mantoloking', 'rent', 'Manager covers two properties'],
+  ['Wrightdavis property', 'Wrightdavis', 'rent', 'Management changing; expect a new name'],
+  // mortgage side: who takes money out. Confirmed from the servicer statements.
+  ['293 Coles Way, Lakewood NJ', 'Santander', 'mortgage', 'Personal residence'],
+  ['16717 Delia St, Wimauma FL', 'Lakeview', 'mortgage', null],
+  ['12 Maple St', 'Pennymac', 'mortgage', null],
+  ['987 Grace', 'Rushmore', 'mortgage', null],
+  ['9514 Princess St', 'Shellpoin', 'mortgage', 'Also appears as NewRez'],
+  ['9514 Princess St', 'Newrez', 'mortgage', 'ShellPoint trades as NewRez'],
 ];
 const upP = d.prepare(
-  `INSERT INTO property_payers(property_id,match_text,note) VALUES(?,?,?)`
+  `INSERT INTO property_payers(property_id,match_text,kind,note) VALUES(?,?,?,?)`
 );
 d.prepare('DELETE FROM property_payers').run();
-for (const [prop, match, note] of PAYERS) {
-  if (id[prop]) upP.run(id[prop], match, note);
+for (const [prop, match, kind, note] of PAYERS) {
+  if (id[prop]) upP.run(id[prop], match, kind, note);
 }
 
 console.log(`properties: ${PROPERTIES.length}`);

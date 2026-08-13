@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { isAuthed } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { money } from '@/lib/queries';
+import { money, propertyActuals, latestDate, monthsBack } from '@/lib/queries';
 import { saveProperty, addPayer, removePayer } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +49,13 @@ export default async function Properties() {
     .prepare('SELECT * FROM property_payers ORDER BY id')
     .all() as Array<{ id: number; property_id: number; match_text: string; note: string | null }>;
 
+  const to = latestDate();
+  const from = monthsBack(12);
+  const actuals = propertyActuals(from, to);
+
   const rentals = props.filter((p) => p.kind === 'rental');
+  const actRent = rentals.reduce((a, p) => a + (actuals.get(p.id)?.rent ?? 0), 0);
+  const actMort = rentals.reduce((a, p) => a + (actuals.get(p.id)?.mortgage ?? 0), 0);
   const forwardRent = rentals
     .filter((p) => p.occupancy === 'occupied')
     .reduce((a, b) => a + (b.monthly_rent ?? 0), 0);
@@ -83,6 +89,21 @@ export default async function Properties() {
         ))}
       </div>
 
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+        <div className="mb-1 text-xs uppercase tracking-wider text-slate-400">
+          Rentals, actual last 12 months ({from} to {to})
+        </div>
+        <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm">
+          <span>Rent received <b className="tabular-nums text-emerald-400">{money(actRent)}</b></span>
+          <span>Mortgages paid <b className="tabular-nums">{money(actMort)}</b></span>
+          <span>Net <b className={`tabular-nums ${actRent - actMort >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {money(actRent - actMort)}</b></span>
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Excludes the residence. Taxes, insurance and repairs are not in these figures yet.
+        </div>
+      </div>
+
       {forwardRent - debtService < 0 && (
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm">
           <span className="font-medium text-rose-300">
@@ -112,6 +133,21 @@ export default async function Properties() {
                 <span className="text-xs text-slate-500">residence</span>
               )}
             </div>
+
+            {(() => {
+              const a = actuals.get(p.id);
+              if (!a || (a.rent === 0 && a.mortgage === 0)) return null;
+              return (
+                <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 rounded-xl bg-slate-950/60 px-3 py-2 text-xs">
+                  <span className="text-slate-500">Actual 12 mo:</span>
+                  {a.rent > 0 && <span>rent in <b className="tabular-nums text-emerald-400">{money(a.rent)}</b></span>}
+                  {a.mortgage > 0 && <span>mortgage out <b className="tabular-nums">{money(a.mortgage)}</b></span>}
+                  <span>net <b className={`tabular-nums ${a.rent - a.mortgage >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {money(a.rent - a.mortgage)}</b></span>
+                  {a.shared && <span className="text-slate-500">(split with another property sharing this payer)</span>}
+                </div>
+              );
+            })()}
 
             <form action={saveProperty} className="space-y-3">
               <input type="hidden" name="id" value={p.id} />
