@@ -17,6 +17,7 @@ import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
+import { buildPublishedPayload, publishableGroups, downloadPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 
 /** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
@@ -106,6 +107,25 @@ function line(label, value, isHtml = false, keepEmpty = false) {
   </div>`;
 }
 
+/** The publish step, explained where the thing being published is on screen.
+ *
+ *  It produces a file rather than uploading anywhere: the site is static, so publishing
+ *  means the file joins the site's own files. Deliberately not automatic, because
+ *  publishing is the moment the congregation sees a change and that should be a decision,
+ *  not a side effect of editing a cell. */
+function publishPanelHtml(sheet) {
+  const label = sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף';
+  return `<details class="panel">
+    <summary>Publish this season for the congregation</summary>
+    <div class="panel-body">
+      <p class="hint">The board at <strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
+      <p class="hint">Publish once per season. The board then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
+      <div class="actions"><button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> and its Weekday chart</button></div>
+      <p class="hint">This saves a file called <code>published.json</code>. Send it over and it goes onto the site, which is the step that makes it visible.</p>
+    </div>
+  </details>`;
+}
+
 function cardHtml(title, subtitle, linesHtml, settings) {
   return `<section class="week-card">
     <div class="page-header">
@@ -131,14 +151,17 @@ function cardHtml(title, subtitle, linesHtml, settings) {
   </section>`;
 }
 
-export function renderWeek(container, state, onSerialChange, serial = null) {
+export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
+  // opts.board: the congregation-facing view, which has no app chrome around it.
+  const board = Boolean(opts.board);
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
 
   if (!serials.length) {
-    container.innerHTML = `
-      <h2>This week</h2>
+    container.innerHTML = board
+      ? '<p class="hint">Nothing has been published yet.</p>'
+      : `<h2>This week</h2>
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
     return;
   }
@@ -176,8 +199,12 @@ export function renderWeek(container, state, onSerialChange, serial = null) {
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
 
   container.innerHTML = `
-    <h2>This week</h2>
-    <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>
+    ${
+      board
+        ? ''
+        : `<h2>This week</h2>
+    <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
+    }
     <div class="week-nav">
       <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
       <span class="week-when">${fmtDate(week.date)}</span>
@@ -185,10 +212,17 @@ export function renderWeek(container, state, onSerialChange, serial = null) {
     </div>
     ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
     ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    ${board ? '' : publishPanelHtml(sheet)}
   `;
 
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+
+  container.querySelector('#publish-btn')?.addEventListener('click', () => {
+    const group = publishableGroups(state).find((g) => g.sheet.id === sheet.id);
+    const toPublish = [group.sheet, group.weekday].filter(Boolean);
+    downloadPublished(buildPublishedPayload(state, toPublish));
+  });
 }
 
 /** Rich text from Settings, kept as HTML but with its own outer whitespace trimmed. */

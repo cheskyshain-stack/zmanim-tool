@@ -771,6 +771,20 @@ td.ruled .cell { background: var(--ruled); }
 .week-card .header-rabbi { justify-self: end; white-space: nowrap; font-size: 8.5pt; }
 .week-card .header-subtitle { font-size: calc(var(--sheet-font-size) + 0.5pt); }
 .week-card .page-footer { margin-top: 1rem; }
+/* The everyday שחרית is stored wrapped in .big, which is what sets it above the ר"ח
+   block on the printed chart. Here the two are separate rows, each with its own label,
+   so the size difference has nothing left to say and only made one row look shouty. */
+.week-card .big { font-size: inherit; }
+
+/* The congregation-facing board (index.html?board). No sidebar to sit beside, so unlike
+   every other screen this one is centred: it is a page to read, not a workspace to reach
+   controls in. */
+body.is-board main { max-width: 40rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
+body.is-board .week-card { max-width: none; }
+body.is-board .week-nav { justify-content: center; }
+@media (max-width: 900px) {
+  body.is-board main { padding: 0.75rem 0.75rem 2rem; }
+}
 
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {

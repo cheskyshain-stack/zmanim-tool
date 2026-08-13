@@ -11,6 +11,76 @@ async function loadTables() {
   return cached;
 }
 
+// ==== publish.js ====
+// Publishing a season for the congregation.
+//
+// Everything in this app lives in one browser's localStorage, so a visitor's browser has
+// nothing to show. Publishing writes the season into a file that ships with the site, at
+// data/published.json, which the board view (index.html?board) reads instead of
+// localStorage. That is the whole mechanism: no backend, no login, no database.
+//
+// A season is published once. The board then advances by itself every week, because the
+// week it shows is worked out from today's date against the weeks in the file.
+
+/** What the board needs, and nothing else.
+ *
+ *  The sheets are carried whole (weeks and overrides included) rather than as
+ *  pre-rendered times, so the board runs the same code the app does and a manual edit or
+ *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
+ *  Settings are trimmed to what the card actually prints: no location maths is redone on
+ *  the board, but the header, footer and שחרית schedules are all read from here. */
+function buildPublishedPayload(state, sheets) {
+  return {
+    version: 1,
+    publishedAt: new Date().toISOString(),
+    settings: state.settings,
+    rules: state.rules,
+    sheets: sheets.map((s) => ({
+      id: s.id,
+      season: s.season,
+      hebrewYear: s.hebrewYear,
+      linkedSheetId: s.linkedSheetId,
+      weeks: s.weeks,
+      pageSizes: s.pageSizes,
+      overrides: s.overrides || {},
+    })),
+  };
+}
+
+/** The Shabbos sheets worth publishing, newest first, each with its weekday companion. */
+function publishableGroups(state) {
+  return state.sheets
+    .filter((s) => s.season !== 'weekday')
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((sheet) => ({
+      sheet,
+      weekday: state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null,
+    }));
+}
+
+function downloadPublished(payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'published.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Reads what is currently published, or null when nothing is. A 404 is the normal state
+ *  before the first publish, not an error worth shouting about. */
+async function loadPublished() {
+  try {
+    const res = await fetch('data/published.json', { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && Array.isArray(data.sheets) && data.sheets.length ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // ==== settings.js ====
 // Settings model, mirroring the workbook's SETTINGS sheet. Stored in a clean,
 // serializable "raw" shape; resolveSettings() expands it into the shape the
@@ -1757,6 +1827,15 @@ function renderGuide(container, onOpenTab) {
         <p>Set the paper to <strong>Letter, landscape</strong>, and turn on <strong>background graphics</strong> so the shaded header row prints.</p>
         <p>The Shabbos and Weekday pages come out interleaved (שבת, its Weekday chart, שבת, its Weekday chart), so the pair for a run of weeks stays together.</p>
         <p>Under <strong>Which pages to print or save</strong> you can untick individual pages. Unticked pages stay on screen, dimmed, and are left out of the print.</p>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>The board for the congregation</summary>
+      <div class="panel-body">
+        <p><strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
+        <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
+        <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish this season for the congregation</em>, and press the button. That saves a file called <code>published.json</code>, which then goes onto the site. Publish once per season, and again whenever you change a time so the congregation sees the correction.</p>
       </div>
     </details>
 
@@ -3539,6 +3618,7 @@ function esc(str) {
 
 
 
+
 /** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
  *  in more than one saved sheet resolves to the most recently generated one. */
 function weekIndex(state) {
@@ -3626,6 +3706,25 @@ function line(label, value, isHtml = false, keepEmpty = false) {
   </div>`;
 }
 
+/** The publish step, explained where the thing being published is on screen.
+ *
+ *  It produces a file rather than uploading anywhere: the site is static, so publishing
+ *  means the file joins the site's own files. Deliberately not automatic, because
+ *  publishing is the moment the congregation sees a change and that should be a decision,
+ *  not a side effect of editing a cell. */
+function publishPanelHtml(sheet) {
+  const label = sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף';
+  return `<details class="panel">
+    <summary>Publish this season for the congregation</summary>
+    <div class="panel-body">
+      <p class="hint">The board at <strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
+      <p class="hint">Publish once per season. The board then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
+      <div class="actions"><button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> and its Weekday chart</button></div>
+      <p class="hint">This saves a file called <code>published.json</code>. Send it over and it goes onto the site, which is the step that makes it visible.</p>
+    </div>
+  </details>`;
+}
+
 function cardHtml(title, subtitle, linesHtml, settings) {
   return `<section class="week-card">
     <div class="page-header">
@@ -3651,14 +3750,17 @@ function cardHtml(title, subtitle, linesHtml, settings) {
   </section>`;
 }
 
-function renderWeek(container, state, onSerialChange, serial = null) {
+function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
+  // opts.board: the congregation-facing view, which has no app chrome around it.
+  const board = Boolean(opts.board);
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
 
   if (!serials.length) {
-    container.innerHTML = `
-      <h2>This week</h2>
+    container.innerHTML = board
+      ? '<p class="hint">Nothing has been published yet.</p>'
+      : `<h2>This week</h2>
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
     return;
   }
@@ -3696,8 +3798,12 @@ function renderWeek(container, state, onSerialChange, serial = null) {
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
 
   container.innerHTML = `
-    <h2>This week</h2>
-    <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>
+    ${
+      board
+        ? ''
+        : `<h2>This week</h2>
+    <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
+    }
     <div class="week-nav">
       <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
       <span class="week-when">${fmtDate(week.date)}</span>
@@ -3705,10 +3811,17 @@ function renderWeek(container, state, onSerialChange, serial = null) {
     </div>
     ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
     ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+    ${board ? '' : publishPanelHtml(sheet)}
   `;
 
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+
+  container.querySelector('#publish-btn')?.addEventListener('click', () => {
+    const group = publishableGroups(state).find((g) => g.sheet.id === sheet.id);
+    const toPublish = [group.sheet, group.weekday].filter(Boolean);
+    downloadPublished(buildPublishedPayload(state, toPublish));
+  });
 }
 
 /** Rich text from Settings, kept as HTML but with its own outer whitespace trimmed. */
@@ -3896,6 +4009,28 @@ function render() {
   }
 }
 
+
+// The congregation-facing board: index.html?board. It reads the published season from
+// data/published.json instead of localStorage, because a visitor's browser has none of
+// this app's data. No sidebar, no editing, just the week.
+async function startBoard() {
+  document.querySelector('.sidebar')?.remove();
+  document.body.classList.add('is-board');
+  main.innerHTML = '<p class="hint">Loading…</p>';
+  const published = await loadPublished();
+  if (!published) {
+    main.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
+    return;
+  }
+  const boardState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  let serial = null;
+  const draw = () => renderWeek(main, boardState, (s) => { serial = s; draw(); }, serial, { board: true });
+  draw();
+}
+
+if (new URLSearchParams(location.search).has('board')) {
+  startBoard();
+} else {
 loadTables()
   .then((t) => {
     tables = t;
@@ -3904,3 +4039,4 @@ loadTables()
   .catch((err) => {
     main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
   });
+}

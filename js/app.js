@@ -7,6 +7,7 @@ import { renderSavedSheets } from './ui/saved-sheets-view.js';
 import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
 import { renderWeek } from './ui/week-view.js';
+import { loadPublished } from './publish.js';
 
 const state = loadState();
 let tables = null;
@@ -171,6 +172,28 @@ function render() {
   }
 }
 
+
+// The congregation-facing board: index.html?board. It reads the published season from
+// data/published.json instead of localStorage, because a visitor's browser has none of
+// this app's data. No sidebar, no editing, just the week.
+async function startBoard() {
+  document.querySelector('.sidebar')?.remove();
+  document.body.classList.add('is-board');
+  main.innerHTML = '<p class="hint">Loading…</p>';
+  const published = await loadPublished();
+  if (!published) {
+    main.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
+    return;
+  }
+  const boardState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  let serial = null;
+  const draw = () => renderWeek(main, boardState, (s) => { serial = s; draw(); }, serial, { board: true });
+  draw();
+}
+
+if (new URLSearchParams(location.search).has('board')) {
+  startBoard();
+} else {
 loadTables()
   .then((t) => {
     tables = t;
@@ -179,3 +202,4 @@ loadTables()
   .catch((err) => {
     main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
   });
+}
