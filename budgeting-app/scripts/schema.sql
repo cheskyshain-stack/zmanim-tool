@@ -82,3 +82,36 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS properties (
+  id              INTEGER PRIMARY KEY,
+  name            TEXT NOT NULL UNIQUE,
+  kind            TEXT NOT NULL DEFAULT 'rental',
+  status          TEXT NOT NULL DEFAULT 'owned',
+  occupancy       TEXT NOT NULL DEFAULT 'occupied',
+  purchased_on    TEXT,
+  purchase_price  REAL,
+  market_value    REAL,
+  sold_on         TEXT,
+  sold_price      REAL,
+  lender          TEXT,
+  rate            REAL,
+  monthly_payment REAL,
+  loan_balance    REAL,
+  monthly_rent    REAL,
+  tax_year        REAL,
+  insurance_year  REAL,
+  notes           TEXT,
+  sort            INTEGER NOT NULL DEFAULT 0
+);
+
+-- Links a bank descriptor to a property. One payer can cover several
+-- properties, which is why this is a table and not a column.
+CREATE TABLE IF NOT EXISTS property_payers (
+  id          INTEGER PRIMARY KEY,
+  property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  match_text  TEXT NOT NULL,
+  active      INTEGER NOT NULL DEFAULT 1,
+  note        TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_payer_match ON property_payers(match_text);

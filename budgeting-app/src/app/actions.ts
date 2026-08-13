@@ -97,3 +97,60 @@ export async function skipTransaction(formData: FormData) {
   db().prepare('UPDATE transactions SET needs_review=0 WHERE id=?').run(id);
   revalidatePath('/review');
 }
+
+/* ------------------------------------------------------------- properties */
+
+const NUM = (v: FormDataEntryValue | null) => {
+  const s = String(v ?? '').trim();
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+const TXT = (v: FormDataEntryValue | null) => {
+  const s = String(v ?? '').trim();
+  return s === '' ? null : s;
+};
+
+export async function saveProperty(formData: FormData) {
+  await guard();
+  const id = Number(formData.get('id'));
+  if (!id) return;
+  db().prepare(
+    `UPDATE properties SET
+       occupancy=?, status=?, purchased_on=?, purchase_price=?, market_value=?,
+       monthly_rent=?, lender=?, rate=?, monthly_payment=?, loan_balance=?,
+       tax_year=?, insurance_year=?, sold_on=?, sold_price=?, notes=?
+     WHERE id=?`
+  ).run(
+    String(formData.get('occupancy') ?? 'unknown'),
+    String(formData.get('status') ?? 'owned'),
+    TXT(formData.get('purchased_on')), NUM(formData.get('purchase_price')),
+    NUM(formData.get('market_value')), NUM(formData.get('monthly_rent')),
+    TXT(formData.get('lender')), NUM(formData.get('rate')),
+    NUM(formData.get('monthly_payment')), NUM(formData.get('loan_balance')),
+    NUM(formData.get('tax_year')), NUM(formData.get('insurance_year')),
+    TXT(formData.get('sold_on')), NUM(formData.get('sold_price')),
+    TXT(formData.get('notes')),
+    id
+  );
+  revalidatePath('/properties');
+}
+
+export async function addPayer(formData: FormData) {
+  await guard();
+  const propertyId = Number(formData.get('propertyId'));
+  const matchText = TXT(formData.get('matchText'));
+  if (!propertyId || !matchText) return;
+  db().prepare(
+    'INSERT INTO property_payers(property_id,match_text) VALUES(?,?)'
+  ).run(propertyId, matchText);
+  revalidatePath('/properties');
+}
+
+export async function removePayer(formData: FormData) {
+  await guard();
+  const id = Number(formData.get('id'));
+  if (!id) return;
+  db().prepare('DELETE FROM property_payers WHERE id=?').run(id);
+  revalidatePath('/properties');
+}
