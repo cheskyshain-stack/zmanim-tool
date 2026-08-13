@@ -621,34 +621,79 @@ The AI is not the expensive part. The bank connection is.
 
 ---
 
-## 13. One honest alternative before you build
+## 12a. You are already halfway, which changes the plan
 
-Some of this already exists, and two options are close enough to your requirements to be
-worth an hour of evaluation before committing to a build:
+The existing setup is a sync-backed spreadsheet, not a static template. That means the ingestion
+layer in section 3 is already solved, and several other pieces are partly built. Measured
+against the seven systems in section 1:
 
-- **Actual Budget.** Open source, self hostable, envelope budgeting, has an API and a
-  plugin surface. You could add the AI categorization layer and the business entity layer
-  on top rather than building the ledger, sync, and UI from scratch.
-- **Lunch Money.** Hosted, developer friendly, good API, supports rules and multiple
-  currencies. Weaker on multi entity business separation.
-- **Firefly III.** Open source, self hosted, strong on multi account and multi currency
-  ledgers.
+| System | Status | What is missing |
+|--------|--------|-----------------|
+| **Ingestion** | **Done** | Nothing. Banks and cards already sync automatically |
+| **Normalization** | Partial | AutoCat matches description substrings, but there is no stable merchant identity |
+| **Categorization** | Rules only | 221 rules exist and roughly a quarter of transactions still land uncategorized. The AI fallback stage is the gap |
+| **Entity ledger** | Not started | A `Business` column exists and is entirely empty. Transfers are untagged |
+| **Budgeting** | Present | Categories exist but mix unrelated things, and Yom Tov is not separated |
+| **Forecasting** | Naive | Projection is the last three months multiplied by four, with no recurring versus one-time distinction |
+| **Enrichment** | Not started | No receipt or line item data |
 
-None of them do business versus personal entity separation with owner draw treatment the
-way section 9 describes, and none do AI categorization with a learning feedback loop.
-Those two are your genuinely differentiated requirements. If the goal is the outcome,
-extending Actual Budget is the fastest path to it. If the goal is a system that matches
-exactly how you think about your money, build it, and this plan is the order to build it
-in.
+**The rules-only ceiling is the thing to understand.** A rule fires on a merchant somebody
+already wrote a rule for. Every new merchant falls through and stays uncategorized until a
+human writes another rule. Adding more rules raises the ceiling slowly and never reaches
+it, which is why hundreds of rules can coexist with a large uncategorized share. That is
+precisely the gap the classifier fills, and it is the reason the pipeline in section 5 puts
+the AI stage *after* the rules rather than in place of them.
 
----
+This reorders the build phases considerably. Phase 1 is largely done, so the highest value
+work is now:
+
+| Priority | Work | Fixes |
+|---|---|---|
+| 1 | Recurring versus one-time detection | Temporary costs being annualized into the forecast |
+| 2 | AI categorization for unseen merchants | The uncategorized remainder that rules cannot reach |
+| 3 | Transfer tagging and pairing | Card payments and inter-account moves counted as spending |
+| 4 | Entity separation | Business revenue booked as personal income |
+
+Two of those four can be done inside the existing sheet without building an application at
+all, which is the next section.
+
+## 13. Three options, not two
+
+Given how much already works, building from scratch is now the least attractive option.
+
+**Option A: extend the existing workbook.** Tag transfers, populate the business column,
+add a Yom Tov category group, and split the projection into recurring and one-time. This is
+a day of work, no code, and it fixes the largest errors. It does not fix the categorization
+ceiling, because a spreadsheet cannot call a model on a new merchant.
+
+**Option B: add a categorization service alongside the sheet.** A small scheduled job reads
+uncategorized rows, calls the classifier with the taxonomy in a cached prompt, writes back
+a category and a confidence, and flags low-confidence rows for review. Everything else stays
+exactly as it is. This is a few hundred lines and it targets the one problem that more
+rules will never solve. **This is the recommended starting point**, because it delivers the
+distinctive value with the least disruption.
+
+**Option C: build the full application in section 1.** Justified when the entity model,
+per-property rental tracking, forecasting with ranges, and receipt enrichment all matter at
+once and the spreadsheet is genuinely in the way. Real, but it should follow B rather than
+replace it.
+
+Existing products worth an hour before committing to C:
+
+- **Actual Budget.** Open source, self hostable, envelope budgeting, has an API.
+- **Lunch Money.** Hosted, good API, supports rules. Weaker on multi entity separation.
+- **Firefly III.** Open source, self hosted, strong multi account ledger.
+
+None of them do business versus personal separation with owner draw treatment, per property
+rental tracking, or AI categorization with a learning loop. Those remain the genuinely
+differentiated requirements.
 
 ## 14. Decisions I need from you
 
 | Question | My recommendation |
 |----------|-------------------|
-| Build from scratch, or extend Actual Budget? | Build if you want the entity model exactly right, extend if you want results in weeks |
-| Which aggregator? | Start with Teller or SimpleFIN, move to Plaid only if coverage forces it |
+| Option A, B, or C from section 13? | **B.** Keep the existing sync, add the classifier alongside it |
+| Which aggregator? | None needed. Keep the existing one, it already works |
 | Self host or managed hosting? | Managed (Vercel plus Supabase) unless you specifically want the data on your own hardware |
 | One business entity or several? | Model the schema for several regardless, it costs nothing now |
 | Is the Amazon account a personal or Amazon Business account? | Changes whether path 3 in section 8 is available |
