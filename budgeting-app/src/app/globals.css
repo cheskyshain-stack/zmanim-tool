@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+ * Committed dark palette. The scaffold shipped a light/dark `body` rule that
+ * overrode the utility classes, which is why the first render came out grey
+ * with unreadable text. Tokens live here, utilities do the work.
+ */
+:root {
+  --bg: #020617;      /* slate-950 */
+  --panel: #0f172a;   /* slate-900 */
+  --line: #1e293b;    /* slate-800 */
+  --fg: #f1f5f9;      /* slate-100 */
+  --muted: #94a3b8;   /* slate-400 */
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+/* Native controls default to light in some browsers; keep them on-theme. */
+select,
+input,
+button {
+  color-scheme: dark;
+}
+
+select option {
+  background: var(--panel);
+  color: var(--fg);
+}
