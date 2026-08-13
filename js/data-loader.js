@@ -5,7 +5,7 @@ let cached = null;
 export async function loadTables() {
   if (cached) return cached;
   const [parshaChutz, parshaEY, parshaNames, specialDays] = await Promise.all(
-    ['data/parsha_chutz.json', 'data/parsha_ey.json', 'data/parsha_names.json', 'data/special_days.json'].map((p) =>
+    ['/data/parsha_chutz.json', '/data/parsha_ey.json', '/data/parsha_names.json', '/data/special_days.json'].map((p) =>
       fetch(p).then((r) => {
         if (!r.ok) throw new Error(`Failed to load ${p}: ${r.status}`);
         return r.json();

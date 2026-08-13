@@ -11,76 +11,6 @@ async function loadTables() {
   return cached;
 }
 
-// ==== publish.js ====
-// Publishing a season for the congregation.
-//
-// Everything in this app lives in one browser's localStorage, so a visitor's browser has
-// nothing to show. Publishing writes the season into a file that ships with the site, at
-// data/published.json, which the luach (index.html?luach) reads instead of
-// localStorage. That is the whole mechanism: no backend, no login, no database.
-//
-// A season is published once. The luach then advances by itself every week, because the
-// week it shows is worked out from today's date against the weeks in the file.
-
-/** What the luach needs, and nothing else.
- *
- *  The sheets are carried whole (weeks and overrides included) rather than as
- *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
- *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
- *  Settings are trimmed to what the card actually prints: no location maths is redone on
- *  the luach, but the header, footer and שחרית schedules are all read from here. */
-function buildPublishedPayload(state, sheets) {
-  return {
-    version: 1,
-    publishedAt: new Date().toISOString(),
-    settings: state.settings,
-    rules: state.rules,
-    sheets: sheets.map((s) => ({
-      id: s.id,
-      season: s.season,
-      hebrewYear: s.hebrewYear,
-      linkedSheetId: s.linkedSheetId,
-      weeks: s.weeks,
-      pageSizes: s.pageSizes,
-      overrides: s.overrides || {},
-    })),
-  };
-}
-
-/** The Shabbos sheets worth publishing, newest first, each with its weekday companion. */
-function publishableGroups(state) {
-  return state.sheets
-    .filter((s) => s.season !== 'weekday')
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .map((sheet) => ({
-      sheet,
-      weekday: state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null,
-    }));
-}
-
-function downloadPublished(payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'published.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** Reads what is currently published, or null when nothing is. A 404 is the normal state
- *  before the first publish, not an error worth shouting about. */
-async function loadPublished() {
-  try {
-    const res = await fetch('data/published.json', { cache: 'no-cache' });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data && Array.isArray(data.sheets) && data.sheets.length ? data : null;
-  } catch {
-    return null;
-  }
-}
-
 // ==== settings.js ====
 // Settings model, mirroring the workbook's SETTINGS sheet. Stored in a clean,
 // serializable "raw" shape; resolveSettings() expands it into the shape the
@@ -3597,6 +3527,76 @@ function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ==== publish.js ====
+// Publishing a season for the congregation.
+//
+// Everything in this app lives in one browser's localStorage, so a visitor's browser has
+// nothing to show. Publishing writes the season into a file that ships with the site, at
+// data/published.json, which the luach (index.html?luach) reads instead of
+// localStorage. That is the whole mechanism: no backend, no login, no database.
+//
+// A season is published once. The luach then advances by itself every week, because the
+// week it shows is worked out from today's date against the weeks in the file.
+
+/** What the luach needs, and nothing else.
+ *
+ *  The sheets are carried whole (weeks and overrides included) rather than as
+ *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
+ *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
+ *  Settings are trimmed to what the card actually prints: no location maths is redone on
+ *  the luach, but the header, footer and שחרית schedules are all read from here. */
+function buildPublishedPayload(state, sheets) {
+  return {
+    version: 1,
+    publishedAt: new Date().toISOString(),
+    settings: state.settings,
+    rules: state.rules,
+    sheets: sheets.map((s) => ({
+      id: s.id,
+      season: s.season,
+      hebrewYear: s.hebrewYear,
+      linkedSheetId: s.linkedSheetId,
+      weeks: s.weeks,
+      pageSizes: s.pageSizes,
+      overrides: s.overrides || {},
+    })),
+  };
+}
+
+/** The Shabbos sheets worth publishing, newest first, each with its weekday companion. */
+function publishableGroups(state) {
+  return state.sheets
+    .filter((s) => s.season !== 'weekday')
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((sheet) => ({
+      sheet,
+      weekday: state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null,
+    }));
+}
+
+function downloadPublished(payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'published.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Reads what is currently published, or null when nothing is. A 404 is the normal state
+ *  before the first publish, not an error worth shouting about. */
+async function loadPublished() {
+  try {
+    const res = await fetch('/data/published.json', { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && Array.isArray(data.sheets) && data.sheets.length ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // ==== ui/week-view.js ====
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
@@ -4032,30 +4032,6 @@ function render() {
 }
 
 
-// The congregation-facing luach: index.html?luach. It reads the published season from
-// data/published.json instead of localStorage, because a visitor's browser has none of
-// this app's data. No sidebar, no editing, just the week.
-async function startLuach() {
-  document.querySelector('.sidebar')?.remove();
-  document.body.classList.add('is-luach');
-  main.innerHTML = '<p class="hint">Loading…</p>';
-  const published = await loadPublished();
-  if (!published) {
-    main.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
-    return;
-  }
-  const luachState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  let serial = null;
-  const draw = () => renderWeek(main, luachState, (s) => { serial = s; draw(); }, serial, { luach: true });
-  draw();
-}
-
-// ?board is kept as an alias: it was the first name this had, and a link already sent
-// out should not break.
-const params = new URLSearchParams(location.search);
-if (params.has('luach') || params.has('board')) {
-  startLuach();
-} else {
 loadTables()
   .then((t) => {
     tables = t;
@@ -4064,4 +4040,3 @@ loadTables()
   .catch((err) => {
     main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
   });
-}

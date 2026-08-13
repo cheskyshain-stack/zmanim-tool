@@ -58,7 +58,7 @@ export function downloadPublished(payload) {
  *  before the first publish, not an error worth shouting about. */
 export async function loadPublished() {
   try {
-    const res = await fetch('data/published.json', { cache: 'no-cache' });
+    const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) return null;
     const data = await res.json();
     return data && Array.isArray(data.sheets) && data.sheets.length ? data : null;

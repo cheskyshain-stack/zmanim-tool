@@ -18,7 +18,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
   container.innerHTML = `
     <div class="crop-tool">
       <div class="crop-current-row">
-        <img class="crop-current" src="${currentDataUrl || 'assets/logo-building-icon.png'}" alt="Current header photo">
+        <img class="crop-current" src="${currentDataUrl || '/assets/logo-building-icon.png'}" alt="Current header photo">
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>

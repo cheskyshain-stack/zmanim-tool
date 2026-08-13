@@ -149,8 +149,8 @@ def inline_fonts(css: str) -> str:
     return re.sub(r"url\('\.\./assets/fonts/([\w.-]+)'\)", sub, css)
 
 
-def stamp_css_versions():
-    """Rewrite index.html's stylesheet links to css/x.css?v=<hash of that file>.
+def stamp_css_versions(page: Path, prefix: str):
+    """Rewrite a page's stylesheet links to css/x.css?v=<hash of that file>.
 
     GitHub Pages serves everything with a 10-minute max-age, so after a deploy the
     browser keeps showing the previous stylesheet until it expires - a design change
@@ -159,19 +159,19 @@ def stamp_css_versions():
 
     See stamp_js_versions() for the modules, which need a different mechanism.
     """
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    html = page.read_text(encoding="utf-8")
 
     def stamp(match):
         name = match.group(1)
         digest = hashlib.md5((ROOT / "css" / name).read_bytes()).hexdigest()[:8]
-        return f'href="css/{name}?v={digest}"'
+        return f'href="{prefix}css/{name}?v={digest}"'
 
-    stamped = re.sub(r'href="css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
+    stamped = re.sub(r'href="(?:\.\./)?css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
     if stamped != html:
-        (ROOT / "index.html").write_text(stamped, encoding="utf-8", newline="\n")
+        page.write_text(stamped, encoding="utf-8", newline="\n")
 
 
-def stamp_js_versions():
+def stamp_js_versions(page: Path, prefix: str, entry: str):
     """Give every JS module a content hash in its URL, via an import map.
 
     Same 10-minute GitHub Pages cache as the CSS, but the modules can't be stamped the
@@ -182,16 +182,16 @@ def stamp_js_versions():
 
     An import map rewrites those relative specifiers at load time without touching a
     single source file: `import './storage.js'` still resolves to /js/storage.js, and
-    the map turns that into /js/storage.js?v=<hash>. The map lives in index.html, which
-    a page load revalidates anyway - the same reason the CSS stamps work. The entry
-    itself is stamped directly, since a map applies to imports, not to <script src>.
+    the map turns that into /js/storage.js?v=<hash>. The keys are site-absolute, so the
+    same map works from the root page and from /admin/ alike. The entry itself is
+    stamped directly, since a map applies to imports, not to <script src>.
     """
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    html = page.read_text(encoding="utf-8")
 
     def digest(path):
         return hashlib.md5(path.read_bytes()).hexdigest()[:8]
 
-    imports = {f"./js/{rel_key(f)}": f"./js/{rel_key(f)}?v={digest(f)}" for f in all_js_files()}
+    imports = {f"/js/{rel_key(f)}": f"/js/{rel_key(f)}?v={digest(f)}" for f in all_js_files()}
     block = f'{JS_MAP_MARKER}\n<script type="importmap">{json.dumps({"imports": imports})}</script>'
 
     existing = re.compile(re.escape(JS_MAP_MARKER) + r'\n<script type="importmap">.*?</script>', re.S)
@@ -200,12 +200,11 @@ def stamp_js_versions():
     else:
         html = html.replace("</head>", block + "\n</head>")
     html = re.sub(
-        r'src="js/' + re.escape(ENTRY) + r'(?:\?v=[0-9a-f]+)?"',
-        lambda m: f'src="js/{ENTRY}?v={digest(JS_DIR / ENTRY)}"',
+        r'src="(?:\.\./)?js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
+        lambda m: f'src="{prefix}js/{entry}?v={digest(JS_DIR / entry)}"',
         html,
     )
-
-    (ROOT / "index.html").write_text(html, encoding="utf-8", newline="\n")
+    page.write_text(html, encoding="utf-8", newline="\n")
 
 
 def main():
@@ -232,17 +231,25 @@ def main():
     bundle = "\n\n".join(chunks[:entry_idx]) + "\n\n// ==== namespace shims for `import * as X` ====\n" + "\n".join(sorted(set(trailing_namespace_consts))) + "\n\n" + chunks[entry_idx]
 
     OUT_DIR.mkdir(exist_ok=True)
+    # Site-absolute paths are for the hosted site; file:// has no site root.
+    bundle = bundle.replace("'/assets/", "'assets/").replace('"/assets/', '"assets/')
     (OUT_DIR / "bundle.js").write_text(bundle, encoding="utf-8")
 
-    stamp_css_versions()
-    stamp_js_versions()
+    # The congregation's page at the root, and the app under /admin.
+    stamp_css_versions(ROOT / "index.html", "")
+    stamp_js_versions(ROOT / "index.html", "", "luach.js")
+    stamp_css_versions(ROOT / "admin" / "index.html", "../")
+    stamp_js_versions(ROOT / "admin" / "index.html", "../", "app.js")
 
-    # The offline copy is one plain script off the filesystem: no modules to remap, and
-    # no cache to bust either, so both the import map and the ?v= come straight back out.
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    # The offline copy is the app, not the luach: a USB stick is for making sheets, and
+    # the luach needs a published file it has no way to fetch under file://. One plain
+    # script off the filesystem, so the import map and the ?v= come straight back out,
+    # and the site-absolute asset paths go back to relative ones.
+    html = (ROOT / "admin" / "index.html").read_text(encoding="utf-8")
+    html = html.replace('href="../css/', 'href="css/').replace('src="/assets/', 'src="assets/')
     html = re.sub(re.escape(JS_MAP_MARKER) + r'\n<script type="importmap">.*?</script>\n', "", html, flags=re.S)
     html = re.sub(
-        r'<script type="module" src="js/' + re.escape(ENTRY) + r'(?:\?v=[0-9a-f]+)?"></script>',
+        r'<script type="module" src="(?:\.\./)?js/' + re.escape(ENTRY) + r'(?:\?v=[0-9a-f]+)?"></script>',
         '<script src="bundle.js"></script>',
         html,
     )

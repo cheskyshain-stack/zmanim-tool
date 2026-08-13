@@ -130,9 +130,9 @@ function cardHtml(title, subtitle, linesHtml, settings) {
   return `<section class="week-card">
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
+        <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
+          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
           ${settings.headerSubtitle ? `<div class="header-subtitle">${weekEsc(settings.headerSubtitle)}</div>` : ''}
         </div>
         <div class="header-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
