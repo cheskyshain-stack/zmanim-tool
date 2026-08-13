@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db } from './db.ts';
 
 export type Row = Record<string, unknown>;
 

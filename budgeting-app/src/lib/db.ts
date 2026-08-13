@@ -109,6 +109,18 @@ CREATE TABLE IF NOT EXISTS rules (
   is_active    INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS ai_suggestions (
+  id             INTEGER PRIMARY KEY,
+  transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  category_id    INTEGER REFERENCES categories(id),
+  rank           INTEGER NOT NULL DEFAULT 0,
+  confidence     REAL,
+  reason         TEXT,
+  model          TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_ai_tx ON ai_suggestions(transaction_id);
+
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL

@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db } from './db.ts';
 
 /**
  * Turn a hostile bank descriptor into a stable merchant key.

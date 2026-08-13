@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    // Node runs the scripts in src/lib directly with --experimental-strip-types,
+    // and its ESM resolver requires explicit extensions. Safe because Next sets noEmit.
+    "allowImportingTsExtensions": true,
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,

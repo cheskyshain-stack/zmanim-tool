@@ -14,8 +14,25 @@ export const dynamic = 'force-dynamic';
  * When the model is wired in, it replaces the body of this function and the
  * interface here does not change.
  */
-function suggest(description: string, amount: number): Array<{ id: number; name: string }> {
+function suggest(
+  txId: number,
+  description: string,
+  amount: number
+): Array<{ id: number; name: string; fromModel?: boolean; reason?: string | null }> {
   const d = db();
+
+  // The model's answer wins when there is one: it saw the whole taxonomy.
+  const ai = d
+    .prepare(
+      `SELECT c.id, c.name, s.confidence, s.reason
+         FROM ai_suggestions s JOIN categories c ON c.id = s.category_id
+        WHERE s.transaction_id = ? ORDER BY s.rank LIMIT 3`
+    )
+    .all(txId) as Array<{ id: number; name: string; confidence: number | null; reason: string | null }>;
+  if (ai.length) {
+    return ai.map((r, i) => ({ id: r.id, name: r.name, fromModel: true, reason: i === 0 ? r.reason : null }));
+  }
+
   const norm = normalizeMerchant(description);
   const first = norm.split(' ')[0];
   const out = new Map<number, string>();
@@ -76,7 +93,7 @@ export default async function Review() {
       </div>
 
       {rows.map((t) => {
-        const sugg = suggest(t.raw_description, t.amount);
+        const sugg = suggest(t.id, t.raw_description, t.amount);
         return (
           <div key={t.id} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -93,13 +110,26 @@ export default async function Review() {
               </div>
             </div>
 
+            {sugg[0]?.reason && (
+              <div className="mt-2 text-xs text-slate-500">
+                Model: {sugg[0].reason}
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {sugg.map((s) => (
                 <form key={s.id} action={setCategory}>
                   <input type="hidden" name="id" value={t.id} />
                   <input type="hidden" name="categoryId" value={s.id} />
                   <input type="hidden" name="remember" value="on" />
-                  <button className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm hover:border-slate-500 hover:bg-slate-700">
+                  <button
+                    className={`rounded-full border px-3 py-1.5 text-sm hover:border-slate-500 hover:bg-slate-700 ${
+                      s.fromModel
+                        ? 'border-sky-700/60 bg-sky-900/30'
+                        : 'border-slate-700 bg-slate-800'
+                    }`}
+                    title={s.fromModel ? 'suggested by the model' : 'suggested from similar transactions'}
+                  >
                     {s.name}
                   </button>
                 </form>

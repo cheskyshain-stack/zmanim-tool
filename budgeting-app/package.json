@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "categorize": "node --experimental-strip-types scripts/categorize-ai.ts",
+    "import": "node scripts/import.mjs",
+    "pair": "node scripts/pair-transfers.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@types/better-sqlite3": "^9.6.0",
     "better-sqlite3": "^13.0.3",
     "next": "16.3.0",

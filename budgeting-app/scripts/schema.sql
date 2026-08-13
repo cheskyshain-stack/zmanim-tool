@@ -119,3 +119,15 @@ CREATE INDEX IF NOT EXISTS ix_payer_match ON property_payers(match_text);
 -- kind distinguishes the rent side from the mortgage side, so a property can
 -- match both its manager's deposits and its servicer's withdrawals.
 -- (added after initial release; ALTER is guarded by the seed script)
+
+CREATE TABLE IF NOT EXISTS ai_suggestions (
+  id             INTEGER PRIMARY KEY,
+  transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  category_id    INTEGER REFERENCES categories(id),
+  rank           INTEGER NOT NULL DEFAULT 0,
+  confidence     REAL,
+  reason         TEXT,
+  model          TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_ai_tx ON ai_suggestions(transaction_id);
