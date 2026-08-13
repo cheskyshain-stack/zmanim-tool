@@ -346,6 +346,74 @@ want to see.
 The business tax reserve deserves its own line and its own priority. It is the most common
 place a business owner overstates how much money they have.
 
+### 6.2 Horizon buckets, and why the split must be phased
+
+A common way to slice the savings percentage is by **horizon** rather than by purpose:
+
+| Bucket | Horizon | Holds |
+|--------|---------|-------|
+| **Short** | 0 to 2 years | Emergency cushion, debt payoff, known near-term costs |
+| **Mid** | 2 to 7 years | Simcha, vehicle replacement, home projects, tuition step-ups |
+| **Long** | 7 years and out | Retirement, investment property, children's futures |
+
+This is a good model, and the usual default of Long 50 / Short 25 / Mid 25 is the right
+*destination*. It is the wrong *starting point* for anyone carrying short-term debt or
+lacking an emergency cushion, because it puts the majority of new savings into the bucket
+that cannot be touched, while the household stays one broken transmission away from the
+credit card.
+
+**So phase it.** The split is a function of the balance sheet, not a constant:
+
+```
+Phase 1  (no emergency cushion, or a promotional-rate debt with a deadline)
+         Short 60 / Mid 20 / Long 20
+         Short funds the debt payoff first, cushion second.
+
+Phase 2  (cushion funded, promotional debt cleared)
+         Long 50 / Mid 25 / Short 25
+         The destination split.
+```
+
+The application should own this transition rather than leaving it to memory. Two rules:
+
+1. **Compute the Phase 1 Short allocation from the deadline, not from a percentage.** A
+   promotional 0% balance has a fixed expiry, so the required monthly payment is
+   `balance / months_remaining`, and it should be pinned at that number and displayed with
+   the deadline next to it. A percentage that happens to be too small is silent; a deadline
+   that will be missed should be loud.
+2. **Trigger the phase change automatically** when the cushion reaches its target and the
+   promotional balance hits zero, then tell the user the split changed and why.
+
+### 6.3 Sanity check the target against actuals before committing to it
+
+A percentage target is a hypothesis. Before showing it as a goal, test it against the
+trailing twelve months:
+
+```
+achievable_savings_rate =
+    (trailing 12mo income - trailing 12mo fixed - trailing 12mo variable
+     - net drag from rentals and other entities)
+    / trailing 12mo income
+```
+
+Three outcomes, and each deserves different words in the interface:
+
+- **Target is below what is already achievable.** The money exists and is simply not being
+  moved. This is by far the most common case, and the honest message is not "spend less",
+  it is "your surplus is sitting in checking, automate the transfer."
+- **Target is slightly above.** Show the monthly gap and which variable categories are
+  furthest above their own trailing median. A gap expressed as "find $1,442 a month" is
+  actionable; the same gap expressed as a percentage is not.
+- **Target is far above.** Say so plainly rather than displaying a goal that cannot be
+  met. A budgeting tool that shows an impossible target every month trains the user to
+  ignore it.
+
+Also check the shape, not just the savings number. A household whose fixed costs run well
+below a template's assumption and whose variable costs run well above it does not have a
+problem, it has a different shape. Forcing the template's fixed and variable percentages
+onto it produces two failing meters and no useful signal. **Only the savings line is a real
+target. The other two are observations.**
+
 ---
 
 ## 7. Forecasting
