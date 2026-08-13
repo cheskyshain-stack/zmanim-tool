@@ -790,14 +790,14 @@ td.ruled .cell { background: var(--ruled); }
    so the size difference has nothing left to say and only made one row look shouty. */
 .week-card .big { font-size: inherit; }
 
-/* The congregation-facing board (index.html?board). No sidebar to sit beside, so unlike
+/* The congregation-facing luach (index.html?luach). No sidebar to sit beside, so unlike
    every other screen this one is centred: it is a page to read, not a workspace to reach
    controls in. */
-body.is-board main { max-width: 68rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
-body.is-board .week-card { max-width: none; }
-body.is-board .week-nav { justify-content: center; }
+body.is-luach main { max-width: 68rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
+body.is-luach .week-card { max-width: none; }
+body.is-luach .week-nav { justify-content: center; }
 @media (max-width: 900px) {
-  body.is-board main { padding: 0.75rem 0.75rem 2rem; }
+  body.is-luach main { padding: 0.75rem 0.75rem 2rem; }
 }
 
 /* --- Guide ------------------------------------------------------------------------ */

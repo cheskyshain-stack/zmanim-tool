@@ -16,19 +16,19 @@ async function loadTables() {
 //
 // Everything in this app lives in one browser's localStorage, so a visitor's browser has
 // nothing to show. Publishing writes the season into a file that ships with the site, at
-// data/published.json, which the board view (index.html?board) reads instead of
+// data/published.json, which the luach (index.html?luach) reads instead of
 // localStorage. That is the whole mechanism: no backend, no login, no database.
 //
-// A season is published once. The board then advances by itself every week, because the
+// A season is published once. The luach then advances by itself every week, because the
 // week it shows is worked out from today's date against the weeks in the file.
 
-/** What the board needs, and nothing else.
+/** What the luach needs, and nothing else.
  *
  *  The sheets are carried whole (weeks and overrides included) rather than as
- *  pre-rendered times, so the board runs the same code the app does and a manual edit or
+ *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
  *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
  *  Settings are trimmed to what the card actually prints: no location maths is redone on
- *  the board, but the header, footer and שחרית schedules are all read from here. */
+ *  the luach, but the header, footer and שחרית schedules are all read from here. */
 function buildPublishedPayload(state, sheets) {
   return {
     version: 1,
@@ -1831,9 +1831,9 @@ function renderGuide(container, onOpenTab) {
     </details>
 
     <details class="panel">
-      <summary>The board for the congregation</summary>
+      <summary>The luach for the congregation</summary>
       <div class="panel-body">
-        <p><strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
+        <p><strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
         <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
         <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish this season for the congregation</em>, and press the button. That saves a file called <code>published.json</code>, which then goes onto the site. Publish once per season, and again whenever you change a time so the congregation sees the correction.</p>
       </div>
@@ -3717,8 +3717,8 @@ function publishPanelHtml(sheet) {
   return `<details class="panel">
     <summary>Publish this season for the congregation</summary>
     <div class="panel-body">
-      <p class="hint">The board at <strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
-      <p class="hint">Publish once per season. The board then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
+      <p class="hint">The luach at <strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
+      <p class="hint">Publish once per season. The luach then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
       <div class="actions"><button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> and its Weekday chart</button></div>
       <p class="hint">This saves a file called <code>published.json</code>. Send it over and it goes onto the site, which is the step that makes it visible.</p>
     </div>
@@ -3751,14 +3751,14 @@ function cardHtml(title, subtitle, linesHtml, settings) {
 }
 
 function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
-  // opts.board: the congregation-facing view, which has no app chrome around it.
-  const board = Boolean(opts.board);
+  // opts.luach: the congregation-facing view, which has no app chrome around it.
+  const luach = Boolean(opts.luach);
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
 
   if (!serials.length) {
-    container.innerHTML = board
+    container.innerHTML = luach
       ? '<p class="hint">Nothing has been published yet.</p>'
       : `<h2>This week</h2>
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
@@ -3802,7 +3802,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
 
   container.innerHTML = `
     ${
-      board
+      luach
         ? ''
         : `<h2>This week</h2>
     <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
@@ -3816,7 +3816,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
       ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
     </div>
-    ${board ? '' : publishPanelHtml(sheet)}
+    ${luach ? '' : publishPanelHtml(sheet)}
   `;
 
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
@@ -4032,26 +4032,29 @@ function render() {
 }
 
 
-// The congregation-facing board: index.html?board. It reads the published season from
+// The congregation-facing luach: index.html?luach. It reads the published season from
 // data/published.json instead of localStorage, because a visitor's browser has none of
 // this app's data. No sidebar, no editing, just the week.
-async function startBoard() {
+async function startLuach() {
   document.querySelector('.sidebar')?.remove();
-  document.body.classList.add('is-board');
+  document.body.classList.add('is-luach');
   main.innerHTML = '<p class="hint">Loading…</p>';
   const published = await loadPublished();
   if (!published) {
     main.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
     return;
   }
-  const boardState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  const luachState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
-  const draw = () => renderWeek(main, boardState, (s) => { serial = s; draw(); }, serial, { board: true });
+  const draw = () => renderWeek(main, luachState, (s) => { serial = s; draw(); }, serial, { luach: true });
   draw();
 }
 
-if (new URLSearchParams(location.search).has('board')) {
-  startBoard();
+// ?board is kept as an alias: it was the first name this had, and a link already sent
+// out should not break.
+const params = new URLSearchParams(location.search);
+if (params.has('luach') || params.has('board')) {
+  startLuach();
 } else {
 loadTables()
   .then((t) => {

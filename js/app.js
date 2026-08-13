@@ -190,26 +190,29 @@ function render() {
 }
 
 
-// The congregation-facing board: index.html?board. It reads the published season from
+// The congregation-facing luach: index.html?luach. It reads the published season from
 // data/published.json instead of localStorage, because a visitor's browser has none of
 // this app's data. No sidebar, no editing, just the week.
-async function startBoard() {
+async function startLuach() {
   document.querySelector('.sidebar')?.remove();
-  document.body.classList.add('is-board');
+  document.body.classList.add('is-luach');
   main.innerHTML = '<p class="hint">Loading…</p>';
   const published = await loadPublished();
   if (!published) {
     main.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
     return;
   }
-  const boardState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  const luachState = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
-  const draw = () => renderWeek(main, boardState, (s) => { serial = s; draw(); }, serial, { board: true });
+  const draw = () => renderWeek(main, luachState, (s) => { serial = s; draw(); }, serial, { luach: true });
   draw();
 }
 
-if (new URLSearchParams(location.search).has('board')) {
-  startBoard();
+// ?board is kept as an alias: it was the first name this had, and a link already sent
+// out should not break.
+const params = new URLSearchParams(location.search);
+if (params.has('luach') || params.has('board')) {
+  startLuach();
 } else {
 loadTables()
   .then((t) => {

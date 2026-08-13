@@ -2,19 +2,19 @@
 //
 // Everything in this app lives in one browser's localStorage, so a visitor's browser has
 // nothing to show. Publishing writes the season into a file that ships with the site, at
-// data/published.json, which the board view (index.html?board) reads instead of
+// data/published.json, which the luach (index.html?luach) reads instead of
 // localStorage. That is the whole mechanism: no backend, no login, no database.
 //
-// A season is published once. The board then advances by itself every week, because the
+// A season is published once. The luach then advances by itself every week, because the
 // week it shows is worked out from today's date against the weeks in the file.
 
-/** What the board needs, and nothing else.
+/** What the luach needs, and nothing else.
  *
  *  The sheets are carried whole (weeks and overrides included) rather than as
- *  pre-rendered times, so the board runs the same code the app does and a manual edit or
+ *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
  *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
  *  Settings are trimmed to what the card actually prints: no location maths is redone on
- *  the board, but the header, footer and שחרית schedules are all read from here. */
+ *  the luach, but the header, footer and שחרית schedules are all read from here. */
 export function buildPublishedPayload(state, sheets) {
   return {
     version: 1,

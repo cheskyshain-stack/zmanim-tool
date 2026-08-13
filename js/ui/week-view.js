@@ -118,8 +118,8 @@ function publishPanelHtml(sheet) {
   return `<details class="panel">
     <summary>Publish this season for the congregation</summary>
     <div class="panel-body">
-      <p class="hint">The board at <strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
-      <p class="hint">Publish once per season. The board then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
+      <p class="hint">The luach at <strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
+      <p class="hint">Publish once per season. The luach then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
       <div class="actions"><button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> and its Weekday chart</button></div>
       <p class="hint">This saves a file called <code>published.json</code>. Send it over and it goes onto the site, which is the step that makes it visible.</p>
     </div>
@@ -152,14 +152,14 @@ function cardHtml(title, subtitle, linesHtml, settings) {
 }
 
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
-  // opts.board: the congregation-facing view, which has no app chrome around it.
-  const board = Boolean(opts.board);
+  // opts.luach: the congregation-facing view, which has no app chrome around it.
+  const luach = Boolean(opts.luach);
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
 
   if (!serials.length) {
-    container.innerHTML = board
+    container.innerHTML = luach
       ? '<p class="hint">Nothing has been published yet.</p>'
       : `<h2>This week</h2>
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
@@ -203,7 +203,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
 
   container.innerHTML = `
     ${
-      board
+      luach
         ? ''
         : `<h2>This week</h2>
     <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
@@ -217,7 +217,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
       ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
     </div>
-    ${board ? '' : publishPanelHtml(sheet)}
+    ${luach ? '' : publishPanelHtml(sheet)}
   `;
 
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));

@@ -55,9 +55,9 @@ export function renderGuide(container, onOpenTab) {
     </details>
 
     <details class="panel">
-      <summary>The board for the congregation</summary>
+      <summary>The luach for the congregation</summary>
       <div class="panel-body">
-        <p><strong>lczmanim.cjaffa.com/?board</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
+        <p><strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
         <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
         <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish this season for the congregation</em>, and press the button. That saves a file called <code>published.json</code>, which then goes onto the site. Publish once per season, and again whenever you change a time so the congregation sees the correction.</p>
       </div>
