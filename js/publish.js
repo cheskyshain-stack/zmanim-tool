@@ -25,6 +25,11 @@ export function buildPublishedPayload(state, sheets) {
       id: s.id,
       season: s.season,
       hebrewYear: s.hebrewYear,
+      // Carried across because the luach sorts on it: where two published sheets both
+      // cover a week, the most recently generated one wins. Left out, every sheet sorted
+      // as undefined and the winner came down to the order they happened to be published
+      // in, which is not a rule anyone could predict.
+      createdAt: s.createdAt,
       linkedSheetId: s.linkedSheetId,
       weeks: s.weeks,
       pageSizes: s.pageSizes,
