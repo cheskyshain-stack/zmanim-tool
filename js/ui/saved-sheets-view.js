@@ -1,3 +1,5 @@
+import { getPublishToken, fetchPublished } from '../publish.js';
+
 const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
@@ -42,7 +44,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
         <tr data-id="${s.id}">
           <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABEL[s.season] || s.season}${
             companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
-          }</td>
+          }<span class="live-chip" data-live-for="${s.id}" hidden>Live</span></td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
           <td data-label="Created">${created(s.createdAt)}</td>
@@ -85,6 +87,31 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
         : '<p class="hint">No saved sheets yet. Use Generate to create one.</p>'
     }
   `;
+
+  // Which of these the congregation is actually looking at. Asked of the repository
+  // rather than assumed, because a sheet can be published from another browser and a
+  // stale badge on the wrong row is worse than no badge. Silent on failure: this is a
+  // nice-to-know, not a reason to break the list.
+  (async () => {
+    if (!getPublishToken()) return;
+    try {
+      const { data } = await fetchPublished(getPublishToken());
+      const live = data?.sheets || [];
+      container.querySelectorAll('[data-live-for]').forEach((chip) => {
+        const sheet = state.sheets.find((x) => x.id === chip.dataset.liveFor);
+        if (!sheet) return;
+        const seasonLive = live.some((p) => p.season === sheet.season && p.hebrewYear === sheet.hebrewYear);
+        const thisOneLive = live.some((p) => p.id === sheet.id);
+        chip.hidden = !seasonLive;
+        chip.classList.toggle('is-superseded', seasonLive && !thisOneLive);
+        chip.title = thisOneLive
+          ? "This exact sheet is on the congregation's page"
+          : 'This season is published, but from a different sheet than this one';
+      });
+    } catch {
+      /* no badge rather than an error: the list itself is fine */
+    }
+  })();
 
   // A row is a pair, so every action here works on the sheets in it, not just the one
   // the row is keyed by.

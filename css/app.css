@@ -729,7 +729,7 @@ td.ruled .cell { background: var(--ruled); }
    together. Below 60rem of usable width there is no room for two readable columns, so
    they stack. */
 .week-cards { display: grid; grid-template-columns: 1fr; gap: 1.25rem; align-items: start; }
-@media (min-width: 62rem) {
+@media (min-width: 72rem) {
   .week-cards { grid-template-columns: 1fr 1fr; }
 }
 .week-cards > .week-card { margin-bottom: 0; }
@@ -741,7 +741,7 @@ td.ruled .cell { background: var(--ruled); }
   --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   --sheet-font-size: 10pt;
   --sheet-header-scale: 0.5;
-  max-width: 34rem;
+  max-width: 40rem;
   background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); padding: 1.25rem 1.35rem 1rem; margin-bottom: 1.25rem;
   font-family: var(--sheet-font-family); color: var(--ink);
@@ -777,7 +777,10 @@ td.ruled .cell { background: var(--ruled); }
 }
 /* Three columns with equal sides, so the logo sits on the card's centre line. The flex
    version let the wider rabbi line push it off centre. */
-.week-card .header-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+/* minmax(0, 1fr) rather than 1fr: a plain 1fr is a *minimum* of the content's size, so
+   the rabbi line was widening its own column and pushing the logo off the centre line.
+   Capped at zero minimum, the two sides stay equal whatever they hold. */
+.week-card .header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
 .week-card .header-icon { justify-self: start; }
 /* nowrap: the equal side columns are narrower than the flex version, and the rabbi
    line was breaking mid-title. Smaller here than on the printed page, where it has an
@@ -793,7 +796,7 @@ td.ruled .cell { background: var(--ruled); }
 /* The congregation-facing luach (index.html?luach). No sidebar to sit beside, so unlike
    every other screen this one is centred: it is a page to read, not a workspace to reach
    controls in. */
-body.is-luach main { max-width: 68rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
+body.is-luach main { max-width: 82rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
 body.is-luach .week-card { max-width: none; }
 body.is-luach .week-nav { justify-content: center; }
 @media (max-width: 900px) {
@@ -860,3 +863,13 @@ kbd {
   background: var(--bg); border-radius: var(--radius-sm); font-size: var(--fs-md);
 }
 #publish-status { margin-top: 0.6rem; display: block; }
+
+/* Marks the sheet the congregation is currently looking at. The superseded variant is
+   for a season that is published from a different sheet than this one. */
+.live-chip {
+  background: #dcfce7; color: #14532d; border-radius: 4px;
+  padding: 0.05rem 0.4rem; margin-left: 0.35rem;
+  font-size: var(--fs-xs); font-weight: 600; white-space: nowrap;
+}
+.live-chip.is-superseded { background: var(--accent-soft); color: var(--muted); }
+.live-chip.is-superseded::after { content: " (other)"; }

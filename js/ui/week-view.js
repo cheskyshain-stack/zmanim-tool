@@ -19,6 +19,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis } from '../hebr
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
+import { SLASH } from '../util.js';
 
 /** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
  *  in more than one saved sheet resolves to the most recently generated one. */
@@ -96,6 +97,26 @@ function specialDaysInWeek(shabbosSerial, settings) {
 const fmtDate = (date) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
+/** At most three times to a line.
+ *
+ *  The charts pack a Mincha menu into two long lines because a column on paper is narrow
+ *  and tall. A card is the other shape, and five times running across one line is hard to
+ *  read at a glance, which is the whole point of this page. Splitting is done on the same
+ *  separator the formulas join with, so the underline markers stay attached to their own
+ *  time. */
+function capPerLine(text, max = 3) {
+  return String(text ?? '')
+    .split('\n')
+    .map((one) => {
+      const parts = one.split(SLASH);
+      if (parts.length <= max) return one;
+      const chunks = [];
+      for (let i = 0; i < parts.length; i += max) chunks.push(parts.slice(i, i + max).join(SLASH));
+      return chunks.join('\n');
+    })
+    .join('\n');
+}
+
 /** A label/time line. The label keeps its line breaks as spaces, since a column header
  *  is wrapped to fit a narrow column and has no reason to wrap here. */
 function line(label, value, isHtml = false, keepEmpty = false) {
@@ -103,7 +124,7 @@ function line(label, value, isHtml = false, keepEmpty = false) {
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
     <span class="week-label">${weekEsc(label.replace(/\n/g, ' ').trim())}</span>
-    <span class="week-time">${isHtml ? text : weekNl2br(text)}</span>
+    <span class="week-time">${isHtml ? text : weekNl2br(capPerLine(text))}</span>
   </div>`;
 }
 
@@ -218,6 +239,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     }
     <div class="week-nav">
       <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
+      <button type="button" id="week-today">Today</button>
       <span class="week-when">${fmtDate(week.date)}</span>
       <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
     </div>
@@ -228,6 +250,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     ${luach ? '' : publishPanelHtml(sheet)}
   `;
 
+  // null puts it back on whichever Shabbos is next, rather than a pinned week.
+  container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
 
