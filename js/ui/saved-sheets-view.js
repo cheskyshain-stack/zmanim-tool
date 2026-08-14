@@ -1,4 +1,4 @@
-import { getPublishToken, fetchPublished } from '../publish.js';
+import { getPublishToken, fetchPublished, publishToSite, buildPublishedPayload } from '../publish.js';
 
 const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 const NEW_FOLDER = '__new__';
@@ -57,6 +57,11 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
           </td>
           <td>
             <button class="open-btn btn-primary">Open</button>
+            ${
+              s.season !== 'weekday' && getPublishToken()
+                ? `<button class="publish-btn" title="Put this season on the congregation's page. Any other published season stays where it is.">Publish</button>`
+                : ''
+            }
             <button class="lock-btn" title="${s.locked ? 'Allow this sheet to be deleted again' : 'Protect this sheet from being deleted'}">${s.locked ? 'Unlock' : 'Lock'}</button>
             <button class="delete-btn btn-danger" ${s.locked ? 'disabled title="Unlock this sheet before deleting it"' : ''}>Delete</button>
           </td>
@@ -92,7 +97,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
   // rather than assumed, because a sheet can be published from another browser and a
   // stale badge on the wrong row is worse than no badge. Silent on failure: this is a
   // nice-to-know, not a reason to break the list.
-  (async () => {
+  const refreshLive = async () => {
     if (!getPublishToken()) return;
     try {
       const { data } = await fetchPublished(getPublishToken());
@@ -111,7 +116,8 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
     } catch {
       /* no badge rather than an error: the list itself is fine */
     }
-  })();
+  };
+  refreshLive();
 
   // A row is a pair, so every action here works on the sheets in it, not just the one
   // the row is keyed by.
@@ -120,6 +126,30 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
 
   container.querySelectorAll('.open-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => onOpen(e.target.closest('tr').dataset.id));
+  });
+  // Publishing from the list, so any saved season can go up without first paging This
+  // week around to a date inside it. One season per press, but pressing it on a second
+  // season leaves the first alone: the published file holds them all.
+  container.querySelectorAll('.publish-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      const { primary, companion } = groupOf(e);
+      const label = `${SEASON_LABEL[primary.season] || primary.season} ${primary.hebrewYear}`;
+      if (!confirm(`Put ${label} on the congregation's page?`)) return;
+      const was = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Publishing…';
+      try {
+        await publishToSite(buildPublishedPayload(state, [primary, companion].filter(Boolean)), getPublishToken());
+        btn.textContent = 'Published';
+        await refreshLive();
+      } catch (err) {
+        alert(err.message);
+        btn.textContent = was;
+      } finally {
+        btn.disabled = false;
+        setTimeout(() => (btn.textContent = was), 4000);
+      }
+    });
   });
   container.querySelectorAll('.lock-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
