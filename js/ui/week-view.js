@@ -20,6 +20,7 @@ import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import { SLASH } from '../util.js';
+import { attachPagePrintToAll } from './print-page.js';
 
 /** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
  *  in more than one saved sheet resolves to the most recently generated one. */
@@ -305,6 +306,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   container.querySelectorAll('.week-card').forEach((card, i) => {
     card.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
   });
+
+  // Each page prints on its own: usually you want this week's שבת page, or the חול
+  // page, not both.
+  attachPagePrintToAll(container, '.week-card', 'Print this page');
 
   fitPagesToWindow(container);
 

@@ -3289,6 +3289,39 @@ function applyOverrideValue(sheet, serial, col, value) {
   else setOverride(sheet, serial, col, value);
 }
 
+/** The printed pages of one sheet, built and styled but not yet in the document.
+ *
+ *  Exported because the congregation's page shows the same chart, and a second renderer
+ *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
+ *  that use: it is the same markup with the cell editing taken off, rather than a
+ *  different rendering path that could quietly diverge.
+ *
+ *  Row heights still need syncPageHeights() once the pages are in the document, since
+ *  nothing can be measured before then. */
+function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
+  if (!sheet) return [];
+  const settings = resolveSettings(state.settings);
+  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
+  if (!sheet.columnWidths) sheet.columnWidths = {};
+  const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+  const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
+  return split.map(({ weeks: pw, effectiveSeason }, i) => {
+    const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
+    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason);
+    el.dataset.sheetLabel = sheetLabel(sheet);
+    el.dataset.pageIndex = i;
+    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
+    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
+    return el;
+  });
+}
+
+/** Makes every row on every page the same height. Must run with the pages in the
+ *  document: heights read 0 on a detached element. */
+function syncPageHeights(pagesEl) {
+  syncHeaderRowHeight(pagesEl);
+}
+
 function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
   if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#54595f'; // sheets saved before this control existed
@@ -3411,21 +3444,7 @@ function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => {
-    if (!sh) return [];
-    if (!sh.style) sh.style = { ...state.settings.sheetStyle };
-    if (!sh.columnWidths) sh.columnWidths = {};
-    const wks = sh.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-    const split = splitWeeksIntoPages(wks, sh.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sh, pw, settings) }));
-    return split.map(({ weeks: pw, effectiveSeason }, i) => {
-      const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-      const el = renderPage(pw, i, split.length, columns, buildRow, settings, sh, state, onChange, effectiveSeason);
-      el.dataset.sheetLabel = sheetLabel(sh);
-      el.dataset.pageIndex = i;
-      applyStyle(el, sh.style); // variables only - row heights need the page in the document
-      return el;
-    });
-  };
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
   const primaryPages = buildPagesFor(sheet);
   const companionPages = buildPagesFor(companion);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
@@ -3805,6 +3824,59 @@ function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ==== ui/print-page.js ====
+// Printing one page on its own.
+//
+// A print button that prints everything is fine when everything is what you want. Usually
+// it is not: one week's page for the board outside, or one page of the season chart. Each
+// page therefore carries its own button, in a strip above it so it never sits on top of
+// anything and never reaches paper.
+//
+// The isolation is done in CSS rather than by building a separate document: the page is
+// marked, the body is told only marked pages print, and both marks come off again when
+// the dialog closes. Nothing is moved or cloned, so what prints is the page you were
+// looking at.
+
+/** Prints one element, hiding every other page for the duration. */
+function printOnly(pageEl) {
+  document.body.classList.add('is-printing-one');
+  pageEl.classList.add('is-print-target');
+  const done = () => {
+    document.body.classList.remove('is-printing-one');
+    pageEl.classList.remove('is-print-target');
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  // Safari and some mobile browsers never fire afterprint. A timer is a poor signal but a
+  // page left hidden would be a real bug, and clearing early costs nothing: print() has
+  // already taken its snapshot by then.
+  setTimeout(done, 1500);
+}
+
+/** Puts a print button above one page. The page keeps its own place in the flow; the
+ *  wrapper only adds the strip. */
+function attachPagePrint(pageEl, label = 'Print this page') {
+  const slot = document.createElement('div');
+  slot.className = 'page-slot';
+  const bar = document.createElement('div');
+  bar.className = 'page-slot-bar no-print';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'page-print';
+  btn.textContent = label;
+  btn.addEventListener('click', () => printOnly(pageEl));
+  bar.appendChild(btn);
+  pageEl.replaceWith(slot);
+  slot.append(bar, pageEl);
+  return slot;
+}
+
+/** Gives every matching page its own button. */
+function attachPagePrintToAll(root, selector, label) {
+  root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
+}
+
 // ==== ui/week-view.js ====
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
@@ -3815,6 +3887,7 @@ function esc(str) {
 // labels and the week's cells become the times. That means every manual edit, rule and
 // override already in a sheet shows up here with no extra work, and the two can never
 // drift apart.
+
 
 
 
@@ -4112,6 +4185,10 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   container.querySelectorAll('.week-card').forEach((card, i) => {
     card.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
   });
+
+  // Each page prints on its own: usually you want this week's שבת page, or the חול
+  // page, not both.
+  attachPagePrintToAll(container, '.week-card', 'Print this page');
 
   fitPagesToWindow(container);
 

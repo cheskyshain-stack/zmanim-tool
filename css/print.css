@@ -61,3 +61,11 @@
   .week-cards > .week-card:last-child { break-after: auto; }
   .week-line { break-inside: avoid; }
 }
+
+/* Printing one page: every other page is taken out of the run for the duration. The
+   marks are put on by printOnly() in ui/print-page.js and taken off again afterwards. */
+@media print {
+  body.is-printing-one .week-card:not(.is-print-target),
+  body.is-printing-one .page:not(.is-print-target) { display: none !important; }
+  .page-slot { display: block; margin: 0; }
+}

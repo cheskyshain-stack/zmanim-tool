@@ -68,6 +68,39 @@ function applyOverrideValue(sheet, serial, col, value) {
   else setOverride(sheet, serial, col, value);
 }
 
+/** The printed pages of one sheet, built and styled but not yet in the document.
+ *
+ *  Exported because the congregation's page shows the same chart, and a second renderer
+ *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
+ *  that use: it is the same markup with the cell editing taken off, rather than a
+ *  different rendering path that could quietly diverge.
+ *
+ *  Row heights still need syncPageHeights() once the pages are in the document, since
+ *  nothing can be measured before then. */
+export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
+  if (!sheet) return [];
+  const settings = resolveSettings(state.settings);
+  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
+  if (!sheet.columnWidths) sheet.columnWidths = {};
+  const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+  const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
+  return split.map(({ weeks: pw, effectiveSeason }, i) => {
+    const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
+    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason);
+    el.dataset.sheetLabel = sheetLabel(sheet);
+    el.dataset.pageIndex = i;
+    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
+    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
+    return el;
+  });
+}
+
+/** Makes every row on every page the same height. Must run with the pages in the
+ *  document: heights read 0 on a detached element. */
+export function syncPageHeights(pagesEl) {
+  syncHeaderRowHeight(pagesEl);
+}
+
 export function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
   if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#54595f'; // sheets saved before this control existed
@@ -190,21 +223,7 @@ export function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => {
-    if (!sh) return [];
-    if (!sh.style) sh.style = { ...state.settings.sheetStyle };
-    if (!sh.columnWidths) sh.columnWidths = {};
-    const wks = sh.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-    const split = splitWeeksIntoPages(wks, sh.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sh, pw, settings) }));
-    return split.map(({ weeks: pw, effectiveSeason }, i) => {
-      const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-      const el = renderPage(pw, i, split.length, columns, buildRow, settings, sh, state, onChange, effectiveSeason);
-      el.dataset.sheetLabel = sheetLabel(sh);
-      el.dataset.pageIndex = i;
-      applyStyle(el, sh.style); // variables only - row heights need the page in the document
-      return el;
-    });
-  };
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
   const primaryPages = buildPagesFor(sheet);
   const companionPages = buildPagesFor(companion);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
