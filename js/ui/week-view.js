@@ -17,7 +17,7 @@ import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
-import { buildPublishedPayload, publishableGroups, downloadPublished } from '../publish.js';
+import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 
 /** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
@@ -109,19 +109,27 @@ function line(label, value, isHtml = false, keepEmpty = false) {
 
 /** The publish step, explained where the thing being published is on screen.
  *
- *  It produces a file rather than uploading anywhere: the site is static, so publishing
- *  means the file joins the site's own files. Deliberately not automatic, because
- *  publishing is the moment the congregation sees a change and that should be a decision,
- *  not a side effect of editing a cell. */
+ *  Publishing commits one file to the site, so it takes effect on its own: no file
+ *  changes hands. Deliberately a button rather than something automatic, because
+ *  publishing is the moment the congregation sees a change and that should be a
+ *  decision, not a side effect of editing a cell. */
 function publishPanelHtml(sheet) {
   const label = sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף';
+  const hasToken = Boolean(getPublishToken());
   return `<details class="panel">
-    <summary>Publish this season for the congregation</summary>
+    <summary>Publish for the congregation</summary>
     <div class="panel-body">
-      <p class="hint">The luach at <strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who visits, with no login and nothing to install. It reads a published copy of the season, because a visitor's browser has none of your saved sheets.</p>
-      <p class="hint">Publish once per season. The luach then moves to the next week by itself. Publish again whenever you change a time, so the congregation sees the correction.</p>
-      <div class="actions"><button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> and its Weekday chart</button></div>
-      <p class="hint">This saves a file called <code>published.json</code>. Send it over and it goes onto the site, which is the step that makes it visible.</p>
+      <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
+      ${
+        hasToken
+          ? `<div class="actions">
+               <button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> ${sheet.hebrewYear}</button>
+             </div>
+             <p class="hint">Publishing this season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
+             <div id="publish-status" class="hint"></div>
+             <div id="published-list"></div>`
+          : '<p class="error">No publishing token set. Add one in Settings, under Publishing, and this becomes a single button.</p>'
+      }
     </div>
   </details>`;
 }
@@ -223,10 +231,71 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
 
-  container.querySelector('#publish-btn')?.addEventListener('click', () => {
-    const group = publishableGroups(state).find((g) => g.sheet.id === sheet.id);
-    const toPublish = [group.sheet, group.weekday].filter(Boolean);
-    downloadPublished(buildPublishedPayload(state, toPublish));
+  const status = container.querySelector('#publish-status');
+  const say = (message, isError = false) => {
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('error', isError);
+  };
+
+  /** What is live right now, with a way to take each one back down. */
+  const showPublished = async () => {
+    const listEl = container.querySelector('#published-list');
+    if (!listEl) return;
+    try {
+      const { data } = await fetchPublished(getPublishToken());
+      const live = (data?.sheets || []).filter((s) => s.season !== 'weekday');
+      if (!live.length) {
+        listEl.innerHTML = '<p class="hint">Nothing is published yet.</p>';
+        return;
+      }
+      listEl.innerHTML =
+        '<p class="hint">Live on the congregation&rsquo;s page now:</p>' +
+        live
+          .map(
+            (s) => `<div class="published-row">
+              <span><bdi>${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${s.hebrewYear} <span class="hint">(${s.weeks.length} weeks)</span></span>
+              <button type="button" class="btn-danger unpublish-btn" data-season="${s.season}" data-year="${s.hebrewYear}" data-id="${s.id}">Unpublish</button>
+            </div>`
+          )
+          .join('');
+      listEl.querySelectorAll('.unpublish-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm("Take this season off the congregation's page?")) return;
+          btn.disabled = true;
+          say('Unpublishing…');
+          try {
+            const left = await unpublishFromSite({ season: btn.dataset.season, hebrewYear: Number(btn.dataset.year), id: btn.dataset.id }, getPublishToken());
+            say(left ? 'Unpublished. The page updates in about a minute.' : 'Unpublished. Nothing is published now.');
+            showPublished();
+          } catch (err) {
+            say(err.message, true);
+            btn.disabled = false;
+          }
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = '';
+      say(err.message, true);
+    }
+  };
+  showPublished();
+
+  container.querySelector('#publish-btn')?.addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    say('Publishing…');
+    try {
+      const group = publishableGroups(state).find((g) => g.sheet.id === sheet.id);
+      const toPublish = [group.sheet, group.weekday].filter(Boolean);
+      await publishToSite(buildPublishedPayload(state, toPublish), getPublishToken());
+      say("Published. The congregation's page updates in about a minute.");
+      showPublished();
+    } catch (err) {
+      say(err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 

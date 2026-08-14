@@ -3,6 +3,7 @@ import { exportStateToFile, importStateFromText, isSheetFile, importSheetFromTex
 import { renderImageCropper } from './image-crop.js';
 import { normalizeRichText } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
+import { getPublishToken, setPublishToken } from '../publish.js';
 
 export function renderSettings(container, state, onSave, onStateReplaced) {
   const s = state.settings;
@@ -71,6 +72,21 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       </details>
       <div class="actions"><button type="submit" class="btn-primary">Save settings</button></div>
     </form>
+    <form class="form-grid" id="settings-publish" onsubmit="return false">
+      <details class="panel">
+        <summary>Publishing</summary>
+        <div class="panel-body">
+        <p class="hint">Publishing puts the season on the congregation's page at <strong>lczmanim.cjaffa.com</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
+        <p class="hint"><strong>Making one:</strong> on GitHub, go to Settings, Developer settings, Personal access tokens, Fine-grained tokens, and generate a token. Give it access to the <code>zmanim-tool</code> repository only, and under Repository permissions set <strong>Contents</strong> to <strong>Read and write</strong>. Nothing else is needed.</p>
+        <p class="hint">The token is stored in this browser only, and deliberately kept out of the backup file, so exporting a backup never carries it. Anyone using this computer could take it and change the site, so do not set it on a shared machine. You can revoke it on GitHub at any time.</p>
+        <label>Publishing token<input type="password" id="publish-token" autocomplete="off" placeholder="${getPublishToken() ? '' : 'github_pat_...'}" value="${getPublishToken()}"></label>
+        <div class="backup-row">
+          <button type="button" id="save-token-btn" class="btn-primary">Save token</button>
+          <button type="button" id="clear-token-btn" class="btn-danger">Remove token</button>
+        </div>
+      </div>
+      </details>
+    </form>
     <form class="form-grid" id="settings-backup" onsubmit="return false">
       <details class="panel">
         <summary>Backup</summary>
@@ -85,6 +101,16 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
       </details>
     </form>
   `;
+
+  container.querySelector('#save-token-btn').addEventListener('click', () => {
+    setPublishToken(container.querySelector('#publish-token').value);
+    showToast(getPublishToken() ? 'Publishing token saved' : 'Publishing token removed');
+  });
+  container.querySelector('#clear-token-btn').addEventListener('click', () => {
+    setPublishToken('');
+    container.querySelector('#publish-token').value = '';
+    showToast('Publishing token removed');
+  });
 
   container.querySelector('#export-btn').addEventListener('click', () => exportStateToFile(state));
   container.querySelector('#import-input').addEventListener('change', async (e) => {

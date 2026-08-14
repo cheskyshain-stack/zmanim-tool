@@ -852,3 +852,11 @@ kbd {
 @media (max-width: 900px) {
   .toast { left: 0.75rem; right: 0.75rem; bottom: 0.75rem; max-width: none; }
 }
+
+/* One published season, with the way to take it back down. */
+.published-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.55rem 0.8rem; margin-top: 0.4rem;
+  background: var(--bg); border-radius: var(--radius-sm); font-size: var(--fs-md);
+}
+#publish-status { margin-top: 0.6rem; display: block; }
