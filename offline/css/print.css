@@ -37,53 +37,27 @@
 }
 
 /* --- The week cards on paper -------------------------------------------------------
-   Two to a sheet, side by side on a landscape page: the שבת card on one half and the חול
-   card on the other, so one sheet is the whole week.
+   Almost nothing to do: the card is already a letter page on screen, so printing it is a
+   matter of giving it the page to sit on and dropping the app's chrome. What you see is
+   what comes out.
 
-   A named page, because the wall charts above claim @page for their own letter landscape
-   and a second bare @page would fight them. Only the cards carry `page: weekcard`.
-
-   A landscape letter sheet less its margins is 10.2in across and 7.7in down, so each
-   card gets half the width and the full height. That height is why this shape suits the
-   cards: they are tall lists, and on a portrait half-sheet the קיץ week had to shrink to
-   0.586 to fit, where here it has half as far to shrink. */
-@page weekcard { size: letter landscape; margin: 0.4in; }
+   A named page, because the wall charts above claim @page for letter landscape and a
+   second bare @page would fight them. Only the cards carry `page: weekcard`. */
+@page weekcard { size: letter portrait; margin: 0; }
 
 @media print {
-  .week-cards {
-    page: weekcard;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.3in;
-    align-items: stretch;
-  }
+  .week-cards { display: block; gap: 0; }
   .week-cards > .week-card {
-    height: 7.7in;
-    max-width: none;
-    margin: 0;
-    padding: 0.2in 0.24in;
-    border: 1px solid #999;
-    border-radius: 0;
+    page: weekcard;
+    /* The on-screen zoom is a way of fitting a page into a window; paper has no such
+       problem and the page must come out at its real size. */
+    zoom: 1 !important;
+    border: none;
     box-shadow: none;
-    overflow: hidden;
+    margin: 0;
+    break-after: page;
     break-inside: avoid;
-    display: flex;
-    flex-direction: column;
   }
-  /* A third card would start the next sheet, so a longer run still comes off two to a
-     page rather than one. */
-  .week-cards > .week-card:nth-child(2n) { break-after: page; }
   .week-cards > .week-card:last-child { break-after: auto; }
-  /* The lines take whatever height is left, spread through it, so the shorter חול card
-     does not leave its half looking empty at the top. */
-  .week-lines { flex: 1; display: flex; flex-direction: column; justify-content: center; margin: 0.12in 0; overflow: hidden; }
-  /* zoom, not transform: transform would only paint smaller and leave the original
-     footprint behind, which is the whole problem being solved. The factor is measured by
-     fitCardsForPrint() in week-view.js, since CSS cannot fit text to a box. */
-  .week-lines-inner { zoom: var(--print-scale, 1); }
-  .week-line { break-inside: avoid; padding: 0.06in 0.14in; margin-bottom: 0.05in; background: #f2f3f5; }
-  .week-title { font-size: 17pt; margin: 0.07in 0 0; }
-  .week-label { font-size: 12pt; }
-  .week-time { font-size: 13pt; }
-  .week-card .page-footer { margin-top: 0; }
+  .week-line { break-inside: avoid; }
 }

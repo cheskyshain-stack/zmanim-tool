@@ -720,88 +720,65 @@ td.ruled .cell { background: var(--ruled); }
 .alloc-msg { margin: 0.35rem 0 0; font-size: var(--fs-sm); color: var(--muted); }
 .alloc-msg.is-bad { color: var(--danger); font-weight: 500; }
 
-/* --- This week ---------------------------------------------------------------------
-   One week as a tall card meant to be read on a screen or handed out, rather than the
-   wide wall chart. It borrows .page-header and .page-footer from the printed sheet so
-   the logo, rabbi line and address are the same ones, not a second copy that drifts. */
+/* --- This week ----------------------------------------------------------------------
+   A week card is a page, and it is the same page on screen as on paper: letter portrait,
+   the grey blocks, the same type. What you are looking at is what comes out of the
+   printer, which is why there is no separate print layout for it any more. Space left at
+   the bottom of a short week is fine; it is a page, not a box to fill. */
 .week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.1rem; flex-wrap: wrap; }
-/* שבת and חול beside each other, since they are one week's information and get read
-   together. Below 60rem of usable width there is no room for two readable columns, so
-   they stack. */
-.week-cards { display: grid; grid-template-columns: 1fr; gap: 1.25rem; align-items: start; }
-@media (min-width: 72rem) {
-  .week-cards { grid-template-columns: 1fr 1fr; }
-}
-.week-cards > .week-card { margin-bottom: 0; }
 .week-when { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
+.week-cards { display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+
 .week-card {
-  /* The printed-sheet variables are scoped to .pages, so the borrowed .page-header needs
-     its own copy here or its calc()s are invalid and the logo renders at full size. The
-     scale is turned down: this is a card, not an 11in page. */
+  /* The printed-sheet variables are scoped to .pages, so the borrowed type needs its own
+     copy here. */
   --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
-  --sheet-font-size: 10pt;
-  --sheet-header-scale: 0.5;
-  max-width: 40rem;
-  background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); padding: 1.25rem 1.35rem 1rem; margin-bottom: 1.25rem;
-  font-family: var(--sheet-font-family); color: var(--ink);
+  width: 8.5in;
+  height: 11in;
+  flex: none;
+  padding: 0.55in 0.6in 0.5in;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--sheet-font-family);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
 }
-.week-card .page-header { margin-bottom: 0.5rem; }
-.week-title {
-  margin: 0.6rem 0 0; text-align: center; font-size: 1.6rem; font-weight: 700;
-  direction: rtl; color: var(--ink);
-}
-.week-subtitle { margin: 0.15rem 0 0; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
-.week-lines { margin: 1.1rem 0 0.4rem; }
-/* Name on the right, time on the left, which is how the board reads. Two fixed columns
-   rather than space-between, so every name starts at the same place and every time sits
-   in the same band: with space-between each row was set by its own content and nothing
-   lined up down the card. The times column keeps its own left-to-right run, so
-   "7:30 / 8:15" is not reordered. */
+
+/* Top row: the photo on one side, the rabbi's line on the other, above the name. */
+.week-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.week-photo { height: 0.62in; width: auto; }
+.week-rabbi { text-align: right; font-size: 11pt; line-height: 1.35; white-space: pre-line; }
+.week-masthead { text-align: center; margin-top: 0.12in; }
+.week-logo { height: 0.52in; width: auto; }
+.week-place { font-size: 12pt; margin-top: 2pt; }
+
+.week-title { margin: 0.24in 0 0; text-align: center; font-size: 20pt; font-weight: 700; direction: rtl; color: var(--ink); }
+
+.week-lines { margin: 0.22in 0 0; }
+/* Name on the right, time on the left, in two fixed columns so every name starts at the
+   same place and every time sits in the same band. */
 .week-line {
-  display: grid; grid-template-columns: minmax(7rem, 11rem) 1fr; align-items: center;
-  gap: 1rem; padding: 0.6rem 0.9rem; margin-bottom: 0.4rem;
-  background: var(--bg); border-radius: var(--radius-sm);
+  display: grid; grid-template-columns: minmax(1.6in, 2.4in) 1fr; align-items: center;
+  gap: 0.2in; padding: 0.1in 0.16in; margin-bottom: 0.07in;
+  background: var(--bg); border-radius: 6px;
 }
-/* grid-row too: the label comes first in the DOM but belongs in the second column, and
-   without a row the time could only be placed after it, dropping onto a second row. */
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
-.week-label { direction: rtl; font-weight: 600; font-size: 1.05rem; text-align: right; }
-/* pre-line, because the שחרית schedule stores its breaks as real newlines inside its
-   HTML (see DEFAULT_WEEKDAY_SHACHARIS) and nowrap collapsed them into one long line.
-   Centred so a two- or three-line time block stacks tidily instead of ragged. */
-.week-time {
-  direction: ltr; font-weight: 700; font-size: 1.15rem;
-  text-align: center; white-space: pre-line; line-height: 1.35;
-}
-/* Three columns with equal sides, so the logo sits on the card's centre line. The flex
-   version let the wider rabbi line push it off centre. */
-/* minmax(0, 1fr) rather than 1fr: a plain 1fr is a *minimum* of the content's size, so
-   the rabbi line was widening its own column and pushing the logo off the centre line.
-   Capped at zero minimum, the two sides stay equal whatever they hold. */
-.week-card .header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
-.week-card .header-icon { justify-self: start; }
-/* nowrap: the equal side columns are narrower than the flex version, and the rabbi
-   line was breaking mid-title. Smaller here than on the printed page, where it has an
-   11in width to sit in. */
-.week-card .header-rabbi { justify-self: end; white-space: nowrap; font-size: 8.5pt; }
-.week-card .header-subtitle { font-size: calc(var(--sheet-font-size) + 0.5pt); }
-.week-card .page-footer { margin-top: 1rem; }
-/* The everyday שחרית is stored wrapped in .big, which is what sets it above the ר"ח
-   block on the printed chart. Here the two are separate rows, each with its own label,
-   so the size difference has nothing left to say and only made one row look shouty. */
+.week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
+.week-time { direction: ltr; font-weight: 700; font-size: 14pt; text-align: center; white-space: pre-line; line-height: 1.3; }
+.week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
+/* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the
+   wall chart. Here they are separate labelled rows, so the size difference says nothing. */
 .week-card .big { font-size: inherit; }
 
-/* The congregation-facing luach (index.html?luach). No sidebar to sit beside, so unlike
-   every other screen this one is centred: it is a page to read, not a workspace to reach
-   controls in. */
-body.is-luach main { max-width: 82rem; margin-inline: auto; padding: 1.25rem 1rem 3rem; max-height: none; }
-body.is-luach .week-card { max-width: none; }
-body.is-luach .week-nav { justify-content: center; }
-@media (max-width: 900px) {
-  body.is-luach main { padding: 0.75rem 0.75rem 2rem; }
-}
+.week-foot { margin-top: auto; padding-top: 0.15in; text-align: center; font-size: 10.5pt; border-top: 1px solid var(--border); }
+
+/* A letter page is 816px across, wider than a phone and most windows once the sidebar is
+   there. Scaled down to fit rather than scrolled sideways, so the whole page is visible:
+   the same reason the wall charts have Fit to screen. */
+.week-cards.is-scaled > .week-card { zoom: var(--page-zoom, 1); }
 
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {

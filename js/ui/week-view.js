@@ -175,96 +175,53 @@ function publishPanelHtml(sheet) {
   </details>`;
 }
 
-function cardHtml(title, subtitle, linesHtml, settings) {
+function cardHtml(title, linesHtml, settings) {
+  // The rabbi's line and the photo sit on the top row, with the shul's name below them
+  // rather than beside them: on a page this shape the name is the thing to see first, and
+  // squeezed into the middle of a three-column row it was neither big nor centred.
   return `<section class="week-card">
-    <div class="page-header">
-      <div class="header-row">
-        <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
-        <div class="header-center">
-          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
-          ${settings.headerSubtitle ? `<div class="header-subtitle">${weekEsc(settings.headerSubtitle)}</div>` : ''}
-        </div>
-        <div class="header-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
-      </div>
+    <div class="week-topline">
+      <img class="week-photo" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
+      <div class="week-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
+    </div>
+    <div class="week-masthead">
+      <img class="week-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
+      ${settings.headerSubtitle ? `<div class="week-place">${weekEsc(settings.headerSubtitle)}</div>` : ''}
     </div>
     <h3 class="week-title">${weekEsc(title)}</h3>
-    ${subtitle ? `<p class="week-subtitle">${weekEsc(subtitle)}</p>` : ''}
     <div class="week-lines"><div class="week-lines-inner">${linesHtml}</div></div>
-    <div class="page-footer">
-      <span class="footer-line"></span>
-      <div class="footer-text">
-        <span class="footer-address">${weekEsc(settings.footerAddress)}</span>
-      </div>
-      <span class="footer-line"></span>
-    </div>
+    <div class="week-foot">${weekEsc(settings.footerAddress)}</div>
   </section>`;
 }
 
-/** Scales each card's list of times down until it fits its half of a printed sheet.
+/** Scales the pages down until one fits across the window.
  *
- *  Two cards to a sheet means each gets a fixed 5.1in, and how much goes in one varies a
- *  lot: a חורף week is eight lines, a קיץ week eleven, several of them two lines deep.
- *  Sized by hand, קיץ needed 7.18in in a 5.08in box and would simply have been cut off.
+ *  A letter page is 816px wide, which is wider than a phone and wider than this app's
+ *  column on most screens. Scaled rather than scrolled sideways, so a whole page is
+ *  visible at once, and with `zoom` rather than `transform` so the layout really shrinks
+ *  instead of only being painted smaller. Print resets it: paper has no such problem.
  *
- *  CSS cannot fit text to a box on its own, so the ratio is measured here and handed to
- *  print.css as a custom property. Measuring means briefly applying the print rules on
- *  screen: they live inside @media print, so the declarations are lifted out of the
- *  stylesheet and applied directly, measured, and removed within the one frame. */
-async function fitCardsForPrint(container) {
-  const cards = [...container.querySelectorAll('.week-card')];
-  if (!cards.length) return;
-  let probe;
-  try {
-    const css = await (await fetch('/css/print.css')).text();
-    const blocks = [];
-    let i = 0;
-    while ((i = css.indexOf('@media print', i)) !== -1) {
-      const open = css.indexOf('{', i);
-      let depth = 0;
-      let j = open;
-      for (; j < css.length; j++) {
-        if (css[j] === '{') depth++;
-        else if (css[j] === '}') {
-          depth--;
-          if (!depth) break;
-        }
-      }
-      blocks.push(css.slice(open + 1, j));
-      i = j;
-    }
-    probe = document.createElement('style');
-    probe.textContent = blocks.join('\n');
-    // hidden while measuring, so the page does not visibly flinch
-    const hide = document.createElement('style');
-    hide.textContent = '.week-cards { visibility: hidden; }';
-    document.head.append(hide, probe);
-    // Let the new rules actually take effect before measuring. Without this every card
-    // measured against its screen layout, where it is as tall as its content, so nothing
-    // ever looked like it overflowed and every scale came out 1.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    for (const card of cards) {
-      const lines = card.querySelector('.week-lines');
-      if (!lines) continue;
-      // Measured on the card, not on the lines box: that box centres its content, so
-      // content spilling equally above and below it is not counted by its own
-      // scrollHeight, and every card measured as fitting when one plainly did not.
-      // The inner wrapper is an ordinary block, so its natural height and the room it has
-      // are both plain numbers. Zooming the flex item itself was not: its height comes
-      // from the flex algorithm in the parent's space while its contents lay out in the
-      // zoomed one, and the card still came out half an inch over.
-      const inner = lines.firstElementChild;
-      const needed = inner ? inner.scrollHeight : 0;
-      const room = lines.clientHeight;
-      // A hair under, so rounding never puts the last line over the edge.
-      const scale = needed > room && needed ? Math.max(0.5, (room / needed) * 0.98) : 1;
-      card.style.setProperty('--print-scale', scale.toFixed(3));
-    }
-    hide.remove();
-  } catch {
-    // Without a measurement the cards print at full size, which is the old behaviour.
-  } finally {
-    probe?.remove();
-  }
+ *  Recomputed on resize, since rotating a phone changes what fits. */
+let fitPagesHandler = null;
+
+function fitPagesToWindow(container) {
+  const wrap = container.querySelector('.week-cards');
+  const card = wrap?.querySelector('.week-card');
+  if (!card) return;
+  const apply = () => {
+    if (!document.body.contains(wrap)) return;
+    wrap.classList.remove('is-scaled');
+    wrap.style.removeProperty('--page-zoom');
+    const available = wrap.clientWidth;
+    const pageWidth = card.getBoundingClientRect().width;
+    if (!available || !pageWidth || pageWidth <= available) return;
+    wrap.style.setProperty('--page-zoom', (available / pageWidth).toFixed(4));
+    wrap.classList.add('is-scaled');
+  };
+  apply();
+  if (fitPagesHandler) window.removeEventListener('resize', fitPagesHandler);
+  fitPagesHandler = apply;
+  window.addEventListener('resize', fitPagesHandler);
 }
 
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
@@ -336,16 +293,20 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
     </div>
     <div class="week-cards">
-      ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
-      ${weekdayLines ? cardHtml('זמני חול', '', weekdayLines, state.settings) : ''}
+      ${cardHtml('פרשת ' + parsha, shabbosLines, state.settings)}
+      ${weekdayLines ? cardHtml('זמני חול · פרשת ' + parsha, weekdayLines, state.settings) : ''}
     </div>
     ${luach ? '' : publishPanelHtml(sheet)}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
-  container.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el));
+  // Two to a line on the weekday card, three on the שבת one: a typed list of minyan
+  // times is usually longer than a computed pair, and two sit better in the space.
+  container.querySelectorAll('.week-card').forEach((card, i) => {
+    card.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
+  });
 
-  fitCardsForPrint(container);
+  fitPagesToWindow(container);
 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
