@@ -1,0 +1,413 @@
+{
+  "version": 1,
+  "publishedAt": "2026-08-14T04:33:38.987Z",
+  "settings": {
+    "shulName": "קהל לב מנחם",
+    "headerSubtitle": "ליקוואוד קאמענס",
+    "headerRabbiLine": "הרב אריה שרבינטר שליט\"א\nמרא דאתרא",
+    "headerIconImage": null,
+    "footerNote": "All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.",
+    "footerAddress": "Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701",
+    "weekdayDefaultMincha": "",
+    "weekdayDefaultMaariv": "",
+    "weekdayShacharis": "<span class=\"big\">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>",
+    "weekdayShacharisSpecial": "6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>",
+    "weekdayFooterNote": "All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*",
+    "locationName": "Lakewood",
+    "latitude": 40.068,
+    "longitude": -74.205,
+    "elevation": 0,
+    "timezoneId": "America/New_York",
+    "language": "he",
+    "horizon": 0.8333333333333334,
+    "candleLightingMinutes": 18,
+    "ateretTorahTzaisOffset": 40,
+    "useAstronomicalChatzos": true,
+    "useElevation": false,
+    "inIsrael": false,
+    "useGregorianBefore1582": false,
+    "sheetStyle": {
+      "fontFamily": "Times New Roman",
+      "fontSizePt": 10,
+      "headerScale": 1,
+      "accentColor": "#54595f"
+    }
+  },
+  "rules": [
+    {
+      "id": "rule-tisha-bav",
+      "name": "ט באב: מוצאי שבת",
+      "enabled": true,
+      "condition": {
+        "hebrewDate": [
+          "5-8",
+          "5-9"
+        ]
+      },
+      "columnKeys": [
+        "kayitz:B",
+        "kayitz:C",
+        "choref:B",
+        "choref:C"
+      ],
+      "mode": "append",
+      "value": "ט באב"
+    },
+    {
+      "id": "rule-shabbos-hagadol",
+      "name": "שבת הגדול: דרשה",
+      "enabled": true,
+      "condition": {
+        "specialParsha": [
+          "הגדול",
+          "Hagadol"
+        ]
+      },
+      "columnKeys": [
+        "kayitz:C",
+        "choref:C"
+      ],
+      "mode": "append",
+      "value": "דרשה"
+    },
+    {
+      "id": "rule-shabbos-shuva",
+      "name": "שבת שובה: דרשה",
+      "enabled": true,
+      "condition": {
+        "specialParsha": [
+          "שובה",
+          "Shuva"
+        ]
+      },
+      "columnKeys": [
+        "kayitz:C",
+        "choref:C"
+      ],
+      "mode": "append",
+      "value": "דרשה"
+    }
+  ],
+  "sheets": [
+    {
+      "id": "sheet-msplhrin-ocxn92",
+      "season": "kayitz",
+      "hebrewYear": 5786,
+      "createdAt": "2026-08-12T04:34:30.681Z",
+      "weeks": [
+        {
+          "serial": 46123,
+          "date": "2026-04-11T00:00:00.000Z",
+          "parsha": "שמיני",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46130,
+          "date": "2026-04-18T00:00:00.000Z",
+          "parsha": "תזריע - מצורע",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46137,
+          "date": "2026-04-25T00:00:00.000Z",
+          "parsha": "אחרי מות - קדושים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46144,
+          "date": "2026-05-02T00:00:00.000Z",
+          "parsha": "אמור",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46151,
+          "date": "2026-05-09T00:00:00.000Z",
+          "parsha": "בהר - בחוקתי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46158,
+          "date": "2026-05-16T00:00:00.000Z",
+          "parsha": "במדבר",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46172,
+          "date": "2026-05-30T00:00:00.000Z",
+          "parsha": "נשא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46179,
+          "date": "2026-06-06T00:00:00.000Z",
+          "parsha": "בהעלותך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46186,
+          "date": "2026-06-13T00:00:00.000Z",
+          "parsha": "שלח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46193,
+          "date": "2026-06-20T00:00:00.000Z",
+          "parsha": "קרח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46200,
+          "date": "2026-06-27T00:00:00.000Z",
+          "parsha": "חקת - בלק",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46207,
+          "date": "2026-07-04T00:00:00.000Z",
+          "parsha": "פינחס",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46214,
+          "date": "2026-07-11T00:00:00.000Z",
+          "parsha": "מטות - מסעי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46221,
+          "date": "2026-07-18T00:00:00.000Z",
+          "parsha": "דברים",
+          "specialParsha": "חזון"
+        },
+        {
+          "serial": 46228,
+          "date": "2026-07-25T00:00:00.000Z",
+          "parsha": "ואתחנן",
+          "specialParsha": "נחמו"
+        },
+        {
+          "serial": 46235,
+          "date": "2026-08-01T00:00:00.000Z",
+          "parsha": "עקב",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46242,
+          "date": "2026-08-08T00:00:00.000Z",
+          "parsha": "ראה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46249,
+          "date": "2026-08-15T00:00:00.000Z",
+          "parsha": "שופטים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46256,
+          "date": "2026-08-22T00:00:00.000Z",
+          "parsha": "כי תצא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46263,
+          "date": "2026-08-29T00:00:00.000Z",
+          "parsha": "כי תבא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46270,
+          "date": "2026-09-05T00:00:00.000Z",
+          "parsha": "נצבים - וילך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46284,
+          "date": "2026-09-19T00:00:00.000Z",
+          "parsha": "האזינו",
+          "specialParsha": "שובה"
+        }
+      ],
+      "pageSizes": [
+        8,
+        7,
+        7
+      ],
+      "overrides": {}
+    },
+    {
+      "id": "sheet-msplhrin-r8yr1c",
+      "season": "weekday",
+      "hebrewYear": 5786,
+      "createdAt": "2026-08-12T04:34:30.671Z",
+      "linkedSheetId": "sheet-msplhrin-ocxn92",
+      "weeks": [
+        {
+          "serial": 46123,
+          "date": "2026-04-11T00:00:00.000Z",
+          "parsha": "שמיני",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46130,
+          "date": "2026-04-18T00:00:00.000Z",
+          "parsha": "תזריע - מצורע",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46137,
+          "date": "2026-04-25T00:00:00.000Z",
+          "parsha": "אחרי מות - קדושים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46144,
+          "date": "2026-05-02T00:00:00.000Z",
+          "parsha": "אמור",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46151,
+          "date": "2026-05-09T00:00:00.000Z",
+          "parsha": "בהר - בחוקתי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46158,
+          "date": "2026-05-16T00:00:00.000Z",
+          "parsha": "במדבר",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46165,
+          "date": "2026-05-23T00:00:00.000Z",
+          "parsha": "שבועות",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46172,
+          "date": "2026-05-30T00:00:00.000Z",
+          "parsha": "נשא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46179,
+          "date": "2026-06-06T00:00:00.000Z",
+          "parsha": "בהעלותך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46186,
+          "date": "2026-06-13T00:00:00.000Z",
+          "parsha": "שלח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46193,
+          "date": "2026-06-20T00:00:00.000Z",
+          "parsha": "קרח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46200,
+          "date": "2026-06-27T00:00:00.000Z",
+          "parsha": "חקת - בלק",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46207,
+          "date": "2026-07-04T00:00:00.000Z",
+          "parsha": "פינחס",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46214,
+          "date": "2026-07-11T00:00:00.000Z",
+          "parsha": "מטות - מסעי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46221,
+          "date": "2026-07-18T00:00:00.000Z",
+          "parsha": "דברים",
+          "specialParsha": "חזון"
+        },
+        {
+          "serial": 46228,
+          "date": "2026-07-25T00:00:00.000Z",
+          "parsha": "ואתחנן",
+          "specialParsha": "נחמו"
+        },
+        {
+          "serial": 46235,
+          "date": "2026-08-01T00:00:00.000Z",
+          "parsha": "עקב",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46242,
+          "date": "2026-08-08T00:00:00.000Z",
+          "parsha": "ראה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46249,
+          "date": "2026-08-15T00:00:00.000Z",
+          "parsha": "שופטים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46256,
+          "date": "2026-08-22T00:00:00.000Z",
+          "parsha": "כי תצא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46263,
+          "date": "2026-08-29T00:00:00.000Z",
+          "parsha": "כי תבא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46270,
+          "date": "2026-09-05T00:00:00.000Z",
+          "parsha": "נצבים - וילך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46277,
+          "date": "2026-09-12T00:00:00.000Z",
+          "parsha": "ראש השנה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46284,
+          "date": "2026-09-19T00:00:00.000Z",
+          "parsha": "האזינו",
+          "specialParsha": "שובה"
+        },
+        {
+          "serial": 46291,
+          "date": "2026-09-26T00:00:00.000Z",
+          "parsha": "סוכות",
+          "specialParsha": ""
+        }
+      ],
+      "pageSizes": [
+        9,
+        7,
+        9
+      ],
+      "overrides": {
+        "46249": {
+          "C": "1:40 1:50<div>6:35 7:30</div>",
+          "B": "<u>8:50</u>/<u>9:30</u>/<u>10:00</u>/10:30/<u>11:00</u>/<u>11:30</u>/<u>12:00</u>"
+        },
+        "46256": {
+          "C": "1:35/1:50/4:15/6:35/7:30",
+          "B": "<u>8:45</u>/<u>9:30</u>/<u>10:00</u>/10:30/<u>11:00</u>/<u>11:30</u>"
+        }
+      }
+    }
+  ]
+}
