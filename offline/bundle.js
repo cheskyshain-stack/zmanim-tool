@@ -1933,7 +1933,7 @@ const KAYITZ_COLUMNS = [
   // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
   // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
   // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\nפלג מ"א 72' },
+  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
   { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
   { key: 'K', header: 'מנחה\nפלג גר"א' },
   { key: 'L', header: 'מנחה\nערב שבת' },
