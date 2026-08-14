@@ -109,31 +109,39 @@ const fmtDate = (date) =>
  *  Counting resets at every existing break, so a value that already comes in two lines
  *  keeps them and only over-long lines are broken further. */
 function capTimesPerLine(root, max = 3) {
+  // Counting times rather than separators, because there is no one separator to count.
+  // The formulas join with "/", the שחרית schedule uses commas, and a typed list is
+  // spaced. Splitting on punctuation therefore missed typed times entirely and left the
+  // שחרית line at three. A time is recognisable on its own, so that is what is counted,
+  // and a break goes in front of the one that would start a line too many.
+  const TIME = /\d{1,2}:\d{2}\*{0,3}/g;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
-  let separators = 0;
+  let onThisLine = 0;
   for (const node of nodes) {
     if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.tagName === 'BR') separators = 0;
+      if (node.tagName === 'BR') onThisLine = 0;
       continue;
     }
-    if (node.nodeValue.includes('\n')) separators = 0;
-    if (!node.nodeValue.includes('/')) continue;
-    const pieces = node.nodeValue.split('/');
+    const text = node.nodeValue;
+    if (text.includes('\n')) onThisLine = 0;
     const frag = document.createDocumentFragment();
-    pieces.forEach((piece, i) => {
-      frag.append(piece);
-      if (i === pieces.length - 1) return;
-      separators++;
-      // Three times to a line means breaking at every third separator: the third one is
-      // the one that would have started a fourth time.
-      if (separators % max === 0) {
-        frag.append(document.createElement('br'));
-      } else {
-        frag.append('/');
-      }
-    });
+    let cut = 0;
+    let match;
+    TIME.lastIndex = 0;
+    while ((match = TIME.exec(text))) {
+      onThisLine++;
+      if (onThisLine <= max) continue;
+      // Everything up to this time, with the separator that would have preceded it
+      // trimmed away so the next line starts at the time itself.
+      frag.append(text.slice(cut, match.index).replace(/[\s,/]+$/, ''));
+      frag.append(document.createElement('br'));
+      cut = match.index;
+      onThisLine = 1;
+    }
+    if (!frag.childNodes.length) continue;
+    frag.append(text.slice(cut));
     node.replaceWith(frag);
   }
 }
@@ -177,22 +185,49 @@ function publishPanelHtml(sheet) {
 }
 
 function cardHtml(title, linesHtml, settings) {
-  // The rabbi's line and the photo sit on the top row, with the shul's name below them
-  // rather than beside them: on a page this shape the name is the thing to see first, and
-  // squeezed into the middle of a three-column row it was neither big nor centred.
+  // The same header the wall charts carry, markup and all, rather than a second one that
+  // looks similar: one header, one place to change it. It is sized in inches off
+  // --sheet-header-scale, so on this narrower page it shrinks in proportion instead of
+  // being redrawn.
   return `<section class="week-card">
-    <div class="week-topline">
-      <img class="week-photo" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
-      <div class="week-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
-    </div>
-    <div class="week-masthead">
-      <img class="week-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
-      ${settings.headerSubtitle ? `<div class="week-place">${weekEsc(settings.headerSubtitle)}</div>` : ''}
+    <div class="page-header">
+      <div class="header-row">
+        <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
+        <div class="header-center">
+          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
+          ${settings.headerSubtitle ? `<div class="header-subtitle">${weekEsc(settings.headerSubtitle)}</div>` : ''}
+        </div>
+        <div class="header-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
+      </div>
     </div>
     <h3 class="week-title">${weekEsc(title)}</h3>
     <div class="week-lines"><div class="week-lines-inner">${linesHtml}</div></div>
     <div class="week-foot">${weekEsc(settings.footerAddress)}</div>
   </section>`;
+}
+
+/** Scales a week's list of times down when it would otherwise run past the page.
+ *
+ *  A שבת קיץ week is eleven rows, some of them two lines deep, and at full size that
+ *  spills onto a second sheet: the print preview showed "2 sheets of paper" with the page
+ *  cut mid-list. Nothing can be shrunk by CSS alone, so the ratio is measured and applied.
+ *
+ *  The measurement is now taken from the page on screen, because the page on screen *is*
+ *  the printed page: same size, same type, same rules. The earlier version had to inject
+ *  the print stylesheet and measure against that, which was fragile and got the answer
+ *  wrong twice. */
+function fitLinesToPage(container) {
+  container.querySelectorAll('.week-card').forEach((card) => {
+    const box = card.querySelector('.week-lines');
+    const inner = box?.firstElementChild;
+    if (!inner) return;
+    card.style.removeProperty('--fit-scale');
+    const room = box.clientHeight;
+    const needed = inner.scrollHeight;
+    if (!room || !needed || needed <= room) return;
+    // A hair under, so rounding never pushes the last row over the edge.
+    card.style.setProperty('--fit-scale', Math.max(0.5, (room / needed) * 0.98).toFixed(3));
+  });
 }
 
 /** Scales the pages down until one fits across the window.
@@ -259,7 +294,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
       // even before anyone has filled it, or the card looks like the minyan does not
       // exist rather than like the time is not set yet.
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E'));
+      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E', '', c.key === 'E'));
 
     // The second שחרית schedule, only on weeks that actually have one of those days,
     // labelled with which day it is rather than the chart's catch-all heading. It goes
@@ -273,7 +308,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       const labelHtml = special
         .map((d) => `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`)
         .join('<br>');
-      parts.splice(1, 0, line('', htmlLines(state.settings.weekdayShacharisSpecial), true, false, labelHtml));
+      parts.splice(1, 0, line('', htmlLines(state.settings.weekdayShacharisSpecial), true, false, labelHtml, true));
     }
     weekdayLines = parts.join('');
   }
@@ -304,13 +339,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // Two to a line on the weekday card, three on the שבת one: a typed list of minyan
   // times is usually longer than a computed pair, and two sit better in the space.
   container.querySelectorAll('.week-card').forEach((card, i) => {
-    card.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
+    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
   });
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול
   // page, not both.
   attachPagePrintToAll(container, '.week-card', 'Print this page');
 
+  fitLinesToPage(container);
   fitPagesToWindow(container);
 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));

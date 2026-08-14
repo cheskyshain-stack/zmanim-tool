@@ -733,6 +733,8 @@ td.ruled .cell { background: var(--ruled); }
   /* The printed-sheet variables are scoped to .pages, so the borrowed type needs its own
      copy here. */
   --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  --sheet-font-size: 11pt;
+  --sheet-header-scale: 0.77;
   width: 8.5in;
   height: 11in;
   flex: none;
@@ -744,19 +746,19 @@ td.ruled .cell { background: var(--ruled); }
   color: var(--ink);
   display: flex;
   flex-direction: column;
+  /* A page is a page: nothing may spill past it onto a second sheet. */
+  overflow: hidden;
 }
 
-/* Top row: the photo on one side, the rabbi's line on the other, above the name. */
-.week-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.week-photo { height: 0.62in; width: auto; }
-.week-rabbi { text-align: right; font-size: 11pt; line-height: 1.35; white-space: pre-line; }
-.week-masthead { text-align: center; margin-top: 0.12in; }
-.week-logo { height: 0.52in; width: auto; }
-.week-place { font-size: 12pt; margin-top: 2pt; }
-
+/* The chart's own header, on this narrower page. Everything in it is sized in inches
+   against --sheet-header-scale, so one number shrinks the whole thing in proportion:
+   8.5in of page against the chart's 11in. */
 .week-title { margin: 0.24in 0 0; text-align: center; font-size: 20pt; font-weight: 700; direction: rtl; color: var(--ink); }
 
-.week-lines { margin: 0.22in 0 0; }
+/* Takes the room left between the masthead and the footer. The list inside is scaled to
+   fit it when a long week would otherwise overflow the page (see fitLinesToPage). */
+.week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; }
+.week-lines-inner { zoom: var(--fit-scale, 1); }
 /* Name on the right, time on the left, in two fixed columns so every name starts at the
    same place and every time sits in the same band. */
 .week-line {
@@ -767,11 +769,23 @@ td.ruled .cell { background: var(--ruled); }
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
 .week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
-.week-time { direction: ltr; font-weight: 700; font-size: 14pt; text-align: center; white-space: pre-line; line-height: 1.3; }
+/* The block of times is centred in its column, but its own lines are flush with each
+   other rather than each being centred separately: stacked times that step in and out
+   line by line are harder to read than a squared-off block. */
+.week-time {
+  direction: ltr; font-weight: 700; font-size: 14pt; white-space: pre-line; line-height: 1.35;
+  display: inline-block; justify-self: center; text-align: left;
+}
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
 /* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the
    wall chart. Here they are separate labelled rows, so the size difference says nothing. */
 .week-card .big { font-size: inherit; }
+
+/* minmax(0, 1fr) on the sides rather than 1fr: a plain 1fr is a minimum of its content,
+   so the rabbi's line widened its own column and pushed the name off the centre line. */
+.week-card .header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
+.week-card .header-icon { justify-self: start; }
+.week-card .header-rabbi { justify-self: end; white-space: pre-line; }
 
 .week-foot { margin-top: auto; padding-top: 0.15in; text-align: center; font-size: 10.5pt; border-top: 1px solid var(--border); }
 
