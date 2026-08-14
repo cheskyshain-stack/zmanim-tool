@@ -59,7 +59,9 @@ export function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p><strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
         <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
-        <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish this season for the congregation</em>, and press the button. That saves a file called <code>published.json</code>, which then goes onto the site. Publish once per season, and again whenever you change a time so the congregation sees the correction.</p>
+        <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish for the congregation</em>, and press the button. A minute later the congregation's page is showing it. Publish once per season, and again whenever you change a time so they see the correction.</p>
+        <p>Publishing needs a one-time setup: a token that allows the site to be written to. <strong>Settings → Publishing</strong> has step-by-step instructions for making one, and until it is set the publish button explains that rather than appearing broken.</p>
+        <p>Publishing a season leaves any other published season in place, so קיץ and חורף can both be live and the changeover between them happens on its own. A new year's chart does not remove last year's. Each published season also has an <strong>Unpublish</strong> button, and <strong>Saved sheets</strong> marks which sheet the congregation is currently looking at.</p>
       </div>
     </details>
 

@@ -77,7 +77,34 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
         <summary>Publishing</summary>
         <div class="panel-body">
         <p class="hint">Publishing puts the season on the congregation's page at <strong>lczmanim.cjaffa.com</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
-        <p class="hint"><strong>Making one:</strong> on GitHub, go to Settings, Developer settings, Personal access tokens, Fine-grained tokens, and generate a token. Give it access to the <code>zmanim-tool</code> repository only, and under Repository permissions set <strong>Contents</strong> to <strong>Read and write</strong>. Nothing else is needed.</p>
+        <details class="panel">
+          <summary>How to make the token</summary>
+          <div class="panel-body">
+            <ol class="guide-steps">
+              <li>Sign in to <strong>github.com</strong>.</li>
+              <li>Click your <strong>profile picture</strong>, top right, then <strong>Settings</strong>.</li>
+              <li>Scroll to the very bottom of the left sidebar: <strong>Developer settings</strong>.</li>
+              <li><strong>Personal access tokens</strong>, then <strong>Fine-grained tokens</strong>.</li>
+              <li><strong>Generate new token</strong>.</li>
+              <li>Name it anything, for example <code>zmanim publish</code>, and pick an expiry.
+                <span class="hint">When it expires, publishing stops until you make a new one and paste it here. A year is reasonable.</span>
+              </li>
+              <li>Under <strong>Repository access</strong>, choose <strong>Only select repositories</strong> and pick <strong>zmanim-tool</strong>.</li>
+              <li>Under <strong>Permissions</strong>, click <strong>+ Add permissions</strong>.
+                <span class="hint">This is the step that is easy to miss: the list starts empty and says "No repository permissions added yet".</span>
+              </li>
+              <li>Search for <strong>Contents</strong>, tick it, and add it.</li>
+              <li>Its dropdown will say <em>Read-only</em>. Change it to <strong>Read and write</strong>.
+                <span class="hint">Metadata adds itself as Read-only. Leave it, it is required.</span>
+              </li>
+              <li><strong>Generate token</strong> at the bottom, and copy it straight away.
+                <span class="hint">It starts with <code>github_pat_</code> and GitHub never shows it again.</span>
+              </li>
+              <li>Paste it below and press <strong>Save token</strong>.</li>
+            </ol>
+            <p class="hint">To check it worked, open <strong>This week</strong> and expand <em>Publish for the congregation</em>. A good token shows the publish button and, underneath, what is currently published. A bad one says so in plain words rather than failing quietly: "not allowed to write to this repository" means Contents was left on Read-only.</p>
+          </div>
+        </details>
         <p class="hint">The token is stored in this browser only, and deliberately kept out of the backup file, so exporting a backup never carries it. Anyone using this computer could take it and change the site, so do not set it on a shared machine. You can revoke it on GitHub at any time.</p>
         <label>Publishing token<input type="password" id="publish-token" autocomplete="off" placeholder="${getPublishToken() ? '' : 'github_pat_...'}" value="${getPublishToken()}"></label>
         <div class="backup-row">
