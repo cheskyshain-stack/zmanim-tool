@@ -137,7 +137,7 @@ function line(label, value, isHtml = false, keepEmpty = false) {
 function publishPanelHtml(sheet) {
   const label = sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף';
   const hasToken = Boolean(getPublishToken());
-  return `<details class="panel">
+  return `<details class="panel no-print">
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
       <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
@@ -169,7 +169,7 @@ function cardHtml(title, subtitle, linesHtml, settings) {
     </div>
     <h3 class="week-title">${weekEsc(title)}</h3>
     ${subtitle ? `<p class="week-subtitle">${weekEsc(subtitle)}</p>` : ''}
-    <div class="week-lines">${linesHtml}</div>
+    <div class="week-lines"><div class="week-lines-inner">${linesHtml}</div></div>
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
@@ -178,6 +178,73 @@ function cardHtml(title, subtitle, linesHtml, settings) {
       <span class="footer-line"></span>
     </div>
   </section>`;
+}
+
+/** Scales each card's list of times down until it fits its half of a printed sheet.
+ *
+ *  Two cards to a sheet means each gets a fixed 5.1in, and how much goes in one varies a
+ *  lot: a חורף week is eight lines, a קיץ week eleven, several of them two lines deep.
+ *  Sized by hand, קיץ needed 7.18in in a 5.08in box and would simply have been cut off.
+ *
+ *  CSS cannot fit text to a box on its own, so the ratio is measured here and handed to
+ *  print.css as a custom property. Measuring means briefly applying the print rules on
+ *  screen: they live inside @media print, so the declarations are lifted out of the
+ *  stylesheet and applied directly, measured, and removed within the one frame. */
+async function fitCardsForPrint(container) {
+  const cards = [...container.querySelectorAll('.week-card')];
+  if (!cards.length) return;
+  let probe;
+  try {
+    const css = await (await fetch('/css/print.css')).text();
+    const blocks = [];
+    let i = 0;
+    while ((i = css.indexOf('@media print', i)) !== -1) {
+      const open = css.indexOf('{', i);
+      let depth = 0;
+      let j = open;
+      for (; j < css.length; j++) {
+        if (css[j] === '{') depth++;
+        else if (css[j] === '}') {
+          depth--;
+          if (!depth) break;
+        }
+      }
+      blocks.push(css.slice(open + 1, j));
+      i = j;
+    }
+    probe = document.createElement('style');
+    probe.textContent = blocks.join('\n');
+    // hidden while measuring, so the page does not visibly flinch
+    const hide = document.createElement('style');
+    hide.textContent = '.week-cards { visibility: hidden; }';
+    document.head.append(hide, probe);
+    // Let the new rules actually take effect before measuring. Without this every card
+    // measured against its screen layout, where it is as tall as its content, so nothing
+    // ever looked like it overflowed and every scale came out 1.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (const card of cards) {
+      const lines = card.querySelector('.week-lines');
+      if (!lines) continue;
+      // Measured on the card, not on the lines box: that box centres its content, so
+      // content spilling equally above and below it is not counted by its own
+      // scrollHeight, and every card measured as fitting when one plainly did not.
+      // The inner wrapper is an ordinary block, so its natural height and the room it has
+      // are both plain numbers. Zooming the flex item itself was not: its height comes
+      // from the flex algorithm in the parent's space while its contents lay out in the
+      // zoomed one, and the card still came out half an inch over.
+      const inner = lines.firstElementChild;
+      const needed = inner ? inner.scrollHeight : 0;
+      const room = lines.clientHeight;
+      // A hair under, so rounding never puts the last line over the edge.
+      const scale = needed > room && needed ? Math.max(0.5, (room / needed) * 0.98) : 1;
+      card.style.setProperty('--print-scale', scale.toFixed(3));
+    }
+    hide.remove();
+  } catch {
+    // Without a measurement the cards print at full size, which is the old behaviour.
+  } finally {
+    probe?.remove();
+  }
 }
 
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
@@ -237,7 +304,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         : `<h2>This week</h2>
     <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
     }
-    <div class="week-nav">
+    <div class="week-nav no-print">
       <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
       <button type="button" id="week-today">Today</button>
       <span class="week-when">${fmtDate(week.date)}</span>
@@ -245,12 +312,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     </div>
     <div class="week-cards">
       ${cardHtml('פרשת ' + parsha, '', shabbosLines, state.settings)}
-      ${weekdayLines ? cardHtml('זמני חול', 'Weekday', weekdayLines, state.settings) : ''}
+      ${weekdayLines ? cardHtml('זמני חול', '', weekdayLines, state.settings) : ''}
     </div>
     ${luach ? '' : publishPanelHtml(sheet)}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
+  fitCardsForPrint(container);
+
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));

@@ -35,3 +35,49 @@
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* --- The week cards on paper -------------------------------------------------------
+   Two to a sheet, exactly: the שבת card and the חול card come off one page, which is
+   what gets handed out or hung up.
+
+   A named page, because the wall charts above claim @page for letter landscape and a
+   plain second @page would fight them. Only the cards carry `page: weekcard`, so the two
+   sizes coexist in one stylesheet.
+
+   Half of the printable height each, with the halves worked out from the sheet rather
+   than guessed: 11in less the 0.4in margins is 10.2in, so 5.1in a card. */
+@page weekcard { size: letter portrait; margin: 0.4in; }
+
+@media print {
+  .week-cards { display: block; }
+  .week-cards > .week-card {
+    page: weekcard;
+    height: 5.1in;
+    max-width: none;
+    margin: 0;
+    padding: 0.18in 0.22in;
+    border: 1px solid #999;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    break-inside: avoid;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Every second card ends the sheet, so a season's worth would still come off two to a
+     page rather than one per page. */
+  .week-cards > .week-card:nth-child(2n) { break-after: page; }
+  .week-cards > .week-card:last-child { break-after: auto; }
+  /* The lines take whatever height is left, spread through it, so a short חול card does
+     not leave its half of the sheet looking empty at the top. */
+  /* zoom, not transform: transform would only paint smaller and leave the original
+     footprint behind, which is the whole problem being solved. The factor is measured by
+     fitCardsForPrint() in week-view.js, since CSS cannot fit text to a box. */
+  .week-lines { flex: 1; display: flex; flex-direction: column; justify-content: center; margin: 0.1in 0; overflow: hidden; }
+  .week-lines-inner { zoom: var(--print-scale, 1); }
+  .week-line { break-inside: avoid; padding: 0.05in 0.12in; margin-bottom: 0.04in; background: #f2f3f5; }
+  .week-title { font-size: 15pt; margin: 0.06in 0 0; }
+  .week-label { font-size: 10.5pt; }
+  .week-time { font-size: 11.5pt; }
+  .week-card .page-footer { margin-top: 0; }
+}
