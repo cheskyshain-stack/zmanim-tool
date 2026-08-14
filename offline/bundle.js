@@ -907,13 +907,16 @@ function normalizeTimeShorthand(text) {
   return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
 }
 
-/** normalizeTimeShorthand plus the separator: whitespace *between two times* becomes the
- *  "/" these lists are written with. Spaces anywhere else (inside a Hebrew word, say)
- *  are deliberately left alone. */
+/** normalizeTimeShorthand, with the spacing between times tidied to a single space.
+ *
+ *  It used to join them with "/", matching how the computed columns are written, but a
+ *  typed מנחה or מעריב is a plain list of times and the slashes only made it noisier. Runs
+ *  of whitespace *between two times* collapse to one space; whitespace anywhere else
+ *  (inside a Hebrew word, say) is deliberately left alone. */
 function normalizeTimeList(text) {
   return normalizeTimeShorthand(text)
     .trim()
-    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1/');
+    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
 }
 
 /** Light contenteditable HTML cleanup, shared by every rich-text field in the app
