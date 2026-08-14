@@ -873,3 +873,7 @@ kbd {
 }
 .live-chip.is-superseded { background: var(--accent-soft); color: var(--muted); }
 .live-chip.is-superseded::after { content: " (other)"; }
+
+/* The day a ר"ח or בה"ב falls on, under the name rather than beside it. Its own
+   direction, so a bracketed Latin list is not reordered inside a Hebrew label. */
+.week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: var(--fs-sm); color: var(--muted); }

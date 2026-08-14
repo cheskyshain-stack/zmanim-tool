@@ -97,34 +97,54 @@ function specialDaysInWeek(shabbosSerial, settings) {
 const fmtDate = (date) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
-/** At most three times to a line.
+/** At most three times to a line, applied to the rendered cell rather than to a string.
  *
- *  The charts pack a Mincha menu into two long lines because a column on paper is narrow
- *  and tall. A card is the other shape, and five times running across one line is hard to
- *  read at a glance, which is the whole point of this page. Splitting is done on the same
- *  separator the formulas join with, so the underline markers stay attached to their own
- *  time. */
-function capPerLine(text, max = 3) {
-  return String(text ?? '')
-    .split('\n')
-    .map((one) => {
-      const parts = one.split(SLASH);
-      if (parts.length <= max) return one;
-      const chunks = [];
-      for (let i = 0; i < parts.length; i += max) chunks.push(parts.slice(i, i + max).join(SLASH));
-      return chunks.join('\n');
-    })
-    .join('\n');
+ *  Two reasons it is done here. A typed מנחה or מעריב is stored as HTML, and splitting
+ *  HTML on "/" would cut through the slash in a closing tag; and a hand-typed value
+ *  separates times with a plain "/", where the formulas use a padded one, so a string
+ *  split had to know which kind it was holding. Walking text nodes sidesteps both: only
+ *  real text is touched, whatever produced it.
+ *
+ *  Counting resets at every existing break, so a value that already comes in two lines
+ *  keeps them and only over-long lines are broken further. */
+function capTimesPerLine(root, max = 3) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let separators = 0;
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.tagName === 'BR') separators = 0;
+      continue;
+    }
+    if (node.nodeValue.includes('\n')) separators = 0;
+    if (!node.nodeValue.includes('/')) continue;
+    const pieces = node.nodeValue.split('/');
+    const frag = document.createDocumentFragment();
+    pieces.forEach((piece, i) => {
+      frag.append(piece);
+      if (i === pieces.length - 1) return;
+      separators++;
+      // Three times to a line means breaking at every third separator: the third one is
+      // the one that would have started a fourth time.
+      if (separators % max === 0) {
+        frag.append(document.createElement('br'));
+      } else {
+        frag.append('/');
+      }
+    });
+    node.replaceWith(frag);
+  }
 }
 
 /** A label/time line. The label keeps its line breaks as spaces, since a column header
  *  is wrapped to fit a narrow column and has no reason to wrap here. */
-function line(label, value, isHtml = false, keepEmpty = false) {
+function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
-    <span class="week-label">${weekEsc(label.replace(/\n/g, ' ').trim())}</span>
-    <span class="week-time">${isHtml ? text : weekNl2br(capPerLine(text))}</span>
+    <span class="week-label">${labelHtml || weekEsc(label.replace(/\n/g, ' ').trim())}</span>
+    <span class="week-time">${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
 
@@ -289,8 +309,13 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     // on the regular times, so those are what should be read first.
     const special = specialDaysInWeek(showing, settings);
     if (special.length && state.settings.weekdayShacharisSpecial) {
-      const label = 'שחרית ' + special.map((d) => `${d.name} (${d.day})`).join(', ');
-      parts.splice(1, 0, line(label, htmlLines(state.settings.weekdayShacharisSpecial), true));
+      // The day names go on their own line, in their own direction. Run together with
+      // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
+      // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
+      const labelHtml = special
+        .map((d) => `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`)
+        .join('<br>');
+      parts.splice(1, 0, line('', htmlLines(state.settings.weekdayShacharisSpecial), true, false, labelHtml));
     }
     weekdayLines = parts.join('');
   }
@@ -318,6 +343,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
+  container.querySelectorAll('.week-time').forEach((el) => capTimesPerLine(el));
+
   fitCardsForPrint(container);
 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
