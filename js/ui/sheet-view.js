@@ -427,9 +427,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
-      // The Weekday chart's Mincha/Maariv are plain Settings-driven default text, not
-      // computed zmanim, so neither the Tisha B'Av note nor the Rules engine (both
-      // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
+      // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
+      // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
+      // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
+      // there is nothing for a Weekday column to match against.
       const computed = buildRow(week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) - a חורף page that prints as קיץ (see
@@ -447,12 +448,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const html = state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
-        // times into it - "1220 130" becomes "12:20/1:30" on blur, same shorthand every
-        // other cell takes (see applyTimeShorthand below) - which turned out to be
-        // quicker than picking from the dropdown that used to live here.
+        // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
+        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
+        // week stores an override the same as any other column. An override already
+        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const html = row[c.key] ?? ''; // already HTML - the Settings default is rich text
+          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
           return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -513,10 +515,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const computed = builtRow;
     const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
     const raw = ruled[col] ?? '';
-    // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
-    // list in Settings); every other column is plain text that nl2br has to mark up
-    // first, or the comparison would see markup-vs-none and store a bogus override.
-    return normalizeRichText(weekSeason === 'weekday' ? raw : nl2br(raw));
+    // Every column, Weekday included, is built as plain text with underline sentinels
+    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
+    // store a bogus override on a cell nobody actually edited.
+    return normalizeRichText(nl2br(raw));
   };
 
   const commitCell = (cellEl) => {
