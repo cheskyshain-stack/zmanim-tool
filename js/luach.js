@@ -8,9 +8,10 @@
 // Where it goes is in the URL hash (#week, #chart), so the browser's back button works
 // and a page can be linked to directly, with no server configuration to arrange.
 import { loadPublished } from './publish.js';
-import { renderWeek } from './ui/week-view.js';
+import { renderWeek, currentSerial } from './ui/week-view.js';
 import { buildSheetPages, syncPageHeights } from './ui/sheet-view.js';
 import { attachPagePrintToAll } from './ui/print-page.js';
+import { splitWeeksIntoPages } from './pagination.js';
 
 const main = document.getElementById('main');
 
@@ -52,7 +53,7 @@ function homeHtml(published) {
       </a>
       <a class="luach-item" href="#chart">
         <span class="luach-item-title">לוח הזמנים לכל העונה</span>
-        <span class="luach-item-sub">The full season chart, the one on the wall. Print or save it.</span>
+        <span class="luach-item-sub">The part of the wall chart covering now. Print or save it.</span>
       </a>
     </nav>
     <p class="luach-foot">${esc(s.footerAddress)}</p>
@@ -87,23 +88,35 @@ function renderChartPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   const sheet = currentSheet(published);
   const weekday = published.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet?.id);
-  main.innerHTML = backBar('The full chart') + '<div id="pages" class="pages"></div>';
+  main.innerHTML = backBar('The chart') + '<div id="pages" class="pages"></div>';
   const pagesEl = main.querySelector('#pages');
   if (!sheet) {
     pagesEl.innerHTML = '<p class="hint">Nothing has been published yet.</p>';
     return;
   }
-  // Interleaved the way they print: שבת, its Weekday chart, שבת, its Weekday chart.
+  // Only the stretch of the season we are actually in. A season chart runs to three
+  // pages, and handing a congregant all of them means finding the right one before
+  // reading a single time. The page breaks of the two charts fall on the same dates
+  // (alignPageSizesTo at generation time), so one index picks the matching pair: the
+  // שבת page and its Weekday page, in the order they print.
   const shabbos = buildSheetPages(sheet, state, () => {}, { readOnly: true });
   const chol = buildSheetPages(weekday, state, () => {}, { readOnly: true });
-  for (let i = 0; i < Math.max(shabbos.length, chol.length); i++) {
-    if (shabbos[i]) pagesEl.appendChild(shabbos[i]);
-    if (chol[i]) pagesEl.appendChild(chol[i]);
-  }
+  const i = pageIndexForNow(sheet);
+  for (const page of [shabbos[i], chol[i]]) if (page) pagesEl.appendChild(page);
   syncPageHeights(pagesEl);
   attachPagePrintToAll(pagesEl, '.page', 'Print this page');
   fitPagesToWindow(pagesEl);
   main.querySelector('#print-btn').addEventListener('click', () => window.print());
+}
+
+/** Which page of a chart covers now: the one holding the same week the week page opens
+ *  on, so the two views of the site never disagree about which Shabbos is "this" one.
+ *  Falls back to the first page for a season that has not started or is already over. */
+function pageIndexForNow(sheet) {
+  const target = currentSerial(sheet.weeks.map((w) => w.serial));
+  const pages = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes);
+  const index = pages.findIndex((page) => page.some((w) => w.serial === target));
+  return index === -1 ? 0 : index;
 }
 
 /** A chart page is a fixed 11in wide, so on anything narrower it is scaled down rather

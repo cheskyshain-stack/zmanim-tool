@@ -48,7 +48,7 @@ function weekdayCompanionOf(sheet, state) {
  *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
  *  week. Compared as a date rather than a moment, so the switch happens at midnight on
  *  Motzei Shabbos rather than at an exact tzais. */
-function currentSerial(serials) {
+export function currentSerial(serials) {
   const today = new Date();
   const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
