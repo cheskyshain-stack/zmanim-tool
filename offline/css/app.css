@@ -728,6 +728,10 @@ td.ruled .cell { background: var(--ruled); }
 .week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.1rem; flex-wrap: wrap; }
 .week-when { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
 .week-cards { display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
+/* Centred on the congregation site only. There is no sidebar there, so a left-aligned
+   page leaves the whole right of the window empty. In the admin app the card stays left,
+   with every other screen, against the sidebar (see the note in CLAUDE.md). */
+body.is-luach .week-cards { align-items: center; }
 
 .week-card {
   /* The printed-sheet variables are scoped to .pages, so the borrowed type needs its own
@@ -757,12 +761,21 @@ td.ruled .cell { background: var(--ruled); }
 
 /* Takes the room left between the masthead and the footer. The list inside is scaled to
    fit it when a long week would otherwise overflow the page (see fitLinesToPage). */
-.week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; }
-.week-lines-inner { zoom: var(--fit-scale, 1); }
+/* Takes the room left between the masthead and the footer, with the rows sitting in the
+   middle of it: a weekday card carries three or four minyanim against a full page, and
+   pinned to the top they left the bottom half of the sheet visibly empty. Anything long
+   enough to overflow has already been scaled to fit by fitLinesToPage, so centring never
+   pushes a row off either end. */
+.week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+/* Held to the width the two columns actually need and centred, rather than being left to
+   span the page. Stretched full width the name sat against the right edge and the time
+   against the left, with a hand's width of nothing between them. */
+.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: 5.6in; margin-inline: auto; }
 /* Name on the right, time on the left, in two fixed columns so every name starts at the
-   same place and every time sits in the same band. */
+   same place and every time sits in the same band. Fixed rather than content-sized
+   because each row is its own grid: only a fixed track lines up down the card. */
 .week-line {
-  display: grid; grid-template-columns: minmax(1.6in, 2.4in) 1fr; align-items: center;
+  display: grid; grid-template-columns: 2.2in 1fr; align-items: center;
   gap: 0.2in; padding: 0.1in 0.16in; margin-bottom: 0.07in;
   background: var(--bg); border-radius: 6px;
 }
