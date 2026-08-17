@@ -791,8 +791,13 @@ td.ruled .cell { background: var(--ruled); }
 
 /* A letter page is 816px across, wider than a phone and most windows once the sidebar is
    there. Scaled down to fit rather than scrolled sideways, so the whole page is visible:
-   the same reason the wall charts have Fit to screen. */
-.week-cards.is-scaled > .week-card { zoom: var(--page-zoom, 1); }
+   the same reason the wall charts have Fit to screen.
+
+   Descendant, not child: every card is wrapped in a .page-slot for its own print button
+   (attachPagePrint in ui/print-page.js), so a "> .week-card" stops matching the moment
+   that button is attached and the page never scales. That is exactly what happened, and
+   the congregation's week page overflowed sideways on a phone. */
+.week-cards.is-scaled .week-card { zoom: var(--page-zoom, 1); }
 
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {
