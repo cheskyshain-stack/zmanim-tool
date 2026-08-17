@@ -367,8 +367,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     ${
       luach
         ? ''
-        : `<h2>This week</h2>
-    <p class="hint">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
+        : // no-print, like the nav and the publish panel below. Left printable, this
+          // heading and its explanation are the only things on the page not claiming the
+          // "weekcard" named page, so they took a sheet of their own: a landscape one, at
+          // the wall chart's @page size, empty apart from two lines of screen furniture.
+          `<h2 class="no-print">This week</h2>
+    <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
     }
     <div class="week-nav no-print">
       <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
