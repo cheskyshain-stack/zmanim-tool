@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "publishedAt": "2026-08-14T04:33:38.987Z",
+  "publishedAt": "2026-08-17T23:51:16.082Z",
   "settings": {
     "shulName": "קהל לב מנחם",
     "headerSubtitle": "ליקוואוד קאמענס",
@@ -10,8 +10,8 @@
     "footerAddress": "Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701",
     "weekdayDefaultMincha": "",
     "weekdayDefaultMaariv": "",
-    "weekdayShacharis": "<span class=\"big\">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>",
-    "weekdayShacharisSpecial": "6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>",
+    "weekdayShacharis": "<span class=\"big\">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>",
+    "weekdayShacharisSpecial": "6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>",
     "weekdayFooterNote": "All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*",
     "locationName": "Lakewood",
     "latitude": 40.068,
@@ -90,10 +90,10 @@
   ],
   "sheets": [
     {
-      "id": "sheet-msplhrin-ocxn92",
+      "id": "sheet-msxvzctq-p7x5lv",
       "season": "kayitz",
       "hebrewYear": 5786,
-      "createdAt": "2026-08-12T04:34:30.681Z",
+      "createdAt": "2026-08-17T23:50:17.023Z",
       "weeks": [
         {
           "serial": 46123,
@@ -229,18 +229,22 @@
         }
       ],
       "pageSizes": [
-        8,
         7,
-        7
+        7,
+        8
       ],
-      "overrides": {}
+      "overrides": {
+        "46284": {
+          "C": "1:40 / <u> 4:45</u><div><u><span style=\"font-size: 13.3333px;\">דרשה 5:15</span><br></u>6:14 / <u> 6:29</u><br></div>"
+        }
+      }
     },
     {
-      "id": "sheet-msplhrin-r8yr1c",
+      "id": "sheet-msxvzctq-yptefz",
       "season": "weekday",
       "hebrewYear": 5786,
-      "createdAt": "2026-08-12T04:34:30.671Z",
-      "linkedSheetId": "sheet-msplhrin-ocxn92",
+      "createdAt": "2026-08-17T23:50:17.006Z",
+      "linkedSheetId": "sheet-msxvzctq-p7x5lv",
       "weeks": [
         {
           "serial": 46123,
@@ -394,9 +398,9 @@
         }
       ],
       "pageSizes": [
-        9,
+        8,
         7,
-        9
+        10
       ],
       "overrides": {}
     }
