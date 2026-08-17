@@ -3242,16 +3242,243 @@ function applyRules(row, week, rules, season, appliedColumns) {
 }
 
 // ==== sheets/weekday.js ====
-// Weekday Zmanim chart - unlike שבת קיץ/חורף, nothing here is computed from
-// sunrise/sunset: מנחה and מעריב start blank and are typed in per week (they differ
-// every week, so there's no sensible default to seed them with), and שחרית is one fixed
-// schedule that's identical every week, sourced directly from Settings at render time
-// (see sheet-view.js) rather than through this row builder.
+// Weekday chart מנחה/מעריב schedule.
 //
-// Typing into those cells still takes the time shorthand every other cell does -
-// "1220 130" becomes "12:20/1:30" on blur (see ui/rich-text.js).
-function buildWeekdayRow() {
-  return { B: '', C: '' };
+// The שבת charts are 1:1 ports of workbook columns. These two are not: the workbook
+// leaves weekday מנחה/מעריב blank and they were typed in by hand every week. So the
+// shul's standing weekday schedule is written out here as the rules it actually follows,
+// and every zman those rules lean on still comes from the workbook's own ported formulas
+// (zmanim.js / hebrew-calendar.js), never from a zmanim library:
+//
+//   שקיעה         Z.sunset          (workbook SUNSET)
+//   מנחה גדולה    Z.minchaGedolaLechumra (workbook MINCHA_GEDOLA_LECHUMRA - the same one
+//                                    the workbook's own ערב שבת מנחה menu tests against
+//                                    to decide its 1:35 slot, see common.js)
+//   DST           Z.dstLocal        (workbook calcDST_LOCAL)
+//   ר"ח / dates   hebrew-calendar.js (workbook ROSH_HASHANA + JEWISH_DATE_AS_ARRAY)
+//
+// Everything is decided once per *week*, from Sunday through Thursday only: Friday runs
+// on the ערב שבת schedule over on the שבת chart, and Shabbos has its own.
+//
+// שחרית is deliberately not built here. It's one fixed schedule identical every week,
+// printed once as a merged cell straight from Settings (see ui/sheet-view.js).
+//
+// How a printed time says where that מנין davens (the same symbols the chart's own footer
+// explains):
+//
+//   plain time        main בית מדרש
+//   underlined time   למטה
+//   one * after it    בעזר״נ
+//   two ** after it   באולם השמחות
+//
+// Typing over a cell still works and still wins: a hand-typed value is stored as a
+// per-cell override and rendered instead of anything computed here (see overrides.js).
+
+
+
+
+/** Times are handled in whole minutes after midnight rather than Excel day-fractions,
+ *  because every zman on this chart sits on a 5-minute grid and the moves below are
+ *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
+ *  would otherwise sort before everything else. Day-fractions only come back at the end,
+ *  to hand to formatTime. */
+const HM = (h, m) => h * 60 + m;
+const fmtMinutes = (mins) => formatTime(mins / 1440);
+/** Zmanim come back as day-fractions; this chart works in minutes. */
+const toMinutes = (dayFraction) => dayFraction * 1440;
+
+const STEP = 5; // a zman is nudged 5 minutes at a time
+const TOO_CLOSE = 14; // 14 minutes or less from its neighbour and a moved zman is dropped
+const STEP_GUARD = 288; // 288 * 5 = a full day, so a bad latitude can never spin forever
+
+const MAIN = 'main'; // main בית מדרש, printed plain
+const LMATA = 'lmata'; // למטה, printed underlined
+const EZRAS = 'ezras'; // בעזר״נ, printed with one *
+
+function renderTime(mins, place) {
+  const text = fmtMinutes(mins);
+  if (place === LMATA) return underlineTime(text);
+  if (place === EZRAS) return `${text}*`;
+  return text;
+}
+
+/** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
+ *  like every other row, so Sunday is six days back. Two rows on a Weekday chart are
+ *  anchored on a stand-in date instead of a real Saturday (the season's trailing gap
+ *  before Yom Tov, and a Chol Hamoed row - see weeks.js), which is why this walks back
+ *  from whatever weekday the serial actually is rather than just subtracting six. */
+function sundayThroughThursday(serial) {
+  const sunday = serial - (excelWeekday(serial) - 1);
+  return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+function shkiaMinutes(serial, settings) {
+  return toMinutes(Z.sunset(dateFromSerial(serial), settings));
+}
+
+/** The three BMG זמנים, as Hebrew (day, month) pairs. Month numbering is the workbook's
+ *  own: Nissan=1 .. Elul=6, Tishrei=7 .. Adar=12. `endYearOffset` is 1 for the אלול range
+ *  only, because its end (יום כיפור) falls after ראש השנה and so lands in the next AM
+ *  year, while the other two open and close inside one AM year. */
+const BMG_RANGES = [
+  { start: [1, 6], end: [10, 7], endYearOffset: 1 }, // ר"ח אלול -> יום כיפור
+  { start: [1, 8], end: [7, 1], endYearOffset: 0 }, // ר"ח חשון -> ז' ניסן
+  { start: [1, 2], end: [9, 5], endYearOffset: 0 }, // ר"ח אייר -> ט' באב
+];
+
+/** Whether one calendar day falls inside a BMG זמן. Each range is resolved into actual
+ *  serial dates so the comparison is a plain date range, which sidesteps the fact that
+ *  the AM year rolls over at ראש השנה (month 7) while the month numbering starts at
+ *  ניסן (month 1). The neighbouring years are checked too: a day in תשרי belongs to a
+ *  range that opened in אלול of the year before. */
+function isBmgDay(serial, settings) {
+  const { year } = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    for (const r of BMG_RANGES) {
+      const from = dateFromHebrew(r.start[0], r.start[1], y);
+      const to = dateFromHebrew(r.end[0], r.end[1], y + r.endYearOffset);
+      if (serial >= from && serial <= to) return true;
+    }
+  }
+  return false;
+}
+
+/** One answer for the whole row, since the chart prints one line per week. A week that
+ *  straddles the start or end of a BMG זמן goes with the majority of its Sunday-Thursday
+ *  days, so the row can never come out self-contradictory (a 4:15 מנחה, which is BMG
+ *  only, printed alongside an 11:30 מעריב, which is not). */
+function isBmgWeek(serial, settings) {
+  const days = sundayThroughThursday(serial);
+  const bmgDays = days.filter((d) => isBmgDay(d, settings)).length;
+  return bmgDays * 2 > days.length;
+}
+
+/** מנחה.
+ *
+ *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
+ *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
+ *  keeps the location it started with. */
+function minchaTimes(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const dates = days.map(dateFromSerial);
+
+  // 12:45 and 1:15 only run on standard time. DST always flips on a Sunday, so all five
+  // days agree; .every() is just being explicit about which way a split week would go.
+  const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
+  const bmg = isBmgWeek(week.serial, settings);
+
+  // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
+  // Never anything else. The workbook makes the same call the same way for its ערב שבת
+  // מנחה menu (common.js), against the same MINCHA_GEDOLA_LECHUMRA.
+  const latestMinchaGedola = Math.max(...dates.map((d) => toMinutes(Z.minchaGedolaLechumra(d, settings))));
+  const earlyAfternoon = latestMinchaGedola > HM(13, 35) ? HM(13, 40) : HM(13, 35);
+
+  // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
+  // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
+  // can never leave a zman a few seconds short of the 15.
+  const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
+  const latestAllowed = earliestShkia - 15;
+
+  const slots = [
+    standardTime ? { mins: HM(12, 45), place: LMATA } : null,
+    standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    { mins: earlyAfternoon, place: LMATA },
+    { mins: HM(13, 50), place: MAIN },
+    bmg ? { mins: HM(16, 15), place: LMATA } : null, // 4:15 is a BMG zman
+    { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
+    { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
+    { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
+  ].filter(Boolean);
+
+  // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
+  for (const slot of slots) {
+    if (!slot.shkiaDriven) continue;
+    const base = slot.mins;
+    for (let guard = 0; slot.mins > latestAllowed && guard < STEP_GUARD; guard++) slot.mins -= STEP;
+    slot.moved = slot.mins !== base;
+  }
+
+  // A move can walk a zman back into the one before it. Once it is within 14 minutes of
+  // the previous מנחה still being printed, it stops being printed at all.
+  const kept = [];
+  for (const slot of slots) {
+    const prev = kept[kept.length - 1];
+    if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) continue;
+    kept.push(slot);
+  }
+  return kept.map((slot) => renderTime(slot.mins, slot.place));
+}
+
+/** Where the 8:45 מעריב davens, which follows wherever the clock pushed it to. It is
+ *  still the 8:45 מנין at every one of these times. */
+function place845(mins) {
+  if (mins <= HM(20, 45)) return MAIN; // never moved: main בית מדרש
+  if (mins <= HM(21, 15)) return LMATA; // 8:50 through 9:15: למטה
+  return EZRAS; // 9:20 or later: בעזר״נ
+}
+
+/** מעריב.
+ *
+ *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
+ *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
+ *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
+function maarivTimes(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+
+  const bmg = isBmgWeek(week.serial, settings);
+
+  // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
+  // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
+  const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
+  const earliestAllowed = latestShkia + 50;
+
+  const slots = [
+    { mins: HM(18, 35) },
+    { mins: HM(19, 0) },
+    { mins: HM(19, 30) },
+    { mins: HM(20, 0) },
+    { mins: HM(20, 45), is845: true },
+    { mins: HM(21, 30) },
+    { mins: HM(22, 0) },
+    { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
+    { mins: HM(23, 0) },
+    !bmg ? { mins: HM(23, 30) } : null, // 11:30 and 12:00 run only when BMG is out
+    !bmg ? { mins: HM(24, 0) } : null,
+  ].filter(Boolean);
+
+  // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
+  for (const slot of slots) {
+    const base = slot.mins;
+    for (let guard = 0; slot.mins < earliestAllowed && guard < STEP_GUARD; guard++) slot.mins += STEP;
+    slot.moved = slot.mins !== base;
+  }
+
+  // Mirror of the מנחה rule, in the other direction: a zman pushed up to within 14
+  // minutes of the next מעריב still being printed stops being printed. Walked from the
+  // end backwards so "the next one" means the next one actually surviving, not one that
+  // is itself about to be dropped.
+  //
+  // The 8:45 is exempt. It is a מנין in its own right rather than a duplicate of the one
+  // behind it, and once it passes 9:20 it davens in a different room (בעזר״נ) from the
+  // 9:30 (למטה), so the two belong on the board together. Without the exemption it would
+  // be deleted every year from mid-June to mid-July, which is the only stretch where it
+  // ever reaches בעזר״נ at all - the location rule above would never print once.
+  const kept = [];
+  for (let i = slots.length - 1; i >= 0; i--) {
+    const slot = slots[i];
+    const next = kept[kept.length - 1];
+    if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) continue;
+    kept.push(slot);
+  }
+  kept.reverse();
+  return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
+}
+
+function buildWeekdayRow(week, settings) {
+  return {
+    B: splitLinesInHalf(maarivTimes(week, settings)),
+    C: splitLinesInHalf(minchaTimes(week, settings)),
+  };
 }
 
 const WEEKDAY_COLUMNS = [
@@ -3699,9 +3926,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
-      // The Weekday chart's Mincha/Maariv are plain Settings-driven default text, not
-      // computed zmanim, so neither the Tisha B'Av note nor the Rules engine (both
-      // keyed to actual computed formulas / קיץ-חורף columns) apply to it.
+      // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
+      // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
+      // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
+      // there is nothing for a Weekday column to match against.
       const computed = buildRow(week, settings);
       const appliedColumns = new Set();
       // effectiveSeason (not sheet.season) - a חורף page that prints as קיץ (see
@@ -3727,12 +3955,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 ${special}` : '');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
-        // מנחה/מעריב on the Weekday chart: a plain editable cell. You just type the
-        // times into it - "1220 130" becomes "12:20/1:30" on blur, same shorthand every
-        // other cell takes (see applyTimeShorthand below) - which turned out to be
-        // quicker than picking from the dropdown that used to live here.
+        // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
+        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
+        // week stores an override the same as any other column. An override already
+        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const html = row[c.key] ?? ''; // already HTML - the Settings default is rich text
+          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
           return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -3793,10 +4022,10 @@ ${special}` : '');
     const computed = builtRow;
     const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
     const raw = ruled[col] ?? '';
-    // A Weekday מנחה/מעריב default is already HTML (it comes from the rich-text option
-    // list in Settings); every other column is plain text that nl2br has to mark up
-    // first, or the comparison would see markup-vs-none and store a bogus override.
-    return normalizeRichText(weekSeason === 'weekday' ? raw : nl2br(raw));
+    // Every column, Weekday included, is built as plain text with underline sentinels
+    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
+    // store a bogus override on a cell nobody actually edited.
+    return normalizeRichText(nl2br(raw));
   };
 
   const commitCell = (cellEl) => {
@@ -4053,6 +4282,44 @@ function capTimesPerLine(root, max = 3) {
     frag.append(text.slice(cut));
     node.replaceWith(frag);
   }
+  trimSeparatorsBeforeBreaks(root);
+}
+
+/** The text node immediately before `node` in reading order, without crossing a line
+ *  break or leaving `root`. Returns null at either boundary. */
+function previousTextNode(from, root) {
+  let node = from;
+  while (node && node !== root) {
+    if (!node.previousSibling) {
+      node = node.parentNode;
+      continue;
+    }
+    node = node.previousSibling;
+    while (node.lastChild) node = node.lastChild;
+    if (node.nodeType === Node.TEXT_NODE) return node;
+    if (node.nodeName === 'BR') return null; // a line already ends here, nothing to tidy
+  }
+  return null;
+}
+
+/** Removes the separator stranded at the end of a line by a break inserted above.
+ *
+ *  The in-node trim can only reach text it is already holding. An underlined time is its
+ *  own <u>, so the "/" in front of it lives in the text node *outside* that element and
+ *  survives, leaving lines ending in a bare "10:30 /". Every underlined column hits this,
+ *  which is most of them, so the tidy-up walks back out of the element and strips it. */
+function trimSeparatorsBeforeBreaks(root) {
+  for (const br of root.querySelectorAll('br')) {
+    let node = previousTextNode(br, root);
+    while (node) {
+      // No early-out on "nothing changed": the break is usually preceded by an empty
+      // text node (the trim above leaves one behind when the whole slice was separator),
+      // and stopping there would never reach the real separator further back.
+      node.nodeValue = node.nodeValue.replace(/[\s,/]+$/, '');
+      if (node.nodeValue) break; // ends in real content now
+      node = previousTextNode(node, root); // nothing left here, keep walking back
+    }
+  }
 }
 
 /** A label/time line. The label keeps its line breaks as spaces, since a column header
@@ -4197,13 +4464,23 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
   let weekdayLines = '';
   if (weekdayWeek) {
-    const wdRow = mergeRow({ B: '', C: '' }, weekday, showing).row;
+    // Built from the formulas and then overridden, exactly like the Shabbos row above.
+    // A blank baseline here would print an empty מנחה and מעריב on every week nobody had
+    // happened to type over, even though the schedule is computed now.
+    const { row: wdRow, overriddenKeys: wdOverridden } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
-      // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
-      // even before anyone has filled it, or the card looks like the minyan does not
-      // exist rather than like the time is not set yet.
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E', '', c.key === 'E'));
+      // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
+      // nothing, or the card reads as though the minyan does not exist rather than as
+      // though the time is not set yet.
+      // isHtml only for an override (already real HTML) and for שחרית (rich text out of
+      // Settings). A computed value still carries the underline sentinels, which
+      // weekNl2br has to turn into real <u> elements.
+      .map((c) =>
+        c.key === 'E'
+          ? line(c.header, htmlLines(state.settings.weekdayShacharis), true, false, '', true)
+          : line(c.header, wdRow[c.key], wdOverridden.has(c.key), true)
+      );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,
     // labelled with which day it is rather than the chart's catch-all heading. It goes

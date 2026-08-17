@@ -11,7 +11,7 @@
 import { resolveSettings } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
-import { WEEKDAY_COLUMNS } from '../sheets/weekday.js';
+import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
@@ -143,6 +143,44 @@ function capTimesPerLine(root, max = 3) {
     if (!frag.childNodes.length) continue;
     frag.append(text.slice(cut));
     node.replaceWith(frag);
+  }
+  trimSeparatorsBeforeBreaks(root);
+}
+
+/** The text node immediately before `node` in reading order, without crossing a line
+ *  break or leaving `root`. Returns null at either boundary. */
+function previousTextNode(from, root) {
+  let node = from;
+  while (node && node !== root) {
+    if (!node.previousSibling) {
+      node = node.parentNode;
+      continue;
+    }
+    node = node.previousSibling;
+    while (node.lastChild) node = node.lastChild;
+    if (node.nodeType === Node.TEXT_NODE) return node;
+    if (node.nodeName === 'BR') return null; // a line already ends here, nothing to tidy
+  }
+  return null;
+}
+
+/** Removes the separator stranded at the end of a line by a break inserted above.
+ *
+ *  The in-node trim can only reach text it is already holding. An underlined time is its
+ *  own <u>, so the "/" in front of it lives in the text node *outside* that element and
+ *  survives, leaving lines ending in a bare "10:30 /". Every underlined column hits this,
+ *  which is most of them, so the tidy-up walks back out of the element and strips it. */
+function trimSeparatorsBeforeBreaks(root) {
+  for (const br of root.querySelectorAll('br')) {
+    let node = previousTextNode(br, root);
+    while (node) {
+      // No early-out on "nothing changed": the break is usually preceded by an empty
+      // text node (the trim above leaves one behind when the whole slice was separator),
+      // and stopping there would never reach the real separator further back.
+      node.nodeValue = node.nodeValue.replace(/[\s,/]+$/, '');
+      if (node.nodeValue) break; // ends in real content now
+      node = previousTextNode(node, root); // nothing left here, keep walking back
+    }
   }
 }
 
@@ -288,13 +326,23 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
   let weekdayLines = '';
   if (weekdayWeek) {
-    const wdRow = mergeRow({ B: '', C: '' }, weekday, showing).row;
+    // Built from the formulas and then overridden, exactly like the Shabbos row above.
+    // A blank baseline here would print an empty מנחה and מעריב on every week nobody had
+    // happened to type over, even though the schedule is computed now.
+    const { row: wdRow, overriddenKeys: wdOverridden } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
-      // keepEmpty: מנחה and מעריב are typed in per week, so the row has to be there
-      // even before anyone has filled it, or the card looks like the minyan does not
-      // exist rather than like the time is not set yet.
-      .map((c) => line(c.header, c.key === 'E' ? htmlLines(state.settings.weekdayShacharis) : wdRow[c.key], true, c.key !== 'E', '', c.key === 'E'));
+      // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
+      // nothing, or the card reads as though the minyan does not exist rather than as
+      // though the time is not set yet.
+      // isHtml only for an override (already real HTML) and for שחרית (rich text out of
+      // Settings). A computed value still carries the underline sentinels, which
+      // weekNl2br has to turn into real <u> elements.
+      .map((c) =>
+        c.key === 'E'
+          ? line(c.header, htmlLines(state.settings.weekdayShacharis), true, false, '', true)
+          : line(c.header, wdRow[c.key], wdOverridden.has(c.key), true)
+      );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,
     // labelled with which day it is rather than the chart's catch-all heading. It goes
