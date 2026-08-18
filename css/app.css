@@ -789,19 +789,20 @@ body.is-luach .week-cards { align-items: center; }
    same place and every time sits in the same band. Fixed rather than content-sized
    because each row is its own grid: only a fixed track lines up down the card. */
 .week-line {
-  display: grid; grid-template-columns: 2.2in 1fr; align-items: center;
+  display: grid; grid-template-columns: 40% 40%; justify-content: center; align-items: center;
   gap: 0.2in; padding: 0.1in 0.16in; margin-bottom: 0.07in;
   background: var(--bg); border-radius: 6px;
 }
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
 .week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
-/* Every line of times is centred in the column, not just the block as a whole. Flush
-   left, a short second line hung off the left of a longer first one and the column read
-   as ragged rather than set. Centred, the stack sits on one axis down the card. */
+/* Set to the left edge of its column, mirroring the name set to the right edge of its
+   own. Centred, the times floated inward and left a gap on the left about twice the one
+   on the right, so the row looked lopsided; flush, the two sides are inset by the same
+   amount and every time starts on one axis down the card. */
 .week-time {
   direction: ltr; font-weight: 700; font-size: 14pt; white-space: pre-line; line-height: 1.35;
-  display: block; justify-self: stretch; text-align: center;
+  display: block; justify-self: stretch; text-align: left;
 }
 /* A run of location stars, set in a box of no width so it hangs off the end of its time
    rather than widening the line (see hangTimeMarkers in ui/week-view.js). Without this a

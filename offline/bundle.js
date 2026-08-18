@@ -4383,13 +4383,24 @@ function trimSeparatorsBeforeBreaks(root) {
   }
 }
 
-/** A label/time line. The label keeps its line breaks as spaces, since a column header
- *  is wrapped to fit a narrow column and has no reason to wrap here. */
+/** A row's name, taken from the chart's column header.
+ *
+ *  A header is written to wrap inside a narrow chart column, so its own breaks mean
+ *  nothing on a card and are flattened away. A פלג row is the exception: the name is
+ *  two things, which מנחה it is and which פלג it is measured to, and run onto one line
+ *  it reads as neither. Those keep a break, in front of פלג, which is what separates
+ *  "מנחה (למטה)" from "פלג מ״א". No other header wants one: "הדלקת נרות" and
+ *  "מנחה ערב שבת" are single names that only wrapped because the column was narrow. */
+function formatLabel(label) {
+  return weekEsc(label.replace(/\s+/g, ' ').trim()).replace(/ (פלג )/, '<br>$1');
+}
+
+/** A label/time line. */
 function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
-    <span class="week-label">${labelHtml || weekEsc(label.replace(/\n/g, ' ').trim())}</span>
+    <span class="week-label">${labelHtml || formatLabel(label)}</span>
     <span class="week-time">${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
