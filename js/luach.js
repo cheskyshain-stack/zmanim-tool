@@ -31,13 +31,20 @@ function currentSheet(published) {
   return (upcoming || spans.sort((a, b) => b.to - a.to)[0])?.sheet || null;
 }
 
-function backBar(title) {
+function backBar(title, hint) {
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="#">&larr; Menu</a>
     <span class="luach-bar-title">${esc(title)}</span>
     <button type="button" class="btn-primary" id="print-btn">Print all</button>
-  </div>`;
+  </div>${hint ? `<p class="print-hint no-print">${esc(hint)}</p>` : ''}`;
 }
+
+/** Said next to anything that has to come out landscape. A phone hands printing to the
+ *  system dialog, which carries its own paper size and orientation and does not take them
+ *  from the page, so the chart arrives portrait unless the person changes it there. On a
+ *  computer the browser follows the stylesheet and there is nothing to do (checked: the
+ *  chart prints 792x612 and a week card 612x792, each without being asked). */
+const LANDSCAPE_HINT = 'The chart prints landscape. If the print dialog opens portrait, change it in its options.';
 
 function homeHtml(published) {
   const s = published.settings;
@@ -88,7 +95,7 @@ function renderChartPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   const sheet = currentSheet(published);
   const weekday = published.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet?.id);
-  main.innerHTML = backBar('The chart') + '<div id="pages" class="pages"></div>';
+  main.innerHTML = backBar('The chart', LANDSCAPE_HINT) + '<div id="pages" class="pages"></div>';
   const pagesEl = main.querySelector('#pages');
   if (!sheet) {
     pagesEl.innerHTML = '<p class="hint">Nothing has been published yet.</p>';

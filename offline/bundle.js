@@ -4883,6 +4883,13 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
         <button type="button" id="week-print-rest">Print every week to the end of the season</button>
       </div>
+      ${
+        // Only on a touch device, and only next to the one action here that needs paper
+        // turned: see .print-hint in app.css for why a computer is not told this.
+        cardCount > 1
+          ? '<p class="print-hint no-print">Both on one sheet prints landscape. If the print dialog opens portrait, change it in its options.</p>'
+          : ''
+      }
     </div>
     <div class="week-cards">${cardsHtml}</div>
     ${luach ? '' : publishPanelHtml(sheet, state)}
