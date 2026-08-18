@@ -164,39 +164,90 @@ function capTimesPerLine(root, max = 3) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
-  let onThisLine = 0;
-  for (const node of nodes) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.tagName === 'BR') onThisLine = 0;
-      continue;
+
+  /** Walks the value once, calling onTime for each time and onBreak at each line the
+   *  value itself supplies - a <br> put there by weekNl2br, or a \n still inside a text
+   *  node (the שחרית schedule is one node holding several lines). Both passes below have
+   *  to agree on where a line starts, so they share this rather than repeating it.
+   *
+   *  A hard break is honoured from where it actually sits, not from the start of the node
+   *  it is in: "7:15 7:35**\n8:00" is a single text node, and treating the whole node as
+   *  one line left 7:35 sitting beside 7:15 while every other time got a line to itself. */
+  const walkTimes = (onTime, onBreak) => {
+    for (const node of nodes) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.tagName === 'BR') onBreak();
+        continue;
+      }
+      const text = node.nodeValue;
+      let prevEnd = 0;
+      let match;
+      TIME.lastIndex = 0;
+      while ((match = TIME.exec(text))) {
+        if (text.slice(prevEnd, match.index).includes('\n')) onBreak();
+        prevEnd = match.index + match[0].length;
+        onTime(node, match);
+      }
+      if (text.slice(prevEnd).includes('\n')) onBreak();
     }
+  };
+
+  // First pass: how many times each of the value's own lines holds.
+  const counts = [0];
+  walkTimes(
+    () => counts[counts.length - 1]++,
+    () => counts.push(0)
+  );
+
+  /** How to split n times over as few lines as the cap allows, as evenly as those lines
+   *  can be. Filling each line to the cap instead leaves whatever is left over sitting
+   *  alone: a run of four with a cap of three came out three and then a single 3:00,
+   *  which is what a חורף מנחה ערב שבת does every week once the clocks go back. Seven
+   *  becomes 3, 2, 2 rather than 3, 3, 1. The bigger lines go first, so a ragged edge
+   *  falls at the bottom where it reads as the end of a list. */
+  const sizesFor = (n) => {
+    const lines = Math.max(1, Math.ceil(n / max));
+    const base = Math.floor(n / lines);
+    const extra = n % lines;
+    return Array.from({ length: lines }, (_, i) => base + (i < extra ? 1 : 0));
+  };
+  const plan = counts.map(sizesFor);
+
+  // Second pass: the same walk, breaking where the plan says to. Cuts are collected and
+  // applied per node afterwards, since replacing a node mid-walk would invalidate it.
+  const cutsByNode = new Map();
+  let line = 0;
+  let chunk = 0;
+  let taken = 0;
+  walkTimes(
+    (node, match) => {
+      taken++;
+      const limit = plan[line]?.[chunk] ?? max;
+      if (taken <= limit) return;
+      if (!cutsByNode.has(node)) cutsByNode.set(node, []);
+      cutsByNode.get(node).push(match.index);
+      taken = 1;
+      chunk++;
+    },
+    () => {
+      line++;
+      chunk = 0;
+      taken = 0;
+    }
+  );
+
+  for (const [node, cuts] of cutsByNode) {
     const text = node.nodeValue;
     const frag = document.createDocumentFragment();
-    let cut = 0;
-    let prevEnd = 0;
-    let match;
-    TIME.lastIndex = 0;
-    while ((match = TIME.exec(text))) {
-      // A hard line break starts the count over, but only from where it actually sits.
-      // Testing the node as a whole got this wrong whenever a break fell in the middle
-      // of one: "7:15 7:35**\n8:00" is a single text node, and resetting on entry made
-      // 7:35 look like the first time on its line, so it was left sitting beside 7:15
-      // while every other time got a line to itself.
-      if (text.slice(prevEnd, match.index).includes('\n')) onThisLine = 0;
-      prevEnd = match.index + match[0].length;
-      onThisLine++;
-      if (onThisLine <= max) continue;
+    let from = 0;
+    for (const at of cuts) {
       // Everything up to this time, with the separator that would have preceded it
       // trimmed away so the next line starts at the time itself.
-      frag.append(text.slice(cut, match.index).replace(/[\s,/]+$/, ''));
+      frag.append(text.slice(from, at).replace(/[\s,/]+$/, ''));
       frag.append(document.createElement('br'));
-      cut = match.index;
-      onThisLine = 1;
+      from = at;
     }
-    // A break after the last time in this node still ends the line, for the node after it.
-    if (text.slice(prevEnd).includes('\n')) onThisLine = 0;
-    if (!frag.childNodes.length) continue;
-    frag.append(text.slice(cut));
+    frag.append(text.slice(from));
     node.replaceWith(frag);
   }
   trimSeparatorsBeforeBreaks(root);
