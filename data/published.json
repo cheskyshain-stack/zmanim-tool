@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "publishedAt": "2026-08-17T23:51:16.082Z",
+  "publishedAt": "2026-08-18T19:43:41.495Z",
   "settings": {
     "shulName": "קהל לב מנחם",
     "headerSubtitle": "ליקוואוד קאמענס",
@@ -401,6 +401,377 @@
         8,
         7,
         10
+      ],
+      "overrides": {}
+    },
+    {
+      "id": "sheet-msz2kdja-dmo1wl",
+      "season": "choref",
+      "hebrewYear": 5787,
+      "createdAt": "2026-08-18T19:42:21.603Z",
+      "weeks": [
+        {
+          "serial": 46305,
+          "date": "2026-10-10T00:00:00.000Z",
+          "parsha": "בראשית",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46312,
+          "date": "2026-10-17T00:00:00.000Z",
+          "parsha": "נח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46319,
+          "date": "2026-10-24T00:00:00.000Z",
+          "parsha": "לך לך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46326,
+          "date": "2026-10-31T00:00:00.000Z",
+          "parsha": "וירא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46333,
+          "date": "2026-11-07T00:00:00.000Z",
+          "parsha": "חיי שרה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46340,
+          "date": "2026-11-14T00:00:00.000Z",
+          "parsha": "תולדות",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46347,
+          "date": "2026-11-21T00:00:00.000Z",
+          "parsha": "ויצא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46354,
+          "date": "2026-11-28T00:00:00.000Z",
+          "parsha": "וישלח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46361,
+          "date": "2026-12-05T00:00:00.000Z",
+          "parsha": "וישב",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46368,
+          "date": "2026-12-12T00:00:00.000Z",
+          "parsha": "מקץ",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46375,
+          "date": "2026-12-19T00:00:00.000Z",
+          "parsha": "ויגש",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46382,
+          "date": "2026-12-26T00:00:00.000Z",
+          "parsha": "ויחי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46389,
+          "date": "2027-01-02T00:00:00.000Z",
+          "parsha": "שמות",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46396,
+          "date": "2027-01-09T00:00:00.000Z",
+          "parsha": "וארא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46403,
+          "date": "2027-01-16T00:00:00.000Z",
+          "parsha": "בא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46410,
+          "date": "2027-01-23T00:00:00.000Z",
+          "parsha": "בשלח",
+          "specialParsha": "שירה"
+        },
+        {
+          "serial": 46417,
+          "date": "2027-01-30T00:00:00.000Z",
+          "parsha": "יתרו",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46424,
+          "date": "2027-02-06T00:00:00.000Z",
+          "parsha": "משפטים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46431,
+          "date": "2027-02-13T00:00:00.000Z",
+          "parsha": "תרומה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46438,
+          "date": "2027-02-20T00:00:00.000Z",
+          "parsha": "תצוה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46445,
+          "date": "2027-02-27T00:00:00.000Z",
+          "parsha": "כי תשא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46452,
+          "date": "2027-03-06T00:00:00.000Z",
+          "parsha": "ויקהל",
+          "specialParsha": "שקלים"
+        },
+        {
+          "serial": 46459,
+          "date": "2027-03-13T00:00:00.000Z",
+          "parsha": "פקודי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46466,
+          "date": "2027-03-20T00:00:00.000Z",
+          "parsha": "ויקרא",
+          "specialParsha": "זכור"
+        },
+        {
+          "serial": 46473,
+          "date": "2027-03-27T00:00:00.000Z",
+          "parsha": "צו",
+          "specialParsha": "פרה"
+        },
+        {
+          "serial": 46480,
+          "date": "2027-04-03T00:00:00.000Z",
+          "parsha": "שמיני",
+          "specialParsha": "החדש"
+        },
+        {
+          "serial": 46487,
+          "date": "2027-04-10T00:00:00.000Z",
+          "parsha": "תזריע",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46494,
+          "date": "2027-04-17T00:00:00.000Z",
+          "parsha": "מצורע",
+          "specialParsha": "הגדול"
+        }
+      ],
+      "pageSizes": [
+        10,
+        10,
+        8
+      ],
+      "overrides": {}
+    },
+    {
+      "id": "sheet-msz2kdja-i6dms9",
+      "season": "weekday",
+      "hebrewYear": 5787,
+      "createdAt": "2026-08-18T19:42:21.574Z",
+      "linkedSheetId": "sheet-msz2kdja-dmo1wl",
+      "weeks": [
+        {
+          "serial": 46305,
+          "date": "2026-10-10T00:00:00.000Z",
+          "parsha": "בראשית",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46312,
+          "date": "2026-10-17T00:00:00.000Z",
+          "parsha": "נח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46319,
+          "date": "2026-10-24T00:00:00.000Z",
+          "parsha": "לך לך",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46326,
+          "date": "2026-10-31T00:00:00.000Z",
+          "parsha": "וירא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46333,
+          "date": "2026-11-07T00:00:00.000Z",
+          "parsha": "חיי שרה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46340,
+          "date": "2026-11-14T00:00:00.000Z",
+          "parsha": "תולדות",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46347,
+          "date": "2026-11-21T00:00:00.000Z",
+          "parsha": "ויצא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46354,
+          "date": "2026-11-28T00:00:00.000Z",
+          "parsha": "וישלח",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46361,
+          "date": "2026-12-05T00:00:00.000Z",
+          "parsha": "וישב",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46368,
+          "date": "2026-12-12T00:00:00.000Z",
+          "parsha": "מקץ",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46375,
+          "date": "2026-12-19T00:00:00.000Z",
+          "parsha": "ויגש",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46382,
+          "date": "2026-12-26T00:00:00.000Z",
+          "parsha": "ויחי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46389,
+          "date": "2027-01-02T00:00:00.000Z",
+          "parsha": "שמות",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46396,
+          "date": "2027-01-09T00:00:00.000Z",
+          "parsha": "וארא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46403,
+          "date": "2027-01-16T00:00:00.000Z",
+          "parsha": "בא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46410,
+          "date": "2027-01-23T00:00:00.000Z",
+          "parsha": "בשלח",
+          "specialParsha": "שירה"
+        },
+        {
+          "serial": 46417,
+          "date": "2027-01-30T00:00:00.000Z",
+          "parsha": "יתרו",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46424,
+          "date": "2027-02-06T00:00:00.000Z",
+          "parsha": "משפטים",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46431,
+          "date": "2027-02-13T00:00:00.000Z",
+          "parsha": "תרומה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46438,
+          "date": "2027-02-20T00:00:00.000Z",
+          "parsha": "תצוה",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46445,
+          "date": "2027-02-27T00:00:00.000Z",
+          "parsha": "כי תשא",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46452,
+          "date": "2027-03-06T00:00:00.000Z",
+          "parsha": "ויקהל",
+          "specialParsha": "שקלים"
+        },
+        {
+          "serial": 46459,
+          "date": "2027-03-13T00:00:00.000Z",
+          "parsha": "פקודי",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46466,
+          "date": "2027-03-20T00:00:00.000Z",
+          "parsha": "ויקרא",
+          "specialParsha": "זכור"
+        },
+        {
+          "serial": 46473,
+          "date": "2027-03-27T00:00:00.000Z",
+          "parsha": "צו",
+          "specialParsha": "פרה"
+        },
+        {
+          "serial": 46480,
+          "date": "2027-04-03T00:00:00.000Z",
+          "parsha": "שמיני",
+          "specialParsha": "החדש"
+        },
+        {
+          "serial": 46487,
+          "date": "2027-04-10T00:00:00.000Z",
+          "parsha": "תזריע",
+          "specialParsha": ""
+        },
+        {
+          "serial": 46494,
+          "date": "2027-04-17T00:00:00.000Z",
+          "parsha": "מצורע",
+          "specialParsha": "הגדול"
+        },
+        {
+          "serial": 46499,
+          "date": "2027-04-22T00:00:00.000Z",
+          "parsha": "פסח",
+          "specialParsha": ""
+        }
+      ],
+      "pageSizes": [
+        10,
+        10,
+        9
       ],
       "overrides": {}
     }
