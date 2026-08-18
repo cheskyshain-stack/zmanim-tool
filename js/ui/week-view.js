@@ -125,12 +125,19 @@ function capTimesPerLine(root, max = 3) {
       continue;
     }
     const text = node.nodeValue;
-    if (text.includes('\n')) onThisLine = 0;
     const frag = document.createDocumentFragment();
     let cut = 0;
+    let prevEnd = 0;
     let match;
     TIME.lastIndex = 0;
     while ((match = TIME.exec(text))) {
+      // A hard line break starts the count over, but only from where it actually sits.
+      // Testing the node as a whole got this wrong whenever a break fell in the middle
+      // of one: "7:15 7:35**\n8:00" is a single text node, and resetting on entry made
+      // 7:35 look like the first time on its line, so it was left sitting beside 7:15
+      // while every other time got a line to itself.
+      if (text.slice(prevEnd, match.index).includes('\n')) onThisLine = 0;
+      prevEnd = match.index + match[0].length;
       onThisLine++;
       if (onThisLine <= max) continue;
       // Everything up to this time, with the separator that would have preceded it
@@ -140,6 +147,8 @@ function capTimesPerLine(root, max = 3) {
       cut = match.index;
       onThisLine = 1;
     }
+    // A break after the last time in this node still ends the line, for the node after it.
+    if (text.slice(prevEnd).includes('\n')) onThisLine = 0;
     if (!frag.childNodes.length) continue;
     frag.append(text.slice(cut));
     node.replaceWith(frag);
