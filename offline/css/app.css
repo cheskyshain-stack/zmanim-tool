@@ -819,7 +819,12 @@ body.is-luach .week-cards { align-items: center; }
 .week-card .header-icon { justify-self: start; }
 .week-card .header-rabbi { justify-self: end; white-space: pre-line; }
 
-.week-foot { margin-top: auto; padding-top: 0.15in; text-align: center; font-size: 10.5pt; border-top: 1px solid var(--border); }
+/* The key to the marks used on this card. Sits above the address, in the space the times
+   do not need, and is left out entirely when the card uses no marks at all. */
+.week-legend { margin-top: auto; padding-top: 0.12in; text-align: center; font-size: 9.5pt; color: #444; line-height: 1.35; }
+.week-legend:empty { display: none; }
+.week-legend-line { unicode-bidi: isolate; }
+.week-foot { margin-top: 0; padding-top: 0.15in; text-align: center; font-size: 10.5pt; border-top: 1px solid var(--border); }
 
 /* A letter page is 816px across, wider than a phone and most windows once the sidebar is
    there. Scaled down to fit rather than scrolled sideways, so the whole page is visible:

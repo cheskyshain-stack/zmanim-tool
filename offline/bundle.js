@@ -4430,6 +4430,28 @@ function trimSeparatorsBeforeBreaks(root) {
   }
 }
 
+/** The key to the symbols, carrying only the lines the card actually uses.
+ *
+ *  A card is a page on its own, so it has to say what its own marks mean, but saying all
+ *  three every time would explain marks that are not on it: a week whose מנינים are all
+ *  in the main בית מדרש has no underline to explain, and באולם השמחות only appears on a
+ *  week that has a second שחרית. Each line is added only if its mark is on the card.
+ *
+ *  The star lines are set right to left so the star sits at the right-hand end, against
+ *  the Hebrew it belongs to, the same way round as the footer of the printed chart. The
+ *  first line is mostly English and is set the other way. Measured, not assumed: stored
+ *  order is not display order for either of them. */
+function fillLegend(card) {
+  const legend = card.querySelector('.week-legend');
+  if (!legend) return;
+  const marks = [...card.querySelectorAll('.week-lines .time-mark')].map((m) => m.textContent.trim());
+  const lines = [];
+  if (card.querySelector('.week-lines u')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
+  if (marks.includes('*')) lines.push({ dir: 'rtl', text: '*בעזרת נשים' });
+  if (marks.includes('**')) lines.push({ dir: 'rtl', text: '**באולם השמחות' });
+  legend.innerHTML = lines.map((l) => `<div class="week-legend-line" dir="${l.dir}">${weekEsc(l.text)}</div>`).join('');
+}
+
 /** A row's name, taken from the chart's column header.
  *
  *  A header is written to wrap inside a narrow chart column, so its own breaks mean
@@ -4497,6 +4519,7 @@ function cardHtml(title, linesHtml, settings, kind = '') {
     </div>
     <h3 class="week-title">${weekEsc(title)}</h3>
     <div class="week-lines"><div class="week-lines-inner">${linesHtml}</div></div>
+    <div class="week-legend"></div>
     <div class="week-foot">${weekEsc(settings.footerAddress)}</div>
   </section>`;
 }
@@ -4703,6 +4726,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       trimSpaceAtLineStart(el);
       hangTimeMarkers(el);
     });
+    // After the marks exist, so the key can be built from what is really on the card.
+    fillLegend(card);
   });
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול
