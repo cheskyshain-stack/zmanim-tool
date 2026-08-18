@@ -161,9 +161,13 @@ function capTimesPerLine(root, max = 3) {
   // שחרית line at three. A time is recognisable on its own, so that is what is counted,
   // and a break goes in front of the one that would start a line too many.
   const TIME = /\d{1,2}:\d{2}\*{0,3}/g;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
+  const collectNodes = () => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    const found = [];
+    while (walker.nextNode()) found.push(walker.currentNode);
+    return found;
+  };
+  let nodes = collectNodes();
 
   /** Walks the value once, calling onTime for each time and onBreak at each line the
    *  value itself supplies - a <br> put there by weekNl2br, or a \n still inside a text
@@ -193,23 +197,46 @@ function capTimesPerLine(root, max = 3) {
   };
 
   // First pass: how many times each of the value's own lines holds.
-  const counts = [0];
-  walkTimes(
-    () => counts[counts.length - 1]++,
-    () => counts.push(0)
-  );
+  const countLines = () => {
+    const counts = [0];
+    walkTimes(
+      () => counts[counts.length - 1]++,
+      () => counts.push(0)
+    );
+    return counts;
+  };
+  let counts = countLines();
+
+  // A cell of nothing but times, where the value's own line break falls somewhere that
+  // leaves a line over the cap, is re-flowed as one run: the workbook writes מנחה ערב שבת
+  // as three times and then four, and honouring that break gave 3, 2, 2 where laying the
+  // seven out fresh gives 2, 2, 3. Only when a break is needed anyway, so a cell that
+  // already fits keeps the grouping the value asked for - מנחה stays 1:20 above
+  // 4:03 / 4:18 rather than being run together. Only when the cell is times and
+  // separators, so the שחרית schedule keeps its heading and its blocks, and
+  // "שקיעה 4:48" is never joined onto the line above it.
+  if (!/\p{L}/u.test(root.textContent) && counts.some((n) => n > max)) {
+    root.querySelectorAll('br').forEach((br) => br.replaceWith(document.createTextNode(SLASH)));
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE && node.nodeValue.includes('\n')) {
+        node.nodeValue = node.nodeValue.replace(/\s*\n\s*/g, SLASH);
+      }
+    }
+    nodes = collectNodes();
+    counts = countLines();
+  }
 
   /** How to split n times over as few lines as the cap allows, as evenly as those lines
    *  can be. Filling each line to the cap instead leaves whatever is left over sitting
    *  alone: a run of four with a cap of three came out three and then a single 3:00,
    *  which is what a חורף מנחה ערב שבת does every week once the clocks go back. Seven
-   *  becomes 3, 2, 2 rather than 3, 3, 1. The bigger lines go first, so a ragged edge
-   *  falls at the bottom where it reads as the end of a list. */
+   *  becomes 2, 2, 3 rather than 3, 3, 1: the fuller line goes last, so the block builds
+   *  downwards rather than tailing off. */
   const sizesFor = (n) => {
     const lines = Math.max(1, Math.ceil(n / max));
     const base = Math.floor(n / lines);
     const extra = n % lines;
-    return Array.from({ length: lines }, (_, i) => base + (i < extra ? 1 : 0));
+    return Array.from({ length: lines }, (_, i) => base + (i >= lines - extra ? 1 : 0));
   };
   const plan = counts.map(sizesFor);
 
@@ -341,9 +368,17 @@ function alignColons(root) {
     let changed = false;
     for (let i = 0; i < segments.length; i++) {
       if (i === 0 && !atLineStart) continue;
-      const lead = segments[i].match(/^(\s*)\d:\d{2}/);
-      if (!lead) continue;
-      if (i === 0 && !lead[1]) {
+      // The first time on the line, wherever it sits in the string. Matching only a line
+      // that *begins* with one skipped "שקיעה 4:48": in the string the Hebrew word comes
+      // first, so the line looked like it had no time to align, and its colon sat a digit
+      // to the left of every other colon on the card. Padding the line start moves the
+      // whole line, colon included, onto the axis. Only a one-digit hour needs it - a
+      // 12:30 is what the axis is set by.
+      const firstTime = segments[i].match(/(\d{1,2}):\d{2}/);
+      if (!firstTime || firstTime[1].length !== 1) continue;
+      const lead = [segments[i].match(/^(\s*)/)[1]];
+      const opensWithTime = segments[i].slice(lead[0].length).startsWith(firstTime[0]);
+      if (i === 0 && !lead[0] && opensWithTime) {
         // The time opens this node, and the node is often inside the <u> of an underlined
         // time. As plain text the pad would sit inside that <u> and the rule would be
         // drawn a whole digit wider than the time it belongs to. An inline-block is an
@@ -354,7 +389,7 @@ function alignColons(root) {
         pad.textContent = FIGURE_SPACE;
         node.parentNode.insertBefore(pad, node);
       } else {
-        segments[i] = lead[1] + FIGURE_SPACE + segments[i].slice(lead[1].length);
+        segments[i] = lead[0] + FIGURE_SPACE + segments[i].slice(lead[0].length);
         changed = true;
       }
     }
