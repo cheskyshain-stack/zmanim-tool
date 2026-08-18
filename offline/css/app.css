@@ -593,7 +593,9 @@ table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size
 th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: middle; text-align: center; }
 th {
   background: var(--sheet-accent, var(--accent));
-  color: white;
+  /* Follows the page colour rather than being fixed white, so a light one is readable.
+     See headerInkFor in ui/sheet-view.js. */
+  color: var(--sheet-head-ink, white);
   font-weight: 700;
   font-size: calc(var(--sheet-font-size) + 2pt);
   white-space: pre-line;

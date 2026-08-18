@@ -117,7 +117,7 @@ const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
@@ -3754,7 +3754,7 @@ function renderSheet(container, state, sheet, onChange) {
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#54595f' };
+    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' };
     commit(); // app.js re-renders the whole sheet view on save
   });
 }
@@ -3836,11 +3836,24 @@ function autoFit(container) {
   window.addEventListener('resize', fitResizeHandler);
 }
 
+/** Black or white, whichever the header row can actually be read in against the page
+ *  colour. White on the dark grey the chart shipped with, black once the colour is light:
+ *  without this, picking a light Page color left the header white on near-white and the
+ *  column names simply vanished. Rec. 601 luma, which is the usual rule of thumb for
+ *  this, with the threshold at the middle of the range. */
+function headerInkFor(color) {
+  const hex = String(color || '').replace('#', '');
+  if (hex.length !== 6) return '#fff';
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
+}
+
 function applyStyle(target, style) {
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
   target.style.setProperty('--sheet-accent', style.accentColor);
+  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
 }
 
 /** Makes every row in a table - header included - exactly the same height.
