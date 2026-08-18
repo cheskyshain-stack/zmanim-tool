@@ -761,12 +761,11 @@ body.is-luach .week-cards { align-items: center; }
 
 /* Takes the room left between the masthead and the footer. The list inside is scaled to
    fit it when a long week would otherwise overflow the page (see fitLinesToPage). */
-/* Takes the room left between the masthead and the footer, with the rows sitting in the
-   middle of it: a weekday card carries three or four minyanim against a full page, and
-   pinned to the top they left the bottom half of the sheet visibly empty. Anything long
-   enough to overflow has already been scaled to fit by fitLinesToPage, so centring never
-   pushes a row off either end. */
-.week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+/* Takes the room left between the masthead and the footer. The rows start at the top:
+   a card is read from the top down, and a block floated into the middle of the sheet
+   reads as though something above it failed to load. The weekday card fills the page by
+   giving each time its own line instead (see capTimesPerLine in ui/week-view.js). */
+.week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; }
 /* Held to the width the two columns actually need and centred, rather than being left to
    span the page. Stretched full width the name sat against the right edge and the time
    against the left, with a hand's width of nothing between them. */
@@ -782,12 +781,12 @@ body.is-luach .week-cards { align-items: center; }
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
 .week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
-/* The block of times is centred in its column, but its own lines are flush with each
-   other rather than each being centred separately: stacked times that step in and out
-   line by line are harder to read than a squared-off block. */
+/* Every line of times is centred in the column, not just the block as a whole. Flush
+   left, a short second line hung off the left of a longer first one and the column read
+   as ragged rather than set. Centred, the stack sits on one axis down the card. */
 .week-time {
   direction: ltr; font-weight: 700; font-size: 14pt; white-space: pre-line; line-height: 1.35;
-  display: inline-block; justify-self: center; text-align: left;
+  display: block; justify-self: stretch; text-align: center;
 }
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
 /* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the

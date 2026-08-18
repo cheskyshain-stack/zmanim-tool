@@ -4100,9 +4100,16 @@ function esc(str) {
 function printOnly(pageEl) {
   document.body.classList.add('is-printing-one');
   pageEl.classList.add('is-print-target');
+  // The wrapper is marked as well as the page. Hiding only the other pages left their
+  // wrappers standing, and an empty wrapper is still a box outside the named page the
+  // pages themselves claim, which was enough to put out a blank sheet of the *default*
+  // page size next to the one being printed.
+  const slot = pageEl.closest('.page-slot');
+  slot?.classList.add('is-print-slot');
   const done = () => {
     document.body.classList.remove('is-printing-one');
     pageEl.classList.remove('is-print-target');
+    slot?.classList.remove('is-print-slot');
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);
@@ -4382,16 +4389,23 @@ function cardHtml(title, linesHtml, settings) {
   </section>`;
 }
 
-/** Scales a week's list of times down when it would otherwise run past the page.
+/** Sizes a week's list of times to the page: down when it would run past the bottom, up
+ *  when it would otherwise leave the sheet half empty.
  *
  *  A שבת קיץ week is eleven rows, some of them two lines deep, and at full size that
  *  spills onto a second sheet: the print preview showed "2 sheets of paper" with the page
  *  cut mid-list. Nothing can be shrunk by CSS alone, so the ratio is measured and applied.
  *
- *  The measurement is now taken from the page on screen, because the page on screen *is*
- *  the printed page: same size, same type, same rules. The earlier version had to inject
- *  the print stylesheet and measure against that, which was fragile and got the answer
- *  wrong twice. */
+ *  The weekday card is the opposite problem. It carries three minyanim, and even with a
+ *  time to a line it stopped two thirds down the sheet, which on a wall reads as a page
+ *  that failed to finish rather than as a short list. So it grows to meet the footer.
+ *
+ *  The measurement is taken from the page on screen, because the page on screen *is* the
+ *  printed page: same size, same type, same rules. The earlier version had to inject the
+ *  print stylesheet and measure against that, which was fragile and got the answer wrong
+ *  twice. */
+const MAX_GROW = 1.6; // past this the times are billboard-sized rather than well set
+
 function fitLinesToPage(container) {
   container.querySelectorAll('.week-card').forEach((card) => {
     const box = card.querySelector('.week-lines');
@@ -4400,9 +4414,20 @@ function fitLinesToPage(container) {
     card.style.removeProperty('--fit-scale');
     const room = box.clientHeight;
     const needed = inner.scrollHeight;
-    if (!room || !needed || needed <= room) return;
+    if (!room || !needed) return;
     // A hair under, so rounding never pushes the last row over the edge.
-    card.style.setProperty('--fit-scale', Math.max(0.5, (room / needed) * 0.98).toFixed(3));
+    const byHeight = (room / needed) * 0.98;
+    if (needed > room) {
+      card.style.setProperty('--fit-scale', Math.max(0.5, byHeight).toFixed(3));
+      return;
+    }
+    // Growing has to respect the width too. The row block is held to a fixed measure
+    // (see .week-lines-inner), and zoom scales that measure with everything else, so past
+    // a point the rows would run wider than the card and be clipped.
+    const width = inner.getBoundingClientRect().width;
+    const byWidth = width ? box.clientWidth / width : 1;
+    const grow = Math.min(byHeight, byWidth, MAX_GROW);
+    if (grow > 1.02) card.style.setProperty('--fit-scale', grow.toFixed(3));
   });
 }
 
@@ -4526,10 +4551,11 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
-  // Two to a line on the weekday card, three on the שבת one: a typed list of minyan
-  // times is usually longer than a computed pair, and two sit better in the space.
+  // Three to a line on the שבת card, one on the weekday card. The weekday card carries
+  // only three minyanim against a full sheet, so a time to a line is what fills it;
+  // the שבת card has eleven rows and would run off the page the same way.
   container.querySelectorAll('.week-card').forEach((card, i) => {
-    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 2));
+    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 1));
   });
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול

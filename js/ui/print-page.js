@@ -14,9 +14,16 @@
 export function printOnly(pageEl) {
   document.body.classList.add('is-printing-one');
   pageEl.classList.add('is-print-target');
+  // The wrapper is marked as well as the page. Hiding only the other pages left their
+  // wrappers standing, and an empty wrapper is still a box outside the named page the
+  // pages themselves claim, which was enough to put out a blank sheet of the *default*
+  // page size next to the one being printed.
+  const slot = pageEl.closest('.page-slot');
+  slot?.classList.add('is-print-slot');
   const done = () => {
     document.body.classList.remove('is-printing-one');
     pageEl.classList.remove('is-print-target');
+    slot?.classList.remove('is-print-slot');
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);

@@ -69,6 +69,11 @@
   /* No trailing blank page after the last card, whether or not it is wrapped in a slot. */
   .week-cards > :last-child .week-card,
   .week-cards > .week-card:last-child { break-after: auto; }
+  /* Browsers drop background colours unless told otherwise, and the print dialog's
+     "Background graphics" box is off by default. Without this the card printed as bare
+     text: the band behind every row, which is what separates one מנין from the next,
+     simply was not there. The wall charts have had the same line since the beginning. */
+  .week-card, .week-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .week-line { break-inside: avoid; }
 }
 
@@ -77,5 +82,14 @@
 @media print {
   body.is-printing-one .week-card:not(.is-print-target),
   body.is-printing-one .page:not(.is-print-target) { display: none !important; }
+  /* The wrappers of the pages not being printed go too (marked by printOnly). An empty
+     wrapper still counts as a box outside the named page, and that alone was enough to
+     put out a blank sheet at the default page size beside the one page wanted. */
+  body.is-printing-one .page-slot:not(.is-print-slot) { display: none !important; }
   .page-slot { display: block; margin: 0; }
+  /* The one page being printed is the whole run, so it must not ask for a break on
+     either side of itself. Every card and chart page carries break-after: page so the
+     next one starts on a fresh sheet, and left in place while printing alone that break
+     put out an empty sheet after it (or before it, printing the last one). */
+  body.is-printing-one .is-print-target { break-before: auto; break-after: auto; page-break-before: auto; page-break-after: auto; }
 }
