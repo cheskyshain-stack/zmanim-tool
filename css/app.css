@@ -610,14 +610,12 @@ th {
    two-line cell (a parsha with a special-Shabbos name under it) ran ~29px per line and
    became the tallest row on the page. Since every row is pinned to the tallest one
    (see syncHeaderRowHeight), that one cell was dragging the whole table past 8.5in. */
-/* The parsha column: the page colour mixed 60% with white, so it is plainly the same
-   colour as the header row but a step lighter than it, never darker. It was a 12% tint
-   once, which read as a distinct band while the page colour was dark but went to within
-   a couple of percent of white once the colour was light; then full strength, matching
-   the header exactly. Its ink is computed from the mixed colour rather than from the
-   header's, since at 60% the two can want different ink: see sideInk in
-   ui/sheet-view.js. */
-.parsha-cell { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 60%, white); color: var(--sheet-side-ink, var(--sheet-head-ink, white)); text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
+/* The parsha column has no colour of its own: it bands along with the row it belongs to,
+   like every other cell. It has been a 12% tint, then the page colour at full strength,
+   then a 60% mix of it, and each of those made it a separate object stuck to the side of
+   the table. The names still lead the row without it, being 2pt larger than everything
+   else. */
+.parsha-cell { text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
@@ -631,8 +629,9 @@ table:not(.weekday-table) .parsha-cell { min-width: 5.5em; }
 /* The alternating row band, mixed from the header colour so it is the same hue at a
    fraction of the strength. It was 5%, which read fine under the old dark gray header
    but all but vanished once the header went light: 5% of a light gray is white. At 40%
-   the band is plainly a band under either. */
-tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 40%, white); }
+   the band is plainly a band under either. The parsha cell is in it too, so a band runs
+   the full width of its row and is what ties the row together. */
+tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 40%, white); }
 /* Cell content is direction:ltr even inside the RTL table - without this, the Unicode
    bidi algorithm can visually reverse "/"-separated time lists (e.g. "9:03 / 9:15"
    rendering as "9:15 / 9:03") since bare numbers are directionally weak. Hebrew words
