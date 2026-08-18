@@ -855,7 +855,11 @@ body.is-luach .week-cards { align-items: center; }
 /* The digit-width pad that lines the colons up. inline-block on purpose: an ancestor's
    underline is not drawn through an atomic inline box, so padding an underlined time
    does not stretch its rule (see alignColons in ui/week-view.js). */
-.time-pad { display: inline-block; white-space: pre; }
+/* A digit's worth of blank, made of width rather than of a character: 1ch is the width of
+   a "0" in whatever face is actually being used, so the indent holds on a device whose
+   font has no U+2007 figure space. Inline-block so an ancestor's underline is not drawn
+   through it. */
+.time-pad { display: inline-block; width: 1ch; }
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
 /* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the
    wall chart. Here they are separate labelled rows, so the size difference says nothing. */

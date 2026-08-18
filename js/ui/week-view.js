@@ -264,10 +264,16 @@ function capTimesPerLine(root, max = 3) {
   );
 
   for (const [node, cuts] of cutsByNode) {
+    // A cut at the very start of a node breaks before whatever inline element that node
+    // opens, rather than inside it: see insertAtLineStart.
+    const leading = cuts[0] === 0;
+    const rest = leading ? cuts.slice(1) : cuts;
+    if (leading) insertAtLineStart(root, node, document.createElement('br'));
+    if (!rest.length) continue;
     const text = node.nodeValue;
     const frag = document.createDocumentFragment();
     let from = 0;
-    for (const at of cuts) {
+    for (const at of rest) {
       // Everything up to this time, with the separator that would have preceded it
       // trimmed away so the next line starts at the time itself.
       frag.append(text.slice(from, at).replace(/[\s,/]+$/, ''));
@@ -345,13 +351,25 @@ function hasTwoDigitHourAtLineStart(root) {
  *
  *  Paired with font-variant-numeric: tabular-nums in the stylesheet, without which a font
  *  with proportional figures would put "1" and "8" at different widths and undo it. */
-const FIGURE_SPACE = '\u2007';
+/** A digit's worth of blank at the start of a line, so a 1:35 lines its colon up with a
+ *  12:30. An empty element sized in CSS rather than a U+2007 figure space: as a character
+ *  it is only as wide as the font says, and a font without it falls back to something
+ *  else or to nothing, so the indent was one thing here and another on a phone. An
+ *  inline-block also keeps an ancestor's underline from being drawn through it. */
+const timePad = () => {
+  const pad = document.createElement('span');
+  pad.className = 'time-pad';
+  return pad;
+};
 
 function alignColons(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
 
+  // Where a pad belongs, gathered first and inserted afterwards: putting one in mid-walk
+  // splits the very node the walk is reading.
+  const inserts = [];
   let atLineStart = true;
   for (const node of nodes) {
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -365,8 +383,11 @@ function alignColons(root) {
     // node, and looking only at the node's own start left that 8:00 unpadded while every
     // other time in the column was padded.
     const segments = text.split('\n');
-    let changed = false;
+    let at = 0;
     for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const startsAt = at;
+      at += segment.length + 1; // + the newline it was split on
       if (i === 0 && !atLineStart) continue;
       // The first time on the line, wherever it sits in the string. Matching only a line
       // that *begins* with one skipped "שקיעה 4:48": in the string the Hebrew word comes
@@ -374,28 +395,31 @@ function alignColons(root) {
       // to the left of every other colon on the card. Padding the line start moves the
       // whole line, colon included, onto the axis. Only a one-digit hour needs it - a
       // 12:30 is what the axis is set by.
-      const firstTime = segments[i].match(/(\d{1,2}):\d{2}/);
+      const firstTime = segment.match(/(\d{1,2}):\d{2}/);
       if (!firstTime || firstTime[1].length !== 1) continue;
-      const lead = [segments[i].match(/^(\s*)/)[1]];
-      const opensWithTime = segments[i].slice(lead[0].length).startsWith(firstTime[0]);
-      if (i === 0 && !lead[0] && opensWithTime) {
-        // The time opens this node, and the node is often inside the <u> of an underlined
-        // time. As plain text the pad would sit inside that <u> and the rule would be
-        // drawn a whole digit wider than the time it belongs to. An inline-block is an
-        // atomic box, and an ancestor's underline is not drawn through one, so the pad
-        // holds its width without being underlined.
-        const pad = document.createElement('span');
-        pad.className = 'time-pad';
-        pad.textContent = FIGURE_SPACE;
-        node.parentNode.insertBefore(pad, node);
-      } else {
-        segments[i] = lead[0] + FIGURE_SPACE + segments[i].slice(lead[0].length);
-        changed = true;
-      }
+      inserts.push({ node, offset: startsAt + segment.match(/^\s*/)[0].length });
     }
-    if (changed) node.nodeValue = segments.join('\n');
     atLineStart = text.endsWith('\n');
   }
+
+  // Back to front, so an earlier offset is still an offset into the same text.
+  for (const { node, offset } of inserts.reverse()) {
+    if (offset === 0) insertAtLineStart(root, node, timePad());
+    else {
+      const tail = node.splitText(offset);
+      tail.parentNode.insertBefore(timePad(), tail);
+    }
+  }
+}
+
+/** Puts an element in front of a node that opens a line, outside whatever inline element
+ *  the node happens to open. A pad left inside a <u> is fine to look at but a <br> is not:
+ *  an underlined line break paints a rule out to the edge of the line in some engines, and
+ *  the markup reads as though the underline spans two lines when it does not. */
+function insertAtLineStart(root, node, el) {
+  let target = node;
+  while (target.parentNode && target.parentNode !== root && target.parentNode.firstChild === target) target = target.parentNode;
+  target.parentNode.insertBefore(el, target);
 }
 
 /** Hangs the location stars off the end of a time instead of letting them widen it.
