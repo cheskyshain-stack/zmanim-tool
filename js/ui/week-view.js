@@ -119,6 +119,17 @@ function specialDaysInWeek(shabbosSerial, settings) {
  *  The word is written in rather than formatted, since no locale has it. */
 const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף' };
 
+/** Which of a week's two cards comes first: the שבת page or the חול page.
+ *
+ *  Its own localStorage key rather than a field in the app state, for two reasons. It is
+ *  a view preference about how one person prints, not part of the shul's data, so it has
+ *  no business travelling to the congregation inside published.json. And the
+ *  congregation's page never loads the app state at all - it is built from the published
+ *  file - so a setting kept there could not reach the very page this button is on. The
+ *  publishing token is kept out on its own for a like reason. */
+const CARD_ORDER_KEY = 'zmanim-week-card-order';
+const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos');
+
 /** The season that would follow the last week in the list, named. The two alternate, so
  *  it is whichever one the last week is not: a קיץ season ends at Sukkos and חורף picks
  *  up from there. Read off the newest week that belongs to a שבת sheet, since the last
@@ -658,10 +669,12 @@ function weekCardsHtml(showing, index, state, settings) {
   // which they are not: they are the ordinary weekdays around it.
   const cardTitle = sheet ? 'פרשת ' + parsha : 'שבוע שחל בו ' + parsha;
 
-  return (
-    (shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '') +
-    (weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '')
-  );
+  const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '';
+  const weekdayCard = weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '';
+  // The two are ordered the same way on screen as on paper, here rather than only in the
+  // print run: this page's whole bargain is that what you see is what comes out, so an
+  // order that applied to the printer alone would be a surprise waiting to happen.
+  return cardOrder() === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
 }
 
 /** Swipe across the week to page through it, the way a photo album works: drag left to
@@ -754,6 +767,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
         <button type="button" id="week-print-rest">Print every week to the end of the season</button>
       </div>
+      <label class="week-order">Which page first
+        <select id="week-order">
+          <option value="shabbos" ${cardOrder() === 'shabbos' ? 'selected' : ''}>שבת, then weekday</option>
+          <option value="weekday" ${cardOrder() === 'weekday' ? 'selected' : ''}>Weekday, then שבת</option>
+        </select>
+      </label>
       ${
         // At the end of the list, say why rather than just greying Next out. The weeks
         // here are the published ones, and a season stops where the next season begins:
@@ -818,6 +837,15 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     window.print();
     setTimeout(restore, 1500);
   });
+  // Re-rendered through onSerialChange rather than by shuffling the two cards in place:
+  // the cards are decorated after they are built (line caps, colon axis, legend, the
+  // fit-to-page pass) and those passes are not safe to run over their own output, which
+  // is the same reason the print-rest run restores from raw markup.
+  container.querySelector('#week-order')?.addEventListener('change', (e) => {
+    localStorage.setItem(CARD_ORDER_KEY, e.target.value === 'weekday' ? 'weekday' : 'shabbos');
+    onSerialChange(showing);
+  });
+
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
