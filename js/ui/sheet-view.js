@@ -1,4 +1,4 @@
-import { resolveSettings, SPECIAL_SHACHARIS_HEADING } from '../settings.js';
+import { resolveSettings, SPECIAL_SHACHARIS_HEADING, DEFAULT_ACCENT_COLOR } from '../settings.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
@@ -103,7 +103,7 @@ export function syncPageHeights(pagesEl) {
 
 export function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
-  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#54595f'; // sheets saved before this control existed
+  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || DEFAULT_ACCENT_COLOR; // sheets saved before this control existed
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const settings = resolveSettings(state.settings);
   const weeks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
@@ -276,7 +276,7 @@ export function renderSheet(container, state, sheet, onChange) {
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' };
+    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
     commit(); // app.js re-renders the whole sheet view on save
   });
 }

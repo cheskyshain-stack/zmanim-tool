@@ -1,7 +1,15 @@
 // localStorage persistence + JSON export/import. Everything (settings, saved sheet
 // instances with their per-cell overrides, and rules) lives in one namespaced key -
 // this is the single-browser "local app" model the user chose over a hosted backend.
-import { DEFAULT_SETTINGS, DEFAULT_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_SHACHARIS, LEGACY_WEEKDAY_FOOTER, splitCombinedShacharis } from './settings.js';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_WEEKDAY_SHACHARIS,
+  LEGACY_WEEKDAY_SHACHARIS,
+  LEGACY_WEEKDAY_FOOTER,
+  DEFAULT_ACCENT_COLOR,
+  LEGACY_ACCENT_COLORS,
+  splitCombinedShacharis,
+} from './settings.js';
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
@@ -105,6 +113,7 @@ function normalizeSettings(raw) {
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
+  if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
   // שחרית used to be one field holding both schedules. Anything saved back then is cut
   // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
   // already set. Only when the saved value still carries that heading: a value already
@@ -119,6 +128,19 @@ function normalizeSettings(raw) {
   return merged;
 }
 
+const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
+
+/** The same carry-forward, for sheets already saved. A sheet keeps its own copy of the
+ *  style, so changing the default alone would leave every existing chart on the old dark
+ *  header while new ones came out light. Only the exact old default is moved; a colour
+ *  picked by hand is left alone, as everywhere else. */
+function normalizeSheets(sheets) {
+  for (const sheet of sheets) {
+    if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
+  }
+  return sheets;
+}
+
 function defaultState() {
   return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {} });
 }
@@ -130,7 +152,7 @@ export function loadState() {
     const parsed = JSON.parse(raw);
     return applySeeds({
       settings: normalizeSettings(parsed.settings),
-      sheets: parsed.sheets || [],
+      sheets: normalizeSheets(parsed.sheets || []),
       rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
       seeded: parsed.seeded || {},
     });
@@ -182,7 +204,7 @@ export function importStateFromText(text) {
   // deleting a seeded rule would hand it straight back on the next load.
   return applySeeds({
     settings: normalizeSettings(parsed.settings),
-    sheets: parsed.sheets || [],
+    sheets: normalizeSheets(parsed.sheets || []),
     rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
     seeded: parsed.seeded || {},
   });

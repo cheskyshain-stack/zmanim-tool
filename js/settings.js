@@ -62,6 +62,16 @@ export const LEGACY_WEEKDAY_FOOTER = [
   'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
 ];
 
+/** The chart's header colour, which the parsha column is painted in too. Light gray with
+ *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
+ *  every page is a lot of toner, and the user asked for the light one. */
+export const DEFAULT_ACCENT_COLOR = '#c9ced5';
+
+/** Accent colours that were once the shipped default. Same carry-forward treatment as
+ *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
+ *  by hand, so it follows the default instead of staying on the old one for ever. */
+export const LEGACY_ACCENT_COLORS = ['#54595f'];
+
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
@@ -103,7 +113,7 @@ export const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */

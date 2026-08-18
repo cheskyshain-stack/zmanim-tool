@@ -76,6 +76,16 @@ const LEGACY_WEEKDAY_FOOTER = [
   'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
 ];
 
+/** The chart's header colour, which the parsha column is painted in too. Light gray with
+ *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
+ *  every page is a lot of toner, and the user asked for the light one. */
+const DEFAULT_ACCENT_COLOR = '#c9ced5';
+
+/** Accent colours that were once the shipped default. Same carry-forward treatment as
+ *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
+ *  by hand, so it follows the default instead of staying on the old one for ever. */
+const LEGACY_ACCENT_COLORS = ['#54595f'];
+
 const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
   // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
@@ -117,7 +127,7 @@ const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
@@ -237,6 +247,7 @@ function normalizeSettings(raw) {
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
+  if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
   // שחרית used to be one field holding both schedules. Anything saved back then is cut
   // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
   // already set. Only when the saved value still carries that heading: a value already
@@ -251,6 +262,19 @@ function normalizeSettings(raw) {
   return merged;
 }
 
+const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
+
+/** The same carry-forward, for sheets already saved. A sheet keeps its own copy of the
+ *  style, so changing the default alone would leave every existing chart on the old dark
+ *  header while new ones came out light. Only the exact old default is moved; a colour
+ *  picked by hand is left alone, as everywhere else. */
+function normalizeSheets(sheets) {
+  for (const sheet of sheets) {
+    if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
+  }
+  return sheets;
+}
+
 function defaultState() {
   return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {} });
 }
@@ -262,7 +286,7 @@ function loadState() {
     const parsed = JSON.parse(raw);
     return applySeeds({
       settings: normalizeSettings(parsed.settings),
-      sheets: parsed.sheets || [],
+      sheets: normalizeSheets(parsed.sheets || []),
       rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
       seeded: parsed.seeded || {},
     });
@@ -314,7 +338,7 @@ function importStateFromText(text) {
   // deleting a seeded rule would hand it straight back on the next load.
   return applySeeds({
     settings: normalizeSettings(parsed.settings),
-    sheets: parsed.sheets || [],
+    sheets: normalizeSheets(parsed.sheets || []),
     rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
     seeded: parsed.seeded || {},
   });
@@ -3581,7 +3605,7 @@ function syncPageHeights(pagesEl) {
 
 function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
-  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || '#54595f'; // sheets saved before this control existed
+  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || DEFAULT_ACCENT_COLOR; // sheets saved before this control existed
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const settings = resolveSettings(state.settings);
   const weeks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
@@ -3754,7 +3778,7 @@ function renderSheet(container, state, sheet, onChange) {
   });
   colorInput.addEventListener('change', commit);
   container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: '#c9ced5' };
+    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
     commit(); // app.js re-renders the whole sheet view on save
   });
 }
