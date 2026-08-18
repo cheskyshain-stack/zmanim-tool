@@ -110,6 +110,44 @@ function hebrewYear(year) {
   const small = year % 1000;
   return hebrewNumber(small || year);
 }
+/** The holiday names that stand in for a parsha on a Shabbos that has none.
+ *
+ *  A week is labelled by the parsha read on its Shabbos; when that Shabbos is Yom Tov
+ *  there is no parsha, so the week carries the Yom Tov's own name instead (weeks.js).
+ *  Printed as it stands, "סוכות" reads as though the row held the times for Yom Tov,
+ *  which it does not - the row is the ordinary weekdays around it. This is how a renderer
+ *  tells the two kinds of label apart so it can say "שבוע של סוכות".
+ *
+ *  Derived rather than guessed: every parsha-less Shabbos over forty years, in Hebrew and
+ *  English and in Israel and out, produces exactly these seven names each way. */
+export const YOM_TOV_WEEK_LABELS = [
+  'פסח',
+  'שבועות',
+  'ראש השנה',
+  'יום כפור',
+  'סוכות',
+  'שמיני עצרת',
+  'שמחת תורה',
+  'Pesach',
+  'Shavuos',
+  'Rosh Hashana',
+  'Yom Kippur',
+  'Succos',
+  'Shemini Atzeres',
+  'Simchas Torah',
+];
+
+/** A week label that names a Yom Tov rather than a parsha. */
+export function isYomTovWeekLabel(label) {
+  return YOM_TOV_WEEK_LABELS.includes(String(label ?? '').trim());
+}
+
+/** How such a week is named on a chart or a card: "שבוע של סוכות" / "Week of Succos".
+ *  Anything else is returned untouched, so a caller can hand it any week label. */
+export function weekOfLabel(label, english) {
+  return isYomTovWeekLabel(label) ? (english ? 'Week of ' : 'שבוע של ') + String(label).trim() : label;
+}
+
 export function jewishDateString(serial, english, useGregorianBefore1582 = false) {
   const { dayOfMonth, month, year } = hebrewDateExtended(serial, useGregorianBefore1582);
   const monthName = (english ? JEWISH_MONTHS_EN : JEWISH_MONTHS_HE)[month - 1];

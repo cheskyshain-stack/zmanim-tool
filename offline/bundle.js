@@ -717,6 +717,44 @@ function hebrewYear(year) {
   const small = year % 1000;
   return hebrewNumber(small || year);
 }
+/** The holiday names that stand in for a parsha on a Shabbos that has none.
+ *
+ *  A week is labelled by the parsha read on its Shabbos; when that Shabbos is Yom Tov
+ *  there is no parsha, so the week carries the Yom Tov's own name instead (weeks.js).
+ *  Printed as it stands, "סוכות" reads as though the row held the times for Yom Tov,
+ *  which it does not - the row is the ordinary weekdays around it. This is how a renderer
+ *  tells the two kinds of label apart so it can say "שבוע של סוכות".
+ *
+ *  Derived rather than guessed: every parsha-less Shabbos over forty years, in Hebrew and
+ *  English and in Israel and out, produces exactly these seven names each way. */
+const YOM_TOV_WEEK_LABELS = [
+  'פסח',
+  'שבועות',
+  'ראש השנה',
+  'יום כפור',
+  'סוכות',
+  'שמיני עצרת',
+  'שמחת תורה',
+  'Pesach',
+  'Shavuos',
+  'Rosh Hashana',
+  'Yom Kippur',
+  'Succos',
+  'Shemini Atzeres',
+  'Simchas Torah',
+];
+
+/** A week label that names a Yom Tov rather than a parsha. */
+function isYomTovWeekLabel(label) {
+  return YOM_TOV_WEEK_LABELS.includes(String(label ?? '').trim());
+}
+
+/** How such a week is named on a chart or a card: "שבוע של סוכות" / "Week of Succos".
+ *  Anything else is returned untouched, so a caller can hand it any week label. */
+function weekOfLabel(label, english) {
+  return isYomTovWeekLabel(label) ? (english ? 'Week of ' : 'שבוע של ') + String(label).trim() : label;
+}
+
 function jewishDateString(serial, english, useGregorianBefore1582 = false) {
   const { dayOfMonth, month, year } = hebrewDateExtended(serial, useGregorianBefore1582);
   const monthName = (english ? JEWISH_MONTHS_EN : JEWISH_MONTHS_HE)[month - 1];
@@ -4044,7 +4082,11 @@ ${special}` : '');
         return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
-      const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
+      // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
+      // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
+      // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
@@ -5011,11 +5053,12 @@ function weekCardsHtml(showing, index, state, settings) {
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
-  // A week with no Shabbos sheet is named for its Yom Tov rather than a parsha, the
-  // Shabbos being the Yom Tov itself, so no parsha is read. Naming it "פרשת סוכות" would
-  // be wrong and naming it "סוכות" reads as though these were the times for Yom Tov,
-  // which they are not: they are the ordinary weekdays around it.
-  const cardTitle = sheet ? 'פרשת ' + parsha : 'שבוע שחל בו ' + parsha;
+  // A week whose Shabbos is Yom Tov is named for its Yom Tov rather than a parsha, no
+  // parsha being read that Shabbos. "פרשת סוכות" would be wrong and "סוכות" on its own
+  // reads as though these were the times for Yom Tov, which they are not: they are the
+  // ordinary weekdays around it. Named off the label rather than off the missing Shabbos
+  // sheet, so the card and the chart say the same thing by the same rule.
+  const cardTitle = isYomTovWeekLabel(week.parsha) ? weekOfLabel(week.parsha, false) : 'פרשת ' + parsha;
 
   const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '';
   const weekdayCard = weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '';

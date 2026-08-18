@@ -1,5 +1,5 @@
 import { resolveSettings, SPECIAL_SHACHARIS_HEADING, DEFAULT_ACCENT_COLOR } from '../settings.js';
-import { hebrewDateExtended } from '../hebrew-calendar.js';
+import { hebrewDateExtended, weekOfLabel } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
@@ -509,7 +509,11 @@ ${special}` : '');
         return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
-      const parshaCell = week.parsha + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
+      // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
+      // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
+      // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.

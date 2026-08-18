@@ -15,7 +15,7 @@ import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
@@ -775,11 +775,12 @@ function weekCardsHtml(showing, index, state, settings) {
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
-  // A week with no Shabbos sheet is named for its Yom Tov rather than a parsha, the
-  // Shabbos being the Yom Tov itself, so no parsha is read. Naming it "פרשת סוכות" would
-  // be wrong and naming it "סוכות" reads as though these were the times for Yom Tov,
-  // which they are not: they are the ordinary weekdays around it.
-  const cardTitle = sheet ? 'פרשת ' + parsha : 'שבוע שחל בו ' + parsha;
+  // A week whose Shabbos is Yom Tov is named for its Yom Tov rather than a parsha, no
+  // parsha being read that Shabbos. "פרשת סוכות" would be wrong and "סוכות" on its own
+  // reads as though these were the times for Yom Tov, which they are not: they are the
+  // ordinary weekdays around it. Named off the label rather than off the missing Shabbos
+  // sheet, so the card and the chart say the same thing by the same rule.
+  const cardTitle = isYomTovWeekLabel(week.parsha) ? weekOfLabel(week.parsha, false) : 'פרשת ' + parsha;
 
   const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '';
   const weekdayCard = weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '';
