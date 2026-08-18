@@ -849,7 +849,10 @@ body.is-luach .week-cards { align-items: center; }
 .week-legend { margin-top: auto; padding-top: 0.12in; text-align: center; font-size: 9.5pt; color: #444; line-height: 1.35; }
 .week-legend:empty { display: none; }
 .week-legend-line { unicode-bidi: isolate; }
-.week-foot { margin-top: 0; padding-top: 0.15in; text-align: center; font-size: 10.5pt; border-top: 1px solid var(--border); }
+/* No rule above the address: the legend already sets it apart, and the card is quiet
+   enough not to need a divider. Bold, so the shul's address is the line the eye lands on
+   at the bottom of the card rather than the note above it. */
+.week-foot { margin-top: 0; padding-top: 0.15in; text-align: center; font-size: 10.5pt; font-weight: 700; }
 
 /* A letter page is 816px across, wider than a phone and most windows once the sidebar is
    there. Scaled down to fit rather than scrolled sideways, so the whole page is visible:
