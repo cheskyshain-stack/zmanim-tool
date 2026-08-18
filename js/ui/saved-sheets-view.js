@@ -1,6 +1,6 @@
 import { getPublishToken, fetchPublished, publishToSite, buildPublishedPayload } from '../publish.js';
+import { SEASON_LABELS } from '../settings.js';
 
-const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
 
@@ -24,7 +24,7 @@ function groupSheets(sheets) {
   return sheets.filter((s) => !paired.has(s.id)).map((s) => ({ primary: s, companion: companionOf.get(s.id) || null }));
 }
 
-export function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
+export function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenPublish = null) {
   const groups = groupSheets(state.sheets);
   // Folders are just a name stored on each sheet - there's no separate folder list, so a
   // folder exists exactly as long as something is in it and disappears when the last
@@ -42,7 +42,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
       .map(
         ({ primary: s, companion }) => `
         <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABEL[s.season] || s.season}${
+          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABELS[s.season] || s.season}${
             companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
           }<span class="live-chip" data-live-for="${s.id}" hidden>Live</span></td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
@@ -76,6 +76,15 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
   container.innerHTML = `
     <h2>Saved sheets</h2>
     <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
+    ${
+      // The row's own Publish button puts one season up and nothing else. This goes to the
+      // publishing panel, which is the place that shows what the congregation is looking
+      // at right now and can take a season back down - and the place that tells you about
+      // the token when there is no token, which is why it shows either way.
+      onOpenPublish
+        ? `<div class="actions"><button type="button" id="saved-publishing">Publishing${getPublishToken() ? '' : ' (no token set)'}</button></div>`
+        : ''
+    }
     ${
       state.sheets.length
         ? `
@@ -133,7 +142,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
   container.querySelectorAll('.publish-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       const { primary, companion } = groupOf(e);
-      const label = `${SEASON_LABEL[primary.season] || primary.season} ${primary.hebrewYear}`;
+      const label = `${SEASON_LABELS[primary.season] || primary.season} ${primary.hebrewYear}`;
       if (!confirm(`Put ${label} on the congregation's page?`)) return;
       const was = btn.textContent;
       btn.disabled = true;
@@ -151,6 +160,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange) 
       }
     });
   });
+  container.querySelector('#saved-publishing')?.addEventListener('click', () => onOpenPublish());
   container.querySelectorAll('.lock-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const locked = !groupOf(e).primary.locked;

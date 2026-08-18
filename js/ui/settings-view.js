@@ -4,12 +4,19 @@ import { renderImageCropper } from './image-crop.js';
 import { normalizeRichText } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { getPublishToken, setPublishToken } from '../publish.js';
+import { renderRules } from './rules-view.js';
 
-export function renderSettings(container, state, onSave, onStateReplaced) {
+export function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
   container.innerHTML = `
     <h2>Settings</h2>
     <p class="hint">Mirrors the workbook's SETTINGS sheet. Saved in this browser.</p>
+    <!-- Rules sit outside the form: they are saved as they are made, not by the Save
+         button at the bottom, and a nested form is not valid HTML anyway. -->
+    <details class="panel" id="rules-panel">
+      <summary>Rules</summary>
+      <div class="panel-body" id="rules-host"></div>
+    </details>
     <form id="settings-form" class="form-grid">
       <details class="panel" open>
         <summary>Header &amp; footer</summary>
@@ -163,6 +170,10 @@ export function renderSettings(container, state, onSave, onStateReplaced) {
   renderImageCropper(container.querySelector('#header-photo-cropper'), s.headerIconImage, (headerIconImage) => {
     onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
   });
+
+  // The Rules screen, whole, inside the first panel. It re-renders into its own host as
+  // you add or edit a rule, which leaves the rest of Settings untouched.
+  renderRules(container.querySelector('#rules-host'), state, onRulesChange);
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
   const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');

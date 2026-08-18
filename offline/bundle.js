@@ -81,6 +81,13 @@ const LEGACY_WEEKDAY_FOOTER = [
  *  every page is a lot of toner, and the user asked for the light one. */
 const DEFAULT_ACCENT_COLOR = '#c9ced5';
 
+/** How each season is named in the interface. Defined once and imported, rather than
+ *  written out in each screen that needs it: build-offline.py flattens every module into
+ *  one plain script sharing a single scope, so two modules declaring the same top-level
+ *  name is a SyntaxError there while being perfectly legal under ES modules - it breaks
+ *  the USB copy while the site itself carries on working. */
+const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
+
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
  *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
@@ -1858,304 +1865,6 @@ function renderGuide(container, onOpenTab) {
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
 }
 
-// ==== sheets/choref.js ====
-// שבת חורף (Winter Shabbos) column formulas, ported 1:1 from the workbook's
-// WINTER_ZMANIM_1 table (columns B:J). `week.serial` is the Shabbos (Saturday)
-// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
-
-
-
-
-function buildChorefRow(week, settings) {
-  const shabbos = week.serial;
-  const friday = shabbos - 1;
-  const shabbosDate = dateFromSerial(shabbos);
-  const fridayDate = dateFromSerial(friday);
-
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
-  const E = shacharisLine();
-
-  const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + 50 / 1440));
-
-  const G = inPlagWindow(friday, settings)
-    ? textjoin(SLASH, true, [
-        formatTime(Z.plagHamincha(fridayDate, settings) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(floorToMinute(sunsetFriday - 15 / 1440)),
-      ])
-    : formatTime(floorToMinute(sunsetFriday - 15 / 1440));
-
-  const H = candleLightingCell(fridayDate, settings);
-  const I = fridayMainMinchaMenu(fridayDate, settings);
-
-  return { B, C, D, E, F, G, H, I };
-}
-
-const CHOREF_COLUMNS = [
-  { key: 'B', header: 'מעריב' },
-  { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
-  { key: 'E', header: 'שחרית' },
-  { key: 'F', header: 'מעריב' },
-  { key: 'G', header: 'מנחה\nמעריב' },
-  { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nערב שבת' },
-];
-
-// ==== sheets/kayitz.js ====
-// שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
-// SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
-// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
-
-
-
-
-
-/** AND(dayOfYear>16, dayOfYear<65): roughly the Sefirah stretch (after Pesach, before
- *  Shavuos), where the workbook adds a few extra minutes to the Friday Maariv time and
- *  offers a second (later) Maariv. */
-function inExtraMaarivWindow(serial, settings) {
-  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
-  return doy > 16 && doy < 65;
-}
-
-function buildKayitzRow(week, settings) {
-  const shabbos = week.serial;
-  const friday = shabbos - 1;
-  const shabbosDate = dateFromSerial(shabbos);
-  const fridayDate = dateFromSerial(friday);
-
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
-  const E = shacharisLine();
-
-  const extraMaariv = inExtraMaarivWindow(friday, settings);
-  const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + (extraMaariv ? 55 : 50) / 1440));
-
-  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
-  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב ${formatTime(floorToMinute(sunsetFriday + 30 / 1440))}` : '');
-
-  const H = candleLightingCell(fridayDate, settings);
-
-  const plagWindow = inPlagWindow(friday, settings);
-  const plagMA = Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings));
-  const I = plagWindow ? `${formatTime(ceilToMinute(plagMA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA))}` : '';
-
-  const plagMA2 = Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings));
-  const J = plagWindow ? `${underlineTime(ceilToMinute(plagMA2 - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA2))}` : '';
-
-  const plagGRA = Z.plagHamincha(fridayDate, settings);
-  const K = plagWindow ? `${formatTime(ceilToMinute(plagGRA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagGRA))}` : '';
-
-  const L = fridayMainMinchaMenu(fridayDate, settings);
-
-  return { B, C, D, E, F, G, H, I, J, K, L };
-}
-
-const KAYITZ_COLUMNS = [
-  { key: 'B', header: 'מעריב' },
-  { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
-  { key: 'E', header: 'שחרית' },
-  { key: 'F', header: ' מעריב ' },
-  { key: 'G', header: 'מנחה\nמעריב' },
-  { key: 'H', header: 'הדלקת\nנרות' },
-  // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
-  // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
-  // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
-  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
-  { key: 'K', header: 'מנחה\nפלג גר"א' },
-  { key: 'L', header: 'מנחה\nערב שבת' },
-];
-
-// ==== ui/rules-view.js ====
-/** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
- *  Null (the default) shows just the list - most visits here are to glance at the
- *  rules, not write one, and the creation form used to sit open below them permanently. */
-function renderRules(container, state, onChange, editingRuleId = null) {
-  // Editing loads the rule's values into the same form used for adding; submitting
-  // then updates that rule in place (keeping its id and enabled state) instead of
-  // appending a new one.
-  const cloneOf = typeof editingRuleId === 'string' && editingRuleId.startsWith('clone:') ? editingRuleId.slice(6) : null;
-  const source = cloneOf ? state.rules.find((r) => r.id === cloneOf) : null;
-  const editing = editingRuleId && editingRuleId !== 'new' && !cloneOf ? state.rules.find((r) => r.id === editingRuleId) : null;
-  // Editing writes back to an existing rule; cloning only *prefills* from one and saves
-  // as a new rule, so the two share every field below but differ on submit.
-  const prefill = editing || source;
-  const formOpen = editingRuleId !== null;
-  container.innerHTML = `
-    <h2>Rules</h2>
-    <p class="hint">Reusable, recurring overrides. They apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text. Pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
-    <div id="rules-list"></div>
-    <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
-    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
-    <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
-      <fieldset>
-        <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
-      </fieldset>
-      <fieldset>
-        <legend>Which cell(s) to replace</legend>
-        <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף). One rule then covers both, without touching any other cell.</p>
-        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, prefill)}
-        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, prefill)}
-      </fieldset>
-      <fieldset>
-        <legend>What to do to the cell</legend>
-        <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
-        <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
-      </fieldset>
-      <div class="actions">
-        <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
-        <button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>
-      </div>
-    </form>
-  `;
-
-  container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
-  container.querySelector('#rule-add').addEventListener('click', () => {
-    renderRules(container, state, onChange, 'new');
-    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
-
-  const list = container.querySelector('#rules-list');
-  list.innerHTML = state.rules.length
-    ? state.rules
-        .map(
-          (r) => `
-      <div class="rule-row" data-id="${r.id}">
-        <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
-        <div class="rule-summary">
-          <strong>${esc(r.name)}</strong>
-          <div class="hint">columns ${columnsOf(r)
-            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
-            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
-        </div>
-        <div class="rule-actions">
-          <button class="rule-edit" title="Edit this rule">Edit</button>
-          <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
-          <button class="rule-delete" title="Delete rule">Delete</button>
-        </div>
-      </div>`
-        )
-        .join('')
-    : '<p class="hint">No rules yet.</p>';
-
-  list.querySelectorAll('.rule-enabled').forEach((cb) => {
-    cb.addEventListener('change', (e) => {
-      const id = e.target.closest('.rule-row').dataset.id;
-      state.rules.find((r) => r.id === id).enabled = e.target.checked;
-      onChange();
-    });
-  });
-  list.querySelectorAll('.rule-edit').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      renderRules(container, state, onChange, e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-  list.querySelectorAll('.rule-clone').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-  });
-  list.querySelectorAll('.rule-delete').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const id = e.target.closest('.rule-row').dataset.id;
-      if (!confirm('Delete this rule?')) return;
-      state.rules = state.rules.filter((r) => r.id !== id);
-      onChange();
-      renderRules(container, state, onChange);
-    });
-  });
-
-  container.querySelector('#rule-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const condition = {};
-    if (fd.get('always') === 'on') condition.always = true;
-    const specialParsha = splitCsv(fd.get('specialParsha'));
-    const parsha = splitCsv(fd.get('parsha'));
-    const hebrewDate = splitCsv(fd.get('hebrewDate'));
-    if (specialParsha.length) condition.specialParsha = specialParsha;
-    if (parsha.length) condition.parsha = parsha;
-    if (hebrewDate.length) condition.hebrewDate = hebrewDate;
-    const columnKeys = fd.getAll('columnKeys');
-    if (!columnKeys.length) {
-      alert('Pick at least one cell/column for this rule to affect.');
-      return;
-    }
-    const data = {
-      name: fd.get('name'),
-      condition,
-      columnKeys,
-      mode: fd.get('mode') || 'append',
-      value: fd.get('value'),
-    };
-    if (editing) {
-      Object.assign(editing, data); // id and enabled stay as they were
-    } else {
-      state.rules.push({ id: newId('rule'), enabled: true, ...data });
-    }
-    onChange();
-    renderRules(container, state, onChange);
-  });
-}
-
-function columnChecklist(sheetLabel, seasonKey, columns, editing) {
-  const checkedKeys = editing ? columnsOf(editing) : [];
-  return `
-    <div class="col-group">
-      <div class="col-group-title">${sheetLabel}</div>
-      ${columns
-        .map(
-          (c) =>
-            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
-        )
-        .join('')}
-    </div>
-  `;
-}
-function columnsOf(rule) {
-  return Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-}
-function prettyColumn(entry) {
-  if (!entry.includes(':')) return entry;
-  const [season, key] = entry.split(':');
-  return (season === 'kayitz' ? 'קיץ' : 'חורף') + ' ' + key;
-}
-function splitCsv(str) {
-  return (str || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-function conditionSummary(c) {
-  const parts = [];
-  if (c.always) parts.push('always');
-  if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
-  if (c.parsha) parts.push('parsha: ' + c.parsha.join(', '));
-  if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
-  if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
-  return parts.join(' or ') || '(no condition, never matches)';
-}
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 // ==== publish.js ====
 // Publishing a season for the congregation.
 //
@@ -2353,7 +2062,6 @@ async function unpublishFromSite(sheet, token) {
 }
 
 // ==== ui/saved-sheets-view.js ====
-const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
 
@@ -2377,7 +2085,7 @@ function groupSheets(sheets) {
   return sheets.filter((s) => !paired.has(s.id)).map((s) => ({ primary: s, companion: companionOf.get(s.id) || null }));
 }
 
-function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
+function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenPublish = null) {
   const groups = groupSheets(state.sheets);
   // Folders are just a name stored on each sheet - there's no separate folder list, so a
   // folder exists exactly as long as something is in it and disappears when the last
@@ -2395,7 +2103,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
       .map(
         ({ primary: s, companion }) => `
         <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABEL[s.season] || s.season}${
+          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABELS[s.season] || s.season}${
             companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
           }<span class="live-chip" data-live-for="${s.id}" hidden>Live</span></td>
           <td data-label="Hebrew year">${s.hebrewYear}</td>
@@ -2429,6 +2137,15 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
   container.innerHTML = `
     <h2>Saved sheets</h2>
     <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
+    ${
+      // The row's own Publish button puts one season up and nothing else. This goes to the
+      // publishing panel, which is the place that shows what the congregation is looking
+      // at right now and can take a season back down - and the place that tells you about
+      // the token when there is no token, which is why it shows either way.
+      onOpenPublish
+        ? `<div class="actions"><button type="button" id="saved-publishing">Publishing${getPublishToken() ? '' : ' (no token set)'}</button></div>`
+        : ''
+    }
     ${
       state.sheets.length
         ? `
@@ -2486,7 +2203,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
   container.querySelectorAll('.publish-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       const { primary, companion } = groupOf(e);
-      const label = `${SEASON_LABEL[primary.season] || primary.season} ${primary.hebrewYear}`;
+      const label = `${SEASON_LABELS[primary.season] || primary.season} ${primary.hebrewYear}`;
       if (!confirm(`Put ${label} on the congregation's page?`)) return;
       const was = btn.textContent;
       btn.disabled = true;
@@ -2504,6 +2221,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange) {
       }
     });
   });
+  container.querySelector('#saved-publishing')?.addEventListener('click', () => onOpenPublish());
   container.querySelectorAll('.lock-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const locked = !groupOf(e).primary.locked;
@@ -2929,12 +2647,316 @@ function reselect(sel, node) {
   sel.addRange(r);
 }
 
+// ==== sheets/choref.js ====
+// שבת חורף (Winter Shabbos) column formulas, ported 1:1 from the workbook's
+// WINTER_ZMANIM_1 table (columns B:J). `week.serial` is the Shabbos (Saturday)
+// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
+
+
+
+
+function buildChorefRow(week, settings) {
+  const shabbos = week.serial;
+  const friday = shabbos - 1;
+  const shabbosDate = dateFromSerial(shabbos);
+  const fridayDate = dateFromSerial(friday);
+
+  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+  const E = shacharisLine();
+
+  const sunsetFriday = Z.sunset(fridayDate, settings);
+  const F = underlineTime(floorToMinute(sunsetFriday + 50 / 1440));
+
+  const G = inPlagWindow(friday, settings)
+    ? textjoin(SLASH, true, [
+        formatTime(Z.plagHamincha(fridayDate, settings) - 15 / 1440),
+        formatTime(Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
+        formatTime(Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
+        formatTime(floorToMinute(sunsetFriday - 15 / 1440)),
+      ])
+    : formatTime(floorToMinute(sunsetFriday - 15 / 1440));
+
+  const H = candleLightingCell(fridayDate, settings);
+  const I = fridayMainMinchaMenu(fridayDate, settings);
+
+  return { B, C, D, E, F, G, H, I };
+}
+
+const CHOREF_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  { key: 'E', header: 'שחרית' },
+  { key: 'F', header: 'מעריב' },
+  { key: 'G', header: 'מנחה\nמעריב' },
+  { key: 'H', header: 'הדלקת\nנרות' },
+  { key: 'I', header: 'מנחה\nערב שבת' },
+];
+
+// ==== sheets/kayitz.js ====
+// שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
+// SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
+// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
+
+
+
+
+
+/** AND(dayOfYear>16, dayOfYear<65): roughly the Sefirah stretch (after Pesach, before
+ *  Shavuos), where the workbook adds a few extra minutes to the Friday Maariv time and
+ *  offers a second (later) Maariv. */
+function inExtraMaarivWindow(serial, settings) {
+  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
+  return doy > 16 && doy < 65;
+}
+
+function buildKayitzRow(week, settings) {
+  const shabbos = week.serial;
+  const friday = shabbos - 1;
+  const shabbosDate = dateFromSerial(shabbos);
+  const fridayDate = dateFromSerial(friday);
+
+  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+  const E = shacharisLine();
+
+  const extraMaariv = inExtraMaarivWindow(friday, settings);
+  const sunsetFriday = Z.sunset(fridayDate, settings);
+  const F = underlineTime(floorToMinute(sunsetFriday + (extraMaariv ? 55 : 50) / 1440));
+
+  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
+  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב ${formatTime(floorToMinute(sunsetFriday + 30 / 1440))}` : '');
+
+  const H = candleLightingCell(fridayDate, settings);
+
+  const plagWindow = inPlagWindow(friday, settings);
+  const plagMA = Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings));
+  const I = plagWindow ? `${formatTime(ceilToMinute(plagMA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA))}` : '';
+
+  const plagMA2 = Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings));
+  const J = plagWindow ? `${underlineTime(ceilToMinute(plagMA2 - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA2))}` : '';
+
+  const plagGRA = Z.plagHamincha(fridayDate, settings);
+  const K = plagWindow ? `${formatTime(ceilToMinute(plagGRA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagGRA))}` : '';
+
+  const L = fridayMainMinchaMenu(fridayDate, settings);
+
+  return { B, C, D, E, F, G, H, I, J, K, L };
+}
+
+const KAYITZ_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  { key: 'E', header: 'שחרית' },
+  { key: 'F', header: ' מעריב ' },
+  { key: 'G', header: 'מנחה\nמעריב' },
+  { key: 'H', header: 'הדלקת\nנרות' },
+  // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
+  // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
+  // sits after פלג מ"א on its own line to match the printed board.
+  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
+  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
+  { key: 'K', header: 'מנחה\nפלג גר"א' },
+  { key: 'L', header: 'מנחה\nערב שבת' },
+];
+
+// ==== ui/rules-view.js ====
+/** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
+ *  Null (the default) shows just the list - most visits here are to glance at the
+ *  rules, not write one, and the creation form used to sit open below them permanently. */
+function renderRules(container, state, onChange, editingRuleId = null) {
+  // Editing loads the rule's values into the same form used for adding; submitting
+  // then updates that rule in place (keeping its id and enabled state) instead of
+  // appending a new one.
+  const cloneOf = typeof editingRuleId === 'string' && editingRuleId.startsWith('clone:') ? editingRuleId.slice(6) : null;
+  const source = cloneOf ? state.rules.find((r) => r.id === cloneOf) : null;
+  const editing = editingRuleId && editingRuleId !== 'new' && !cloneOf ? state.rules.find((r) => r.id === editingRuleId) : null;
+  // Editing writes back to an existing rule; cloning only *prefills* from one and saves
+  // as a new rule, so the two share every field below but differ on submit.
+  const prefill = editing || source;
+  const formOpen = editingRuleId !== null;
+  container.innerHTML = `
+    <h2>Rules</h2>
+    <p class="hint">Reusable, recurring overrides. They apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text. Pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
+    <div id="rules-list"></div>
+    <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
+    <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
+      <fieldset>
+        <legend>When does this apply?</legend>
+        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Which cell(s) to replace</legend>
+        <p class="hint">Check the equivalent cell on both charts if it's the same real-world minyan (e.g. "Mincha Erev Shabbos" is column L on קיץ and column I on חורף). One rule then covers both, without touching any other cell.</p>
+        ${columnChecklist('שבת קיץ', 'kayitz', KAYITZ_COLUMNS, prefill)}
+        ${columnChecklist('שבת חורף', 'choref', CHOREF_COLUMNS, prefill)}
+      </fieldset>
+      <fieldset>
+        <legend>What to do to the cell</legend>
+        <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
+        <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
+      </fieldset>
+      <div class="actions">
+        <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
+        <button type="button" id="rule-edit-cancel" class="secondary-btn">Cancel</button>
+      </div>
+    </form>
+  `;
+
+  container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
+  container.querySelector('#rule-add').addEventListener('click', () => {
+    renderRules(container, state, onChange, 'new');
+    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  const list = container.querySelector('#rules-list');
+  list.innerHTML = state.rules.length
+    ? state.rules
+        .map(
+          (r) => `
+      <div class="rule-row" data-id="${r.id}">
+        <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
+        <div class="rule-summary">
+          <strong>${esc(r.name)}</strong>
+          <div class="hint">columns ${columnsOf(r)
+            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
+            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
+        </div>
+        <div class="rule-actions">
+          <button class="rule-edit" title="Edit this rule">Edit</button>
+          <button class="rule-clone" title="Make a copy of this rule to adjust">Duplicate</button>
+          <button class="rule-delete" title="Delete rule">Delete</button>
+        </div>
+      </div>`
+        )
+        .join('')
+    : '<p class="hint">No rules yet.</p>';
+
+  list.querySelectorAll('.rule-enabled').forEach((cb) => {
+    cb.addEventListener('change', (e) => {
+      const id = e.target.closest('.rule-row').dataset.id;
+      state.rules.find((r) => r.id === id).enabled = e.target.checked;
+      onChange();
+    });
+  });
+  list.querySelectorAll('.rule-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      renderRules(container, state, onChange, e.target.closest('.rule-row').dataset.id);
+      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  list.querySelectorAll('.rule-clone').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
+      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
+  list.querySelectorAll('.rule-delete').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.closest('.rule-row').dataset.id;
+      if (!confirm('Delete this rule?')) return;
+      state.rules = state.rules.filter((r) => r.id !== id);
+      onChange();
+      renderRules(container, state, onChange);
+    });
+  });
+
+  container.querySelector('#rule-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const condition = {};
+    if (fd.get('always') === 'on') condition.always = true;
+    const specialParsha = splitCsv(fd.get('specialParsha'));
+    const parsha = splitCsv(fd.get('parsha'));
+    const hebrewDate = splitCsv(fd.get('hebrewDate'));
+    if (specialParsha.length) condition.specialParsha = specialParsha;
+    if (parsha.length) condition.parsha = parsha;
+    if (hebrewDate.length) condition.hebrewDate = hebrewDate;
+    const columnKeys = fd.getAll('columnKeys');
+    if (!columnKeys.length) {
+      alert('Pick at least one cell/column for this rule to affect.');
+      return;
+    }
+    const data = {
+      name: fd.get('name'),
+      condition,
+      columnKeys,
+      mode: fd.get('mode') || 'append',
+      value: fd.get('value'),
+    };
+    if (editing) {
+      Object.assign(editing, data); // id and enabled stay as they were
+    } else {
+      state.rules.push({ id: newId('rule'), enabled: true, ...data });
+    }
+    onChange();
+    renderRules(container, state, onChange);
+  });
+}
+
+function columnChecklist(sheetLabel, seasonKey, columns, editing) {
+  const checkedKeys = editing ? columnsOf(editing) : [];
+  return `
+    <div class="col-group">
+      <div class="col-group-title">${sheetLabel}</div>
+      ${columns
+        .map(
+          (c) =>
+            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
+        )
+        .join('')}
+    </div>
+  `;
+}
+function columnsOf(rule) {
+  return Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+}
+function prettyColumn(entry) {
+  if (!entry.includes(':')) return entry;
+  const [season, key] = entry.split(':');
+  return (season === 'kayitz' ? 'קיץ' : 'חורף') + ' ' + key;
+}
+function splitCsv(str) {
+  return (str || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+function conditionSummary(c) {
+  const parts = [];
+  if (c.always) parts.push('always');
+  if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
+  if (c.parsha) parts.push('parsha: ' + c.parsha.join(', '));
+  if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
+  if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
+  return parts.join(' or ') || '(no condition, never matches)';
+}
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ==== ui/settings-view.js ====
-function renderSettings(container, state, onSave, onStateReplaced) {
+function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
   container.innerHTML = `
     <h2>Settings</h2>
     <p class="hint">Mirrors the workbook's SETTINGS sheet. Saved in this browser.</p>
+    <!-- Rules sit outside the form: they are saved as they are made, not by the Save
+         button at the bottom, and a nested form is not valid HTML anyway. -->
+    <details class="panel" id="rules-panel">
+      <summary>Rules</summary>
+      <div class="panel-body" id="rules-host"></div>
+    </details>
     <form id="settings-form" class="form-grid">
       <details class="panel" open>
         <summary>Header &amp; footer</summary>
@@ -3088,6 +3110,10 @@ function renderSettings(container, state, onSave, onStateReplaced) {
   renderImageCropper(container.querySelector('#header-photo-cropper'), s.headerIconImage, (headerIconImage) => {
     onSave({ ...s, headerIconImage }); // saves immediately, independent of the "Save settings" button below
   });
+
+  // The Rules screen, whole, inside the first panel. It re-renders into its own host as
+  // you add or edit a rule, which leaves the rest of Settings untouched.
+  renderRules(container.querySelector('#rules-host'), state, onRulesChange);
 
   const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
   const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');
@@ -4316,11 +4342,6 @@ function specialDaysInWeek(shabbosSerial, settings) {
   return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
 }
 
-/** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
- *  name is always Saturday and there is no reason to call it that on a shul's own page.
- *  The word is written in rather than formatted, since no locale has it. */
-const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף' };
-
 /** Which of a week's two cards comes first: the שבת page or the חול page.
  *
  *  Its own localStorage key rather than a field in the app state, for two reasons. It is
@@ -4340,12 +4361,15 @@ const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'w
 function nextSeasonLabel(index, serials) {
   for (let i = serials.length - 1; i >= 0; i--) {
     const season = index.get(serials[i])?.sheet?.season;
-    if (season) return season === 'kayitz' ? SEASON_LABEL.choref : SEASON_LABEL.kayitz;
+    if (season) return season === 'kayitz' ? SEASON_LABELS.choref : SEASON_LABELS.kayitz;
   }
   return null;
 }
 
-const fmtDate = (date) =>
+/** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
+ *  name is always Saturday and there is no reason to call it that on a shul's own page.
+ *  The word is written in rather than formatted, since no locale has it. */
+const fmtShabbosDate = (date) =>
   'Shabbos, ' + new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
 /** At most three times to a line, applied to the rendered cell rather than to a string.
@@ -4639,10 +4663,10 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
  *  changes hands. Deliberately a button rather than something automatic, because
  *  publishing is the moment the congregation sees a change and that should be a
  *  decision, not a side effect of editing a cell. */
-function publishPanelHtml(sheet, state) {
+function publishPanelHtml(sheet, state, open = false) {
   const hasToken = Boolean(getPublishToken());
   const groups = publishableGroups(state);
-  const label = (s) => SEASON_LABEL[s.season] || s.season;
+  const label = (s) => SEASON_LABELS[s.season] || s.season;
   // A row here is a season that exists to be published. With only one generated there is
   // only one row, which reads as "there is no way to publish a second chart" - so say
   // where the second one comes from instead of leaving an empty space to interpret.
@@ -4656,7 +4680,7 @@ function publishPanelHtml(sheet, state) {
         </div>`
     )
     .join('');
-  return `<details class="panel no-print">
+  return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
       <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
@@ -4665,7 +4689,7 @@ function publishPanelHtml(sheet, state) {
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
              ${
                groups.length && missing.length
-                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABEL[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABEL[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
+                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
                  : ''
              }
              <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
@@ -4953,7 +4977,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     }
     <div class="week-nav no-print">
       <div class="week-nav-when">
-        ${fmtDate(week.date)}
+        ${fmtShabbosDate(week.date)}
         <bdi class="week-nav-hebrew">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
       </div>
       <div class="week-nav-row">
@@ -4993,7 +5017,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
-    ${luach ? '' : publishPanelHtml(sheet, state)}
+    ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
@@ -5051,6 +5075,11 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+
+  // Arriving from "Publishing" on Saved sheets: the panel is already open, but it sits
+  // below a full week card, so without this you land on the card with no sign that
+  // anything happened.
+  if (opts.openPublish) container.querySelector('#publish-panel')?.scrollIntoView({ block: 'start' });
 
   wireSwipe(
     container,
@@ -5167,6 +5196,9 @@ let currentSheetId = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
+// Set when This week is opened from "Publishing" on Saved sheets, so the panel it wants
+// is already open when the screen arrives. Cleared as it is used: it describes one trip.
+let openPublish = false;
 
 // Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
 // changes its value instead of scrolling the page) - on a long form like Generate, that
@@ -5186,10 +5218,13 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-const tabs = ['generate', 'week', 'settings', 'rules', 'saved', 'guide'];
+// In the order the work actually happens: the week you are on, the sheets you have, then
+// making a new one, then the things you set once. Rules is no longer among them - it is
+// the first panel inside Settings, being something configured rather than a place you go.
+const tabs = ['week', 'saved', 'generate', 'settings', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
+const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -5197,7 +5232,6 @@ const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', 
 const tabIcons = {
   generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
   settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
-  rules: '<path d="M3 6h14M3 10h14M3 14h14"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="6" cy="14" r="1.6"/>',
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
@@ -5279,7 +5313,11 @@ function render() {
         persist();
         currentSheetId = null;
         render();
-      }
+      },
+      // Rules live inside Settings now. They are saved on the same state object but not
+      // through the settings form, so they get their own save: a rule is written the
+      // moment it is added or edited, with no Save button to press.
+      () => persist()
     );
   } else if (currentTab === 'generate') {
     renderGenerate(
@@ -5300,6 +5338,8 @@ function render() {
       }
     );
   } else if (currentTab === 'week') {
+    const showPublish = openPublish;
+    openPublish = false;
     renderWeek(
       main,
       state,
@@ -5307,15 +5347,14 @@ function render() {
         weekSerial = serial;
         render();
       },
-      weekSerial
+      weekSerial,
+      { openPublish: showPublish }
     );
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
       currentTab = tab;
       render();
     });
-  } else if (currentTab === 'rules') {
-    renderRules(main, state, () => persist());
   } else if (currentTab === 'saved') {
     renderSavedSheets(
       main,
@@ -5334,6 +5373,13 @@ function render() {
       // Lock/unlock mutates the sheet in place, so this just saves and redraws the list.
       () => {
         persist();
+        render();
+      },
+      // "Publishing" on the list goes to the panel on This week, which is the one place
+      // that shows what the congregation has in front of it and can take a season down.
+      () => {
+        currentTab = 'week';
+        openPublish = true;
         render();
       }
     );

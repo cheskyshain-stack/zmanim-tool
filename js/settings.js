@@ -67,6 +67,13 @@ export const LEGACY_WEEKDAY_FOOTER = [
  *  every page is a lot of toner, and the user asked for the light one. */
 export const DEFAULT_ACCENT_COLOR = '#c9ced5';
 
+/** How each season is named in the interface. Defined once and imported, rather than
+ *  written out in each screen that needs it: build-offline.py flattens every module into
+ *  one plain script sharing a single scope, so two modules declaring the same top-level
+ *  name is a SyntaxError there while being perfectly legal under ES modules - it breaks
+ *  the USB copy while the site itself carries on working. */
+export const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
+
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
  *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */

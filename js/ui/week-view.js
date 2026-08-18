@@ -8,7 +8,7 @@
 // override already in a sheet shows up here with no extra work, and the two can never
 // drift apart.
 
-import { resolveSettings } from '../settings.js';
+import { resolveSettings, SEASON_LABELS } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
@@ -114,11 +114,6 @@ function specialDaysInWeek(shabbosSerial, settings) {
   return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
 }
 
-/** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
- *  name is always Saturday and there is no reason to call it that on a shul's own page.
- *  The word is written in rather than formatted, since no locale has it. */
-const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף' };
-
 /** Which of a week's two cards comes first: the שבת page or the חול page.
  *
  *  Its own localStorage key rather than a field in the app state, for two reasons. It is
@@ -138,12 +133,15 @@ const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'w
 function nextSeasonLabel(index, serials) {
   for (let i = serials.length - 1; i >= 0; i--) {
     const season = index.get(serials[i])?.sheet?.season;
-    if (season) return season === 'kayitz' ? SEASON_LABEL.choref : SEASON_LABEL.kayitz;
+    if (season) return season === 'kayitz' ? SEASON_LABELS.choref : SEASON_LABELS.kayitz;
   }
   return null;
 }
 
-const fmtDate = (date) =>
+/** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
+ *  name is always Saturday and there is no reason to call it that on a shul's own page.
+ *  The word is written in rather than formatted, since no locale has it. */
+const fmtShabbosDate = (date) =>
   'Shabbos, ' + new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
 /** At most three times to a line, applied to the rendered cell rather than to a string.
@@ -437,10 +435,10 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
  *  changes hands. Deliberately a button rather than something automatic, because
  *  publishing is the moment the congregation sees a change and that should be a
  *  decision, not a side effect of editing a cell. */
-function publishPanelHtml(sheet, state) {
+function publishPanelHtml(sheet, state, open = false) {
   const hasToken = Boolean(getPublishToken());
   const groups = publishableGroups(state);
-  const label = (s) => SEASON_LABEL[s.season] || s.season;
+  const label = (s) => SEASON_LABELS[s.season] || s.season;
   // A row here is a season that exists to be published. With only one generated there is
   // only one row, which reads as "there is no way to publish a second chart" - so say
   // where the second one comes from instead of leaving an empty space to interpret.
@@ -454,7 +452,7 @@ function publishPanelHtml(sheet, state) {
         </div>`
     )
     .join('');
-  return `<details class="panel no-print">
+  return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
       <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
@@ -463,7 +461,7 @@ function publishPanelHtml(sheet, state) {
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
              ${
                groups.length && missing.length
-                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABEL[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABEL[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
+                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
                  : ''
              }
              <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
@@ -751,7 +749,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     }
     <div class="week-nav no-print">
       <div class="week-nav-when">
-        ${fmtDate(week.date)}
+        ${fmtShabbosDate(week.date)}
         <bdi class="week-nav-hebrew">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
       </div>
       <div class="week-nav-row">
@@ -791,7 +789,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
-    ${luach ? '' : publishPanelHtml(sheet, state)}
+    ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
@@ -849,6 +847,11 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+
+  // Arriving from "Publishing" on Saved sheets: the panel is already open, but it sits
+  // below a full week card, so without this you land on the card with no sign that
+  // anything happened.
+  if (opts.openPublish) container.querySelector('#publish-panel')?.scrollIntoView({ block: 'start' });
 
   wireSwipe(
     container,

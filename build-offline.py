@@ -111,6 +111,44 @@ def transform_module(key, text, all_exports):
     return text.strip("\n"), namespace_consts
 
 
+TOP_LEVEL_DECL_RE = re.compile(r"^(?:export\s+)?(const|let|var|function|class)\s+([A-Za-z_$][\w$]*)", re.M)
+
+
+def check_name_collisions(bundled_keys, texts):
+    """Two modules declaring the same top-level name.
+
+    Under ES modules each file has its own scope, so this is perfectly legal and the
+    hosted site never notices. Flattened into one script it is a SyntaxError, and the
+    whole bundle fails to parse: the USB copy opens to a blank page while the site it
+    was built from carries on working. That is exactly how it went unnoticed for six
+    days, so it is checked here rather than asserted in a comment.
+
+    Only a repeated `function` is allowed, which is a legal redeclaration - several
+    modules have their own private `esc` helper and always have. Anything involving a
+    const, let, var or class stops the build.
+    """
+    seen = {}
+    problems = []
+    for key in bundled_keys:
+        for m in TOP_LEVEL_DECL_RE.finditer(texts[key]):
+            # Column 0 only: an indented match is inside some other function.
+            if m.start() and texts[key][m.start() - 1] != "\n":
+                continue
+            kind, name = m.group(1), m.group(2)
+            if name in seen:
+                prev_kind, prev_key = seen[name]
+                if not (kind == "function" and prev_kind == "function"):
+                    problems.append(f"  {name}: {prev_kind} in {prev_key}, {kind} in {key}")
+            else:
+                seen[name] = (kind, key)
+    if problems:
+        raise SystemExit(
+            "offline build: the same top-level name is declared in two modules, which the\n"
+            "flattened bundle cannot parse. Rename one of each pair (or move it to a module\n"
+            "both import):\n" + "\n".join(problems)
+        )
+
+
 def build_data_loader_replacement():
     tables = {}
     for name, filename in [
@@ -228,6 +266,7 @@ def main():
     # docstring) - putting them all together right before app.js keeps the output
     # readable without needing per-file interleaving.
     entry_idx = order.index(ENTRY)
+    check_name_collisions(order[: entry_idx + 1], texts)
     bundle = "\n\n".join(chunks[:entry_idx]) + "\n\n// ==== namespace shims for `import * as X` ====\n" + "\n".join(sorted(set(trailing_namespace_consts))) + "\n\n" + chunks[entry_idx]
 
     OUT_DIR.mkdir(exist_ok=True)

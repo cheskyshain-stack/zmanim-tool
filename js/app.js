@@ -2,7 +2,6 @@ import { loadState, saveState } from './storage.js';
 import { loadTables } from './data-loader.js';
 import { renderSettings } from './ui/settings-view.js';
 import { renderGenerate } from './ui/generate-view.js';
-import { renderRules } from './ui/rules-view.js';
 import { renderSavedSheets } from './ui/saved-sheets-view.js';
 import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
@@ -15,6 +14,9 @@ let currentSheetId = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
+// Set when This week is opened from "Publishing" on Saved sheets, so the panel it wants
+// is already open when the screen arrives. Cleared as it is used: it describes one trip.
+let openPublish = false;
 
 // Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
 // changes its value instead of scrolling the page) - on a long form like Generate, that
@@ -34,10 +36,13 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-const tabs = ['generate', 'week', 'settings', 'rules', 'saved', 'guide'];
+// In the order the work actually happens: the week you are on, the sheets you have, then
+// making a new one, then the things you set once. Rules is no longer among them - it is
+// the first panel inside Settings, being something configured rather than a place you go.
+const tabs = ['week', 'saved', 'generate', 'settings', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
+const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -45,7 +50,6 @@ const tabLabels = { generate: 'Generate', settings: 'Settings', rules: 'Rules', 
 const tabIcons = {
   generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
   settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
-  rules: '<path d="M3 6h14M3 10h14M3 14h14"/><circle cx="7" cy="6" r="1.6"/><circle cx="13" cy="10" r="1.6"/><circle cx="6" cy="14" r="1.6"/>',
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
@@ -127,7 +131,11 @@ function render() {
         persist();
         currentSheetId = null;
         render();
-      }
+      },
+      // Rules live inside Settings now. They are saved on the same state object but not
+      // through the settings form, so they get their own save: a rule is written the
+      // moment it is added or edited, with no Save button to press.
+      () => persist()
     );
   } else if (currentTab === 'generate') {
     renderGenerate(
@@ -148,6 +156,8 @@ function render() {
       }
     );
   } else if (currentTab === 'week') {
+    const showPublish = openPublish;
+    openPublish = false;
     renderWeek(
       main,
       state,
@@ -155,15 +165,14 @@ function render() {
         weekSerial = serial;
         render();
       },
-      weekSerial
+      weekSerial,
+      { openPublish: showPublish }
     );
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
       currentTab = tab;
       render();
     });
-  } else if (currentTab === 'rules') {
-    renderRules(main, state, () => persist());
   } else if (currentTab === 'saved') {
     renderSavedSheets(
       main,
@@ -182,6 +191,13 @@ function render() {
       // Lock/unlock mutates the sheet in place, so this just saves and redraws the list.
       () => {
         persist();
+        render();
+      },
+      // "Publishing" on the list goes to the panel on This week, which is the one place
+      // that shows what the congregation has in front of it and can take a season down.
+      () => {
+        currentTab = 'week';
+        openPublish = true;
         render();
       }
     );

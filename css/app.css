@@ -281,6 +281,11 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 /* Backup sits in its own form; keep it clear of the Save button above it. */
 #settings-backup { margin-top: 1rem; }
 .panel-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+/* The Rules screen is rendered whole inside a Settings panel, and it brings its own
+   "Rules" heading, which would sit directly under the panel's summary saying the same
+   word. Hidden here rather than by a flag on renderRules, which re-renders itself from
+   several places and would have to thread the flag through every one of them. */
+#rules-host > h2 { display: none; }
 .panel-section-title { font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.6rem; }
 .panel-section-title .hint { font-weight: 400; }
 
