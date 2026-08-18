@@ -48,11 +48,11 @@ function homeHtml(published) {
     </header>
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
-        <span class="luach-item-title">זמני השבוע</span>
+        <span class="luach-item-title">Weekly Zmanim</span>
         <span class="luach-item-sub">This week's times, with the weekday schedule. Print or save it.</span>
       </a>
       <a class="luach-item" href="#chart">
-        <span class="luach-item-title">לוח הזמנים לכל העונה</span>
+        <span class="luach-item-title">Zmanim chart</span>
         <span class="luach-item-sub">The part of the wall chart covering now. Print or save it.</span>
       </a>
     </nav>

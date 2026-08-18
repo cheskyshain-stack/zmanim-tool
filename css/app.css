@@ -905,7 +905,10 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
   box-shadow: var(--shadow-sm); transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .luach-item:hover { border-color: var(--ui-accent); box-shadow: var(--shadow-md); }
-.luach-item-title { display: block; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.5rem; font-weight: 700; direction: rtl; }
+/* Reads left to right with its subtitle underneath. The menu is right-aligned because
+   these titles used to be Hebrew; now that they are not, a right-set title over a
+   left-set line of English read as two separate columns. */
+.luach-item-title { display: block; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.5rem; font-weight: 700; direction: ltr; text-align: left; }
 .luach-item-sub { display: block; margin-top: 0.2rem; color: var(--muted); font-size: var(--fs-sm); direction: ltr; text-align: left; }
 .luach-foot { margin-top: 2.5rem; color: var(--muted); font-size: var(--fs-sm); }
 
