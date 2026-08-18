@@ -604,9 +604,11 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
-  // A week with no Shabbos sheet is labelled with its Yom Tov rather than a parsha (the
-  // Shabbos is the Yom Tov, so no parsha is read), and "פרשת סוכות" would be wrong.
-  const cardTitle = sheet ? 'פרשת ' + parsha : parsha;
+  // A week with no Shabbos sheet is named for its Yom Tov rather than a parsha, the
+  // Shabbos being the Yom Tov itself, so no parsha is read. Naming it "פרשת סוכות" would
+  // be wrong and naming it "סוכות" reads as though these were the times for Yom Tov,
+  // which they are not: they are the ordinary weekdays around it.
+  const cardTitle = sheet ? 'פרשת ' + parsha : 'שבוע שחל בו ' + parsha;
 
   container.innerHTML = `
     ${
