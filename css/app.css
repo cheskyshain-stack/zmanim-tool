@@ -627,7 +627,11 @@ th {
    the column past it. In em, so it tracks the text-size slider. Excluded for the
    Weekday chart, which is table-layout:fixed and sizes its columns by percentage. */
 table:not(.weekday-table) .parsha-cell { min-width: 5.5em; }
-tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 5%, white); }
+/* The alternating row band, mixed from the header colour so it is the same hue at a
+   fraction of the strength. It was 5%, which read fine under the old dark gray header
+   but all but vanished once the header went light: 5% of a light gray is white. At 40%
+   the band is plainly a band under either. */
+tbody tr:nth-child(even) td:not(.parsha-cell) { background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 40%, white); }
 /* Cell content is direction:ltr even inside the RTL table - without this, the Unicode
    bidi algorithm can visually reverse "/"-separated time lists (e.g. "9:03 / 9:15"
    rendering as "9:15 / 9:03") since bare numbers are directionally weak. Hebrew words
