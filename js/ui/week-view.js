@@ -22,20 +22,39 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import { SLASH } from '../util.js';
 import { attachPagePrintToAll, printWith } from './print-page.js';
 
-/** Every week of every saved Shabbos sheet, newest sheet first, so a week that appears
- *  in more than one saved sheet resolves to the most recently generated one. */
+/** Every week worth showing, newest sheet first, so a week that appears in more than one
+ *  saved sheet resolves to the most recently generated one.
+ *
+ *  Shabbos sheets first, then any week a Weekday chart has that they do not. A Yom Tov
+ *  Shabbos has no parsha, so it is left out of the Shabbos chart, but the days before it
+ *  are ordinary days that are davened and its Weekday chart carries them. Indexing only
+ *  the Shabbos sheets left those weeks off the site altogether: שבועות, ראש השנה and
+ *  סוכות each had a full set of weekday times published and no way to reach them. Such a
+ *  week comes through with no Shabbos sheet, and renders as the חול card on its own. */
 function weekIndex(state) {
   const sheets = [...state.sheets].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const bySerial = new Map();
+  // A saved week's date is an ISO string, not a Date: it went through localStorage. The
+  // zmanim code calls Date methods on it, so revive it the way sheet-view does.
+  const add = (week, sheet) => {
+    if (!bySerial.has(week.serial)) bySerial.set(week.serial, { week: { ...week, date: new Date(week.date) }, sheet });
+  };
   for (const sheet of sheets) {
     if (sheet.season === 'weekday') continue;
-    // A saved week's date is an ISO string, not a Date: it went through localStorage.
-    // The zmanim code calls Date methods on it, so revive it the way sheet-view does.
-    for (const week of sheet.weeks) {
-      if (!bySerial.has(week.serial)) bySerial.set(week.serial, { week: { ...week, date: new Date(week.date) }, sheet });
-    }
+    for (const week of sheet.weeks) add(week, sheet);
+  }
+  for (const sheet of sheets) {
+    if (sheet.season !== 'weekday') continue;
+    for (const week of sheet.weeks) add(week, null); // null: no Shabbos chart covers it
   }
   return bySerial;
+}
+
+/** The Weekday chart holding a given week, whether it came in beside a Shabbos sheet or
+ *  is the only chart that has the week at all. */
+function weekdayChartFor(sheet, serial, state) {
+  if (sheet) return weekdayCompanionOf(sheet, state);
+  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
 }
 
 /** The weekday chart generated alongside a given Shabbos sheet, if there is one. */
@@ -302,12 +321,12 @@ function publishPanelHtml(sheet) {
   </details>`;
 }
 
-function cardHtml(title, linesHtml, settings) {
+function cardHtml(title, linesHtml, settings, kind = '') {
   // The same header the wall charts carry, markup and all, rather than a second one that
   // looks similar: one header, one place to change it. It is sized in inches off
   // --sheet-header-scale, so on this narrower page it shrinks in proportion instead of
   // being redrawn.
-  return `<section class="week-card">
+  return `<section class="week-card${kind ? ' ' + kind : ''}">
     <div class="page-header">
       <div class="header-row">
         <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
@@ -425,13 +444,18 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const showing = serials.includes(serial) ? serial : currentSerial(serials);
   const at = serials.indexOf(showing);
   const { week, sheet } = index.get(showing);
-  const { row, columns, overriddenKeys } = rowFor(week, sheet, state, settings);
 
+  // No Shabbos sheet means this week's Shabbos is Yom Tov, which has no parsha and so no
+  // row on the chart. The weekday times are still real, so the week shows its חול card
+  // alone rather than being dropped.
+  const shabbos = sheet ? rowFor(week, sheet, state, settings) : null;
   // Printed order, right to left, so the card lists the minyanim in the same sequence
   // the wall chart does.
-  const shabbosLines = [...columns].reverse().map((c) => line(c.header, row[c.key], overriddenKeys.has(c.key))).join('');
+  const shabbosLines = shabbos
+    ? [...shabbos.columns].reverse().map((c) => line(c.header, shabbos.row[c.key], shabbos.overriddenKeys.has(c.key))).join('')
+    : '';
 
-  const weekday = weekdayCompanionOf(sheet, state);
+  const weekday = weekdayChartFor(sheet, showing, state);
   const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
   let weekdayLines = '';
   if (weekdayWeek) {
@@ -471,6 +495,9 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   }
 
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
+  // A week with no Shabbos sheet is labelled with its Yom Tov rather than a parsha (the
+  // Shabbos is the Yom Tov, so no parsha is read), and "פרשת סוכות" would be wrong.
+  const cardTitle = sheet ? 'פרשת ' + parsha : parsha;
 
   container.innerHTML = `
     ${
@@ -495,22 +522,25 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         </button>
       </div>
       <div class="week-nav-row week-nav-print">
-        <button type="button" id="week-print-pair">Print both on one sheet</button>
+        <button type="button" id="week-print-pair">${shabbosLines ? 'Print both on one sheet' : 'Print this page'}</button>
       </div>
     </div>
     <div class="week-cards">
-      ${cardHtml('פרשת ' + parsha, shabbosLines, state.settings)}
-      ${weekdayLines ? cardHtml('זמני חול · פרשת ' + parsha, weekdayLines, state.settings) : ''}
+      ${shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : ''}
+      ${weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : ''}
     </div>
-    ${luach ? '' : publishPanelHtml(sheet)}
+    ${luach || !sheet ? '' : publishPanelHtml(sheet)}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
   // Three to a line on the שבת card, one on the weekday card. The weekday card carries
   // only three minyanim against a full sheet, so a time to a line is what fills it;
-  // the שבת card has eleven rows and would run off the page the same way.
-  container.querySelectorAll('.week-card').forEach((card, i) => {
-    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 1));
+  // the שבת card has eleven rows and would run off the page the same way. Keyed on which
+  // card it is rather than where it sits: a Yom Tov week has no שבת card, and going by
+  // position gave its חול card the שבת card's three-to-a-line.
+  container.querySelectorAll('.week-card').forEach((card) => {
+    const perLine = card.classList.contains('is-weekday-card') ? 1 : 3;
+    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     card.querySelectorAll('.week-time').forEach((el) => {
       trimSpaceAtLineStart(el);
       hangTimeMarkers(el);
