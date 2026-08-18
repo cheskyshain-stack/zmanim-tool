@@ -696,12 +696,16 @@ function fitPagesToWindow(container) {
  *  cards with a whole season's worth and every one of them needs the same treatment. */
 function decorateCards(root) {
   root.querySelectorAll('.week-card').forEach((card) => {
-    // Three to a line on the שבת card, one on the weekday card. The weekday card carries
+    // Two to a line on the שבת card, one on the weekday card. The weekday card carries
     // only three minyanim against a full sheet, so a time to a line is what fills it;
     // the שבת card has eleven rows and would run off the page the same way. Keyed on
     // which card it is rather than where it sits: a Yom Tov week has no שבת card, and
-    // going by position gave its חול card the שבת card's three-to-a-line.
-    const perLine = card.classList.contains('is-weekday-card') ? 1 : 3;
+    // going by position gave its חול card the שבת card's own count.
+    //
+    // It was three. Two makes the pairs plain and, with sizesFor putting the short line
+    // first, leaves any odd time at the top of the block rather than trailing off the
+    // bottom: seven comes out 1, 2, 2, 2.
+    const perLine = card.classList.contains('is-weekday-card') ? 1 : 2;
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     const cells = [...card.querySelectorAll('.week-time')];
     cells.forEach((el) => trimSpaceAtLineStart(el));
