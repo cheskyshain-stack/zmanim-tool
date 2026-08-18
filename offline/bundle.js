@@ -4039,10 +4039,12 @@ ${special}` : '');
       <tbody>${rows}</tbody>
     </table>
     <div class="page-footer">
+      <span class="footer-line"></span>
       <div class="footer-text">
         ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
         <span class="footer-address">${esc(state.settings.footerAddress)}</span>
       </div>
+      <span class="footer-line"></span>
     </div>
   `;
 
