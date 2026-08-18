@@ -4146,7 +4146,15 @@ function splitBuild(season) {
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
-  const escaped = esc(str).split(UL_START).join('<u>').split(UL_END).join('</u>');
+  // underlineTime writes its value as "<u> 6:42</u>". The space was meant as a lead-in
+  // that would not show on a centred chart cell, and it does show: a cell holding several
+  // times leaves 13.7px in front of an underlined one against 10.36px in front of a plain
+  // one, and the rule itself starts a space before its own first digit. Dropped, so every
+  // gap in a cell is the separator's width and nothing else. The character is a
+  // non-breaking space rather than the plain one it looks like in the source, so it is
+  // matched as whitespace rather than written out.
+  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 function esc(str) {
@@ -5173,11 +5181,14 @@ function weekNl2br(str) {
   // painted rule past the first digit, against 0.25 to 2.25px for the ones without it,
   // which is only the side bearing the font itself leaves. Moving the space in front of
   // the sentinel keeps the gap between times and takes it out from under the rule.
-  // Any whitespace, matched rather than written out: the character underlineTime puts
-  // there is a non-breaking space, not the plain one it looks like in the source, and
-  // splitting on a literal " " quietly matches nothing at all.
-  const moved = weekEsc(str).replace(new RegExp(UL_START + '(\\s+)', 'g'), '$1' + UL_START);
-  const escaped = moved.split(UL_START).join('<u>').split(UL_END).join('</u>');
+  // Dropped, not moved out: the times are already joined by a "&nbsp;/&nbsp;" separator,
+  // so an extra space in front of an underlined one only makes the gap before it wider
+  // than the gap before a plain one - measured at 19.73px against 14.92px, which is
+  // visible in a column of times. Any whitespace, matched rather than written out: the
+  // character underlineTime puts there is a non-breaking space, not the plain one it
+  // looks like in the source, and splitting on a literal " " matches nothing at all.
+  const trimmed = weekEsc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 

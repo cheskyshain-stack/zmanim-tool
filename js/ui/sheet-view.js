@@ -611,7 +611,15 @@ function splitBuild(season) {
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
-  const escaped = esc(str).split(UL_START).join('<u>').split(UL_END).join('</u>');
+  // underlineTime writes its value as "<u> 6:42</u>". The space was meant as a lead-in
+  // that would not show on a centred chart cell, and it does show: a cell holding several
+  // times leaves 13.7px in front of an underlined one against 10.36px in front of a plain
+  // one, and the rule itself starts a space before its own first digit. Dropped, so every
+  // gap in a cell is the separator's width and nothing else. The character is a
+  // non-breaking space rather than the plain one it looks like in the source, so it is
+  // matched as whitespace rather than written out.
+  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 function esc(str) {

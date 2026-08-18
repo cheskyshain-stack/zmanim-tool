@@ -56,7 +56,7 @@ function homeHtml(published) {
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
         <span class="luach-item-title">Weekly Zmanim</span>
-        <span class="luach-item-sub">This week's times, with the weekday schedule. Print or save it.</span>
+        <span class="luach-item-sub">This week's schedule, שבת and weekday. Print or save it.</span>
       </a>
       <a class="luach-item" href="#chart">
         <span class="luach-item-title">Zmanim chart</span>
@@ -75,7 +75,7 @@ function renderWeekPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
   const draw = () => {
-    main.innerHTML = backBar("This week's times") + '<div id="week-host"></div>';
+    main.innerHTML = backBar("This week's schedule") + '<div id="week-host"></div>';
     renderWeek(
       main.querySelector('#week-host'),
       state,

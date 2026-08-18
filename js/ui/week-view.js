@@ -945,11 +945,14 @@ function weekNl2br(str) {
   // painted rule past the first digit, against 0.25 to 2.25px for the ones without it,
   // which is only the side bearing the font itself leaves. Moving the space in front of
   // the sentinel keeps the gap between times and takes it out from under the rule.
-  // Any whitespace, matched rather than written out: the character underlineTime puts
-  // there is a non-breaking space, not the plain one it looks like in the source, and
-  // splitting on a literal " " quietly matches nothing at all.
-  const moved = weekEsc(str).replace(new RegExp(UL_START + '(\\s+)', 'g'), '$1' + UL_START);
-  const escaped = moved.split(UL_START).join('<u>').split(UL_END).join('</u>');
+  // Dropped, not moved out: the times are already joined by a "&nbsp;/&nbsp;" separator,
+  // so an extra space in front of an underlined one only makes the gap before it wider
+  // than the gap before a plain one - measured at 19.73px against 14.92px, which is
+  // visible in a column of times. Any whitespace, matched rather than written out: the
+  // character underlineTime puts there is a non-breaking space, not the plain one it
+  // looks like in the source, and splitting on a literal " " matches nothing at all.
+  const trimmed = weekEsc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 
