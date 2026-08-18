@@ -752,6 +752,10 @@ td.ruled .cell { background: var(--ruled); }
    them. Stacked, the same controls read the same way at any width. */
 .week-nav { margin: 0 0 1.1rem; }
 .week-nav-when { text-align: center; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.5rem; }
+/* The Hebrew date on its own line under the English one. In a <bdi> with its own
+   direction: dropped into an otherwise-LTR line, the two would be reordered against each
+   other, which is how "28 · 5787 · שבת חורף weeks" happened elsewhere in this app. */
+.week-nav-hebrew { display: block; direction: rtl; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: var(--fs-md); }
 .week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
 /* Equal widths, so the group does not shift sideways as the labels change length. */
 .week-nav-row > button { flex: 1 1 0; max-width: 11rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }

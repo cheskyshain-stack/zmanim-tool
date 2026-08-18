@@ -703,10 +703,17 @@ function hebrewNumber(n) {
   out = out.replace('יה', 'טו').replace('יו', 'טז');
   return out.length <= 1 ? out + '׳' : out.slice(0, -1) + '״' + out.slice(-1);
 }
+/** A year in לפרט קטן, the way one is written: the thousands are left off, so 5786 is
+ *  תשפ"ו. Spelled in full it would start with fourteen ת's, since the numeral system has
+ *  no letter past 400 and hebrewNumber repeats it - which is what this used to print. */
+function hebrewYear(year) {
+  const small = year % 1000;
+  return hebrewNumber(small || year);
+}
 function jewishDateString(serial, english, useGregorianBefore1582 = false) {
   const { dayOfMonth, month, year } = hebrewDateExtended(serial, useGregorianBefore1582);
   const monthName = (english ? JEWISH_MONTHS_EN : JEWISH_MONTHS_HE)[month - 1];
-  return english ? `${dayOfMonth} ${monthName}, ${year}` : `${hebrewNumber(dayOfMonth)} ${monthName}, ${hebrewNumber(year)}`;
+  return english ? `${dayOfMonth} ${monthName}, ${year}` : `${hebrewNumber(dayOfMonth)} ${monthName}, ${hebrewYear(year)}`;
 }
 
 /** HAS_PARSHA: the parsha read on the Shabbos containing `serial` (Hebrew calendar
@@ -4869,7 +4876,10 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
     }
     <div class="week-nav no-print">
-      <div class="week-nav-when">${fmtDate(week.date)}</div>
+      <div class="week-nav-when">
+        ${fmtDate(week.date)}
+        <bdi class="week-nav-hebrew">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
+      </div>
       <div class="week-nav-row">
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
           <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>

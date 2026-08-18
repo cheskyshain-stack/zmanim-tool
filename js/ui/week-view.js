@@ -15,7 +15,7 @@ import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { dateFromSerial } from '../zmanim/solar.js';
@@ -674,7 +674,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
     }
     <div class="week-nav no-print">
-      <div class="week-nav-when">${fmtDate(week.date)}</div>
+      <div class="week-nav-when">
+        ${fmtDate(week.date)}
+        <bdi class="week-nav-hebrew">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
+      </div>
       <div class="week-nav-row">
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
           <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>

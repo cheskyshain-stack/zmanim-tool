@@ -103,10 +103,17 @@ function hebrewNumber(n) {
   out = out.replace('יה', 'טו').replace('יו', 'טז');
   return out.length <= 1 ? out + '׳' : out.slice(0, -1) + '״' + out.slice(-1);
 }
+/** A year in לפרט קטן, the way one is written: the thousands are left off, so 5786 is
+ *  תשפ"ו. Spelled in full it would start with fourteen ת's, since the numeral system has
+ *  no letter past 400 and hebrewNumber repeats it - which is what this used to print. */
+function hebrewYear(year) {
+  const small = year % 1000;
+  return hebrewNumber(small || year);
+}
 export function jewishDateString(serial, english, useGregorianBefore1582 = false) {
   const { dayOfMonth, month, year } = hebrewDateExtended(serial, useGregorianBefore1582);
   const monthName = (english ? JEWISH_MONTHS_EN : JEWISH_MONTHS_HE)[month - 1];
-  return english ? `${dayOfMonth} ${monthName}, ${year}` : `${hebrewNumber(dayOfMonth)} ${monthName}, ${hebrewNumber(year)}`;
+  return english ? `${dayOfMonth} ${monthName}, ${year}` : `${hebrewNumber(dayOfMonth)} ${monthName}, ${hebrewYear(year)}`;
 }
 
 /** HAS_PARSHA: the parsha read on the Shabbos containing `serial` (Hebrew calendar
