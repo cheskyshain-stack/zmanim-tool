@@ -725,7 +725,19 @@ td.ruled .cell { background: var(--ruled); }
    the grey blocks, the same type. What you are looking at is what comes out of the
    printer, which is why there is no separate print layout for it any more. Space left at
    the bottom of a short week is fine; it is a page, not a box to fill. */
-.week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.1rem; flex-wrap: wrap; }
+/* The week's controls, as three stacked bands rather than one wrapping line: the date,
+   then the three navigation buttons as an even group, then printing on its own under a
+   rule. Left as one flex line they wrapped wherever they happened to run out of room,
+   which on a phone came out as four ragged rows with the date stranded in the middle of
+   them. Stacked, the same controls read the same way at any width. */
+.week-nav { margin: 0 0 1.1rem; }
+.week-nav-when { text-align: center; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.5rem; }
+.week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
+/* Equal widths, so the group does not shift sideways as the labels change length. */
+.week-nav-row > button { flex: 1 1 0; max-width: 11rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }
+.week-nav-word { white-space: nowrap; }
+.week-nav-print { margin-top: 0.5rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
+.week-nav-print > button { max-width: 22rem; }
 .week-when { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
 .week-cards { display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem; }
 /* Centred on the congregation site only. There is no sidebar there, so a left-aligned
@@ -769,7 +781,10 @@ body.is-luach .week-cards { align-items: center; }
 /* Held to the width the two columns actually need and centred, rather than being left to
    span the page. Stretched full width the name sat against the right edge and the time
    against the left, with a hand's width of nothing between them. */
-.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: 5.6in; margin-inline: auto; }
+/* The measure is divided by the growth factor so that growing the type leaves the block
+   the same width on paper (see fitLinesToPage). --fit-width stays 1 when shrinking, where
+   the block is meant to come in with everything else. */
+.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: calc(5.6in / var(--fit-width, 1)); margin-inline: auto; }
 /* Name on the right, time on the left, in two fixed columns so every name starts at the
    same place and every time sits in the same band. Fixed rather than content-sized
    because each row is its own grid: only a fixed track lines up down the card. */

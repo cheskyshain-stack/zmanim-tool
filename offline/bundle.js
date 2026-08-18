@@ -4466,6 +4466,7 @@ function fitLinesToPage(container) {
     const inner = box?.firstElementChild;
     if (!inner) return;
     card.style.removeProperty('--fit-scale');
+    card.style.removeProperty('--fit-width');
     const room = box.clientHeight;
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
@@ -4475,13 +4476,23 @@ function fitLinesToPage(container) {
       card.style.setProperty('--fit-scale', Math.max(0.5, byHeight).toFixed(3));
       return;
     }
-    // Growing has to respect the width too. The row block is held to a fixed measure
-    // (see .week-lines-inner), and zoom scales that measure with everything else, so past
-    // a point the rows would run wider than the card and be clipped.
-    const width = inner.getBoundingClientRect().width;
-    const byWidth = width ? box.clientWidth / width : 1;
-    const grow = Math.min(byHeight, byWidth, MAX_GROW);
-    if (grow > 1.02) card.style.setProperty('--fit-scale', grow.toFixed(3));
+    // Growing must not widen the block. zoom scales the measure along with the type, and
+    // the weekday card grew far enough that its rows spanned the whole page while the
+    // שבת card's stayed narrow, so a pair of cards meant to match did not. Dividing the
+    // measure by the same factor cancels that: the type grows, the block stays put.
+    //
+    // A constant width and bigger type can push a line into wrapping, which makes the
+    // block taller than the growth assumed, so the result is measured and eased back
+    // until it really fits rather than trusted first time.
+    let grow = Math.min(byHeight, MAX_GROW);
+    for (let i = 0; i < 8 && grow > 1.02; i++) {
+      card.style.setProperty('--fit-scale', grow.toFixed(3));
+      card.style.setProperty('--fit-width', grow.toFixed(3));
+      if (inner.scrollHeight * grow <= room) return;
+      grow -= 0.05;
+    }
+    card.style.removeProperty('--fit-scale');
+    card.style.removeProperty('--fit-width');
   });
 }
 
@@ -4592,11 +4603,19 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
     }
     <div class="week-nav no-print">
-      <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>&larr; Previous week</button>
-      <button type="button" id="week-today">Today</button>
-      <span class="week-when">${fmtDate(week.date)}</span>
-      <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
-      <button type="button" id="week-print-pair">Print both on one sheet</button>
+      <div class="week-nav-when">${fmtDate(week.date)}</div>
+      <div class="week-nav-row">
+        <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
+          <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
+        </button>
+        <button type="button" id="week-today">Today</button>
+        <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>
+          <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+      <div class="week-nav-row week-nav-print">
+        <button type="button" id="week-print-pair">Print both on one sheet</button>
+      </div>
     </div>
     <div class="week-cards">
       ${cardHtml('פרשת ' + parsha, shabbosLines, state.settings)}
