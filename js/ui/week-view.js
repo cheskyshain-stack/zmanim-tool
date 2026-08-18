@@ -203,6 +203,81 @@ function trimSpaceAtLineStart(root) {
   }
 }
 
+/** Lines the colons up down a column of times.
+ *
+ *  Set flush left, "8:45" and "10:00" start at the same place, which puts their colons a
+ *  digit apart and makes the column look as though it wobbles. A single-digit hour is
+ *  given a figure space (U+2007, defined to be exactly as wide as a digit) so the hour
+ *  occupies two digits' width either way and every colon falls on one axis. Only the time
+ *  that starts a line is padded: that is the one the column is read down.
+ *
+ *  Paired with font-variant-numeric: tabular-nums in the stylesheet, without which a font
+ *  with proportional figures would put "1" and "8" at different widths and undo it. */
+const FIGURE_SPACE = '\u2007';
+
+function alignColons(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  // Only worth doing where the cell actually mixes hour widths. Padding a cell whose
+  // hours are all single-digit moves every line by the same amount and changes nothing,
+  // except on a cell that also has a line opening with a word rather than a time
+  // ("6:06" over "פלג 6:21"), where it would shift one line and not the other and pull
+  // the two out of line with each other.
+  let sawTwoDigitHour = false;
+  let scanning = true;
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') scanning = true;
+      continue;
+    }
+    node.nodeValue.split('\n').forEach((part, i) => {
+      if (i === 0 && !scanning) return;
+      if (/^\s*\d{2}:\d{2}/.test(part)) sawTwoDigitHour = true;
+    });
+    scanning = node.nodeValue.endsWith('\n');
+  }
+  if (!sawTwoDigitHour) return;
+
+  let atLineStart = true;
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') atLineStart = true;
+      continue;
+    }
+    const text = node.nodeValue;
+    if (!text.length) continue;
+    // Split on the newlines the value carries, because a line can start in the middle of
+    // a text node as well as after a <br>: the שחרית block is "…7:35\n8:00 8:20*…" in one
+    // node, and looking only at the node's own start left that 8:00 unpadded while every
+    // other time in the column was padded.
+    const segments = text.split('\n');
+    let changed = false;
+    for (let i = 0; i < segments.length; i++) {
+      if (i === 0 && !atLineStart) continue;
+      const lead = segments[i].match(/^(\s*)\d:\d{2}/);
+      if (!lead) continue;
+      if (i === 0 && !lead[1]) {
+        // The time opens this node, and the node is often inside the <u> of an underlined
+        // time. As plain text the pad would sit inside that <u> and the rule would be
+        // drawn a whole digit wider than the time it belongs to. An inline-block is an
+        // atomic box, and an ancestor's underline is not drawn through one, so the pad
+        // holds its width without being underlined.
+        const pad = document.createElement('span');
+        pad.className = 'time-pad';
+        pad.textContent = FIGURE_SPACE;
+        node.parentNode.insertBefore(pad, node);
+      } else {
+        segments[i] = lead[1] + FIGURE_SPACE + segments[i].slice(lead[1].length);
+        changed = true;
+      }
+    }
+    if (changed) node.nodeValue = segments.join('\n');
+    atLineStart = text.endsWith('\n');
+  }
+}
+
 /** Hangs the location stars off the end of a time instead of letting them widen it.
  *
  *  A star says which room a מנין is in, not what time it is, so it should not move the
@@ -289,8 +364,12 @@ function fillLegend(card) {
   const marks = [...card.querySelectorAll('.week-lines .time-mark')].map((m) => m.textContent.trim());
   const lines = [];
   if (card.querySelector('.week-lines u')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
-  if (marks.includes('*')) lines.push({ dir: 'rtl', text: '*בעזרת נשים' });
-  if (marks.includes('**')) lines.push({ dir: 'rtl', text: '**באולם השמחות' });
+  // The two star notes share a line, in the order the printed chart's footer has them,
+  // and either can appear on its own if only its mark is on the card.
+  const stars = [];
+  if (marks.includes('*')) stars.push('*בעזרת נשים');
+  if (marks.includes('**')) stars.push('**באולם השמחות');
+  if (stars.length) lines.push({ dir: 'rtl', text: stars.join(' ') });
   legend.innerHTML = lines.map((l) => `<div class="week-legend-line" dir="${l.dir}">${weekEsc(l.text)}</div>`).join('');
 }
 
@@ -566,6 +645,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     card.querySelectorAll('.week-time').forEach((el) => {
       trimSpaceAtLineStart(el);
+      alignColons(el);
       hangTimeMarkers(el);
     });
     // After the marks exist, so the key can be built from what is really on the card.
