@@ -4626,7 +4626,6 @@ function fitLinesToPage(container) {
     const inner = box?.firstElementChild;
     if (!inner) return;
     card.style.removeProperty('--fit-scale');
-    card.style.removeProperty('--fit-width');
     const room = box.clientHeight;
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
@@ -4636,23 +4635,20 @@ function fitLinesToPage(container) {
       card.style.setProperty('--fit-scale', Math.max(0.5, byHeight).toFixed(3));
       return;
     }
-    // Growing must not widen the block. zoom scales the measure along with the type, and
-    // the weekday card grew far enough that its rows spanned the whole page while the
-    // שבת card's stayed narrow, so a pair of cards meant to match did not. Dividing the
-    // measure by the same factor cancels that: the type grows, the block stays put.
+    // The rows span the card whatever the growth (width:100% is divided by the zoom, so
+    // it resolves to the card's own width either way), which keeps the two cards matching
+    // each other without the measure having to be corrected for the growth.
     //
-    // A constant width and bigger type can push a line into wrapping, which makes the
-    // block taller than the growth assumed, so the result is measured and eased back
-    // until it really fits rather than trusted first time.
+    // Bigger type in a fixed width can still push a line into wrapping and make the block
+    // taller than the growth assumed, so the result is measured and eased back until it
+    // really fits rather than trusted first time.
     let grow = Math.min(byHeight, MAX_GROW);
     for (let i = 0; i < 8 && grow > 1.02; i++) {
       card.style.setProperty('--fit-scale', grow.toFixed(3));
-      card.style.setProperty('--fit-width', grow.toFixed(3));
       if (inner.scrollHeight * grow <= room) return;
       grow -= 0.05;
     }
     card.style.removeProperty('--fit-scale');
-    card.style.removeProperty('--fit-width');
   });
 }
 

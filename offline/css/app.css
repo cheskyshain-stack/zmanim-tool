@@ -778,13 +778,12 @@ body.is-luach .week-cards { align-items: center; }
    reads as though something above it failed to load. The weekday card fills the page by
    giving each time its own line instead (see capTimesPerLine in ui/week-view.js). */
 .week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; }
-/* Held to the width the two columns actually need and centred, rather than being left to
-   span the page. Stretched full width the name sat against the right edge and the time
-   against the left, with a hand's width of nothing between them. */
-/* The measure is divided by the growth factor so that growing the type leaves the block
-   the same width on paper (see fitLinesToPage). --fit-width stays 1 when shrinking, where
-   the block is meant to come in with everything else. */
-.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: calc(5.6in / var(--fit-width, 1)); margin-inline: auto; }
+/* The rows span the page. They used to be held to a fixed measure and centred, which
+   left a wide white margin down each side of the card and, with the times set to the
+   outer edge of the row, put them a long way in from the page. width:100% is scale
+   independent under zoom: the containing block is divided by the zoom, so the rows come
+   out at the card's own width whatever the page-filling growth is set to. */
+.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; }
 /* Name on the right, time on the left, in two fixed columns so every name starts at the
    same place and every time sits in the same band. Fixed rather than content-sized
    because each row is its own grid: only a fixed track lines up down the card. */
