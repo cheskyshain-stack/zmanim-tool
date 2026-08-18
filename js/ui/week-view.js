@@ -803,7 +803,7 @@ function weekCardsHtml(showing, index, state, settings) {
  *  render, so an old pair is taken off before a new one goes on. Left to stack, every
  *  swipe after the first would fire a whole history of stale handlers, each still holding
  *  the week it was rendered for. */
-function wireSwipe(container, onPrev, onNext) {
+export function wireSwipe(container, onPrev, onNext) {
   container._weekSwipeOff?.();
   let startX = null;
   let startY = null;
