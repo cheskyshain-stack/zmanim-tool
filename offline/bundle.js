@@ -4309,8 +4309,11 @@ function specialDaysInWeek(shabbosSerial, settings) {
   return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
 }
 
+/** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
+ *  name is always Saturday and there is no reason to call it that on a shul's own page.
+ *  The word is written in rather than formatted, since no locale has it. */
 const fmtDate = (date) =>
-  new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
+  'Shabbos, ' + new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
 /** At most three times to a line, applied to the rendered cell rather than to a string.
  *
