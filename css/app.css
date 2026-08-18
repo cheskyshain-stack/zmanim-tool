@@ -789,7 +789,11 @@ body.is-luach .week-cards { align-items: center; }
    same place and every time sits in the same band. Fixed rather than content-sized
    because each row is its own grid: only a fixed track lines up down the card. */
 .week-line {
-  display: grid; grid-template-columns: 40% 40%; justify-content: center; align-items: center;
+  /* The two columns go to the outer edges of the row rather than being centred in it:
+     centred, the pair sat in the middle of the band with a wide margin either side, and
+     the times read as set too far in from the page. Pushed out, each side is inset by the
+     row's own padding and no more, so they still match each other exactly. */
+  display: grid; grid-template-columns: 40% 40%; justify-content: space-between; align-items: center;
   gap: 0.2in; padding: 0.1in 0.16in; margin-bottom: 0.07in;
   background: var(--bg); border-radius: 6px;
 }
