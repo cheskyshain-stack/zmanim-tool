@@ -4361,6 +4361,33 @@ function trimSpaceAtLineStart(root) {
   }
 }
 
+/** Whether any line in this cell opens with a two-digit hour, which is what decides
+ *  whether padding is worth doing. Asked of a whole card rather than one cell: the colons
+ *  should line up down the page, so a שחרית block of single-digit hours is padded to sit
+ *  on the same axis as a מעריב block that runs past ten, instead of each block finding
+ *  its own. Where no row on the card has a long hour, nothing is padded at all: it would
+ *  move every line equally and change nothing, except on a row that opens with a word
+ *  rather than a time ("6:06" over "פלג 6:21"), where it would shift one and not the
+ *  other and pull the two out of line. */
+function hasTwoDigitHourAtLineStart(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let atLineStart = true;
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') atLineStart = true;
+      continue;
+    }
+    const segments = node.nodeValue.split('\n');
+    for (let i = 0; i < segments.length; i++) {
+      if (i === 0 && !atLineStart) continue;
+      if (/^\s*\d{2}:\d{2}/.test(segments[i])) return true;
+    }
+    atLineStart = node.nodeValue.endsWith('\n');
+  }
+  return false;
+}
+
 /** Lines the colons up down a column of times.
  *
  *  Set flush left, "8:45" and "10:00" start at the same place, which puts their colons a
@@ -4377,26 +4404,6 @@ function alignColons(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
-
-  // Only worth doing where the cell actually mixes hour widths. Padding a cell whose
-  // hours are all single-digit moves every line by the same amount and changes nothing,
-  // except on a cell that also has a line opening with a word rather than a time
-  // ("6:06" over "פלג 6:21"), where it would shift one line and not the other and pull
-  // the two out of line with each other.
-  let sawTwoDigitHour = false;
-  let scanning = true;
-  for (const node of nodes) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.nodeName === 'BR') scanning = true;
-      continue;
-    }
-    node.nodeValue.split('\n').forEach((part, i) => {
-      if (i === 0 && !scanning) return;
-      if (/^\s*\d{2}:\d{2}/.test(part)) sawTwoDigitHour = true;
-    });
-    scanning = node.nodeValue.endsWith('\n');
-  }
-  if (!sawTwoDigitHour) return;
 
   let atLineStart = true;
   for (const node of nodes) {
@@ -4626,6 +4633,7 @@ function fitLinesToPage(container) {
     const inner = box?.firstElementChild;
     if (!inner) return;
     card.style.removeProperty('--fit-scale');
+    card.style.removeProperty('--fit-width');
     const room = box.clientHeight;
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
@@ -4635,20 +4643,23 @@ function fitLinesToPage(container) {
       card.style.setProperty('--fit-scale', Math.max(0.5, byHeight).toFixed(3));
       return;
     }
-    // The rows span the card whatever the growth (width:100% is divided by the zoom, so
-    // it resolves to the card's own width either way), which keeps the two cards matching
-    // each other without the measure having to be corrected for the growth.
+    // Growing must not widen the block. zoom scales the measure along with the type, and
+    // the weekday card grew far enough that its rows spanned the whole page while the
+    // שבת card's stayed narrow, so a pair of cards meant to match did not. Dividing the
+    // measure by the same factor cancels that: the type grows, the block stays put.
     //
-    // Bigger type in a fixed width can still push a line into wrapping and make the block
-    // taller than the growth assumed, so the result is measured and eased back until it
-    // really fits rather than trusted first time.
+    // A constant width and bigger type can push a line into wrapping, which makes the
+    // block taller than the growth assumed, so the result is measured and eased back
+    // until it really fits rather than trusted first time.
     let grow = Math.min(byHeight, MAX_GROW);
     for (let i = 0; i < 8 && grow > 1.02; i++) {
       card.style.setProperty('--fit-scale', grow.toFixed(3));
+      card.style.setProperty('--fit-width', grow.toFixed(3));
       if (inner.scrollHeight * grow <= room) return;
       grow -= 0.05;
     }
     card.style.removeProperty('--fit-scale');
+    card.style.removeProperty('--fit-width');
   });
 }
 
@@ -4797,11 +4808,11 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   container.querySelectorAll('.week-card').forEach((card) => {
     const perLine = card.classList.contains('is-weekday-card') ? 1 : 3;
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
-    card.querySelectorAll('.week-time').forEach((el) => {
-      trimSpaceAtLineStart(el);
-      alignColons(el);
-      hangTimeMarkers(el);
-    });
+    const cells = [...card.querySelectorAll('.week-time')];
+    cells.forEach((el) => trimSpaceAtLineStart(el));
+    // One colon axis for the whole card rather than one per row.
+    if (cells.some((el) => hasTwoDigitHourAtLineStart(el))) cells.forEach((el) => alignColons(el));
+    cells.forEach((el) => hangTimeMarkers(el));
     // After the marks exist, so the key can be built from what is really on the card.
     fillLegend(card);
   });
