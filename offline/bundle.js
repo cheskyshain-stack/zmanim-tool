@@ -5137,7 +5137,18 @@ function htmlLines(html) {
  *  alternate time loses its underline here while keeping it on the printed chart, and
  *  the sentinel characters sit in the output as invisible strays. */
 function weekNl2br(str) {
-  const escaped = weekEsc(str).split(UL_START).join('<u>').split(UL_END).join('</u>');
+  // underlineTime writes its value as "<u> 6:42</u>", a space inside the underline. On
+  // the wall chart that lead-in is wanted: the times are centred there and it does not
+  // show. Here the times are set flush left in a column, and a rule that starts a space
+  // early reads as an underline wider than its own number - measured at 5.5 to 5.75px of
+  // painted rule past the first digit, against 0.25 to 2.25px for the ones without it,
+  // which is only the side bearing the font itself leaves. Moving the space in front of
+  // the sentinel keeps the gap between times and takes it out from under the rule.
+  // Any whitespace, matched rather than written out: the character underlineTime puts
+  // there is a non-breaking space, not the plain one it looks like in the source, and
+  // splitting on a literal " " quietly matches nothing at all.
+  const moved = weekEsc(str).replace(new RegExp(UL_START + '(\\s+)', 'g'), '$1' + UL_START);
+  const escaped = moved.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
 
