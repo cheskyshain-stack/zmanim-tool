@@ -117,6 +117,21 @@ function specialDaysInWeek(shabbosSerial, settings) {
 /** "Shabbos, August 22, 2026". Every week here is anchored on its Shabbos, so the day
  *  name is always Saturday and there is no reason to call it that on a shul's own page.
  *  The word is written in rather than formatted, since no locale has it. */
+const SEASON_LABEL = { kayitz: 'שבת קיץ', choref: 'שבת חורף' };
+
+/** The season that would follow the last week in the list, named. The two alternate, so
+ *  it is whichever one the last week is not: a קיץ season ends at Sukkos and חורף picks
+ *  up from there. Read off the newest week that belongs to a שבת sheet, since the last
+ *  week or two can come from the Weekday chart alone (a Yom Tov week has no parsha and so
+ *  no שבת page). */
+function nextSeasonLabel(index, serials) {
+  for (let i = serials.length - 1; i >= 0; i--) {
+    const season = index.get(serials[i])?.sheet?.season;
+    if (season) return season === 'kayitz' ? SEASON_LABEL.choref : SEASON_LABEL.kayitz;
+  }
+  return null;
+}
+
 const fmtDate = (date) =>
   'Shabbos, ' + new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
@@ -414,7 +429,11 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
 function publishPanelHtml(sheet, state) {
   const hasToken = Boolean(getPublishToken());
   const groups = publishableGroups(state);
-  const label = (s) => (s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף');
+  const label = (s) => SEASON_LABEL[s.season] || s.season;
+  // A row here is a season that exists to be published. With only one generated there is
+  // only one row, which reads as "there is no way to publish a second chart" - so say
+  // where the second one comes from instead of leaving an empty space to interpret.
+  const missing = ['kayitz', 'choref'].filter((season) => !groups.some((g) => g.sheet.season === season));
   const rows = groups
     .map(
       (g) =>
@@ -431,6 +450,11 @@ function publishPanelHtml(sheet, state) {
       ${
         hasToken
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
+             ${
+               groups.length && missing.length
+                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABEL[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABEL[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
+                 : ''
+             }
              <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
              <div id="publish-status" class="hint"></div>
              <div id="published-list"></div>`
@@ -640,6 +664,45 @@ function weekCardsHtml(showing, index, state, settings) {
   );
 }
 
+/** Swipe across the week to page through it, the way a photo album works: drag left to
+ *  bring the next week in, right for the previous one.
+ *
+ *  Read on touchend rather than followed on touchmove, because the page has to keep
+ *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
+ *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
+ *  across and half again as far across as down, which leaves the diagonal drags that end
+ *  a scroll alone.
+ *
+ *  The handlers hang off the container, which in the admin is the same element every
+ *  render, so an old pair is taken off before a new one goes on. Left to stack, every
+ *  swipe after the first would fire a whole history of stale handlers, each still holding
+ *  the week it was rendered for. */
+function wireSwipe(container, onPrev, onNext) {
+  container._weekSwipeOff?.();
+  let startX = null;
+  let startY = null;
+  const start = (e) => {
+    if (e.touches.length !== 1) return (startX = null);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  };
+  const end = (e) => {
+    if (startX === null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    (dx < 0 ? onNext : onPrev)();
+  };
+  container.addEventListener('touchstart', start, { passive: true });
+  container.addEventListener('touchend', end, { passive: true });
+  container._weekSwipeOff = () => {
+    container.removeEventListener('touchstart', start);
+    container.removeEventListener('touchend', end);
+  };
+}
+
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
@@ -691,6 +754,15 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
         <button type="button" id="week-print-rest">Print every week to the end of the season</button>
       </div>
+      ${
+        // At the end of the list, say why rather than just greying Next out. The weeks
+        // here are the published ones, and a season stops where the next season begins:
+        // Next runs out at Sukkos because the winter chart is not up, which looks like a
+        // broken button unless it says so.
+        at >= serials.length - 1 && nextSeasonLabel(index, serials)
+          ? `<p class="hint no-print week-end-note">This is the last week published. <bdi>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
+          : ''
+      }
       ${
         // Only on a touch device, and only next to the one action here that needs paper
         // turned: see .print-hint in app.css for why a computer is not told this.
@@ -749,6 +821,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+
+  wireSwipe(
+    container,
+    () => at > 0 && onSerialChange(serials[at - 1]),
+    () => at < serials.length - 1 && onSerialChange(serials[at + 1])
+  );
 
   const status = container.querySelector('#publish-status');
   const say = (message, isError = false) => {
