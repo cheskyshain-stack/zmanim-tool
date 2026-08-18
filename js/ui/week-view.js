@@ -408,19 +408,27 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
  *  changes hands. Deliberately a button rather than something automatic, because
  *  publishing is the moment the congregation sees a change and that should be a
  *  decision, not a side effect of editing a cell. */
-function publishPanelHtml(sheet) {
-  const label = sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף';
+function publishPanelHtml(sheet, state) {
   const hasToken = Boolean(getPublishToken());
+  const groups = publishableGroups(state);
+  const label = (s) => (s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף');
+  const rows = groups
+    .map(
+      (g) =>
+        `<div class="published-row">
+          <span><bdi>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
+          <button type="button" class="btn-primary publish-btn" data-id="${g.sheet.id}">Publish</button>
+        </div>`
+    )
+    .join('');
   return `<details class="panel no-print">
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
       <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
       ${
         hasToken
-          ? `<div class="actions">
-               <button type="button" id="publish-btn" class="btn-primary">Publish <bdi>${weekEsc(label)}</bdi> ${sheet.hebrewYear}</button>
-             </div>
-             <p class="hint">Publishing this season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
+          ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
+             <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
              <div id="publish-status" class="hint"></div>
              <div id="published-list"></div>`
           : '<p class="error">No publishing token set. Add one in Settings, under Publishing, and this becomes a single button.</p>'
@@ -535,23 +543,36 @@ function fitPagesToWindow(container) {
   window.addEventListener('resize', fitPagesHandler);
 }
 
-export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
-  // opts.luach: the congregation-facing view, which has no app chrome around it.
-  const luach = Boolean(opts.luach);
-  const settings = resolveSettings(state.settings);
-  const index = weekIndex(state);
-  const serials = [...index.keys()].sort((a, b) => a - b);
+/** Everything that has to be done to a card once its markup is in the document: break
+ *  the long lines, square the times up, hang the marks, and write the key.
+ *
+ *  A function rather than inline, because printing the rest of the season replaces the
+ *  cards with a whole season's worth and every one of them needs the same treatment. */
+function decorateCards(root) {
+  root.querySelectorAll('.week-card').forEach((card) => {
+    // Three to a line on the שבת card, one on the weekday card. The weekday card carries
+    // only three minyanim against a full sheet, so a time to a line is what fills it;
+    // the שבת card has eleven rows and would run off the page the same way. Keyed on
+    // which card it is rather than where it sits: a Yom Tov week has no שבת card, and
+    // going by position gave its חול card the שבת card's three-to-a-line.
+    const perLine = card.classList.contains('is-weekday-card') ? 1 : 3;
+    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
+    const cells = [...card.querySelectorAll('.week-time')];
+    cells.forEach((el) => trimSpaceAtLineStart(el));
+    // One colon axis for the whole card rather than one per row.
+    if (cells.some((el) => hasTwoDigitHourAtLineStart(el))) cells.forEach((el) => alignColons(el));
+    cells.forEach((el) => hangTimeMarkers(el));
+    // After the marks exist, so the key can be built from what is really on the card.
+    fillLegend(card);
+  });
+}
 
-  if (!serials.length) {
-    container.innerHTML = luach
-      ? '<p class="hint">Nothing has been published yet.</p>'
-      : `<h2>This week</h2>
-      <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
-    return;
-  }
-
-  const showing = serials.includes(serial) ? serial : currentSerial(serials);
-  const at = serials.indexOf(showing);
+/** Both cards for one week, as markup, ready to be dropped into a .week-cards container.
+ *
+ *  Split out of renderWeek so a week other than the one on screen can be built too: that
+ *  is what printing the rest of the season does, which lays every remaining week out at
+ *  once rather than asking someone to page through and print them one at a time. */
+function weekCardsHtml(showing, index, state, settings) {
   const { week, sheet } = index.get(showing);
 
   // No Shabbos sheet means this week's Shabbos is Yom Tov, which has no parsha and so no
@@ -610,6 +631,34 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // which they are not: they are the ordinary weekdays around it.
   const cardTitle = sheet ? 'פרשת ' + parsha : 'שבוע שחל בו ' + parsha;
 
+  return (
+    (shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '') +
+    (weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '')
+  );
+}
+
+export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
+  // opts.luach: the congregation-facing view, which has no app chrome around it.
+  const luach = Boolean(opts.luach);
+  const settings = resolveSettings(state.settings);
+  const index = weekIndex(state);
+  const serials = [...index.keys()].sort((a, b) => a - b);
+
+  if (!serials.length) {
+    container.innerHTML = luach
+      ? '<p class="hint">Nothing has been published yet.</p>'
+      : `<h2>This week</h2>
+      <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
+    return;
+  }
+
+  const showing = serials.includes(serial) ? serial : currentSerial(serials);
+  const at = serials.indexOf(showing);
+  const { sheet } = index.get(showing);
+  const week = index.get(showing).week;
+  const cardsHtml = weekCardsHtml(showing, index, state, settings);
+  const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
+
   container.innerHTML = `
     ${
       luach
@@ -633,14 +682,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         </button>
       </div>
       <div class="week-nav-row week-nav-print">
-        <button type="button" id="week-print-pair">${shabbosLines ? 'Print both on one sheet' : 'Print this page'}</button>
+        <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
+        <button type="button" id="week-print-rest">Print every week to the end of the season</button>
       </div>
     </div>
-    <div class="week-cards">
-      ${shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : ''}
-      ${weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : ''}
-    </div>
-    ${luach || !sheet ? '' : publishPanelHtml(sheet)}
+    <div class="week-cards">${cardsHtml}</div>
+    ${luach ? '' : publishPanelHtml(sheet, state)}
   `;
 
   // null puts it back on whichever Shabbos is next, rather than a pinned week.
@@ -649,17 +696,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // the שבת card has eleven rows and would run off the page the same way. Keyed on which
   // card it is rather than where it sits: a Yom Tov week has no שבת card, and going by
   // position gave its חול card the שבת card's three-to-a-line.
-  container.querySelectorAll('.week-card').forEach((card) => {
-    const perLine = card.classList.contains('is-weekday-card') ? 1 : 3;
-    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
-    const cells = [...card.querySelectorAll('.week-time')];
-    cells.forEach((el) => trimSpaceAtLineStart(el));
-    // One colon axis for the whole card rather than one per row.
-    if (cells.some((el) => hasTwoDigitHourAtLineStart(el))) cells.forEach((el) => alignColons(el));
-    cells.forEach((el) => hangTimeMarkers(el));
-    // After the marks exist, so the key can be built from what is really on the card.
-    fillLegend(card);
-  });
+  decorateCards(container);
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול
   // page, not both.
@@ -672,6 +709,30 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // dialog's own landscape setting: @page fixes a card at letter portrait, so choosing
   // landscape there changes nothing (measured, the PDF comes out portrait either way).
   container.querySelector('#week-print-pair')?.addEventListener('click', () => printWith('is-print-pair'));
+
+  // Every week from this one to the end of the season, in one run. The cards for the
+  // whole stretch are built and put in place of the single week's, printed, then the one
+  // week is put back: same markup and same treatment either way, so a printed run cannot
+  // drift from what a week looks like on its own. Restored from the markup rather than
+  // from the decorated DOM, since the passes are not safe to run twice over their own
+  // output.
+  container.querySelector('#week-print-rest')?.addEventListener('click', () => {
+    const wrap = container.querySelector('.week-cards');
+    wrap.innerHTML = serials.slice(at).map((s) => weekCardsHtml(s, index, state, settings)).join('');
+    decorateCards(wrap);
+    fitLinesToPage(wrap);
+    const restore = () => {
+      wrap.innerHTML = cardsHtml;
+      decorateCards(wrap);
+      attachPagePrintToAll(wrap, '.week-card', 'Print this page');
+      fitLinesToPage(container);
+      fitPagesToWindow(container);
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+    setTimeout(restore, 1500);
+  });
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
@@ -726,12 +787,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   };
   showPublished();
 
-  container.querySelector('#publish-btn')?.addEventListener('click', async (e) => {
-    const btn = e.target;
+  container.querySelectorAll('.publish-btn').forEach((btn) =>
+    btn.addEventListener('click', async () => {
     btn.disabled = true;
     say('Publishing…');
     try {
-      const group = publishableGroups(state).find((g) => g.sheet.id === sheet.id);
+      const group = publishableGroups(state).find((g) => g.sheet.id === btn.dataset.id);
       const toPublish = [group.sheet, group.weekday].filter(Boolean);
       await publishToSite(buildPublishedPayload(state, toPublish), getPublishToken());
       say("Published. The congregation's page updates in about a minute.");
@@ -741,7 +802,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     } finally {
       btn.disabled = false;
     }
-  });
+    })
+  );
 }
 
 /** Rich text from Settings, kept as HTML but with its own outer whitespace trimmed. */
