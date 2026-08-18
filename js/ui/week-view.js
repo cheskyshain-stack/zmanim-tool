@@ -156,6 +156,34 @@ function capTimesPerLine(root, max = 3) {
   trimSeparatorsBeforeBreaks(root);
 }
 
+/** Strips the space a line starts with, so every line starts on the same axis.
+ *
+ *  underlineTime writes its value as "<u> 6:42</u>": the leading space gives the rule a
+ *  lead-in on the wall chart, where the times are centred and it does not show. Set flush
+ *  left here it shows as an indent of about half a character, and only on some lines. The
+ *  ones capTimesPerLine broke itself already lost it, being trimmed as the separator in
+ *  front of the time, so a line beginning at a break the *source* supplied was indented
+ *  while its neighbours were not, which is what made the column look crooked. */
+function trimSpaceAtLineStart(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let atLineStart = true;
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') atLineStart = true;
+      continue;
+    }
+    // [^\S\n] is "whitespace but not a newline", which covers the non-breaking spaces the
+    // separators are built from as well as ordinary ones.
+    let text = atLineStart ? node.nodeValue.replace(/^[^\S\n]+/, '') : node.nodeValue;
+    text = text.replace(/\n[^\S\n]+/g, '\n');
+    if (text !== node.nodeValue) node.nodeValue = text;
+    // An emptied node leaves the flag alone: the next node is still starting the line.
+    if (text.length) atLineStart = text.endsWith('\n');
+  }
+}
+
 /** Hangs the location stars off the end of a time instead of letting them widen it.
  *
  *  A star says which room a מנין is in, not what time it is, so it should not move the
@@ -483,7 +511,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // the שבת card has eleven rows and would run off the page the same way.
   container.querySelectorAll('.week-card').forEach((card, i) => {
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 1));
-    card.querySelectorAll('.week-time').forEach(hangTimeMarkers);
+    card.querySelectorAll('.week-time').forEach((el) => {
+      trimSpaceAtLineStart(el);
+      hangTimeMarkers(el);
+    });
   });
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול
