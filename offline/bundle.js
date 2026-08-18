@@ -5218,10 +5218,11 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-// In the order the work actually happens: the week you are on, the sheets you have, then
-// making a new one, then the things you set once. Rules is no longer among them - it is
-// the first panel inside Settings, being something configured rather than a place you go.
-const tabs = ['week', 'saved', 'generate', 'settings', 'guide'];
+// Making a chart first, then the week you are on, then the sheets you already have, then
+// the things you set once. Rules is no longer among them - it is the first panel inside
+// Settings, being something configured rather than a place you go. Generate leading also
+// matches where the app opens.
+const tabs = ['generate', 'week', 'saved', 'settings', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
 const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
