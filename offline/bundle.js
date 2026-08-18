@@ -4120,6 +4120,19 @@ function printOnly(pageEl) {
   setTimeout(done, 1500);
 }
 
+/** Prints with a class on the body, for a layout that only applies to paper (see
+ *  is-print-pair in print.css). Same clean-up dance as printOnly. */
+function printWith(bodyClass) {
+  document.body.classList.add(bodyClass);
+  const done = () => {
+    document.body.classList.remove(bodyClass);
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 1500);
+}
+
 /** Puts a print button above one page. The page keeps its own place in the flow; the
  *  wrapper only adds the strip. */
 function attachPagePrint(pageEl, label = 'Print this page') {
@@ -4299,6 +4312,38 @@ function capTimesPerLine(root, max = 3) {
     node.replaceWith(frag);
   }
   trimSeparatorsBeforeBreaks(root);
+}
+
+/** Hangs the location stars off the end of a time instead of letting them widen it.
+ *
+ *  A star says which room a מנין is in, not what time it is, so it should not move the
+ *  time. Centred with the star counted, 7:20* sat a couple of characters left of 7:00
+ *  above it and the column read as though it had been nudged. Each run of stars goes into
+ *  a box of no width, so it still prints exactly where it was but the line measures as
+ *  the digits alone and every time centres on the same axis. */
+function hangTimeMarkers(root) {
+  const MARKED = /(\d{1,2}:\d{2})(\*{1,3})/g;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const text = node.nodeValue;
+    if (!MARKED.test(text)) continue;
+    MARKED.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let cut = 0;
+    let match;
+    while ((match = MARKED.exec(text))) {
+      frag.append(text.slice(cut, match.index) + match[1]);
+      const mark = document.createElement('span');
+      mark.className = 'time-mark';
+      mark.textContent = match[2];
+      frag.append(mark);
+      cut = match.index + match[0].length;
+    }
+    frag.append(text.slice(cut));
+    node.replaceWith(frag);
+  }
 }
 
 /** The text node immediately before `node` in reading order, without crossing a line
@@ -4551,6 +4596,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       <button type="button" id="week-today">Today</button>
       <span class="week-when">${fmtDate(week.date)}</span>
       <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>Next week &rarr;</button>
+      <button type="button" id="week-print-pair">Print both on one sheet</button>
     </div>
     <div class="week-cards">
       ${cardHtml('פרשת ' + parsha, shabbosLines, state.settings)}
@@ -4565,6 +4611,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // the שבת card has eleven rows and would run off the page the same way.
   container.querySelectorAll('.week-card').forEach((card, i) => {
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, i === 0 ? 3 : 1));
+    card.querySelectorAll('.week-time').forEach(hangTimeMarkers);
   });
 
   // Each page prints on its own: usually you want this week's שבת page, or the חול
@@ -4574,6 +4621,10 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   fitLinesToPage(container);
   fitPagesToWindow(container);
 
+  // Landscape, two cards side by side. It has to be a button rather than the print
+  // dialog's own landscape setting: @page fixes a card at letter portrait, so choosing
+  // landscape there changes nothing (measured, the PDF comes out portrait either way).
+  container.querySelector('#week-print-pair')?.addEventListener('click', () => printWith('is-print-pair'));
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));

@@ -77,6 +77,29 @@
   .week-line { break-inside: avoid; }
 }
 
+/* Both week cards on one landscape sheet, side by side.
+
+   This cannot be driven by the print dialog's own landscape setting. @page fixes a card
+   at letter portrait, so choosing landscape there changes nothing at all (measured: the
+   PDF comes out 612x792 either way), and an (orientation: landscape) query can never
+   match a page CSS has already made portrait. So it is a button in the app, which sets
+   the class below and lets the stylesheet set the paper up to match.
+
+   0.64: two 8.5in cards side by side is 17in, which has to come down inside 11in. That
+   leaves them 7.04in tall on an 8.5in sheet. */
+@page pair { size: letter landscape; margin: 0; }
+@media print {
+  body.is-print-pair .week-cards { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; gap: 0; }
+  body.is-print-pair .page-slot { display: block; margin: 0; }
+  body.is-print-pair .week-cards .week-card {
+    page: pair;
+    zoom: 0.64 !important;
+    break-after: auto !important;
+    page-break-after: auto !important;
+    break-inside: avoid;
+  }
+}
+
 /* Printing one page: every other page is taken out of the run for the duration. The
    marks are put on by printOnly() in ui/print-page.js and taken off again afterwards. */
 @media print {

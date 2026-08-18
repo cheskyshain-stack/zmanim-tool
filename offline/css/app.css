@@ -788,6 +788,10 @@ body.is-luach .week-cards { align-items: center; }
   direction: ltr; font-weight: 700; font-size: 14pt; white-space: pre-line; line-height: 1.35;
   display: block; justify-self: stretch; text-align: center;
 }
+/* A run of location stars, set in a box of no width so it hangs off the end of its time
+   rather than widening the line (see hangTimeMarkers in ui/week-view.js). Without this a
+   starred time centres a couple of characters left of the ones above and below it. */
+.time-mark { display: inline-block; width: 0; overflow: visible; white-space: pre; }
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
 /* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the
    wall chart. Here they are separate labelled rows, so the size difference says nothing. */

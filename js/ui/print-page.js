@@ -34,6 +34,19 @@ export function printOnly(pageEl) {
   setTimeout(done, 1500);
 }
 
+/** Prints with a class on the body, for a layout that only applies to paper (see
+ *  is-print-pair in print.css). Same clean-up dance as printOnly. */
+export function printWith(bodyClass) {
+  document.body.classList.add(bodyClass);
+  const done = () => {
+    document.body.classList.remove(bodyClass);
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 1500);
+}
+
 /** Puts a print button above one page. The page keeps its own place in the flow; the
  *  wrapper only adds the strip. */
 export function attachPagePrint(pageEl, label = 'Print this page') {
