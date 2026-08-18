@@ -370,12 +370,30 @@ function headerInkFor(color) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
 }
 
+/** The page colour mixed with white, matching what CSS color-mix does to it, so the ink
+ *  rule above can be asked about a tint of the colour rather than only the colour. */
+function mixWithWhite(color, amount) {
+  const hex = String(color || '').replace('#', '');
+  if (hex.length !== 6) return color;
+  const mixed = [0, 2, 4]
+    .map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * amount + 255 * (1 - amount)))
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('');
+  return '#' + mixed;
+}
+
+/** The parsha column is painted at 60% (see .parsha-cell in app.css), which is light
+ *  enough that a colour needing white ink in the header can need black ink here. Working
+ *  it out from the mixed colour keeps the column readable at both ends of the range. */
+const SIDE_TINT = 0.6;
+
 function applyStyle(target, style) {
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
   target.style.setProperty('--sheet-accent', style.accentColor);
   target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
+  target.style.setProperty('--sheet-side-ink', headerInkFor(mixWithWhite(style.accentColor, SIDE_TINT)));
 }
 
 /** Makes every row in a table - header included - exactly the same height.
