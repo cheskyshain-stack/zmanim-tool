@@ -1081,3 +1081,8 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
 /* The first of the two download headings follows the lede, which already has space under
    it, so it does not need the gap the second one uses to separate the two groups. */
 .dl-heading-first { margin-top: 1rem; }
+/* The three programs, folded away. The browser copy is the one to reach for, and putting
+   the platform builds behind a summary keeps the page from opening on a choice most
+   people do not have to make. */
+.dl-programs { margin-top: 1.4rem; }
+.dl-programs .dl-list { margin-top: 0.6rem; }

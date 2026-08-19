@@ -2802,6 +2802,13 @@ function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>
+        <!-- The congregation's own chart page has carried this since it was built; this
+             screen, which shows the same chart, never did. A chart is letter landscape and
+             a phone's print dialog opens portrait, which puts an 11in page on an 8.5in
+             sheet and trims the right hand edge: the parsha column loses a letter and the
+             rabbi's line above it loses two. Shown only on a touch device, like the other
+             one: see .print-hint in app.css. -->
+        <p class="print-hint no-print">The chart prints landscape. If the print dialog opens portrait, change it in its options.</p>
       </div>
       <div class="pages"></div>`;
     const pagesEl = container.querySelector('.pages');
@@ -3596,11 +3603,14 @@ function renderProgram(container, platform = detectPlatform()) {
     </div>
     <p class="hint">It is the whole thing, not a cut down one: generating, typing over cells, rules, printing, backups. It keeps its work in the browser it is opened in, so the same folder on the same stick opens with your boards on the computer you last used it on and empty on a new one. Move work between them with <strong>Settings, Backup, Export</strong>. Publishing to the congregation's page needs the internet, so it does not work with none.</p>
 
-    <h3 class="dl-heading">Or the program, which needs no browser either</h3>
-    <p class="hint">A single file that opens on its own, like any other program on the computer. Built for one kind of machine at a time, so take the one that matches. It keeps its boards beside itself, which is what lets a stick carry your work from one computer to the next.</p>
-    <div class="dl-list">${rows}</div>
-
-    <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
+    <details class="panel dl-programs">
+      <summary>Or the program, which needs no browser either</summary>
+      <div class="panel-body">
+        <p class="hint">A single file that opens on its own, like any other program on the computer. Worth it over the browser copy for two things: it keeps its boards beside itself, so a USB stick carries your work and not just the program, and it opens like anything else on the machine. The cost is that it is built for one kind of computer at a time and the machine will refuse it the first time.</p>
+        <div class="dl-list">${rows}</div>
+        <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
+      </div>
+    </details>
 
     <details class="panel" ${platform === 'windows' || platform === 'mac' ? 'open' : ''}>
       <summary>The program will refuse to open the first time. Here is why, and what to press</summary>
