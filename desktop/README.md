@@ -9,7 +9,7 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Nine suites, all of which measure real output rather than checking that code ran:
+Ten suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
@@ -20,6 +20,7 @@ python3 desktop/tests/test_week.py            # which week This week opens on, a
 python3 desktop/tests/test_settings.py        # settings, rules, and importing a backup
 python3 desktop/tests/test_editor.py          # typing over a cell, and the style controls
 python3 desktop/tests/test_sheet_view.py      # fitting a page to the window, and side by side
+python3 desktop/tests/test_guide.py           # the guide, and whether it still names real buttons
 python3 desktop/tests/test_publish.py         # what gets published, against a stubbed GitHub
 ```
 
@@ -64,7 +65,7 @@ finished cards at letter portrait with every time present and nothing past the e
 rows are drawn line by line rather than as one laid out block, which is what makes the
 colon axis exact: a line whose hour is one digit is started a digit's width further in.
 
-**The program**: a window with a sidebar, and four places behind it. **Generate** makes a
+**The program**: a window with a sidebar, and five places behind it. **Generate** makes a
 season. **This week** shows the week's two cards as they print, opening on whichever שבת is
 next and moving on by itself once Shabbos is over, with Previous, Today and Next, a choice
 of which page comes first, "Print both on one sheet" (landscape, side by side, which has to
@@ -77,7 +78,10 @@ tick box per page, since a reprint is usually one page rather than the whole she
 left out of the print stays on the screen, dimmed, and the ticks survive a redraw. **Fit to
 screen** scales the pages down until a whole page is across the window, and turns itself on
 when one does not fit; **Side by side** puts the other chart's matching page next to each
-one, so the two can be checked row against row.
+one, so the two can be checked row against row. And the **Guide** says what the program
+is and how to get a printed board out of it, kept inside the program rather than in a file
+beside it: this thing is one file that needs nothing else, and a guide in a separate
+document is the first thing to be lost off a USB stick.
 
 Fitting redraws the page at a lower resolution rather than shrinking a picture already
 drawn. The text stays sharp at any scale, and the map of where the cells landed still comes
@@ -118,10 +122,9 @@ already made.
 
 ## What is not done
 
-- The guide.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
-- Starting the built `Zmanim.exe` on a Windows machine. It builds, and all nine suites pass
+- Starting the built `Zmanim.exe` on a Windows machine. It builds, and all ten suites pass
   on Windows before it is built, but nothing here has double clicked it.
 
 ## Layout
@@ -135,6 +138,7 @@ zmanimboard/
   htmlfield.py     a rich text box that saves the same small markup subset the site stores
   rulesui.py       the rule editor
   celldialog.py    typing over one cell
+  guide.py         the guide screen
   publish.py       committing a season to the congregation's site
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
@@ -210,11 +214,11 @@ Windows machine of your own is needed.
 It only ever runs when it is started by hand, never on a push: a build takes a few minutes
 and is only wanted when there is a version to hand to someone.
 
-The workflow runs all nine test suites on Windows first. If the numbers disagree with
+The workflow runs all ten test suites on Windows first. If the numbers disagree with
 `fixtures/golden.json` there is nothing worth building.
 
 This has been run: a build finished in under two minutes and produced a 39 MB
-`Zmanim.exe`, with all nine suites passing on Windows first. An artifact is kept for 90
+`Zmanim.exe`, with all ten suites passing on Windows first. An artifact is kept for 90
 days, so a build older than that has to be run again rather than downloaded.
 
 To build it on a Windows machine instead:

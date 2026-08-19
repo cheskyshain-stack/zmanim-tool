@@ -42,6 +42,7 @@ jobs:
           python desktop/tests/test_settings.py
           python desktop/tests/test_editor.py
           python desktop/tests/test_sheet_view.py
+          python desktop/tests/test_guide.py
           python desktop/tests/test_publish.py
 
       # The Hebrew calendar tables and the fonts have to travel inside the executable: it must

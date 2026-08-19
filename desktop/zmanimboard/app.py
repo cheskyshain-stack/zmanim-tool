@@ -51,6 +51,7 @@ from .engine import pagination as pag
 from .engine import tables as tables_mod
 from .engine.settings import SEASON_LABELS
 from .engine.sheets.weeks import compute_season_weeks, default_season_and_year
+from .guide import GuideScreen
 from .celldialog import CellDialog
 from .render.card import CardPainter
 from .render.chart import ChartPainter
@@ -1209,6 +1210,7 @@ class Window(QMainWindow):
             ("week", "This week", WeekScreen(self)),
             ("saved", "Saved sheets", SavedScreen(self)),
             ("settings", "Settings", SettingsScreen(self)),
+            ("guide", "Guide", GuideScreen(self)),
         ):
             if first:
                 self.nav.addItem(QListWidgetItem(label))
@@ -1221,7 +1223,7 @@ class Window(QMainWindow):
     def settings(self):
         return statelib.resolved_settings(self.state)
 
-    NAV = ["generate", "week", "saved", "settings"]
+    NAV = ["generate", "week", "saved", "settings", "guide"]
 
     def _nav_changed(self, row: int):
         self.show_screen(self.NAV[row] if 0 <= row < len(self.NAV) else "generate")
