@@ -124,8 +124,9 @@ already made.
 
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
-- Starting the built `Zmanim.exe` on a Windows machine. It builds, and all ten suites pass
-  on Windows before it is built, but nothing here has double clicked it.
+- Opening either built program on a real desktop with a screen. Every build starts the
+  program it just made and has it draw a board, write a PDF and write the save file, but
+  that runs headless: it proves the thing works, not that the window looks right.
 
 ## Layout
 
@@ -255,6 +256,26 @@ On a Mac, beside the `.app` rather than inside it. The thing that runs is buried
 naive answer would hide someone's boards inside the application and lose them the day it is
 replaced with a newer copy. See `beside_the_program` in `app.py`.
 
+### Checking a build without waiting for GitHub
+
+PyInstaller cannot build for another kind of machine, but the packaging itself is the same
+code everywhere, so a Linux build here catches a packaging mistake in a minute instead of
+five minutes and a round trip. This is how the missing header images were found and fixed:
+
+```bash
+pip install pyinstaller
+pyinstaller --noconfirm --onefile --windowed --name Zmanim --paths desktop \
+  --add-data "desktop/zmanimboard/assets:assets" \
+  --add-data "assets:assets" \
+  --add-data "data:data" \
+  --distpath /tmp/zb/dist --workpath /tmp/zb/build --specpath /tmp/zb \
+  desktop/run.py
+QT_QPA_PLATFORM=offscreen /tmp/zb/dist/Zmanim --selftest
+```
+
+Use absolute paths for `--add-data` if `--specpath` points outside the repository, since it
+is what relative ones are resolved against.
+
 ### Building it on your own machine instead
 
 On Windows:
@@ -263,6 +284,7 @@ On Windows:
 pip install PySide6-Essentials PyInstaller
 pyinstaller --onefile --windowed --name Zmanim --paths desktop ^
   --add-data "desktop/zmanimboard/assets;assets" ^
+  --add-data "assets;assets" ^
   --add-data "data;data" ^
   desktop/run.py
 ```
@@ -273,9 +295,17 @@ On a Mac, the same but with a colon where Windows wants a semicolon:
 pip install PySide6-Essentials PyInstaller
 pyinstaller --onefile --windowed --name Zmanim --paths desktop \
   --add-data "desktop/zmanimboard/assets:assets" \
+  --add-data "assets:assets" \
   --add-data "data:data" \
   desktop/run.py
 ```
+
+Two asset folders, not one, and both are needed. `desktop/zmanimboard/assets` holds the TTF
+fonts, which exist only there because Qt cannot read the WOFF2 the website ships. The
+repository's own `assets` folder holds the header images, which are shared with the website
+rather than duplicated. Bundling only the first built a program that opened and then crashed
+the moment it drew a chart, on the missing logo. Both land in the same place inside the
+program, which is what the `render` modules look for.
 
 `assets` and `data` have to travel inside the bundle: `engine/tables.py` and
 `render/fonts.py` both look in `sys._MEIPASS` first for exactly this reason.

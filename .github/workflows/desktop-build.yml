@@ -52,15 +52,24 @@ jobs:
           python desktop/tests/test_guide.py
           python desktop/tests/test_publish.py
 
-      # The Hebrew calendar tables and the fonts have to travel inside the program: it must
-      # work with no network and nothing sitting beside it. engine/tables.py and
-      # render/fonts.py both look in sys._MEIPASS first for exactly this reason.
+      # The Hebrew calendar tables, the fonts and the header images all have to travel inside
+      # the program: it must work with no network and nothing sitting beside it.
+      # engine/tables.py, render/fonts.py and render/chart.py all look in sys._MEIPASS first
+      # for exactly this reason.
+      #
+      # Two asset folders, not one, and both are needed. desktop/zmanimboard/assets holds the
+      # TTF fonts, which exist only here because Qt cannot read the WOFF2 the website ships.
+      # The repository's own assets folder holds the header images, which are shared with the
+      # website and are not duplicated. Bundling only the first one built a program that
+      # opened and then crashed the moment it drew a chart, on the missing logo. Both land in
+      # the same place inside the program, which is what render/*.py look for.
       - name: Build the program
         run: >
           pyinstaller --noconfirm --onefile --windowed
           --name Zmanim
           --paths desktop
           --add-data "desktop/zmanimboard/assets;assets"
+          --add-data "assets;assets"
           --add-data "data;data"
           desktop/run.py
 
@@ -85,12 +94,14 @@ jobs:
 
   mac:
     # Both kinds of Mac, because a build for one will not run on the other. fail-fast is off
-    # so that one of them being unavailable still leaves the other downloadable.
+    # so that one of them being unavailable still leaves the other downloadable, which is not
+    # hypothetical: macos-13 sat queued for twenty minutes without ever being given a machine,
+    # so the Intel build asks for macos-15-intel instead.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
+          - runner: macos-15-intel
             kind: intel
           - runner: macos-latest
             kind: apple
@@ -124,6 +135,7 @@ jobs:
           --name Zmanim
           --paths desktop
           --add-data "desktop/zmanimboard/assets:assets"
+          --add-data "assets:assets"
           --add-data "data:data"
           desktop/run.py
 
