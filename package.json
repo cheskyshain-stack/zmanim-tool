@@ -1,0 +1,9 @@
+{
+  "name": "zmanim-tool",
+  "private": true,
+  "type": "module",
+  "description": "Declares js/ as ES modules so Node can import them directly (the browser already treats them that way, via the import map in index.html). Nothing here is installed or built; the site is static.",
+  "scripts": {
+    "fixture": "node tools/gen-golden-fixture.mjs"
+  }
+}
