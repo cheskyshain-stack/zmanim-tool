@@ -167,7 +167,7 @@ function render() {
         render();
       },
       weekSerial,
-      { openPublish: showPublish }
+      { openPublish: showPublish, withChart: true }
     );
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {

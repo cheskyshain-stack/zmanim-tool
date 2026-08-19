@@ -1024,3 +1024,10 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
   font-size: var(--fs-sm); font-weight: 500; font-family: inherit;
 }
 .page-print:hover { background: var(--accent-soft); border-color: var(--ui-accent); }
+
+/* The wall chart under the week cards on This week, set apart from them: the buttons
+   above it page by stretch of season while the ones above the cards page by week, and
+   two identical rows doing different things need a line between them. */
+.week-chart { margin-top: 2rem; padding-top: 1.2rem; border-top: 2px solid var(--border); }
+.week-chart h2 { margin-bottom: 0.2rem; }
+.week-chart .hint { margin-bottom: 1rem; }

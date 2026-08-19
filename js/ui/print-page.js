@@ -20,10 +20,18 @@ export function printOnly(pageEl) {
   // page size next to the one being printed.
   const slot = pageEl.closest('.page-slot');
   slot?.classList.add('is-print-slot');
+  // The section this page lives in, when it is inside one. On This week the wall chart
+  // sits in its own section under the cards: hiding the pages inside it is not enough,
+  // because the empty section is still a box outside the named page the cards claim, and
+  // that alone put out a blank landscape sheet next to a printed card. Marked rather than
+  // matched with :has(), which not every browser this runs on is guaranteed to have.
+  const branch = pageEl.closest('.week-chart');
+  branch?.classList.add('is-print-branch');
   const done = () => {
     document.body.classList.remove('is-printing-one');
     pageEl.classList.remove('is-print-target');
     slot?.classList.remove('is-print-slot');
+    branch?.classList.remove('is-print-branch');
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);

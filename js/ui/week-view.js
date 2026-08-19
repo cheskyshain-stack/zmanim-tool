@@ -18,9 +18,10 @@ import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { dateFromSerial } from '../zmanim/solar.js';
 import { SLASH } from '../util.js';
 import { attachPagePrintToAll, printWith } from './print-page.js';
+import { currentSerial, wireSwipe } from './nav-helpers.js';
+import { renderChartBrowser } from './chart-view.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
  *  saved sheet resolves to the most recently generated one.
@@ -62,17 +63,6 @@ function weekdayCompanionOf(sheet, state) {
   return state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
 }
 
-/** The week the congregation should be looking at: the next Shabbos still to come.
- *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-export function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
-}
 
 /** The chart row for one week, with rules and manual overrides applied, exactly as the
  *  printed chart would show it. */
@@ -790,44 +780,6 @@ function weekCardsHtml(showing, index, state, settings) {
   return cardOrder() === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
 }
 
-/** Swipe across the week to page through it, the way a photo album works: drag left to
- *  bring the next week in, right for the previous one.
- *
- *  Read on touchend rather than followed on touchmove, because the page has to keep
- *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
- *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
- *  across and half again as far across as down, which leaves the diagonal drags that end
- *  a scroll alone.
- *
- *  The handlers hang off the container, which in the admin is the same element every
- *  render, so an old pair is taken off before a new one goes on. Left to stack, every
- *  swipe after the first would fire a whole history of stale handlers, each still holding
- *  the week it was rendered for. */
-export function wireSwipe(container, onPrev, onNext) {
-  container._weekSwipeOff?.();
-  let startX = null;
-  let startY = null;
-  const start = (e) => {
-    if (e.touches.length !== 1) return (startX = null);
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  };
-  const end = (e) => {
-    if (startX === null) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - startX;
-    const dy = touch.clientY - startY;
-    startX = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    (dx < 0 ? onNext : onPrev)();
-  };
-  container.addEventListener('touchstart', start, { passive: true });
-  container.addEventListener('touchend', end, { passive: true });
-  container._weekSwipeOff = () => {
-    container.removeEventListener('touchstart', start);
-    container.removeEventListener('touchend', end);
-  };
-}
 
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
@@ -904,6 +856,19 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
+    ${
+      // The wall chart under the cards, so this screen shows everything the congregation
+      // can see rather than half of it. Its own section with its own heading, because it
+      // pages by stretch of season while the cards above page by week - two sets of
+      // buttons doing different things need to be told apart at a glance.
+      opts.withChart
+        ? `<section class="week-chart">
+             <h2 class="no-print">The chart</h2>
+             <p class="hint no-print">The wall chart as the congregation sees it, opening on the stretch covering now.</p>
+             <div id="week-chart-host"></div>
+           </section>`
+        : ''
+    }
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -973,6 +938,16 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     () => at > 0 && onSerialChange(serials[at - 1]),
     () => at < serials.length - 1 && onSerialChange(serials[at + 1])
   );
+
+  const chartHost = container.querySelector('#week-chart-host');
+  if (chartHost) {
+    // No swipe on the chart here: this container already swipes through the weeks, and a
+    // gesture over the chart would reach both handlers and move two things at once.
+    renderChartBrowser(chartHost, state, { swipe: false, empty: 'Generate a שבת sheet and its chart shows up here.' });
+    // Nor should a swipe over the chart page the weeks behind it. Passive listeners, so
+    // stopping propagation is all they do; nothing is prevented.
+    for (const type of ['touchstart', 'touchend']) chartHost.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+  }
 
   const status = container.querySelector('#publish-status');
   const say = (message, isError = false) => {

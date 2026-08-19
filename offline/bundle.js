@@ -4203,6 +4203,65 @@ function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ==== ui/nav-helpers.js ====
+// Two small pieces the week view and the chart view both need.
+//
+// Their own module because they are all the two views share: with them inside week-view
+// the chart view had to import it, and week-view imports the chart view to put the chart
+// under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
+// into one flat script.
+
+/** The week the congregation should be looking at: the next Shabbos still to come.
+ *
+ *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
+ *  week. Compared as a date rather than a moment, so the switch happens at midnight on
+ *  Motzei Shabbos rather than at an exact tzais. */
+function currentSerial(serials) {
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
+  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
+}
+
+/** Swipe across the week to page through it, the way a photo album works: drag left to
+ *  bring the next week in, right for the previous one.
+ *
+ *  Read on touchend rather than followed on touchmove, because the page has to keep
+ *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
+ *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
+ *  across and half again as far across as down, which leaves the diagonal drags that end
+ *  a scroll alone.
+ *
+ *  The handlers hang off the container, which in the admin is the same element every
+ *  render, so an old pair is taken off before a new one goes on. Left to stack, every
+ *  swipe after the first would fire a whole history of stale handlers, each still holding
+ *  the week it was rendered for. */
+function wireSwipe(container, onPrev, onNext) {
+  container._weekSwipeOff?.();
+  let startX = null;
+  let startY = null;
+  const start = (e) => {
+    if (e.touches.length !== 1) return (startX = null);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  };
+  const end = (e) => {
+    if (startX === null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    (dx < 0 ? onNext : onPrev)();
+  };
+  container.addEventListener('touchstart', start, { passive: true });
+  container.addEventListener('touchend', end, { passive: true });
+  container._weekSwipeOff = () => {
+    container.removeEventListener('touchstart', start);
+    container.removeEventListener('touchend', end);
+  };
+}
+
 // ==== ui/print-page.js ====
 // Printing one page on its own.
 //
@@ -4226,10 +4285,18 @@ function printOnly(pageEl) {
   // page size next to the one being printed.
   const slot = pageEl.closest('.page-slot');
   slot?.classList.add('is-print-slot');
+  // The section this page lives in, when it is inside one. On This week the wall chart
+  // sits in its own section under the cards: hiding the pages inside it is not enough,
+  // because the empty section is still a box outside the named page the cards claim, and
+  // that alone put out a blank landscape sheet next to a printed card. Marked rather than
+  // matched with :has(), which not every browser this runs on is guaranteed to have.
+  const branch = pageEl.closest('.week-chart');
+  branch?.classList.add('is-print-branch');
   const done = () => {
     document.body.classList.remove('is-printing-one');
     pageEl.classList.remove('is-print-target');
     slot?.classList.remove('is-print-slot');
+    branch?.classList.remove('is-print-branch');
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);
@@ -4276,6 +4343,144 @@ function attachPagePrintToAll(root, selector, label) {
   root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
 }
 
+// ==== ui/chart-view.js ====
+// Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
+// and Next above it.
+//
+// A season chart runs to three pages and there can be two seasons in play at once.
+// Showing all of them at once means finding the right one before reading a single time,
+// so this opens on the stretch covering now and pages from there, exactly as the week
+// view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
+// - a second renderer would be a second thing to keep in step with the formulas.
+//
+// Shared between the congregation's site and the admin's This week screen, so the two
+// cannot drift apart.
+
+
+
+
+
+
+/** Every stretch of chart there is to look at, in date order: one entry per page of each
+ *  season, carrying the שבת page and the Weekday page that go together.
+ *
+ *  The page breaks of the two charts fall on the same dates (alignPageSizesTo at
+ *  generation time), so one index picks the matching pair. Seasons are ordered by the
+ *  week they start on, so paging forward runs קיץ into חורף the way the year does. */
+function chartSpreads(state) {
+  const spreads = [];
+  for (const sheet of state.sheets.filter((s) => s.season !== 'weekday')) {
+    const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
+    splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).forEach((weeks, index) => {
+      if (!weeks.length) return;
+      spreads.push({ sheet, weekday, index, serials: weeks.map((w) => w.serial) });
+    });
+  }
+  return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
+}
+
+/** The spread covering now: the one holding the same week the week view opens on, so the
+ *  two never disagree about which Shabbos is "this" one. */
+function spreadIndexForNow(spreads) {
+  if (!spreads.length) return 0;
+  const target = currentSerial(spreads.flatMap((s) => s.serials));
+  const found = spreads.findIndex((s) => s.serials.includes(target));
+  return found === -1 ? 0 : found;
+}
+
+/** What a spread covers, for the line above the buttons: the first and last Shabbos on
+ *  it, in both calendars, the way the week view names its week.
+ *
+ *  The Hebrew pair goes on its own line in its own direction. Run into the English one it
+ *  would be reordered against it, and inside a right-to-left line the earlier date sits
+ *  on the right, which is the order it is read in. */
+function spreadLabel(spread) {
+  const ends = [Math.min(...spread.serials), Math.max(...spread.serials)];
+  const english = ends.map((serial) =>
+    new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(dateFromSerial(serial))
+  );
+  const hebrew = ends.map((serial) => jewishDateString(serial, false));
+  return {
+    english: english[0] === english[1] ? english[0] : `${english[0]} to ${english[1]}`,
+    hebrew: hebrew[0] === hebrew[1] ? hebrew[0] : `${hebrew[0]} – ${hebrew[1]}`,
+  };
+}
+
+/** A chart page is a fixed 11in wide, so on anything narrower it is scaled down rather
+ *  than scrolled sideways: the whole page should be visible at once. Print resets it
+ *  (see print.css), since paper has no such problem. */
+function fitChartToWindow(pagesEl) {
+  const apply = () => {
+    if (!document.body.contains(pagesEl)) return;
+    pagesEl.style.zoom = '';
+    const available = pagesEl.clientWidth;
+    const content = pagesEl.scrollWidth;
+    if (!available || content <= available) return;
+    pagesEl.style.zoom = (available / content).toFixed(4);
+  };
+  apply();
+  window.addEventListener('resize', apply);
+}
+
+/** @param {object} opts
+ *    - empty: what to say when there is no chart to show at all
+ *    - swipe: false to leave the gesture off, for an embed sitting inside something that
+ *      already swipes - two handlers on nested elements would both fire and the page
+ *      would move twice at once. */
+function renderChartBrowser(container, state, opts = {}) {
+  const { empty = 'Nothing has been published yet.', swipe = true } = opts;
+  const spreads = chartSpreads(state);
+  let at = spreadIndexForNow(spreads);
+
+  const draw = () => {
+    const spread = spreads[at];
+    if (!spread) {
+      container.innerHTML = `<p class="hint">${empty}</p>`;
+      return;
+    }
+    const label = spreadLabel(spread);
+    container.innerHTML = `
+      <div class="week-nav no-print">
+        <div class="week-nav-when">
+          ${chartEsc(label.english)}
+          <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
+        </div>
+        <div class="week-nav-row">
+          <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>
+            <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
+          </button>
+          <button type="button" class="chart-today">Today</button>
+          <button type="button" class="chart-next" ${at >= spreads.length - 1 ? 'disabled' : ''}>
+            <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
+      </div>
+      <div class="pages"></div>`;
+    const pagesEl = container.querySelector('.pages');
+    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
+    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
+    for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
+    syncPageHeights(pagesEl);
+    attachPagePrintToAll(pagesEl, '.page', 'Print this page');
+    fitChartToWindow(pagesEl);
+
+    const go = (next) => {
+      if (next < 0 || next >= spreads.length) return;
+      at = next;
+      draw();
+    };
+    container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
+    container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
+    if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+  };
+  draw();
+}
+
+function chartEsc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ==== ui/week-view.js ====
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
@@ -4286,6 +4491,7 @@ function attachPagePrintToAll(root, selector, label) {
 // labels and the week's cells become the times. That means every manual edit, rule and
 // override already in a sheet shows up here with no extra work, and the two can never
 // drift apart.
+
 
 
 
@@ -4340,17 +4546,6 @@ function weekdayCompanionOf(sheet, state) {
   return state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
 }
 
-/** The week the congregation should be looking at: the next Shabbos still to come.
- *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
-}
 
 /** The chart row for one week, with rules and manual overrides applied, exactly as the
  *  printed chart would show it. */
@@ -5068,44 +5263,6 @@ function weekCardsHtml(showing, index, state, settings) {
   return cardOrder() === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
 }
 
-/** Swipe across the week to page through it, the way a photo album works: drag left to
- *  bring the next week in, right for the previous one.
- *
- *  Read on touchend rather than followed on touchmove, because the page has to keep
- *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
- *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
- *  across and half again as far across as down, which leaves the diagonal drags that end
- *  a scroll alone.
- *
- *  The handlers hang off the container, which in the admin is the same element every
- *  render, so an old pair is taken off before a new one goes on. Left to stack, every
- *  swipe after the first would fire a whole history of stale handlers, each still holding
- *  the week it was rendered for. */
-function wireSwipe(container, onPrev, onNext) {
-  container._weekSwipeOff?.();
-  let startX = null;
-  let startY = null;
-  const start = (e) => {
-    if (e.touches.length !== 1) return (startX = null);
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  };
-  const end = (e) => {
-    if (startX === null) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - startX;
-    const dy = touch.clientY - startY;
-    startX = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    (dx < 0 ? onNext : onPrev)();
-  };
-  container.addEventListener('touchstart', start, { passive: true });
-  container.addEventListener('touchend', end, { passive: true });
-  container._weekSwipeOff = () => {
-    container.removeEventListener('touchstart', start);
-    container.removeEventListener('touchend', end);
-  };
-}
 
 function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
@@ -5182,6 +5339,19 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
+    ${
+      // The wall chart under the cards, so this screen shows everything the congregation
+      // can see rather than half of it. Its own section with its own heading, because it
+      // pages by stretch of season while the cards above page by week - two sets of
+      // buttons doing different things need to be told apart at a glance.
+      opts.withChart
+        ? `<section class="week-chart">
+             <h2 class="no-print">The chart</h2>
+             <p class="hint no-print">The wall chart as the congregation sees it, opening on the stretch covering now.</p>
+             <div id="week-chart-host"></div>
+           </section>`
+        : ''
+    }
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -5251,6 +5421,16 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     () => at > 0 && onSerialChange(serials[at - 1]),
     () => at < serials.length - 1 && onSerialChange(serials[at + 1])
   );
+
+  const chartHost = container.querySelector('#week-chart-host');
+  if (chartHost) {
+    // No swipe on the chart here: this container already swipes through the weeks, and a
+    // gesture over the chart would reach both handlers and move two things at once.
+    renderChartBrowser(chartHost, state, { swipe: false, empty: 'Generate a שבת sheet and its chart shows up here.' });
+    // Nor should a swipe over the chart page the weeks behind it. Passive listeners, so
+    // stopping propagation is all they do; nothing is prevented.
+    for (const type of ['touchstart', 'touchend']) chartHost.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
+  }
 
   const status = container.querySelector('#publish-status');
   const say = (message, isError = false) => {
@@ -5517,7 +5697,7 @@ function render() {
         render();
       },
       weekSerial,
-      { openPublish: showPublish }
+      { openPublish: showPublish, withChart: true }
     );
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
