@@ -7,14 +7,17 @@ buttons are the words for what they do.
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
+    QColorDialog,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QGraphicsOpacityEffect,
+    QGridLayout,
     QGroupBox,
     QLineEdit,
     QCheckBox,
@@ -51,6 +54,7 @@ from .engine.sheets.weeks import compute_season_weeks, default_season_and_year
 from .celldialog import CellDialog
 from .render.card import CardPainter
 from .render.chart import ChartPainter
+from .render import theme
 from .render.fonts import FONT_CHOICES
 from .render.output import chart_preview, page_image, paint_card_pair, paint_pages, pdf_painter, printer_painter
 from .weeks import current_serial, shabbos_date_line, week_index
@@ -789,7 +793,10 @@ class PagePreview(QLabel):
         self.cells = cells
         self.setPixmap(QPixmap.fromImage(image))
         self.setFrameShape(QFrame.Box)
-        self.setCursor(Qt.PointingHandCursor)
+        # A page shown beside another for comparison is handed no cells: it belongs to the
+        # other sheet, so typing in it here would put the edit on the wrong chart. The
+        # pointing hand is the promise that a click does something, so it is left off too.
+        self.setCursor(Qt.PointingHandCursor if cells else Qt.ArrowCursor)
 
     def mousePressEvent(self, event):
         where = event.position()
@@ -821,6 +828,16 @@ class SheetScreen(QWidget):
         self.companion = QPushButton()
         self.companion.clicked.connect(self.open_companion)
         bar.addWidget(self.companion)
+        self.beside_button = QPushButton("⇄ Side by side")
+        self.beside_button.setCheckable(True)
+        self.beside_button.setToolTip("Show the other chart beside this one, page against page")
+        self.beside_button.toggled.connect(self.set_side_by_side)
+        bar.addWidget(self.beside_button)
+        self.fit_button = QPushButton("⛶ Fit to screen")
+        self.fit_button.setCheckable(True)
+        self.fit_button.setToolTip("Scale the pages down until a whole page fits across the window")
+        self.fit_button.toggled.connect(self.set_fit)
+        bar.addWidget(self.fit_button)
         self.undo_button = QPushButton("Undo")
         self.undo_button.clicked.connect(self.undo)
         self.redo_button = QPushButton("Redo")
@@ -871,10 +888,24 @@ class SheetScreen(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.pages_holder = QWidget()
-        self.pages_layout = QVBoxLayout(self.pages_holder)
+        # A grid rather than a column, because side by side puts the other chart's matching
+        # page in a second column, which is what makes the two line up row against row.
+        self.pages_layout = QGridLayout(self.pages_holder)
         self.pages_layout.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
         self.scroll.setWidget(self.pages_holder)
         column.addWidget(self.scroll, 1)
+
+        self.fit = False
+        self.fit_chosen = False
+        self.side_by_side = False
+        self._fitted_width = 0
+        # Dragging a window edge sends a resize a frame, and every redraw paints every page,
+        # so the refit waits until the dragging stops.
+        self._refit = QTimer(self)
+        self._refit.setSingleShot(True)
+        self._refit.setInterval(180)
+        self._refit.timeout.connect(self.redraw)
+        self.scroll.viewport().installEventFilter(self)
 
     # Undo history is per sheet and in memory only, the same as the web version: it lives as
     # long as the program is open, like the undo in most editors, and is not part of the
@@ -889,8 +920,24 @@ class SheetScreen(QWidget):
         self.title.setText(sheet_name(sheet))
         other = sheetlib.companion_of(sheet, self.window.state["sheets"])
         self.companion.setVisible(bool(other))
+        self.beside_button.setVisible(bool(other))
         if other:
             self.companion.setText("Weekday chart →" if sheet["season"] != "weekday" else isolate("שבת") + " sheet →")
+        else:
+            self.side_by_side = False
+            self.beside_button.blockSignals(True)
+            self.beside_button.setChecked(False)
+            self.beside_button.blockSignals(False)
+
+        # A page is 11 inches across, so at most window sizes a chart can only be read a
+        # column at a time by scrolling sideways. Fitting starts on when a whole page does
+        # not fit, and a choice made with the button is never overridden afterwards.
+        if not self.fit_chosen:
+            self.fit = self.scroll.viewport().width() < theme.CHART.width * PREVIEW_DPI
+            self.fit_button.blockSignals(True)
+            self.fit_button.setChecked(self.fit)
+            self.fit_button.blockSignals(False)
+
         style = sheet.get("style") or {}
         for widget, key, default in ((self.font_box, "fontFamily", "Times New Roman"),
                                      (self.size_box, "fontSizePt", 10),
@@ -912,14 +959,91 @@ class SheetScreen(QWidget):
         style, chrome = self._painter_parts()
         pages = self.pages()
         self._rebuild_picker(len(pages))
-        for page in pages:
-            image, cells = chart_preview(page, style, chrome, PREVIEW_DPI)
+
+        beside_sheet = sheetlib.companion_of(self.sheet, self.window.state["sheets"]) if self.side_by_side else None
+        beside = self._pages_of(beside_sheet) if beside_sheet else []
+        dpi = self._preview_dpi(2 if beside else 1)
+        self._fitted_width = self.scroll.viewport().width()
+
+        for index, page in enumerate(pages):
+            image, cells = chart_preview(page, style, chrome, dpi)
             preview = PagePreview(image, cells)
             preview.clicked.connect(self.edit_cell)
-            self.pages_layout.addWidget(preview)
+            self.pages_layout.addWidget(preview, index, 0)
+        if beside:
+            other_style = sheetlib.style_of(beside_sheet)
+            other_chrome = sheetlib.chrome_of(self.window.state["settings"], beside_sheet["season"] == "weekday")
+            for index, page in enumerate(beside):
+                image, _cells = chart_preview(page, other_style, other_chrome, dpi)
+                self.pages_layout.addWidget(PagePreview(image, []), index, 1)
+
+        self._dim_left_out()
         history = self._history()
         self.undo_button.setEnabled(bool(history["undo"]))
         self.redo_button.setEnabled(bool(history["redo"]))
+
+    def eventFilter(self, watched, event):
+        # How far down the pages are scaled is worked out from the width of the area they are
+        # shown in, so anything that changes that width changes the answer. Watched on the
+        # viewport rather than on this screen: the first drawing happens before the layout has
+        # settled, and the viewport goes on resizing after that without this widget doing so,
+        # which left a sheet opening at two thirds of the size that would have fitted.
+        if watched is self.scroll.viewport() and event.type() == QEvent.Resize:
+            if self.sheet and self._fitting() and abs(self.scroll.viewport().width() - self._fitted_width) > 8:
+                self._refit.start()
+        return super().eventFilter(watched, event)
+
+    def _fitting(self) -> bool:
+        """Side by side always scales down: two pages side by side are 22 inches across, which
+        fits on no screen at full size."""
+        return self.fit or self.side_by_side
+
+    def set_fit(self, on: bool):
+        self.fit = on
+        self.fit_chosen = True
+        if self.sheet:
+            self.redraw()
+
+    def set_side_by_side(self, on: bool):
+        self.side_by_side = on
+        if self.sheet:
+            self.redraw()
+
+    def _preview_dpi(self, columns: int) -> int:
+        """How many dots to the inch the pages are drawn at.
+
+        Fitting redraws at a lower resolution rather than shrinking a picture already drawn.
+        The text stays sharp at any scale, and the cell map still comes from the same
+        painting run as the picture, so a click lands on the cell that is under it.
+        """
+        if not self._fitting():
+            return PREVIEW_DPI
+        # The frame around each page, the gap between two of them, and the scroll bar.
+        available = self.scroll.viewport().width() - 12 * columns - 24
+        if available < 200:
+            return PREVIEW_DPI if columns == 1 else PREVIEW_DPI // 2
+        return max(30, min(PREVIEW_DPI, int(available / (theme.CHART.width * columns))))
+
+    def _pages_of(self, sheet):
+        return sheetlib.chart_pages(
+            sheet, self.window.state, self.window.settings,
+            sheetlib.merged_shacharis_html(self.window.state["settings"]),
+        )
+
+    def _dim_left_out(self):
+        """A page left out of the print stays on the screen, dimmed, so it can still be read.
+        Taking a page out of the print is not the same as not wanting to see it."""
+        for index, box in enumerate(self.page_boxes):
+            item = self.pages_layout.itemAtPosition(index, 0)
+            widget = item.widget() if item else None
+            if widget is None:
+                continue
+            if box.isChecked():
+                widget.setGraphicsEffect(None)
+            else:
+                faded = QGraphicsOpacityEffect(widget)
+                faded.setOpacity(0.35)
+                widget.setGraphicsEffect(faded)
 
     def _rebuild_picker(self, count: int):
         wanted = {index for index, box in enumerate(self.page_boxes) if box.isChecked()} if self.page_boxes else set(range(count))
@@ -931,8 +1055,13 @@ class SheetScreen(QWidget):
         for index in range(count):
             box = QCheckBox(f"Page {index + 1}")
             box.setChecked(index in wanted)
+            box.toggled.connect(self._dim_left_out)
             self.page_boxes.append(box)
             self.picker_row.insertWidget(index + 1, box)
+        if count > 1:
+            every = QPushButton("All")
+            every.clicked.connect(lambda: [box.setChecked(True) for box in self.page_boxes])
+            self.picker_row.insertWidget(count + 1, every)
         self.picker_row.addStretch(1)
 
     def chosen_pages(self):
@@ -1005,10 +1134,7 @@ class SheetScreen(QWidget):
             self.window.open_sheet(other)
 
     def pages(self):
-        return sheetlib.chart_pages(
-            self.sheet, self.window.state, self.window.settings,
-            sheetlib.merged_shacharis_html(self.window.state["settings"]),
-        )
+        return self._pages_of(self.sheet)
 
     def _painter_parts(self):
         weekday = self.sheet["season"] == "weekday"

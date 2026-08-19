@@ -9,7 +9,7 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Eight suites, all of which measure real output rather than checking that code ran:
+Nine suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
@@ -19,8 +19,13 @@ python3 desktop/tests/test_state.py           # what is saved, and what generati
 python3 desktop/tests/test_week.py            # which week This week opens on, and its cards
 python3 desktop/tests/test_settings.py        # settings, rules, and importing a backup
 python3 desktop/tests/test_editor.py          # typing over a cell, and the style controls
+python3 desktop/tests/test_sheet_view.py      # fitting a page to the window, and side by side
 python3 desktop/tests/test_publish.py         # what gets published, against a stubbed GitHub
 ```
+
+They print in Hebrew, so each one sets its own stdout to UTF-8 first. A Windows console
+writes cp1252, and without that a run where every check passed still ends non-zero, on the
+print at the end rather than on anything it measured.
 
 And to run the program itself:
 
@@ -69,7 +74,15 @@ sheets** lists what has been made. **Settings** holds the wording on the boards,
 shul is, the advanced zmanim settings, the rules, and Export and Import backup. And a
 **sheet view** previews every page at the size it prints, with Print and Save as PDF and a
 tick box per page, since a reprint is usually one page rather than the whole sheet. A page
-left out of the print stays on the screen, and the ticks survive a redraw.
+left out of the print stays on the screen, dimmed, and the ticks survive a redraw. **Fit to
+screen** scales the pages down until a whole page is across the window, and turns itself on
+when one does not fit; **Side by side** puts the other chart's matching page next to each
+one, so the two can be checked row against row.
+
+Fitting redraws the page at a lower resolution rather than shrinking a picture already
+drawn. The text stays sharp at any scale, and the map of where the cells landed still comes
+from the same painting run as the picture, so a click lands on the cell under it whatever
+the page has been scaled to.
 
 **Publishing** puts a season on lczmanim.cjaffa.com. The congregation's page is a static
 site, so publishing means committing one file to the repository behind it,
@@ -105,11 +118,11 @@ already made.
 
 ## What is not done
 
-- Side by side and fit to screen from the web version's sheet view.
 - The guide.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
-- The single file executable. See below.
+- Starting the built `Zmanim.exe` on a Windows machine. It builds, and all nine suites pass
+  on Windows before it is built, but nothing here has double clicked it.
 
 ## Layout
 
@@ -197,8 +210,12 @@ Windows machine of your own is needed.
 It only ever runs when it is started by hand, never on a push: a build takes a few minutes
 and is only wanted when there is a version to hand to someone.
 
-The workflow runs all eight test suites on Windows first. If the numbers disagree with
+The workflow runs all nine test suites on Windows first. If the numbers disagree with
 `fixtures/golden.json` there is nothing worth building.
+
+This has been run: a build finished in under two minutes and produced a 39 MB
+`Zmanim.exe`, with all nine suites passing on Windows first. An artifact is kept for 90
+days, so a build older than that has to be run again rather than downloaded.
 
 To build it on a Windows machine instead:
 
