@@ -1078,3 +1078,6 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
 .week-print-panel > .panel-body { padding-top: 0.2rem; }
 /* Inside the panel the row has the panel's own rule above it already. */
 .week-print-panel .week-nav-print { margin-top: 0; padding-top: 0; border-top: 0; }
+/* The first of the two download headings follows the lede, which already has space under
+   it, so it does not need the gap the second one uses to separate the two groups. */
+.dl-heading-first { margin-top: 1rem; }

@@ -78,29 +78,25 @@ export function renderProgram(container, platform = detectPlatform()) {
 
   const phoneNote =
     platform === 'phone'
-      ? `<p class="dl-warn"><strong>You are on a phone or tablet.</strong> These are programs for a Windows computer or a Mac, and a phone cannot run either one: tapping a link here downloads a file it can do nothing with. Open this page on the computer you want the program on.</p>`
+      ? `<p class="dl-warn"><strong>You are on a phone or tablet.</strong> Everything here is meant for a computer: the programs below cannot run on a phone at all, and tapping a link downloads a file it can do little with. Open this page on the computer you want it on.</p>`
       : '';
 
   container.innerHTML = `
     <h2>Get the program</h2>
-    <p class="hint">The same boards, as a program that runs on its own.</p>
+    <p class="hint">The same boards, to keep on a computer of your own.</p>
 
     <div class="guide-lede">
       <!-- Each Hebrew name in its own bdi. Written plainly, the comma between the two is a
            neutral character, so it is swallowed into one right to left run and the pair comes
            out reversed: measured, חורף landed at x=865 and קיץ at x=944, the wrong way round. -->
-      <p>This is everything on this site built as a <strong>program you download once</strong>: the same <bdi>שבת קיץ</bdi>, <bdi>שבת חורף</bdi> and Weekday charts, the same week cards, the same rules and the same numbers, worked out by the same calculations.</p>
-      <p>It needs <strong>no browser, no internet and nothing installed</strong>. One file. Worth having for a computer where the browser is locked down, for making a board somewhere with no signal, and for carrying the whole thing on a USB stick.</p>
+      <p>Everything on this site, to keep on a computer of your own: the same <bdi>שבת קיץ</bdi>, <bdi>שבת חורף</bdi> and Weekday charts, the same week cards, the same rules and the same numbers, worked out by the same calculations.</p>
+      <p>Both ways below need <strong>no internet and nothing installed</strong>, and both carry the whole thing on a USB stick. Worth having for a computer where this site is blocked, and for making a board somewhere with no signal.</p>
     </div>
 
     ${phoneNote}
 
-    <div class="dl-list">${rows}</div>
-
-    <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
-
-    <h3 class="dl-heading">Or the copy that opens in a browser</h3>
-    <p class="hint">The one above is a program. This is a folder you open in whatever browser is already on the computer. It still needs no internet and nothing installed, and it runs anywhere a browser does, including a computer with no build of its own and one where you are not allowed to run a program you downloaded.</p>
+    <h3 class="dl-heading dl-heading-first">Opens in a browser</h3>
+    <p class="hint">A folder you open in whatever browser is already on the computer. The simplest of the two: nothing to get past on the first run, a quarter of the size, and it works on any computer at all, including one with no build of its own below and one where you are not allowed to run a program you downloaded.</p>
     <div class="dl-list">
       <a class="dl-row" href="${LATEST}/${OFFLINE_FILE}" download>
         <span class="dl-what">
@@ -112,10 +108,16 @@ export function renderProgram(container, platform = detectPlatform()) {
     </div>
     <p class="hint">It is the whole thing, not a cut down one: generating, typing over cells, rules, printing, backups. It keeps its work in the browser it is opened in, so the same folder on the same stick opens with your boards on the computer you last used it on and empty on a new one. Move work between them with <strong>Settings, Backup, Export</strong>. Publishing to the congregation's page needs the internet, so it does not work with none.</p>
 
+    <h3 class="dl-heading">Or the program, which needs no browser either</h3>
+    <p class="hint">A single file that opens on its own, like any other program on the computer. Built for one kind of machine at a time, so take the one that matches. It keeps its boards beside itself, which is what lets a stick carry your work from one computer to the next.</p>
+    <div class="dl-list">${rows}</div>
+
+    <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
+
     <details class="panel" ${platform === 'windows' || platform === 'mac' ? 'open' : ''}>
-      <summary>The first time you open it, it will refuse. Here is why, and what to press</summary>
+      <summary>The program will refuse to open the first time. Here is why, and what to press</summary>
       <div class="panel-body">
-        <p>Neither program is signed with a paid developer certificate, so the computer does not recognise who made it and says so the first time. Nothing is wrong with the file. It is <strong>once per computer</strong>, not every time.</p>
+        <p>None of the three programs is signed with a paid developer certificate, so the computer does not recognise who made it and says so the first time. Nothing is wrong with the file. It is <strong>once per computer</strong>, not every time. The browser copy has nothing to get past.</p>
         <p><strong>Windows.</strong> A blue box says "Windows protected your PC". Press <strong>More info</strong>, then <strong>Run anyway</strong>. If it will not start at all, right click the file, choose Properties, tick <strong>Unblock</strong>, then OK.</p>
         <p><strong>Mac.</strong> Unzip it, then open <code>Zmanim.app</code>. macOS refuses the first time. Go to <strong>System Settings</strong>, then <strong>Privacy &amp; Security</strong>, scroll down to the line naming Zmanim, and press <strong>Open Anyway</strong>. Then open it again.</p>
         <p>Antivirus software sometimes flags programs packed this way. It may need allowing through.</p>
@@ -125,7 +127,8 @@ export function renderProgram(container, platform = detectPlatform()) {
     <details class="panel">
       <summary>On a USB stick, and where your work is kept</summary>
       <div class="panel-body">
-        <p>Copy the program onto a stick and run it from there. It keeps its boards, rules and settings <strong>on the stick, beside itself</strong>, so the same stick opens with all your work on any computer you carry it to. Otherwise it keeps them in the usual per-user place on that computer.</p>
+        <p><strong>The program</strong> keeps its boards, rules and settings on the stick, beside itself, so the same stick opens with all your work on any computer you carry it to. Otherwise it keeps them in the usual per-user place on that computer.</p>
+        <p><strong>The browser copy</strong> does not. A browser keeps its storage per computer, so carrying that folder carries the program but not the boards: it opens with your work on the computer you last used it on, and empty on a new one. That is the one real difference between the two.</p>
         <p>Its backup file is the same one this site's <strong>Settings, Backup, Export</strong> writes, so work moves either way: a backup made here opens there, and one made there opens here.</p>
         <p>Emailing the program does not work. Gmail refuses <code>.exe</code> attachments and looks inside zips, and most other mail does the same. Use the stick, or a shared link.</p>
       </div>
