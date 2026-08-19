@@ -237,10 +237,11 @@ jobs:
           Not sure which Mac: Apple menu, About This Mac. An Apple silicon Mac will also run
           the Intel one through Rosetta, but an Intel Mac cannot run the Apple silicon one.
 
-          **The first time on a computer**, neither will open, because neither is signed with
-          a paid certificate. On Windows: More info, then Run anyway. On a Mac: System
-          Settings, Privacy & Security, then Open Anyway on the line naming Zmanim. Once per
-          computer, not every time.
+          **The first time on a computer**, none of the three programs will open, because none
+          is signed with a paid certificate. On Windows: More info, then Run anyway. On a Mac:
+          System Settings, Privacy & Security, then Open Anyway on the line naming Zmanim. Once
+          per computer, not every time. The browser copy has nothing to get past: unzip it and
+          open index.html.
 
           Run from a USB stick it keeps its boards on the stick, so the same stick opens with
           your work on any computer you carry it to.
