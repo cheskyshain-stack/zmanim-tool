@@ -90,7 +90,10 @@ def data_dir() -> Path:
             return beside
         except OSError:
             pass
-    return Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation) or ".") / "ZmanimBoard"
+    # AppDataLocation already ends with the application name, so it is used as it stands:
+    # appending the name again gave ZmanimBoard/ZmanimBoard.
+    location = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+    return Path(location) if location else Path.home() / ".zmanimboard"
 
 
 class Screen(QWidget):

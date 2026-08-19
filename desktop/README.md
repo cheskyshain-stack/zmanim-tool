@@ -25,7 +25,7 @@ python3 desktop/tests/test_publish.py         # what gets published, against a s
 And to run the program itself:
 
 ```bash
-python3 -m zmanimboard.app          # from inside desktop/
+python3 desktop/run.py
 ```
 
 `test_golden.py` checks the engine against `fixtures/golden.json`, which is the reference
@@ -181,23 +181,37 @@ for weight, style in ((400, 'Regular'), (700, 'Bold')):
 "
 ```
 
-## Building the single file executable
+## Getting the Windows program
 
-Not done yet, and it cannot be done from Linux: PyInstaller does not cross compile. On a
-Windows machine with Python installed:
+PyInstaller does not cross compile, so an .exe cannot be built on Linux. GitHub's own
+Windows machines can, and that is what `.github/workflows/desktop-windows.yml` is for. No
+Windows machine of your own is needed.
 
-```bash
+1. Open the repository's **Actions** tab.
+2. Pick **Build the Windows program** and press **Run workflow**.
+3. Wait a few minutes, open the finished run, and download **Zmanim-windows** from the
+   Artifacts at the bottom. Inside is `Zmanim.exe`.
+
+It only ever runs when it is started by hand, never on a push: a build takes a few minutes
+and is only wanted when there is a version to hand to someone.
+
+The workflow runs all eight test suites on Windows first. If the numbers disagree with
+`fixtures/golden.json` there is nothing worth building.
+
+To build it on a Windows machine instead:
+
+```
 pip install PySide6-Essentials PyInstaller
-pyinstaller --onefile --windowed --name Zmanim ^
+pyinstaller --onefile --windowed --name Zmanim --paths desktop ^
   --add-data "desktop/zmanimboard/assets;assets" ^
   --add-data "data;data" ^
-  desktop/zmanimboard/app.py
+  desktop/run.py
 ```
 
 `assets` and `data` have to travel inside the bundle: `engine/tables.py` and
 `render/fonts.py` both look in `sys._MEIPASS` first for exactly this reason.
 
-A frozen build keeps its save file beside the executable when that folder can be written
+A built program keeps its save file beside the executable when that folder can be written
 to, which is what lets a copy on a USB stick carry its own data, and otherwise in the usual
 per-user application data folder. See `data_dir` in `app.py`.
 

@@ -1,0 +1,69 @@
+name: Build the Windows program
+
+# Started by hand from the Actions tab, never on a push. Building the executable takes a few
+# minutes and is only wanted when there is a version to hand to someone, not on every commit.
+# It leaves the .exe as an artifact on the run, which is where to download it from.
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: A note to put on the download, so a run can be told apart later
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install what it needs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6-Essentials PyMuPDF pyinstaller
+
+      # The tests run first, on Windows, against the golden fixture. If the numbers are wrong
+      # there is nothing worth building: the engine is a port, and a port that disagrees with
+      # fixtures/golden.json is wrong whatever it looks like on paper.
+      - name: Check the engine and the pages
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python desktop/tests/test_golden.py
+          python desktop/tests/test_chart_layout.py
+          python desktop/tests/test_card_layout.py
+          python desktop/tests/test_state.py
+          python desktop/tests/test_week.py
+          python desktop/tests/test_settings.py
+          python desktop/tests/test_editor.py
+          python desktop/tests/test_publish.py
+
+      # The Hebrew calendar tables and the fonts have to travel inside the executable: it must
+      # work with no network and nothing sitting beside it. engine/tables.py and
+      # render/fonts.py both look in sys._MEIPASS first for exactly this reason.
+      - name: Build the executable
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name Zmanim
+          --paths desktop
+          --add-data "desktop/zmanimboard/assets;assets"
+          --add-data "data;data"
+          desktop/run.py
+
+      - name: Check it is really one file that starts
+        run: |
+          if (-not (Test-Path dist/Zmanim.exe)) { throw "no exe was produced" }
+          $size = (Get-Item dist/Zmanim.exe).Length / 1MB
+          Write-Host ("Zmanim.exe is {0:N1} MB" -f $size)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zmanim-windows${{ inputs.label && format('-{0}', inputs.label) || '' }}
+          path: dist/Zmanim.exe
+          if-no-files-found: error
+          retention-days: 90
