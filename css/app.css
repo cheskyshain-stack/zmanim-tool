@@ -769,7 +769,27 @@ td.ruled .cell { background: var(--ruled); }
 .week-nav-hebrew { display: block; direction: rtl; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: var(--fs-md); }
 .week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
 /* Equal widths, so the group does not shift sideways as the labels change length. */
-.week-nav-row > button { flex: 1 1 0; max-width: 11rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }
+.week-nav-row > button { flex: 1 1 0; max-width: 11rem; }
+/* These carried no styling of their own at all: they were the browser's default buttons,
+   which is why pressing one showed nothing on a phone. Same look as the app's other
+   buttons, with a pressed state that is a real change of colour rather than only the 1px
+   nudge the desktop ones use - a nudge is invisible under a finger.
+   touch-action keeps the tap immediate, and the tap-highlight is turned off because the
+   :active rule below replaces it with something that matches the rest of the app. */
+.week-nav button, .week-order select {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); font-family: inherit; font-size: var(--fs-md); font-weight: 600;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.week-nav button {
+  padding: 0.55rem 1.15rem; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.05s ease;
+}
+.week-nav button:hover:not(:disabled) { background: var(--accent-soft); }
+.week-nav button:active:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; transform: translateY(1px); }
+.week-nav button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.week-nav button:disabled { opacity: 0.45; cursor: default; }
 .week-nav-word { white-space: nowrap; }
 .week-nav-print { margin-top: 0.5rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
 .week-nav-print > button { max-width: 22rem; }

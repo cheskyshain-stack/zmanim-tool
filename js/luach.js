@@ -9,6 +9,7 @@
 // and a page can be linked to directly, with no server configuration to arrange.
 import { loadPublished } from './publish.js';
 import { renderWeek, currentSerial, wireSwipe } from './ui/week-view.js';
+import { jewishDateString } from './hebrew-calendar.js';
 import { buildSheetPages, syncPageHeights } from './ui/sheet-view.js';
 import { attachPagePrintToAll } from './ui/print-page.js';
 import { splitWeeksIntoPages } from './pagination.js';
@@ -105,12 +106,22 @@ function spreadIndexForNow(spreads) {
   return found === -1 ? 0 : found;
 }
 
-/** What a spread covers, for the line above the buttons. */
+/** What a spread covers, for the line above the buttons: the first and last Shabbos on
+ *  it, in both calendars, the way the week page names its week.
+ *
+ *  The Hebrew pair goes on its own line in its own direction. Run into the English one it
+ *  would be reordered against it, and inside a right-to-left line the earlier date sits
+ *  on the right, which is the order it is read in. */
 function spreadLabel(spread) {
-  const range = [Math.min(...spread.serials), Math.max(...spread.serials)].map((serial) =>
+  const ends = [Math.min(...spread.serials), Math.max(...spread.serials)];
+  const english = ends.map((serial) =>
     new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(dateFromSerial(serial))
   );
-  return range[0] === range[1] ? range[0] : `${range[0]} to ${range[1]}`;
+  const hebrew = ends.map((serial) => jewishDateString(serial, false));
+  return {
+    english: english[0] === english[1] ? english[0] : `${english[0]} to ${english[1]}`,
+    hebrew: hebrew[0] === hebrew[1] ? hebrew[0] : `${hebrew[0]} \u2013 ${hebrew[1]}`,
+  };
 }
 
 function renderChartPage(published) {
@@ -128,7 +139,10 @@ function renderChartPage(published) {
       backBar('The chart', LANDSCAPE_HINT) +
       (spread
         ? `<div class="week-nav no-print">
-             <div class="week-nav-when">${esc(spreadLabel(spread))}</div>
+             <div class="week-nav-when">
+               ${esc(spreadLabel(spread).english)}
+               <bdi class="week-nav-hebrew">${esc(spreadLabel(spread).hebrew)}</bdi>
+             </div>
              <div class="week-nav-row">
                <button type="button" id="chart-prev" ${at <= 0 ? 'disabled' : ''}>
                  <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
