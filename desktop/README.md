@@ -9,12 +9,19 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Three suites, all of which measure real output rather than checking that code ran:
+Four suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
 python3 desktop/tests/test_chart_layout.py    # the printed wall chart
 python3 desktop/tests/test_card_layout.py     # the printed week card
+python3 desktop/tests/test_state.py           # what is saved, and what generating makes
+```
+
+And to run the program itself:
+
+```bash
+python3 -m zmanimboard.app          # from inside desktop/
 ```
 
 `test_golden.py` checks the engine against `fixtures/golden.json`, which is the reference
@@ -48,11 +55,21 @@ finished cards at letter portrait with every time present and nothing past the e
 rows are drawn line by line rather than as one laid out block, which is what makes the
 colon axis exact: a line whose hour is one digit is started a digit's width further in.
 
+**The program**: a window with a sidebar, a Generate screen, Saved sheets, and a sheet
+view that previews every page at the size it prints, with Print and Save as PDF. Saving is
+a single JSON file in the same format the web version exports, so a backup from there opens
+here: checked against `data/published.json`, hand typed cell overrides included.
+
+Rules and overrides are applied when a sheet is opened rather than stored: a sheet keeps
+only which weeks it covers and how they split, so a fix to a formula reaches every sheet
+already made.
+
 ## What is not done
 
-- Every screen: Generate, This week, Saved sheets, Settings, Rules, the sheet editor with
-  its per-cell overrides and rich text.
-- Saving and loading, and importing a backup exported from the web version.
+- This week, with the week cards on it. The cards render (see above) but have no screen yet.
+- Settings, Rules, and the sheet editor, so a cell cannot yet be typed over from inside the
+  program. An override imported from the web version is honoured and printed.
+- Publishing to the congregation's site.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
 - The single file executable. See below.
@@ -61,6 +78,9 @@ colon axis exact: a line whose hour is one digit is started a digit's width furt
 
 ```
 zmanimboard/
+  app.py           the window and its screens
+  state.py         the save file, in the web version's own format
+  sheets.py        making a sheet, and turning a saved one back into printable pages
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
     fmt.py         time formatting, minute rounding, the underline sentinels
@@ -135,8 +155,11 @@ pyinstaller --onefile --windowed --name Zmanim ^
 ```
 
 `assets` and `data` have to travel inside the bundle: `engine/tables.py` and
-`render/fonts.py` both look in `sys._MEIPASS` first for exactly this reason. `app.py` does
-not exist yet.
+`render/fonts.py` both look in `sys._MEIPASS` first for exactly this reason.
+
+A frozen build keeps its save file beside the executable when that folder can be written
+to, which is what lets a copy on a USB stick carry its own data, and otherwise in the usual
+per-user application data folder. See `data_dir` in `app.py`.
 
 ## The rule that matters
 

@@ -23,6 +23,29 @@ def _layout(landscape: bool) -> tuple:
     return QPageSize(QPageSize.Letter), orientation
 
 
+def page_image(paint_one, width_in: float, height_in: float, dpi: int = 110):
+    """One page drawn into an image, for showing on screen.
+
+    The same painter draws it as draws the paper, at a lower resolution: a preview that went
+    through a second, screen-only renderer would be a second thing to keep in step, and the
+    whole bargain of this program is that what is on the screen is what comes out.
+    """
+    from PySide6.QtGui import QImage, QPainter
+
+    image = QImage(round(width_in * dpi), round(height_in * dpi), QImage.Format_RGB32)
+    image.setDotsPerMeterX(round(dpi / 0.0254))
+    image.setDotsPerMeterY(round(dpi / 0.0254))
+    image.fill(0xFFFFFFFF)
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setRenderHint(QPainter.TextAntialiasing, True)
+    try:
+        paint_one(painter)
+    finally:
+        painter.end()
+    return image
+
+
 @contextmanager
 def pdf_painter(path: str, landscape: bool, resolution: int = PDF_RESOLUTION):
     writer = QPdfWriter(path)
