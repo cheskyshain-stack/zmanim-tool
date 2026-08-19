@@ -3485,6 +3485,138 @@ function renderGuide(container, onOpenTab) {
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
 }
 
+// ==== ui/program-view.js ====
+// The "download the program" page. The same boards and the same numbers as this site, as a
+// program that runs on its own with no browser and nothing to install.
+//
+// The files are Release assets on the repository rather than files served from this site.
+// Two reasons: a 40MB program per platform does not belong in a repository that GitHub Pages
+// serves, and the `latest` link means a new build reaches people without this page being
+// edited. The names are fixed for the same reason.
+
+const RELEASES = 'https://github.com/cheskyshain-stack/zmanim-tool/releases';
+const LATEST = `${RELEASES}/latest/download`;
+
+const DOWNLOADS = [
+  {
+    key: 'windows',
+    file: 'Zmanim.exe',
+    label: 'Windows',
+    detail: 'Any Windows 10 or 11 computer, 64 bit.',
+  },
+  {
+    key: 'mac-apple',
+    file: 'Zmanim-mac-apple.zip',
+    label: 'Mac, Apple silicon',
+    detail: 'A Mac from late 2020 onwards: M1, M2, M3, M4.',
+  },
+  {
+    key: 'mac-intel',
+    file: 'Zmanim-mac-intel.zip',
+    label: 'Mac, Intel',
+    detail: 'An older Mac, before Apple silicon.',
+  },
+];
+
+/** Which of the three to put first.
+ *
+ *  Windows and Mac are told apart reliably. Which *kind* of Mac is not: every browser on an
+ *  Apple silicon Mac still reports "Intel Mac OS X" for compatibility, so guessing would send
+ *  half of them to a build that cannot run. A Mac gets both, and is told where to look.
+ *
+ *  A phone is detected so it can be told plainly that there is nothing here for it, rather
+ *  than being handed a Windows program it will download and be unable to open.
+ */
+function detectPlatform(ua = navigator.userAgent, touchPoints = navigator.maxTouchPoints || 0) {
+  if (/Android/i.test(ua)) return 'phone';
+  // An iPad in its default mode reports the same user agent as a Mac. The touch points are
+  // what separate them: a Mac reports 0.
+  if (/iPhone|iPod|iPad/i.test(ua) || (/Macintosh/i.test(ua) && touchPoints > 1)) return 'phone';
+  if (/Macintosh|Mac OS X/i.test(ua)) return 'mac';
+  if (/Windows/i.test(ua)) return 'windows';
+  return 'other';
+}
+
+function downloadRow(item, isLead) {
+  return `
+    <a class="dl-row ${isLead ? 'is-lead' : ''}" href="${LATEST}/${item.file}" download>
+      <span class="dl-what">
+        <strong>${item.label}</strong>
+        <span class="hint">${item.detail}</span>
+      </span>
+      <span class="dl-go">Download</span>
+    </a>`;
+}
+
+function renderProgram(container, platform = detectPlatform()) {
+  // A Mac leads with both of its own, in the order most Macs now are.
+  const order = {
+    windows: ['windows', 'mac-apple', 'mac-intel'],
+    mac: ['mac-apple', 'mac-intel', 'windows'],
+    phone: ['windows', 'mac-apple', 'mac-intel'],
+    other: ['windows', 'mac-apple', 'mac-intel'],
+  }[platform];
+  const leads = platform === 'mac' ? 2 : platform === 'windows' ? 1 : 0;
+  const rows = order
+    .map((key) => DOWNLOADS.find((d) => d.key === key))
+    .map((item, i) => downloadRow(item, i < leads))
+    .join('');
+
+  const phoneNote =
+    platform === 'phone'
+      ? `<p class="dl-warn"><strong>You are on a phone or tablet.</strong> These are programs for a Windows computer or a Mac, and a phone cannot run either one: tapping a link here downloads a file it can do nothing with. Open this page on the computer you want the program on.</p>`
+      : '';
+
+  container.innerHTML = `
+    <h2>Get the program</h2>
+    <p class="hint">The same boards, as a program that runs on its own.</p>
+
+    <div class="guide-lede">
+      <!-- Each Hebrew name in its own bdi. Written plainly, the comma between the two is a
+           neutral character, so it is swallowed into one right to left run and the pair comes
+           out reversed: measured, חורף landed at x=865 and קיץ at x=944, the wrong way round. -->
+      <p>This is everything on this site built as a <strong>program you download once</strong>: the same <bdi>שבת קיץ</bdi>, <bdi>שבת חורף</bdi> and Weekday charts, the same week cards, the same rules and the same numbers, worked out by the same calculations.</p>
+      <p>It needs <strong>no browser, no internet and nothing installed</strong>. One file. Worth having for a computer where the browser is locked down, for making a board somewhere with no signal, and for carrying the whole thing on a USB stick.</p>
+    </div>
+
+    ${phoneNote}
+
+    <div class="dl-list">${rows}</div>
+
+    <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
+
+    <details class="panel" ${platform === 'windows' || platform === 'mac' ? 'open' : ''}>
+      <summary>The first time you open it, it will refuse. Here is why, and what to press</summary>
+      <div class="panel-body">
+        <p>Neither program is signed with a paid developer certificate, so the computer does not recognise who made it and says so the first time. Nothing is wrong with the file. It is <strong>once per computer</strong>, not every time.</p>
+        <p><strong>Windows.</strong> A blue box says "Windows protected your PC". Press <strong>More info</strong>, then <strong>Run anyway</strong>. If it will not start at all, right click the file, choose Properties, tick <strong>Unblock</strong>, then OK.</p>
+        <p><strong>Mac.</strong> Unzip it, then open <code>Zmanim.app</code>. macOS refuses the first time. Go to <strong>System Settings</strong>, then <strong>Privacy &amp; Security</strong>, scroll down to the line naming Zmanim, and press <strong>Open Anyway</strong>. Then open it again.</p>
+        <p>Antivirus software sometimes flags programs packed this way. It may need allowing through.</p>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>On a USB stick, and where your work is kept</summary>
+      <div class="panel-body">
+        <p>Copy the program onto a stick and run it from there. It keeps its boards, rules and settings <strong>on the stick, beside itself</strong>, so the same stick opens with all your work on any computer you carry it to. Otherwise it keeps them in the usual per-user place on that computer.</p>
+        <p>Its backup file is the same one this site's <strong>Settings, Backup, Export</strong> writes, so work moves either way: a backup made here opens there, and one made there opens here.</p>
+        <p>Emailing the program does not work. Gmail refuses <code>.exe</code> attachments and looks inside zips, and most other mail does the same. Use the stick, or a shared link.</p>
+      </div>
+    </details>
+
+    <details class="panel">
+      <summary>What it can do, and what it cannot</summary>
+      <div class="panel-body">
+        <p>Everything this site does: generate a season, type over any cell, rules, undo and redo, the week's two cards, printing and saving a PDF, backups, and publishing to the congregation's page. It publishes to the same place this site does, so the two can be used side by side.</p>
+        <p>It is checked hard before it is handed over. Every build runs the full test suite on the machine that builds it, against the reference output of this site's own engine, and then <strong>starts the program it just made</strong> and has it draw a board, write a PDF and write its save file. A build that cannot do that is not offered here.</p>
+        <p>What it does not have: this site is what the congregation sees, and it is the one that stays up to date by itself.</p>
+      </div>
+    </details>
+
+    <p class="hint"><a href="${RELEASES}" target="_blank" rel="noopener">Every version, with what changed</a>. The links above always fetch the newest.</p>
+  `;
+}
+
 // ==== publish.js ====
 // Publishing a season for the congregation.
 //
@@ -5600,10 +5732,10 @@ const nav = document.getElementById('nav');
 // the things you set once. Rules is no longer among them - it is the first panel inside
 // Settings, being something configured rather than a place you go. Generate leading also
 // matches where the app opens.
-const tabs = ['generate', 'week', 'saved', 'settings', 'guide'];
+const tabs = ['generate', 'week', 'saved', 'settings', 'program', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', guide: 'Guide', week: 'This week' };
+const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', program: 'Get the program', guide: 'Guide', week: 'This week' };
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -5614,6 +5746,7 @@ const tabIcons = {
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
+  program: '<path d="M10 3v9"/><path d="M6.5 8.5 10 12l3.5-3.5"/><path d="M3.5 13v2.5A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5V13"/>',
 };
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
@@ -5770,6 +5903,8 @@ function render() {
     // whichever half was last open, that trip wants this one.
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
+  } else if (currentTab === 'program') {
+    renderProgram(main);
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
       currentTab = tab;

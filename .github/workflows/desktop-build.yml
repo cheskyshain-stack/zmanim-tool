@@ -231,7 +231,12 @@ jobs:
           program it just made and has it draw a board, write a PDF and write the save file.
           TEXT
           )
+          # --repo and --target because this job never checks the repository out: it only
+          # collects what the three build jobs made. Without them gh looks for a .git folder
+          # in an empty working directory and gives up.
           gh release create "$TAG" out/* \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
             --title "Zmanim boards, $(date -u +'%-d %B %Y')" \
             --notes "$NOTES"
           echo "published $TAG"

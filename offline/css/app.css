@@ -1042,3 +1042,27 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
 /* The one you are on is filled in, not just outlined: with two buttons side by side,
    a border alone does not say which of them you are looking at. */
 .pane-btn.is-on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* --- Get the program ---------------------------------------------------------------- */
+/* The download rows. A whole row is the link rather than a button at its end: on a phone
+   the target is then the width of the screen instead of a word. */
+.dl-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+.dl-row {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.85rem 1rem; text-decoration: none; color: inherit; background: var(--surface, #fff);
+}
+.dl-row:hover { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+/* The build for the computer this page is open on. Only ever a hint: which kind of Mac
+   cannot be told from a browser, so both of a Mac's are led and neither is picked. */
+.dl-row.is-lead { border-color: var(--ui-accent); border-width: 2px; padding: calc(0.85rem - 1px) calc(1rem - 1px); }
+.dl-what { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 14rem; min-width: 0; }
+.dl-go {
+  flex: 0 0 auto; background: var(--ui-accent); color: #fff; border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap;
+}
+.dl-row:hover .dl-go { background: var(--ui-accent-dark); }
+.dl-warn {
+  background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius);
+  padding: 0.8rem 1rem; margin: 1rem 0; font-size: var(--fs-sm); line-height: 1.55;
+}
