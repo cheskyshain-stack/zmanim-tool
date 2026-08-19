@@ -241,9 +241,14 @@ with `fixtures/golden.json` there is nothing worth building.
 Then the built program is started with `--selftest` and has to draw a board with itself.
 That is a different question from the suites: they run against the source tree, where the
 fonts and the calendar tables are simply files on disk, but the built program has to find
-them inside itself. A packaging mistake leaves every suite green and hands over a program
-that opens to a blank chart. The self check opens every screen, generates a season, draws a
-page, writes a PDF and writes the save file. See `zmanimboard/selftest.py`.
+them inside itself. The self check opens every screen, generates a season, draws a page,
+writes a PDF and writes the save file. See `zmanimboard/selftest.py`.
+
+It is not a formality. On the first run it ever did, both builds passed all ten suites,
+packaged cleanly, and then died on the first chart they drew: the header images live in the
+repository's own `assets` folder and only `desktop/zmanimboard/assets` was being bundled, so
+the program had its fonts and no logo. Without this step that build would have been handed
+over as working.
 
 ### Where a built program keeps its save file
 
