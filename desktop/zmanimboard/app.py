@@ -78,6 +78,25 @@ def sheet_name(sheet) -> str:
     return f'{isolate(sheetlib.label_of(sheet))} {sheet["hebrewYear"]}'
 
 
+def beside_the_program(executable: Path) -> Path:
+    """The folder a built program should keep its save file in.
+
+    On Windows that is simply the folder holding the .exe, which is what lets a copy on a USB
+    stick carry its own boards from one computer to the next.
+
+    A Mac program is not one file but a folder, Zmanim.app, and the thing that runs is buried
+    at Zmanim.app/Contents/MacOS/Zmanim. The folder holding *that* is inside the bundle, so
+    writing there would hide a person's boards inside the application and lose them the day
+    it is replaced with a newer one. So a bundle is climbed out of first, and the save file
+    sits beside the .app, where dragging the pair onto a stick still takes both.
+    """
+    if executable.parent.name == "MacOS" and executable.parent.parent.name == "Contents":
+        bundle = executable.parent.parent.parent
+        if bundle.suffix == ".app":
+            return bundle.parent
+    return executable.parent
+
+
 def data_dir() -> Path:
     """Where the save file lives.
 
@@ -87,7 +106,7 @@ def data_dir() -> Path:
     from PySide6.QtCore import QStandardPaths
 
     if getattr(sys, "frozen", False):
-        beside = Path(sys.executable).parent
+        beside = beside_the_program(Path(sys.executable))
         try:
             probe = beside / ".writable"
             probe.touch()

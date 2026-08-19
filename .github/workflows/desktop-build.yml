@@ -1,0 +1,148 @@
+name: Build the program
+
+# Started by hand from the Actions tab, never on a push. A build takes a few minutes and is
+# only wanted when there is a version to hand to someone, not on every commit. Each build
+# leaves its program as an artifact on the run, which is where to download it from.
+#
+# Three come out, because a program cannot be built for a machine unlike the one building it:
+#   Zmanim-windows        Zmanim.exe, for Windows
+#   Zmanim-mac-intel      Zmanim.app, for a Mac with an Intel processor
+#   Zmanim-mac-apple      Zmanim.app, for a Mac with Apple silicon (M1 and later)
+# An Apple silicon Mac can also run the Intel one through Rosetta, but not the other way
+# round, so the Intel build is the one to send when it is not known which Mac it is for.
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: A note to put on the download, so a run can be told apart later
+        required: false
+        default: ""
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install what it needs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6-Essentials PyMuPDF pyinstaller
+
+      # The tests run first, on Windows, against the golden fixture. If the numbers are wrong
+      # there is nothing worth building: the engine is a port, and a port that disagrees with
+      # fixtures/golden.json is wrong whatever it looks like on paper.
+      - name: Check the engine and the pages
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python desktop/tests/test_golden.py
+          python desktop/tests/test_chart_layout.py
+          python desktop/tests/test_card_layout.py
+          python desktop/tests/test_state.py
+          python desktop/tests/test_week.py
+          python desktop/tests/test_settings.py
+          python desktop/tests/test_editor.py
+          python desktop/tests/test_sheet_view.py
+          python desktop/tests/test_guide.py
+          python desktop/tests/test_publish.py
+
+      # The Hebrew calendar tables and the fonts have to travel inside the program: it must
+      # work with no network and nothing sitting beside it. engine/tables.py and
+      # render/fonts.py both look in sys._MEIPASS first for exactly this reason.
+      - name: Build the program
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name Zmanim
+          --paths desktop
+          --add-data "desktop/zmanimboard/assets;assets"
+          --add-data "data;data"
+          desktop/run.py
+
+      # The suites above run against the source tree, where the fonts and the tables are
+      # simply files on disk. This runs the built program itself, which has to find them
+      # inside itself: a packaging mistake leaves every suite green and hands over a program
+      # that opens to a blank chart.
+      - name: Start the built program and draw a board with it
+        run: |
+          if (-not (Test-Path dist/Zmanim.exe)) { throw "no exe was produced" }
+          $size = (Get-Item dist/Zmanim.exe).Length / 1MB
+          Write-Host ("Zmanim.exe is {0:N1} MB" -f $size)
+          ./dist/Zmanim.exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw "the built program failed its own check" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zmanim-windows${{ inputs.label && format('-{0}', inputs.label) || '' }}
+          path: dist/Zmanim.exe
+          if-no-files-found: error
+          retention-days: 90
+
+  mac:
+    # Both kinds of Mac, because a build for one will not run on the other. fail-fast is off
+    # so that one of them being unavailable still leaves the other downloadable.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            kind: intel
+          - runner: macos-latest
+            kind: apple
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install what it needs
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6-Essentials PyMuPDF pyinstaller
+
+      - name: Check the engine and the pages
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          for suite in golden chart_layout card_layout state week settings editor sheet_view guide publish; do
+            python desktop/tests/test_$suite.py || exit 1
+          done
+
+      # Same as the Windows build but for the separator in --add-data, which is a colon here
+      # and a semicolon there. A Mac program is a folder, Zmanim.app, rather than one file.
+      - name: Build the program
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name Zmanim
+          --paths desktop
+          --add-data "desktop/zmanimboard/assets:assets"
+          --add-data "data:data"
+          desktop/run.py
+
+      - name: Start the built program and draw a board with it
+        run: |
+          test -d dist/Zmanim.app || { echo "no app was produced"; exit 1; }
+          du -sh dist/Zmanim.app
+          ./dist/Zmanim.app/Contents/MacOS/Zmanim --selftest
+
+      # Zipped here rather than left to the upload step, which does not keep file permissions.
+      # Unzipped without the executable bit on Contents/MacOS/Zmanim, the app does not open at
+      # all, so the download would be a folder that refuses to start. ditto is the tool that
+      # keeps it, and is what the Finder itself uses to make a zip.
+      - name: Wrap the app so it survives the trip
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Zmanim.app dist/Zmanim-mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zmanim-mac-${{ matrix.kind }}${{ inputs.label && format('-{0}', inputs.label) || '' }}
+          path: dist/Zmanim-mac.zip
+          if-no-files-found: error
+          retention-days: 90

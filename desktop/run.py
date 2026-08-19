@@ -11,7 +11,15 @@ from pathlib import Path
 # without anything having to be installed first.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from zmanimboard.app import main  # noqa: E402
-
 if __name__ == "__main__":
+    # Handed to the built program by the build workflow, to prove it really starts. Checked
+    # before the window is imported so a packaging failure shows up as a failed check rather
+    # than as a crash on the way in.
+    if "--selftest" in sys.argv:
+        from zmanimboard.selftest import run_selftest
+
+        sys.exit(run_selftest())
+
+    from zmanimboard.app import main
+
     sys.exit(main())

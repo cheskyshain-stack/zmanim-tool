@@ -200,28 +200,64 @@ for weight, style in ((400, 'Regular'), (700, 'Bold')):
 "
 ```
 
-## Getting the Windows program
+## Getting the program
 
-PyInstaller does not cross compile, so an .exe cannot be built on Linux. GitHub's own
-Windows machines can, and that is what `.github/workflows/desktop-windows.yml` is for. No
-Windows machine of your own is needed.
+PyInstaller does not cross compile: a program can only be built on the kind of machine it is
+for, and this one is Linux. GitHub's own Windows and Mac machines can, and that is what
+`.github/workflows/desktop-build.yml` is for. No Windows or Mac machine of your own is
+needed to build it.
 
 1. Open the repository's **Actions** tab.
-2. Pick **Build the Windows program** and press **Run workflow**.
-3. Wait a few minutes, open the finished run, and download **Zmanim-windows** from the
-   Artifacts at the bottom. Inside is `Zmanim.exe`.
+2. Pick **Build the program** and press **Run workflow**.
+3. Wait a few minutes, open the finished run, and take what you need from the Artifacts at
+   the bottom.
+
+Three come out, because a build for one kind of machine will not run on another:
+
+| Artifact | What is inside | For |
+| --- | --- | --- |
+| `Zmanim-windows` | `Zmanim.exe` | Windows, 64 bit |
+| `Zmanim-mac-intel` | `Zmanim.app` in a zip | a Mac with an Intel processor |
+| `Zmanim-mac-apple` | `Zmanim.app` in a zip | a Mac with Apple silicon, M1 and later |
+
+An Apple silicon Mac will also run the Intel build through Rosetta, but an Intel Mac cannot
+run the Apple silicon one at all. So the Intel build is the one to send when it is not known
+which Mac it is going to.
+
+The Mac app is zipped by the workflow with `ditto` rather than left to the upload step,
+which does not keep file permissions. Unzipped without the executable bit on
+`Contents/MacOS/Zmanim` the app does not open at all, and the download would be a folder
+that refuses to start.
 
 It only ever runs when it is started by hand, never on a push: a build takes a few minutes
 and is only wanted when there is a version to hand to someone.
 
-The workflow runs all ten test suites on Windows first. If the numbers disagree with
-`fixtures/golden.json` there is nothing worth building.
+### What the workflow checks before it hands anything over
 
-This has been run: a build finished in under two minutes and produced a 39 MB
-`Zmanim.exe`, with all ten suites passing on Windows first. An artifact is kept for 90
-days, so a build older than that has to be run again rather than downloaded.
+All ten test suites run first, on the machine doing the building. If the numbers disagree
+with `fixtures/golden.json` there is nothing worth building.
 
-To build it on a Windows machine instead:
+Then the built program is started with `--selftest` and has to draw a board with itself.
+That is a different question from the suites: they run against the source tree, where the
+fonts and the calendar tables are simply files on disk, but the built program has to find
+them inside itself. A packaging mistake leaves every suite green and hands over a program
+that opens to a blank chart. The self check opens every screen, generates a season, draws a
+page, writes a PDF and writes the save file. See `zmanimboard/selftest.py`.
+
+### Where a built program keeps its save file
+
+Beside itself when that folder can be written to, which is what lets a copy on a USB stick
+carry its own boards from one computer to another, and otherwise in the usual per-user
+application data folder.
+
+On a Mac, beside the `.app` rather than inside it. The thing that runs is buried at
+`Zmanim.app/Contents/MacOS/Zmanim`, and the folder holding that is inside the bundle, so the
+naive answer would hide someone's boards inside the application and lose them the day it is
+replaced with a newer copy. See `beside_the_program` in `app.py`.
+
+### Building it on your own machine instead
+
+On Windows:
 
 ```
 pip install PySide6-Essentials PyInstaller
@@ -231,12 +267,35 @@ pyinstaller --onefile --windowed --name Zmanim --paths desktop ^
   desktop/run.py
 ```
 
+On a Mac, the same but with a colon where Windows wants a semicolon:
+
+```
+pip install PySide6-Essentials PyInstaller
+pyinstaller --onefile --windowed --name Zmanim --paths desktop \
+  --add-data "desktop/zmanimboard/assets:assets" \
+  --add-data "data:data" \
+  desktop/run.py
+```
+
 `assets` and `data` have to travel inside the bundle: `engine/tables.py` and
 `render/fonts.py` both look in `sys._MEIPASS` first for exactly this reason.
 
-A built program keeps its save file beside the executable when that folder can be written
-to, which is what lets a copy on a USB stick carry its own data, and otherwise in the usual
-per-user application data folder. See `data_dir` in `app.py`.
+### Handing it to someone
+
+Neither program is signed with a paid developer certificate, so the first computer to see it
+will say so. That is about the certificate, not about the program.
+
+- **Windows** shows "Windows protected your PC". More info, then Run anyway. A downloaded
+  file may also need right click, Properties, Unblock.
+- **A Mac** refuses to open it at all on the first try. System Settings, Privacy & Security,
+  then Open Anyway against the line naming Zmanim. Or in Terminal:
+  `xattr -dr com.apple.quarantine /path/to/Zmanim.app`.
+- **Email will not carry either of them.** Gmail refuses `.exe` attachments outright and
+  looks inside zips, and most other mail does the same. A shared link or the USB stick is
+  the way.
+- **An Actions artifact can only be downloaded by someone signed in to GitHub** with access
+  to this repository. To hand the program to anyone else, put it on a Release instead, which
+  gives a plain public link that does not expire after 90 days.
 
 ## The rule that matters
 

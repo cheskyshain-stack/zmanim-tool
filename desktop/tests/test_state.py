@@ -150,4 +150,24 @@ first = pages[0]
 R.equal("a hand typed cell wins", "<u>1:40</u><br>נסיון", first.rows[target]["C"])
 R.expect("and is flagged as typed", "C" in first.authored.get(target, set()), "")
 
+# --- where a built program keeps the save file ------------------------------------------------
+# Beside the program, which is what lets a copy on a USB stick carry its own boards. A Mac
+# program is not one file but a folder, and the thing that runs is buried three levels down
+# inside it, so the naive answer would hide someone's boards inside the application and lose
+# them the day it is replaced with a newer copy.
+from zmanimboard.app import beside_the_program  # noqa: E402
+
+for name, executable, want in (
+    ("a Windows program keeps it in its own folder", "E:/sticks/Zmanim.exe", "E:/sticks"),
+    ("a Mac app keeps it beside the app, not inside it",
+     "/Volumes/USB/Zmanim.app/Contents/MacOS/Zmanim", "/Volumes/USB"),
+    ("and the same in Applications", "/Applications/Zmanim.app/Contents/MacOS/Zmanim", "/Applications"),
+    ("a plain binary keeps it in its own folder", "/Volumes/USB/Zmanim", "/Volumes/USB"),
+    # Contents/MacOS with no .app above it is not a bundle, so it is left where it is rather
+    # than having three folders climbed off it.
+    ("and a folder merely named like one is not treated as one",
+     "/home/x/Contents/MacOS/Zmanim", "/home/x/Contents/MacOS"),
+):
+    R.equal(name, want, str(beside_the_program(Path(executable))))
+
 sys.exit(0 if R.summary() else 1)
