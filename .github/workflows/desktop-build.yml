@@ -10,6 +10,13 @@ name: Build the program
 #   Zmanim-mac-apple      Zmanim.app, for a Mac with Apple silicon (M1 and later)
 # An Apple silicon Mac can also run the Intel one through Rosetta, but not the other way
 # round, so the Intel build is the one to send when it is not known which Mac it is for.
+#
+# A finished build is also published as a Release, which is what the website's Get the
+# program tab links to. An artifact cannot be linked to from a web page: downloading one
+# needs a GitHub account with access to this repository, and it is deleted after 90 days. A
+# Release asset is a plain public link that does not expire, and
+# .../releases/latest/download/NAME always points at the newest one, so the website never
+# has to be edited when a new build goes out.
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +24,11 @@ on:
         description: A note to put on the download, so a run can be told apart later
         required: false
         default: ""
+      publish:
+        description: Publish as a Release, which is what the website's download links point at
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   windows:
@@ -163,3 +175,63 @@ jobs:
           path: dist/Zmanim-mac.zip
           if-no-files-found: error
           retention-days: 90
+
+  # The three programs, published where they can simply be linked to. Only when all three
+  # built: a Release offering two of them, with the third quietly missing, is worse than no
+  # new Release, because the website's links are what people follow.
+  release:
+    needs: [windows, mac]
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+
+      # Renamed to fixed names, because the website links by name:
+      # .../releases/latest/download/Zmanim.exe has to keep working for every future build,
+      # so the name cannot carry a version or the label from the run.
+      - name: Name them what the website asks for
+        run: |
+          mkdir -p out
+          cp downloaded/Zmanim-windows*/Zmanim.exe        out/Zmanim.exe
+          cp downloaded/Zmanim-mac-intel*/Zmanim-mac.zip  out/Zmanim-mac-intel.zip
+          cp downloaded/Zmanim-mac-apple*/Zmanim-mac.zip  out/Zmanim-mac-apple.zip
+          ls -lh out
+
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(date -u +%Y.%m.%d)-${{ github.run_number }}"
+          NOTES=$(cat <<'TEXT'
+          The zmanim board program, one file, nothing to install.
+
+          | Download | For |
+          | --- | --- |
+          | `Zmanim.exe` | Windows, 64 bit |
+          | `Zmanim-mac-apple.zip` | a Mac with Apple silicon, M1 and later |
+          | `Zmanim-mac-intel.zip` | a Mac with an Intel processor |
+
+          Not sure which Mac: Apple menu, About This Mac. An Apple silicon Mac will also run
+          the Intel one through Rosetta, but an Intel Mac cannot run the Apple silicon one.
+
+          **The first time on a computer**, neither will open, because neither is signed with
+          a paid certificate. On Windows: More info, then Run anyway. On a Mac: System
+          Settings, Privacy & Security, then Open Anyway on the line naming Zmanim. Once per
+          computer, not every time.
+
+          Run from a USB stick it keeps its boards on the stick, so the same stick opens with
+          your work on any computer you carry it to.
+
+          Every build runs all ten test suites on the machine that builds it, then starts the
+          program it just made and has it draw a board, write a PDF and write the save file.
+          TEXT
+          )
+          gh release create "$TAG" out/* \
+            --title "Zmanim boards, $(date -u +'%-d %B %Y')" \
+            --notes "$NOTES"
+          echo "published $TAG"
