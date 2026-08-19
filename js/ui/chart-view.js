@@ -109,13 +109,6 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>
-        <!-- The congregation's own chart page has carried this since it was built; this
-             screen, which shows the same chart, never did. A chart is letter landscape and
-             a phone's print dialog opens portrait, which puts an 11in page on an 8.5in
-             sheet and trims the right hand edge: the parsha column loses a letter and the
-             rabbi's line above it loses two. Shown only on a touch device, like the other
-             one: see .print-hint in app.css. -->
-        <p class="print-hint no-print">The chart prints landscape. If the print dialog opens portrait, change it in its options.</p>
       </div>
       <div class="pages"></div>`;
     const pagesEl = container.querySelector('.pages');
