@@ -70,10 +70,10 @@ def _anchor_direction(html_text: str, rtl: bool) -> str:
 _BIG_CLASS = re.compile(r'<span class="big"', re.IGNORECASE)
 
 
-def _inline_big(html_text: str, point_size: float) -> str:
+def _inline_big(html_text: str, point_size: float, scale: float = 1.3) -> str:
     """A percentage did not reach it either (measured: still 10.1pt against a 10pt base), so
     the size is worked out here and written in points, which QTextDocument does honour."""
-    return _BIG_CLASS.sub(f'<span style="font-size:{point_size * 1.3:.2f}pt"', html_text)
+    return _BIG_CLASS.sub(f'<span style="font-size:{point_size * scale:.2f}pt"', html_text)
 
 
 def make_document(
@@ -88,6 +88,7 @@ def make_document(
     line_height: float | None = None,
     device=None,
     rtl: bool = False,
+    big_scale: float = 1.3,
 ) -> QTextDocument:
     """A laid out fragment, ready to be drawn at a position.
 
@@ -114,11 +115,11 @@ def make_document(
     option.setWrapMode(QTextOption.WordWrap)
     doc.setDefaultTextOption(option)
 
-    style = f"color:{color};"
+    style = f"color:{color};font-weight:{'bold' if bold else 'normal'};"
     if line_height is not None:
         style += f"line-height:{line_height * 100:.0f}%;"
     direction = "rtl" if rtl else "ltr"
-    html_text = _anchor_direction(_inline_big(html_text, point_size), rtl)
+    html_text = _anchor_direction(_inline_big(html_text, point_size, big_scale), rtl)
     doc.setDefaultStyleSheet(f"body,p,div,span{{{style}}} u{{text-decoration:underline}}")
     doc.setHtml(f'<body style="{style}"><div dir="{direction}" style="{style}">{html_text}</div></body>')
     doc.setTextWidth(width)

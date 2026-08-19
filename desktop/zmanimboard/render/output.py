@@ -64,6 +64,17 @@ def paint_pages(writer, painter, pages, paint_one):
         paint_one(painter, page)
 
 
+def write_card_pdf(path: str, cards, chrome, font_family="Times New Roman", resolution: int = PDF_RESOLUTION):
+    """Every week card in a run, portrait, at its real size."""
+    from .card import CardPainter
+
+    with pdf_painter(path, landscape=False, resolution=resolution) as (writer, painter):
+        def one(p, card):
+            CardPainter(p, chrome, font_family).paint(card)
+        paint_pages(writer, painter, cards, one)
+    return path
+
+
 def write_chart_pdf(path: str, pages, style, chrome, resolution: int = PDF_RESOLUTION):
     """Every page of a chart, landscape, at its real size."""
     from .chart import ChartPainter

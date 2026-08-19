@@ -9,18 +9,19 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Two suites, both of which measure real output rather than checking that code ran:
+Three suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
-python3 desktop/tests/test_chart_layout.py    # the printed page
+python3 desktop/tests/test_chart_layout.py    # the printed wall chart
+python3 desktop/tests/test_card_layout.py     # the printed week card
 ```
 
 `test_golden.py` checks the engine against `fixtures/golden.json`, which is the reference
 output of the web version's own engine. It needs nothing beyond the standard library.
 
-`test_chart_layout.py` renders real charts to PDF and measures them. It needs `PySide6`
-and `PyMuPDF`, and forces Qt's offscreen platform so it runs with no display.
+The two layout suites render real pages to PDF and measure them. They need `PySide6` and
+`PyMuPDF`, and force Qt's offscreen platform so they run with no display.
 
 ```bash
 pip install PySide6-Essentials PyMuPDF
@@ -41,9 +42,14 @@ checks: letter landscape at exactly 792 by 612 points, every body row the same h
 the header row never shorter, nothing outside the margins, and every time and parsha on
 the page matching what the engine produced.
 
+**The week cards**, שבת and חול, also verified against the same card printed by the web
+version. 59 checks: the line splitting on its own as plain string transforms, then the
+finished cards at letter portrait with every time present and nothing past the edges. The
+rows are drawn line by line rather than as one laid out block, which is what makes the
+colon axis exact: a line whose hour is one digit is started a digit's width further in.
+
 ## What is not done
 
-- The week cards, portrait, one week per page.
 - Every screen: Generate, This week, Saved sheets, Settings, Rules, the sheet editor with
   its per-cell overrides and rich text.
 - Saving and loading, and importing a backup exported from the web version.
@@ -68,7 +74,10 @@ zmanimboard/
     theme.py       the page geometry and colour, taken from css/app.css
     fonts.py       the bundled Hebrew faces and the stand-in mapping
     richtext.py    engine strings and hand typed HTML into laid out text
+    lines.py       how many times to a line, and the colon axis. No Qt.
     chart.py       one page of a wall chart
+    card.py        one week card
+    weekcards.py   which rows go on a card, and what each is called
     output.py      PDF and printer
   assets/fonts/    David Libre and Frank Ruhl Libre as TTF
 tests/
@@ -80,19 +89,35 @@ a display or a graphics stack.
 
 ## The fonts
 
-Qt cannot load the WOFF2 files the website ships, so `assets/fonts/` holds the same two
-faces converted to TTF. They are the same outlines from the same files, under the SIL Open
-Font License 1.1; the licences are in `assets/fonts/` at the repository root. Regenerate
-them with:
+Qt cannot load the WOFF2 files the website ships, so `assets/fonts/` holds the same faces
+converted to TTF. Same outlines, same files, SIL Open Font License 1.1; the licences are in
+`assets/fonts/` at the repository root.
+
+Frank Ruhl Libre needs one extra step. It ships as a variable font spanning weight 300 to
+900, and Qt registers a variable font under its default instance only: the family came up
+with a Regular style and no Bold, so every bold run on the page silently rendered regular.
+Measured in the PDF, LiberationSerif and FrankRuhlLibre-Regular where the web version had
+LiberationSerif-Bold. So two static instances are cut from it instead.
 
 ```bash
 pip install fonttools brotli
 python3 -c "
 from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
 from pathlib import Path
 out = Path('desktop/zmanimboard/assets/fonts'); out.mkdir(parents=True, exist_ok=True)
-for w in sorted(Path('assets/fonts').glob('*.woff2')):
+for w in sorted(Path('assets/fonts').glob('david-libre-*.woff2')):
     f = TTFont(str(w)); f.flavor = None; f.save(str(out / (w.stem + '.ttf')))
+for weight, style in ((400, 'Regular'), (700, 'Bold')):
+    f = TTFont('assets/fonts/frank-ruhl-libre.woff2'); f.flavor = None
+    instancer.instantiateVariableFont(f, {'wght': weight}, inplace=True, updateFontNames=True)
+    f['OS/2'].usWeightClass = weight
+    f['name'].setName('Frank Ruhl Libre', 1, 3, 1, 0x409)
+    f['name'].setName(style, 2, 3, 1, 0x409)
+    if style == 'Bold':
+        f['head'].macStyle |= 1
+        f['OS/2'].fsSelection = (f['OS/2'].fsSelection & ~0x40) | 0x20
+    f.save(str(out / f'frank-ruhl-libre-{weight}.ttf'))
 "
 ```
 
