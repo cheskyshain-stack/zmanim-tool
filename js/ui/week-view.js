@@ -133,6 +133,39 @@ function nextSeasonLabel(index, serials) {
 const fmtShabbosDate = (date) =>
   'Shabbos, ' + new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
 
+/** The box a node sits in, when that box is one that starts a line of its own, up to but
+ *  not including the cell. Everything below has to agree on where a line begins, and a
+ *  <br> is only half the answer: a value typed into a cell is rich text, and the browser's
+ *  own editor wraps a new line in a <div> rather than writing a <br>. The מנחה cell of one
+ *  hand-typed week is "1:40 / 4:45<div>דרשה 5:15<br>6:14 / 6:29</div>", where the <div> is
+ *  a line break on the screen but was invisible to the counting - so 1:40, 4:45 and
+ *  דרשה 5:15 counted as one line of three, over the cap of two, and 1:40 was pushed onto a
+ *  line of its own away from the 4:45 it was typed beside. */
+const LINE_BOX_TAGS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'SECTION', 'PRE', 'TABLE', 'TR']);
+function lineBoxOf(root, node) {
+  let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  while (el && el !== root) {
+    if (LINE_BOX_TAGS.has(el.tagName)) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/** Tells you, node by node, whether this one has crossed into or out of such a box since
+ *  the last one, which is a line break either way: text after a </div> starts a new line
+ *  just as text after the matching <div> does. */
+function lineBoxTracker(root) {
+  let box;
+  let seen = false;
+  return (node) => {
+    const next = lineBoxOf(root, node);
+    const crossed = seen && next !== box;
+    box = next;
+    seen = true;
+    return crossed;
+  };
+}
+
 /** At most three times to a line, applied to the rendered cell rather than to a string.
  *
  *  Two reasons it is done here. A typed מנחה or מעריב is stored as HTML, and splitting
@@ -167,11 +200,13 @@ function capTimesPerLine(root, max = 3) {
    *  it is in: "7:15 7:35**\n8:00" is a single text node, and treating the whole node as
    *  one line left 7:35 sitting beside 7:15 while every other time got a line to itself. */
   const walkTimes = (onTime, onBreak) => {
+    const crossedBox = lineBoxTracker(root);
     for (const node of nodes) {
       if (node.nodeType === Node.ELEMENT_NODE) {
         if (node.tagName === 'BR') onBreak();
         continue;
       }
+      if (crossedBox(node)) onBreak();
       const text = node.nodeValue;
       let prevEnd = 0;
       let match;
@@ -287,12 +322,14 @@ function trimSpaceAtLineStart(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
+  const crossedBox = lineBoxTracker(root);
   let atLineStart = true;
   for (const node of nodes) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       if (node.nodeName === 'BR') atLineStart = true;
       continue;
     }
+    if (crossedBox(node)) atLineStart = true;
     // [^\S\n] is "whitespace but not a newline", which covers the non-breaking spaces the
     // separators are built from as well as ordinary ones.
     let text = atLineStart ? node.nodeValue.replace(/^[^\S\n]+/, '') : node.nodeValue;
@@ -313,6 +350,7 @@ function trimSpaceAtLineStart(root) {
  *  other and pull the two out of line. */
 function hasTwoDigitHourAtLineStart(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const crossedBox = lineBoxTracker(root);
   let atLineStart = true;
   let node;
   while ((node = walker.nextNode())) {
@@ -320,6 +358,7 @@ function hasTwoDigitHourAtLineStart(root) {
       if (node.nodeName === 'BR') atLineStart = true;
       continue;
     }
+    if (crossedBox(node)) atLineStart = true;
     const segments = node.nodeValue.split('\n');
     for (let i = 0; i < segments.length; i++) {
       if (i === 0 && !atLineStart) continue;
@@ -359,12 +398,14 @@ function alignColons(root) {
   // Where a pad belongs, gathered first and inserted afterwards: putting one in mid-walk
   // splits the very node the walk is reading.
   const inserts = [];
+  const crossedBox = lineBoxTracker(root);
   let atLineStart = true;
   for (const node of nodes) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       if (node.nodeName === 'BR') atLineStart = true;
       continue;
     }
+    if (crossedBox(node)) atLineStart = true;
     const text = node.nodeValue;
     if (!text.length) continue;
     // Split on the newlines the value carries, because a line can start in the middle of
@@ -404,10 +445,21 @@ function alignColons(root) {
 /** Puts an element in front of a node that opens a line, outside whatever inline element
  *  the node happens to open. A pad left inside a <u> is fine to look at but a <br> is not:
  *  an underlined line break paints a rule out to the edge of the line in some engines, and
- *  the markup reads as though the underline spans two lines when it does not. */
+ *  the markup reads as though the underline spans two lines when it does not.
+ *
+ *  It stops at a box that starts a line of its own: climbing out of a <div> would put the
+ *  pad or the break in front of the whole block rather than at the head of its first line,
+ *  which is a line the value never asked for. */
 function insertAtLineStart(root, node, el) {
   let target = node;
-  while (target.parentNode && target.parentNode !== root && target.parentNode.firstChild === target) target = target.parentNode;
+  while (
+    target.parentNode &&
+    target.parentNode !== root &&
+    !LINE_BOX_TAGS.has(target.parentNode.tagName) &&
+    target.parentNode.firstChild === target
+  ) {
+    target = target.parentNode;
+  }
   target.parentNode.insertBefore(el, target);
 }
 
