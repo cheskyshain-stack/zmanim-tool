@@ -9,7 +9,7 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Six suites, all of which measure real output rather than checking that code ran:
+Seven suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
@@ -18,6 +18,7 @@ python3 desktop/tests/test_card_layout.py     # the printed week card
 python3 desktop/tests/test_state.py           # what is saved, and what generating makes
 python3 desktop/tests/test_week.py            # which week This week opens on, and its cards
 python3 desktop/tests/test_settings.py        # settings, rules, and importing a backup
+python3 desktop/tests/test_editor.py          # typing over a cell, and the style controls
 ```
 
 And to run the program itself:
@@ -67,6 +68,16 @@ sheets** lists what has been made. **Settings** holds the wording on the boards,
 shul is, the advanced zmanim settings, the rules, and Export and Import backup. And a
 **sheet view** previews every page at the size it prints, with Print and Save as PDF.
 
+**Cells are typed over by clicking them.** The map of where each cell was drawn comes from
+the same painting run as the picture, so a click lands on the cell that is really under it
+rather than on one worked out a second time. The dialog shows what the cell works out to
+and takes what should print instead, with Ctrl+U for the underline the board uses to mark an
+alternate time, and undo and redo above. Typing a cell back to exactly what it works out to
+clears the override rather than storing one that agrees: stored, it would do nothing today
+and quietly stop following a corrected formula tomorrow. Font, size, logo size and page
+colour are on the same bar, kept per sheet, and the last one set becomes the starting point
+for the next sheet generated.
+
 **Rules** are edited from Settings, laid out as a sentence: when this happens, do this to
 these columns. A rule applies to every sheet generated from then on, every year; typing over
 a cell on a sheet is the other thing, a one-off belonging to that sheet alone, and the
@@ -80,11 +91,9 @@ already made.
 
 ## What is not done
 
-- The sheet editor, so a cell cannot yet be typed over from inside the program. An override
-  imported from the web version is honoured and printed.
-- The style controls on a sheet: font, size, logo size and page colour are read from the
-  settings and used, but there is no screen to change them yet.
 - Publishing to the congregation's site.
+- The page picker, side by side, and fit to screen from the web version's sheet view.
+- The guide.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
 - The single file executable. See below.
@@ -99,6 +108,7 @@ zmanimboard/
   weeks.py         which weeks there are, and which one is "this" one
   htmlfield.py     a rich text box that saves the same small markup subset the site stores
   rulesui.py       the rule editor
+  celldialog.py    typing over one cell
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
     fmt.py         time formatting, minute rounding, the underline sentinels

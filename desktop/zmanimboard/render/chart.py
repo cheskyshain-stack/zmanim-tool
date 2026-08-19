@@ -125,6 +125,11 @@ class ChartPainter:
         self.accent = style.accent_color
         self.head_ink = theme.header_ink(self.accent)
         self.band = theme.band_color(self.accent)
+        # Where every editable cell was drawn, in the painter's own units, so a click on a
+        # preview can be turned back into the cell under it. Filled as the page is painted:
+        # the layout is worked out here and nowhere else, so anywhere else would be a second
+        # copy of it to keep in step.
+        self.cell_rects = []
 
     # inches to device units
     def u(self, inches: float) -> float:
@@ -328,9 +333,15 @@ class ChartPainter:
                 self.p.fillRect(QRectF(left, y, width, body_h), QColor(self.band))
             x = left
             cells = self._row_cells(page, week, columns, index)
-            for w, (text, size, rtl, _authored) in zip(widths, cells):
+            keys = [key for key, _header in columns] + ["parsha"]
+            for w, key, (text, size, rtl, _authored) in zip(widths, keys, cells):
                 if text is not None:
                     self._draw_cell(text, x, y, w, body_h, size, rtl=rtl)
+                    # The parsha column is a label rather than a time, and the Weekday
+                    # chart's שחרית is one shul-wide value out of settings spanning the whole
+                    # page. Neither is typed over on the sheet, so neither is a target.
+                    if key != "parsha" and not (page.effective_season == "weekday" and key == "E"):
+                        self.cell_rects.append((QRectF(x, y, w, body_h), week.serial, key))
                 x += w
             # No separator across the merged column, except under the last row, which is
             # the bottom of the table itself.

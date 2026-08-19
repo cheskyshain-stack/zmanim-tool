@@ -7,8 +7,8 @@ buttons are the words for what they do.
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -47,9 +47,11 @@ from .engine import pagination as pag
 from .engine import tables as tables_mod
 from .engine.settings import SEASON_LABELS
 from .engine.sheets.weeks import compute_season_weeks, default_season_and_year
+from .celldialog import CellDialog
 from .render.card import CardPainter
 from .render.chart import ChartPainter
-from .render.output import page_image, paint_card_pair, paint_pages, pdf_painter, printer_painter
+from .render.fonts import FONT_CHOICES
+from .render.output import chart_preview, page_image, paint_card_pair, paint_pages, pdf_painter, printer_painter
 from .weeks import current_serial, shabbos_date_line, week_index
 
 PREVIEW_DPI = 110
@@ -650,6 +652,30 @@ class SettingsScreen(Screen):
         self.window.rebuild()
 
 
+class PagePreview(QLabel):
+    """One page of a chart, at the size it prints, that can be clicked.
+
+    The cell map comes from the same painting run as the picture, so a click lands on the
+    cell that is really under it rather than on one worked out a second time.
+    """
+
+    clicked = Signal(int, str)
+
+    def __init__(self, image, cells):
+        super().__init__()
+        self.cells = cells
+        self.setPixmap(QPixmap.fromImage(image))
+        self.setFrameShape(QFrame.Box)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        where = event.position()
+        for rect, serial, key in self.cells:
+            if rect.contains(where):
+                self.clicked.emit(serial, key)
+                return
+
+
 class SheetScreen(QWidget):
     """One sheet, shown at the size it prints, with the buttons that put it on paper."""
 
@@ -672,11 +698,44 @@ class SheetScreen(QWidget):
         self.companion = QPushButton()
         self.companion.clicked.connect(self.open_companion)
         bar.addWidget(self.companion)
+        self.undo_button = QPushButton("Undo")
+        self.undo_button.clicked.connect(self.undo)
+        self.redo_button = QPushButton("Redo")
+        self.redo_button.clicked.connect(self.redo)
+        bar.addWidget(self.undo_button)
+        bar.addWidget(self.redo_button)
         for label, slot in (("Print", self.print_sheet), ("Save as PDF", self.save_pdf)):
             button = QPushButton(label)
             button.clicked.connect(slot)
             bar.addWidget(button)
         column.addLayout(bar)
+
+        style_bar = QHBoxLayout()
+        style_bar.addWidget(QLabel("Click a cell to type over it."))
+        style_bar.addStretch(1)
+        style_bar.addWidget(QLabel("Font"))
+        self.font_box = QComboBox()
+        self.font_box.addItems(FONT_CHOICES)
+        self.font_box.currentTextChanged.connect(lambda value: self.set_style("fontFamily", value))
+        style_bar.addWidget(self.font_box)
+        style_bar.addWidget(QLabel("Size"))
+        self.size_box = QDoubleSpinBox()
+        self.size_box.setRange(6, 18)
+        self.size_box.setSingleStep(0.5)
+        self.size_box.setDecimals(1)
+        self.size_box.valueChanged.connect(lambda value: self.set_style("fontSizePt", value))
+        style_bar.addWidget(self.size_box)
+        style_bar.addWidget(QLabel("Logo"))
+        self.logo_box = QDoubleSpinBox()
+        self.logo_box.setRange(0.6, 1.6)
+        self.logo_box.setSingleStep(0.1)
+        self.logo_box.setDecimals(1)
+        self.logo_box.valueChanged.connect(lambda value: self.set_style("headerScale", value))
+        style_bar.addWidget(self.logo_box)
+        self.colour_button = QPushButton("Page colour")
+        self.colour_button.clicked.connect(self.pick_colour)
+        style_bar.addWidget(self.colour_button)
+        column.addLayout(style_bar)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -686,6 +745,14 @@ class SheetScreen(QWidget):
         self.scroll.setWidget(self.pages_holder)
         column.addWidget(self.scroll, 1)
 
+    # Undo history is per sheet and in memory only, the same as the web version: it lives as
+    # long as the program is open, like the undo in most editors, and is not part of the
+    # user's data.
+    history: dict = {}
+
+    def _history(self):
+        return self.history.setdefault(self.sheet["id"], {"undo": [], "redo": []})
+
     def show_sheet(self, sheet):
         self.sheet = sheet
         self.title.setText(sheet_name(sheet))
@@ -693,15 +760,88 @@ class SheetScreen(QWidget):
         self.companion.setVisible(bool(other))
         if other:
             self.companion.setText("Weekday chart →" if sheet["season"] != "weekday" else isolate("שבת") + " sheet →")
+        style = sheet.get("style") or {}
+        for widget, key, default in ((self.font_box, "fontFamily", "Times New Roman"),
+                                     (self.size_box, "fontSizePt", 10),
+                                     (self.logo_box, "headerScale", 1)):
+            widget.blockSignals(True)
+            if widget is self.font_box:
+                widget.setCurrentText(style.get(key, default))
+            else:
+                widget.setValue(float(style.get(key, default)))
+            widget.blockSignals(False)
+        self.redraw()
+
+    def redraw(self):
+        """The pages again from the sheet as it now is."""
         while self.pages_layout.count():
             item = self.pages_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        style, chrome = self._painter_parts()
         for page in self.pages():
-            label = QLabel()
-            label.setPixmap(QPixmap.fromImage(self.render_preview(page)))
-            label.setFrameShape(QFrame.Box)
-            self.pages_layout.addWidget(label)
+            image, cells = chart_preview(page, style, chrome, PREVIEW_DPI)
+            preview = PagePreview(image, cells)
+            preview.clicked.connect(self.edit_cell)
+            self.pages_layout.addWidget(preview)
+        history = self._history()
+        self.undo_button.setEnabled(bool(history["undo"]))
+        self.redo_button.setEnabled(bool(history["redo"]))
+
+    def edit_cell(self, serial: int, key: str):
+        settings = self.window.settings
+        computed = sheetlib.computed_cell(self.sheet, self.window.state, settings, serial, key)
+        current = sheetlib.get_override(self.sheet, serial, key)
+        english, hebrew = shabbos_date_line(serial, settings)
+        dialog = CellDialog(self, title=f"{english}  ·  column {key}", computed=computed, current=current)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        after = dialog.value()
+        if after == current:
+            return
+        self.apply_edit(serial, key, current, after)
+
+    def apply_edit(self, serial, key, before, after):
+        sheetlib.set_override(self.sheet, serial, key, after)
+        history = self._history()
+        history["undo"].append((serial, key, before, after))
+        history["redo"].clear()
+        self.window.persist()
+        self.redraw()
+
+    def undo(self):
+        history = self._history()
+        if not history["undo"]:
+            return
+        serial, key, before, after = history["undo"].pop()
+        sheetlib.set_override(self.sheet, serial, key, before)
+        history["redo"].append((serial, key, before, after))
+        self.window.persist()
+        self.redraw()
+
+    def redo(self):
+        history = self._history()
+        if not history["redo"]:
+            return
+        serial, key, before, after = history["redo"].pop()
+        sheetlib.set_override(self.sheet, serial, key, after)
+        history["undo"].append((serial, key, before, after))
+        self.window.persist()
+        self.redraw()
+
+    def set_style(self, key: str, value):
+        """A sheet keeps its own style, and the last one set becomes the starting point for
+        the next sheet generated, which is how the web version behaves too."""
+        self.sheet.setdefault("style", {})[key] = value
+        self.window.state["settings"]["sheetStyle"] = dict(self.sheet["style"])
+        self.window.persist()
+        self.redraw()
+
+    def pick_colour(self):
+        style = self.sheet.get("style") or {}
+        chosen = QColorDialog.getColor(QColor(style.get("accentColor", "#c9ced5")), self, "Page colour")
+        if chosen.isValid():
+            self.set_style("accentColor", chosen.name())
 
     def open_companion(self):
         other = sheetlib.companion_of(self.sheet, self.window.state["sheets"])
@@ -717,10 +857,6 @@ class SheetScreen(QWidget):
     def _painter_parts(self):
         weekday = self.sheet["season"] == "weekday"
         return sheetlib.style_of(self.sheet), sheetlib.chrome_of(self.window.state["settings"], weekday)
-
-    def render_preview(self, page):
-        style, chrome = self._painter_parts()
-        return page_image(lambda p: ChartPainter(p, style, chrome).paint(page), 11.0, 8.5, PREVIEW_DPI)
 
     def print_sheet(self):
         printer = QPrinter(QPrinter.HighResolution)

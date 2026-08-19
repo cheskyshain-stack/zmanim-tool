@@ -126,6 +126,25 @@ def paint_card_pair(painter, cards, chrome, font_family="Times New Roman"):
         painter.restore()
 
 
+def chart_preview(page, style, chrome, dpi: int = 110):
+    """A chart page as an image, with the map of where its cells landed.
+
+    The map comes from the same painting run as the picture, so the two cannot disagree
+    about where a cell is.
+    """
+    from .chart import ChartPainter
+
+    holder = {}
+
+    def draw(painter):
+        painter_object = ChartPainter(painter, style, chrome)
+        painter_object.paint(page)
+        holder["cells"] = painter_object.cell_rects
+
+    image = page_image(draw, theme.CHART.width, theme.CHART.height, dpi)
+    return image, holder.get("cells", [])
+
+
 def write_card_pair_pdf(path: str, cards, chrome, font_family="Times New Roman", resolution: int = PDF_RESOLUTION):
     with pdf_painter(path, landscape=True, resolution=resolution) as (_writer, painter):
         paint_card_pair(painter, cards, chrome, font_family)

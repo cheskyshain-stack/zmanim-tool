@@ -191,6 +191,46 @@ def _overrides_of(sheet: dict) -> dict:
     return {int(serial): cells for serial, cells in (sheet.get("overrides") or {}).items()}
 
 
+def computed_cell(sheet: dict, state: dict, settings, serial: int, key: str) -> str:
+    """What a cell would say with nothing typed over it: the formulas, then the rules.
+
+    This is what an edit is compared against. A cell typed back to exactly what it computes
+    to should stop being an override rather than becoming one that happens to agree, or the
+    sheet would carry a growing pile of overrides that do nothing and quietly stop following
+    a corrected formula.
+    """
+    weeks = week_objects(sheet["weeks"])
+    for page_weeks in pag.split_weeks_into_pages(weeks, sheet["pageSizes"]):
+        week = next((w for w in page_weeks if w.serial == serial), None)
+        if week is None:
+            continue
+        season = effective_season(sheet, page_weeks, settings)
+        build, _columns = builder_for(season)
+        row = build(week, settings)
+        if season != "weekday":
+            hebrew = hebrew_date_extended(week.serial, settings.use_gregorian_before_1582)
+            row = apply_rules(row, week, state.get("rules") or [], season, hebrew)
+        return row.get(key, "")
+    return ""
+
+
+def set_override(sheet: dict, serial: int, key: str, value) -> None:
+    """Stores a typed cell, or takes it away when value is None. Keyed by the serial as a
+    string, which is what JSON does to a number and what the web version writes."""
+    overrides = sheet.setdefault("overrides", {})
+    week = overrides.setdefault(str(serial), {})
+    if value is None:
+        week.pop(key, None)
+    else:
+        week[key] = value
+    if not week:
+        overrides.pop(str(serial), None)
+
+
+def get_override(sheet: dict, serial: int, key: str):
+    return (sheet.get("overrides") or {}).get(str(serial), {}).get(key)
+
+
 def merged_shacharis_html(raw_settings: dict) -> str:
     """Both schedules as the wall chart has always shown them, with the heading between."""
     from .engine.settings import SPECIAL_SHACHARIS_HEADING
