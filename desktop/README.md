@@ -9,7 +9,7 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Five suites, all of which measure real output rather than checking that code ran:
+Six suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
@@ -17,6 +17,7 @@ python3 desktop/tests/test_chart_layout.py    # the printed wall chart
 python3 desktop/tests/test_card_layout.py     # the printed week card
 python3 desktop/tests/test_state.py           # what is saved, and what generating makes
 python3 desktop/tests/test_week.py            # which week This week opens on, and its cards
+python3 desktop/tests/test_settings.py        # settings, rules, and importing a backup
 ```
 
 And to run the program itself:
@@ -62,8 +63,14 @@ next and moving on by itself once Shabbos is over, with Previous, Today and Next
 of which page comes first, "Print both on one sheet" (landscape, side by side, which has to
 be the program's job because the page size is fixed here and the dialog's own landscape
 setting would change nothing) and "Print every week to the end of the season". **Saved
-sheets** lists what has been made. And a **sheet view** previews every page at the size it
-prints, with Print and Save as PDF. Saving is
+sheets** lists what has been made. **Settings** holds the wording on the boards, where the
+shul is, the advanced zmanim settings, the rules, and Export and Import backup. And a
+**sheet view** previews every page at the size it prints, with Print and Save as PDF.
+
+**Rules** are edited from Settings, laid out as a sentence: when this happens, do this to
+these columns. A rule applies to every sheet generated from then on, every year; typing over
+a cell on a sheet is the other thing, a one-off belonging to that sheet alone, and the
+Settings screen says so where the rules are. Saving is
 a single JSON file in the same format the web version exports, so a backup from there opens
 here: checked against `data/published.json`, hand typed cell overrides included.
 
@@ -73,8 +80,10 @@ already made.
 
 ## What is not done
 
-- Settings, Rules, and the sheet editor, so a cell cannot yet be typed over from inside the
-  program. An override imported from the web version is honoured and printed.
+- The sheet editor, so a cell cannot yet be typed over from inside the program. An override
+  imported from the web version is honoured and printed.
+- The style controls on a sheet: font, size, logo size and page colour are read from the
+  settings and used, but there is no screen to change them yet.
 - Publishing to the congregation's site.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.
@@ -88,6 +97,8 @@ zmanimboard/
   state.py         the save file, in the web version's own format
   sheets.py        making a sheet, and turning a saved one back into printable pages
   weeks.py         which weeks there are, and which one is "this" one
+  htmlfield.py     a rich text box that saves the same small markup subset the site stores
+  rulesui.py       the rule editor
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
     fmt.py         time formatting, minute rounding, the underline sentinels

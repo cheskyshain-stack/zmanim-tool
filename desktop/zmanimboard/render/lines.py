@@ -200,7 +200,17 @@ def split_html_lines(fragment: str):
 
     for token in _TOKEN.findall(str(fragment or "")):
         if not token.startswith("<"):
-            current.append((token, list(stack)))
+            # A literal newline is a break as much as a <br> is: the shipped שחרית schedule
+            # is stored with one, and the merged cell on the wall chart is set to honour it
+            # (white-space: pre-line in the stylesheet). It only ever came out right here by
+            # accident, because capping the line at one time a line happened to break it in
+            # the same places.
+            pieces = token.split("\n")
+            for index, piece in enumerate(pieces):
+                if index:
+                    flush()
+                if piece:
+                    current.append((piece, list(stack)))
             continue
         name = _tag_name(token)
         if _BREAK_TAG.match(token):

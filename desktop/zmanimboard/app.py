@@ -12,6 +12,11 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QLineEdit,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -35,6 +40,9 @@ from PySide6.QtWidgets import (
 
 from . import sheets as sheetlib
 from . import state as statelib
+from .engine.settings import TIMEZONES
+from .htmlfield import HtmlField
+from .rulesui import RuleDialog, describe, describe_target
 from .engine import pagination as pag
 from .engine import tables as tables_mod
 from .engine.settings import SEASON_LABELS
@@ -414,6 +422,234 @@ class SavedScreen(Screen):
         self.refresh()
 
 
+class SettingsScreen(Screen):
+    """What the boards say, and where the shul is.
+
+    Rules come first because they are the thing most likely to be changed: they are the
+    shul's standing exceptions, and everything below them is set once and left.
+    """
+
+    def __init__(self, window):
+        super().__init__("Settings", "The wording on the boards, where the shul is, and the rules that apply to every sheet.")
+        self.window = window
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        inner = QWidget()
+        self.form = QVBoxLayout(inner)
+        scroll.setWidget(inner)
+        self.column.addWidget(scroll, 1)
+
+        raw = window.state["settings"]
+        self.fields = {}
+
+        rules_box = QGroupBox("Rules")
+        rules_layout = QVBoxLayout(rules_box)
+        blurb = QLabel("A rule applies to every sheet you generate from now on, every year. "
+                       "Typing over a cell on a sheet is the other thing: that is a one-off and belongs to that sheet alone.")
+        blurb.setWordWrap(True)
+        blurb.setStyleSheet("color: #6b7280;")
+        rules_layout.addWidget(blurb)
+        self.rules_table = QTableWidget(0, 5)
+        self.rules_table.setHorizontalHeaderLabels(["On", "Name", "When", "What it does", ""])
+        self.rules_table.horizontalHeader().setStretchLastSection(True)
+        self.rules_table.verticalHeader().setVisible(False)
+        self.rules_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.rules_table.setMinimumHeight(190)
+        rules_layout.addWidget(self.rules_table)
+        add = QPushButton("Add a rule")
+        add.clicked.connect(self.add_rule)
+        rules_layout.addWidget(add, 0, Qt.AlignLeft)
+        self.form.addWidget(rules_box)
+
+        self._text_group("Header and footer", [
+            ("shulName", "Shul name"), ("headerSubtitle", "Under the name"),
+            ("footerAddress", "Address, at the foot of every page"),
+        ], [("headerRabbiLine", "Rabbi line, on the other side"), ("footerNote", "Note above the address")])
+
+        self._text_group("Weekday chart", [], [
+            ("weekdayShacharis", "Everyday שחרית"),
+            ("weekdayShacharisSpecial", 'ר"ח, בה"ב and תענית שחרית'),
+            ("weekdayFooterNote", "Note at the foot of the Weekday chart"),
+        ], hint="Ctrl+U underlines the selection, which is how the board marks a time as the alternate one.")
+
+        location = QGroupBox("Location")
+        grid = QFormLayout(location)
+        self.fields["locationName"] = QLineEdit(str(raw.get("locationName", "")))
+        grid.addRow("Name", self.fields["locationName"])
+        for key, label, low, high, step in (("latitude", "Latitude", -90.0, 90.0, 0.001),
+                                            ("longitude", "Longitude", -180.0, 180.0, 0.001),
+                                            ("elevation", "Elevation, metres", 0.0, 5000.0, 1.0)):
+            box = QDoubleSpinBox()
+            box.setRange(low, high)
+            box.setDecimals(4 if step < 1 else 0)
+            box.setSingleStep(step)
+            box.setValue(float(raw.get(key, 0)))
+            self.fields[key] = box
+            grid.addRow(label, box)
+        self.fields["timezoneId"] = QComboBox()
+        for zone in TIMEZONES:
+            self.fields["timezoneId"].addItem(zone.label, zone.id)
+        index = max(0, [z.id for z in TIMEZONES].index(raw.get("timezoneId", "America/New_York")))
+        self.fields["timezoneId"].setCurrentIndex(index)
+        grid.addRow("Timezone", self.fields["timezoneId"])
+        self.form.addWidget(location)
+
+        advanced = QGroupBox("Advanced zmanim settings, best left alone")
+        advanced_form = QFormLayout(advanced)
+        for key, label, low, high, step, decimals in (("horizon", "Horizon, degrees below level", 0.0, 20.0, 0.01, 4),
+                                                      ("candleLightingMinutes", "Candle lighting, minutes before שקיעה", 0.0, 120.0, 1.0, 0)):
+            box = QDoubleSpinBox()
+            box.setRange(low, high)
+            box.setDecimals(decimals)
+            box.setSingleStep(step)
+            box.setValue(float(raw.get(key, 0)))
+            self.fields[key] = box
+            advanced_form.addRow(label, box)
+        for key, label in (("useAstronomicalChatzos", "Measure the proportional hours from astronomical chatzos"),
+                           ("useElevation", "Use the elevation for the zmanim"),
+                           ("inIsrael", "In Israel"),
+                           ("useGregorianBefore1582", "Gregorian dates before 1582")):
+            box = QCheckBox()
+            box.setChecked(bool(raw.get(key)))
+            self.fields[key] = box
+            advanced_form.addRow(label, box)
+        self.form.addWidget(advanced)
+
+        backup = QGroupBox("Backup")
+        backup_layout = QHBoxLayout(backup)
+        note = QLabel("A backup is the same file the website's Settings exports, so one made there opens here and one made here opens there.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #6b7280;")
+        backup_layout.addWidget(note, 1)
+        for label, slot in (("Export backup", self.export_backup), ("Import backup", self.import_backup)):
+            button = QPushButton(label)
+            button.clicked.connect(slot)
+            backup_layout.addWidget(button)
+        self.form.addWidget(backup)
+
+        self.form.addStretch(1)
+        save = QPushButton("Save settings")
+        save.clicked.connect(self.save)
+        self.saved_note = QLabel()
+        self.saved_note.setStyleSheet("color: #6b7280;")
+        row = QHBoxLayout()
+        row.addWidget(save)
+        row.addWidget(self.saved_note)
+        row.addStretch(1)
+        self.column.addLayout(row)
+
+    def _text_group(self, title, single_lines, rich_lines, hint: str = ""):
+        group = QGroupBox(title)
+        form = QFormLayout(group)
+        raw = self.window.state["settings"]
+        if hint:
+            note = QLabel(hint)
+            note.setWordWrap(True)
+            note.setStyleSheet("color: #6b7280;")
+            form.addRow(note)
+        for key, label in single_lines:
+            self.fields[key] = QLineEdit(str(raw.get(key, "")))
+            form.addRow(label, self.fields[key])
+        for key, label in rich_lines:
+            self.fields[key] = HtmlField(str(raw.get(key, "")))
+            form.addRow(label, self.fields[key])
+        self.form.addWidget(group)
+
+    def refresh(self):
+        rules = self.window.state["rules"]
+        self.rules_table.setRowCount(len(rules))
+        for row, rule in enumerate(rules):
+            on = QCheckBox()
+            on.setChecked(bool(rule.get("enabled")))
+            on.toggled.connect(lambda checked, r=rule: self.set_enabled(r, checked))
+            self.rules_table.setCellWidget(row, 0, on)
+            self.rules_table.setItem(row, 1, QTableWidgetItem(isolate(rule.get("name", ""))))
+            self.rules_table.setItem(row, 2, QTableWidgetItem(isolate(describe(rule))))
+            self.rules_table.setItem(row, 3, QTableWidgetItem(describe_target(rule)))
+            actions = QWidget()
+            layout = QHBoxLayout(actions)
+            layout.setContentsMargins(0, 0, 0, 0)
+            edit = QPushButton("Edit")
+            edit.clicked.connect(lambda _=False, r=rule: self.edit_rule(r))
+            remove = QPushButton("Delete")
+            remove.clicked.connect(lambda _=False, r=rule: self.delete_rule(r))
+            layout.addWidget(edit)
+            layout.addWidget(remove)
+            layout.addStretch(1)
+            self.rules_table.setCellWidget(row, 4, actions)
+        self.rules_table.resizeColumnsToContents()
+
+    def set_enabled(self, rule, checked):
+        rule["enabled"] = checked
+        self.window.persist()
+
+    def add_rule(self):
+        dialog = RuleDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            self.window.state["rules"].append(dialog.rule())
+            self.window.persist()
+            self.refresh()
+
+    def edit_rule(self, rule):
+        dialog = RuleDialog(self, rule)
+        if dialog.exec() == QDialog.Accepted:
+            rule.update(dialog.rule())
+            self.window.persist()
+            self.refresh()
+
+    def delete_rule(self, rule):
+        asked = QMessageBox.question(self, "Delete this rule?",
+                                     f'Delete "{rule.get("name", "")}"? It will stop applying to sheets you generate from now on. '
+                                     "Sheets already made are not changed until they are opened.")
+        if asked != QMessageBox.Yes:
+            return
+        self.window.state["rules"] = [r for r in self.window.state["rules"] if r is not rule]
+        self.window.persist()
+        self.refresh()
+
+    def save(self):
+        raw = self.window.state["settings"]
+        for key, widget in self.fields.items():
+            if isinstance(widget, HtmlField):
+                raw[key] = widget.value()
+            elif isinstance(widget, QLineEdit):
+                raw[key] = widget.text()
+            elif isinstance(widget, QDoubleSpinBox):
+                raw[key] = widget.value()
+            elif isinstance(widget, QComboBox):
+                raw[key] = widget.currentData()
+            elif isinstance(widget, QCheckBox):
+                raw[key] = widget.isChecked()
+        self.window.persist()
+        self.saved_note.setText("Saved.")
+
+    def export_backup(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export backup", "zmanim-backup.json", "JSON (*.json)")
+        if not path:
+            return
+        Path(path).write_text(statelib.to_json(self.window.state), encoding="utf-8")
+        QMessageBox.information(self, "Exported", f"Saved to {path}")
+
+    def import_backup(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Import backup", "", "JSON (*.json)")
+        if not path:
+            return
+        asked = QMessageBox.question(self, "Replace everything?",
+                                     "Importing replaces the settings, the sheets and the rules in this program with the ones in that file. "
+                                     "Export a backup of what is here first if you want to keep it.")
+        if asked != QMessageBox.Yes:
+            return
+        try:
+            self.window.state = statelib.from_json(Path(path).read_text(encoding="utf-8"))
+        except (ValueError, KeyError, TypeError) as err:
+            QMessageBox.warning(self, "That file could not be read", str(err))
+            return
+        self.window.persist()
+        QMessageBox.information(self, "Imported",
+                                f'{len(self.window.state["sheets"])} sheets and {len(self.window.state["rules"])} rules.')
+        self.window.rebuild()
+
+
 class SheetScreen(QWidget):
     """One sheet, shown at the size it prints, with the buttons that put it on paper."""
 
@@ -536,25 +772,30 @@ class Window(QMainWindow):
         self.setCentralWidget(shell)
 
         self.screens = {}
+        self._build_screens(first=True)
+
+        self.nav.currentRowChanged.connect(self._nav_changed)
+        self.nav.setCurrentRow(0)
+
+    def _build_screens(self, first: bool = False):
         for key, label, screen in (
             ("generate", "Generate", GenerateScreen(self)),
             ("week", "This week", WeekScreen(self)),
             ("saved", "Saved sheets", SavedScreen(self)),
+            ("settings", "Settings", SettingsScreen(self)),
         ):
-            self.nav.addItem(QListWidgetItem(label))
+            if first:
+                self.nav.addItem(QListWidgetItem(label))
             self.stack.addWidget(screen)
             self.screens[key] = screen
         self.sheet_screen = SheetScreen(self)
         self.stack.addWidget(self.sheet_screen)
 
-        self.nav.currentRowChanged.connect(self._nav_changed)
-        self.nav.setCurrentRow(0)
-
     @property
     def settings(self):
         return statelib.resolved_settings(self.state)
 
-    NAV = ["generate", "week", "saved"]
+    NAV = ["generate", "week", "saved", "settings"]
 
     def _nav_changed(self, row: int):
         self.show_screen(self.NAV[row] if 0 <= row < len(self.NAV) else "generate")
@@ -576,6 +817,24 @@ class Window(QMainWindow):
 
     def persist(self):
         statelib.save(self.paths.state, self.state)
+
+    def rebuild(self):
+        """Everything again from the state as it now is. Importing a backup replaces the
+        lot, so every screen has to be built afresh rather than refreshed: they were made
+        holding the settings that have just been thrown away."""
+        row = self.nav.currentRow()
+        for key in list(self.screens):
+            screen = self.screens.pop(key)
+            self.stack.removeWidget(screen)
+            screen.deleteLater()
+        self.stack.removeWidget(self.sheet_screen)
+        self.sheet_screen.deleteLater()
+        self._build_screens()
+        # Shown explicitly rather than by setting the row: the row has not changed, so
+        # nothing would fire, and the stack would be left on whichever screen was added
+        # first while the sidebar still said Settings. A screen refreshes when it is shown,
+        # which is also why the others are left alone until they are.
+        self.show_screen(self.NAV[max(0, row)])
 
 
 def main():
