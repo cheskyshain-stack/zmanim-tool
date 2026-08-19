@@ -17,6 +17,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "desktop"))
 
+# A Windows console writes cp1252, and every test name here is in Hebrew. Without this, a run
+# where every single check passed still ends non-zero, on the print at the end rather than on
+# anything it measured. errors="replace" is for the underline sentinels, U+E000 and U+E001,
+# which are private use characters with no glyph in any font.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from zmanimboard.engine import fmt, pagination as pag, rules as rules_mod, settings as settings_mod, solar, tables as tables_mod, util  # noqa: E402
 from zmanimboard.engine import hebrew_calendar as cal  # noqa: E402
 from zmanimboard.engine import zmanim as Z  # noqa: E402

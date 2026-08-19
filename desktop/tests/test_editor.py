@@ -15,6 +15,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "desktop"))
 
+# A Windows console writes cp1252, and every test name here is in Hebrew. Without this, a run
+# where every single check passed still ends non-zero, on the print at the end rather than on
+# anything it measured. errors="replace" is for the underline sentinels, U+E000 and U+E001,
+# which are private use characters with no glyph in any font.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import fitz  # noqa: E402
 from PySide6.QtCore import QPointF  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
