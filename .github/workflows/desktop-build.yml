@@ -77,13 +77,18 @@ jobs:
       # simply files on disk. This runs the built program itself, which has to find them
       # inside itself: a packaging mistake leaves every suite green and hands over a program
       # that opens to a blank chart.
+      # Start-Process -Wait rather than calling it directly. The program is built --windowed,
+      # which on Windows means it is a GUI program, and PowerShell does not wait for one of
+      # those: it read a stale $LASTEXITCODE and threw two seconds before the program had
+      # even finished printing that everything had passed.
       - name: Start the built program and draw a board with it
         run: |
           if (-not (Test-Path dist/Zmanim.exe)) { throw "no exe was produced" }
           $size = (Get-Item dist/Zmanim.exe).Length / 1MB
           Write-Host ("Zmanim.exe is {0:N1} MB" -f $size)
-          ./dist/Zmanim.exe --selftest
-          if ($LASTEXITCODE -ne 0) { throw "the built program failed its own check" }
+          $run = Start-Process -FilePath dist/Zmanim.exe -ArgumentList "--selftest" -NoNewWindow -Wait -PassThru
+          Write-Host ("it exited with {0}" -f $run.ExitCode)
+          if ($run.ExitCode -ne 0) { throw "the built program failed its own check" }
 
       - uses: actions/upload-artifact@v4
         with:
