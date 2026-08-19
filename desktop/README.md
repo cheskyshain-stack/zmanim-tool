@@ -67,7 +67,9 @@ be the program's job because the page size is fixed here and the dialog's own la
 setting would change nothing) and "Print every week to the end of the season". **Saved
 sheets** lists what has been made. **Settings** holds the wording on the boards, where the
 shul is, the advanced zmanim settings, the rules, and Export and Import backup. And a
-**sheet view** previews every page at the size it prints, with Print and Save as PDF.
+**sheet view** previews every page at the size it prints, with Print and Save as PDF and a
+tick box per page, since a reprint is usually one page rather than the whole sheet. A page
+left out of the print stays on the screen, and the ticks survive a redraw.
 
 **Publishing** puts a season on lczmanim.cjaffa.com. The congregation's page is a static
 site, so publishing means committing one file to the repository behind it,
@@ -103,7 +105,7 @@ already made.
 
 ## What is not done
 
-- The page picker, side by side, and fit to screen from the web version's sheet view.
+- Side by side and fit to screen from the web version's sheet view.
 - The guide.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
   painter as the PDF, but it has not been run against a printer from this machine.

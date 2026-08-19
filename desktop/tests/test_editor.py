@@ -135,6 +135,40 @@ with tempfile.TemporaryDirectory() as tmp:
     screen.apply_edit(serial, key, sheetlib.get_override(sheet, serial, key), None)
     R.equal("clearing removes the whole entry", {}, sheet.get("overrides"))
 
+    # --- the page picker ---------------------------------------------------------------------
+    # A sheet is three pages and a reprint is usually one of them, because one page was wrong
+    # or one page ran out on the wall. Leaving a page out of the print does not take it off
+    # the screen: it is still there to read.
+    pages = screen.pages()
+    R.equal("there is a tick box for every page", 3, len(screen.page_boxes))
+    R.expect("all ticked to start with", all(box.isChecked() for box in screen.page_boxes), "")
+    R.equal("so every page prints", 3, len(screen.chosen_pages()))
+
+    screen.page_boxes[1].setChecked(False)
+    chosen = screen.chosen_pages()
+    R.equal("unticking one leaves two", 2, len(chosen))
+    R.equal("and the one left out is the one unticked",
+            [pages[0].weeks[0].parsha, pages[2].weeks[0].parsha],
+            [p.weeks[0].parsha for p in chosen])
+
+    # Measured on the paper rather than in the list: a page left out has to be missing from
+    # the file, not merely from a count.
+    picked = write_chart_pdf(str(folder / "picked.pdf"), chosen,
+                             sheetlib.style_of(sheet), sheetlib.chrome_of(window.state["settings"]))
+    doc = fitz.open(picked)
+    R.equal("the file really has two pages", 2, doc.page_count)
+    printed = "\n".join(p.get_text() for p in doc)
+    R.expect("with nothing from the page left out", pages[1].weeks[0].parsha not in printed,
+             pages[1].weeks[0].parsha)
+    R.expect("and the pages kept still on it", pages[2].weeks[0].parsha in printed,
+             pages[2].weeks[0].parsha)
+
+    # Every edit redraws, which rebuilds the row. If the ticks did not survive that, a page
+    # left out would quietly come back the moment a cell was typed over.
+    screen.redraw()
+    R.equal("a redraw keeps the ticks", [True, False, True], [box.isChecked() for box in screen.page_boxes])
+    screen.page_boxes[1].setChecked(True)
+
     # --- the style controls ------------------------------------------------------------------
     screen.set_style("fontSizePt", 12.5)
     screen.set_style("accentColor", "#b0c4de")

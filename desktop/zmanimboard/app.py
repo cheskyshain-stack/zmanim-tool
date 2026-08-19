@@ -833,6 +833,14 @@ class SheetScreen(QWidget):
             bar.addWidget(button)
         column.addLayout(bar)
 
+        # Which pages go into the next print. Everything is included by default; a page left
+        # out stays on the screen so you can still read what you left out.
+        self.picker_row = QHBoxLayout()
+        self.picker_row.addWidget(QLabel("Print"))
+        self.page_boxes = []
+        self.picker_row.addStretch(1)
+        column.addLayout(self.picker_row)
+
         style_bar = QHBoxLayout()
         style_bar.addWidget(QLabel("Click a cell to type over it."))
         style_bar.addStretch(1)
@@ -902,7 +910,9 @@ class SheetScreen(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         style, chrome = self._painter_parts()
-        for page in self.pages():
+        pages = self.pages()
+        self._rebuild_picker(len(pages))
+        for page in pages:
             image, cells = chart_preview(page, style, chrome, PREVIEW_DPI)
             preview = PagePreview(image, cells)
             preview.clicked.connect(self.edit_cell)
@@ -910,6 +920,29 @@ class SheetScreen(QWidget):
         history = self._history()
         self.undo_button.setEnabled(bool(history["undo"]))
         self.redo_button.setEnabled(bool(history["redo"]))
+
+    def _rebuild_picker(self, count: int):
+        wanted = {index for index, box in enumerate(self.page_boxes) if box.isChecked()} if self.page_boxes else set(range(count))
+        while self.picker_row.count() > 1:
+            item = self.picker_row.takeAt(1)
+            if item.widget():
+                item.widget().deleteLater()
+        self.page_boxes = []
+        for index in range(count):
+            box = QCheckBox(f"Page {index + 1}")
+            box.setChecked(index in wanted)
+            self.page_boxes.append(box)
+            self.picker_row.insertWidget(index + 1, box)
+        self.picker_row.addStretch(1)
+
+    def chosen_pages(self):
+        """The pages ticked for printing, or all of them when the picker has not been built
+        yet. A run with nothing ticked prints nothing rather than everything, which is what
+        the ticks say."""
+        pages = self.pages()
+        if not self.page_boxes:
+            return pages
+        return [page for page, box in zip(pages, self.page_boxes) if box.isChecked()]
 
     def edit_cell(self, serial: int, key: str):
         settings = self.window.settings
@@ -988,8 +1021,12 @@ class SheetScreen(QWidget):
         if dialog.exec() != QPrintDialog.Accepted:
             return
         style, chrome = self._painter_parts()
+        chosen = self.chosen_pages()
+        if not chosen:
+            QMessageBox.information(self, "Nothing to print", "No pages are ticked.")
+            return
         with printer_painter(printer, landscape=True) as (device, painter):
-            paint_pages(device, painter, self.pages(), lambda p, page: ChartPainter(p, style, chrome).paint(page))
+            paint_pages(device, painter, chosen, lambda p, page: ChartPainter(p, style, chrome).paint(page))
 
     def save_pdf(self):
         # A file name is not display text: the isolate characters would end up in it.
@@ -998,9 +1035,13 @@ class SheetScreen(QWidget):
         if not path:
             return
         style, chrome = self._painter_parts()
+        chosen = self.chosen_pages()
+        if not chosen:
+            QMessageBox.information(self, "Nothing to save", "No pages are ticked.")
+            return
         with pdf_painter(path, landscape=True) as (writer, painter):
-            paint_pages(writer, painter, self.pages(), lambda p, page: ChartPainter(p, style, chrome).paint(page))
-        QMessageBox.information(self, "Saved", f"Saved to {path}")
+            paint_pages(writer, painter, chosen, lambda p, page: ChartPainter(p, style, chrome).paint(page))
+        QMessageBox.information(self, "Saved", f"Saved {len(chosen)} page{'' if len(chosen) == 1 else 's'} to {path}")
 
 
 class Window(QMainWindow):
