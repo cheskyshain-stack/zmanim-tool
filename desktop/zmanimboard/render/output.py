@@ -98,6 +98,40 @@ def write_card_pdf(path: str, cards, chrome, font_family="Times New Roman", reso
     return path
 
 
+# Two cards side by side on one landscape sheet. 8.5in twice over is 17in, which has to come
+# down inside 11in; 0.64 leaves them 7.04in tall on an 8.5in sheet.
+PAIR_SCALE = 0.64
+
+
+def paint_card_pair(painter, cards, chrome, font_family="Times New Roman"):
+    """Both of a week's cards on one landscape sheet.
+
+    It has to be the program that does this rather than the print dialog's own landscape
+    setting: the page size is fixed here, so choosing landscape in the dialog would change
+    nothing at all and the pair would come out on two portrait sheets.
+    """
+    from .card import CardPainter
+    from . import theme
+
+    dpi = painter.device().logicalDpiX()
+    card_w, card_h = theme.CARD.width, theme.CARD.height
+    across = len(cards) * card_w * PAIR_SCALE
+    left = (theme.CHART.width - across) / 2
+    top = (theme.CHART.height - card_h * PAIR_SCALE) / 2
+    for index, card in enumerate(cards):
+        painter.save()
+        painter.translate((left + index * card_w * PAIR_SCALE) * dpi, top * dpi)
+        painter.scale(PAIR_SCALE, PAIR_SCALE)
+        CardPainter(painter, chrome, font_family).paint(card)
+        painter.restore()
+
+
+def write_card_pair_pdf(path: str, cards, chrome, font_family="Times New Roman", resolution: int = PDF_RESOLUTION):
+    with pdf_painter(path, landscape=True, resolution=resolution) as (_writer, painter):
+        paint_card_pair(painter, cards, chrome, font_family)
+    return path
+
+
 def write_chart_pdf(path: str, pages, style, chrome, resolution: int = PDF_RESOLUTION):
     """Every page of a chart, landscape, at its real size."""
     from .chart import ChartPainter

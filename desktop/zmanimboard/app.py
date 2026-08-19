@@ -39,8 +39,10 @@ from .engine import pagination as pag
 from .engine import tables as tables_mod
 from .engine.settings import SEASON_LABELS
 from .engine.sheets.weeks import compute_season_weeks, default_season_and_year
+from .render.card import CardPainter
 from .render.chart import ChartPainter
-from .render.output import page_image, paint_pages, pdf_painter, printer_painter
+from .render.output import page_image, paint_card_pair, paint_pages, pdf_painter, printer_painter
+from .weeks import current_serial, shabbos_date_line, week_index
 
 PREVIEW_DPI = 110
 
@@ -218,6 +220,143 @@ class GenerateScreen(Screen):
         self.window.state["sheets"].extend(made)
         self.window.persist()
         self.window.open_sheet(made[0])
+
+
+class WeekScreen(Screen):
+    """One week at a time, laid out to read rather than to print.
+
+    It follows whichever שבת is next and moves on by itself once Shabbos is over, so the
+    screen is right on a Sunday morning without anyone touching it.
+    """
+
+    def __init__(self, window):
+        super().__init__("This week", "The week's two pages, as they print. It follows whichever שבת is next and moves on once Shabbos is over.")
+        self.window = window
+        self.serial = None
+
+        self.when = QLabel()
+        self.when.setAlignment(Qt.AlignHCenter)
+        self.when.setStyleSheet("font-weight: 600;")
+        self.column.addWidget(self.when)
+
+        nav = QHBoxLayout()
+        nav.addStretch(1)
+        self.previous = QPushButton("← Previous")
+        self.previous.clicked.connect(lambda: self.step(-1))
+        self.today = QPushButton("Today")
+        self.today.clicked.connect(lambda: self.show_week(None))
+        self.next = QPushButton("Next →")
+        self.next.clicked.connect(lambda: self.step(1))
+        for button in (self.previous, self.today, self.next):
+            nav.addWidget(button)
+        nav.addStretch(1)
+        self.column.addLayout(nav)
+
+        actions = QHBoxLayout()
+        self.print_pair = QPushButton("Print both on one sheet")
+        self.print_pair.clicked.connect(self.do_print_pair)
+        self.print_rest = QPushButton("Print every week to the end of the season")
+        self.print_rest.clicked.connect(self.do_print_rest)
+        actions.addWidget(self.print_pair)
+        actions.addWidget(self.print_rest)
+        actions.addWidget(QLabel("Which page first"))
+        self.order = QComboBox()
+        self.order.addItem("שבת, then weekday", False)
+        self.order.addItem("Weekday, then שבת", True)
+        self.order.currentIndexChanged.connect(lambda _: self.show_week(self.serial))
+        actions.addWidget(self.order)
+        actions.addStretch(1)
+        self.column.addLayout(actions)
+
+        self.note = QLabel()
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet("color: #6b7280;")
+        self.column.addWidget(self.note)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.holder = QWidget()
+        self.holder_layout = QVBoxLayout(self.holder)
+        self.holder_layout.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        self.scroll.setWidget(self.holder)
+        self.column.addWidget(self.scroll, 1)
+
+    def serials(self):
+        return list(week_index(self.window.state).keys())
+
+    def refresh(self):
+        self.show_week(self.serial)
+
+    def step(self, direction: int):
+        serials = self.serials()
+        if self.serial in serials:
+            at = serials.index(self.serial) + direction
+            if 0 <= at < len(serials):
+                self.show_week(serials[at])
+
+    def show_week(self, serial):
+        serials = self.serials()
+        have = bool(serials)
+        for widget in (self.previous, self.today, self.next, self.print_pair, self.print_rest, self.order):
+            widget.setEnabled(have)
+        while self.holder_layout.count():
+            item = self.holder_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        if not have:
+            self.when.setText("")
+            self.note.setText("Generate a שבת sheet and its weeks show up here.")
+            self.serial = None
+            return
+
+        self.serial = serial if serial in serials else current_serial(serials)
+        english, hebrew = shabbos_date_line(self.serial, self.window.settings)
+        self.when.setText(f"{english}\n{isolate(hebrew)}")
+        at = serials.index(self.serial)
+        self.previous.setEnabled(at > 0)
+        self.next.setEnabled(at < len(serials) - 1)
+        # At the end of the list, say why rather than only greying Next out.
+        self.note.setText("" if at < len(serials) - 1 else "This is the last week you have generated.")
+
+        for card in self.cards():
+            label = QLabel()
+            label.setPixmap(QPixmap.fromImage(page_image(
+                lambda p, c=card: CardPainter(p, self.chrome()).paint(c), 8.5, 11.0, PREVIEW_DPI)))
+            label.setFrameShape(QFrame.Box)
+            self.holder_layout.addWidget(label)
+
+    def chrome(self):
+        return sheetlib.chrome_of(self.window.state["settings"])
+
+    def cards(self, serial=None):
+        return sheetlib.week_cards(serial or self.serial, self.window.state, self.window.settings,
+                                   self.window.state["settings"], weekday_first=bool(self.order.currentData()))
+
+    def do_print_pair(self):
+        """Both cards on one landscape sheet."""
+        cards = self.cards()
+        if not cards:
+            return
+        printer = QPrinter(QPrinter.HighResolution)
+        if QPrintDialog(printer, self).exec() != QPrintDialog.Accepted:
+            return
+        with printer_painter(printer, landscape=True) as (_device, painter):
+            paint_card_pair(painter, cards, self.chrome())
+
+    def do_print_rest(self):
+        """Every week from this one to the end, portrait, one card a page."""
+        serials = [s for s in self.serials() if s >= self.serial]
+        cards = [card for serial in serials for card in self.cards(serial)]
+        if not cards:
+            return
+        printer = QPrinter(QPrinter.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        dialog.setWindowTitle(f"Print {len(cards)} pages, {len(serials)} weeks")
+        if dialog.exec() != QPrintDialog.Accepted:
+            return
+        chrome = self.chrome()
+        with printer_painter(printer, landscape=False) as (device, painter):
+            paint_pages(device, painter, cards, lambda p, card: CardPainter(p, chrome).paint(card))
 
 
 class SavedScreen(Screen):
@@ -399,6 +538,7 @@ class Window(QMainWindow):
         self.screens = {}
         for key, label, screen in (
             ("generate", "Generate", GenerateScreen(self)),
+            ("week", "This week", WeekScreen(self)),
             ("saved", "Saved sheets", SavedScreen(self)),
         ):
             self.nav.addItem(QListWidgetItem(label))
@@ -414,16 +554,17 @@ class Window(QMainWindow):
     def settings(self):
         return statelib.resolved_settings(self.state)
 
+    NAV = ["generate", "week", "saved"]
+
     def _nav_changed(self, row: int):
-        key = ["generate", "saved"][row] if 0 <= row < 2 else "generate"
-        self.show_screen(key)
+        self.show_screen(self.NAV[row] if 0 <= row < len(self.NAV) else "generate")
 
     def show_screen(self, key: str):
         screen = self.screens[key]
         if hasattr(screen, "refresh"):
             screen.refresh()
         self.stack.setCurrentWidget(screen)
-        row = ["generate", "saved"].index(key)
+        row = self.NAV.index(key)
         if self.nav.currentRow() != row:
             self.nav.blockSignals(True)
             self.nav.setCurrentRow(row)

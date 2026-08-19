@@ -9,13 +9,14 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Four suites, all of which measure real output rather than checking that code ran:
+Five suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
 python3 desktop/tests/test_chart_layout.py    # the printed wall chart
 python3 desktop/tests/test_card_layout.py     # the printed week card
 python3 desktop/tests/test_state.py           # what is saved, and what generating makes
+python3 desktop/tests/test_week.py            # which week This week opens on, and its cards
 ```
 
 And to run the program itself:
@@ -55,8 +56,14 @@ finished cards at letter portrait with every time present and nothing past the e
 rows are drawn line by line rather than as one laid out block, which is what makes the
 colon axis exact: a line whose hour is one digit is started a digit's width further in.
 
-**The program**: a window with a sidebar, a Generate screen, Saved sheets, and a sheet
-view that previews every page at the size it prints, with Print and Save as PDF. Saving is
+**The program**: a window with a sidebar, and four places behind it. **Generate** makes a
+season. **This week** shows the week's two cards as they print, opening on whichever שבת is
+next and moving on by itself once Shabbos is over, with Previous, Today and Next, a choice
+of which page comes first, "Print both on one sheet" (landscape, side by side, which has to
+be the program's job because the page size is fixed here and the dialog's own landscape
+setting would change nothing) and "Print every week to the end of the season". **Saved
+sheets** lists what has been made. And a **sheet view** previews every page at the size it
+prints, with Print and Save as PDF. Saving is
 a single JSON file in the same format the web version exports, so a backup from there opens
 here: checked against `data/published.json`, hand typed cell overrides included.
 
@@ -66,7 +73,6 @@ already made.
 
 ## What is not done
 
-- This week, with the week cards on it. The cards render (see above) but have no screen yet.
 - Settings, Rules, and the sheet editor, so a cell cannot yet be typed over from inside the
   program. An override imported from the web version is honoured and printed.
 - Publishing to the congregation's site.
@@ -81,6 +87,7 @@ zmanimboard/
   app.py           the window and its screens
   state.py         the save file, in the web version's own format
   sheets.py        making a sheet, and turning a saved one back into printable pages
+  weeks.py         which weeks there are, and which one is "this" one
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
     fmt.py         time formatting, minute rounding, the underline sentinels

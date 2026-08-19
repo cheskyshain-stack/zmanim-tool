@@ -150,6 +150,47 @@ def chart_pages(sheet: dict, state: dict, settings, merged_shacharis: str = "") 
     return pages
 
 
+def week_cards(serial: int, state: dict, settings, raw_settings: dict, weekday_first: bool = False) -> list:
+    """A week's two cards, built from the saved sheets exactly as the chart would show them:
+    the formulas, then the rules, then anything typed over.
+
+    A week whose Shabbos is Yom Tov has no parsha and so no row on any Shabbos chart. Its
+    weekday times are still real, so it shows its חול card alone rather than being dropped.
+    """
+    from .render.weekcards import shabbos_card, weekday_card
+    from .weeks import week_index, weekday_chart_for
+
+    index = week_index(state)
+    if serial not in index:
+        return []
+    week, sheet = index[serial]
+    cards = []
+
+    if sheet:
+        overrides = _overrides_of(sheet)
+        cards.append(shabbos_card(week, sheet["season"], settings, raw_settings,
+                                  rules=state.get("rules") or [], overrides=overrides))
+
+    weekday_sheet = weekday_chart_for(sheet, serial, state)
+    if weekday_sheet:
+        weekday_week = next((w for w in week_objects(weekday_sheet["weeks"]) if w.serial == serial), None)
+        if weekday_week:
+            cards.append(weekday_card(weekday_week, settings, raw_settings, overrides=_overrides_of(weekday_sheet)))
+
+    # The two are ordered the same way on screen as on paper. This screen's whole bargain is
+    # that what you see is what comes out, so an order that applied to the printer alone
+    # would be a surprise waiting to happen.
+    if weekday_first:
+        cards.reverse()
+    return cards
+
+
+def _overrides_of(sheet: dict) -> dict:
+    """A sheet's overrides keyed by serial as a number. JSON turns an object key into a
+    string, so a file written here or exported from the web version has them as strings."""
+    return {int(serial): cells for serial, cells in (sheet.get("overrides") or {}).items()}
+
+
 def merged_shacharis_html(raw_settings: dict) -> str:
     """Both schedules as the wall chart has always shown them, with the heading between."""
     from .engine.settings import SPECIAL_SHACHARIS_HEADING
