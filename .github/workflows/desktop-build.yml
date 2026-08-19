@@ -8,6 +8,8 @@ name: Build the program
 #   Zmanim-windows        Zmanim.exe, for Windows
 #   Zmanim-mac-intel      Zmanim.app, for a Mac with an Intel processor
 #   Zmanim-mac-apple      Zmanim.app, for a Mac with Apple silicon (M1 and later)
+# The Release carries a fourth, Zmanim-offline.zip: the browser copy from offline/, which
+# runs anywhere a browser does and is the answer for a machine with no build of its own.
 # An Apple silicon Mac can also run the Intel one through Rosetta, but not the other way
 # round, so the Intel build is the one to send when it is not known which Mac it is for.
 #
@@ -187,6 +189,11 @@ jobs:
       contents: write
 
     steps:
+      # Checked out for offline/, which is the fourth thing published: the browser copy for a
+      # USB stick. It is build output committed to the repository, so there is nothing to
+      # build here, only something to zip.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: downloaded
@@ -202,6 +209,16 @@ jobs:
           cp downloaded/Zmanim-mac-apple*/Zmanim-mac.zip  out/Zmanim-mac-apple.zip
           ls -lh out
 
+      # The browser copy. Zipped with the folder inside it rather than its contents loose, so
+      # unzipping gives one folder called Zmanim-offline holding index.html, and not a dozen
+      # files scattered into whatever folder it was unzipped in.
+      - name: Wrap the browser copy
+        run: |
+          test -f offline/index.html || { echo "offline/ is missing or was never built"; exit 1; }
+          cp -r offline Zmanim-offline
+          zip -qr out/Zmanim-offline.zip Zmanim-offline
+          unzip -l out/Zmanim-offline.zip | tail -3
+
       - name: Publish it
         env:
           GH_TOKEN: ${{ github.token }}
@@ -215,6 +232,7 @@ jobs:
           | `Zmanim.exe` | Windows, 64 bit |
           | `Zmanim-mac-apple.zip` | a Mac with Apple silicon, M1 and later |
           | `Zmanim-mac-intel.zip` | a Mac with an Intel processor |
+          | `Zmanim-offline.zip` | any computer, opened in a browser, with no internet |
 
           Not sure which Mac: Apple menu, About This Mac. An Apple silicon Mac will also run
           the Intel one through Rosetta, but an Intel Mac cannot run the Apple silicon one.

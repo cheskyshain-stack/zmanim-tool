@@ -1066,3 +1066,6 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
   background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius);
   padding: 0.8rem 1rem; margin: 1rem 0; font-size: var(--fs-sm); line-height: 1.55;
 }
+/* The browser copy is a different kind of thing from the three programs, so it gets a
+   heading of its own rather than looking like a fourth platform in the same list. */
+.dl-heading { font-size: 1rem; margin: 1.6rem 0 0.35rem; }

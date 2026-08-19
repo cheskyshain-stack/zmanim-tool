@@ -3496,6 +3496,8 @@ function renderGuide(container, onOpenTab) {
 
 const RELEASES = 'https://github.com/cheskyshain-stack/zmanim-tool/releases';
 const LATEST = `${RELEASES}/latest/download`;
+// The browser copy, built by build-offline.py and zipped by the release workflow.
+const OFFLINE_FILE = 'Zmanim-offline.zip';
 
 const DOWNLOADS = [
   {
@@ -3584,6 +3586,19 @@ function renderProgram(container, platform = detectPlatform()) {
     <div class="dl-list">${rows}</div>
 
     <p class="hint">Not sure which Mac: <strong>Apple menu, then About This Mac</strong>. If it names an M1, M2, M3 or M4, take the Apple silicon one. An Apple silicon Mac will also run the Intel build, but an Intel Mac cannot run the Apple silicon one.</p>
+
+    <h3 class="dl-heading">Or the copy that opens in a browser</h3>
+    <p class="hint">The one above is a program. This is a folder you open in whatever browser is already on the computer. It still needs no internet and nothing installed, and it runs anywhere a browser does, including a computer with no build of its own and one where you are not allowed to run a program you downloaded.</p>
+    <div class="dl-list">
+      <a class="dl-row" href="${LATEST}/${OFFLINE_FILE}" download>
+        <span class="dl-what">
+          <strong>Any computer, in a browser</strong>
+          <span class="hint">About 260 KB. Unzip it, then open <code>index.html</code>.</span>
+        </span>
+        <span class="dl-go">Download</span>
+      </a>
+    </div>
+    <p class="hint">It is the whole thing, not a cut down one: generating, typing over cells, rules, printing, backups. It keeps its work in the browser it is opened in, so the same folder on the same stick opens with your boards on the computer you last used it on and empty on a new one. Move work between them with <strong>Settings, Backup, Export</strong>. Publishing to the congregation's page needs the internet, so it does not work with none.</p>
 
     <details class="panel" ${platform === 'windows' || platform === 'mac' ? 'open' : ''}>
       <summary>The first time you open it, it will refuse. Here is why, and what to press</summary>
