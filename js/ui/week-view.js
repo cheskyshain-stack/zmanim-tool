@@ -21,7 +21,6 @@ import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSit
 import { SLASH } from '../util.js';
 import { attachPagePrintToAll, printWith } from './print-page.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
-import { renderChartBrowser } from './chart-view.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
  *  saved sheet resolves to the most recently generated one.
@@ -784,6 +783,10 @@ function weekCardsHtml(showing, index, state, settings) {
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
+  // opts.heading: false where whatever put this on the screen has already written the
+  // heading itself. On This week the pages and the wall chart are two sides of one screen,
+  // so the title and the buttons that swap them belong to the screen, not to this half.
+  const heading = !luach && opts.heading !== false;
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
@@ -791,7 +794,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   if (!serials.length) {
     container.innerHTML = luach
       ? '<p class="hint">Nothing has been published yet.</p>'
-      : `<h2>This week</h2>
+      : `${heading ? '<h2>This week</h2>' : ''}
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
     return;
   }
@@ -805,14 +808,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
 
   container.innerHTML = `
     ${
-      luach
-        ? ''
-        : // no-print, like the nav and the publish panel below. Left printable, this
+      heading
+        ? // no-print, like the nav and the publish panel below. Left printable, this
           // heading and its explanation are the only things on the page not claiming the
           // "weekcard" named page, so they took a sheet of their own: a landscape one, at
           // the wall chart's @page size, empty apart from two lines of screen furniture.
           `<h2 class="no-print">This week</h2>
     <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
+        : ''
     }
     <div class="week-nav no-print">
       <div class="week-nav-when">
@@ -856,19 +859,6 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
-    ${
-      // The wall chart under the cards, so this screen shows everything the congregation
-      // can see rather than half of it. Its own section with its own heading, because it
-      // pages by stretch of season while the cards above page by week - two sets of
-      // buttons doing different things need to be told apart at a glance.
-      opts.withChart
-        ? `<section class="week-chart">
-             <h2 class="no-print">The chart</h2>
-             <p class="hint no-print">The wall chart as the congregation sees it, opening on the stretch covering now.</p>
-             <div id="week-chart-host"></div>
-           </section>`
-        : ''
-    }
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -938,16 +928,6 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     () => at > 0 && onSerialChange(serials[at - 1]),
     () => at < serials.length - 1 && onSerialChange(serials[at + 1])
   );
-
-  const chartHost = container.querySelector('#week-chart-host');
-  if (chartHost) {
-    // No swipe on the chart here: this container already swipes through the weeks, and a
-    // gesture over the chart would reach both handlers and move two things at once.
-    renderChartBrowser(chartHost, state, { swipe: false, empty: 'Generate a שבת sheet and its chart shows up here.' });
-    // Nor should a swipe over the chart page the weeks behind it. Passive listeners, so
-    // stopping propagation is all they do; nothing is prevented.
-    for (const type of ['touchstart', 'touchend']) chartHost.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
-  }
 
   const status = container.querySelector('#publish-status');
   const say = (message, isError = false) => {

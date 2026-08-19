@@ -355,56 +355,6 @@ function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ==== pagination.js ====
-// Splits a generated week list across however many printable pages the user chooses
-// (3, 4, or any other count), by user-chosen per-page counts.
-function validatePageSizes(total, sizes) {
-  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
-  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
-  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
-  return null;
-}
-
-/** Even default split across `numPages` pages (earlier pages absorb the remainder one
- *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
-function defaultPageSizes(total, numPages) {
-  const base = Math.floor(total / numPages);
-  const rem = total % numPages;
-  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
-}
-
-/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
- *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
- *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
- *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
- *  the gap between two source pages lands on the earlier one, matching how the season
- *  boundaries themselves are assigned in sheets/weeks.js. */
-function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
-  const cutoffs = []; // serial of the first source week on each page after the first
-  let idx = 0;
-  for (let i = 0; i < sourceSizes.length - 1; i++) {
-    idx += Number(sourceSizes[i]) || 0;
-    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
-  }
-  const counts = new Array(sourceSizes.length).fill(0);
-  for (const week of targetWeeks) {
-    let page = 0;
-    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
-    counts[page]++;
-  }
-  return counts;
-}
-
-function splitWeeksIntoPages(weeks, sizes) {
-  const pages = [];
-  let i = 0;
-  for (const size of sizes) {
-    pages.push(weeks.slice(i, i + size));
-    i += size;
-  }
-  return pages;
-}
-
 // ==== zmanim/solar.js ====
 // Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
@@ -917,6 +867,188 @@ function hasTaanis(serial, settings) {
   }
 }
 
+// ==== pagination.js ====
+// Splits a generated week list across however many printable pages the user chooses
+// (3, 4, or any other count), by user-chosen per-page counts.
+function validatePageSizes(total, sizes) {
+  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
+  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
+  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
+  return null;
+}
+
+/** Even default split across `numPages` pages (earlier pages absorb the remainder one
+ *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
+function defaultPageSizes(total, numPages) {
+  const base = Math.floor(total / numPages);
+  const rem = total % numPages;
+  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
+ *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
+ *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
+ *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
+ *  the gap between two source pages lands on the earlier one, matching how the season
+ *  boundaries themselves are assigned in sheets/weeks.js. */
+function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
+  const cutoffs = []; // serial of the first source week on each page after the first
+  let idx = 0;
+  for (let i = 0; i < sourceSizes.length - 1; i++) {
+    idx += Number(sourceSizes[i]) || 0;
+    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
+  }
+  const counts = new Array(sourceSizes.length).fill(0);
+  for (const week of targetWeeks) {
+    let page = 0;
+    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
+    counts[page]++;
+  }
+  return counts;
+}
+
+function splitWeeksIntoPages(weeks, sizes) {
+  const pages = [];
+  let i = 0;
+  for (const size of sizes) {
+    pages.push(weeks.slice(i, i + size));
+    i += size;
+  }
+  return pages;
+}
+
+// ==== ui/nav-helpers.js ====
+// Two small pieces the week view and the chart view both need.
+//
+// Their own module because they are all the two views share: with them inside week-view
+// the chart view had to import it, and week-view imports the chart view to put the chart
+// under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
+// into one flat script.
+
+/** The week the congregation should be looking at: the next Shabbos still to come.
+ *
+ *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
+ *  week. Compared as a date rather than a moment, so the switch happens at midnight on
+ *  Motzei Shabbos rather than at an exact tzais. */
+function currentSerial(serials) {
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
+  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
+}
+
+/** Swipe across the week to page through it, the way a photo album works: drag left to
+ *  bring the next week in, right for the previous one.
+ *
+ *  Read on touchend rather than followed on touchmove, because the page has to keep
+ *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
+ *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
+ *  across and half again as far across as down, which leaves the diagonal drags that end
+ *  a scroll alone.
+ *
+ *  The handlers hang off the container, which in the admin is the same element every
+ *  render, so an old pair is taken off before a new one goes on. Left to stack, every
+ *  swipe after the first would fire a whole history of stale handlers, each still holding
+ *  the week it was rendered for. */
+function wireSwipe(container, onPrev, onNext) {
+  container._weekSwipeOff?.();
+  let startX = null;
+  let startY = null;
+  const start = (e) => {
+    if (e.touches.length !== 1) return (startX = null);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  };
+  const end = (e) => {
+    if (startX === null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    (dx < 0 ? onNext : onPrev)();
+  };
+  container.addEventListener('touchstart', start, { passive: true });
+  container.addEventListener('touchend', end, { passive: true });
+  container._weekSwipeOff = () => {
+    container.removeEventListener('touchstart', start);
+    container.removeEventListener('touchend', end);
+  };
+}
+
+// ==== ui/print-page.js ====
+// Printing one page on its own.
+//
+// A print button that prints everything is fine when everything is what you want. Usually
+// it is not: one week's page for the board outside, or one page of the season chart. Each
+// page therefore carries its own button, in a strip above it so it never sits on top of
+// anything and never reaches paper.
+//
+// The isolation is done in CSS rather than by building a separate document: the page is
+// marked, the body is told only marked pages print, and both marks come off again when
+// the dialog closes. Nothing is moved or cloned, so what prints is the page you were
+// looking at.
+
+/** Prints one element, hiding every other page for the duration. */
+function printOnly(pageEl) {
+  document.body.classList.add('is-printing-one');
+  pageEl.classList.add('is-print-target');
+  // The wrapper is marked as well as the page. Hiding only the other pages left their
+  // wrappers standing, and an empty wrapper is still a box outside the named page the
+  // pages themselves claim, which was enough to put out a blank sheet of the *default*
+  // page size next to the one being printed.
+  const slot = pageEl.closest('.page-slot');
+  slot?.classList.add('is-print-slot');
+  const done = () => {
+    document.body.classList.remove('is-printing-one');
+    pageEl.classList.remove('is-print-target');
+    slot?.classList.remove('is-print-slot');
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  // Safari and some mobile browsers never fire afterprint. A timer is a poor signal but a
+  // page left hidden would be a real bug, and clearing early costs nothing: print() has
+  // already taken its snapshot by then.
+  setTimeout(done, 1500);
+}
+
+/** Prints with a class on the body, for a layout that only applies to paper (see
+ *  is-print-pair in print.css). Same clean-up dance as printOnly. */
+function printWith(bodyClass) {
+  document.body.classList.add(bodyClass);
+  const done = () => {
+    document.body.classList.remove(bodyClass);
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 1500);
+}
+
+/** Puts a print button above one page. The page keeps its own place in the flow; the
+ *  wrapper only adds the strip. */
+function attachPagePrint(pageEl, label = 'Print this page') {
+  const slot = document.createElement('div');
+  slot.className = 'page-slot';
+  const bar = document.createElement('div');
+  bar.className = 'page-slot-bar no-print';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'page-print';
+  btn.textContent = label;
+  btn.addEventListener('click', () => printOnly(pageEl));
+  bar.appendChild(btn);
+  pageEl.replaceWith(slot);
+  slot.append(bar, pageEl);
+  return slot;
+}
+
+/** Gives every matching page its own button. */
+function attachPagePrintToAll(root, selector, label) {
+  root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
+}
+
 // ==== format.js ====
 // Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
 // CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
@@ -1005,6 +1137,108 @@ function normalizeRichText(html) {
     .replace(/(<br\s*\/?>)+\s*$/i, '')
     .replace(/&nbsp;/g, ' ')
     .trim();
+}
+
+// ==== overrides.js ====
+// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
+// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
+function getOverride(sheet, weekSerial, columnKey) {
+  return sheet.overrides?.[weekSerial]?.[columnKey];
+}
+function setOverride(sheet, weekSerial, columnKey, value) {
+  if (!sheet.overrides) sheet.overrides = {};
+  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
+  sheet.overrides[weekSerial][columnKey] = value;
+}
+function clearOverride(sheet, weekSerial, columnKey) {
+  if (sheet.overrides?.[weekSerial]) {
+    delete sheet.overrides[weekSerial][columnKey];
+    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
+  }
+}
+
+/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
+function mergeRow(computedRow, sheet, weekSerial) {
+  const overriddenKeys = new Set();
+  const row = { ...computedRow };
+  const weekOverrides = sheet.overrides?.[weekSerial];
+  if (weekOverrides) {
+    for (const [key, value] of Object.entries(weekOverrides)) {
+      row[key] = value;
+      overriddenKeys.add(key);
+    }
+  }
+  return { row, overriddenKeys };
+}
+
+// ==== rules.js ====
+// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
+// HaGadol have a different Mincha time because of the drasha"). Applied to every
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
+// the intended distinction between rules (recurring, reapplies every year) and
+// overrides (tied to one generated sheet instance).
+//
+// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
+// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
+// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
+// touching the wrong column on the other sheet.
+//
+// A condition can combine any of:
+//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
+//   parsha:        [names]      - matches week.parsha
+//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
+//   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
+function conditionMatches(condition, week) {
+  if (condition.always) return true;
+  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
+  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
+  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
+  return false;
+}
+
+/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
+ *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
+ *  compatibility with data saved before that format existed, bare keys ("L") and the
+ *  older singular columnKey field (applied to any sheet). */
+function targetColumnsForSeason(rule, season) {
+  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+  return raw
+    .map((entry) => {
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
+      const [entrySeason, key] = entry.split(':');
+      return entrySeason === season ? key : null;
+    })
+    .filter(Boolean);
+}
+
+/** Applies every enabled rule to a row of computed cell text, returning a new object
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
+function applyRules(row, week, rules, season, appliedColumns) {
+  let out = row;
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (!conditionMatches(rule.condition, week)) continue;
+    for (const col of targetColumnsForSeason(rule, season)) {
+      if (!(col in out)) continue;
+      if (out === row) out = { ...row };
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      if (appliedColumns) appliedColumns.add(col);
+    }
+  }
+  return out;
 }
 
 // ==== util.js ====
@@ -1245,6 +1479,1354 @@ function applyTishaBavNote(row, week, settings) {
   if (jdate.month !== 5 || jdate.dayOfMonth !== 9) return row; // month 5 = Av (Nissan=1..Adar=12 numbering)
   const withNote = (text) => [text, 'ט באב'].filter(Boolean).join('\n');
   return { ...row, B: withNote(row.B), C: withNote(row.C) };
+}
+
+// ==== sheets/choref.js ====
+// שבת חורף (Winter Shabbos) column formulas, ported 1:1 from the workbook's
+// WINTER_ZMANIM_1 table (columns B:J). `week.serial` is the Shabbos (Saturday)
+// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
+
+
+
+
+function buildChorefRow(week, settings) {
+  const shabbos = week.serial;
+  const friday = shabbos - 1;
+  const shabbosDate = dateFromSerial(shabbos);
+  const fridayDate = dateFromSerial(friday);
+
+  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+  const E = shacharisLine();
+
+  const sunsetFriday = Z.sunset(fridayDate, settings);
+  const F = underlineTime(floorToMinute(sunsetFriday + 50 / 1440));
+
+  const G = inPlagWindow(friday, settings)
+    ? textjoin(SLASH, true, [
+        formatTime(Z.plagHamincha(fridayDate, settings) - 15 / 1440),
+        formatTime(Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
+        formatTime(Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
+        formatTime(floorToMinute(sunsetFriday - 15 / 1440)),
+      ])
+    : formatTime(floorToMinute(sunsetFriday - 15 / 1440));
+
+  const H = candleLightingCell(fridayDate, settings);
+  const I = fridayMainMinchaMenu(fridayDate, settings);
+
+  return { B, C, D, E, F, G, H, I };
+}
+
+const CHOREF_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  { key: 'E', header: 'שחרית' },
+  { key: 'F', header: 'מעריב' },
+  { key: 'G', header: 'מנחה\nמעריב' },
+  { key: 'H', header: 'הדלקת\nנרות' },
+  { key: 'I', header: 'מנחה\nערב שבת' },
+];
+
+// ==== sheets/kayitz.js ====
+// שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
+// SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
+// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
+
+
+
+
+
+/** AND(dayOfYear>16, dayOfYear<65): roughly the Sefirah stretch (after Pesach, before
+ *  Shavuos), where the workbook adds a few extra minutes to the Friday Maariv time and
+ *  offers a second (later) Maariv. */
+function inExtraMaarivWindow(serial, settings) {
+  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
+  return doy > 16 && doy < 65;
+}
+
+function buildKayitzRow(week, settings) {
+  const shabbos = week.serial;
+  const friday = shabbos - 1;
+  const shabbosDate = dateFromSerial(shabbos);
+  const fridayDate = dateFromSerial(friday);
+
+  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+  const E = shacharisLine();
+
+  const extraMaariv = inExtraMaarivWindow(friday, settings);
+  const sunsetFriday = Z.sunset(fridayDate, settings);
+  const F = underlineTime(floorToMinute(sunsetFriday + (extraMaariv ? 55 : 50) / 1440));
+
+  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
+  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב ${formatTime(floorToMinute(sunsetFriday + 30 / 1440))}` : '');
+
+  const H = candleLightingCell(fridayDate, settings);
+
+  const plagWindow = inPlagWindow(friday, settings);
+  const plagMA = Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings));
+  const I = plagWindow ? `${formatTime(ceilToMinute(plagMA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA))}` : '';
+
+  const plagMA2 = Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings));
+  const J = plagWindow ? `${underlineTime(ceilToMinute(plagMA2 - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA2))}` : '';
+
+  const plagGRA = Z.plagHamincha(fridayDate, settings);
+  const K = plagWindow ? `${formatTime(ceilToMinute(plagGRA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagGRA))}` : '';
+
+  const L = fridayMainMinchaMenu(fridayDate, settings);
+
+  return { B, C, D, E, F, G, H, I, J, K, L };
+}
+
+const KAYITZ_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  { key: 'E', header: 'שחרית' },
+  { key: 'F', header: ' מעריב ' },
+  { key: 'G', header: 'מנחה\nמעריב' },
+  { key: 'H', header: 'הדלקת\nנרות' },
+  // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
+  // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
+  // sits after פלג מ"א on its own line to match the printed board.
+  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
+  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
+  { key: 'K', header: 'מנחה\nפלג גר"א' },
+  { key: 'L', header: 'מנחה\nערב שבת' },
+];
+
+// ==== sheets/weekday.js ====
+// Weekday chart מנחה/מעריב schedule.
+//
+// The שבת charts are 1:1 ports of workbook columns. These two are not: the workbook
+// leaves weekday מנחה/מעריב blank and they were typed in by hand every week. So the
+// shul's standing weekday schedule is written out here as the rules it actually follows,
+// and every zman those rules lean on still comes from the workbook's own ported formulas
+// (zmanim.js / hebrew-calendar.js), never from a zmanim library:
+//
+//   שקיעה         Z.sunset          (workbook SUNSET)
+//   מנחה גדולה    Z.minchaGedolaLechumra (workbook MINCHA_GEDOLA_LECHUMRA - the same one
+//                                    the workbook's own ערב שבת מנחה menu tests against
+//                                    to decide its 1:35 slot, see common.js)
+//   DST           Z.dstLocal        (workbook calcDST_LOCAL)
+//   ר"ח / dates   hebrew-calendar.js (workbook ROSH_HASHANA + JEWISH_DATE_AS_ARRAY)
+//
+// Everything is decided once per *week*, from Sunday through Thursday only: Friday runs
+// on the ערב שבת schedule over on the שבת chart, and Shabbos has its own.
+//
+// שחרית is deliberately not built here. It's one fixed schedule identical every week,
+// printed once as a merged cell straight from Settings (see ui/sheet-view.js).
+//
+// How a printed time says where that מנין davens (the same symbols the chart's own footer
+// explains):
+//
+//   plain time        main בית מדרש
+//   underlined time   למטה
+//   one * after it    בעזר״נ
+//   two ** after it   באולם השמחות
+//
+// Typing over a cell still works and still wins: a hand-typed value is stored as a
+// per-cell override and rendered instead of anything computed here (see overrides.js).
+
+
+
+
+/** Times are handled in whole minutes after midnight rather than Excel day-fractions,
+ *  because every zman on this chart sits on a 5-minute grid and the moves below are
+ *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
+ *  would otherwise sort before everything else. Day-fractions only come back at the end,
+ *  to hand to formatTime. */
+const HM = (h, m) => h * 60 + m;
+const fmtMinutes = (mins) => formatTime(mins / 1440);
+/** Zmanim come back as day-fractions; this chart works in minutes. */
+const toMinutes = (dayFraction) => dayFraction * 1440;
+
+const STEP = 5; // a zman is nudged 5 minutes at a time
+const TOO_CLOSE = 14; // 14 minutes or less from its neighbour and a moved zman is dropped
+const STEP_GUARD = 288; // 288 * 5 = a full day, so a bad latitude can never spin forever
+
+const MAIN = 'main'; // main בית מדרש, printed plain
+const LMATA = 'lmata'; // למטה, printed underlined
+const EZRAS = 'ezras'; // בעזר״נ, printed with one *
+
+function renderTime(mins, place) {
+  const text = fmtMinutes(mins);
+  if (place === LMATA) return underlineTime(text);
+  if (place === EZRAS) return `${text}*`;
+  return text;
+}
+
+/** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
+ *  like every other row, so Sunday is six days back. Two rows on a Weekday chart are
+ *  anchored on a stand-in date instead of a real Saturday (the season's trailing gap
+ *  before Yom Tov, and a Chol Hamoed row - see weeks.js), which is why this walks back
+ *  from whatever weekday the serial actually is rather than just subtracting six. */
+function sundayThroughThursday(serial) {
+  const sunday = serial - (excelWeekday(serial) - 1);
+  return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+function shkiaMinutes(serial, settings) {
+  return toMinutes(Z.sunset(dateFromSerial(serial), settings));
+}
+
+/** The three BMG זמנים, as Hebrew (day, month) pairs. Month numbering is the workbook's
+ *  own: Nissan=1 .. Elul=6, Tishrei=7 .. Adar=12. `endYearOffset` is 1 for the אלול range
+ *  only, because its end (יום כיפור) falls after ראש השנה and so lands in the next AM
+ *  year, while the other two open and close inside one AM year. */
+const BMG_RANGES = [
+  { start: [1, 6], end: [10, 7], endYearOffset: 1 }, // ר"ח אלול -> יום כיפור
+  { start: [1, 8], end: [7, 1], endYearOffset: 0 }, // ר"ח חשון -> ז' ניסן
+  { start: [1, 2], end: [9, 5], endYearOffset: 0 }, // ר"ח אייר -> ט' באב
+];
+
+/** Whether one calendar day falls inside a BMG זמן. Each range is resolved into actual
+ *  serial dates so the comparison is a plain date range, which sidesteps the fact that
+ *  the AM year rolls over at ראש השנה (month 7) while the month numbering starts at
+ *  ניסן (month 1). The neighbouring years are checked too: a day in תשרי belongs to a
+ *  range that opened in אלול of the year before. */
+function isBmgDay(serial, settings) {
+  const { year } = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    for (const r of BMG_RANGES) {
+      const from = dateFromHebrew(r.start[0], r.start[1], y);
+      const to = dateFromHebrew(r.end[0], r.end[1], y + r.endYearOffset);
+      if (serial >= from && serial <= to) return true;
+    }
+  }
+  return false;
+}
+
+/** One answer for the whole row, since the chart prints one line per week. A week that
+ *  straddles the start or end of a BMG זמן goes with the majority of its Sunday-Thursday
+ *  days, so the row can never come out self-contradictory (a 4:15 מנחה, which is BMG
+ *  only, printed alongside an 11:30 מעריב, which is not). */
+function isBmgWeek(serial, settings) {
+  const days = sundayThroughThursday(serial);
+  const bmgDays = days.filter((d) => isBmgDay(d, settings)).length;
+  return bmgDays * 2 > days.length;
+}
+
+/** מנחה.
+ *
+ *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
+ *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
+ *  keeps the location it started with. */
+function minchaTimes(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const dates = days.map(dateFromSerial);
+
+  // 12:45 and 1:15 only run on standard time. DST always flips on a Sunday, so all five
+  // days agree; .every() is just being explicit about which way a split week would go.
+  const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
+  const bmg = isBmgWeek(week.serial, settings);
+
+  // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
+  // Never anything else. The workbook makes the same call the same way for its ערב שבת
+  // מנחה menu (common.js), against the same MINCHA_GEDOLA_LECHUMRA.
+  const latestMinchaGedola = Math.max(...dates.map((d) => toMinutes(Z.minchaGedolaLechumra(d, settings))));
+  const earlyAfternoon = latestMinchaGedola > HM(13, 35) ? HM(13, 40) : HM(13, 35);
+
+  // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
+  // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
+  // can never leave a zman a few seconds short of the 15.
+  const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
+  const latestAllowed = earliestShkia - 15;
+
+  const slots = [
+    standardTime ? { mins: HM(12, 45), place: LMATA } : null,
+    standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    { mins: earlyAfternoon, place: LMATA },
+    { mins: HM(13, 50), place: MAIN },
+    bmg ? { mins: HM(16, 15), place: LMATA } : null, // 4:15 is a BMG zman
+    { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
+    { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
+    { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
+  ].filter(Boolean);
+
+  // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
+  for (const slot of slots) {
+    if (!slot.shkiaDriven) continue;
+    const base = slot.mins;
+    for (let guard = 0; slot.mins > latestAllowed && guard < STEP_GUARD; guard++) slot.mins -= STEP;
+    slot.moved = slot.mins !== base;
+  }
+
+  // A move can walk a zman back into the one before it. Once it is within 14 minutes of
+  // the previous מנחה still being printed, it stops being printed at all.
+  const kept = [];
+  for (const slot of slots) {
+    const prev = kept[kept.length - 1];
+    if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) continue;
+    kept.push(slot);
+  }
+  return kept.map((slot) => renderTime(slot.mins, slot.place));
+}
+
+/** Where the 8:45 מעריב davens, which follows wherever the clock pushed it to. It is
+ *  still the 8:45 מנין at every one of these times. */
+function place845(mins) {
+  if (mins <= HM(20, 45)) return MAIN; // never moved: main בית מדרש
+  if (mins <= HM(21, 15)) return LMATA; // 8:50 through 9:15: למטה
+  return EZRAS; // 9:20 or later: בעזר״נ
+}
+
+/** מעריב.
+ *
+ *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
+ *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
+ *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
+function maarivTimes(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+
+  const bmg = isBmgWeek(week.serial, settings);
+
+  // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
+  // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
+  const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
+  const earliestAllowed = latestShkia + 50;
+
+  const slots = [
+    { mins: HM(18, 35) },
+    { mins: HM(19, 0) },
+    { mins: HM(19, 30) },
+    { mins: HM(20, 0) },
+    { mins: HM(20, 45), is845: true },
+    { mins: HM(21, 30) },
+    { mins: HM(22, 0) },
+    { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
+    { mins: HM(23, 0) },
+    !bmg ? { mins: HM(23, 30) } : null, // 11:30 and 12:00 run only when BMG is out
+    !bmg ? { mins: HM(24, 0) } : null,
+  ].filter(Boolean);
+
+  // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
+  for (const slot of slots) {
+    const base = slot.mins;
+    for (let guard = 0; slot.mins < earliestAllowed && guard < STEP_GUARD; guard++) slot.mins += STEP;
+    slot.moved = slot.mins !== base;
+  }
+
+  // Mirror of the מנחה rule, in the other direction: a zman pushed up to within 14
+  // minutes of the next מעריב still being printed stops being printed. Walked from the
+  // end backwards so "the next one" means the next one actually surviving, not one that
+  // is itself about to be dropped.
+  //
+  // The 8:45 is exempt. It is a מנין in its own right rather than a duplicate of the one
+  // behind it, and once it passes 9:20 it davens in a different room (בעזר״נ) from the
+  // 9:30 (למטה), so the two belong on the board together. Without the exemption it would
+  // be deleted every year from mid-June to mid-July, which is the only stretch where it
+  // ever reaches בעזר״נ at all - the location rule above would never print once.
+  const kept = [];
+  for (let i = slots.length - 1; i >= 0; i--) {
+    const slot = slots[i];
+    const next = kept[kept.length - 1];
+    if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) continue;
+    kept.push(slot);
+  }
+  kept.reverse();
+  return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
+}
+
+function buildWeekdayRow(week, settings) {
+  return {
+    B: splitLinesInHalf(maarivTimes(week, settings)),
+    C: splitLinesInHalf(minchaTimes(week, settings)),
+  };
+}
+
+const WEEKDAY_COLUMNS = [
+  { key: 'B', header: 'מעריב' },
+  { key: 'C', header: 'מנחה' },
+  { key: 'E', header: 'שחרית' },
+];
+
+// ==== ui/rich-text.js ====
+// Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
+// (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
+// Underline goes through execCommand, which already handles the add/remove toggle and
+// partial selections correctly; text size is a plain <span class="big"> wrap, so what's
+// stored stays readable HTML rather than the <font size> tags execCommand would emit.
+
+/** The modifier key as this machine's user would write it, for the shortcut hints. */
+const MOD = /mac|iphone|ipad/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+
+/** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
+ *  it acts on. Each button's tooltip names its keyboard shortcut - the toolbar is the
+ *  only place they're discoverable. */
+function richTextToolbarHtml(label = '') {
+  return `<span class="rt-toolbar no-print">
+    ${label ? `<span class="rt-label">${label}</span>` : ''}
+    ${richTextButtonsHtml()}
+  </span>`;
+}
+
+/** Just the buttons, for a container that supplies its own wrapper (the floating bar). */
+function richTextButtonsHtml() {
+  return `<button type="button" data-rt="underline" title="Underline / remove underline from the selected text  (${MOD}+U)"><u>U</u></button>
+    <button type="button" data-rt="big" title="Make the selected text bigger  (${MOD}+Shift+&gt;)">A&plus;</button>
+    <button type="button" data-rt="unbig" title="Put the selected text back to normal size  (${MOD}+Shift+&lt;)">A&minus;</button>`;
+}
+
+/** Ctrl+Shift+> / Ctrl+Shift+< for the size buttons, matching what Word and Google Docs
+ *  use. Underline needs nothing: Ctrl+U is already built into contenteditable, and it
+ *  fires an input event, so the edit saves the same way a toolbar click does.
+ *
+ *  One listener for the whole app, resolving the editor from whatever has focus - the
+ *  sheet's cells and the Settings שחרית editor both qualify, and neither can be reached
+ *  by a keystroke without being focused first. Registered once, since the views that use
+ *  the toolbar re-render freely. */
+let shortcutsWired = false;
+function wireShortcutsOnce() {
+  if (shortcutsWired) return;
+  shortcutsWired = true;
+  document.addEventListener('keydown', (e) => {
+    const editor = document.activeElement;
+    if (!editor?.isContentEditable || !(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+    // Reading both the shifted character and the unshifted key, since which one arrives
+    // depends on the keyboard layout.
+    const cmd = ['>', '.'].includes(e.key) ? 'big' : ['<', ','].includes(e.key) ? 'unbig' : null;
+    if (!cmd) return;
+    e.preventDefault();
+    applyRichTextCommand(cmd, editor);
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+/** The same three buttons, following the selection.
+ *
+ *  The toolbar at the top of the sheet is a long way from the cell you're editing, and on
+ *  a phone it can be off screen entirely. This puts the buttons right above whatever you
+ *  just selected, and works for any editable field in the app, since it resolves the
+ *  editor from the selection rather than from a particular view.
+ *
+ *  Built once and reused: it's a single element parked on <body> at position:fixed, so it
+ *  sits above everything without caring what the page around it is doing. */
+let floatEl = null;
+function floatingToolbarOnce() {
+  if (floatEl) return;
+  floatEl = document.createElement('div');
+  floatEl.className = 'rt-float rt-toolbar no-print';
+  floatEl.hidden = true;
+  floatEl.innerHTML = richTextButtonsHtml();
+  document.body.appendChild(floatEl);
+  // The editor is whichever editable field holds the selection, resolved at click time.
+  wireRichTextToolbar(floatEl, editorOfSelection);
+
+  const place = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !editorOfSelection()) {
+      floatEl.hidden = true;
+      return;
+    }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (!rect.width && !rect.height) {
+      floatEl.hidden = true;
+      return;
+    }
+    floatEl.hidden = false;
+    // Measured after unhiding, since a hidden element has no size to centre on.
+    const { width, height } = floatEl.getBoundingClientRect();
+    const edge = 8;
+    // Below the selection, not above: a phone puts its own Cut/Copy/Paste bar above the
+    // text you just selected, and the two landed on top of each other. The gap clears the
+    // drag handles that hang under the selection on a touch screen. Above only as a
+    // fallback, when there is no room underneath.
+    const BELOW_GAP = 26;
+    const below = rect.bottom + BELOW_GAP;
+    const fitsBelow = below + height <= window.innerHeight - edge;
+    floatEl.style.top = `${fitsBelow ? below : Math.max(edge, rect.top - height - edge)}px`;
+    floatEl.style.left = `${Math.max(edge, Math.min(window.innerWidth - width - edge, rect.left + rect.width / 2 - width / 2))}px`;
+  };
+
+  // selectionchange fires for every caret move, so the work is deferred and collapsed
+  // into one update. A timeout rather than requestAnimationFrame: rAF doesn't run at all
+  // while the page is considered hidden, which would leave the bar stuck wherever it was
+  // when the window lost visibility.
+  let queued = false;
+  const schedule = () => {
+    if (queued) return;
+    queued = true;
+    setTimeout(() => {
+      queued = false;
+      place();
+    }, 0);
+  };
+  document.addEventListener('selectionchange', schedule);
+  // Keep it against the text while the page moves under it.
+  window.addEventListener('scroll', schedule, true);
+  window.addEventListener('resize', schedule);
+}
+
+/** The editable field containing the current selection, or null if it isn't in one. */
+function editorOfSelection() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+  const editor = node.closest?.('[contenteditable="true"]');
+  return editor || null;
+}
+
+/** `getEditor()` is called per click so callers whose target moves (the sheet's toolbar
+ *  acts on whichever cell was last focused) can resolve it late. */
+function wireRichTextToolbar(root, getEditor) {
+  wireShortcutsOnce();
+  floatingToolbarOnce();
+  root.querySelectorAll('[data-rt]').forEach((btn) => {
+    // Without this the button steals focus on press, which collapses the selection in
+    // the editor before the click handler ever runs - leaving nothing to format.
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const editor = getEditor();
+      if (!editor) return;
+      applyRichTextCommand(btn.dataset.rt, editor);
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+}
+
+function applyRichTextCommand(cmd, editor) {
+  if (cmd === 'underline') {
+    document.execCommand('underline');
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return;
+
+  if (cmd === 'big') {
+    const span = document.createElement('span');
+    span.className = 'big';
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    reselect(sel, span);
+    return;
+  }
+  if (cmd === 'unbig') {
+    // Selection sitting *inside* one big span (the common case - you enlarged a line,
+    // then selected part of it): unwrap that whole span rather than splitting it.
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    const enclosing = node.closest?.('span.big');
+    if (enclosing && editor.contains(enclosing)) {
+      enclosing.replaceWith(...enclosing.childNodes);
+      return;
+    }
+    // Otherwise the selection spans several - strip any it fully contains.
+    const frag = range.extractContents();
+    frag.querySelectorAll('span.big').forEach((s) => s.replaceWith(...s.childNodes));
+    range.insertNode(frag);
+  }
+}
+
+/** Whether a run of text is nothing but times and the punctuation that separates them,
+ *  so expanding bare digits in it is unambiguous.
+ *
+ *  Without this the expansion reaches into ordinary text: "10 דק׳" became "10:00 דק׳"
+ *  and "TEST123" became "TEST1:23" - and because it runs on blur, merely clicking into
+ *  a cell and back out was enough to rewrite it and save an override. Any letter in the
+ *  run means it isn't a bare time list, so leave it alone. In a formatted field this is
+ *  applied per text node, so times and words can still coexist there - a line of times
+ *  is expanded even when a Hebrew line right above it isn't. */
+function isBareTimeList(text) {
+  return /\d/.test(text) && !/\p{L}/u.test(text);
+}
+
+/** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
+ *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
+ *
+ *  With no markup in the field it can work on the text wholesale, separators included.
+ *  Once part of the text is underlined or resized, it only expands digits within each
+ *  text node and leaves separators alone: the spaces between times may then live in
+ *  different nodes than the times themselves, and rewriting across that boundary would
+ *  mean rebuilding the field's HTML - which would throw away exactly the formatting the
+ *  user just applied. */
+function applyTimeShorthand(editorEl) {
+  if (!editorEl.children.length) {
+    if (!isBareTimeList(editorEl.textContent)) return;
+    const normalized = normalizeTimeList(editorEl.textContent);
+    if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
+    return;
+  }
+  const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach((node) => {
+    if (!isBareTimeList(node.nodeValue)) return;
+    const normalized = normalizeTimeShorthand(node.nodeValue);
+    if (normalized !== node.nodeValue) node.nodeValue = normalized;
+  });
+}
+
+function reselect(sel, node) {
+  sel.removeAllRanges();
+  const r = document.createRange();
+  r.selectNodeContents(node);
+  sel.addRange(r);
+}
+
+// ==== ui/sheet-view.js ====
+/** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
+ *  week). Whichever page ends up containing at least one week past the spring DST
+ *  cutover (2nd Sunday of March - not the fall one near Sukkos) prints as a real שבת
+ *  קיץ chart for its *entire* page - same columns, same formulas, same rule-matching
+ *  as an actual קיץ sheet - even for any earlier weeks sharing that page, which just
+ *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window).
+ *  A Weekday chart has no such split - it's always 'weekday'. */
+function pageEffectiveSeason(sheet, pageWeeks, settings) {
+  if (sheet.season !== 'choref') return sheet.season;
+  return pageWeeks.some((w) => inSpringDstWindow(w.date, settings)) ? 'kayitz' : 'choref';
+}
+function columnsAndBuilderFor(effectiveSeason) {
+  if (effectiveSeason === 'weekday') return { columns: WEEKDAY_COLUMNS, buildRow: buildWeekdayRow };
+  return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
+}
+
+const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Times New Roman', 'Arial', 'Segoe UI'];
+
+/** Which shipped webfont stands in for each choice when the real one isn't installed.
+ *
+ *  A phone has none of these fonts, so without a stand-in every Hebrew column falls back
+ *  to the system sans - and with a single stand-in for all of them, picking Times New
+ *  Roman still got you David's Hebrew, which looks nothing like it. Times New Roman and
+ *  Frank Ruehl are both traditional high-contrast Hebrew serifs, so one covers the other
+ *  closely; David is a lighter semi-serif and only matches itself.
+ *
+ *  Arial and Segoe UI are deliberately absent: they fall back to the device's own Hebrew
+ *  sans (Noto on Android, Segoe on Windows), which is already the right shape - no point
+ *  downloading a font to say the same thing. */
+const HEBREW_STAND_IN = {
+  'Times New Roman': 'Frank Ruhl Libre',
+  'Frank Ruehl': 'Frank Ruhl Libre',
+  'Guttman Yad': 'Frank Ruhl Libre',
+  David: 'David Libre',
+  'David Libre': 'David Libre',
+};
+
+/** The full CSS stack for a chosen font: the real font first (installed on the machines
+ *  these sheets are printed from), then the shipped stand-in, then a generic. */
+function fontStackFor(fontFamily) {
+  const standIn = HEBREW_STAND_IN[fontFamily];
+  const generic = fontFamily === 'Arial' || fontFamily === 'Segoe UI' ? 'sans-serif' : 'serif';
+  return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
+}
+
+// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
+// intentionally not persisted to localStorage; it lives for as long as the app tab is
+// open, same as undo history in most editors.
+const histories = new Map();
+function getHistory(sheetId) {
+  if (!histories.has(sheetId)) histories.set(sheetId, { undo: [], redo: [] });
+  return histories.get(sheetId);
+}
+function applyOverrideValue(sheet, serial, col, value) {
+  if (value === undefined) clearOverride(sheet, serial, col);
+  else setOverride(sheet, serial, col, value);
+}
+
+/** The printed pages of one sheet, built and styled but not yet in the document.
+ *
+ *  Exported because the congregation's page shows the same chart, and a second renderer
+ *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
+ *  that use: it is the same markup with the cell editing taken off, rather than a
+ *  different rendering path that could quietly diverge.
+ *
+ *  Row heights still need syncPageHeights() once the pages are in the document, since
+ *  nothing can be measured before then. */
+function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
+  if (!sheet) return [];
+  const settings = resolveSettings(state.settings);
+  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
+  if (!sheet.columnWidths) sheet.columnWidths = {};
+  const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+  const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
+  return split.map(({ weeks: pw, effectiveSeason }, i) => {
+    const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
+    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason);
+    el.dataset.sheetLabel = sheetLabel(sheet);
+    el.dataset.pageIndex = i;
+    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
+    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
+    return el;
+  });
+}
+
+/** Makes every row on every page the same height. Must run with the pages in the
+ *  document: heights read 0 on a detached element. */
+function syncPageHeights(pagesEl) {
+  syncHeaderRowHeight(pagesEl);
+}
+
+function renderSheet(container, state, sheet, onChange) {
+  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
+  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || DEFAULT_ACCENT_COLOR; // sheets saved before this control existed
+  if (!sheet.columnWidths) sheet.columnWidths = {};
+  const settings = resolveSettings(state.settings);
+  const weeks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
+  const pages = splitWeeksIntoPages(weeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: pageEffectiveSeason(sheet, pageWeeks, settings) }));
+  const anyKayitzPage = pages.some((p) => p.effectiveSeason === 'kayitz');
+  const isEnglish = state.settings.language === 'en';
+
+  // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
+  // the Shabbos sheet it was generated alongside) - generating both saves both, but only
+  // one can be open at a time, so this link is how you actually get to see the other one
+  // right after generating instead of having to dig it up from Saved Sheets.
+  // linkedSheetId is the exact pairing recorded at generation time; the season+year
+  // match after it is the fallback for pairs generated before that was stored.
+  const companion =
+    sheet.season === 'weekday'
+      ? state.sheets.find((s) => s.id === sheet.linkedSheetId) ||
+        state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      : state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) ||
+        state.sheets
+          .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+  const hist = getHistory(sheet.id);
+  container.innerHTML = `
+    <div class="sheet-toolbar no-print">
+      <button id="back-btn">&larr; Back</button>
+      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
+      <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
+      <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
+      ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
+      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
+      <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
+      ${richTextToolbarHtml('In the cell you\'re editing:')}
+      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
+        anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
+      }</span>
+    </div>
+    <details class="panel no-print">
+      <summary>Which pages to print or save</summary>
+      <div class="panel-body">
+        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF. Excluded pages stay on screen, dimmed, so you can still read them.</p>
+        <div class="page-picker" id="page-picker"></div>
+        <div class="actions"><button type="button" id="pages-all">Include all</button></div>
+      </div>
+    </details>
+    <details class="panel no-print">
+      <summary>Layout &amp; style: font, sizes, colour</summary>
+      <div class="panel-body">
+        <div class="style-toolbar">
+          <label>Font
+            <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
+          </label>
+          <label>Text size
+            <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
+            <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
+          </label>
+          <label>Logo size
+            <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
+          </label>
+          <label>Page color
+            <input id="style-color" type="color" value="${sheet.style.accentColor}">
+          </label>
+          <button id="style-reset" type="button">Reset style</button>
+        </div>
+      </div>
+    </details>
+    <div id="sheet-stack">
+      <div id="pages" class="pages"></div>
+    </div>
+  `;
+  container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
+  container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
+  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
+    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
+    e.target.classList.toggle('is-active', on);
+    if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
+  });
+
+  // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
+  // ever be read a column at a time by scrolling sideways. Fitting scales it down until
+  // a whole page is on screen at once: too small to edit in, but the point is seeing the
+  // page. It starts on whenever the page doesn't fit, which in practice means phones.
+  const fitBtn = container.querySelector('#fit-btn');
+  fitBtn.addEventListener('click', () => setFit(container, !fitOn));
+
+
+  // The formatting buttons act on whichever cell was last being edited. Tracked on
+  // focusin rather than read from document.activeElement at click time because the
+  // buttons deliberately don't take focus (see wireRichTextToolbar) - but a click
+  // elsewhere on the page in between should still leave them pointing at that cell.
+  let lastFocusedCell = null;
+  container.addEventListener('focusin', (e) => {
+    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
+  });
+  wireRichTextToolbar(container, () => lastFocusedCell);
+  container.querySelector('#undo-btn').addEventListener('click', () => {
+    const action = hist.undo.pop();
+    if (!action) return;
+    applyOverrideValue(sheet, action.serial, action.col, action.before);
+    hist.redo.push(action);
+    onChange({ save: true }); // app.js re-renders the whole sheet view on save
+  });
+  container.querySelector('#redo-btn').addEventListener('click', () => {
+    const action = hist.redo.pop();
+    if (!action) return;
+    applyOverrideValue(sheet, action.serial, action.col, action.after);
+    hist.undo.push(action);
+    onChange({ save: true });
+  });
+
+  // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
+  // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
+  // so each pair covers the same weeks - which is the order you want to print in, and
+  // also what makes the side-by-side view line up pair-per-row.
+  //
+  // Style variables are set per *page* rather than per container, because the two sheets
+  // carry their own font/size/colour and they now share a parent.
+  const pagesEl = container.querySelector('#pages');
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
+  const primaryPages = buildPagesFor(sheet);
+  const companionPages = buildPagesFor(companion);
+  for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
+    if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
+    if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
+  }
+
+  // Both of these need the pages in the document: the picker to count them, and the row
+  // sync to measure them (heights read 0 on a detached element).
+  syncHeaderRowHeight(pagesEl);
+  buildPagePicker(container);
+  autoFit(container);
+
+
+  const restyleOwnPages = () => {
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    syncHeaderRowHeight(pagesEl);
+  };
+
+  const fontSel = container.querySelector('#style-font');
+  const sizeInput = container.querySelector('#style-size');
+  const sizeLabel = container.querySelector('#style-size-label');
+  const headerInput = container.querySelector('#style-header');
+  // Persists sheet.style as the app's "last used" style too, so the next *newly
+  // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
+  const commit = () => {
+    state.settings.sheetStyle = { ...sheet.style };
+    onChange({ save: true });
+  };
+  fontSel.addEventListener('change', () => {
+    sheet.style.fontFamily = fontSel.value;
+    restyleOwnPages();
+    commit();
+  });
+  sizeInput.addEventListener('input', () => {
+    sheet.style.fontSizePt = Number(sizeInput.value);
+    sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
+    restyleOwnPages();
+  });
+  sizeInput.addEventListener('change', commit);
+  headerInput.addEventListener('input', () => {
+    sheet.style.headerScale = Number(headerInput.value);
+    restyleOwnPages();
+  });
+  headerInput.addEventListener('change', commit);
+  const colorInput = container.querySelector('#style-color');
+  colorInput.addEventListener('input', () => {
+    sheet.style.accentColor = colorInput.value;
+    restyleOwnPages();
+  });
+  colorInput.addEventListener('change', commit);
+  container.querySelector('#style-reset').addEventListener('click', () => {
+    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
+    commit(); // app.js re-renders the whole sheet view on save
+  });
+}
+
+/** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
+ *  print.css drops from the output - the page stays visible on screen (dimmed) so you
+ *  can still see what you left out. */
+function buildPagePicker(container) {
+  const picker = container.querySelector('#page-picker');
+  if (!picker) return;
+  const pages = [...container.querySelectorAll('#pages > .page')];
+  picker.innerHTML = pages
+    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${esc(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
+    .join('');
+  picker.querySelectorAll('input').forEach((cb) => {
+    cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
+  });
+  container.querySelector('#pages-all').addEventListener('click', () => {
+    picker.querySelectorAll('input').forEach((cb) => {
+      cb.checked = true;
+      pages[Number(cb.dataset.i)].classList.remove('page-excluded');
+    });
+  });
+}
+
+const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
+
+
+// --- Fit to screen -----------------------------------------------------------------
+// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
+// the view shouldn't snap back to full size underneath you each time.
+let fitOn = false;
+let fitChosenByUser = false;
+let fitResizeHandler = null;
+
+/** Scales #pages down until its widest row fits across the screen. Uses `zoom` rather
+ *  than `transform: scale`, which only paints smaller and leaves the original footprint
+ *  behind - the same reason side-by-side uses it. */
+function applyFit(container, on) {
+  const pagesEl = container.querySelector('#pages');
+  if (!pagesEl) return;
+  pagesEl.style.zoom = ''; // always measure unscaled
+  if (!on) return;
+  const avail = pagesEl.clientWidth;
+  const content = pagesEl.scrollWidth;
+  if (!avail || content <= avail) return;
+  pagesEl.style.zoom = Math.max(0.15, avail / content);
+}
+
+function setFit(container, on) {
+  fitOn = on;
+  fitChosenByUser = true;
+  const btn = container.querySelector('#fit-btn');
+  btn?.classList.toggle('is-active', on);
+  applyFit(container, on);
+}
+
+/** Turns fitting on by itself the first time a sheet is opened on a screen too narrow to
+ *  show a page - otherwise a phone opens onto a wall of one column. Never overrides a
+ *  choice already made with the button. */
+function autoFit(container) {
+  const pagesEl = container.querySelector('#pages');
+  const decide = () => {
+    if (!fitChosenByUser) {
+      pagesEl.style.zoom = ''; // measure unscaled before asking whether it fits
+      fitOn = pagesEl.scrollWidth > pagesEl.clientWidth;
+      container.querySelector('#fit-btn')?.classList.toggle('is-active', fitOn);
+    }
+    applyFit(container, fitOn);
+  };
+  decide();
+
+  // Rotating a phone changes what fits. One listener, replaced each render so it always
+  // points at the container currently on screen.
+  if (fitResizeHandler) window.removeEventListener('resize', fitResizeHandler);
+  fitResizeHandler = () => {
+    if (document.body.contains(pagesEl)) decide();
+  };
+  window.addEventListener('resize', fitResizeHandler);
+}
+
+/** Black or white, whichever the header row can actually be read in against the page
+ *  colour. White on the dark grey the chart shipped with, black once the colour is light:
+ *  without this, picking a light Page color left the header white on near-white and the
+ *  column names simply vanished. Rec. 601 luma, which is the usual rule of thumb for
+ *  this, with the threshold at the middle of the range. */
+function headerInkFor(color) {
+  const hex = String(color || '').replace('#', '');
+  if (hex.length !== 6) return '#fff';
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
+}
+
+function applyStyle(target, style) {
+  target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
+  target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
+  target.style.setProperty('--sheet-header-scale', style.headerScale);
+  target.style.setProperty('--sheet-accent', style.accentColor);
+  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
+}
+
+/** Makes every row in a table - header included - exactly the same height.
+ *
+ *  Left alone, the header always comes out shorter: the table stretches to fill the page
+ *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
+ *  height in proportion to each row's *natural* content height, which for the header is
+ *  a single short line. Simply pinning the header to a measured data-row height doesn't
+ *  settle it either - the total is fixed, so growing the header shrinks the data rows it
+ *  was just matched against.
+ *
+ *  So instead of measuring one against the other, this splits the table's total height
+ *  evenly across all its rows, which is stable in one pass. The floor guards the case
+ *  where there are enough rows that an even share would be tighter than the content
+ *  actually needs - better to overflow the even split than to clip real text. Re-run on
+ *  every applyStyle(), since the font/size controls invalidate the measurements. */
+function syncHeaderRowHeight(pagesEl) {
+  pagesEl.querySelectorAll('table').forEach((table) => {
+    const headRow = table.querySelector('thead tr');
+    const bodyRows = [...table.querySelectorAll('tbody tr')];
+    if (!headRow || !bodyRows.length) return;
+    const allRows = [headRow, ...bodyRows];
+    allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
+
+    // Every row gets an equal share of the table's height. Measuring the tallest row and
+    // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
+    // cell spans every row, so its height is what the browser divides between them, and
+    // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
+    // the distribution, not the row's own requirement - pinning to it inflated the whole
+    // table past the 8.5in page. The even share is the real target; the row only stays
+    // taller if its own content genuinely needs more, which the tightened parsha
+    // line-height now avoids.
+    // The header is never shorter than a body row, so there are two cases and the table
+    // has to end up exactly its own height either way:
+    //   header fits in an equal share  -> every row (header included) takes that share
+    //   header needs more than a share -> it keeps its height, the rest split what's left
+    // Using one formula for both overflowed the page: the first case pushed a tall header
+    // down to a share it couldn't fit in, the second handed a short header a share bigger
+    // than it needed.
+    const tableHeight = table.getBoundingClientRect().height;
+    const headNatural = headRow.getBoundingClientRect().height;
+    const evenShare = tableHeight / allRows.length;
+    const target = headNatural <= evenShare ? evenShare : (tableHeight - headNatural) / bodyRows.length;
+    bodyRows.forEach((r) => (r.style.height = target + 'px'));
+    // The header never comes out shorter than a body row, and keeps its own greater
+    // height where its text needs it.
+    headRow.style.height = Math.max(target, headNatural) + 'px';
+  });
+}
+
+
+// Right-to-left reading order after the parsha column: the workbook's own B..L/B..I
+// order is "latest event of the week first" (Motzei Shabbos Maariv is column B) -
+// reversed here so reading right-to-left after the parsha actually follows the week
+// chronologically (Friday's Mincha/candle-lighting first, Motzei Shabbos Maariv last).
+function rtlOrdered(columns) {
+  return [...columns].reverse();
+}
+
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason) {
+  const page = document.createElement('div');
+  page.className = 'page';
+  const isEnglish = state.settings.language === 'en';
+  const dir = isEnglish ? 'ltr' : 'rtl';
+  const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
+  const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
+  const isWeekday = effectiveSeason === 'weekday';
+
+  const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
+  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
+
+  const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
+  // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
+  // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
+  const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
+
+  // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
+  // one shul-wide value straight from Settings, not per-week: instead of repeating it
+  // in every row (which would make a multi-line schedule absurdly tall over many
+  // weeks), it prints once as a single cell spanning the whole page's rows, matching
+  // how it looks in the original printed chart. It's sourced live from Settings with
+  // no per-cell override - change it in Settings and it updates everywhere at once.
+
+  const rows = pageWeeks
+    .map((week, rowIndex) => {
+      // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
+      // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
+      // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
+      // there is nothing for a Weekday column to match against.
+      const computed = buildRow(week, settings);
+      const appliedColumns = new Set();
+      // effectiveSeason (not sheet.season) - a חורף page that prints as קיץ (see
+      // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
+      // as a real קיץ sheet would for these weeks.
+      const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
+      const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
+      const cellHtml = (c) => {
+        // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
+        // first row (browsers naturally leave that column slot filled on later rows).
+        // Stored as real HTML straight from Settings' rich-text editor (see
+        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
+        if (isWeekday && c.key === 'E') {
+          if (rowIndex !== 0) return '';
+          // Both schedules on the printed chart, rebuilt from the two fields with the
+          // heading between them, so the wall chart looks exactly as it always has.
+          const special = state.settings.weekdayShacharisSpecial;
+          const html =
+            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
+            (special ? `
+
+<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
+${special}` : '');
+          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
+        }
+        // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
+        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
+        // week stores an override the same as any other column. An override already
+        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // nl2br, exactly like the Shabbos columns below.
+        if (isWeekday && (c.key === 'B' || c.key === 'C')) {
+          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
+          return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        }
+        const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
+        // Overridden cells already hold real HTML (captured from the editable div,
+        // possibly with manual <u> underlining); computed cells still need nl2br().
+        const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
+        // data-season records which season this *page* rendered as, so a later edit
+        // (see the blur handler below) recomputes its "did this really change?"
+        // baseline the same way, without having to re-derive the page split.
+        return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+      };
+      const cells = orderedColumns.map(cellHtml).join('');
+      // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
+      // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
+      // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
+      // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // An explicit width from the column-width panel has to beat the CSS min-width
+      // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
+      // would silently do nothing. Inline, so it outranks the stylesheet.
+      const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
+      const parshaTd = `<td class="parsha-cell"${parshaWidth}>${nl2br(parshaCell)}</td>`;
+      return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
+    })
+    .join('');
+  const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;
+
+  page.innerHTML = `
+    <div class="page-header">
+      <div class="header-row">
+        <img class="header-icon" src="${state.settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
+        <div class="header-center">
+          <img class="header-logo" src="assets/logo-text.png" alt="${esc(state.settings.shulName)}">
+          ${state.settings.headerSubtitle ? `<div class="header-subtitle">${esc(state.settings.headerSubtitle)}</div>` : ''}
+        </div>
+        <div class="header-rabbi">${nl2br(esc(state.settings.headerRabbiLine))}</div>
+      </div>
+    </div>
+    <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
+      ${colgroup}
+      <thead><tr>${theadRow}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="page-footer">
+      <span class="footer-line"></span>
+      <div class="footer-text">
+        ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
+        <span class="footer-address">${esc(state.settings.footerAddress)}</span>
+      </div>
+      <span class="footer-line"></span>
+    </div>
+  `;
+
+  /** What this cell would hold with no manual override - what an edit is diffed against
+   *  to decide whether it's a real change worth storing. */
+  const baselineHtmlFor = (cellEl) => {
+    const col = cellEl.dataset.col;
+    const weekSeason = cellEl.dataset.season;
+    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
+    const settingsResolved = resolveSettings(state.settings);
+    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
+    const computed = builtRow;
+    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
+    const raw = ruled[col] ?? '';
+    // Every column, Weekday included, is built as plain text with underline sentinels
+    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
+    // store a bogus override on a cell nobody actually edited.
+    return normalizeRichText(nl2br(raw));
+  };
+
+  const commitCell = (cellEl) => {
+    const serial = Number(cellEl.dataset.serial);
+    const col = cellEl.dataset.col;
+    const newHtml = normalizeRichText(cellEl.innerHTML);
+    const before = getOverride(sheet, serial, col); // undefined = "no override"
+    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
+    if (before === after) return; // no real change (e.g. just clicked in and out)
+    applyOverrideValue(sheet, serial, col, after);
+    const hist = getHistory(sheet.id);
+    hist.undo.push({ serial, col, before, after });
+    hist.redo = []; // a fresh edit invalidates any redo history
+    onChange({ save: true });
+  };
+
+  page.querySelectorAll('.cell').forEach((cellEl) => {
+    cellEl.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+        e.preventDefault();
+        document.execCommand('underline');
+      }
+    });
+    cellEl.addEventListener('blur', () => {
+      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
+      commitCell(cellEl);
+    });
+  });
+
+  return page;
+}
+
+/** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed
+ *  here rather than stored on the sheet, so it works for sheets saved before hebrewDate
+ *  conditions existed. */
+function withHebrewDate(week, settings) {
+  return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
+}
+
+function splitBuild(season) {
+  if (season === 'weekday') return buildWeekdayRow;
+  return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
+}
+
+// Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
+// HTML-escaping the rest of the text, and \n into <br>. Plain <u> rather than a styled
+// <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
+// go through execCommand, which only recognizes its own native markup and silently
+// no-ops on a class-based underline it doesn't know how to undo.
+function nl2br(str) {
+  // underlineTime writes its value as "<u> 6:42</u>". The space was meant as a lead-in
+  // that would not show on a centred chart cell, and it does show: a cell holding several
+  // times leaves 13.7px in front of an underlined one against 10.36px in front of a plain
+  // one, and the rule itself starts a space before its own first digit. Dropped, so every
+  // gap in a cell is the separator's width and nothing else. The character is a
+  // non-breaking space rather than the plain one it looks like in the source, so it is
+  // matched as whitespace rather than written out.
+  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
+  return escaped.replace(/\n/g, '<br>');
+}
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ==== ui/chart-view.js ====
+// Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
+// and Next above it.
+//
+// A season chart runs to three pages and there can be two seasons in play at once.
+// Showing all of them at once means finding the right one before reading a single time,
+// so this opens on the stretch covering now and pages from there, exactly as the week
+// view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
+// - a second renderer would be a second thing to keep in step with the formulas.
+//
+// Shared between the congregation's site and the admin's This week screen, so the two
+// cannot drift apart.
+
+
+
+
+
+
+/** Every stretch of chart there is to look at, in date order: one entry per page of each
+ *  season, carrying the שבת page and the Weekday page that go together.
+ *
+ *  The page breaks of the two charts fall on the same dates (alignPageSizesTo at
+ *  generation time), so one index picks the matching pair. Seasons are ordered by the
+ *  week they start on, so paging forward runs קיץ into חורף the way the year does. */
+function chartSpreads(state) {
+  const spreads = [];
+  for (const sheet of state.sheets.filter((s) => s.season !== 'weekday')) {
+    const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
+    splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).forEach((weeks, index) => {
+      if (!weeks.length) return;
+      spreads.push({ sheet, weekday, index, serials: weeks.map((w) => w.serial) });
+    });
+  }
+  return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
+}
+
+/** The spread covering now: the one holding the same week the week view opens on, so the
+ *  two never disagree about which Shabbos is "this" one. */
+function spreadIndexForNow(spreads) {
+  if (!spreads.length) return 0;
+  const target = currentSerial(spreads.flatMap((s) => s.serials));
+  const found = spreads.findIndex((s) => s.serials.includes(target));
+  return found === -1 ? 0 : found;
+}
+
+/** What a spread covers, for the line above the buttons: the first and last Shabbos on
+ *  it, in both calendars, the way the week view names its week.
+ *
+ *  The Hebrew pair goes on its own line in its own direction. Run into the English one it
+ *  would be reordered against it, and inside a right-to-left line the earlier date sits
+ *  on the right, which is the order it is read in. */
+function spreadLabel(spread) {
+  const ends = [Math.min(...spread.serials), Math.max(...spread.serials)];
+  const english = ends.map((serial) =>
+    new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(dateFromSerial(serial))
+  );
+  const hebrew = ends.map((serial) => jewishDateString(serial, false));
+  return {
+    english: english[0] === english[1] ? english[0] : `${english[0]} to ${english[1]}`,
+    hebrew: hebrew[0] === hebrew[1] ? hebrew[0] : `${hebrew[0]} – ${hebrew[1]}`,
+  };
+}
+
+/** A chart page is a fixed 11in wide, so on anything narrower it is scaled down rather
+ *  than scrolled sideways: the whole page should be visible at once. Print resets it
+ *  (see print.css), since paper has no such problem. */
+function fitChartToWindow(pagesEl) {
+  const apply = () => {
+    if (!document.body.contains(pagesEl)) return;
+    pagesEl.style.zoom = '';
+    const available = pagesEl.clientWidth;
+    const content = pagesEl.scrollWidth;
+    if (!available || content <= available) return;
+    pagesEl.style.zoom = (available / content).toFixed(4);
+  };
+  apply();
+  window.addEventListener('resize', apply);
+}
+
+/** @param {object} opts
+ *    - empty: what to say when there is no chart to show at all
+ *    - swipe: false to leave the gesture off, for an embed sitting inside something that
+ *      already swipes - two handlers on nested elements would both fire and the page
+ *      would move twice at once. */
+function renderChartBrowser(container, state, opts = {}) {
+  const { empty = 'Nothing has been published yet.', swipe = true } = opts;
+  const spreads = chartSpreads(state);
+  let at = spreadIndexForNow(spreads);
+
+  const draw = () => {
+    const spread = spreads[at];
+    if (!spread) {
+      container.innerHTML = `<p class="hint">${empty}</p>`;
+      return;
+    }
+    const label = spreadLabel(spread);
+    container.innerHTML = `
+      <div class="week-nav no-print">
+        <div class="week-nav-when">
+          ${chartEsc(label.english)}
+          <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
+        </div>
+        <div class="week-nav-row">
+          <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>
+            <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
+          </button>
+          <button type="button" class="chart-today">Today</button>
+          <button type="button" class="chart-next" ${at >= spreads.length - 1 ? 'disabled' : ''}>
+            <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
+      </div>
+      <div class="pages"></div>`;
+    const pagesEl = container.querySelector('.pages');
+    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
+    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
+    for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
+    syncPageHeights(pagesEl);
+    attachPagePrintToAll(pagesEl, '.page', 'Print this page');
+    fitChartToWindow(pagesEl);
+
+    const go = (next) => {
+      if (next < 0 || next >= spreads.length) return;
+      at = next;
+      draw();
+    };
+    container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
+    container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
+    if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+  };
+  draw();
+}
+
+function chartEsc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ==== sheets/weeks.js ====
@@ -2459,349 +4041,6 @@ function renderImageCropper(container, currentDataUrl, onSave) {
   container.querySelector('#crop-remove')?.addEventListener('click', () => onSave(null));
 }
 
-// ==== ui/rich-text.js ====
-// Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
-// (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
-// Underline goes through execCommand, which already handles the add/remove toggle and
-// partial selections correctly; text size is a plain <span class="big"> wrap, so what's
-// stored stays readable HTML rather than the <font size> tags execCommand would emit.
-
-/** The modifier key as this machine's user would write it, for the shortcut hints. */
-const MOD = /mac|iphone|ipad/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
-
-/** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
- *  it acts on. Each button's tooltip names its keyboard shortcut - the toolbar is the
- *  only place they're discoverable. */
-function richTextToolbarHtml(label = '') {
-  return `<span class="rt-toolbar no-print">
-    ${label ? `<span class="rt-label">${label}</span>` : ''}
-    ${richTextButtonsHtml()}
-  </span>`;
-}
-
-/** Just the buttons, for a container that supplies its own wrapper (the floating bar). */
-function richTextButtonsHtml() {
-  return `<button type="button" data-rt="underline" title="Underline / remove underline from the selected text  (${MOD}+U)"><u>U</u></button>
-    <button type="button" data-rt="big" title="Make the selected text bigger  (${MOD}+Shift+&gt;)">A&plus;</button>
-    <button type="button" data-rt="unbig" title="Put the selected text back to normal size  (${MOD}+Shift+&lt;)">A&minus;</button>`;
-}
-
-/** Ctrl+Shift+> / Ctrl+Shift+< for the size buttons, matching what Word and Google Docs
- *  use. Underline needs nothing: Ctrl+U is already built into contenteditable, and it
- *  fires an input event, so the edit saves the same way a toolbar click does.
- *
- *  One listener for the whole app, resolving the editor from whatever has focus - the
- *  sheet's cells and the Settings שחרית editor both qualify, and neither can be reached
- *  by a keystroke without being focused first. Registered once, since the views that use
- *  the toolbar re-render freely. */
-let shortcutsWired = false;
-function wireShortcutsOnce() {
-  if (shortcutsWired) return;
-  shortcutsWired = true;
-  document.addEventListener('keydown', (e) => {
-    const editor = document.activeElement;
-    if (!editor?.isContentEditable || !(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
-    // Reading both the shifted character and the unshifted key, since which one arrives
-    // depends on the keyboard layout.
-    const cmd = ['>', '.'].includes(e.key) ? 'big' : ['<', ','].includes(e.key) ? 'unbig' : null;
-    if (!cmd) return;
-    e.preventDefault();
-    applyRichTextCommand(cmd, editor);
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
-
-/** The same three buttons, following the selection.
- *
- *  The toolbar at the top of the sheet is a long way from the cell you're editing, and on
- *  a phone it can be off screen entirely. This puts the buttons right above whatever you
- *  just selected, and works for any editable field in the app, since it resolves the
- *  editor from the selection rather than from a particular view.
- *
- *  Built once and reused: it's a single element parked on <body> at position:fixed, so it
- *  sits above everything without caring what the page around it is doing. */
-let floatEl = null;
-function floatingToolbarOnce() {
-  if (floatEl) return;
-  floatEl = document.createElement('div');
-  floatEl.className = 'rt-float rt-toolbar no-print';
-  floatEl.hidden = true;
-  floatEl.innerHTML = richTextButtonsHtml();
-  document.body.appendChild(floatEl);
-  // The editor is whichever editable field holds the selection, resolved at click time.
-  wireRichTextToolbar(floatEl, editorOfSelection);
-
-  const place = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount || !editorOfSelection()) {
-      floatEl.hidden = true;
-      return;
-    }
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
-    if (!rect.width && !rect.height) {
-      floatEl.hidden = true;
-      return;
-    }
-    floatEl.hidden = false;
-    // Measured after unhiding, since a hidden element has no size to centre on.
-    const { width, height } = floatEl.getBoundingClientRect();
-    const edge = 8;
-    // Below the selection, not above: a phone puts its own Cut/Copy/Paste bar above the
-    // text you just selected, and the two landed on top of each other. The gap clears the
-    // drag handles that hang under the selection on a touch screen. Above only as a
-    // fallback, when there is no room underneath.
-    const BELOW_GAP = 26;
-    const below = rect.bottom + BELOW_GAP;
-    const fitsBelow = below + height <= window.innerHeight - edge;
-    floatEl.style.top = `${fitsBelow ? below : Math.max(edge, rect.top - height - edge)}px`;
-    floatEl.style.left = `${Math.max(edge, Math.min(window.innerWidth - width - edge, rect.left + rect.width / 2 - width / 2))}px`;
-  };
-
-  // selectionchange fires for every caret move, so the work is deferred and collapsed
-  // into one update. A timeout rather than requestAnimationFrame: rAF doesn't run at all
-  // while the page is considered hidden, which would leave the bar stuck wherever it was
-  // when the window lost visibility.
-  let queued = false;
-  const schedule = () => {
-    if (queued) return;
-    queued = true;
-    setTimeout(() => {
-      queued = false;
-      place();
-    }, 0);
-  };
-  document.addEventListener('selectionchange', schedule);
-  // Keep it against the text while the page moves under it.
-  window.addEventListener('scroll', schedule, true);
-  window.addEventListener('resize', schedule);
-}
-
-/** The editable field containing the current selection, or null if it isn't in one. */
-function editorOfSelection() {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return null;
-  let node = sel.getRangeAt(0).commonAncestorContainer;
-  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-  const editor = node.closest?.('[contenteditable="true"]');
-  return editor || null;
-}
-
-/** `getEditor()` is called per click so callers whose target moves (the sheet's toolbar
- *  acts on whichever cell was last focused) can resolve it late. */
-function wireRichTextToolbar(root, getEditor) {
-  wireShortcutsOnce();
-  floatingToolbarOnce();
-  root.querySelectorAll('[data-rt]').forEach((btn) => {
-    // Without this the button steals focus on press, which collapses the selection in
-    // the editor before the click handler ever runs - leaving nothing to format.
-    btn.addEventListener('mousedown', (e) => e.preventDefault());
-    btn.addEventListener('click', () => {
-      const editor = getEditor();
-      if (!editor) return;
-      applyRichTextCommand(btn.dataset.rt, editor);
-      editor.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  });
-}
-
-function applyRichTextCommand(cmd, editor) {
-  if (cmd === 'underline') {
-    document.execCommand('underline');
-    return;
-  }
-  const sel = window.getSelection();
-  if (!sel.rangeCount || sel.isCollapsed) return;
-  const range = sel.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) return;
-
-  if (cmd === 'big') {
-    const span = document.createElement('span');
-    span.className = 'big';
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
-    reselect(sel, span);
-    return;
-  }
-  if (cmd === 'unbig') {
-    // Selection sitting *inside* one big span (the common case - you enlarged a line,
-    // then selected part of it): unwrap that whole span rather than splitting it.
-    let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-    const enclosing = node.closest?.('span.big');
-    if (enclosing && editor.contains(enclosing)) {
-      enclosing.replaceWith(...enclosing.childNodes);
-      return;
-    }
-    // Otherwise the selection spans several - strip any it fully contains.
-    const frag = range.extractContents();
-    frag.querySelectorAll('span.big').forEach((s) => s.replaceWith(...s.childNodes));
-    range.insertNode(frag);
-  }
-}
-
-/** Whether a run of text is nothing but times and the punctuation that separates them,
- *  so expanding bare digits in it is unambiguous.
- *
- *  Without this the expansion reaches into ordinary text: "10 דק׳" became "10:00 דק׳"
- *  and "TEST123" became "TEST1:23" - and because it runs on blur, merely clicking into
- *  a cell and back out was enough to rewrite it and save an override. Any letter in the
- *  run means it isn't a bare time list, so leave it alone. In a formatted field this is
- *  applied per text node, so times and words can still coexist there - a line of times
- *  is expanded even when a Hebrew line right above it isn't. */
-function isBareTimeList(text) {
-  return /\d/.test(text) && !/\p{L}/u.test(text);
-}
-
-/** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
- *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
- *
- *  With no markup in the field it can work on the text wholesale, separators included.
- *  Once part of the text is underlined or resized, it only expands digits within each
- *  text node and leaves separators alone: the spaces between times may then live in
- *  different nodes than the times themselves, and rewriting across that boundary would
- *  mean rebuilding the field's HTML - which would throw away exactly the formatting the
- *  user just applied. */
-function applyTimeShorthand(editorEl) {
-  if (!editorEl.children.length) {
-    if (!isBareTimeList(editorEl.textContent)) return;
-    const normalized = normalizeTimeList(editorEl.textContent);
-    if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
-    return;
-  }
-  const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-  textNodes.forEach((node) => {
-    if (!isBareTimeList(node.nodeValue)) return;
-    const normalized = normalizeTimeShorthand(node.nodeValue);
-    if (normalized !== node.nodeValue) node.nodeValue = normalized;
-  });
-}
-
-function reselect(sel, node) {
-  sel.removeAllRanges();
-  const r = document.createRange();
-  r.selectNodeContents(node);
-  sel.addRange(r);
-}
-
-// ==== sheets/choref.js ====
-// שבת חורף (Winter Shabbos) column formulas, ported 1:1 from the workbook's
-// WINTER_ZMANIM_1 table (columns B:J). `week.serial` is the Shabbos (Saturday)
-// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
-
-
-
-
-function buildChorefRow(week, settings) {
-  const shabbos = week.serial;
-  const friday = shabbos - 1;
-  const shabbosDate = dateFromSerial(shabbos);
-  const fridayDate = dateFromSerial(friday);
-
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
-  const E = shacharisLine();
-
-  const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + 50 / 1440));
-
-  const G = inPlagWindow(friday, settings)
-    ? textjoin(SLASH, true, [
-        formatTime(Z.plagHamincha(fridayDate, settings) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(floorToMinute(sunsetFriday - 15 / 1440)),
-      ])
-    : formatTime(floorToMinute(sunsetFriday - 15 / 1440));
-
-  const H = candleLightingCell(fridayDate, settings);
-  const I = fridayMainMinchaMenu(fridayDate, settings);
-
-  return { B, C, D, E, F, G, H, I };
-}
-
-const CHOREF_COLUMNS = [
-  { key: 'B', header: 'מעריב' },
-  { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
-  { key: 'E', header: 'שחרית' },
-  { key: 'F', header: 'מעריב' },
-  { key: 'G', header: 'מנחה\nמעריב' },
-  { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nערב שבת' },
-];
-
-// ==== sheets/kayitz.js ====
-// שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
-// SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
-// Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
-
-
-
-
-
-/** AND(dayOfYear>16, dayOfYear<65): roughly the Sefirah stretch (after Pesach, before
- *  Shavuos), where the workbook adds a few extra minutes to the Friday Maariv time and
- *  offers a second (later) Maariv. */
-function inExtraMaarivWindow(serial, settings) {
-  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
-  return doy > 16 && doy < 65;
-}
-
-function buildKayitzRow(week, settings) {
-  const shabbos = week.serial;
-  const friday = shabbos - 1;
-  const shabbosDate = dateFromSerial(shabbos);
-  const fridayDate = dateFromSerial(friday);
-
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
-  const E = shacharisLine();
-
-  const extraMaariv = inExtraMaarivWindow(friday, settings);
-  const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + (extraMaariv ? 55 : 50) / 1440));
-
-  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
-  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב ${formatTime(floorToMinute(sunsetFriday + 30 / 1440))}` : '');
-
-  const H = candleLightingCell(fridayDate, settings);
-
-  const plagWindow = inPlagWindow(friday, settings);
-  const plagMA = Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings));
-  const I = plagWindow ? `${formatTime(ceilToMinute(plagMA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA))}` : '';
-
-  const plagMA2 = Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings));
-  const J = plagWindow ? `${underlineTime(ceilToMinute(plagMA2 - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagMA2))}` : '';
-
-  const plagGRA = Z.plagHamincha(fridayDate, settings);
-  const K = plagWindow ? `${formatTime(ceilToMinute(plagGRA - 15 / 1440))}\nפלג ${formatTime(ceilToMinute(plagGRA))}` : '';
-
-  const L = fridayMainMinchaMenu(fridayDate, settings);
-
-  return { B, C, D, E, F, G, H, I, J, K, L };
-}
-
-const KAYITZ_COLUMNS = [
-  { key: 'B', header: 'מעריב' },
-  { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
-  { key: 'E', header: 'שחרית' },
-  { key: 'F', header: ' מעריב ' },
-  { key: 'G', header: 'מנחה\nמעריב' },
-  { key: 'H', header: 'הדלקת\nנרות' },
-  // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
-  // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
-  // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
-  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
-  { key: 'K', header: 'מנחה\nפלג גר"א' },
-  { key: 'L', header: 'מנחה\nערב שבת' },
-];
-
 // ==== ui/rules-view.js ====
 /** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
  *  Null (the default) shows just the list - most visits here are to glance at the
@@ -3234,1253 +4473,6 @@ function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ==== overrides.js ====
-// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
-// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
-function getOverride(sheet, weekSerial, columnKey) {
-  return sheet.overrides?.[weekSerial]?.[columnKey];
-}
-function setOverride(sheet, weekSerial, columnKey, value) {
-  if (!sheet.overrides) sheet.overrides = {};
-  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
-  sheet.overrides[weekSerial][columnKey] = value;
-}
-function clearOverride(sheet, weekSerial, columnKey) {
-  if (sheet.overrides?.[weekSerial]) {
-    delete sheet.overrides[weekSerial][columnKey];
-    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
-  }
-}
-
-/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
-function mergeRow(computedRow, sheet, weekSerial) {
-  const overriddenKeys = new Set();
-  const row = { ...computedRow };
-  const weekOverrides = sheet.overrides?.[weekSerial];
-  if (weekOverrides) {
-    for (const [key, value] of Object.entries(weekOverrides)) {
-      row[key] = value;
-      overriddenKeys.add(key);
-    }
-  }
-  return { row, overriddenKeys };
-}
-
-// ==== rules.js ====
-// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
-// HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides - that's
-// the intended distinction between rules (recurring, reapplies every year) and
-// overrides (tied to one generated sheet instance).
-//
-// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
-// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
-// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
-// touching the wrong column on the other sheet.
-//
-// A condition can combine any of:
-//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
-//   parsha:        [names]      - matches week.parsha
-//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
-//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
-//                                 (month 5 = Av). Recurs every year, unlike dateISO.
-//   always:        true         - matches every week (for a blanket override)
-//
-// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
-// isn't stored on saved sheets, so it's computed at render time and works for sheets
-// generated before hebrewDate conditions existed.
-function conditionMatches(condition, week) {
-  if (condition.always) return true;
-  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
-  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
-  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
-  return false;
-}
-
-/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
- *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
- *  compatibility with data saved before that format existed, bare keys ("L") and the
- *  older singular columnKey field (applied to any sheet). */
-function targetColumnsForSeason(rule, season) {
-  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-  return raw
-    .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
-      const [entrySeason, key] = entry.split(':');
-      return entrySeason === season ? key : null;
-    })
-    .filter(Boolean);
-}
-
-/** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
- *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
- *
- *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
- *  'append' adds rule.value as an extra line onto whatever the cell already computed
- *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
-function applyRules(row, week, rules, season, appliedColumns) {
-  let out = row;
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    if (!conditionMatches(rule.condition, week)) continue;
-    for (const col of targetColumnsForSeason(rule, season)) {
-      if (!(col in out)) continue;
-      if (out === row) out = { ...row };
-      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
-      if (appliedColumns) appliedColumns.add(col);
-    }
-  }
-  return out;
-}
-
-// ==== sheets/weekday.js ====
-// Weekday chart מנחה/מעריב schedule.
-//
-// The שבת charts are 1:1 ports of workbook columns. These two are not: the workbook
-// leaves weekday מנחה/מעריב blank and they were typed in by hand every week. So the
-// shul's standing weekday schedule is written out here as the rules it actually follows,
-// and every zman those rules lean on still comes from the workbook's own ported formulas
-// (zmanim.js / hebrew-calendar.js), never from a zmanim library:
-//
-//   שקיעה         Z.sunset          (workbook SUNSET)
-//   מנחה גדולה    Z.minchaGedolaLechumra (workbook MINCHA_GEDOLA_LECHUMRA - the same one
-//                                    the workbook's own ערב שבת מנחה menu tests against
-//                                    to decide its 1:35 slot, see common.js)
-//   DST           Z.dstLocal        (workbook calcDST_LOCAL)
-//   ר"ח / dates   hebrew-calendar.js (workbook ROSH_HASHANA + JEWISH_DATE_AS_ARRAY)
-//
-// Everything is decided once per *week*, from Sunday through Thursday only: Friday runs
-// on the ערב שבת schedule over on the שבת chart, and Shabbos has its own.
-//
-// שחרית is deliberately not built here. It's one fixed schedule identical every week,
-// printed once as a merged cell straight from Settings (see ui/sheet-view.js).
-//
-// How a printed time says where that מנין davens (the same symbols the chart's own footer
-// explains):
-//
-//   plain time        main בית מדרש
-//   underlined time   למטה
-//   one * after it    בעזר״נ
-//   two ** after it   באולם השמחות
-//
-// Typing over a cell still works and still wins: a hand-typed value is stored as a
-// per-cell override and rendered instead of anything computed here (see overrides.js).
-
-
-
-
-/** Times are handled in whole minutes after midnight rather than Excel day-fractions,
- *  because every zman on this chart sits on a 5-minute grid and the moves below are
- *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
- *  would otherwise sort before everything else. Day-fractions only come back at the end,
- *  to hand to formatTime. */
-const HM = (h, m) => h * 60 + m;
-const fmtMinutes = (mins) => formatTime(mins / 1440);
-/** Zmanim come back as day-fractions; this chart works in minutes. */
-const toMinutes = (dayFraction) => dayFraction * 1440;
-
-const STEP = 5; // a zman is nudged 5 minutes at a time
-const TOO_CLOSE = 14; // 14 minutes or less from its neighbour and a moved zman is dropped
-const STEP_GUARD = 288; // 288 * 5 = a full day, so a bad latitude can never spin forever
-
-const MAIN = 'main'; // main בית מדרש, printed plain
-const LMATA = 'lmata'; // למטה, printed underlined
-const EZRAS = 'ezras'; // בעזר״נ, printed with one *
-
-function renderTime(mins, place) {
-  const text = fmtMinutes(mins);
-  if (place === LMATA) return underlineTime(text);
-  if (place === EZRAS) return `${text}*`;
-  return text;
-}
-
-/** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
- *  like every other row, so Sunday is six days back. Two rows on a Weekday chart are
- *  anchored on a stand-in date instead of a real Saturday (the season's trailing gap
- *  before Yom Tov, and a Chol Hamoed row - see weeks.js), which is why this walks back
- *  from whatever weekday the serial actually is rather than just subtracting six. */
-function sundayThroughThursday(serial) {
-  const sunday = serial - (excelWeekday(serial) - 1);
-  return [0, 1, 2, 3, 4].map((i) => sunday + i);
-}
-
-function shkiaMinutes(serial, settings) {
-  return toMinutes(Z.sunset(dateFromSerial(serial), settings));
-}
-
-/** The three BMG זמנים, as Hebrew (day, month) pairs. Month numbering is the workbook's
- *  own: Nissan=1 .. Elul=6, Tishrei=7 .. Adar=12. `endYearOffset` is 1 for the אלול range
- *  only, because its end (יום כיפור) falls after ראש השנה and so lands in the next AM
- *  year, while the other two open and close inside one AM year. */
-const BMG_RANGES = [
-  { start: [1, 6], end: [10, 7], endYearOffset: 1 }, // ר"ח אלול -> יום כיפור
-  { start: [1, 8], end: [7, 1], endYearOffset: 0 }, // ר"ח חשון -> ז' ניסן
-  { start: [1, 2], end: [9, 5], endYearOffset: 0 }, // ר"ח אייר -> ט' באב
-];
-
-/** Whether one calendar day falls inside a BMG זמן. Each range is resolved into actual
- *  serial dates so the comparison is a plain date range, which sidesteps the fact that
- *  the AM year rolls over at ראש השנה (month 7) while the month numbering starts at
- *  ניסן (month 1). The neighbouring years are checked too: a day in תשרי belongs to a
- *  range that opened in אלול of the year before. */
-function isBmgDay(serial, settings) {
-  const { year } = hebrewDateExtended(serial, settings.useGregorianBefore1582);
-  for (const y of [year - 1, year, year + 1]) {
-    for (const r of BMG_RANGES) {
-      const from = dateFromHebrew(r.start[0], r.start[1], y);
-      const to = dateFromHebrew(r.end[0], r.end[1], y + r.endYearOffset);
-      if (serial >= from && serial <= to) return true;
-    }
-  }
-  return false;
-}
-
-/** One answer for the whole row, since the chart prints one line per week. A week that
- *  straddles the start or end of a BMG זמן goes with the majority of its Sunday-Thursday
- *  days, so the row can never come out self-contradictory (a 4:15 מנחה, which is BMG
- *  only, printed alongside an 11:30 מעריב, which is not). */
-function isBmgWeek(serial, settings) {
-  const days = sundayThroughThursday(serial);
-  const bmgDays = days.filter((d) => isBmgDay(d, settings)).length;
-  return bmgDays * 2 > days.length;
-}
-
-/** מנחה.
- *
- *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
- *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
- *  keeps the location it started with. */
-function minchaTimes(week, settings) {
-  const days = sundayThroughThursday(week.serial);
-  const dates = days.map(dateFromSerial);
-
-  // 12:45 and 1:15 only run on standard time. DST always flips on a Sunday, so all five
-  // days agree; .every() is just being explicit about which way a split week would go.
-  const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
-  const bmg = isBmgWeek(week.serial, settings);
-
-  // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
-  // Never anything else. The workbook makes the same call the same way for its ערב שבת
-  // מנחה menu (common.js), against the same MINCHA_GEDOLA_LECHUMRA.
-  const latestMinchaGedola = Math.max(...dates.map((d) => toMinutes(Z.minchaGedolaLechumra(d, settings))));
-  const earlyAfternoon = latestMinchaGedola > HM(13, 35) ? HM(13, 40) : HM(13, 35);
-
-  // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
-  // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
-  // can never leave a zman a few seconds short of the 15.
-  const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
-  const latestAllowed = earliestShkia - 15;
-
-  const slots = [
-    standardTime ? { mins: HM(12, 45), place: LMATA } : null,
-    standardTime ? { mins: HM(13, 15), place: LMATA } : null,
-    { mins: earlyAfternoon, place: LMATA },
-    { mins: HM(13, 50), place: MAIN },
-    bmg ? { mins: HM(16, 15), place: LMATA } : null, // 4:15 is a BMG zman
-    { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
-    { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
-    { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
-  ].filter(Boolean);
-
-  // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
-  for (const slot of slots) {
-    if (!slot.shkiaDriven) continue;
-    const base = slot.mins;
-    for (let guard = 0; slot.mins > latestAllowed && guard < STEP_GUARD; guard++) slot.mins -= STEP;
-    slot.moved = slot.mins !== base;
-  }
-
-  // A move can walk a zman back into the one before it. Once it is within 14 minutes of
-  // the previous מנחה still being printed, it stops being printed at all.
-  const kept = [];
-  for (const slot of slots) {
-    const prev = kept[kept.length - 1];
-    if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) continue;
-    kept.push(slot);
-  }
-  return kept.map((slot) => renderTime(slot.mins, slot.place));
-}
-
-/** Where the 8:45 מעריב davens, which follows wherever the clock pushed it to. It is
- *  still the 8:45 מנין at every one of these times. */
-function place845(mins) {
-  if (mins <= HM(20, 45)) return MAIN; // never moved: main בית מדרש
-  if (mins <= HM(21, 15)) return LMATA; // 8:50 through 9:15: למטה
-  return EZRAS; // 9:20 or later: בעזר״נ
-}
-
-/** מעריב.
- *
- *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
- *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
-function maarivTimes(week, settings) {
-  const days = sundayThroughThursday(week.serial);
-
-  const bmg = isBmgWeek(week.serial, settings);
-
-  // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
-  // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
-  const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
-  const earliestAllowed = latestShkia + 50;
-
-  const slots = [
-    { mins: HM(18, 35) },
-    { mins: HM(19, 0) },
-    { mins: HM(19, 30) },
-    { mins: HM(20, 0) },
-    { mins: HM(20, 45), is845: true },
-    { mins: HM(21, 30) },
-    { mins: HM(22, 0) },
-    { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
-    { mins: HM(23, 0) },
-    !bmg ? { mins: HM(23, 30) } : null, // 11:30 and 12:00 run only when BMG is out
-    !bmg ? { mins: HM(24, 0) } : null,
-  ].filter(Boolean);
-
-  // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
-  for (const slot of slots) {
-    const base = slot.mins;
-    for (let guard = 0; slot.mins < earliestAllowed && guard < STEP_GUARD; guard++) slot.mins += STEP;
-    slot.moved = slot.mins !== base;
-  }
-
-  // Mirror of the מנחה rule, in the other direction: a zman pushed up to within 14
-  // minutes of the next מעריב still being printed stops being printed. Walked from the
-  // end backwards so "the next one" means the next one actually surviving, not one that
-  // is itself about to be dropped.
-  //
-  // The 8:45 is exempt. It is a מנין in its own right rather than a duplicate of the one
-  // behind it, and once it passes 9:20 it davens in a different room (בעזר״נ) from the
-  // 9:30 (למטה), so the two belong on the board together. Without the exemption it would
-  // be deleted every year from mid-June to mid-July, which is the only stretch where it
-  // ever reaches בעזר״נ at all - the location rule above would never print once.
-  const kept = [];
-  for (let i = slots.length - 1; i >= 0; i--) {
-    const slot = slots[i];
-    const next = kept[kept.length - 1];
-    if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) continue;
-    kept.push(slot);
-  }
-  kept.reverse();
-  return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
-}
-
-function buildWeekdayRow(week, settings) {
-  return {
-    B: splitLinesInHalf(maarivTimes(week, settings)),
-    C: splitLinesInHalf(minchaTimes(week, settings)),
-  };
-}
-
-const WEEKDAY_COLUMNS = [
-  { key: 'B', header: 'מעריב' },
-  { key: 'C', header: 'מנחה' },
-  { key: 'E', header: 'שחרית' },
-];
-
-// ==== ui/sheet-view.js ====
-/** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
- *  week). Whichever page ends up containing at least one week past the spring DST
- *  cutover (2nd Sunday of March - not the fall one near Sukkos) prints as a real שבת
- *  קיץ chart for its *entire* page - same columns, same formulas, same rule-matching
- *  as an actual קיץ sheet - even for any earlier weeks sharing that page, which just
- *  come out with blank Plag columns (same as קיץ's own weeks outside its Plag window).
- *  A Weekday chart has no such split - it's always 'weekday'. */
-function pageEffectiveSeason(sheet, pageWeeks, settings) {
-  if (sheet.season !== 'choref') return sheet.season;
-  return pageWeeks.some((w) => inSpringDstWindow(w.date, settings)) ? 'kayitz' : 'choref';
-}
-function columnsAndBuilderFor(effectiveSeason) {
-  if (effectiveSeason === 'weekday') return { columns: WEEKDAY_COLUMNS, buildRow: buildWeekdayRow };
-  return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
-}
-
-const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Times New Roman', 'Arial', 'Segoe UI'];
-
-/** Which shipped webfont stands in for each choice when the real one isn't installed.
- *
- *  A phone has none of these fonts, so without a stand-in every Hebrew column falls back
- *  to the system sans - and with a single stand-in for all of them, picking Times New
- *  Roman still got you David's Hebrew, which looks nothing like it. Times New Roman and
- *  Frank Ruehl are both traditional high-contrast Hebrew serifs, so one covers the other
- *  closely; David is a lighter semi-serif and only matches itself.
- *
- *  Arial and Segoe UI are deliberately absent: they fall back to the device's own Hebrew
- *  sans (Noto on Android, Segoe on Windows), which is already the right shape - no point
- *  downloading a font to say the same thing. */
-const HEBREW_STAND_IN = {
-  'Times New Roman': 'Frank Ruhl Libre',
-  'Frank Ruehl': 'Frank Ruhl Libre',
-  'Guttman Yad': 'Frank Ruhl Libre',
-  David: 'David Libre',
-  'David Libre': 'David Libre',
-};
-
-/** The full CSS stack for a chosen font: the real font first (installed on the machines
- *  these sheets are printed from), then the shipped stand-in, then a generic. */
-function fontStackFor(fontFamily) {
-  const standIn = HEBREW_STAND_IN[fontFamily];
-  const generic = fontFamily === 'Arial' || fontFamily === 'Segoe UI' ? 'sans-serif' : 'serif';
-  return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
-}
-
-// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
-// intentionally not persisted to localStorage; it lives for as long as the app tab is
-// open, same as undo history in most editors.
-const histories = new Map();
-function getHistory(sheetId) {
-  if (!histories.has(sheetId)) histories.set(sheetId, { undo: [], redo: [] });
-  return histories.get(sheetId);
-}
-function applyOverrideValue(sheet, serial, col, value) {
-  if (value === undefined) clearOverride(sheet, serial, col);
-  else setOverride(sheet, serial, col, value);
-}
-
-/** The printed pages of one sheet, built and styled but not yet in the document.
- *
- *  Exported because the congregation's page shows the same chart, and a second renderer
- *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
- *  that use: it is the same markup with the cell editing taken off, rather than a
- *  different rendering path that could quietly diverge.
- *
- *  Row heights still need syncPageHeights() once the pages are in the document, since
- *  nothing can be measured before then. */
-function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
-  if (!sheet) return [];
-  const settings = resolveSettings(state.settings);
-  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
-  if (!sheet.columnWidths) sheet.columnWidths = {};
-  const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-  const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
-  return split.map(({ weeks: pw, effectiveSeason }, i) => {
-    const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason);
-    el.dataset.sheetLabel = sheetLabel(sheet);
-    el.dataset.pageIndex = i;
-    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
-    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
-    return el;
-  });
-}
-
-/** Makes every row on every page the same height. Must run with the pages in the
- *  document: heights read 0 on a detached element. */
-function syncPageHeights(pagesEl) {
-  syncHeaderRowHeight(pagesEl);
-}
-
-function renderSheet(container, state, sheet, onChange) {
-  if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
-  if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || DEFAULT_ACCENT_COLOR; // sheets saved before this control existed
-  if (!sheet.columnWidths) sheet.columnWidths = {};
-  const settings = resolveSettings(state.settings);
-  const weeks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
-  const pages = splitWeeksIntoPages(weeks, sheet.pageSizes).map((pageWeeks) => ({ weeks: pageWeeks, effectiveSeason: pageEffectiveSeason(sheet, pageWeeks, settings) }));
-  const anyKayitzPage = pages.some((p) => p.effectiveSeason === 'kayitz');
-  const isEnglish = state.settings.language === 'en';
-
-  // The Weekday chart generated alongside this one (or, from the Weekday chart itself,
-  // the Shabbos sheet it was generated alongside) - generating both saves both, but only
-  // one can be open at a time, so this link is how you actually get to see the other one
-  // right after generating instead of having to dig it up from Saved Sheets.
-  // linkedSheetId is the exact pairing recorded at generation time; the season+year
-  // match after it is the fallback for pairs generated before that was stored.
-  const companion =
-    sheet.season === 'weekday'
-      ? state.sheets.find((s) => s.id === sheet.linkedSheetId) ||
-        state.sheets.filter((s) => s.season === sheet.linkedSeason && s.hebrewYear === sheet.hebrewYear).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-      : state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) ||
-        state.sheets
-          .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-  const hist = getHistory(sheet.id);
-  container.innerHTML = `
-    <div class="sheet-toolbar no-print">
-      <button id="back-btn">&larr; Back</button>
-      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
-      <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
-      <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
-      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
-      <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
-      ${richTextToolbarHtml('In the cell you\'re editing:')}
-      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
-        anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
-      }</span>
-    </div>
-    <details class="panel no-print">
-      <summary>Which pages to print or save</summary>
-      <div class="panel-body">
-        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF. Excluded pages stay on screen, dimmed, so you can still read them.</p>
-        <div class="page-picker" id="page-picker"></div>
-        <div class="actions"><button type="button" id="pages-all">Include all</button></div>
-      </div>
-    </details>
-    <details class="panel no-print">
-      <summary>Layout &amp; style: font, sizes, colour</summary>
-      <div class="panel-body">
-        <div class="style-toolbar">
-          <label>Font
-            <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
-          </label>
-          <label>Text size
-            <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
-            <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
-          </label>
-          <label>Logo size
-            <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
-          </label>
-          <label>Page color
-            <input id="style-color" type="color" value="${sheet.style.accentColor}">
-          </label>
-          <button id="style-reset" type="button">Reset style</button>
-        </div>
-      </div>
-    </details>
-    <div id="sheet-stack">
-      <div id="pages" class="pages"></div>
-    </div>
-  `;
-  container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
-  container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
-  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
-    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
-    e.target.classList.toggle('is-active', on);
-    if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
-  });
-
-  // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
-  // ever be read a column at a time by scrolling sideways. Fitting scales it down until
-  // a whole page is on screen at once: too small to edit in, but the point is seeing the
-  // page. It starts on whenever the page doesn't fit, which in practice means phones.
-  const fitBtn = container.querySelector('#fit-btn');
-  fitBtn.addEventListener('click', () => setFit(container, !fitOn));
-
-
-  // The formatting buttons act on whichever cell was last being edited. Tracked on
-  // focusin rather than read from document.activeElement at click time because the
-  // buttons deliberately don't take focus (see wireRichTextToolbar) - but a click
-  // elsewhere on the page in between should still leave them pointing at that cell.
-  let lastFocusedCell = null;
-  container.addEventListener('focusin', (e) => {
-    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
-  });
-  wireRichTextToolbar(container, () => lastFocusedCell);
-  container.querySelector('#undo-btn').addEventListener('click', () => {
-    const action = hist.undo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.before);
-    hist.redo.push(action);
-    onChange({ save: true }); // app.js re-renders the whole sheet view on save
-  });
-  container.querySelector('#redo-btn').addEventListener('click', () => {
-    const action = hist.redo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.after);
-    hist.undo.push(action);
-    onChange({ save: true });
-  });
-
-  // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
-  // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
-  // so each pair covers the same weeks - which is the order you want to print in, and
-  // also what makes the side-by-side view line up pair-per-row.
-  //
-  // Style variables are set per *page* rather than per container, because the two sheets
-  // carry their own font/size/colour and they now share a parent.
-  const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
-  const primaryPages = buildPagesFor(sheet);
-  const companionPages = buildPagesFor(companion);
-  for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
-    if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
-    if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
-  }
-
-  // Both of these need the pages in the document: the picker to count them, and the row
-  // sync to measure them (heights read 0 on a detached element).
-  syncHeaderRowHeight(pagesEl);
-  buildPagePicker(container);
-  autoFit(container);
-
-
-  const restyleOwnPages = () => {
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
-    syncHeaderRowHeight(pagesEl);
-  };
-
-  const fontSel = container.querySelector('#style-font');
-  const sizeInput = container.querySelector('#style-size');
-  const sizeLabel = container.querySelector('#style-size-label');
-  const headerInput = container.querySelector('#style-header');
-  // Persists sheet.style as the app's "last used" style too, so the next *newly
-  // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
-  const commit = () => {
-    state.settings.sheetStyle = { ...sheet.style };
-    onChange({ save: true });
-  };
-  fontSel.addEventListener('change', () => {
-    sheet.style.fontFamily = fontSel.value;
-    restyleOwnPages();
-    commit();
-  });
-  sizeInput.addEventListener('input', () => {
-    sheet.style.fontSizePt = Number(sizeInput.value);
-    sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
-    restyleOwnPages();
-  });
-  sizeInput.addEventListener('change', commit);
-  headerInput.addEventListener('input', () => {
-    sheet.style.headerScale = Number(headerInput.value);
-    restyleOwnPages();
-  });
-  headerInput.addEventListener('change', commit);
-  const colorInput = container.querySelector('#style-color');
-  colorInput.addEventListener('input', () => {
-    sheet.style.accentColor = colorInput.value;
-    restyleOwnPages();
-  });
-  colorInput.addEventListener('change', commit);
-  container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
-    commit(); // app.js re-renders the whole sheet view on save
-  });
-}
-
-/** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
- *  print.css drops from the output - the page stays visible on screen (dimmed) so you
- *  can still see what you left out. */
-function buildPagePicker(container) {
-  const picker = container.querySelector('#page-picker');
-  if (!picker) return;
-  const pages = [...container.querySelectorAll('#pages > .page')];
-  picker.innerHTML = pages
-    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${esc(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
-    .join('');
-  picker.querySelectorAll('input').forEach((cb) => {
-    cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
-  });
-  container.querySelector('#pages-all').addEventListener('click', () => {
-    picker.querySelectorAll('input').forEach((cb) => {
-      cb.checked = true;
-      pages[Number(cb.dataset.i)].classList.remove('page-excluded');
-    });
-  });
-}
-
-const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
-
-
-// --- Fit to screen -----------------------------------------------------------------
-// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
-// the view shouldn't snap back to full size underneath you each time.
-let fitOn = false;
-let fitChosenByUser = false;
-let fitResizeHandler = null;
-
-/** Scales #pages down until its widest row fits across the screen. Uses `zoom` rather
- *  than `transform: scale`, which only paints smaller and leaves the original footprint
- *  behind - the same reason side-by-side uses it. */
-function applyFit(container, on) {
-  const pagesEl = container.querySelector('#pages');
-  if (!pagesEl) return;
-  pagesEl.style.zoom = ''; // always measure unscaled
-  if (!on) return;
-  const avail = pagesEl.clientWidth;
-  const content = pagesEl.scrollWidth;
-  if (!avail || content <= avail) return;
-  pagesEl.style.zoom = Math.max(0.15, avail / content);
-}
-
-function setFit(container, on) {
-  fitOn = on;
-  fitChosenByUser = true;
-  const btn = container.querySelector('#fit-btn');
-  btn?.classList.toggle('is-active', on);
-  applyFit(container, on);
-}
-
-/** Turns fitting on by itself the first time a sheet is opened on a screen too narrow to
- *  show a page - otherwise a phone opens onto a wall of one column. Never overrides a
- *  choice already made with the button. */
-function autoFit(container) {
-  const pagesEl = container.querySelector('#pages');
-  const decide = () => {
-    if (!fitChosenByUser) {
-      pagesEl.style.zoom = ''; // measure unscaled before asking whether it fits
-      fitOn = pagesEl.scrollWidth > pagesEl.clientWidth;
-      container.querySelector('#fit-btn')?.classList.toggle('is-active', fitOn);
-    }
-    applyFit(container, fitOn);
-  };
-  decide();
-
-  // Rotating a phone changes what fits. One listener, replaced each render so it always
-  // points at the container currently on screen.
-  if (fitResizeHandler) window.removeEventListener('resize', fitResizeHandler);
-  fitResizeHandler = () => {
-    if (document.body.contains(pagesEl)) decide();
-  };
-  window.addEventListener('resize', fitResizeHandler);
-}
-
-/** Black or white, whichever the header row can actually be read in against the page
- *  colour. White on the dark grey the chart shipped with, black once the colour is light:
- *  without this, picking a light Page color left the header white on near-white and the
- *  column names simply vanished. Rec. 601 luma, which is the usual rule of thumb for
- *  this, with the threshold at the middle of the range. */
-function headerInkFor(color) {
-  const hex = String(color || '').replace('#', '');
-  if (hex.length !== 6) return '#fff';
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
-}
-
-function applyStyle(target, style) {
-  target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
-  target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
-  target.style.setProperty('--sheet-header-scale', style.headerScale);
-  target.style.setProperty('--sheet-accent', style.accentColor);
-  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
-}
-
-/** Makes every row in a table - header included - exactly the same height.
- *
- *  Left alone, the header always comes out shorter: the table stretches to fill the page
- *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
- *  height in proportion to each row's *natural* content height, which for the header is
- *  a single short line. Simply pinning the header to a measured data-row height doesn't
- *  settle it either - the total is fixed, so growing the header shrinks the data rows it
- *  was just matched against.
- *
- *  So instead of measuring one against the other, this splits the table's total height
- *  evenly across all its rows, which is stable in one pass. The floor guards the case
- *  where there are enough rows that an even share would be tighter than the content
- *  actually needs - better to overflow the even split than to clip real text. Re-run on
- *  every applyStyle(), since the font/size controls invalidate the measurements. */
-function syncHeaderRowHeight(pagesEl) {
-  pagesEl.querySelectorAll('table').forEach((table) => {
-    const headRow = table.querySelector('thead tr');
-    const bodyRows = [...table.querySelectorAll('tbody tr')];
-    if (!headRow || !bodyRows.length) return;
-    const allRows = [headRow, ...bodyRows];
-    allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
-
-    // Every row gets an equal share of the table's height. Measuring the tallest row and
-    // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
-    // cell spans every row, so its height is what the browser divides between them, and
-    // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
-    // the distribution, not the row's own requirement - pinning to it inflated the whole
-    // table past the 8.5in page. The even share is the real target; the row only stays
-    // taller if its own content genuinely needs more, which the tightened parsha
-    // line-height now avoids.
-    // The header is never shorter than a body row, so there are two cases and the table
-    // has to end up exactly its own height either way:
-    //   header fits in an equal share  -> every row (header included) takes that share
-    //   header needs more than a share -> it keeps its height, the rest split what's left
-    // Using one formula for both overflowed the page: the first case pushed a tall header
-    // down to a share it couldn't fit in, the second handed a short header a share bigger
-    // than it needed.
-    const tableHeight = table.getBoundingClientRect().height;
-    const headNatural = headRow.getBoundingClientRect().height;
-    const evenShare = tableHeight / allRows.length;
-    const target = headNatural <= evenShare ? evenShare : (tableHeight - headNatural) / bodyRows.length;
-    bodyRows.forEach((r) => (r.style.height = target + 'px'));
-    // The header never comes out shorter than a body row, and keeps its own greater
-    // height where its text needs it.
-    headRow.style.height = Math.max(target, headNatural) + 'px';
-  });
-}
-
-
-// Right-to-left reading order after the parsha column: the workbook's own B..L/B..I
-// order is "latest event of the week first" (Motzei Shabbos Maariv is column B) -
-// reversed here so reading right-to-left after the parsha actually follows the week
-// chronologically (Friday's Mincha/candle-lighting first, Motzei Shabbos Maariv last).
-function rtlOrdered(columns) {
-  return [...columns].reverse();
-}
-
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason) {
-  const page = document.createElement('div');
-  page.className = 'page';
-  const isEnglish = state.settings.language === 'en';
-  const dir = isEnglish ? 'ltr' : 'rtl';
-  const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
-  const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
-  const isWeekday = effectiveSeason === 'weekday';
-
-  const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
-  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
-
-  const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
-  // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
-  // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
-  const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
-
-  // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
-  // one shul-wide value straight from Settings, not per-week: instead of repeating it
-  // in every row (which would make a multi-line schedule absurdly tall over many
-  // weeks), it prints once as a single cell spanning the whole page's rows, matching
-  // how it looks in the original printed chart. It's sourced live from Settings with
-  // no per-cell override - change it in Settings and it updates everywhere at once.
-
-  const rows = pageWeeks
-    .map((week, rowIndex) => {
-      // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
-      // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
-      // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
-      // there is nothing for a Weekday column to match against.
-      const computed = buildRow(week, settings);
-      const appliedColumns = new Set();
-      // effectiveSeason (not sheet.season) - a חורף page that prints as קיץ (see
-      // pageEffectiveSeason above) should also match "kayitz:"-qualified rules, same
-      // as a real קיץ sheet would for these weeks.
-      const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
-      const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-      const cellHtml = (c) => {
-        // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
-        // first row (browsers naturally leave that column slot filled on later rows).
-        // Stored as real HTML straight from Settings' rich-text editor (see
-        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
-        if (isWeekday && c.key === 'E') {
-          if (rowIndex !== 0) return '';
-          // Both schedules on the printed chart, rebuilt from the two fields with the
-          // heading between them, so the wall chart looks exactly as it always has.
-          const special = state.settings.weekdayShacharisSpecial;
-          const html =
-            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
-            (special ? `
-
-<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
-${special}` : '');
-          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
-        }
-        // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
-        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
-        // week stores an override the same as any other column. An override already
-        // holds real HTML; a computed value is still sentinel/newline text and needs
-        // nl2br, exactly like the Shabbos columns below.
-        if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
-          return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
-        }
-        const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
-        // Overridden cells already hold real HTML (captured from the editable div,
-        // possibly with manual <u> underlining); computed cells still need nl2br().
-        const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
-        // data-season records which season this *page* rendered as, so a later edit
-        // (see the blur handler below) recomputes its "did this really change?"
-        // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
-      };
-      const cells = orderedColumns.map(cellHtml).join('');
-      // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
-      // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
-      // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
-      // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
-      // An explicit width from the column-width panel has to beat the CSS min-width
-      // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
-      // would silently do nothing. Inline, so it outranks the stylesheet.
-      const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}>${nl2br(parshaCell)}</td>`;
-      return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
-    })
-    .join('');
-  const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;
-
-  page.innerHTML = `
-    <div class="page-header">
-      <div class="header-row">
-        <img class="header-icon" src="${state.settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
-        <div class="header-center">
-          <img class="header-logo" src="assets/logo-text.png" alt="${esc(state.settings.shulName)}">
-          ${state.settings.headerSubtitle ? `<div class="header-subtitle">${esc(state.settings.headerSubtitle)}</div>` : ''}
-        </div>
-        <div class="header-rabbi">${nl2br(esc(state.settings.headerRabbiLine))}</div>
-      </div>
-    </div>
-    <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
-      ${colgroup}
-      <thead><tr>${theadRow}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="page-footer">
-      <span class="footer-line"></span>
-      <div class="footer-text">
-        ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
-        <span class="footer-address">${esc(state.settings.footerAddress)}</span>
-      </div>
-      <span class="footer-line"></span>
-    </div>
-  `;
-
-  /** What this cell would hold with no manual override - what an edit is diffed against
-   *  to decide whether it's a real change worth storing. */
-  const baselineHtmlFor = (cellEl) => {
-    const col = cellEl.dataset.col;
-    const weekSeason = cellEl.dataset.season;
-    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
-    const settingsResolved = resolveSettings(state.settings);
-    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = builtRow;
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
-    const raw = ruled[col] ?? '';
-    // Every column, Weekday included, is built as plain text with underline sentinels
-    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
-    // store a bogus override on a cell nobody actually edited.
-    return normalizeRichText(nl2br(raw));
-  };
-
-  const commitCell = (cellEl) => {
-    const serial = Number(cellEl.dataset.serial);
-    const col = cellEl.dataset.col;
-    const newHtml = normalizeRichText(cellEl.innerHTML);
-    const before = getOverride(sheet, serial, col); // undefined = "no override"
-    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    if (before === after) return; // no real change (e.g. just clicked in and out)
-    applyOverrideValue(sheet, serial, col, after);
-    const hist = getHistory(sheet.id);
-    hist.undo.push({ serial, col, before, after });
-    hist.redo = []; // a fresh edit invalidates any redo history
-    onChange({ save: true });
-  };
-
-  page.querySelectorAll('.cell').forEach((cellEl) => {
-    cellEl.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-        e.preventDefault();
-        document.execCommand('underline');
-      }
-    });
-    cellEl.addEventListener('blur', () => {
-      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
-      commitCell(cellEl);
-    });
-  });
-
-  return page;
-}
-
-/** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed
- *  here rather than stored on the sheet, so it works for sheets saved before hebrewDate
- *  conditions existed. */
-function withHebrewDate(week, settings) {
-  return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
-}
-
-function splitBuild(season) {
-  if (season === 'weekday') return buildWeekdayRow;
-  return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
-}
-
-// Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
-// HTML-escaping the rest of the text, and \n into <br>. Plain <u> rather than a styled
-// <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
-// go through execCommand, which only recognizes its own native markup and silently
-// no-ops on a class-based underline it doesn't know how to undo.
-function nl2br(str) {
-  // underlineTime writes its value as "<u> 6:42</u>". The space was meant as a lead-in
-  // that would not show on a centred chart cell, and it does show: a cell holding several
-  // times leaves 13.7px in front of an underlined one against 10.36px in front of a plain
-  // one, and the rule itself starts a space before its own first digit. Dropped, so every
-  // gap in a cell is the separator's width and nothing else. The character is a
-  // non-breaking space rather than the plain one it looks like in the source, so it is
-  // matched as whitespace rather than written out.
-  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
-  const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
-  return escaped.replace(/\n/g, '<br>');
-}
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// ==== ui/nav-helpers.js ====
-// Two small pieces the week view and the chart view both need.
-//
-// Their own module because they are all the two views share: with them inside week-view
-// the chart view had to import it, and week-view imports the chart view to put the chart
-// under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
-// into one flat script.
-
-/** The week the congregation should be looking at: the next Shabbos still to come.
- *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
-}
-
-/** Swipe across the week to page through it, the way a photo album works: drag left to
- *  bring the next week in, right for the previous one.
- *
- *  Read on touchend rather than followed on touchmove, because the page has to keep
- *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
- *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
- *  across and half again as far across as down, which leaves the diagonal drags that end
- *  a scroll alone.
- *
- *  The handlers hang off the container, which in the admin is the same element every
- *  render, so an old pair is taken off before a new one goes on. Left to stack, every
- *  swipe after the first would fire a whole history of stale handlers, each still holding
- *  the week it was rendered for. */
-function wireSwipe(container, onPrev, onNext) {
-  container._weekSwipeOff?.();
-  let startX = null;
-  let startY = null;
-  const start = (e) => {
-    if (e.touches.length !== 1) return (startX = null);
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  };
-  const end = (e) => {
-    if (startX === null) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - startX;
-    const dy = touch.clientY - startY;
-    startX = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    (dx < 0 ? onNext : onPrev)();
-  };
-  container.addEventListener('touchstart', start, { passive: true });
-  container.addEventListener('touchend', end, { passive: true });
-  container._weekSwipeOff = () => {
-    container.removeEventListener('touchstart', start);
-    container.removeEventListener('touchend', end);
-  };
-}
-
-// ==== ui/print-page.js ====
-// Printing one page on its own.
-//
-// A print button that prints everything is fine when everything is what you want. Usually
-// it is not: one week's page for the board outside, or one page of the season chart. Each
-// page therefore carries its own button, in a strip above it so it never sits on top of
-// anything and never reaches paper.
-//
-// The isolation is done in CSS rather than by building a separate document: the page is
-// marked, the body is told only marked pages print, and both marks come off again when
-// the dialog closes. Nothing is moved or cloned, so what prints is the page you were
-// looking at.
-
-/** Prints one element, hiding every other page for the duration. */
-function printOnly(pageEl) {
-  document.body.classList.add('is-printing-one');
-  pageEl.classList.add('is-print-target');
-  // The wrapper is marked as well as the page. Hiding only the other pages left their
-  // wrappers standing, and an empty wrapper is still a box outside the named page the
-  // pages themselves claim, which was enough to put out a blank sheet of the *default*
-  // page size next to the one being printed.
-  const slot = pageEl.closest('.page-slot');
-  slot?.classList.add('is-print-slot');
-  // The section this page lives in, when it is inside one. On This week the wall chart
-  // sits in its own section under the cards: hiding the pages inside it is not enough,
-  // because the empty section is still a box outside the named page the cards claim, and
-  // that alone put out a blank landscape sheet next to a printed card. Marked rather than
-  // matched with :has(), which not every browser this runs on is guaranteed to have.
-  const branch = pageEl.closest('.week-chart');
-  branch?.classList.add('is-print-branch');
-  const done = () => {
-    document.body.classList.remove('is-printing-one');
-    pageEl.classList.remove('is-print-target');
-    slot?.classList.remove('is-print-slot');
-    branch?.classList.remove('is-print-branch');
-    window.removeEventListener('afterprint', done);
-  };
-  window.addEventListener('afterprint', done);
-  window.print();
-  // Safari and some mobile browsers never fire afterprint. A timer is a poor signal but a
-  // page left hidden would be a real bug, and clearing early costs nothing: print() has
-  // already taken its snapshot by then.
-  setTimeout(done, 1500);
-}
-
-/** Prints with a class on the body, for a layout that only applies to paper (see
- *  is-print-pair in print.css). Same clean-up dance as printOnly. */
-function printWith(bodyClass) {
-  document.body.classList.add(bodyClass);
-  const done = () => {
-    document.body.classList.remove(bodyClass);
-    window.removeEventListener('afterprint', done);
-  };
-  window.addEventListener('afterprint', done);
-  window.print();
-  setTimeout(done, 1500);
-}
-
-/** Puts a print button above one page. The page keeps its own place in the flow; the
- *  wrapper only adds the strip. */
-function attachPagePrint(pageEl, label = 'Print this page') {
-  const slot = document.createElement('div');
-  slot.className = 'page-slot';
-  const bar = document.createElement('div');
-  bar.className = 'page-slot-bar no-print';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'page-print';
-  btn.textContent = label;
-  btn.addEventListener('click', () => printOnly(pageEl));
-  bar.appendChild(btn);
-  pageEl.replaceWith(slot);
-  slot.append(bar, pageEl);
-  return slot;
-}
-
-/** Gives every matching page its own button. */
-function attachPagePrintToAll(root, selector, label) {
-  root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
-}
-
-// ==== ui/chart-view.js ====
-// Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
-// and Next above it.
-//
-// A season chart runs to three pages and there can be two seasons in play at once.
-// Showing all of them at once means finding the right one before reading a single time,
-// so this opens on the stretch covering now and pages from there, exactly as the week
-// view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
-// - a second renderer would be a second thing to keep in step with the formulas.
-//
-// Shared between the congregation's site and the admin's This week screen, so the two
-// cannot drift apart.
-
-
-
-
-
-
-/** Every stretch of chart there is to look at, in date order: one entry per page of each
- *  season, carrying the שבת page and the Weekday page that go together.
- *
- *  The page breaks of the two charts fall on the same dates (alignPageSizesTo at
- *  generation time), so one index picks the matching pair. Seasons are ordered by the
- *  week they start on, so paging forward runs קיץ into חורף the way the year does. */
-function chartSpreads(state) {
-  const spreads = [];
-  for (const sheet of state.sheets.filter((s) => s.season !== 'weekday')) {
-    const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
-    splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).forEach((weeks, index) => {
-      if (!weeks.length) return;
-      spreads.push({ sheet, weekday, index, serials: weeks.map((w) => w.serial) });
-    });
-  }
-  return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
-}
-
-/** The spread covering now: the one holding the same week the week view opens on, so the
- *  two never disagree about which Shabbos is "this" one. */
-function spreadIndexForNow(spreads) {
-  if (!spreads.length) return 0;
-  const target = currentSerial(spreads.flatMap((s) => s.serials));
-  const found = spreads.findIndex((s) => s.serials.includes(target));
-  return found === -1 ? 0 : found;
-}
-
-/** What a spread covers, for the line above the buttons: the first and last Shabbos on
- *  it, in both calendars, the way the week view names its week.
- *
- *  The Hebrew pair goes on its own line in its own direction. Run into the English one it
- *  would be reordered against it, and inside a right-to-left line the earlier date sits
- *  on the right, which is the order it is read in. */
-function spreadLabel(spread) {
-  const ends = [Math.min(...spread.serials), Math.max(...spread.serials)];
-  const english = ends.map((serial) =>
-    new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(dateFromSerial(serial))
-  );
-  const hebrew = ends.map((serial) => jewishDateString(serial, false));
-  return {
-    english: english[0] === english[1] ? english[0] : `${english[0]} to ${english[1]}`,
-    hebrew: hebrew[0] === hebrew[1] ? hebrew[0] : `${hebrew[0]} – ${hebrew[1]}`,
-  };
-}
-
-/** A chart page is a fixed 11in wide, so on anything narrower it is scaled down rather
- *  than scrolled sideways: the whole page should be visible at once. Print resets it
- *  (see print.css), since paper has no such problem. */
-function fitChartToWindow(pagesEl) {
-  const apply = () => {
-    if (!document.body.contains(pagesEl)) return;
-    pagesEl.style.zoom = '';
-    const available = pagesEl.clientWidth;
-    const content = pagesEl.scrollWidth;
-    if (!available || content <= available) return;
-    pagesEl.style.zoom = (available / content).toFixed(4);
-  };
-  apply();
-  window.addEventListener('resize', apply);
-}
-
-/** @param {object} opts
- *    - empty: what to say when there is no chart to show at all
- *    - swipe: false to leave the gesture off, for an embed sitting inside something that
- *      already swipes - two handlers on nested elements would both fire and the page
- *      would move twice at once. */
-function renderChartBrowser(container, state, opts = {}) {
-  const { empty = 'Nothing has been published yet.', swipe = true } = opts;
-  const spreads = chartSpreads(state);
-  let at = spreadIndexForNow(spreads);
-
-  const draw = () => {
-    const spread = spreads[at];
-    if (!spread) {
-      container.innerHTML = `<p class="hint">${empty}</p>`;
-      return;
-    }
-    const label = spreadLabel(spread);
-    container.innerHTML = `
-      <div class="week-nav no-print">
-        <div class="week-nav-when">
-          ${chartEsc(label.english)}
-          <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
-        </div>
-        <div class="week-nav-row">
-          <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>
-            <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
-          </button>
-          <button type="button" class="chart-today">Today</button>
-          <button type="button" class="chart-next" ${at >= spreads.length - 1 ? 'disabled' : ''}>
-            <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
-          </button>
-        </div>
-      </div>
-      <div class="pages"></div>`;
-    const pagesEl = container.querySelector('.pages');
-    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
-    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
-    for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    syncPageHeights(pagesEl);
-    attachPagePrintToAll(pagesEl, '.page', 'Print this page');
-    fitChartToWindow(pagesEl);
-
-    const go = (next) => {
-      if (next < 0 || next >= spreads.length) return;
-      at = next;
-      draw();
-    };
-    container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
-    container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
-    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
-    if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
-  };
-  draw();
-}
-
-function chartEsc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 // ==== ui/week-view.js ====
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
@@ -4491,7 +4483,6 @@ function chartEsc(str) {
 // labels and the week's cells become the times. That means every manual edit, rule and
 // override already in a sheet shows up here with no extra work, and the two can never
 // drift apart.
-
 
 
 
@@ -5267,6 +5258,10 @@ function weekCardsHtml(showing, index, state, settings) {
 function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
+  // opts.heading: false where whatever put this on the screen has already written the
+  // heading itself. On This week the pages and the wall chart are two sides of one screen,
+  // so the title and the buttons that swap them belong to the screen, not to this half.
+  const heading = !luach && opts.heading !== false;
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
   const serials = [...index.keys()].sort((a, b) => a - b);
@@ -5274,7 +5269,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   if (!serials.length) {
     container.innerHTML = luach
       ? '<p class="hint">Nothing has been published yet.</p>'
-      : `<h2>This week</h2>
+      : `${heading ? '<h2>This week</h2>' : ''}
       <p class="hint">One week at a time, laid out to read rather than to print. Generate a שבת sheet first and the weeks in it show up here.</p>`;
     return;
   }
@@ -5288,14 +5283,14 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
 
   container.innerHTML = `
     ${
-      luach
-        ? ''
-        : // no-print, like the nav and the publish panel below. Left printable, this
+      heading
+        ? // no-print, like the nav and the publish panel below. Left printable, this
           // heading and its explanation are the only things on the page not claiming the
           // "weekcard" named page, so they took a sheet of their own: a landscape one, at
           // the wall chart's @page size, empty apart from two lines of screen furniture.
           `<h2 class="no-print">This week</h2>
     <p class="hint no-print">One week at a time, laid out to read rather than to print. It follows whichever שבת is next and moves on once Shabbos is over.</p>`
+        : ''
     }
     <div class="week-nav no-print">
       <div class="week-nav-when">
@@ -5339,19 +5334,6 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       }
     </div>
     <div class="week-cards">${cardsHtml}</div>
-    ${
-      // The wall chart under the cards, so this screen shows everything the congregation
-      // can see rather than half of it. Its own section with its own heading, because it
-      // pages by stretch of season while the cards above page by week - two sets of
-      // buttons doing different things need to be told apart at a glance.
-      opts.withChart
-        ? `<section class="week-chart">
-             <h2 class="no-print">The chart</h2>
-             <p class="hint no-print">The wall chart as the congregation sees it, opening on the stretch covering now.</p>
-             <div id="week-chart-host"></div>
-           </section>`
-        : ''
-    }
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -5421,16 +5403,6 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     () => at > 0 && onSerialChange(serials[at - 1]),
     () => at < serials.length - 1 && onSerialChange(serials[at + 1])
   );
-
-  const chartHost = container.querySelector('#week-chart-host');
-  if (chartHost) {
-    // No swipe on the chart here: this container already swipes through the weeks, and a
-    // gesture over the chart would reach both handlers and move two things at once.
-    renderChartBrowser(chartHost, state, { swipe: false, empty: 'Generate a שבת sheet and its chart shows up here.' });
-    // Nor should a swipe over the chart page the weeks behind it. Passive listeners, so
-    // stopping propagation is all they do; nothing is prevented.
-    for (const type of ['touchstart', 'touchend']) chartHost.addEventListener(type, (e) => e.stopPropagation(), { passive: true });
-  }
 
   const status = container.querySelector('#publish-status');
   const say = (message, isError = false) => {
@@ -5547,6 +5519,12 @@ let weekSerial = null;
 // Set when This week is opened from "Publishing" on Saved sheets, so the panel it wants
 // is already open when the screen arrives. Cleared as it is used: it describes one trip.
 let openPublish = false;
+// Which half of This week is showing: 'week' for the week's two pages, 'chart' for the
+// wall chart. The same two things the congregation's site offers from its menu, and one
+// at a time here for the same reason: they page by different units (a week against a
+// stretch of season), so stacked they gave the screen two sets of buttons doing
+// different things.
+let weekPane = 'week';
 
 // Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
 // changes its value instead of scrolling the page) - on a long form like Generate, that
@@ -5620,6 +5598,53 @@ function renderNav() {
   });
 }
 
+/** This week: the heading, the two buttons that choose what it shows, and whichever of
+ *  the two is chosen. The same pair the congregation's site puts on its menu, so the two
+ *  screens hold the same things in the same order. */
+function renderWeekTab(showPublish) {
+  const panes = [
+    { key: 'week', label: 'Weekly Zmanim' },
+    { key: 'chart', label: 'Zmanim chart' },
+  ];
+  main.innerHTML = `
+    <h2 class="no-print">This week</h2>
+    <p class="hint no-print">Everything the congregation can see: the week's two pages, and the wall chart.</p>
+    <div class="pane-switch no-print" role="tablist">
+      ${panes
+        .map(
+          (p) =>
+            `<button type="button" role="tab" aria-selected="${p.key === weekPane}" class="pane-btn ${
+              p.key === weekPane ? 'is-on' : ''
+            }" data-pane="${p.key}">${p.label}</button>`
+        )
+        .join('')}
+    </div>
+    <div id="week-pane"></div>`;
+  main.querySelectorAll('.pane-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.pane === weekPane) return;
+      weekPane = btn.dataset.pane;
+      render();
+    });
+  });
+
+  const host = main.querySelector('#week-pane');
+  if (weekPane === 'chart') {
+    renderChartBrowser(host, state, { empty: 'Generate a שבת sheet and its chart shows up here.' });
+    return;
+  }
+  renderWeek(
+    host,
+    state,
+    (serial) => {
+      weekSerial = serial;
+      render();
+    },
+    weekSerial,
+    { openPublish: showPublish, heading: false }
+  );
+}
+
 function render() {
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
@@ -5689,16 +5714,10 @@ function render() {
   } else if (currentTab === 'week') {
     const showPublish = openPublish;
     openPublish = false;
-    renderWeek(
-      main,
-      state,
-      (serial) => {
-        weekSerial = serial;
-        render();
-      },
-      weekSerial,
-      { openPublish: showPublish, withChart: true }
-    );
+    // Coming from "Publishing" on Saved sheets, which is a panel under the week's pages:
+    // whichever half was last open, that trip wants this one.
+    if (showPublish) weekPane = 'week';
+    renderWeekTab(showPublish);
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
       currentTab = tab;

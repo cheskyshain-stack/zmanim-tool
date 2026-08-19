@@ -117,16 +117,7 @@
   body.is-printing-one .is-print-target { break-before: auto; break-after: auto; page-break-before: auto; page-break-after: auto; }
 }
 
-/* The chart sitting under the week cards on This week. Printing the screen prints the
-   cards, as it always has - the chart is there to look at and to print a page of on its
-   own, with its own button, which is what is-printing-one covers. Left printable in a
-   full run it would put a landscape wall-chart page in the middle of the week's cards. */
-@media print {
-  body:not(.is-printing-one) .week-chart { display: none !important; }
-  /* Printing one page that is not in the chart section: the section goes too. Empty, it
-     is still a box outside the page the target claims, which is a blank sheet. */
-  body.is-printing-one .week-chart:not(.is-print-branch) { display: none !important; }
-  /* Its own spacing on screen sets the section apart from the cards above it; on paper it
-     pushes the page down and the footer spills onto a second sheet. */
-  .week-chart { margin: 0 !important; padding: 0 !important; border: 0 !important; }
-}
+/* This week shows the week's pages or the wall chart, never both at once, so a print run
+   can only be the half on the screen and there is nothing here to hide. An earlier
+   version stacked them and needed rules to keep a landscape wall-chart page out of the
+   middle of a week's cards. */

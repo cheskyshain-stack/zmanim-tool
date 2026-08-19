@@ -6,6 +6,7 @@ import { renderSavedSheets } from './ui/saved-sheets-view.js';
 import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
 import { renderWeek } from './ui/week-view.js';
+import { renderChartBrowser } from './ui/chart-view.js';
 
 const state = loadState();
 let tables = null;
@@ -17,6 +18,12 @@ let weekSerial = null;
 // Set when This week is opened from "Publishing" on Saved sheets, so the panel it wants
 // is already open when the screen arrives. Cleared as it is used: it describes one trip.
 let openPublish = false;
+// Which half of This week is showing: 'week' for the week's two pages, 'chart' for the
+// wall chart. The same two things the congregation's site offers from its menu, and one
+// at a time here for the same reason: they page by different units (a week against a
+// stretch of season), so stacked they gave the screen two sets of buttons doing
+// different things.
+let weekPane = 'week';
 
 // Chrome hijacks the mouse wheel for any focused <input type=number> (scrolling over it
 // changes its value instead of scrolling the page) - on a long form like Generate, that
@@ -90,6 +97,53 @@ function renderNav() {
   });
 }
 
+/** This week: the heading, the two buttons that choose what it shows, and whichever of
+ *  the two is chosen. The same pair the congregation's site puts on its menu, so the two
+ *  screens hold the same things in the same order. */
+function renderWeekTab(showPublish) {
+  const panes = [
+    { key: 'week', label: 'Weekly Zmanim' },
+    { key: 'chart', label: 'Zmanim chart' },
+  ];
+  main.innerHTML = `
+    <h2 class="no-print">This week</h2>
+    <p class="hint no-print">Everything the congregation can see: the week's two pages, and the wall chart.</p>
+    <div class="pane-switch no-print" role="tablist">
+      ${panes
+        .map(
+          (p) =>
+            `<button type="button" role="tab" aria-selected="${p.key === weekPane}" class="pane-btn ${
+              p.key === weekPane ? 'is-on' : ''
+            }" data-pane="${p.key}">${p.label}</button>`
+        )
+        .join('')}
+    </div>
+    <div id="week-pane"></div>`;
+  main.querySelectorAll('.pane-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.pane === weekPane) return;
+      weekPane = btn.dataset.pane;
+      render();
+    });
+  });
+
+  const host = main.querySelector('#week-pane');
+  if (weekPane === 'chart') {
+    renderChartBrowser(host, state, { empty: 'Generate a שבת sheet and its chart shows up here.' });
+    return;
+  }
+  renderWeek(
+    host,
+    state,
+    (serial) => {
+      weekSerial = serial;
+      render();
+    },
+    weekSerial,
+    { openPublish: showPublish, heading: false }
+  );
+}
+
 function render() {
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
@@ -159,16 +213,10 @@ function render() {
   } else if (currentTab === 'week') {
     const showPublish = openPublish;
     openPublish = false;
-    renderWeek(
-      main,
-      state,
-      (serial) => {
-        weekSerial = serial;
-        render();
-      },
-      weekSerial,
-      { openPublish: showPublish, withChart: true }
-    );
+    // Coming from "Publishing" on Saved sheets, which is a panel under the week's pages:
+    // whichever half was last open, that trip wants this one.
+    if (showPublish) weekPane = 'week';
+    renderWeekTab(showPublish);
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
       currentTab = tab;
