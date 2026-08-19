@@ -5505,16 +5505,28 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
       </div>
-      <div class="week-nav-row week-nav-print">
-        <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
-        <button type="button" id="week-print-rest">Print every week to the end of the season</button>
-      </div>
-      <label class="week-order">Which page first
-        <select id="week-order">
-          <option value="shabbos" ${cardOrder() === 'shabbos' ? 'selected' : ''}>שבת, then weekday</option>
-          <option value="weekday" ${cardOrder() === 'weekday' ? 'selected' : ''}>Weekday, then שבת</option>
-        </select>
-      </label>
+      <details class="panel week-print-panel no-print">
+        <summary>Printing options</summary>
+        <div class="panel-body">
+          <div class="week-nav-row week-nav-print">
+            <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
+            <button type="button" id="week-print-rest">Print every week to the end of the season</button>
+          </div>
+          <label class="week-order">Which page first
+            <select id="week-order">
+              <option value="shabbos" ${cardOrder() === 'shabbos' ? 'selected' : ''}>שבת, then weekday</option>
+              <option value="weekday" ${cardOrder() === 'weekday' ? 'selected' : ''}>Weekday, then שבת</option>
+            </select>
+          </label>
+          ${
+            // Only on a touch device, and only next to the one action here that needs paper
+            // turned: see .print-hint in app.css for why a computer is not told this.
+            cardCount > 1
+              ? '<p class="print-hint no-print">Both on one sheet prints landscape. If the print dialog opens portrait, change it in its options.</p>'
+              : ''
+          }
+        </div>
+      </details>
       ${
         // At the end of the list, say why rather than just greying Next out. The weeks
         // here are the published ones, and a season stops where the next season begins:
@@ -5522,13 +5534,6 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         // broken button unless it says so.
         at >= serials.length - 1 && nextSeasonLabel(index, serials)
           ? `<p class="hint no-print week-end-note">This is the last week published. <bdi>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
-          : ''
-      }
-      ${
-        // Only on a touch device, and only next to the one action here that needs paper
-        // turned: see .print-hint in app.css for why a computer is not told this.
-        cardCount > 1
-          ? '<p class="print-hint no-print">Both on one sheet prints landscape. If the print dialog opens portrait, change it in its options.</p>'
           : ''
       }
     </div>

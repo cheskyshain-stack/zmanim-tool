@@ -1069,3 +1069,12 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
 /* The browser copy is a different kind of thing from the three programs, so it gets a
    heading of its own rather than looking like a fourth platform in the same list. */
 .dl-heading { font-size: 1rem; margin: 1.6rem 0 0.35rem; }
+
+/* The week's print controls, folded away. This screen is read far more often than it is
+   printed, and on a phone the two buttons wrap to two lines each, which pushed the week
+   itself below the fold. Every card still carries its own Print this page under it, so the
+   common action is not behind this. */
+.week-print-panel { margin-top: 0.6rem; }
+.week-print-panel > .panel-body { padding-top: 0.2rem; }
+/* Inside the panel the row has the panel's own rule above it already. */
+.week-print-panel .week-nav-print { margin-top: 0; padding-top: 0; border-top: 0; }
