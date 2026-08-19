@@ -355,6 +355,96 @@ function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ==== format.js ====
+// Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
+// CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
+// marks an "alternate" time on the printed sheet by underlining it).
+const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
+
+function ceilToMinute(dayFraction) {
+  return Math.ceil(dayFraction * 1440 - EPS) / 1440;
+}
+function floorToMinute(dayFraction) {
+  return Math.floor(dayFraction * 1440 + EPS) / 1440;
+}
+function roundToMinute(dayFraction) {
+  return Math.round(dayFraction * 1440) / 1440;
+}
+
+/** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
+function formatTime(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')}`;
+}
+
+// Sentinel markers wrapping "this should render underlined" spans (Private Use Area
+// code points, so they can never collide with real content). Kept as plain characters
+// through all the string-building/TEXTJOIN-style formula ports, then converted to real
+// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
+// HTML concerns.
+const UL_START = '';
+const UL_END = '';
+
+/** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
+ *  string (both forms appear in the workbook's formulas) and marks it to render
+ *  underlined - the printed sheet's way of flagging an "alternate" time. */
+function underlineTime(value) {
+  const text = typeof value === 'number' ? formatTime(value) : value;
+  return UL_START + ' ' + text + UL_END;
+}
+
+/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
+ *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
+ *  the caller can leave those digits untouched rather than mangle them. */
+function expandTimeDigits(digits) {
+  let hour, minute;
+  if (digits.length <= 2) {
+    hour = Number(digits);
+    minute = '00';
+  } else {
+    const split = digits.length === 3 ? 1 : 2;
+    hour = Number(digits.slice(0, split));
+    minute = digits.slice(split);
+  }
+  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
+  return `${hour}:${minute}`;
+}
+
+/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
+ *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon -
+ *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
+function normalizeTimeShorthand(text) {
+  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
+}
+
+/** normalizeTimeShorthand, with the spacing between times tidied to a single space.
+ *
+ *  It used to join them with "/", matching how the computed columns are written, but a
+ *  typed מנחה or מעריב is a plain list of times and the slashes only made it noisier. Runs
+ *  of whitespace *between two times* collapse to one space; whitespace anywhere else
+ *  (inside a Hebrew word, say) is deliberately left alone. */
+function normalizeTimeList(text) {
+  return normalizeTimeShorthand(text)
+    .trim()
+    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
+}
+
+/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
+ *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
+ *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
+ *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+ *  &nbsp; to a plain space. */
+function normalizeRichText(html) {
+  return html
+    .replace(/(<br\s*\/?>)+\s*$/i, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
 // ==== zmanim/solar.js ====
 // Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
@@ -865,380 +955,6 @@ function hasTaanis(serial, settings) {
     default:
       return '';
   }
-}
-
-// ==== pagination.js ====
-// Splits a generated week list across however many printable pages the user chooses
-// (3, 4, or any other count), by user-chosen per-page counts.
-function validatePageSizes(total, sizes) {
-  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
-  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
-  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
-  return null;
-}
-
-/** Even default split across `numPages` pages (earlier pages absorb the remainder one
- *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
-function defaultPageSizes(total, numPages) {
-  const base = Math.floor(total / numPages);
-  const rem = total % numPages;
-  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
-}
-
-/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
- *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
- *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
- *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
- *  the gap between two source pages lands on the earlier one, matching how the season
- *  boundaries themselves are assigned in sheets/weeks.js. */
-function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
-  const cutoffs = []; // serial of the first source week on each page after the first
-  let idx = 0;
-  for (let i = 0; i < sourceSizes.length - 1; i++) {
-    idx += Number(sourceSizes[i]) || 0;
-    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
-  }
-  const counts = new Array(sourceSizes.length).fill(0);
-  for (const week of targetWeeks) {
-    let page = 0;
-    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
-    counts[page]++;
-  }
-  return counts;
-}
-
-function splitWeeksIntoPages(weeks, sizes) {
-  const pages = [];
-  let i = 0;
-  for (const size of sizes) {
-    pages.push(weeks.slice(i, i + size));
-    i += size;
-  }
-  return pages;
-}
-
-// ==== ui/nav-helpers.js ====
-// Two small pieces the week view and the chart view both need.
-//
-// Their own module because they are all the two views share: with them inside week-view
-// the chart view had to import it, and week-view imports the chart view to put the chart
-// under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
-// into one flat script.
-
-/** The week the congregation should be looking at: the next Shabbos still to come.
- *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
-}
-
-/** Swipe across the week to page through it, the way a photo album works: drag left to
- *  bring the next week in, right for the previous one.
- *
- *  Read on touchend rather than followed on touchmove, because the page has to keep
- *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
- *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
- *  across and half again as far across as down, which leaves the diagonal drags that end
- *  a scroll alone.
- *
- *  The handlers hang off the container, which in the admin is the same element every
- *  render, so an old pair is taken off before a new one goes on. Left to stack, every
- *  swipe after the first would fire a whole history of stale handlers, each still holding
- *  the week it was rendered for. */
-function wireSwipe(container, onPrev, onNext) {
-  container._weekSwipeOff?.();
-  let startX = null;
-  let startY = null;
-  const start = (e) => {
-    if (e.touches.length !== 1) return (startX = null);
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  };
-  const end = (e) => {
-    if (startX === null) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - startX;
-    const dy = touch.clientY - startY;
-    startX = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    (dx < 0 ? onNext : onPrev)();
-  };
-  container.addEventListener('touchstart', start, { passive: true });
-  container.addEventListener('touchend', end, { passive: true });
-  container._weekSwipeOff = () => {
-    container.removeEventListener('touchstart', start);
-    container.removeEventListener('touchend', end);
-  };
-}
-
-// ==== ui/print-page.js ====
-// Printing one page on its own.
-//
-// A print button that prints everything is fine when everything is what you want. Usually
-// it is not: one week's page for the board outside, or one page of the season chart. Each
-// page therefore carries its own button, in a strip above it so it never sits on top of
-// anything and never reaches paper.
-//
-// The isolation is done in CSS rather than by building a separate document: the page is
-// marked, the body is told only marked pages print, and both marks come off again when
-// the dialog closes. Nothing is moved or cloned, so what prints is the page you were
-// looking at.
-
-/** Prints one element, hiding every other page for the duration. */
-function printOnly(pageEl) {
-  document.body.classList.add('is-printing-one');
-  pageEl.classList.add('is-print-target');
-  // The wrapper is marked as well as the page. Hiding only the other pages left their
-  // wrappers standing, and an empty wrapper is still a box outside the named page the
-  // pages themselves claim, which was enough to put out a blank sheet of the *default*
-  // page size next to the one being printed.
-  const slot = pageEl.closest('.page-slot');
-  slot?.classList.add('is-print-slot');
-  const done = () => {
-    document.body.classList.remove('is-printing-one');
-    pageEl.classList.remove('is-print-target');
-    slot?.classList.remove('is-print-slot');
-    window.removeEventListener('afterprint', done);
-  };
-  window.addEventListener('afterprint', done);
-  window.print();
-  // Safari and some mobile browsers never fire afterprint. A timer is a poor signal but a
-  // page left hidden would be a real bug, and clearing early costs nothing: print() has
-  // already taken its snapshot by then.
-  setTimeout(done, 1500);
-}
-
-/** Prints with a class on the body, for a layout that only applies to paper (see
- *  is-print-pair in print.css). Same clean-up dance as printOnly. */
-function printWith(bodyClass) {
-  document.body.classList.add(bodyClass);
-  const done = () => {
-    document.body.classList.remove(bodyClass);
-    window.removeEventListener('afterprint', done);
-  };
-  window.addEventListener('afterprint', done);
-  window.print();
-  setTimeout(done, 1500);
-}
-
-/** Puts a print button above one page. The page keeps its own place in the flow; the
- *  wrapper only adds the strip. */
-function attachPagePrint(pageEl, label = 'Print this page') {
-  const slot = document.createElement('div');
-  slot.className = 'page-slot';
-  const bar = document.createElement('div');
-  bar.className = 'page-slot-bar no-print';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'page-print';
-  btn.textContent = label;
-  btn.addEventListener('click', () => printOnly(pageEl));
-  bar.appendChild(btn);
-  pageEl.replaceWith(slot);
-  slot.append(bar, pageEl);
-  return slot;
-}
-
-/** Gives every matching page its own button. */
-function attachPagePrintToAll(root, selector, label) {
-  root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
-}
-
-// ==== format.js ====
-// Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
-// CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
-// marks an "alternate" time on the printed sheet by underlining it).
-const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
-
-function ceilToMinute(dayFraction) {
-  return Math.ceil(dayFraction * 1440 - EPS) / 1440;
-}
-function floorToMinute(dayFraction) {
-  return Math.floor(dayFraction * 1440 + EPS) / 1440;
-}
-function roundToMinute(dayFraction) {
-  return Math.round(dayFraction * 1440) / 1440;
-}
-
-/** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
-function formatTime(dayFraction) {
-  const frac = ((dayFraction % 1) + 1) % 1;
-  const totalMinutes = Math.round(frac * 1440) % 1440;
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h12}:${String(m).padStart(2, '0')}`;
-}
-
-// Sentinel markers wrapping "this should render underlined" spans (Private Use Area
-// code points, so they can never collide with real content). Kept as plain characters
-// through all the string-building/TEXTJOIN-style formula ports, then converted to real
-// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
-// HTML concerns.
-const UL_START = '';
-const UL_END = '';
-
-/** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
- *  string (both forms appear in the workbook's formulas) and marks it to render
- *  underlined - the printed sheet's way of flagging an "alternate" time. */
-function underlineTime(value) {
-  const text = typeof value === 'number' ? formatTime(value) : value;
-  return UL_START + ' ' + text + UL_END;
-}
-
-/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
- *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
- *  the caller can leave those digits untouched rather than mangle them. */
-function expandTimeDigits(digits) {
-  let hour, minute;
-  if (digits.length <= 2) {
-    hour = Number(digits);
-    minute = '00';
-  } else {
-    const split = digits.length === 3 ? 1 : 2;
-    hour = Number(digits.slice(0, split));
-    minute = digits.slice(split);
-  }
-  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
-  return `${hour}:${minute}`;
-}
-
-/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
- *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon -
- *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
-function normalizeTimeShorthand(text) {
-  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
-}
-
-/** normalizeTimeShorthand, with the spacing between times tidied to a single space.
- *
- *  It used to join them with "/", matching how the computed columns are written, but a
- *  typed מנחה or מעריב is a plain list of times and the slashes only made it noisier. Runs
- *  of whitespace *between two times* collapse to one space; whitespace anywhere else
- *  (inside a Hebrew word, say) is deliberately left alone. */
-function normalizeTimeList(text) {
-  return normalizeTimeShorthand(text)
-    .trim()
-    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
-}
-
-/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
- *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
- *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
- *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
- *  &nbsp; to a plain space. */
-function normalizeRichText(html) {
-  return html
-    .replace(/(<br\s*\/?>)+\s*$/i, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-}
-
-// ==== overrides.js ====
-// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
-// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
-function getOverride(sheet, weekSerial, columnKey) {
-  return sheet.overrides?.[weekSerial]?.[columnKey];
-}
-function setOverride(sheet, weekSerial, columnKey, value) {
-  if (!sheet.overrides) sheet.overrides = {};
-  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
-  sheet.overrides[weekSerial][columnKey] = value;
-}
-function clearOverride(sheet, weekSerial, columnKey) {
-  if (sheet.overrides?.[weekSerial]) {
-    delete sheet.overrides[weekSerial][columnKey];
-    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
-  }
-}
-
-/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
-function mergeRow(computedRow, sheet, weekSerial) {
-  const overriddenKeys = new Set();
-  const row = { ...computedRow };
-  const weekOverrides = sheet.overrides?.[weekSerial];
-  if (weekOverrides) {
-    for (const [key, value] of Object.entries(weekOverrides)) {
-      row[key] = value;
-      overriddenKeys.add(key);
-    }
-  }
-  return { row, overriddenKeys };
-}
-
-// ==== rules.js ====
-// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
-// HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides - that's
-// the intended distinction between rules (recurring, reapplies every year) and
-// overrides (tied to one generated sheet instance).
-//
-// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
-// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
-// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
-// touching the wrong column on the other sheet.
-//
-// A condition can combine any of:
-//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
-//   parsha:        [names]      - matches week.parsha
-//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
-//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
-//                                 (month 5 = Av). Recurs every year, unlike dateISO.
-//   always:        true         - matches every week (for a blanket override)
-//
-// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
-// isn't stored on saved sheets, so it's computed at render time and works for sheets
-// generated before hebrewDate conditions existed.
-function conditionMatches(condition, week) {
-  if (condition.always) return true;
-  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
-  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
-  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
-  return false;
-}
-
-/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
- *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
- *  compatibility with data saved before that format existed, bare keys ("L") and the
- *  older singular columnKey field (applied to any sheet). */
-function targetColumnsForSeason(rule, season) {
-  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-  return raw
-    .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
-      const [entrySeason, key] = entry.split(':');
-      return entrySeason === season ? key : null;
-    })
-    .filter(Boolean);
-}
-
-/** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
- *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
- *
- *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
- *  'append' adds rule.value as an extra line onto whatever the cell already computed
- *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
-function applyRules(row, week, rules, season, appliedColumns) {
-  let out = row;
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    if (!conditionMatches(rule.condition, week)) continue;
-    for (const col of targetColumnsForSeason(rule, season)) {
-      if (!(col in out)) continue;
-      if (out === row) out = { ...row };
-      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
-      if (appliedColumns) appliedColumns.add(col);
-    }
-  }
-  return out;
 }
 
 // ==== util.js ====
@@ -1843,6 +1559,560 @@ const WEEKDAY_COLUMNS = [
   { key: 'C', header: 'מנחה' },
   { key: 'E', header: 'שחרית' },
 ];
+
+// ==== ui/nav-helpers.js ====
+// Two small pieces the week view and the chart view both need.
+//
+// Their own module because they are all the two views share: with them inside week-view
+// the chart view had to import it, and week-view imports the chart view to put the chart
+// under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
+// into one flat script.
+
+/** The week the congregation should be looking at: the next Shabbos still to come.
+ *
+ *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
+ *  week. Compared as a date rather than a moment, so the switch happens at midnight on
+ *  Motzei Shabbos rather than at an exact tzais. */
+function currentSerial(serials) {
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
+  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
+}
+
+/** Swipe across the week to page through it, the way a photo album works: drag left to
+ *  bring the next week in, right for the previous one.
+ *
+ *  Read on touchend rather than followed on touchmove, because the page has to keep
+ *  scrolling normally: the listeners are passive and nothing is prevented, so a vertical
+ *  drag is an ordinary scroll and only a clearly sideways one counts. "Clearly" is 60px
+ *  across and half again as far across as down, which leaves the diagonal drags that end
+ *  a scroll alone.
+ *
+ *  The handlers hang off the container, which in the admin is the same element every
+ *  render, so an old pair is taken off before a new one goes on. Left to stack, every
+ *  swipe after the first would fire a whole history of stale handlers, each still holding
+ *  the week it was rendered for. */
+function wireSwipe(container, onPrev, onNext) {
+  container._weekSwipeOff?.();
+  let startX = null;
+  let startY = null;
+  const start = (e) => {
+    if (e.touches.length !== 1) return (startX = null);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  };
+  const end = (e) => {
+    if (startX === null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    (dx < 0 ? onNext : onPrev)();
+  };
+  container.addEventListener('touchstart', start, { passive: true });
+  container.addEventListener('touchend', end, { passive: true });
+  container._weekSwipeOff = () => {
+    container.removeEventListener('touchstart', start);
+    container.removeEventListener('touchend', end);
+  };
+}
+
+// ==== ui/calculations-view.js ====
+// Every column on every chart, and how its times are worked out.
+//
+// Two readers at once. The plain rule is in the shul's own terms, for checking that the
+// board says what it should. The exact rule under it is the formula as the code has it,
+// for checking the port against the workbook. Neither has to read the other's half.
+//
+// The columns themselves are not listed here. They come from the same KAYITZ_COLUMNS,
+// CHOREF_COLUMNS and WEEKDAY_COLUMNS the charts are built from, so this page cannot
+// describe a column that no longer exists or quietly miss one that was added: a column
+// with no prose still gets a card, saying in as many words that it has not been written
+// up. That is deliberate rather than a gap. A page that silently omitted it would look
+// complete while being wrong, and the test watches for that sentence.
+//
+// The worked examples are not written down either: they are produced by calling the real
+// build functions for a real week, so a number on this page is the number on that board.
+
+
+
+
+
+
+
+const calcEsc = (s) =>
+  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** A built cell as readable text: the underline sentinels become an <u>, the line breaks
+ *  become real ones. Same content the chart prints, without the chart. */
+function cellHtml(text) {
+  if (!text) return '<span class="calc-blank">(blank that week)</span>';
+  // Escaped first. The underline sentinels are private use characters, so escaping cannot
+  // touch them, and swapping them for tags afterwards cannot let anything else through.
+  return calcEsc(text)
+    .split(UL_START)
+    .join('<u>')
+    .split(UL_END)
+    .join('</u>')
+    .split('\n')
+    .join('<br>');
+}
+
+/** A rule is either the words themselves or a function of the settings, for the few that
+ *  quote a number a person can change. */
+const text = (rule, settings) => (typeof rule === 'function' ? rule(settings) : rule);
+
+/** Every Hebrew run in an English sentence, isolated.
+ *
+ *  Done here rather than by hand because these rules are nearly all English sentences with
+ *  Hebrew words in them, and every one of those words is a chance to get it wrong. Left
+ *  plain, a neutral character next to the Hebrew is absorbed into it and moves: "worked
+ *  from שקיעה: 45 minutes" rendered as "worked from 45 :שקיעה minutes", with the colon
+ *  jumping the number. Measured before and after, not guessed.
+ *
+ *  Runs of Hebrew letters are taken whole, along with the geresh and gershayim inside
+ *  abbreviations like גר״א and the spaces between words of one phrase, so הדלקת נרות is
+ *  one isolated run rather than two. */
+const HEBREW_RUN = /[\u0590-\u05FF]+(?:[ \u0590-\u05FF\u05F3\u05F4"']*[\u0590-\u05FF]+)*/g;
+const isolateHebrew = (html) => html.replace(HEBREW_RUN, (run) => `<bdi>${run}</bdi>`);
+
+// --- what each column is ---------------------------------------------------------------
+// Keyed by the column key the chart uses. `plain` is the rule in words; `exact` is the
+// formula. Both are prose: the numbers in them are the fixed times written into the
+// formulas, and anything a person can change in Settings is filled in from Settings at
+// render time rather than written down here.
+
+const SHARED = {
+  B: {
+    plain: 'Motzei Shabbos מעריב. Two times: 60 minutes after שקיעה, then 72 minutes after it. The 72 is underlined, so it davens למטה.',
+    exact: 'צאת 60 and צאת 72, both measured from שקיעה at the shul\'s elevation, each rounded up to the whole minute, printed with a slash between them. The second is underlined.',
+  },
+  C: {
+    plain:
+      'Shabbos afternoon מנחה. It starts at 1:40 on daylight saving time and 1:20 on standard time. Then 5:30, 6:00 and 6:30, each printed only once שקיעה is late enough for it. Then two more worked from שקיעה: 45 minutes before it, and 30 minutes before it. Printed over two lines.',
+    exact:
+      'First 1:40 when DST is in force, otherwise 1:20. Then each of 5:30, 6:00 and 6:30 is kept only if 5:30pm, 6:00pm or 6:30pm respectively is at or before שקיעה minus one hour; the kept ones are underlined. Then the earlier of (שקיעה minus 45 minutes, rounded up) and 7:00, and the earlier of (שקיעה minus 30 minutes, rounded up) and 7:30, the second underlined. Rounded up rather than down, which is what the workbook does here and nowhere else. The list is split across two lines, the longer half second.',
+  },
+  D: {
+    plain:
+      'סוף זמן קריאת שמע, both opinions. The earlier of the two is the מגן אברהם, whose day runs from עלות; the later is the גר״א, whose day runs from sunrise.',
+    exact:
+      'סוף זמן שמע מ״א with the day measured from עלות 72 minutes to צאת 72 minutes, then סוף זמן שמע גר״א from sunrise to שקיעה, printed with a slash between them in that order.',
+  },
+  E: {
+    plain: 'שחרית. The same two times every week, 7:30 and 8:15, with 7:30 underlined for למטה. Nothing about it is worked out from the date.',
+    exact: 'The literal string 7:30 / 8:15, the 7:30 underlined, with no-break spaces around the slash so it can never wrap.',
+  },
+  H: {
+    plain: (settings) =>
+      `הדלקת נרות, with שקיעה printed underneath it. Candle lighting is ${settings.candleLightingMinutes} minutes before שקיעה, which is the offset set in Settings: change it there and every Friday on every chart moves with it.`,
+    exact:
+      'שקיעה at the shul\'s elevation, rounded down to the whole minute, is the second line. The first line is that time less the candle lighting offset from Settings.',
+  },
+};
+
+const KAYITZ_RULES = {
+  ...SHARED,
+  F: {
+    plain: 'Friday מעריב, 50 minutes after שקיעה. Between Pesach and Shavuos it is 55 minutes instead.',
+    exact:
+      'שקיעה on the Friday plus 50 minutes, rounded down, underlined. Inside the Sefirah window the offset is 55 rather than 50. That window is Hebrew day-of-year above 16 and below 65, measured on the Friday.',
+  },
+  G: {
+    plain:
+      'The מנחה that runs straight into מעריב, 15 minutes before שקיעה. Between Pesach and Shavuos a second מעריב is printed under it, half an hour after שקיעה.',
+    exact:
+      'שקיעה on the Friday less 15 minutes, rounded down. In the same Sefirah window as column מעריב, a second line reading מעריב followed by שקיעה plus 30 minutes, rounded down.',
+  },
+  I: {
+    plain:
+      'The פלג מנחה that davens בעזרת נשים, on the מגן אברהם\'s פלג with the day ending at צאת 72. Printed 15 minutes before the פלג, with the פלג itself under it. Only in the season when the early minyanim run.',
+    exact:
+      'פלג המנחה with the day running from עלות 16.1 degrees to צאת 72 minutes. The first line is that less 15 minutes, rounded up; the second is the word פלג and the פלג itself, rounded up. Blank outside the פלג window.',
+  },
+  J: {
+    plain: 'The same thing למטה, but on the פלג with the day ending at צאת 50 rather than 72, so it is a little earlier.',
+    exact:
+      'פלג המנחה with the day running from עלות 16.1 degrees to צאת 50 minutes. First line that less 15 minutes, rounded up and underlined; second line the פלג itself. Blank outside the פלג window.',
+  },
+  K: {
+    plain: 'The same again on the גר״א\'s פלג, which measures the day from sunrise to שקיעה.',
+    exact:
+      'פלג המנחה גר״א for the Friday. First line that less 15 minutes, rounded up; second line the פלג itself. Blank outside the פלג window.',
+  },
+  L: {
+    plain:
+      'The main ערב שבת מנחה. On standard time it opens with 12:30 and 1:00. Then an early one around 1:15, then 1:35, then 1:50, 2:15 and 3:00. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
+    exact:
+      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00. Then, only when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second.',
+  },
+};
+
+const CHOREF_RULES = {
+  ...SHARED,
+  F: {
+    plain: 'Friday מעריב, 50 minutes after שקיעה. No Sefirah exception here: in the winter season that stretch does not arise.',
+    exact: 'שקיעה on the Friday plus 50 minutes, rounded down, underlined.',
+  },
+  G: {
+    plain:
+      'The Friday מנחה. Through most of the winter it is the single time 15 minutes before שקיעה. Once the early minyanim start running, three פלג times are printed before it on the same line: the גר״א\'s פלג, then the מגן אברהם\'s to צאת 50, then to צאת 72, each 15 minutes early.',
+    exact:
+      'Outside the פלג window: שקיעה less 15 minutes, rounded down. Inside it, four times joined by slashes: פלג גר״א less 15, פלג with the day ending at צאת 50 less 15, פלג with the day ending at צאת 72 less 15, and שקיעה less 15 rounded down. The three פלג values are not rounded to the minute before the 15 is taken off.',
+  },
+  I: KAYITZ_RULES.L,
+};
+
+const WEEKDAY_RULES = {
+  B: {
+    plain:
+      'The weekday מעריב times, one row for the whole week. The regular list is 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, and 11:30 and 12:00 while BMG is out of session. Every one of them has to be at least 50 minutes after שקיעה on all five days, so as the days lengthen each is pushed later in 5 minute steps until it clears. A time pushed up to within a quarter of an hour of the next one stops being printed. All of them are למטה except 10:30, which is the main בית מדרש, and the 8:45.',
+    exact:
+      'Sunday through Thursday of the week ending on this Shabbos. The binding שקיעה is the latest of the five, rounded up; a time must be at or after that plus 50 minutes. Each time steps forward by 5 minutes until it does. Then, walking from the last time backwards, a time that moved and now sits within 14 minutes of the next one still being kept is dropped. The 8:45 is exempt from that, being its own מנין rather than a duplicate; it is in the main בית מדרש up to 8:45, למטה from 8:50 to 9:15, and בעזרת נשים from 9:20.',
+  },
+  C: {
+    plain:
+      'The weekday מנחה times. The regular list is 12:45 and 1:15 on standard time only, then an early afternoon one, then 1:50, then 4:15 while BMG is in session, then 6:35, 7:30 and 8:00. The evening ones have to be at least 15 minutes before שקיעה on all five days, so they are pulled earlier in 5 minute steps as the days shorten, and one that lands within a quarter of an hour of the one before it stops being printed. Everything is למטה except 1:50, the main בית מדרש.',
+    exact:
+      'Sunday through Thursday of the week ending on this Shabbos. 12:45 and 1:15 only when none of the five days is on DST. The early afternoon time is 1:35, or 1:40 if מנחה גדולה לחומרא is after 1:35 on any of the five days. 4:15 only in a BMG week. The binding שקיעה is the earliest of the five, rounded down; an evening time must be at or before that less 15 minutes, and steps back by 5 minutes until it is. A time that moved and sits within 14 minutes of the one before it is dropped.',
+  },
+  E: {
+    plain:
+      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding whatever is typed into Settings, so the daily schedule is written once rather than computed.',
+    exact:
+      'Taken from the שחרית field in Settings, rendered as the small markup subset that field stores. A week carrying a fast or a Rosh Chodesh uses the second field instead.',
+  },
+};
+
+const CHARTS = [
+  { key: 'kayitz', name: 'שבת קיץ', columns: KAYITZ_COLUMNS, rules: KAYITZ_RULES, build: buildKayitzRow,
+    note: 'Pesach to Sukkos. The early פלג minyanim run for part of it, which is why it has four מנחה columns the winter chart does not.' },
+  { key: 'choref', name: 'שבת חורף', columns: CHOREF_COLUMNS, rules: CHOREF_RULES, build: buildChorefRow,
+    note: 'Sukkos to Pesach. A page holding a week past the spring clock change prints as a full שבת קיץ chart instead, so the last page of a winter season can be a summer one.' },
+  { key: 'weekday', name: 'Weekday', columns: WEEKDAY_COLUMNS, rules: WEEKDAY_RULES, build: buildWeekdayRow,
+    note: 'One row per week, covering Sunday through Thursday. Every time on it has to work for all five days at once, which is what makes it the only chart whose times move themselves.' },
+];
+
+/** Printed order, left to right. The chart reverses the workbook's B..L so that reading
+ *  right to left after the parsha follows the week forward; this lists them the way they
+ *  appear across the page. */
+const printedOrder = (columns) => [...columns].reverse();
+
+/** A week to work the examples on: whichever the rest of the app is showing, if this
+ *  chart covers it, and otherwise the nearest one that chart has. */
+function exampleWeek(state, season) {
+  const sheets = (state.sheets || []).filter((s) => (season === 'weekday' ? s.season === 'weekday' : s.season === season));
+  const weeks = sheets.flatMap((s) => s.weeks || []);
+  if (!weeks.length) return null;
+  const serial = currentSerial(weeks.map((w) => w.serial));
+  const found = weeks.find((w) => w.serial === serial) || weeks[0];
+  return { ...found, date: new Date(found.date) };
+}
+
+const fmtWeek = (week) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(week.date);
+
+function chartHtml(chart, state, settings) {
+  const week = exampleWeek(state, chart.key);
+  let row = {};
+  if (week) {
+    try {
+      row = chart.build(week, settings) || {};
+    } catch {
+      row = {};
+    }
+  }
+
+  const entries = printedOrder(chart.columns)
+    .map(({ key, header }) => {
+      const rule = chart.rules[key];
+      const worked = week && key in row
+        ? `<div class="calc-worked"><span class="calc-worked-label">That week it comes out</span><span class="calc-worked-value">${cellHtml(row[key])}</span></div>`
+        : '';
+      return `
+        <div class="calc-col">
+          <div class="calc-col-head">
+            <bdi class="calc-col-name">${calcEsc(String(header).replace(/\n/g, ' '))}</bdi>
+            <span class="calc-col-key">column ${calcEsc(key)}</span>
+          </div>
+          <p class="calc-plain">${rule ? isolateHebrew(text(rule.plain, settings)) : 'Not written up yet.'}</p>
+          ${worked}
+          ${rule ? `<details class="calc-exact"><summary>The exact rule</summary><p>${isolateHebrew(text(rule.exact, settings))}</p></details>` : ''}
+        </div>`;
+    })
+    .join('');
+
+  const which = week
+    ? `<p class="hint">Worked through on <strong>${calcEsc(fmtWeek(week))}</strong>, the week this chart is on now.</p>`
+    : '<p class="hint">Generate a season and each column will show what it comes out to that week.</p>';
+
+  return `
+    <details class="panel calc-chart" data-chart="${chart.key}">
+      <summary><bdi>${calcEsc(chart.name)}</bdi></summary>
+      <div class="panel-body">
+        <p class="hint">${isolateHebrew(chart.note)}</p>
+        ${which}
+        <div class="calc-cols">${entries}</div>
+      </div>
+    </details>`;
+}
+
+function renderCalculations(container, state, onOpenTab) {
+  const settings = resolveSettings(state.settings);
+  container.innerHTML = `
+    <h2>Calculations</h2>
+    <p class="hint">Every column on every chart, and how its times are worked out.</p>
+
+    <div class="guide-lede">
+      <p>Two answers for each one. The plain rule is what the column is, in the shul's terms. <strong>The exact rule</strong> under it is the formula as the program has it, down to the rounding, for checking against the workbook.</p>
+      <p>The numbers beside each rule are not written here: they are produced by running the real formula on a real week, so a time on this page is the time on that board.</p>
+    </div>
+
+    <p class="hint calc-not-rules">This is not the <button type="button" class="linkish" id="calc-to-rules">Rules in Settings</button>. Those are the shul's own exceptions, the ones that add דרשה on שבת הגדול and mark ט באב, applied on top of everything below. What is here is the calculation underneath, which is the same every year and is not editable: it comes from the workbook the boards were always made from.</p>
+
+    ${CHARTS.map((c) => chartHtml(c, state, settings)).join('')}
+
+    <details class="panel">
+      <summary>Things that are true of every column</summary>
+      <div class="panel-body">
+        <p><strong>Where the sun is</strong> comes from the שול's location, elevation and timezone in Settings, so moving those moves every time on every chart.</p>
+        <p><strong>Underlined</strong> means the מנין davens בבית מדרש למטה. It is set by the formula, not typed, except where a cell has been typed over by hand.</p>
+        <p><strong>Friday columns are worked on the Friday</strong>, not on the Shabbos the row is named for. The Shabbos columns are worked on the Shabbos.</p>
+        <p><strong>ט באב</strong> is added automatically when the 9th of Av falls on that Shabbos, to the Shabbos מנחה and the motzei Shabbos מעריב. It is a fact of the calendar rather than a rule anyone set, so it is not in the rules list and cannot be switched off.</p>
+        <p><strong>Then the rules, then anything typed.</strong> A rule from Settings is applied to the computed value, and a cell typed over by hand wins over both.</p>
+      </div>
+    </details>
+  `;
+
+  container.querySelector('#calc-to-rules')?.addEventListener('click', () => onOpenTab('settings'));
+}
+
+// ==== pagination.js ====
+// Splits a generated week list across however many printable pages the user chooses
+// (3, 4, or any other count), by user-chosen per-page counts.
+function validatePageSizes(total, sizes) {
+  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
+  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
+  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
+  return null;
+}
+
+/** Even default split across `numPages` pages (earlier pages absorb the remainder one
+ *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
+function defaultPageSizes(total, numPages) {
+  const base = Math.floor(total / numPages);
+  const rem = total % numPages;
+  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
+ *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
+ *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
+ *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
+ *  the gap between two source pages lands on the earlier one, matching how the season
+ *  boundaries themselves are assigned in sheets/weeks.js. */
+function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
+  const cutoffs = []; // serial of the first source week on each page after the first
+  let idx = 0;
+  for (let i = 0; i < sourceSizes.length - 1; i++) {
+    idx += Number(sourceSizes[i]) || 0;
+    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
+  }
+  const counts = new Array(sourceSizes.length).fill(0);
+  for (const week of targetWeeks) {
+    let page = 0;
+    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
+    counts[page]++;
+  }
+  return counts;
+}
+
+function splitWeeksIntoPages(weeks, sizes) {
+  const pages = [];
+  let i = 0;
+  for (const size of sizes) {
+    pages.push(weeks.slice(i, i + size));
+    i += size;
+  }
+  return pages;
+}
+
+// ==== ui/print-page.js ====
+// Printing one page on its own.
+//
+// A print button that prints everything is fine when everything is what you want. Usually
+// it is not: one week's page for the board outside, or one page of the season chart. Each
+// page therefore carries its own button, in a strip above it so it never sits on top of
+// anything and never reaches paper.
+//
+// The isolation is done in CSS rather than by building a separate document: the page is
+// marked, the body is told only marked pages print, and both marks come off again when
+// the dialog closes. Nothing is moved or cloned, so what prints is the page you were
+// looking at.
+
+/** Prints one element, hiding every other page for the duration. */
+function printOnly(pageEl) {
+  document.body.classList.add('is-printing-one');
+  pageEl.classList.add('is-print-target');
+  // The wrapper is marked as well as the page. Hiding only the other pages left their
+  // wrappers standing, and an empty wrapper is still a box outside the named page the
+  // pages themselves claim, which was enough to put out a blank sheet of the *default*
+  // page size next to the one being printed.
+  const slot = pageEl.closest('.page-slot');
+  slot?.classList.add('is-print-slot');
+  const done = () => {
+    document.body.classList.remove('is-printing-one');
+    pageEl.classList.remove('is-print-target');
+    slot?.classList.remove('is-print-slot');
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  // Safari and some mobile browsers never fire afterprint. A timer is a poor signal but a
+  // page left hidden would be a real bug, and clearing early costs nothing: print() has
+  // already taken its snapshot by then.
+  setTimeout(done, 1500);
+}
+
+/** Prints with a class on the body, for a layout that only applies to paper (see
+ *  is-print-pair in print.css). Same clean-up dance as printOnly. */
+function printWith(bodyClass) {
+  document.body.classList.add(bodyClass);
+  const done = () => {
+    document.body.classList.remove(bodyClass);
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 1500);
+}
+
+/** Puts a print button above one page. The page keeps its own place in the flow; the
+ *  wrapper only adds the strip. */
+function attachPagePrint(pageEl, label = 'Print this page') {
+  const slot = document.createElement('div');
+  slot.className = 'page-slot';
+  const bar = document.createElement('div');
+  bar.className = 'page-slot-bar no-print';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'page-print';
+  btn.textContent = label;
+  btn.addEventListener('click', () => printOnly(pageEl));
+  bar.appendChild(btn);
+  pageEl.replaceWith(slot);
+  slot.append(bar, pageEl);
+  return slot;
+}
+
+/** Gives every matching page its own button. */
+function attachPagePrintToAll(root, selector, label) {
+  root.querySelectorAll(selector).forEach((el) => attachPagePrint(el, label));
+}
+
+// ==== overrides.js ====
+// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
+// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
+function getOverride(sheet, weekSerial, columnKey) {
+  return sheet.overrides?.[weekSerial]?.[columnKey];
+}
+function setOverride(sheet, weekSerial, columnKey, value) {
+  if (!sheet.overrides) sheet.overrides = {};
+  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
+  sheet.overrides[weekSerial][columnKey] = value;
+}
+function clearOverride(sheet, weekSerial, columnKey) {
+  if (sheet.overrides?.[weekSerial]) {
+    delete sheet.overrides[weekSerial][columnKey];
+    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
+  }
+}
+
+/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
+function mergeRow(computedRow, sheet, weekSerial) {
+  const overriddenKeys = new Set();
+  const row = { ...computedRow };
+  const weekOverrides = sheet.overrides?.[weekSerial];
+  if (weekOverrides) {
+    for (const [key, value] of Object.entries(weekOverrides)) {
+      row[key] = value;
+      overriddenKeys.add(key);
+    }
+  }
+  return { row, overriddenKeys };
+}
+
+// ==== rules.js ====
+// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
+// HaGadol have a different Mincha time because of the drasha"). Applied to every
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
+// the intended distinction between rules (recurring, reapplies every year) and
+// overrides (tied to one generated sheet instance).
+//
+// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
+// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
+// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
+// touching the wrong column on the other sheet.
+//
+// A condition can combine any of:
+//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
+//   parsha:        [names]      - matches week.parsha
+//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
+//   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
+function conditionMatches(condition, week) {
+  if (condition.always) return true;
+  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
+  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
+  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
+  return false;
+}
+
+/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
+ *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
+ *  compatibility with data saved before that format existed, bare keys ("L") and the
+ *  older singular columnKey field (applied to any sheet). */
+function targetColumnsForSeason(rule, season) {
+  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+  return raw
+    .map((entry) => {
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
+      const [entrySeason, key] = entry.split(':');
+      return entrySeason === season ? key : null;
+    })
+    .filter(Boolean);
+}
+
+/** Applies every enabled rule to a row of computed cell text, returning a new object
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
+function applyRules(row, week, rules, season, appliedColumns) {
+  let out = row;
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (!conditionMatches(rule.condition, week)) continue;
+    for (const col of targetColumnsForSeason(rule, season)) {
+      if (!(col in out)) continue;
+      if (out === row) out = { ...row };
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      if (appliedColumns) appliedColumns.add(col);
+    }
+  }
+  return out;
+}
 
 // ==== ui/rich-text.js ====
 // Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
@@ -5758,10 +6028,10 @@ const nav = document.getElementById('nav');
 // the things you set once. Rules is no longer among them - it is the first panel inside
 // Settings, being something configured rather than a place you go. Generate leading also
 // matches where the app opens.
-const tabs = ['generate', 'week', 'saved', 'settings', 'program', 'guide'];
+const tabs = ['generate', 'week', 'saved', 'settings', 'calc', 'program', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', program: 'Get the program', guide: 'Guide', week: 'This week' };
+const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', calc: 'Calculations', program: 'Get the program', guide: 'Guide', week: 'This week' };
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -5773,6 +6043,7 @@ const tabIcons = {
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
   program: '<path d="M10 3v9"/><path d="M6.5 8.5 10 12l3.5-3.5"/><path d="M3.5 13v2.5A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5V13"/>',
+  calc: '<rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M7 6h6"/><path d="M7 9.5h2M11 9.5h2M7 13h2M11 13h2"/>',
 };
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
@@ -5929,6 +6200,11 @@ function render() {
     // whichever half was last open, that trip wants this one.
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
+  } else if (currentTab === 'calc') {
+    renderCalculations(main, state, (tab) => {
+      currentTab = tab;
+      render();
+    });
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {

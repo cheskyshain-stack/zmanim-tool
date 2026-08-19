@@ -1086,3 +1086,36 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
    people do not have to make. */
 .dl-programs { margin-top: 1.4rem; }
 .dl-programs .dl-list { margin-top: 0.6rem; }
+
+/* --- Calculations --------------------------------------------------------------------- */
+/* One card per column, with the plain rule, what it came out to that week, and the exact
+   formula folded under it. */
+.calc-not-rules { border-left: 3px solid var(--ui-accent); padding-left: 0.8rem; margin: 1rem 0 1.2rem; }
+.calc-chart { margin-bottom: 0.6rem; }
+.calc-cols { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.9rem; }
+.calc-col { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem; background: var(--surface); }
+.calc-col-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+/* The header as the chart prints it, in its own direction so a two word Hebrew heading is
+   not reordered against the English beside it. */
+.calc-col-name { font-size: 1.05rem; font-weight: 700; }
+.calc-col-key { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
+.calc-plain { margin: 0; line-height: 1.6; }
+/* The worked example. Times are left to right even inside a Hebrew line, the same reason
+   .cell sets it on the chart itself. */
+.calc-worked {
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+  margin-top: 0.6rem; padding: 0.5rem 0.7rem; border-radius: var(--radius-sm);
+  background: var(--ui-accent-soft);
+}
+.calc-worked-label { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; }
+.calc-worked-value { direction: ltr; font-weight: 700; line-height: 1.5; }
+.calc-blank { color: var(--muted); font-weight: 400; }
+.calc-exact { margin-top: 0.6rem; }
+.calc-exact > summary {
+  cursor: pointer; font-size: var(--fs-sm); font-weight: 600; color: var(--ui-accent-dark);
+  list-style: none;
+}
+.calc-exact > summary::-webkit-details-marker { display: none; }
+.calc-exact > summary::before { content: '▸ '; }
+.calc-exact[open] > summary::before { content: '▾ '; }
+.calc-exact > p { margin: 0.5rem 0 0; font-size: var(--fs-sm); line-height: 1.6; color: var(--muted); }
