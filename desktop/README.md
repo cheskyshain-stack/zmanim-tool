@@ -9,7 +9,7 @@ site is unaffected: nothing in this folder is served, and nothing in `js/` was c
 
 ## Running the tests
 
-Seven suites, all of which measure real output rather than checking that code ran:
+Eight suites, all of which measure real output rather than checking that code ran:
 
 ```bash
 python3 desktop/tests/test_golden.py          # the calculation engine
@@ -19,6 +19,7 @@ python3 desktop/tests/test_state.py           # what is saved, and what generati
 python3 desktop/tests/test_week.py            # which week This week opens on, and its cards
 python3 desktop/tests/test_settings.py        # settings, rules, and importing a backup
 python3 desktop/tests/test_editor.py          # typing over a cell, and the style controls
+python3 desktop/tests/test_publish.py         # what gets published, against a stubbed GitHub
 ```
 
 And to run the program itself:
@@ -68,6 +69,17 @@ sheets** lists what has been made. **Settings** holds the wording on the boards,
 shul is, the advanced zmanim settings, the rules, and Export and Import backup. And a
 **sheet view** previews every page at the size it prints, with Print and Save as PDF.
 
+**Publishing** puts a season on lczmanim.cjaffa.com. The congregation's page is a static
+site, so publishing means committing one file to the repository behind it,
+`data/published.json`, through GitHub's own API: one HTTPS call, no backend, and nothing
+installed beyond this program. Publishing a season leaves every other published season
+standing, and publishing the same season again replaces it, which is how a correction
+reaches the congregation. The file written is the same shape as the one the website writes,
+checked against the real one, so the two programs can publish to the same site.
+
+The token lives in its own file beside the save file and is deliberately kept out of a
+backup: a backup gets shared, and a write token must not.
+
 **Cells are typed over by clicking them.** The map of where each cell was drawn comes from
 the same painting run as the picture, so a click lands on the cell that is really under it
 rather than on one worked out a second time. The dialog shows what the cell works out to
@@ -91,7 +103,6 @@ already made.
 
 ## What is not done
 
-- Publishing to the congregation's site.
 - The page picker, side by side, and fit to screen from the web version's sheet view.
 - The guide.
 - Printing to a real printer. `render/output.py` has the path and it goes through the same
@@ -109,6 +120,7 @@ zmanimboard/
   htmlfield.py     a rich text box that saves the same small markup subset the site stores
   rulesui.py       the rule editor
   celldialog.py    typing over one cell
+  publish.py       committing a season to the congregation's site
   engine/          the calculation engine, a port of js/. No Qt, no interface.
     jsmath.py      the four places Python and JavaScript disagree about arithmetic
     fmt.py         time formatting, minute rounding, the underline sentinels

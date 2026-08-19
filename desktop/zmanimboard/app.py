@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import publish as publishlib
 from . import sheets as sheetlib
 from . import state as statelib
 from .engine.settings import TIMEZONES
@@ -404,6 +405,9 @@ class SavedScreen(Screen):
                 other = QPushButton("Open Weekday chart")
                 other.clicked.connect(lambda _=False, s=weekday: self.window.open_sheet(s))
                 layout.addWidget(other)
+            publish_button = QPushButton("Publishing")
+            publish_button.clicked.connect(lambda _=False: self.window.show_screen("settings"))
+            layout.addWidget(publish_button)
             delete = QPushButton("Delete")
             delete.clicked.connect(lambda _=False, s=sheet: self.delete(s))
             layout.addWidget(delete)
@@ -517,6 +521,50 @@ class SettingsScreen(Screen):
             advanced_form.addRow(label, box)
         self.form.addWidget(advanced)
 
+        publishing = QGroupBox("Publishing")
+        publish_layout = QVBoxLayout(publishing)
+        where = QLabel("The congregation's page is <b>lczmanim.cjaffa.com</b>. It shows one week at a time and moves "
+                       "on by itself once Shabbos is over, for the whole season. Publishing a season leaves any other "
+                       "published season in place, so קיץ and חורף can both be live; publishing the same season again "
+                       "replaces it, which is how a correction reaches the congregation.")
+        where.setWordWrap(True)
+        where.setStyleSheet("color: #6b7280;")
+        publish_layout.addWidget(where)
+
+        token_row = QHBoxLayout()
+        token_row.addWidget(QLabel("Token"))
+        self.token = QLineEdit(publishlib.read_token(window.paths.state.parent))
+        self.token.setEchoMode(QLineEdit.Password)
+        self.token.setPlaceholderText("A GitHub token that may write to the site's repository")
+        token_row.addWidget(self.token, 1)
+        save_token = QPushButton("Save token")
+        save_token.clicked.connect(self.save_token)
+        token_row.addWidget(save_token)
+        publish_layout.addLayout(token_row)
+        # Its own file rather than part of the state, so it can never ride along in an
+        # exported backup. A backup gets shared; a write token must not.
+        token_note = QLabel("Kept in its own file beside the save file, and deliberately left out of a backup.")
+        token_note.setStyleSheet("color: #6b7280;")
+        publish_layout.addWidget(token_note)
+
+        self.publish_table = QTableWidget(0, 3)
+        self.publish_table.setHorizontalHeaderLabels(["Season", "Weeks", ""])
+        self.publish_table.horizontalHeader().setStretchLastSection(True)
+        self.publish_table.verticalHeader().setVisible(False)
+        self.publish_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.publish_table.setMinimumHeight(120)
+        publish_layout.addWidget(self.publish_table)
+
+        live_row = QHBoxLayout()
+        self.live_note = QLabel("")
+        self.live_note.setWordWrap(True)
+        live_row.addWidget(self.live_note, 1)
+        check = QPushButton("What is live now")
+        check.clicked.connect(self.check_live)
+        live_row.addWidget(check)
+        publish_layout.addLayout(live_row)
+        self.form.addWidget(publishing)
+
         backup = QGroupBox("Backup")
         backup_layout = QHBoxLayout(backup)
         note = QLabel("A backup is the same file the website's Settings exports, so one made there opens here and one made here opens there.")
@@ -558,6 +606,27 @@ class SettingsScreen(Screen):
         self.form.addWidget(group)
 
     def refresh(self):
+        groups = publishlib.publishable_groups(self.window.state)
+        self.publish_table.setRowCount(len(groups))
+        for row, (sheet, weekday) in enumerate(groups):
+            self.publish_table.setItem(row, 0, QTableWidgetItem(sheet_name(sheet)))
+            weeks = f'{len(sheet["weeks"])} weeks' + (f', {len(weekday["weeks"])} weekday' if weekday else ', no weekday chart')
+            self.publish_table.setItem(row, 1, QTableWidgetItem(weeks))
+            actions = QWidget()
+            layout = QHBoxLayout(actions)
+            layout.setContentsMargins(0, 0, 0, 0)
+            button = QPushButton("Publish")
+            button.clicked.connect(lambda _=False, s=sheet, w=weekday: self.publish(s, w))
+            take_down = QPushButton("Take it down")
+            take_down.clicked.connect(lambda _=False, s=sheet: self.unpublish(s))
+            layout.addWidget(button)
+            layout.addWidget(take_down)
+            layout.addStretch(1)
+            self.publish_table.setCellWidget(row, 2, actions)
+        self.publish_table.resizeColumnsToContents()
+        if not groups:
+            self.live_note.setText("Nothing has been generated yet, so there is nothing to publish.")
+
         rules = self.window.state["rules"]
         self.rules_table.setRowCount(len(rules))
         for row, rule in enumerate(rules):
@@ -608,6 +677,57 @@ class SettingsScreen(Screen):
         self.window.state["rules"] = [r for r in self.window.state["rules"] if r is not rule]
         self.window.persist()
         self.refresh()
+
+    def save_token(self):
+        publishlib.write_token(self.window.paths.state.parent, self.token.text())
+        self.live_note.setText("Token saved." if self.token.text().strip() else "Token cleared.")
+
+    def _token(self) -> str:
+        return publishlib.read_token(self.window.paths.state.parent)
+
+    def publish(self, sheet, weekday):
+        """Publishing is a button rather than something automatic, because it is the moment
+        the congregation sees a change, and that should be a decision rather than a side
+        effect of editing a cell."""
+        asked = QMessageBox.question(self, "Publish this season?",
+                                     f"Put {sheet_name(sheet)} on lczmanim.cjaffa.com for the congregation to read? "
+                                     "Any other season already published stays where it is.")
+        if asked != QMessageBox.Yes:
+            return
+        sheets = [sheet] + ([weekday] if weekday else [])
+        try:
+            what = publishlib.publish(self.window.state, sheets, self._token())
+        except publishlib.PublishError as err:
+            QMessageBox.warning(self, "It was not published", str(err))
+            return
+        QMessageBox.information(self, "Published",
+                                f"{sheet_name(sheet)} is {what}. The site takes about a minute to catch up.")
+        self.check_live()
+
+    def unpublish(self, sheet):
+        asked = QMessageBox.question(self, "Take this season down?",
+                                     f"Take {sheet_name(sheet)} off the congregation's page? Other published seasons stay.")
+        if asked != QMessageBox.Yes:
+            return
+        try:
+            left = publishlib.unpublish(sheet, self._token())
+        except publishlib.PublishError as err:
+            QMessageBox.warning(self, "It was not taken down", str(err))
+            return
+        QMessageBox.information(self, "Taken down", f"{left} season{'' if left == 1 else 's'} still published.")
+        self.check_live()
+
+    def check_live(self):
+        try:
+            data, _sha = publishlib.fetch_published(self._token())
+        except publishlib.PublishError as err:
+            self.live_note.setText(str(err))
+            return
+        live = [s for s in (data or {}).get("sheets", []) if s["season"] != "weekday"]
+        if not live:
+            self.live_note.setText("Nothing is published at the moment.")
+            return
+        self.live_note.setText("Live now: " + ", ".join(isolate(sheetlib.label_of(s)) + f' {s["hebrewYear"]}' for s in live))
 
     def save(self):
         raw = self.window.state["settings"]
