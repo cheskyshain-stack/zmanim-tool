@@ -108,6 +108,40 @@ R.equal("a hand typed cell keeps its own three lines",
          '<div>6:14 / <u> 6:29</u></div>'],
         cap_html_times_per_line(drasha, 2))
 
+# --- flush, or on a colon axis --------------------------------------------------------------
+# The axis pulls every one digit hour in by a digit so the colons line up. With exactly one
+# long hour alone on its line it does the opposite, leaving that one looking as though it
+# sticks out, so such a card stands flush instead.
+from zmanimboard.render.lines import stands_flush  # noqa: E402
+
+SHABBOS_WITH_1230 = [
+    ["12:30", "1:00 / 1:15", "1:35 / 1:50", "2:15 / 3:00"],   # מנחה ערב שבת
+    ["4:30", "שקיעה 4:48"],
+    ["4:33"],
+    ["7:30 / 8:15"],
+]
+CHOL = [
+    ["7:00", "7:20", "7:35", "8:00"],
+    ["12:45", "1:15", "1:35", "1:50", "4:15", "4:30"],
+    ["6:35", "7:00", "7:30", "8:00", "8:45", "9:30", "10:00", "10:30", "11:00"],
+]
+R.expect("a lone 12:30 over pairs stands flush", stands_flush(SHABBOS_WITH_1230))
+R.expect("a חול card with 12:45, 10:00, 10:30 and 11:00 keeps the axis", not stands_flush(CHOL))
+R.expect("no long hour at all is not a flush decision", not stands_flush([["1:00 / 1:15"], ["4:33"]]))
+R.expect("two long hours keep the axis",
+         not stands_flush([["12:30", "1:00 / 1:15"], ["10:00", "1:35 / 1:50"]]))
+R.expect("a long hour sharing its line with another time keeps the axis",
+         not stands_flush([["12:30 / 1:00", "1:35 / 1:50"]]))
+R.expect("a lone long hour over single times keeps the axis, which is the חול shape",
+         not stands_flush([["12:45", "1:15", "1:35"]]))
+R.expect("the pairs have to be in the same block as the long hour",
+         not stands_flush([["12:45"], ["1:00 / 1:15", "1:35 / 1:50"]]))
+# card.py strips the underline sentinels before asking, so the decision is made on what is
+# actually printed rather than on the markup around it.
+R.expect("the decision is made on stripped text",
+         stands_flush([[f"{UL_START}12:30{UL_END}".replace(UL_START, "").replace(UL_END, ""),
+                        "1:00 / 1:15", "1:35 / 1:50"]]))
+
 # --- the printed card ---------------------------------------------------------------------
 def card_times(card):
     counts = Counter()

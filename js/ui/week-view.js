@@ -340,6 +340,139 @@ function trimSpaceAtLineStart(root) {
   }
 }
 
+/** Whether this card should stand flush instead of going onto a colon axis.
+ *
+ *  The axis exists so a column of times does not wobble, and with several long hours in a
+ *  block it earns its keep. With exactly one it does the opposite: three lines get pulled in
+ *  by a digit and the lone 12:30 reads as though it is sticking out to the left, which is
+ *  what it looks like on a חורף שבת card between November and early January.
+ *
+ *  So: one long hour on the whole card, alone on its line, with the other lines of its own
+ *  block carrying two times each. That last part is what separates the שבת card, where the
+ *  12:30 sits above three pairs, from a חול card, whose lines carry one time each and whose
+ *  מעריב runs 10:00, 10:30, 11:00 together, where the axis is still the right answer. */
+const TIME_ON_LINE = /\d{1,2}:\d{2}/g;
+
+function cardShouldStandFlush(cells) {
+  const lines = [];
+  cells.forEach((cell, block) => {
+    // innerText rather than a DOM walk: it is the lines as they actually broke, which is
+    // what the question is about, and the pads are not in the document yet.
+    cell.innerText.split('\n').forEach((raw) => {
+      const line = raw.trim();
+      if (line) lines.push({ block, line, times: (line.match(TIME_ON_LINE) || []).length });
+    });
+  });
+  const long = lines.filter((l) => /^\d{2}:\d{2}/.test(l.line));
+  if (long.length !== 1) return false;
+  const only = long[0];
+  if (only.times !== 1) return false;
+  const rest = lines.filter((l) => l.block === only.block && l !== only);
+  return rest.length > 0 && rest.every((l) => l.times === 2);
+}
+
+/** Whether any line in this cell opens with a two-digit hour, which is what decides
+ *  whether padding is worth doing. Asked of a whole card rather than one cell: the colons
+ *  should line up down the page, so a שחרית block of single-digit hours is padded to sit
+ *  on the same axis as a מעריב block that runs past ten, instead of each block finding
+ *  its own. Where no row on the card has a long hour, nothing is padded at all: it would
+ *  move every line equally and change nothing, except on a row that opens with a word
+ *  rather than a time ("6:06" over "פלג 6:21"), where it would shift one and not the
+ *  other and pull the two out of line. */
+function hasTwoDigitHourAtLineStart(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const crossedBox = lineBoxTracker(root);
+  let atLineStart = true;
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') atLineStart = true;
+      continue;
+    }
+    if (crossedBox(node)) atLineStart = true;
+    const segments = node.nodeValue.split('\n');
+    for (let i = 0; i < segments.length; i++) {
+      if (i === 0 && !atLineStart) continue;
+      if (/^\s*\d{2}:\d{2}/.test(segments[i])) return true;
+    }
+    atLineStart = node.nodeValue.endsWith('\n');
+  }
+  return false;
+}
+
+/** Lines the colons up down a column of times.
+ *
+ *  Set flush left, "8:45" and "10:00" start at the same place, which puts their colons a
+ *  digit apart and makes the column look as though it wobbles. A single-digit hour is
+ *  given a figure space (U+2007, defined to be exactly as wide as a digit) so the hour
+ *  occupies two digits' width either way and every colon falls on one axis. Only the time
+ *  that starts a line is padded: that is the one the column is read down.
+ *
+ *  Paired with font-variant-numeric: tabular-nums in the stylesheet, without which a font
+ *  with proportional figures would put "1" and "8" at different widths and undo it. */
+/** A digit's worth of blank at the start of a line, so a 1:35 lines its colon up with a
+ *  12:30. An empty element sized in CSS rather than a U+2007 figure space: as a character
+ *  it is only as wide as the font says, and a font without it falls back to something
+ *  else or to nothing, so the indent was one thing here and another on a phone. An
+ *  inline-block also keeps an ancestor's underline from being drawn through it. */
+const timePad = () => {
+  const pad = document.createElement('span');
+  pad.className = 'time-pad';
+  return pad;
+};
+
+function alignColons(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  // Where a pad belongs, gathered first and inserted afterwards: putting one in mid-walk
+  // splits the very node the walk is reading.
+  const inserts = [];
+  const crossedBox = lineBoxTracker(root);
+  let atLineStart = true;
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.nodeName === 'BR') atLineStart = true;
+      continue;
+    }
+    if (crossedBox(node)) atLineStart = true;
+    const text = node.nodeValue;
+    if (!text.length) continue;
+    // Split on the newlines the value carries, because a line can start in the middle of
+    // a text node as well as after a <br>: the שחרית block is "…7:35\n8:00 8:20*…" in one
+    // node, and looking only at the node's own start left that 8:00 unpadded while every
+    // other time in the column was padded.
+    const segments = text.split('\n');
+    let at = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const startsAt = at;
+      at += segment.length + 1; // + the newline it was split on
+      if (i === 0 && !atLineStart) continue;
+      // The first time on the line, wherever it sits in the string. Matching only a line
+      // that *begins* with one skipped "שקיעה 4:48": in the string the Hebrew word comes
+      // first, so the line looked like it had no time to align, and its colon sat a digit
+      // to the left of every other colon on the card. Padding the line start moves the
+      // whole line, colon included, onto the axis. Only a one-digit hour needs it - a
+      // 12:30 is what the axis is set by.
+      const firstTime = segment.match(/(\d{1,2}):\d{2}/);
+      if (!firstTime || firstTime[1].length !== 1) continue;
+      inserts.push({ node, offset: startsAt + segment.match(/^\s*/)[0].length });
+    }
+    atLineStart = text.endsWith('\n');
+  }
+
+  // Back to front, so an earlier offset is still an offset into the same text.
+  for (const { node, offset } of inserts.reverse()) {
+    if (offset === 0) insertAtLineStart(root, node, timePad());
+    else {
+      const tail = node.splitText(offset);
+      tail.parentNode.insertBefore(timePad(), tail);
+    }
+  }
+}
+
 /** Puts an element in front of a node that opens a line, outside whatever inline element
  *  the node happens to open. A pad left inside a <u> is fine to look at but a <br> is not:
  *  an underlined line break paints a rule out to the edge of the line in some engines, and
@@ -648,11 +781,11 @@ function decorateCards(root) {
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     const cells = [...card.querySelectorAll('.week-time')];
     cells.forEach((el) => trimSpaceAtLineStart(el));
-    // No colon axis. Lining the colons up meant indenting every one digit hour by a digit's
-    // width, which left a 12:30 hanging out to the left of the 1:00 under it. Asked for
-    // flush instead: measured on 7 November 2026, the four lines of מנחה ערב שבת started at
-    // 406, 416, 416, 416 and now all start at 406. The colons no longer agree, which is the
-    // trade that was chosen with both in front of us.
+    // One colon axis for the whole card rather than one per row, except where a single long
+    // hour would be the only thing on it: see cardShouldStandFlush.
+    if (cells.some((el) => hasTwoDigitHourAtLineStart(el)) && !cardShouldStandFlush(cells)) {
+      cells.forEach((el) => alignColons(el));
+    }
     cells.forEach((el) => hangTimeMarkers(el));
     // After the marks exist, so the key can be built from what is really on the card.
     fillLegend(card);

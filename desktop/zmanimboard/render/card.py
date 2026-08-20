@@ -19,8 +19,11 @@ from .lines import (
     cap_html_times_per_line,
     cap_times_per_line,
     format_label,
+    has_two_digit_hour_at_line_start,
     has_underline,
     marks_used,
+    needs_pad,
+    stands_flush,
 )
 from .richtext import engine_text_to_html, make_document
 
@@ -86,6 +89,15 @@ class CardPainter:
 
     def u(self, inches: float) -> float:
         return inches * self.dpi
+
+    def _digit_width(self, size_pt: float) -> float:
+        font = QFont()
+        font.setFamilies(self.families)
+        font.setPointSizeF(size_pt)
+        font.setBold(True)
+        return QFontMetricsF(font, self.device).horizontalAdvance("0")
+
+    # --- the page ---------------------------------------------------------------------
 
     def _doc(self, html_text, size_pt, width, *, color=theme.INK, align=Qt.AlignLeft, rtl=False, bold=True, line_height=None):
         return make_document(
@@ -273,11 +285,14 @@ class CardPainter:
         time_w = content * 0.4
         block_left = left + (width - measure) / 2
 
-        # No colon axis: every line starts flush. Lining the colons up meant indenting each
-        # one digit hour by a digit's width, which left a 12:30 hanging out to the left of
-        # the 1:00 under it. Changed on the website first and mirrored here, because the two
-        # print the same card and a difference between them is the one thing this port is
-        # supposed to make impossible.
+        # One colon axis for the whole card rather than one per row, except where a single
+        # long hour would be the only thing on it: see stands_flush. Mirrors the website,
+        # because the two print the same card and a difference between them is the one thing
+        # this port exists to make impossible.
+        every_line = "\n".join("\n".join(_strip_markup(v) for v in value_lines) for _l, value_lines, _h, _lh in prepared)
+        blocks = [[_strip_markup(v) for v in value_lines] for _l, value_lines, _h, _lh in prepared]
+        align = has_two_digit_hour_at_line_start(every_line) and not stands_flush(blocks)
+        digit = self._digit_width(time_pt)
 
         y = top
         for (label_doc, value_lines, height, line_h) in prepared:
@@ -293,7 +308,8 @@ class CardPainter:
             ty = y + (height - times_h) / 2
             for value in value_lines:
                 doc = self._doc(value, time_pt, time_w, align=Qt.AlignLeft, line_height=1.35)
-                self._draw(doc, block_left + pad_x, ty)
+                offset = digit if (align and needs_pad(_strip_markup(value))) else 0
+                self._draw(doc, block_left + pad_x + offset, ty)
                 ty += line_h
             y += height + gap
 
