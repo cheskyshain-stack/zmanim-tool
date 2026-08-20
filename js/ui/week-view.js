@@ -19,7 +19,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateStri
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH } from '../util.js';
-import { attachPagePrintToAll, printWith } from './print-page.js';
+import { printButtonHtml, printWith, wirePrintButton } from './print-page.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
@@ -917,11 +917,16 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
       </div>
+      <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
       <details class="panel week-print-panel no-print">
         <summary>Printing options</summary>
         <div class="panel-body">
           <div class="week-nav-row week-nav-print">
-            <button type="button" id="week-print-pair">${cardCount > 1 ? 'Print both on one sheet' : 'Print this page'}</button>
+            ${
+              // Only when there are two. With one card there is nothing to put beside it,
+              // and Print above already does that page on its own.
+              cardCount > 1 ? '<button type="button" id="week-print-pair">Print both on one sheet</button>' : ''
+            }
             <button type="button" id="week-print-rest">Print every week to the end of the season</button>
           </div>
           <label class="week-order">Which page first
@@ -961,16 +966,17 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // position gave its חול card the שבת card's three-to-a-line.
   decorateCards(container);
 
-  // Each page prints on its own: usually you want this week's שבת page, or the חול
-  // page, not both.
-  attachPagePrintToAll(container, '.week-card', 'Print this page');
-
   fitLinesToPage(container);
   fitPagesToWindow(container);
+
+  // The one Print button: the whole screen goes to the dialog and the choosing happens
+  // there, which is where a person can pick a single page anyway.
+  wirePrintButton(container);
 
   // Landscape, two cards side by side. It has to be a button rather than the print
   // dialog's own landscape setting: @page fixes a card at letter portrait, so choosing
   // landscape there changes nothing (measured, the PDF comes out portrait either way).
+  // That is the one thing the dialog cannot be asked for, which is why these two stayed.
   container.querySelector('#week-print-pair')?.addEventListener('click', () => printWith('is-print-pair'));
 
   // Every week from this one to the end of the season, in one run. The cards for the
@@ -987,7 +993,6 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     const restore = () => {
       wrap.innerHTML = cardsHtml;
       decorateCards(wrap);
-      attachPagePrintToAll(wrap, '.week-card', 'Print this page');
       fitLinesToPage(container);
       fitPagesToWindow(container);
       window.removeEventListener('afterprint', restore);

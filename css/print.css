@@ -51,10 +51,10 @@
 
 @media print {
   .week-cards { display: block; gap: 0; }
-  /* Descendant, not child, for the same reason as the on-screen scaling in app.css: the
-     card sits inside a .page-slot once its print button is attached. This one matters
-     more, because zoom: 1 is what keeps the screen's fit-to-window out of the print, and
-     a rule that quietly stops matching would put a shrunken page on paper. */
+  /* Descendant, not child, deliberately. zoom: 1 here is what keeps the screen's
+     fit-to-window out of the print, and a rule that quietly stopped matching because a
+     card had been wrapped in something would put a shrunken page on paper. That has
+     happened before. */
   .week-cards .week-card {
     page: weekcard;
     /* The on-screen zoom is a way of fitting a page into a window; paper has no such
@@ -66,7 +66,7 @@
     break-after: page;
     break-inside: avoid;
   }
-  /* No trailing blank page after the last card, whether or not it is wrapped in a slot. */
+  /* No trailing blank page after the last card. */
   .week-cards > :last-child .week-card,
   .week-cards > .week-card:last-child { break-after: auto; }
   /* Browsers drop background colours unless told otherwise, and the print dialog's
@@ -90,7 +90,6 @@
 @page pair { size: letter landscape; margin: 0; }
 @media print {
   body.is-print-pair .week-cards { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; gap: 0; }
-  body.is-print-pair .page-slot { display: block; margin: 0; }
   body.is-print-pair .week-cards .week-card {
     page: pair;
     zoom: 0.64 !important;
@@ -100,22 +99,11 @@
   }
 }
 
-/* Printing one page: every other page is taken out of the run for the duration. The
-   marks are put on by printOnly() in ui/print-page.js and taken off again afterwards. */
-@media print {
-  body.is-printing-one .week-card:not(.is-print-target),
-  body.is-printing-one .page:not(.is-print-target) { display: none !important; }
-  /* The wrappers of the pages not being printed go too (marked by printOnly). An empty
-     wrapper still counts as a box outside the named page, and that alone was enough to
-     put out a blank sheet at the default page size beside the one page wanted. */
-  body.is-printing-one .page-slot:not(.is-print-slot) { display: none !important; }
-  .page-slot { display: block; margin: 0; }
-  /* The one page being printed is the whole run, so it must not ask for a break on
-     either side of itself. Every card and chart page carries break-after: page so the
-     next one starts on a fresh sheet, and left in place while printing alone that break
-     put out an empty sheet after it (or before it, printing the last one). */
-  body.is-printing-one .is-print-target { break-before: auto; break-after: auto; page-break-before: auto; page-break-after: auto; }
-}
+/* There was a block here for printing a single page on its own: every other page hidden
+   for the duration, its wrapper hidden too, and the surviving page's break-after taken
+   off so it did not put out a blank sheet after itself. It went with the per-page "Print
+   this page" buttons. A screen now carries one Print button and hands the whole run to
+   the dialog, which is where a person picks the pages they want. */
 
 /* This week shows the week's pages or the wall chart, never both at once, so a print run
    can only be the half on the screen and there is nothing here to hide. An earlier

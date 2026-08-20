@@ -10,7 +10,7 @@
 // Shared between the congregation's site and the admin's This week screen, so the two
 // cannot drift apart.
 import { buildSheetPages, syncPageHeights } from './sheet-view.js';
-import { attachPagePrintToAll } from './print-page.js';
+import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 import { jewishDateString } from '../hebrew-calendar.js';
@@ -109,6 +109,7 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>
+        <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
       </div>
       <div class="pages"></div>`;
     const pagesEl = container.querySelector('.pages');
@@ -116,7 +117,6 @@ export function renderChartBrowser(container, state, opts = {}) {
     const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     syncPageHeights(pagesEl);
-    attachPagePrintToAll(pagesEl, '.page', 'Print this page');
     fitChartToWindow(pagesEl);
 
     const go = (next) => {
@@ -124,6 +124,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       at = next;
       draw();
     };
+    wirePrintButton(container);
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));

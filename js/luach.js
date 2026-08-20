@@ -18,7 +18,6 @@ function backBar(title) {
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="#">&larr; Menu</a>
     <span class="luach-bar-title">${esc(title)}</span>
-    <button type="button" class="btn-primary" id="print-btn">Print all</button>
   </div>`;
 }
 
@@ -60,7 +59,6 @@ function renderWeekPage(published) {
       serial,
       { luach: true }
     );
-    main.querySelector('#print-btn').addEventListener('click', () => window.print());
   };
   draw();
 }
@@ -68,7 +66,6 @@ function renderWeekPage(published) {
 function renderChartPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   main.innerHTML = backBar('The chart') + '<div id="chart-host"></div>';
-  main.querySelector('#print-btn').addEventListener('click', () => window.print());
   renderChartBrowser(main.querySelector('#chart-host'), state);
 }
 

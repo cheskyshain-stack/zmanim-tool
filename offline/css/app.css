@@ -903,10 +903,9 @@ body.is-luach .week-cards { align-items: center; }
    there. Scaled down to fit rather than scrolled sideways, so the whole page is visible:
    the same reason the wall charts have Fit to screen.
 
-   Descendant, not child: every card is wrapped in a .page-slot for its own print button
-   (attachPagePrint in ui/print-page.js), so a "> .week-card" stops matching the moment
-   that button is attached and the page never scales. That is exactly what happened, and
-   the congregation's week page overflowed sideways on a phone. */
+   Descendant, not child, and it stays that way. A card used to be wrapped for its own
+   print button, and "> .week-card" quietly stopped matching the moment it was: the page
+   never scaled and the congregation's week page overflowed sideways on a phone. */
 .week-cards.is-scaled .week-card { zoom: var(--page-zoom, 1); }
 
 /* --- Guide ------------------------------------------------------------------------ */
@@ -1010,17 +1009,6 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
 .luach-back:hover { text-decoration: underline; }
 .luach-bar-title { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
 
-/* A page and the strip of controls above it (see ui/print-page.js). The strip is outside
-   the page so it never covers content and never prints. */
-.page-slot { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; margin-bottom: 1.25rem; }
-.page-slot-bar { display: flex; gap: 0.5rem; }
-.page-print {
-  background: var(--surface); color: var(--accent-dark); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 0.3rem 0.8rem; cursor: pointer;
-  font-size: var(--fs-sm); font-weight: 500; font-family: inherit;
-}
-.page-print:hover { background: var(--accent-soft); border-color: var(--ui-accent); }
-
 /* Choosing which half of This week to look at: the week's two pages, or the wall chart.
    The same two things the congregation's menu offers. One at a time rather than stacked,
    because each carries its own Previous/Today/Next and one pages by week while the other
@@ -1070,6 +1058,9 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
    printed, and on a phone the two buttons wrap to two lines each, which pushed the week
    itself below the fold. Every card still carries its own Print this page under it, so the
    common action is not behind this. */
+/* The one print button a screen carries, on its own row under the paging buttons. */
+.week-nav-print-one { margin-top: 0.6rem; }
+.week-nav-print-one > .print-btn { flex: 0 1 11rem; }
 .week-print-panel { margin-top: 0.6rem; }
 .week-print-panel > .panel-body { padding-top: 0.2rem; }
 /* Inside the panel the row has the panel's own rule above it already. */
