@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>10 Second Stopwatch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<meta name="theme-color" content="#14161a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root {
+    --ink: #e8e4da;
+    --pad: 8px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: #14161a;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  body {
+    position: fixed;
+    inset: 0;
+    touch-action: manipulation;
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    background:
+      radial-gradient(120% 80% at 50% 0%, #262a31 0%, #14161a 60%, #0c0d10 100%);
+  }
+
+  #app {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding:
+      calc(var(--pad) + env(safe-area-inset-top))
+      calc(var(--pad) + env(safe-area-inset-right))
+      calc(var(--pad) + env(safe-area-inset-bottom))
+      calc(var(--pad) + env(safe-area-inset-left));
+    gap: var(--pad);
+  }
+
+  #dialWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    position: relative;
+  }
+
+  /* Absolutely placed so both percentages resolve against a definite box.
+     With height:100% in normal flow, a landscape phone sized the dial from its
+     width and pushed it off the top of the screen. */
+  svg#watch {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.65));
+  }
+
+  #controls {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    gap: 10px;
+  }
+
+  button.pusher {
+    flex: 1 1 0;
+    min-height: 62px;
+    border: 1px solid #0a0b0d;
+    border-radius: 12px;
+    font: 600 15px/1 "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #22262c;
+    cursor: pointer;
+    padding: 0;
+    background:
+      linear-gradient(180deg, #f2f1ee 0%, #d3d1cb 42%, #a9a7a1 58%, #cfcdc7 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.35),
+      0 4px 0 #4a4d53,
+      0 6px 12px rgba(0, 0, 0, 0.5);
+    transition: transform 60ms ease, box-shadow 60ms ease;
+  }
+
+  button.pusher:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.5),
+      0 1px 0 #4a4d53,
+      0 2px 5px rgba(0, 0, 0, 0.5);
+  }
+
+  button.pusher:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+
+  button.pusher.accent { color: #7d2018; }
+
+  /* Landscape phones: dial on the left, pushers stacked on the right. */
+  @media (orientation: landscape) and (max-height: 560px) {
+    #app { flex-direction: row; align-items: stretch; }
+    #dialWrap { width: auto; }
+    #controls {
+      width: auto;
+      max-width: 190px;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+    }
+    button.pusher { min-height: 0; height: 62px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="dialWrap">
+    <svg id="watch" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" aria-label="Ten second mechanical stopwatch">
+      <defs>
+        <linearGradient id="bezel" x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0"    stop-color="#f6f6f4"/>
+          <stop offset="0.14" stop-color="#8f9299"/>
+          <stop offset="0.30" stop-color="#e6e7e6"/>
+          <stop offset="0.46" stop-color="#6f7278"/>
+          <stop offset="0.62" stop-color="#d5d7d6"/>
+          <stop offset="0.78" stop-color="#7c7f85"/>
+          <stop offset="1"    stop-color="#eceded"/>
+        </linearGradient>
+
+        <linearGradient id="bezelInner" x1="0" y1="1" x2="0.4" y2="0">
+          <stop offset="0"    stop-color="#cfd1d1"/>
+          <stop offset="0.35" stop-color="#5d6067"/>
+          <stop offset="0.7"  stop-color="#c2c4c4"/>
+          <stop offset="1"    stop-color="#6c6f75"/>
+        </linearGradient>
+
+        <radialGradient id="face" cx="0.42" cy="0.34" r="0.82">
+          <stop offset="0"    stop-color="#fbf8f0"/>
+          <stop offset="0.55" stop-color="#f0ebdd"/>
+          <stop offset="0.86" stop-color="#ddd6c3"/>
+          <stop offset="1"    stop-color="#c8c0aa"/>
+        </radialGradient>
+
+        <radialGradient id="cap" cx="0.35" cy="0.3" r="0.8">
+          <stop offset="0"   stop-color="#fdfdfd"/>
+          <stop offset="0.5" stop-color="#9a9da3"/>
+          <stop offset="1"   stop-color="#43464b"/>
+        </radialGradient>
+
+        <linearGradient id="needle" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0"    stop-color="#8e1c14"/>
+          <stop offset="0.55" stop-color="#c62f22"/>
+          <stop offset="1"    stop-color="#e04a38"/>
+        </linearGradient>
+
+        <radialGradient id="glass" cx="0.32" cy="0.22" r="0.62">
+          <stop offset="0"   stop-color="#ffffff" stop-opacity="0.30"/>
+          <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.06"/>
+          <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+
+        <filter id="faceShade" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="b"/>
+          <feOffset in="b" dx="0" dy="4" result="o"/>
+          <feComposite in="o" in2="SourceAlpha" operator="out" result="ring"/>
+          <feColorMatrix in="ring" type="matrix"
+            values="0 0 0 0 0.18  0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0.55 0" result="sh"/>
+          <feMerge>
+            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in="sh"/>
+          </feMerge>
+        </filter>
+
+        <filter id="handShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="1.5" dy="3" stdDeviation="2" flood-color="#000" flood-opacity="0.42"/>
+        </filter>
+      </defs>
+
+      <!-- case -->
+      <circle cx="200" cy="200" r="197" fill="url(#bezel)"/>
+      <circle cx="200" cy="200" r="197" fill="none" stroke="#26282c" stroke-width="1.4"/>
+      <circle cx="200" cy="200" r="181" fill="url(#bezelInner)"/>
+      <circle cx="200" cy="200" r="172" fill="#2b2d31"/>
+
+      <!-- dial -->
+      <g filter="url(#faceShade)">
+        <circle cx="200" cy="200" r="169" fill="url(#face)"/>
+      </g>
+      <g id="guilloche" opacity="0.5"></g>
+      <circle cx="200" cy="200" r="169" fill="none" stroke="#a79c81" stroke-width="0.8" opacity="0.55"/>
+      <circle cx="200" cy="200" r="150" fill="none" stroke="#a79c81" stroke-width="0.7" opacity="0.45"/>
+
+      <g id="ticks"></g>
+      <g id="numerals"></g>
+
+      <!-- lap aperture -->
+      <g id="aperture">
+        <rect x="167" y="243" width="66" height="30" rx="5"
+              fill="#1c1a17" stroke="#8d836c" stroke-width="1.2"/>
+        <text x="200" y="264" id="lapText" text-anchor="middle"
+              font-family="Georgia, 'Times New Roman', serif" font-size="19"
+              fill="#efe7d2" letter-spacing="1">0</text>
+        <text x="200" y="288" text-anchor="middle"
+              font-family="Georgia, 'Times New Roman', serif" font-size="11"
+              fill="#6d6350" letter-spacing="3">ROUNDS</text>
+      </g>
+
+      <text x="200" y="128" text-anchor="middle"
+            font-family="Georgia, 'Times New Roman', serif" font-size="14"
+            fill="#6d6350" letter-spacing="4">10 SECONDS</text>
+      <text x="200" y="146" text-anchor="middle"
+            font-family="Georgia, 'Times New Roman', serif" font-size="9.5"
+            fill="#8b8067" letter-spacing="2.4">CONTINUOUS SWEEP</text>
+
+      <!-- hand -->
+      <g id="hand" filter="url(#handShadow)">
+        <path d="M200 44 L203.4 196 L196.6 196 Z" fill="url(#needle)"/>
+        <rect x="198.6" y="196" width="2.8" height="30" fill="#7f1a12"/>
+        <circle cx="200" cy="228" r="8.5" fill="#8e1c14"/>
+        <circle cx="200" cy="228" r="3.6" fill="#f0ebdd"/>
+      </g>
+      <circle cx="200" cy="200" r="9.5" fill="url(#cap)"/>
+      <circle cx="200" cy="200" r="9.5" fill="none" stroke="#2f3237" stroke-width="0.8"/>
+      <circle cx="200" cy="200" r="2.6" fill="#2b2d31"/>
+
+      <!-- glass -->
+      <circle cx="200" cy="200" r="169" fill="url(#glass)" pointer-events="none"/>
+      <path d="M64 108 A169 169 0 0 1 250 40 A150 150 0 0 0 84 150 Z"
+            fill="#ffffff" opacity="0.10" pointer-events="none"/>
+    </svg>
+  </div>
+
+  <div id="controls">
+    <button class="pusher" id="btnStart" type="button">Start</button>
+    <button class="pusher" id="btnStop" type="button" disabled>Stop</button>
+    <button class="pusher accent" id="btnReset" type="button">Reset</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var CX = 200, CY = 200;
+  var PERIOD = 10000;          // one full turn of the dial, in ms
+  var TICKS_PER_SECOND = 5;    // fifth of a second minor ticks
+
+  function el(name, attrs) {
+    var node = document.createElementNS(SVGNS, name);
+    for (var k in attrs) { node.setAttribute(k, attrs[k]); }
+    return node;
+  }
+
+  // Angles run clockwise from 12 o'clock, where 0 sits.
+  function point(angleDeg, radius) {
+    var rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
+  }
+
+  // Sunburst under the printing, so the dial catches light like a real face.
+  var guilloche = document.getElementById("guilloche");
+  for (var g = 0; g < 180; g++) {
+    var a = g * 2;
+    var p1 = point(a, 22), p2 = point(a, 168);
+    guilloche.appendChild(el("line", {
+      x1: p1.x.toFixed(2), y1: p1.y.toFixed(2),
+      x2: p2.x.toFixed(2), y2: p2.y.toFixed(2),
+      stroke: "#b0a48a",
+      "stroke-width": 0.45,
+      opacity: g % 2 ? 0.10 : 0.05
+    }));
+  }
+
+  // Ticks: a heavy one on every whole second, four light ones between.
+  var ticks = document.getElementById("ticks");
+  var totalTicks = 10 * TICKS_PER_SECOND;
+  for (var i = 0; i < totalTicks; i++) {
+    var ang = i * (360 / totalTicks);
+    var major = (i % TICKS_PER_SECOND) === 0;
+    var outer = point(ang, 168);
+    var inner = point(ang, major ? 150 : 160);
+    ticks.appendChild(el("line", {
+      x1: outer.x.toFixed(2), y1: outer.y.toFixed(2),
+      x2: inner.x.toFixed(2), y2: inner.y.toFixed(2),
+      stroke: major ? "#2a2823" : "#6b6353",
+      "stroke-width": major ? 3.2 : 1.1,
+      "stroke-linecap": "butt"
+    }));
+  }
+
+  // Numerals 0 through 9, one every 36 degrees, 0 at the top.
+  var numerals = document.getElementById("numerals");
+  for (var n = 0; n < 10; n++) {
+    var pt = point(n * 36, 128);
+    var t = el("text", {
+      x: pt.x.toFixed(2),
+      y: (pt.y + 12).toFixed(2),
+      "text-anchor": "middle",
+      "font-family": "Georgia, 'Times New Roman', serif",
+      "font-size": n === 0 ? 40 : 34,
+      "font-weight": n === 0 ? "bold" : "normal",
+      fill: n === 0 ? "#8e1c14" : "#2a2823"
+    });
+    t.textContent = String(n);
+    numerals.appendChild(t);
+  }
+
+  var hand = document.getElementById("hand");
+  var lapText = document.getElementById("lapText");
+  var btnStart = document.getElementById("btnStart");
+  var btnStop = document.getElementById("btnStop");
+  var btnReset = document.getElementById("btnReset");
+
+  var running = false;
+  var startedAt = 0;      // performance.now() when the current run began
+  var carried = 0;        // ms banked from previous runs
+  var rafId = 0;
+  var lastLap = -1;
+  var wakeLock = null;
+
+  function elapsed() {
+    return carried + (running ? performance.now() - startedAt : 0);
+  }
+
+  function paint() {
+    var ms = elapsed();
+    var angle = (ms % PERIOD) / PERIOD * 360;
+    hand.setAttribute("transform", "rotate(" + angle.toFixed(3) + " " + CX + " " + CY + ")");
+
+    var lap = Math.floor(ms / PERIOD);
+    if (lap !== lastLap) {
+      lastLap = lap;
+      lapText.textContent = String(lap);
+    }
+  }
+
+  function frame() {
+    paint();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function requestWakeLock() {
+    if (!("wakeLock" in navigator) || wakeLock) { return; }
+    navigator.wakeLock.request("screen").then(function (lock) {
+      wakeLock = lock;
+      lock.addEventListener("release", function () { wakeLock = null; });
+    }).catch(function () { /* not available, the watch still runs */ });
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+  }
+
+  function start() {
+    if (running) { return; }
+    running = true;
+    startedAt = performance.now();
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+    requestWakeLock();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function stop() {
+    if (!running) { return; }
+    carried = elapsed();
+    running = false;
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    releaseWakeLock();
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+    paint();
+  }
+
+  function reset() {
+    var wasRunning = running;
+    running = false;
+    carried = 0;
+    lastLap = -1;
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+    if (wasRunning) { releaseWakeLock(); }
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    paint();
+  }
+
+  btnStart.addEventListener("click", start);
+  btnStop.addEventListener("click", stop);
+  btnReset.addEventListener("click", reset);
+
+  // Keyboard, for testing on a desktop.
+  document.addEventListener("keydown", function (e) {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      running ? stop() : start();
+    } else if (e.key.toLowerCase() === "r") {
+      reset();
+    }
+  });
+
+  // Coming back from a locked screen: the hand jumps to where it should be,
+  // because position is derived from the clock, not from counted frames.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      if (running) {
+        requestWakeLock();
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(frame);
+      }
+      paint();
+    }
+  });
+
+  // No pinch zoom, no rubber banding, nothing that shifts the dial.
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1) { e.preventDefault(); }
+  }, { passive: false });
+
+  paint();
+})();
+</script>
+</body>
+</html>
