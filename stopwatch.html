@@ -50,6 +50,7 @@
       calc(var(--pad) + env(safe-area-inset-bottom))
       calc(var(--pad) + env(safe-area-inset-left));
     gap: var(--pad);
+    position: relative;
   }
 
   #dialWrap {
@@ -71,6 +72,34 @@
     height: 100%;
     width: 100%;
     filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.65));
+  }
+
+  /* A line of state under the buttons. Empty and invisible when the screen
+     lock is doing its job quietly. */
+  #note {
+    flex: 0 0 auto;
+    height: 15px;
+    width: 100%;
+    text-align: center;
+    font: 400 12px/1.35 "Helvetica Neue", Arial, sans-serif;
+    color: #8b8f97;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    pointer-events: none;
+  }
+  #note.show { opacity: 1; }
+  #note.warn { color: #d9a273; }
+
+  /* The screen keeper: real playing video, 2px of it, out of the way. */
+  #keeper {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 2px;
+    height: 2px;
+    opacity: 0.02;
+    pointer-events: none;
+    z-index: -1;
   }
 
   #controls {
@@ -121,6 +150,15 @@
   /* Landscape phones: dial on the left, pushers stacked on the right. */
   @media (orientation: landscape) and (max-height: 560px) {
     #app { flex-direction: row; align-items: stretch; }
+    #note {
+      position: absolute;
+      left: 10px;
+      bottom: 6px;
+      height: auto;
+      width: auto;
+      max-width: 60%;
+      text-align: left;
+    }
     #dialWrap { width: auto; }
     #controls {
       width: auto;
@@ -256,6 +294,8 @@
     <button class="pusher" id="btnStop" type="button" disabled>Stop</button>
     <button class="pusher accent" id="btnReset" type="button">Reset</button>
   </div>
+
+  <div id="note" role="status" aria-live="polite"></div>
 </div>
 
 <script>
@@ -339,6 +379,18 @@
   var rafId = 0;
   var lastLap = -1;
   var wakeLock = null;
+  var note = document.getElementById("note");
+  var noteTimer = 0;
+
+  function setNote(text, transient) {
+    clearTimeout(noteTimer);
+    note.textContent = text;
+    note.classList.toggle("warn", Boolean(text) && !transient);
+    note.classList.toggle("show", Boolean(text));
+    if (text && transient) {
+      noteTimer = setTimeout(function () { note.classList.remove("show"); }, 2400);
+    }
+  }
 
   function elapsed() {
     return carried + (running ? performance.now() - startedAt : 0);
@@ -358,19 +410,120 @@
 
   function frame() {
     paint();
+    if (awakeBy === "video") { paintKeeper(); }
     rafId = requestAnimationFrame(frame);
   }
 
-  function requestWakeLock() {
-    if (!("wakeLock" in navigator) || wakeLock) { return; }
-    navigator.wakeLock.request("screen").then(function (lock) {
-      wakeLock = lock;
-      lock.addEventListener("release", function () { wakeLock = null; });
-    }).catch(function () { /* not available, the watch still runs */ });
+  // Keeping the screen on has two paths, because the first one is not always
+  // there. navigator.wakeLock only exists in a secure context, so a page opened
+  // straight off the phone (file:// or content://) or inside another app's
+  // preview frame does not get it, and it fails silently.
+  //
+  // The fallback is the same trick a video call uses: a tiny video element
+  // playing a live canvas stream. Android keeps the screen lit while a video is
+  // playing, secure context or not.
+  var awakeBy = "";   // "", "lock" or "video"
+  var lockError = "";
+
+  function reportAwake() {
+    if (!running) { setNote(""); return; }
+    if (awakeBy) { setNote("Screen kept awake", true); return; }
+    setNote(lockError || "This browser will not hold the screen on");
   }
 
-  function releaseWakeLock() {
+  function requestWakeLock() {
+    if (!navigator.wakeLock || !navigator.wakeLock.request) {
+      lockError = "No screen lock here, open the page over https";
+      startVideoFallback();
+      return;
+    }
+    if (wakeLock) { return; }
+    navigator.wakeLock.request("screen").then(function (lock) {
+      wakeLock = lock;
+      awakeBy = "lock";
+      lockError = "";
+      lock.addEventListener("release", function () {
+        wakeLock = null;
+        if (awakeBy === "lock") { awakeBy = ""; }
+        // Chrome drops the lock when the page is hidden. Take it back if the
+        // watch is still running and we are looking at it again.
+        if (running && document.visibilityState === "visible") { requestWakeLock(); }
+      });
+      reportAwake();
+    }).catch(function (err) {
+      lockError = "Screen lock refused (" + (err && err.name ? err.name : "error") + ")";
+      startVideoFallback();
+    });
+  }
+
+  // 2px of live video, parked in a corner. It has to be in the page and not
+  // display:none, or the browser treats it as not playing.
+  var keeperVideo = null;
+  var keeperCanvas = null;
+  var keeperCtx = null;
+  var keeperTint = 0;
+
+  function startVideoFallback() {
+    try {
+      if (!keeperVideo) {
+        keeperCanvas = document.createElement("canvas");
+        keeperCanvas.width = 2;
+        keeperCanvas.height = 2;
+        keeperCtx = keeperCanvas.getContext("2d");
+        if (!keeperCanvas.captureStream) { reportAwake(); return; }
+
+        keeperVideo = document.createElement("video");
+        keeperVideo.muted = true;
+        keeperVideo.defaultMuted = true;
+        keeperVideo.playsInline = true;
+        keeperVideo.setAttribute("muted", "");
+        keeperVideo.setAttribute("playsinline", "");
+        keeperVideo.setAttribute("webkit-playsinline", "");
+        keeperVideo.setAttribute("disablepictureinpicture", "");
+        keeperVideo.setAttribute("aria-hidden", "true");
+        keeperVideo.id = "keeper";
+        keeperVideo.srcObject = keeperCanvas.captureStream(5);
+        document.body.appendChild(keeperVideo);
+      }
+      paintKeeper();
+      var playing = keeperVideo.play();
+      if (playing && playing.then) {
+        playing.then(function () { awakeBy = "video"; reportAwake(); })
+               .catch(function () { reportAwake(); });
+      } else {
+        awakeBy = "video";
+        reportAwake();
+      }
+    } catch (e) {
+      reportAwake();
+    }
+  }
+
+  function paintKeeper() {
+    if (!keeperCtx) { return; }
+    // The frames have to keep changing, otherwise the stream stalls and the
+    // browser stops counting it as playback.
+    keeperTint = (keeperTint + 1) % 2;
+    keeperCtx.fillStyle = keeperTint ? "#050608" : "#060709";
+    keeperCtx.fillRect(0, 0, 2, 2);
+  }
+
+  function stopVideoFallback() {
+    if (keeperVideo) { keeperVideo.pause(); }
+    if (awakeBy === "video") { awakeBy = ""; }
+  }
+
+  function stayAwake() {
+    lockError = "";
+    requestWakeLock();
+    reportAwake();
+  }
+
+  function letSleep() {
     if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    stopVideoFallback();
+    awakeBy = "";
+    setNote("");
   }
 
   function start() {
@@ -379,7 +532,7 @@
     startedAt = performance.now();
     btnStart.disabled = true;
     btnStop.disabled = false;
-    requestWakeLock();
+    stayAwake();
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(frame);
   }
@@ -390,7 +543,7 @@
     running = false;
     btnStart.disabled = false;
     btnStop.disabled = true;
-    releaseWakeLock();
+    letSleep();
     cancelAnimationFrame(rafId);
     rafId = 0;
     paint();
@@ -403,7 +556,7 @@
     lastLap = -1;
     cancelAnimationFrame(rafId);
     rafId = 0;
-    if (wasRunning) { releaseWakeLock(); }
+    if (wasRunning) { letSleep(); }
     btnStart.disabled = false;
     btnStop.disabled = true;
     paint();
@@ -428,7 +581,7 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
       if (running) {
-        requestWakeLock();
+        stayAwake();
         cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(frame);
       }
