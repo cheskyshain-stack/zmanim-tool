@@ -861,10 +861,10 @@ body.is-luach .week-cards { align-items: center; }
    amount and every time starts on one axis down the card. */
 .week-time {
   direction: ltr; font-weight: 700; font-size: 14pt; white-space: pre-line; line-height: 1.35;
-  /* Equal-width figures, so the padding that lines the colons up (alignColons in
-     ui/week-view.js) is not undone by a font setting 1 narrower than 8. Kerning off with
-     it: the advance widths are equal either way, but the pair "11" kerns tighter than
-     "10" and pulled that one colon about a pixel out of the column. */
+  /* Equal-width figures. There is no colon axis any more, every line starting flush, so
+     this is what still keeps a column of times from looking ragged: a font setting 1
+     narrower than 8 would give two lines of the same shape different widths. Kerning off
+     with it, since the pair "11" kerns tighter than "10". */
   font-variant-numeric: tabular-nums; font-kerning: none;
   display: block; justify-self: stretch; text-align: left;
 }
@@ -872,14 +872,6 @@ body.is-luach .week-cards { align-items: center; }
    rather than widening the line (see hangTimeMarkers in ui/week-view.js). Without this a
    starred time centres a couple of characters left of the ones above and below it. */
 .time-mark { display: inline-block; width: 0; overflow: visible; white-space: pre; }
-/* The digit-width pad that lines the colons up. inline-block on purpose: an ancestor's
-   underline is not drawn through an atomic inline box, so padding an underlined time
-   does not stretch its rule (see alignColons in ui/week-view.js). */
-/* A digit's worth of blank, made of width rather than of a character: 1ch is the width of
-   a "0" in whatever face is actually being used, so the indent holds on a device whose
-   font has no U+2007 figure space. Inline-block so an ancestor's underline is not drawn
-   through it. */
-.time-pad { display: inline-block; width: 1ch; }
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: 10pt; color: var(--muted); }
 /* The everyday שחרית is stored wrapped in .big, which sets it above the ר"ח block on the
    wall chart. Here they are separate labelled rows, so the size difference says nothing. */

@@ -1,4 +1,4 @@
-"""Laying a week card's times out: how many to a line, and lining the colons up.
+"""Laying a week card's times out: how many of them go on a line.
 
 The web version does this by walking the rendered DOM, because by the time it runs the
 cell is already markup and splitting HTML on a "/" would cut through the slash in a closing
@@ -95,42 +95,6 @@ def _split_line(line: str, sizes) -> str:
         previous = cut
     pieces.append(line[previous:])
     return "\n".join(piece.lstrip() for piece in pieces if piece.strip())
-
-
-def _first_time(line: str):
-    """The first time anywhere in the line.
-
-    Anywhere, not only at the start: in "שקיעה 4:48" the Hebrew word comes first in the
-    string, so a match anchored to the start found no time to align and left that line's
-    colon a digit to the left of every other colon on the card.
-    """
-    return TIME.search(line)
-
-
-def has_two_digit_hour_at_line_start(text: str) -> bool:
-    """Whether any line here opens with a two digit hour, which is what decides whether
-    padding is worth doing at all.
-
-    Asked of a whole card rather than one cell: the colons should line up down the page, so
-    a שחרית block of single digit hours is padded onto the same axis as a מעריב block that
-    runs past ten, instead of each block finding its own. Where no line on the card has a
-    long hour nothing is padded, since it would move every line equally and change nothing,
-    except on a line that opens with a word rather than a time, where it would shift one
-    and not the other and pull the two out of line.
-    """
-    for line in str(text or "").split("\n"):
-        if re.match(r"^[\s" + NBSP + UL_START + r"]*\d{2}:\d{2}", line):
-            return True
-    return False
-
-
-def needs_pad(line: str) -> bool:
-    """Whether this line's first time has a one digit hour, and so wants a digit of blank
-    in front of it to put its colon on the axis."""
-    match = _first_time(line)
-    if not match:
-        return False
-    return len(match.group(0).split(":")[0]) == 1
 
 
 def marks_used(text: str):
