@@ -32,11 +32,9 @@ function homeHtml(published) {
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
         <span class="luach-item-title">Weekly Zmanim</span>
-        <span class="luach-item-sub">This week's schedule, שבת and weekday. Print or save it.</span>
       </a>
       <a class="luach-item" href="#chart">
         <span class="luach-item-title">Zmanim chart</span>
-        <span class="luach-item-sub">The wall chart, opening on the stretch covering now. Page through it, print or save it.</span>
       </a>
     </nav>
     <p class="luach-foot">${esc(s.footerAddress)}</p>
