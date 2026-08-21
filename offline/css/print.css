@@ -77,22 +77,22 @@
   .week-line { break-inside: avoid; }
 }
 
-/* Both week cards on one landscape sheet, under one header.
+/* Both week cards on one sheet, under one header. Portrait, the same paper a card uses:
+   a column of times wants height rather than width, and this way there is nothing to
+   arrange in the print dialog either.
 
-   The landscape paper cannot be asked for in the print dialog. @page fixes a card at
-   letter portrait, so choosing landscape there changes nothing at all (measured: the PDF
-   came out 612x792 either way), and an (orientation: landscape) query can never match a
-   page CSS has already made portrait. So the sheet claims a landscape page of its own. */
-@page pair { size: letter landscape; margin: 0; }
+   Still its own named page rather than borrowing weekcard, because the two want
+   different things of a page break: a card ends with break-after: page so the next one
+   starts on a fresh sheet, and this sheet is the whole run. */
+@page pair { size: letter portrait; margin: 0; }
 @media print {
-  /* No body class gating this any more. The sheet is a view now: it is either on the
-     screen, in which case it is what should be printed, or it does not exist. That also
-     means the landscape paper needs nothing asked for in the print dialog.
+  /* No body class gating this. The sheet is a view: it is either on the screen, in which
+     case it is what should be printed, or it does not exist.
 
-     The sheet is already 11in by 8.5in and laid out to fill it (see .week-pair in
-     app.css), so there is nothing to scale here beyond undoing the fit-to-window zoom.
-     The version before this squeezed two whole 8.5in cards into 11in at 0.64, which is
-     where the small type and the blank strip along the bottom came from. */
+     It is already 8.5in by 11in and laid out to fill it (see .week-pair in app.css), so
+     there is nothing to scale here beyond undoing the fit-to-window zoom. The version
+     before this squeezed two whole cards side by side at 0.64, which is where the small
+     type and the blank strip along the bottom came from. */
   .week-pair {
     page: pair;
     zoom: 1 !important;
@@ -102,8 +102,9 @@
     break-after: auto;
     break-inside: avoid;
   }
-  /* The columns are .week-card and would otherwise claim the portrait weekcard page from
-     inside a landscape one, which is two page contexts for one box. */
+  /* The columns are .week-card and would otherwise claim the weekcard page from inside
+     this one, which is two page contexts for one box, and weekcard's break-after: page
+     would put a blank sheet out after the pair. */
   .week-pair .week-card { page: pair; break-after: auto; }
   .week-pair, .week-pair * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

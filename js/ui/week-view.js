@@ -1084,13 +1084,9 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
               <option value="weekday" ${cardOrder() === 'weekday' ? 'selected' : ''}>Weekday, then שבת</option>
             </select>
           </label>
-          ${
-            // Only on a touch device, and only next to the one action here that needs paper
-            // turned: see .print-hint in app.css for why a computer is not told this.
-            cardCount > 1
-              ? '<p class="print-hint no-print">Both on one sheet prints landscape. If the print dialog opens portrait, change it in its options.</p>'
-              : ''
-          }
+          <!-- There was a note here telling a phone to turn the paper round: the sheet
+               used to be landscape and the print dialog opens portrait. It is portrait
+               itself now, on the same paper a card uses, so there is nothing to say. -->
         </div>
       </details>
       ${

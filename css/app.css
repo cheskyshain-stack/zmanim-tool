@@ -923,21 +923,26 @@ body.is-luach .week-cards { align-items: center; }
    and two columns of times between them at whatever size fills the space. */
 .week-pair {
   /* Its own copy of the printed-sheet variables, since the header that now sits on the
-     sheet rather than inside a card is sized off them. The header scale is lower than a
-     card's 0.77: one header across 11in has no need to be as big as one across 8.5in, and
-     every tenth of an inch it gives back is another tenth for the times. */
+     sheet rather than inside a card is sized off them. Same header scale as a card, the
+     sheet being the same 8.5in across. */
   --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   --sheet-font-size: 11pt;
-  --sheet-header-scale: 0.66;
-  width: 11in; height: 8.5in; flex: none;
-  padding: 0.32in 0.42in 0.26in;
+  --sheet-header-scale: 0.77;
+  /* Portrait, the same paper a card uses. Landscape put the two lists in boxes 4.86in
+     wide and 5.91in tall, which is the wrong way round for a column of times: the list
+     runs down the page, so the room it wants is height. Turning the sheet gives each one
+     3.7in by about 8.3in, more area than before and the right shape for it. It also
+     prints on ordinary portrait paper with nothing to arrange in the dialog, and on a
+     phone it comes out at half size on screen rather than a third. */
+  width: 8.5in; height: 11in; flex: none;
+  padding: 0.38in 0.4in 0.3in;
   background: var(--paper); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
   font-family: var(--sheet-font-family); color: var(--ink);
   display: flex; flex-direction: column;
   /* A page is a page: nothing may spill past it onto a second sheet. */
   overflow: hidden;
 }
-.week-pair-cols { display: flex; flex: 1; gap: 0.42in; min-height: 0; }
+.week-pair-cols { display: flex; flex: 1; gap: 0.3in; min-height: 0; }
 /* Each column is the card it already was, moved across whole, with the header and the
    address it no longer needs taken off it. Moved rather than rebuilt, so the legend, the
    line caps and the colon axis all carry over exactly as they were worked out. */
@@ -949,18 +954,26 @@ body.is-luach .week-cards { align-items: center; }
 
 /* The band of times, 77% of the column and the same in both, rather than filling it.
 
-   77% because that is the measure it has on a card: 5.6in of block inside 7.3in of paper,
-   which reads as a set list rather than a table stretched to the edges.
+   94% rather than the 77% a card uses. A card's block is 5.6in inside 7.3in of paper; a
+   column here is only 3.7in wide to begin with, so the same fraction again would squeeze
+   the longer labels onto two lines for no reason. Measured at 88%, ס״ז קר״ש גר״א / מ״א
+   still broke across two lines; at 94% it does not.
 
    A plain percentage is all it takes, and that is worth spelling out because two attempts
    at dividing it by the fitting scale got it wrong, one of them putting a 5.33in block in
    a 4.86in column. The block is zoomed to fit, and a percentage inside a zoomed box
    resolves against the box divided by that zoom, so 77% of it comes out at 77% of the
    column on the paper whatever the zoom is. Dividing again double counts. Measured: the
-   two bands now paint 3.74in each and sit dead centre in their columns, against 3.88in
-   and 4.86in before, which is the inch of difference that made the sheet look out of
-   true. max-width goes, or the card's 5.6in would cap the narrower column instead. */
-.week-pair .week-lines-inner { width: 77%; max-width: none; }
+   two bands paint the same width as each other and sit dead centre in their columns,
+   where before they were 3.88in and 4.86in, an inch apart on a sheet whose header, title
+   and address are all centred. max-width goes, or the card's 5.6in would cap one of
+   them instead. */
+.week-pair .week-lines-inner { width: 94%; max-width: none; }
+/* A row keeps its name and its times at the two outer edges and leaves the middle fifth
+   of itself empty, which is right on a card 5.6in wide and wasteful in a column of 3.5in.
+   The two cells take more of the row here, so the longer names have somewhere to go: at
+   40% each, ס״ז קר״ש גר״א / מ״א broke across two lines even with the band widened. */
+.week-pair .week-line { grid-template-columns: 47% 47%; }
 
 /* The name, dead centre on the sheet. In the grid the header uses, the two side cells are
    equal but their contents are not, and the rabbi's line is wider than the building icon:
@@ -974,8 +987,8 @@ body.is-luach .week-cards { align-items: center; }
  /* The parsha, once, across the whole sheet, with each column saying only which half of
     the week it is. Both columns used to carry the parsha, one of them with "זמני חול · "
     in front of it, which said the same thing twice and left neither column room. */
-.week-pair-title { margin: 0.08in 0 0; text-align: center; direction: rtl; font-size: 21pt; font-weight: 700; color: var(--ink); }
-.week-pair .week-title { margin-top: 0.1in; font-size: 15pt; }
+.week-pair-title { margin: 0.12in 0 0; text-align: center; direction: rtl; font-size: 20pt; font-weight: 700; color: var(--ink); }
+.week-pair .week-title { margin-top: 0.14in; font-size: 15pt; }
 /* One note for the sheet, not one per column. buildPairSheet merges them. */
 .week-pair .week-card > .week-legend { display: none; }
 .week-pair-legend { margin-top: 0.08in; padding-top: 0.08in; }
