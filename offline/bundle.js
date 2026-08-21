@@ -5596,6 +5596,34 @@ function fitLinesToPage(container) {
   });
 }
 
+/** Rebuilds the two cards on screen as one landscape sheet: a single header across the
+ *  top, the two lists of times side by side under it, and one address along the bottom.
+ *
+ *  The cards are moved rather than rebuilt. Everything that was worked out on them, the
+ *  legend, the line caps, which times are underlined, the colon axis, comes across
+ *  untouched, and there is no second copy of any of that logic to keep in step.
+ *
+ *  Returns false when there is only one card, which is a week whose Shabbos is Yom Tov:
+ *  there is nothing to put beside it and the button is not offered. */
+function buildPairSheet(wrap) {
+  const cards = [...wrap.querySelectorAll('.week-card')];
+  if (cards.length < 2) return false;
+  const header = cards[0].querySelector('.page-header');
+  const foot = cards[0].querySelector('.week-foot');
+  const sheet = document.createElement('section');
+  sheet.className = 'week-pair';
+  if (header) sheet.appendChild(header.cloneNode(true));
+  const cols = document.createElement('div');
+  cols.className = 'week-pair-cols';
+  // appendChild moves them, so wrap is left empty and the sheet takes their place.
+  cards.forEach((card) => cols.appendChild(card));
+  sheet.appendChild(cols);
+  if (foot) sheet.appendChild(foot.cloneNode(true));
+  wrap.appendChild(sheet);
+  wrap.classList.add('is-pairing');
+  return true;
+}
+
 /** Scales the pages down until one fits across the window.
  *
  *  A letter page is 816px wide, which is wider than a phone and wider than this app's
@@ -5841,11 +5869,33 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // there, which is where a person can pick a single page anyway.
   wirePrintButton(container);
 
-  // Landscape, two cards side by side. It has to be a button rather than the print
+  // Landscape, one sheet, one header. It has to be a button rather than the print
   // dialog's own landscape setting: @page fixes a card at letter portrait, so choosing
   // landscape there changes nothing (measured, the PDF comes out portrait either way).
   // That is the one thing the dialog cannot be asked for, which is why these two stayed.
-  container.querySelector('#week-print-pair')?.addEventListener('click', () => printWith('is-print-pair'));
+  //
+  // The sheet is built for real and then taken down again, the same way printing the rest
+  // of the season does, rather than being faked with print-only rules. fitLinesToPage has
+  // to run again afterwards: the columns are a different shape from the cards they came
+  // out of, so the size that filled a portrait sheet is not the size that fills these.
+  container.querySelector('#week-print-pair')?.addEventListener('click', () => {
+    const wrap = container.querySelector('.week-cards');
+    const built = buildPairSheet(wrap);
+    if (built) fitLinesToPage(wrap);
+    const restore = () => {
+      wrap.classList.remove('is-pairing');
+      wrap.innerHTML = cardsHtml;
+      decorateCards(wrap);
+      fitLinesToPage(container);
+      fitPagesToWindow(container);
+      window.removeEventListener('afterprint', restore);
+    };
+    if (built) {
+      window.addEventListener('afterprint', restore);
+      setTimeout(restore, 1500);
+    }
+    printWith('is-print-pair');
+  });
 
   // Every week from this one to the end of the season, in one run. The cards for the
   // whole stretch are built and put in place of the single week's, printed, then the one

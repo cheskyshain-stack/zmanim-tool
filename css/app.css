@@ -908,6 +908,55 @@ body.is-luach .week-cards { align-items: center; }
    never scaled and the congregation's week page overflowed sideways on a phone. */
 .week-cards.is-scaled .week-card { zoom: var(--page-zoom, 1); }
 
+/* --- Both cards on one landscape sheet ----------------------------------------------
+   Put together by the Print both on one sheet button and taken down again straight
+   after, so this is on screen for a moment and never seen.
+
+   The geometry lives here rather than in print.css on purpose. The type is sized by
+   measuring the page on screen, because the page on screen is the printed page, and a
+   rule that only existed in the print stylesheet would leave nothing to measure.
+
+   The old version printed the two cards whole, each with its own header and its own
+   address, scaled to 0.64 so that two 8.5in sheets came inside 11in. Two thirds of the
+   type for two copies of the same header, and 1.4in of the sheet left blank underneath.
+   Here the sheet is the page: one header across the top, one address along the bottom,
+   and two columns of times between them at whatever size fills the space. */
+.week-pair {
+  /* Its own copy of the printed-sheet variables, since the header that now sits on the
+     sheet rather than inside a card is sized off them. The header scale is lower than a
+     card's 0.77: one header across 11in has no need to be as big as one across 8.5in, and
+     every tenth of an inch it gives back is another tenth for the times. */
+  --sheet-font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  --sheet-font-size: 11pt;
+  --sheet-header-scale: 0.66;
+  width: 11in; height: 8.5in; flex: none;
+  padding: 0.32in 0.42in 0.26in;
+  background: var(--paper); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  font-family: var(--sheet-font-family); color: var(--ink);
+  display: flex; flex-direction: column;
+  /* A page is a page: nothing may spill past it onto a second sheet. */
+  overflow: hidden;
+}
+.week-pair-cols { display: flex; flex: 1; gap: 0.42in; min-height: 0; }
+/* Each column is the card it already was, moved across whole, with the header and the
+   address it no longer needs taken off it. Moved rather than rebuilt, so the legend, the
+   line caps and the colon axis all carry over exactly as they were worked out. */
+.week-pair .week-card {
+  width: auto; height: auto; flex: 1 1 0; min-width: 0;
+  padding: 0; border: none; box-shadow: none; background: none;
+}
+.week-pair .week-card > .page-header, .week-pair .week-card > .week-foot { display: none; }
+.week-pair .week-title { margin-top: 0.1in; }
+.week-pair > .week-foot { padding-top: 0.12in; }
+/* An 11in sheet is wider than the window it is briefly built in. Clipped rather than
+   allowed to push a sideways scrollbar onto the page for the moment it is there; print
+   puts it back, where 11in of sheet has 11in of paper to sit on. */
+.week-cards.is-pairing { overflow: hidden; max-width: 100%; }
+/* The fit-to-window zoom is for a portrait card in a narrow window and has no business
+   on this sheet, which is in inches. Left on, it changed what the type fitting measured:
+   the same sheet came out fitted at 1.60 on a 412px window and 0.70 on a 1280px one. */
+.week-cards.is-pairing .week-card { zoom: 1 !important; }
+
 /* --- Guide ------------------------------------------------------------------------ */
 .guide-lede {
   background: var(--ui-accent-soft); border: 1px solid var(--border); border-radius: var(--radius);

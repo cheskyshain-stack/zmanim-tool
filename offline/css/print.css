@@ -89,13 +89,22 @@
    leaves them 7.04in tall on an 8.5in sheet. */
 @page pair { size: letter landscape; margin: 0; }
 @media print {
-  body.is-print-pair .week-cards { display: flex; flex-direction: row; align-items: flex-start; justify-content: center; gap: 0; }
-  body.is-print-pair .week-cards .week-card {
+  body.is-print-pair .week-cards { display: block; overflow: visible; }
+  /* The sheet is already 11in by 8.5in and laid out to fill it (see .week-pair in
+     app.css), so there is nothing to scale here. The old rule squeezed two whole 8.5in
+     cards into 11in at 0.64, which is where the small type and the blank strip along the
+     bottom came from. */
+  body.is-print-pair .week-pair {
     page: pair;
-    zoom: 0.64 !important;
-    break-after: auto !important;
-    page-break-after: auto !important;
+    zoom: 1 !important;
+    border: none;
+    box-shadow: none;
+    margin: 0;
+    break-after: auto;
     break-inside: avoid;
+  }
+  body.is-print-pair .week-pair, body.is-print-pair .week-pair * {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
 
