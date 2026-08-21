@@ -99,9 +99,13 @@
     border: none;
     box-shadow: none;
     margin: 0;
-    break-after: auto;
+    /* A sheet a page, since printing the rest of the season puts out one of these per
+       week. The last one asks for no break, or the run ends on a blank sheet. */
+    break-after: page;
     break-inside: avoid;
   }
+  .week-cards > .week-pair:last-child,
+  .week-cards > :last-child .week-pair { break-after: auto; }
   /* The columns are .week-card and would otherwise claim the weekcard page from inside
      this one, which is two page contexts for one box, and weekcard's break-after: page
      would put a blank sheet out after the pair. */

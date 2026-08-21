@@ -127,6 +127,20 @@ const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'w
  *  and the sheet should still be a sheet afterwards. */
 let pairView = false;
 
+/** Which season a week belongs to, as something two weeks can be compared by.
+ *
+ *  The שבת sheet's id where there is one. A week whose Shabbos is Yom Tov has no שבת sheet
+ *  at all, since no parsha is read and it has no row on that chart, and it comes through
+ *  on its Weekday chart alone: those are the last weeks of the season they close, so they
+ *  answer with the sheet that chart was generated beside. Without that, ראש השנה, יום כפור
+ *  and סוכות would each read as a season of their own and a run would stop before them. */
+function seasonKeyOf(serial, index, state) {
+  const sheet = index.get(serial)?.sheet;
+  if (sheet) return sheet.id;
+  const weekday = weekdayChartFor(null, serial, state);
+  return weekday?.linkedSheetId || weekday?.id || null;
+}
+
 /** The season that would follow the last week in the list, named. The two alternate, so
  *  it is whichever one the last week is not: a קיץ season ends at Sukkos and חורף picks
  *  up from there. Read off the newest week that belongs to a שבת sheet, since the last
@@ -1145,25 +1159,47 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // page order is: the cards are decorated after they are built and those passes are not
   // safe to run over their own output.
   //
-  // Landscape has to be arranged here rather than left to the print dialog: @page fixes a
-  // card at letter portrait, so choosing landscape in the dialog changes nothing at all
-  // (measured, the PDF came out portrait either way). The sheet claims a landscape @page
-  // of its own, so printing it needs nothing asked for in the dialog.
+  // The sheet claims a page of its own, portrait like the paper a card uses, so printing
+  // it needs nothing asked for in the print dialog.
   container.querySelector('#week-view-pair')?.addEventListener('click', () => {
     pairView = !pairView;
     onSerialChange(showing);
   });
 
-  // Every week from this one to the end of the season, in one run. The cards for the
-  // whole stretch are built and put in place of the single week's, printed, then the one
-  // week is put back: same markup and same treatment either way, so a printed run cannot
-  // drift from what a week looks like on its own. Rebuilt rather than restored from the
-  // decorated DOM, since the passes are not safe to run twice over their own output.
+  // Every week from this one to the end of the season, in one run. Each week is built and
+  // treated exactly as it is when it is on the screen on its own, so a printed run cannot
+  // drift from what a week looks like: same markup, same passes, and the one-sheet view if
+  // that is what is being looked at.
+  //
+  // To the end of the season and no further. It used to take every week left in the index,
+  // which is every week of every published sheet: pressed in August it ran from there to
+  // the end of the following חורף, 33 weeks and 67 pages, rather than the six weeks left
+  // of קיץ. A season is a שבת sheet plus the Yom Tov weeks after it that only its Weekday
+  // chart covers, so the run stops where that changes.
   container.querySelector('#week-print-rest')?.addEventListener('click', () => {
     const wrap = container.querySelector('.week-cards');
-    wrap.innerHTML = serials.slice(at).map((s) => weekCardsHtml(s, index, state, settings)).join('');
-    decorateCards(wrap);
-    fitLinesToPage(wrap);
+    const key = seasonKeyOf(showing, index, state);
+    const rest = [];
+    for (let i = at; i < serials.length; i++) {
+      if (seasonKeyOf(serials[i], index, state) !== key) break;
+      rest.push(serials[i]);
+    }
+
+    wrap.innerHTML = '';
+    for (const serial of rest) {
+      // One host per week, so a week's two cards stay together and the one-sheet build has
+      // exactly the pair it expects rather than every card in the run.
+      const host = document.createElement('div');
+      host.className = 'week-cards';
+      wrap.appendChild(host);
+      host.innerHTML = weekCardsHtml(serial, index, state, settings);
+      decorateCards(host);
+      fitLinesToPage(host);
+      if (pairView && host.querySelectorAll('.week-card').length > 1) {
+        buildPairSheet(host);
+        fitPairColumns(host.querySelector('.week-pair'));
+      }
+    }
     // Put back by re-rendering rather than by rebuilding the cards here. The screen may
     // have been on the one-sheet view when this was pressed, and putting the two cards
     // back by hand would have dropped it.
