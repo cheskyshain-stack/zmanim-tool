@@ -888,6 +888,12 @@ body.is-luach .week-cards { align-items: center; }
 .week-card .header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
 .week-card .header-icon { justify-self: start; }
 .week-card .header-rabbi { justify-self: end; white-space: pre-line; }
+/* The rabbi's line, set to match the wall chart's. On a chart the whole page is bold
+   (.page { font-weight: 700 } above) and the line inherits it; a card sets no such thing,
+   so its copy of the same header came out regular and a point larger. Measured: the
+   chart's is 10pt at weight 700, the card's was 11pt at 400. Written out rather than
+   taken from --sheet-font-size, which is 11pt here on purpose for the rows. */
+.week-card .header-rabbi, .week-pair .header-rabbi { font-size: 10pt; font-weight: 700; }
 
 /* The key to the marks used on this card. Sits above the address, in the space the times
    do not need, and is left out entirely when the card uses no marks at all. */
