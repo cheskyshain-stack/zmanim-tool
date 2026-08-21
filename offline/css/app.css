@@ -1121,7 +1121,15 @@ body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
    address ends up just off the bottom. vh first as the fallback for anything old. */
 body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 .luach-home { max-width: 34rem; margin: 0 auto; width: 100%; text-align: center; flex: 1; display: flex; flex-direction: column; }
-.luach-home > .luach-rule { margin-top: auto; }
+/* The auto is what pushes the address to the foot of the screen. The padding is what
+   keeps the rule off the last card when there is no room to push into: an auto margin
+   gets whatever space is left over, and when the page is already taller than the window
+   that is nothing at all, so the rule sat flush against the card. Measured at 0px on an
+   upright phone with a short screen, on a narrow phone held sideways, and at 767px wide,
+   against 228px on a phone with room to spare. Padding cannot be absorbed that way, and
+   where there is slack it costs nothing: the auto simply takes 30px less of it, so the
+   roomy case still measures the same 228px it did. */
+.luach-home > .luach-rule { margin-top: auto; padding-top: 1.9rem; }
 
 /* The navy cap at the top of every screen here, the same shape on the menu and on the
    pages behind it, so that going in and coming out look like one site rather than two.
@@ -1374,8 +1382,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .luach-masthead { margin-top: auto; }
   .luach-home { max-width: 40rem; flex: 0 0 auto; margin-bottom: auto; }
   /* Clear of the last card. The cards carry a shadow that reaches about 10px past their
-     edge, so a gap measured at 26px read as barely a gap at all. */
-  .luach-home > .luach-rule { margin-top: 2.2rem; }
+     edge, so a gap measured at 26px read as barely a gap at all. Padding rather than a
+     margin, for the reason given where this is first set. */
+  .luach-home > .luach-rule { padding-top: 2.2rem; }
   .luach-menu { gap: 1rem; }
   .luach-item { padding: 1.35rem 1.6rem; gap: 1.15rem; border-radius: 20px; }
   .luach-item-icon { width: 34px; height: 34px; }
@@ -1403,7 +1412,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      three now. What is given back comes off the cap and the masthead above, where a few
      pixels are not noticed. */
   .luach-rule { margin: 1rem auto; }
-  .luach-home > .luach-rule { margin-top: 2rem; }
+  .luach-home > .luach-rule { padding-top: 2rem; }
 }
 
 /* Choosing which half of This week to look at: the week's two pages, or the wall chart.
