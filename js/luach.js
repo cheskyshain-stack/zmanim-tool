@@ -28,7 +28,16 @@ const ICON_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="no
 const ICON_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
   <circle cx="12" cy="12" r="9.1"/><path d="M12 6.6v5.7l3.6 2.1"/>
 </svg>`;
+const ICON_HEART = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
+</svg>`;
 const CHEVRON = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>`;
+/* An arrow leaving a box rather than the chevron the other two carry. A chevron says the
+   site goes on somewhere; this one leaves the site altogether, and the mark should say so
+   before it is pressed rather than after. */
+const OUTWARD = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M14 4.5h5.5V10M19.5 4.5l-8 8M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/>
+</svg>`;
 
 /** The two things this site offers, named once.
  *
@@ -38,6 +47,14 @@ const CHEVRON = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stro
  *  headed "The chart", which is two names for each of two things on a site that only has
  *  two things. Written here rather than in both places, so they cannot drift apart again. */
 const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart' };
+
+/** The shul's donation page, which is not part of this site.
+ *
+ *  It opens in a new tab on purpose. Someone reading the zmanim keeps the page they were
+ *  on, and, more to the point, this site can be installed to a home screen and run in a
+ *  window with no address bar: sent to a payment page inside that window there would be no
+ *  URL and no padlock to check it by. A new tab is a real browser, with both. */
+const DONATE = { name: 'Donate', href: 'https://secure.cardknox.com/bmoflakewoodcommons1' };
 
 /** A gold hairline with a diamond in the middle. Decoration, so it says nothing to a
  *  screen reader. */
@@ -72,6 +89,9 @@ function homeHtml(published) {
       </a>
       <a class="luach-item" href="#chart">
         ${ICON_CALENDAR}<span class="luach-item-title">${esc(PAGE_NAMES.chart)}</span>${CHEVRON}
+      </a>
+      <a class="luach-item" href="${esc(DONATE.href)}" target="_blank" rel="noopener noreferrer">
+        ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${OUTWARD}
       </a>
     </nav>
     ${rule()}

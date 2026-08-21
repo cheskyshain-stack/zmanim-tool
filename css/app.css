@@ -1382,6 +1382,20 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .luach-foot { font-size: 1.15rem; }
 }
 
+/* A short window on a computer: a browser not maximised, or a laptop with a lot of its
+   own chrome. Three items down the menu is about 90px more than two, and at 1280x600 that
+   was the difference between a page that fitted and one that scrolled by 7%. The spacing
+   tightens rather than the type shrinking, since it is the gaps that are generous and the
+   words that have to stay readable. */
+@media (min-width: 48rem) and (max-height: 44rem) {
+  .luach-bar-plain { min-height: 4.5rem; margin-bottom: 1.5rem; }
+  .luach-masthead { margin-bottom: 1.4rem; }
+  .luach-rule { margin: 0.7rem auto; }
+  .luach-home > .luach-rule { margin-top: 1rem; }
+  .luach-menu { gap: 0.7rem; }
+  .luach-item { padding: 1.05rem 1.6rem; }
+}
+
 /* Choosing which half of This week to look at: the week's two pages, or the wall chart.
    The same two things the congregation's menu offers. One at a time rather than stacked,
    because each carries its own Previous/Today/Next and one pages by week while the other
