@@ -56,8 +56,18 @@ and `favicon.ico` from `icons/source.png`, needs Pillow, and is only run when th
 itself changes. The icon links live in the head of both `index.html` and
 `admin/index.html`; the admin one is wrapped in `<!-- icons --> ... <!-- /icons -->` and
 `build-offline.py` strips that block, because the paths are site absolute and a web
-manifest cannot be fetched over `file://` at all. Both manifests are `display: browser`
-on purpose: a standalone window on an iPhone cannot print, and printing is the point.
+manifest cannot be fetched over `file://` at all.
+
+Both manifests carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
+and that pair is load-bearing, not a leftover. Android reads `display_override`, so Chrome
+installs the site as a real app: no Chrome badge on the icon, and the launcher gets the
+maskable icon instead of zooming and cropping the plain one. Safari does not implement
+`display_override` and falls through to `browser`, so an iPhone keeps opening it in Safari
+with the address bar, because a standalone window on an iPhone cannot print at all.
+Collapsing the two into a plain `"display": "standalone"` would take printing away from
+every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
+CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
+be run in a persistent profile or the only answer you get is `in-incognito`.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache

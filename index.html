@@ -9,8 +9,15 @@
      square full-bleed one on purpose: iOS rounds the corners itself, and a picture that
      already has them rounded comes out rounded twice with a dark fringe. The manifest
      carries the same for Android, plus a maskable one with room around it for a launcher
-     that cuts a circle. display is "browser" there, so the shortcut opens the way it does
-     today: a standalone window on an iPhone cannot print, and printing is the point. -->
+     that cuts a circle.
+
+     The manifest says display_override: ["standalone"] with display: "browser", and the
+     two halves are for two different phones. Android reads display_override, so Chrome
+     installs this as a real app: no Chrome badge stamped on the corner of the icon, and
+     the launcher gets the maskable icon rather than zooming and cropping the plain one.
+     Safari does not implement display_override, so an iPhone falls through to "browser"
+     and keeps opening in Safari with its address bar. That is deliberate: a standalone
+     window on an iPhone cannot print at all, and printing is what these pages are for. -->
 <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">

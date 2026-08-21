@@ -116,11 +116,14 @@ def main():
     write(resized(full, 192), "icon-192.png")
     write(resized(full, 180), "apple-touch-icon.png")
 
-    # Shrunk inside its own background, for a launcher that cuts a shape out.
-    inner = int(512 * MASKABLE_SCALE)
-    maskable = Image.new("RGB", (512, 512), colour)
-    maskable.paste(resized(full, inner), ((512 - inner) // 2, (512 - inner) // 2))
-    write(maskable, "icon-maskable-512.png")
+    # Shrunk inside its own background, for a launcher that cuts a shape out. This is
+    # the one Android actually puts on the home screen once the site is installed, so
+    # it is also the one that decides whether the lettering survives.
+    for size in (512, 192):
+        inner = int(size * MASKABLE_SCALE)
+        maskable = Image.new("RGB", (size, size), colour)
+        maskable.paste(resized(full, inner), ((size - inner) // 2, (size - inner) // 2))
+        write(maskable, f"icon-maskable-{size}.png")
 
     # The tab, where only the mark fits.
     x0, y0, x1, y1 = MARK
