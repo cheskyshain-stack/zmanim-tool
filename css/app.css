@@ -993,13 +993,19 @@ kbd {
 
    This is the site's chrome only. The week cards and the chart pages below it are the
    printed boards and are deliberately untouched, on screen and on paper alike. */
+/* Sampled off the design rather than picked by eye: the navy, the parchment, the gold on
+   the arc and the softer gold in the dividers are the colours that were in it. */
 body.is-luach {
-  --luach-navy: #12274f;
-  --luach-navy-deep: #0a172f;
-  --luach-ink: #14264a;
-  --luach-amber: #e2a63c;
-  --luach-gold: #c39a4e;
-  --luach-cream: #f6f0e2;
+  --luach-navy: #162a43;
+  --luach-navy-deep: #101f34;
+  --luach-ink: #16294a;
+  --luach-gold: #d1ad5f;
+  --luach-gold-soft: #c6b184;
+  --luach-cream: #f9f6ef;
+  /* How far the arc under the cap rises from the edges to the middle. Measured on the
+     design at 4.3% of the screen's width, which is what the vw is. Capped, because on a
+     wide window the same fraction would be a canyon. */
+  --luach-arc: clamp(13px, 4.3vw, 26px);
   /* Warm parchment rather than the app's cool grey. The boards themselves stay white. */
   background: var(--luach-cream);
 }
@@ -1015,24 +1021,38 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 .luach-home { max-width: 34rem; margin: 0 auto; width: 100%; text-align: center; flex: 1; display: flex; flex-direction: column; }
 .luach-home > .luach-rule { margin-top: auto; }
 
-/* The navy cap at the top of every screen here: curved along the bottom and edged in
-   gold, the same shape on the menu and on the pages behind it, so that going in and
-   coming out look like one site rather than two.
+/* The navy cap at the top of every screen here, the same shape on the menu and on the
+   pages behind it, so that going in and coming out look like one site rather than two.
    The negative margins are main's own padding, undone, so the cap reaches all three
-   edges of the screen. Keep them in step if that padding changes.
-   The curve is the bottom border-radius given a wide horizontal and a shallow vertical
-   radius, and the gold is a border rather than a separate line, so it follows the arc
-   instead of cutting straight across it. */
+   edges of the screen. Keep them in step if that padding changes. */
 .luach-bar {
+  position: relative;
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  margin: -1.25rem -1rem 1.6rem; padding: 0.85rem 1.25rem 1.5rem;
+  margin: -1.25rem -1rem 1.6rem; padding: 0.85rem 1.25rem calc(var(--luach-arc) + 0.7rem);
   background: linear-gradient(180deg, var(--luach-navy-deep), var(--luach-navy));
-  border-bottom: 2px solid var(--luach-amber);
-  border-radius: 0 0 50% 50% / 0 0 1.1rem 1.1rem;
 }
+/* The arc along the bottom of the cap. It rises in the middle and runs deepest at the
+   left and right edges, which is the way round the design has it: measured there, the
+   edges sat at y=413 and the centre at y=365 of a 1104px wide screen.
+   Two domes stacked, not a rounded corner on the cap itself. A bottom border-radius
+   curves the cap the other way, deepest in the middle, which is what this replaced. The
+   taller dome is the gold and the shorter one is the parchment sitting on top of it, so
+   the gold shows as a line following the arc rather than a straight rule cutting it. */
+/* Flush with the cap's own edges. Overhanging them by a pixel to hide the antialiasing
+   at the far corners pushed the document 1px wider than the window, which is a sideways
+   scrollbar on a phone. Measured: 413px of content in a 412px window. */
+.luach-bar::before, .luach-bar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.luach-bar::before { height: calc(var(--luach-arc) + 3px); background: var(--luach-gold); }
+.luach-bar::after { height: var(--luach-arc); background: var(--luach-cream); }
+/* Above the arc, or the parchment dome would be painted over the words. */
+.luach-back, .luach-bar-title { position: relative; z-index: 1; }
+
 /* On the menu the cap carries nothing, so it is a shape and no more. Taller there, since
    it is the top of the screen and has the whole name below it rather than one link. */
-.luach-bar-plain { display: block; min-height: 7rem; margin-bottom: 2.4rem; padding: 0; border-radius: 0 0 50% 50% / 0 0 1.6rem 1.6rem; }
+.luach-bar-plain { display: block; min-height: 7rem; margin-bottom: 2.4rem; padding: 0; }
 
 /* The name sits on the parchment below the cap, not on the navy.
    The wordmark was drawn as black ink on a transparent background. Rather than ship a
@@ -1055,15 +1075,15 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 }
 .luach-rule::before, .luach-rule::after {
   content: ""; flex: 1; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--luach-gold) 25%, var(--luach-gold) 75%, transparent);
+  background: linear-gradient(90deg, transparent, var(--luach-gold-soft) 25%, var(--luach-gold-soft) 75%, transparent);
 }
-.luach-rule > i { width: 7px; height: 7px; background: var(--luach-gold); transform: rotate(45deg); }
+.luach-rule > i { width: 7px; height: 7px; background: var(--luach-gold-soft); transform: rotate(45deg); }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
 .luach-item {
   display: flex; align-items: center; gap: 0.95rem;
   padding: 1.15rem 1.15rem; text-decoration: none; color: var(--luach-ink);
-  background: #fffdf8; border: none; border-radius: 18px;
+  background: #ffffff; border: none; border-radius: 18px;
   box-shadow: 0 3px 12px rgba(18,39,79,0.09), 0 1px 2px rgba(18,39,79,0.06);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
