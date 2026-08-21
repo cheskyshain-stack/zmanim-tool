@@ -5596,6 +5596,38 @@ function fitLinesToPage(container) {
   });
 }
 
+/** Sizes the times in each column of the pair sheet.
+ *
+ *  Its own routine rather than fitLinesToPage, because on this sheet the measure is tied
+ *  to the scale: the block is set to 77% of the column divided by the scale, so that what
+ *  lands on the paper is 77% whichever way it went. That means the height does not simply
+ *  scale with the type the way it does on a card, since a narrower measure wraps more
+ *  lines. So the scale is searched for and each try is measured, rather than worked out
+ *  from one ratio and trusted.
+ *
+ *  A halving search: bigger type in a narrower measure is always taller on the paper, so
+ *  there is one crossing point to find and nine tries land within a thousandth of it. */
+function fitPairColumns(sheet) {
+  sheet.querySelectorAll('.week-card').forEach((card) => {
+    const box = card.querySelector('.week-lines');
+    const inner = box?.firstElementChild;
+    if (!inner) return;
+    card.style.removeProperty('--fit-width');
+    const room = box.clientHeight;
+    if (!room) return;
+    let fits = 0.5;
+    let tooBig = MAX_GROW;
+    for (let i = 0; i < 9; i++) {
+      const mid = (fits + tooBig) / 2;
+      card.style.setProperty('--fit-scale', mid.toFixed(3));
+      // scrollHeight is in the block's own space, which zoom then scales onto the paper.
+      if (inner.scrollHeight * mid <= room) fits = mid;
+      else tooBig = mid;
+    }
+    card.style.setProperty('--fit-scale', fits.toFixed(3));
+  });
+}
+
 /** Rebuilds the two cards on screen as one landscape sheet: a single header across the
  *  top, the two lists of times side by side under it, and one address along the bottom.
  *
@@ -5918,13 +5950,13 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // That is the one thing the dialog cannot be asked for, which is why these two stayed.
   //
   // The sheet is built for real and then taken down again, the same way printing the rest
-  // of the season does, rather than being faked with print-only rules. fitLinesToPage has
-  // to run again afterwards: the columns are a different shape from the cards they came
-  // out of, so the size that filled a portrait sheet is not the size that fills these.
+  // of the season does, rather than being faked with print-only rules. The times are then
+  // sized again for the column, which is a different shape from the card they came out
+  // of, by fitPairColumns rather than fitLinesToPage: see the note on it.
   container.querySelector('#week-print-pair')?.addEventListener('click', () => {
     const wrap = container.querySelector('.week-cards');
     const built = buildPairSheet(wrap);
-    if (built) fitLinesToPage(wrap);
+    if (built) fitPairColumns(wrap.querySelector('.week-pair'));
     const restore = () => {
       wrap.classList.remove('is-pairing');
       wrap.innerHTML = cardsHtml;

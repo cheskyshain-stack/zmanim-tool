@@ -946,6 +946,31 @@ body.is-luach .week-cards { align-items: center; }
   padding: 0; border: none; box-shadow: none; background: none;
 }
 .week-pair .week-card > .page-header, .week-pair .week-card > .week-foot { display: none; }
+
+/* The band of times, 77% of the column and the same in both, rather than filling it.
+
+   77% because that is the measure it has on a card: 5.6in of block inside 7.3in of paper,
+   which reads as a set list rather than a table stretched to the edges.
+
+   A plain percentage is all it takes, and that is worth spelling out because two attempts
+   at dividing it by the fitting scale got it wrong, one of them putting a 5.33in block in
+   a 4.86in column. The block is zoomed to fit, and a percentage inside a zoomed box
+   resolves against the box divided by that zoom, so 77% of it comes out at 77% of the
+   column on the paper whatever the zoom is. Dividing again double counts. Measured: the
+   two bands now paint 3.74in each and sit dead centre in their columns, against 3.88in
+   and 4.86in before, which is the inch of difference that made the sheet look out of
+   true. max-width goes, or the card's 5.6in would cap the narrower column instead. */
+.week-pair .week-lines-inner { width: 77%; max-width: none; }
+
+/* The name, dead centre on the sheet. In the grid the header uses, the two side cells are
+   equal but their contents are not, and the rabbi's line is wider than the building icon:
+   on an 8.5in card that comes out even, but across 11in the name sat 0.33in left of the
+   parsha under it. The two sides are pinned to the edges instead and the name is centred
+   in the whole row, which cannot be pushed by either of them. */
+.week-pair .header-row { display: block; position: relative; text-align: center; }
+.week-pair .header-icon { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+.week-pair .header-rabbi { position: absolute; right: 0; top: 50%; transform: translateY(-50%); text-align: right; }
+.week-pair .header-center { display: inline-block; }
  /* The parsha, once, across the whole sheet, with each column saying only which half of
     the week it is. Both columns used to carry the parsha, one of them with "זמני חול · "
     in front of it, which said the same thing twice and left neither column room. */
