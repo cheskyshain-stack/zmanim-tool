@@ -9,6 +9,7 @@ import { renderProgram } from './ui/program-view.js';
 import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
+import { wireSecretDoor } from './ui/nav-helpers.js';
 
 const state = loadState();
 let tables = null;
@@ -264,6 +265,11 @@ function render() {
   }
 }
 
+
+// The way back to the congregation's site: three taps on the name at the top of the navy
+// sidebar. The same gesture the congregation's page carries in its own navy cap, in the
+// other direction. Wired once, since the sidebar is in the page rather than rendered.
+wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 
 loadTables()
   .then((t) => {

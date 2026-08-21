@@ -90,7 +90,9 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
   background: linear-gradient(180deg, var(--nav-bg) 0%, var(--nav-bg-2) 100%);
   color: var(--nav-ink);
 }
-.sidebar-brand { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.4rem 0; }
+/* Three taps here go back to the congregation's site, so it opts out of the text
+   selection a third click would otherwise start. */
+.sidebar-brand { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.4rem 0; -webkit-user-select: none; user-select: none; }
 .sidebar-mark { width: 2.1rem; height: 2.1rem; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
 .sidebar-title { display: flex; flex-direction: column; line-height: 1.15; color: #fff; font-weight: 700; letter-spacing: 0.01em; }
 .sidebar-title small { font-size: 0.62rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nav-ink); }
@@ -1127,6 +1129,10 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    edges of the screen. Keep them in step if that padding changes. */
 .luach-bar {
   position: relative;
+  /* Three taps here go to the generator (wireSecretDoor in ui/nav-helpers.js). A third
+     click in the same place is also how a browser selects a line, so the cap opts out
+     rather than flashing a highlighted title on the way. */
+  -webkit-user-select: none; user-select: none;
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
   margin: -1.25rem -1rem 1.6rem; padding: 0.85rem 1.25rem calc(var(--luach-arc) + 0.7rem);
   /* Two layers, and the thin one is a bug fix. The arc below is painted over this, and on

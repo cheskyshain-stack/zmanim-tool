@@ -1,4 +1,4 @@
-// Two small pieces the week view and the chart view both need.
+// Small pieces of navigation that more than one view needs.
 //
 // Their own module because they are all the two views share: with them inside week-view
 // the chart view had to import it, and week-view imports the chart view to put the chart
@@ -55,4 +55,38 @@ export function wireSwipe(container, onPrev, onNext) {
     container.removeEventListener('touchstart', start);
     container.removeEventListener('touchend', end);
   };
+}
+
+/** The way between the congregation's site and the admin app: three taps, in the navy at
+ *  the top, and nothing on the screen to say so.
+ *
+ *  There is no link between the two anywhere, on purpose. The congregation's page should
+ *  not offer a door into the generator, and the generator has no reason to advertise the
+ *  page it publishes to. But whoever runs both needs to get from one to the other on a
+ *  phone without typing a URL, so the navy carries a gesture nobody arrives at by
+ *  accident: three taps inside three quarters of a second.
+ *
+ *  A tap that lands on something that already does something, the way back to the menu or
+ *  a button, belongs to that thing and resets the count. And the run has to be unbroken:
+ *  a pause longer than the window starts again from one, so three taps spread over a
+ *  minute of ordinary use never add up to a door opening.
+ *
+ *  Off under file://, where the offline copy runs: there is no site root there to go to,
+ *  and an absolute path would resolve against the root of the disk. */
+export function wireSecretDoor(el, href, taps = 3, withinMs = 750) {
+  if (!el || !/^https?:$/.test(location.protocol)) return;
+  let run = 0;
+  let last = 0;
+  el.addEventListener('click', (event) => {
+    if (event.target.closest('a, button, input, select, textarea, summary, label')) {
+      run = 0;
+      return;
+    }
+    const now = Date.now();
+    run = now - last > withinMs ? 1 : run + 1;
+    last = now;
+    if (run < taps) return;
+    run = 0;
+    location.href = href;
+  });
 }

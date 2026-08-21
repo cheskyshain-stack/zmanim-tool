@@ -8,6 +8,7 @@
 // Where it goes is in the URL hash (#week, #chart), so the browser's back button works
 // and a page can be linked to directly, with no server configuration to arrange.
 import { loadPublished } from './publish.js';
+import { wireSecretDoor } from './ui/nav-helpers.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 
@@ -83,6 +84,13 @@ function renderHome(published) {
   // The pages behind it are as tall as the board on them and must not be stretched.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  openTheDoor();
+}
+
+/** Three taps in the navy cap go to the generator. Wired after every render, since each
+ *  one builds a new cap. */
+function openTheDoor() {
+  wireSecretDoor(main.querySelector('.luach-bar'), '/admin/');
 }
 
 function renderWeekPage(published) {
@@ -91,6 +99,7 @@ function renderWeekPage(published) {
   const draw = () => {
     main.className = '';
     main.innerHTML = backBar(PAGE_NAMES.week) + '<div id="week-host"></div>';
+    openTheDoor();
     renderWeek(
       main.querySelector('#week-host'),
       state,
@@ -109,6 +118,7 @@ function renderChartPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   main.className = '';
   main.innerHTML = backBar(PAGE_NAMES.chart) + '<div id="chart-host"></div>';
+  openTheDoor();
   renderChartBrowser(main.querySelector('#chart-host'), state);
 }
 
