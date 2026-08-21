@@ -917,10 +917,13 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
       </div>
-      <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
       <details class="panel week-print-panel no-print">
         <summary>Printing options</summary>
         <div class="panel-body">
+          <!-- Print is in here rather than out on the nav row above it. Everything to do
+               with paper is then in one place, and the row above stays what it is for:
+               moving from week to week. -->
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
           <div class="week-nav-row week-nav-print">
             ${
               // Only when there are two. With one card there is nothing to put beside it,

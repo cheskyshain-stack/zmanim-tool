@@ -1005,8 +1005,9 @@ body.is-luach {
   /* How far the arc under the cap rises from the edges to the middle. Measured on the
      design at 4.3% of the screen's width, which is what the vw is. Capped, because on a
      wide window the same fraction would be a canyon. The drawn curve rises nine tenths
-     of this height, so the vw is 4.3 over 0.9. */
-  --luach-arc: clamp(15px, 4.8vw, 29px);
+     of this height and the box is drawn 2px taller than the variable (see the arc below),
+     so the vw is 4.3 over 0.9 with those 2px taken back off. */
+  --luach-arc: clamp(13px, calc(4.78vw - 2px), 27px);
   /* Warm parchment rather than the app's cool grey. The boards themselves stay white. */
   background: var(--luach-cream);
 }
@@ -1030,6 +1031,15 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
   position: relative;
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
   margin: -1.25rem -1rem 1.6rem; padding: 0.85rem 1.25rem calc(var(--luach-arc) + 0.7rem);
+  /* Two layers, and the thin one is a bug fix. The arc below is painted over this, and on
+     a screen whose pixel ratio is not a whole number its bottom row lands half on a device
+     pixel and blends with whatever is behind it. Behind it was the navy, so a faint grey
+     line ran the whole width right under the cap: measured at a 2.625 ratio, which is what
+     a lot of Android phones report, that row sat 151 off the parchment while the rows
+     either side of it sat at 15 and 0. Parchment behind the bottom few pixels means the
+     blend is parchment against parchment and there is nothing to see. The arc's own fill
+     covers this strip everywhere except within a few pixels of the two far corners, where
+     the curve has already come down to meet it. */
   background: linear-gradient(180deg, var(--luach-navy-deep), var(--luach-navy));
 }
 /* The arc along the bottom of the cap. It rises in the middle and runs deepest at the
@@ -1051,12 +1061,20 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    pushed the document 1px wider than the window, which is a sideways scrollbar on a
    phone: 413px of content in a 412px window.
 
+   The fill runs on to y=20, past the bottom of a viewBox that ends at 10, on purpose. Cut
+   off at exactly 10 its bottom edge is antialiased against nothing, which leaves a row of
+   part transparent pixels with the cap's navy showing through them: a faint grey line
+   right under the navy, the whole way across. Measured before the fix, at four pixel
+   ratios, it turned up on 60, 111, 338 and 169 columns, at worst 250 off the parchment.
+   Running the path past the edge makes the SVG's own viewport do the cutting, and a clip
+   has no antialiasing to leave behind.
+
    The two colours are written into the path and cannot read the variables above. If the
    parchment or the gold changes, change them here as well. */
 .luach-bar::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: 0;
-  height: var(--luach-arc);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q50 -8 100 10 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10 Q50 -8 100 10' fill='none' stroke='%23d1ad5f' stroke-width='1.6'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
+  content: ""; position: absolute; left: 0; right: 0; bottom: -2px; z-index: 0;
+  height: calc(var(--luach-arc) + 2px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q50 -8 100 10 L100 20 L0 20 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10 Q50 -8 100 10' fill='none' stroke='%23d1ad5f' stroke-width='1.6'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
 /* Above the arc, or the parchment dome would be painted over the words. */
 .luach-back, .luach-bar-title { position: relative; z-index: 1; }
@@ -1116,6 +1134,114 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 .luach-back:hover { text-decoration: underline; }
 .luach-bar-title { color: #b7c4dd; font-size: var(--fs-sm); margin-right: auto; }
 
+/* --- The congregation site's buttons ------------------------------------------------
+   Previous, Today, Next, Print and the two inside Printing options. In the app these are
+   grey on grey, which is right there and wrong here.
+
+   The states matter more than the colour. A phone has no hover at all, so anything that
+   only happens on hover is invisible to most of the people using this: every button below
+   changes colour outright when it is pressed, not just by a 1px nudge, which is what a
+   finger can actually see. The lift on hover is the extra a mouse gets. Focus gets a gold
+   ring rather than the browser's blue outline.
+
+   Scoped to body.is-luach throughout. The admin app keeps its own plain buttons. */
+body.is-luach .week-nav button,
+body.is-luach .week-order select {
+  background: #fff; color: var(--luach-ink);
+  border: 1px solid rgba(22,42,67,0.14);
+  border-radius: 13px;
+  box-shadow: 0 1px 2px rgba(18,39,79,0.06), 0 2px 8px rgba(18,39,79,0.05);
+  font-weight: 600;
+  /* Two timings on purpose: coming out of a press is slower than going into it, which is
+     what makes a button feel like it answers rather than flickers. */
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+              box-shadow 0.18s ease, transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+body.is-luach .week-nav button { padding: 0.62rem 1.15rem; }
+
+body.is-luach .week-nav button:hover:not(:disabled) {
+  background: #fff;
+  border-color: rgba(22,42,67,0.3);
+  box-shadow: 0 2px 4px rgba(18,39,79,0.08), 0 8px 20px rgba(18,39,79,0.13);
+  transform: translateY(-1px);
+}
+/* The press: navy through, cream lettering, and back down flat. Deliberately a full
+   change of colour, since on a phone this is the only feedback there is. */
+body.is-luach .week-nav button:active:not(:disabled) {
+  background: var(--luach-navy);
+  border-color: var(--luach-navy);
+  color: var(--luach-cream);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.28);
+  transform: translateY(1px) scale(0.985);
+  transition-duration: 0.04s;
+}
+body.is-luach .week-nav button:focus-visible,
+body.is-luach .week-order select:focus-visible {
+  outline: none;
+  border-color: var(--luach-gold);
+  box-shadow: 0 0 0 3px rgba(209,173,95,0.45), 0 2px 8px rgba(18,39,79,0.08);
+}
+body.is-luach .week-nav button:disabled {
+  opacity: 1; color: rgba(22,42,67,0.32);
+  border-color: rgba(22,42,67,0.08); background: rgba(255,255,255,0.5);
+  box-shadow: none; cursor: default;
+}
+
+/* Print is the one thing on the screen worth pressing, so it is the only filled one. The
+   gold hairline is inset rather than a border, so it does not add to the button's size. */
+body.is-luach .week-nav .print-btn,
+body.is-luach .week-nav #print-btn {
+  background: linear-gradient(180deg, #22406a 0%, var(--luach-navy) 100%);
+  color: var(--luach-cream);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.38), 0 2px 5px rgba(18,39,79,0.22),
+              0 8px 18px rgba(18,39,79,0.16);
+  letter-spacing: 0.01em;
+}
+body.is-luach .week-nav .print-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2a4d7d 0%, #1a3055 100%);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.75), 0 4px 9px rgba(18,39,79,0.26),
+              0 14px 30px rgba(18,39,79,0.22);
+  transform: translateY(-1px);
+}
+body.is-luach .week-nav .print-btn:active:not(:disabled) {
+  background: linear-gradient(180deg, #14263f 0%, #0f1d33 100%);
+  color: var(--luach-gold);
+  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.6), inset 0 3px 7px rgba(0,0,0,0.42);
+  transform: translateY(1px) scale(0.985);
+}
+
+/* The menu cards are buttons in everything but name, and had nothing to show for a tap. */
+body.is-luach .luach-item {
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: box-shadow 0.18s ease, transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+              background 0.18s ease;
+}
+body.is-luach .luach-item:hover { transform: translateY(-2px); }
+body.is-luach .luach-item:active {
+  background: var(--luach-navy); color: var(--luach-cream);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);
+  transform: translateY(1px) scale(0.992);
+  transition-duration: 0.04s;
+}
+body.is-luach .luach-item:active .luach-item-go { color: var(--luach-gold); opacity: 1; }
+body.is-luach .luach-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(209,173,95,0.5), 0 6px 18px rgba(18,39,79,0.14);
+}
+/* The chevron leans into the tap, so the card reads as going somewhere. */
+body.is-luach .luach-item-go { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.18s ease; }
+body.is-luach .luach-item:hover .luach-item-go { transform: translateX(3px); opacity: 0.85; }
+
+/* The rest of the chrome on those pages, in the same ink. */
+body.is-luach .week-nav-when { color: rgba(22,42,67,0.62); }
+body.is-luach .week-print-panel > summary { color: var(--luach-ink); }
+body.is-luach .week-print-panel > summary:hover { color: var(--luach-navy); }
+body.is-luach .week-print-panel { border-color: rgba(22,42,67,0.12); }
+body.is-luach .week-order { color: var(--luach-ink); }
+body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
+
 /* On a computer the same page laid out for a phone comes out wrong in two ways, both of
    them about proportion rather than anything breaking. Measured at 1440x900: the cap was
    90px of navy across 1440px, which reads as a stripe rather than a masthead, and its arc
@@ -1125,7 +1251,7 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    So above 48rem the cap and the type grow, and the menu is centred in what is left under
    the masthead rather than pinned to the top of it. A phone keeps the design as given. */
 @media (min-width: 48rem) {
-  body.is-luach { --luach-arc: clamp(29px, 3vw, 46px); }
+  body.is-luach { --luach-arc: clamp(27px, calc(3vw - 2px), 44px); }
   /* Sized against the height of the window, not a fixed number of rem. A window can be
      1440px tall or 600px, and the same cap is a masthead in one and most of the screen in
      the other. The floor keeps it off the short windows: at 600px tall the whole page
@@ -1202,8 +1328,12 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    itself below the fold. Every card still carries its own Print this page under it, so the
    common action is not behind this. */
 /* The one print button a screen carries, on its own row under the paging buttons. */
+/* The one Print button. On the chart it sits under the paging row; on the week it is the
+   first thing inside Printing options, where the rest of the paper business is. */
 .week-nav-print-one { margin-top: 0.6rem; }
 .week-nav-print-one > .print-btn { flex: 0 1 11rem; }
+.week-print-panel .week-nav-print-one { margin-top: 0; }
+.week-print-panel .week-nav-print-one > .print-btn { flex: 1 1 0; max-width: 22rem; }
 .week-print-panel { margin-top: 0.6rem; }
 .week-print-panel > .panel-body { padding-top: 0.2rem; }
 /* Inside the panel the row has the panel's own rule above it already. */
