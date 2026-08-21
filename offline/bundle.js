@@ -5455,13 +5455,22 @@ function fillLegend(card) {
 /** A row's name, taken from the chart's column header.
  *
  *  A header is written to wrap inside a narrow chart column, so its own breaks mean
- *  nothing on a card and are flattened away. A פלג row is the exception: the name is
- *  two things, which מנחה it is and which פלג it is measured to, and run onto one line
- *  it reads as neither. Those keep a break, in front of פלג, which is what separates
- *  "מנחה (למטה)" from "פלג מ״א". No other header wants one: "הדלקת נרות" and
- *  "מנחה ערב שבת" are single names that only wrapped because the column was narrow. */
+ *  nothing on a card and are flattened away. Two are exceptions, and for the same reason:
+ *  the name is two things and run onto one line it reads as neither.
+ *
+ *  A פלג row keeps a break in front of פלג, which is what separates "מנחה (למטה)" from
+ *  "פלג מ״א". And ס״ז קר״ש keeps one after it, separating the zman from the two opinions
+ *  it is given by, "גר״א / מ״א". Both breaks are already in the chart's own headers; this
+ *  puts back the two that are worth keeping.
+ *
+ *  No other header wants one: "הדלקת נרות" and "מנחה ערב שבת" are single names that only
+ *  wrapped because the chart column was narrow. */
 function formatLabel(label) {
-  return weekEsc(label.replace(/\s+/g, ' ').trim()).replace(/ (פלג )/, '<br>$1');
+  return weekEsc(label.replace(/\s+/g, ' ').trim())
+    .replace(/ (פלג )/, '<br>$1')
+    // Matched after escaping, so the gershayim may be a real ״ or the &quot; that a plain
+    // double quote in the header turns into.
+    .replace(/(קר(?:&quot;|״|")ש) /, '$1<br>');
 }
 
 /** A label/time line. */
