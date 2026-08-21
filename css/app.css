@@ -1004,8 +1004,9 @@ body.is-luach {
   --luach-cream: #f9f6ef;
   /* How far the arc under the cap rises from the edges to the middle. Measured on the
      design at 4.3% of the screen's width, which is what the vw is. Capped, because on a
-     wide window the same fraction would be a canyon. */
-  --luach-arc: clamp(13px, 4.3vw, 26px);
+     wide window the same fraction would be a canyon. The drawn curve rises nine tenths
+     of this height, so the vw is 4.3 over 0.9. */
+  --luach-arc: clamp(15px, 4.8vw, 29px);
   /* Warm parchment rather than the app's cool grey. The boards themselves stay white. */
   background: var(--luach-cream);
 }
@@ -1034,25 +1035,35 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 /* The arc along the bottom of the cap. It rises in the middle and runs deepest at the
    left and right edges, which is the way round the design has it: measured there, the
    edges sat at y=413 and the centre at y=365 of a 1104px wide screen.
-   Two domes stacked, not a rounded corner on the cap itself. A bottom border-radius
-   curves the cap the other way, deepest in the middle, which is what this replaced. The
-   taller dome is the gold and the shorter one is the parchment sitting on top of it, so
-   the gold shows as a line following the arc rather than a straight rule cutting it. */
-/* Flush with the cap's own edges. Overhanging them by a pixel to hide the antialiasing
-   at the far corners pushed the document 1px wider than the window, which is a sideways
-   scrollbar on a phone. Measured: 413px of content in a 412px window. */
-.luach-bar::before, .luach-bar::after {
+   A drawn curve, not a border-radius, because the two are different shapes and the
+   difference shows. Measured against the distance from its centre, the design's arc is a
+   parabola: a tenth, a fifth and three tenths of the way in from the edge it had come up
+   32, 18 and 9 of its 48px, and u squared predicts 31, 17 and 8. A border-radius can only
+   be a quarter ellipse, which stays flat across the middle and then plunges at the very
+   edges. Both were tried on the page; this is the one that matches.
+
+   preserveAspectRatio="none" lets the curve stretch to whatever the cap is, and a
+   parabola stretched is still a parabola. The control point is -8 rather than -10 so the
+   top of the stroke stays inside the box; at -10 the gold was shaved in half at the
+   centre. That also makes the rise nine tenths of the height, which the clamp allows for.
+
+   Flush with the cap's own edges. Overhanging them by a pixel to hide the antialiasing
+   pushed the document 1px wider than the window, which is a sideways scrollbar on a
+   phone: 413px of content in a 412px window.
+
+   The two colours are written into the path and cannot read the variables above. If the
+   parchment or the gold changes, change them here as well. */
+.luach-bar::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: 0;
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  height: var(--luach-arc);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q50 -8 100 10 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10 Q50 -8 100 10' fill='none' stroke='%23d1ad5f' stroke-width='1.6'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
-.luach-bar::before { height: calc(var(--luach-arc) + 3px); background: var(--luach-gold); }
-.luach-bar::after { height: var(--luach-arc); background: var(--luach-cream); }
 /* Above the arc, or the parchment dome would be painted over the words. */
 .luach-back, .luach-bar-title { position: relative; z-index: 1; }
 
 /* On the menu the cap carries nothing, so it is a shape and no more. Taller there, since
    it is the top of the screen and has the whole name below it rather than one link. */
-.luach-bar-plain { display: block; min-height: 7rem; margin-bottom: 2.4rem; padding: 0; }
+.luach-bar-plain { display: block; min-height: 5.6rem; margin-bottom: 2.4rem; padding: 0; }
 
 /* The name sits on the parchment below the cap, not on the navy.
    The wordmark was drawn as black ink on a transparent background. Rather than ship a
