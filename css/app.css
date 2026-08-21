@@ -1116,6 +1116,42 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 .luach-back:hover { text-decoration: underline; }
 .luach-bar-title { color: #b7c4dd; font-size: var(--fs-sm); margin-right: auto; }
 
+/* On a computer the same page laid out for a phone comes out wrong in two ways, both of
+   them about proportion rather than anything breaking. Measured at 1440x900: the cap was
+   90px of navy across 1440px, which reads as a stripe rather than a masthead, and its arc
+   rose 29px, a fiftieth of the width, so the curve barely showed. The name was 288px wide
+   in a 1440px window, and the two cards finished 420px down a 900px window with the
+   address at 840px, leaving an empty half screen between them.
+   So above 48rem the cap and the type grow, and the menu is centred in what is left under
+   the masthead rather than pinned to the top of it. A phone keeps the design as given. */
+@media (min-width: 48rem) {
+  body.is-luach { --luach-arc: clamp(29px, 3vw, 46px); }
+  /* Sized against the height of the window, not a fixed number of rem. A window can be
+     1440px tall or 600px, and the same cap is a masthead in one and most of the screen in
+     the other. The floor keeps it off the short windows: at 600px tall the whole page
+     came to 629px and scrolled by 29px, which is now 596px and does not. */
+  .luach-bar-plain { min-height: clamp(6rem, 13vh, 13rem); margin-bottom: 2.8rem; }
+  .luach-logo { width: 24rem; }
+  .luach-place { font-size: 1.3rem; }
+  .luach-rule { max-width: 26rem; }
+  /* The name, the two cards and the address as one block, centred in what is under the
+     cap. The two auto margins are what centre it: the free height splits evenly between
+     the one above the name and the one below the address, and the cap stays at the top
+     because it comes before both. Centring only the cards left the name stranded on its
+     own halfway up the window.
+     This also undoes the phone's push of the address to the foot of the screen, which is
+     right on a phone and looks abandoned on a wide window. */
+  .luach-masthead { margin-top: auto; }
+  .luach-home { max-width: 40rem; flex: 0 0 auto; margin-bottom: auto; }
+  .luach-home > .luach-rule { margin-top: 1.6rem; }
+  .luach-menu { gap: 1rem; }
+  .luach-item { padding: 1.35rem 1.6rem; gap: 1.15rem; border-radius: 20px; }
+  .luach-item-icon { width: 34px; height: 34px; }
+  .luach-item-title { font-size: 1.65rem; }
+  .luach-item-go { width: 21px; height: 21px; }
+  .luach-foot { font-size: 1.15rem; }
+}
+
 /* Choosing which half of This week to look at: the week's two pages, or the wall chart.
    The same two things the congregation's menu offers. One at a time rather than stacked,
    because each carries its own Previous/Today/Next and one pages by week while the other
