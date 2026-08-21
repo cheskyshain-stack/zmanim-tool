@@ -19,7 +19,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateStri
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH } from '../util.js';
-import { printButtonHtml, printWith, wirePrintButton } from './print-page.js';
+import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
@@ -113,6 +113,19 @@ function specialDaysInWeek(shabbosSerial, settings) {
  *  publishing token is kept out on its own for a like reason. */
 const CARD_ORDER_KEY = 'zmanim-week-card-order';
 const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos');
+
+/** Whether the week is being shown as one landscape sheet rather than two pages.
+ *
+ *  A view, not a print action. It used to build the sheet, hand it to the print dialog and
+ *  take it down again inside a second and a half, so the only look anyone got at it was in
+ *  the dialog's own preview. Now it stays on the screen and Print prints what is there,
+ *  which is what the rest of this page has always done.
+ *
+ *  Kept here rather than in localStorage: it is how you are looking at this week now, not
+ *  a setting, and coming back to the site should open on the ordinary two pages. It has to
+ *  outlive a single render, though, since paging to another week re-renders from scratch
+ *  and the sheet should still be a sheet afterwards. */
+let pairView = false;
 
 /** The season that would follow the last week in the list, named. The two alternate, so
  *  it is whichever one the last week is not: a קיץ season ends at Sukkos and חורף picks
@@ -843,6 +856,35 @@ function buildPairSheet(wrap) {
  *  Recomputed on resize, since rotating a phone changes what fits. */
 let fitPagesHandler = null;
 
+/** Scales the one landscape sheet down until it fits across the window.
+ *
+ *  The same idea as fitPagesToWindow, but the zoom goes on the sheet rather than on the
+ *  cards inside it. On the cards it would land between the sheet and the columns, and a
+ *  zoom on a flex item changes the height it resolves to, which is what the times were
+ *  sized against. On the sheet itself nothing inside it can tell the difference.
+ *
+ *  A sheet is 11in wide against a phone's 4in or so, so on a phone this comes out at about
+ *  a third size: enough to see the shape of the page and to check it before printing it,
+ *  not enough to read the times off. That is the honest cost of looking at a landscape
+ *  sheet on a portrait phone, and Back to two pages is right there. */
+function fitSheetToWindow(container) {
+  const wrap = container.querySelector('.week-cards');
+  const sheet = wrap?.querySelector('.week-pair');
+  if (!sheet) return;
+  const apply = () => {
+    if (!document.body.contains(sheet)) return;
+    sheet.style.removeProperty('zoom');
+    const available = wrap.clientWidth;
+    const sheetWidth = sheet.getBoundingClientRect().width;
+    if (!available || !sheetWidth || sheetWidth <= available) return;
+    sheet.style.zoom = (available / sheetWidth).toFixed(4);
+  };
+  apply();
+  if (fitPagesHandler) window.removeEventListener('resize', fitPagesHandler);
+  fitPagesHandler = apply;
+  window.addEventListener('resize', fitPagesHandler);
+}
+
 function fitPagesToWindow(container) {
   const wrap = container.querySelector('.week-cards');
   const card = wrap?.querySelector('.week-card');
@@ -1029,9 +1071,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
           <div class="week-nav-row week-nav-print">
             ${
-              // Only when there are two. With one card there is nothing to put beside it,
-              // and Print above already does that page on its own.
-              cardCount > 1 ? '<button type="button" id="week-print-pair">Print both on one sheet</button>' : ''
+              // Only when there are two. With one card there is nothing to put beside it.
+              cardCount > 1
+                ? `<button type="button" id="week-view-pair">${pairView ? 'Back to two pages' : 'View both on one sheet'}</button>`
+                : ''
             }
             <button type="button" id="week-print-rest">Print every week to the end of the season</button>
           </div>
@@ -1071,59 +1114,60 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // card it is rather than where it sits: a Yom Tov week has no שבת card, and going by
   // position gave its חול card the שבת card's three-to-a-line.
   decorateCards(container);
-
   fitLinesToPage(container);
-  fitPagesToWindow(container);
+
+  // Either the two pages as they are, or the pair of them rebuilt as one landscape sheet.
+  // The sheet is a real thing on the screen from here on, not something assembled for the
+  // length of a print run, so what goes to the printer is whatever is being looked at.
+  const wrap = container.querySelector('.week-cards');
+  const onSheet = pairView && cardCount > 1 && buildPairSheet(wrap);
+  if (onSheet) {
+    // The columns are a different shape from the cards they came out of, so the times are
+    // sized again for them. Before the sheet is scaled to the window, not after: a scale
+    // on the sheet changes what the columns measure, and with it left on the same sheet
+    // fitted at 1.60 in a 412px window and 0.70 in a 1280px one.
+    fitPairColumns(wrap.querySelector('.week-pair'));
+    fitSheetToWindow(container);
+  } else {
+    fitPagesToWindow(container);
+  }
 
   // The one Print button: the whole screen goes to the dialog and the choosing happens
   // there, which is where a person can pick a single page anyway.
   wirePrintButton(container);
 
-  // Landscape, one sheet, one header. It has to be a button rather than the print
-  // dialog's own landscape setting: @page fixes a card at letter portrait, so choosing
-  // landscape there changes nothing (measured, the PDF comes out portrait either way).
-  // That is the one thing the dialog cannot be asked for, which is why these two stayed.
+  // One sheet or two pages. Re-rendered rather than rearranged in place, the same way the
+  // page order is: the cards are decorated after they are built and those passes are not
+  // safe to run over their own output.
   //
-  // The sheet is built for real and then taken down again, the same way printing the rest
-  // of the season does, rather than being faked with print-only rules. The times are then
-  // sized again for the column, which is a different shape from the card they came out
-  // of, by fitPairColumns rather than fitLinesToPage: see the note on it.
-  container.querySelector('#week-print-pair')?.addEventListener('click', () => {
-    const wrap = container.querySelector('.week-cards');
-    const built = buildPairSheet(wrap);
-    if (built) fitPairColumns(wrap.querySelector('.week-pair'));
-    const restore = () => {
-      wrap.classList.remove('is-pairing');
-      wrap.innerHTML = cardsHtml;
-      decorateCards(wrap);
-      fitLinesToPage(container);
-      fitPagesToWindow(container);
-      window.removeEventListener('afterprint', restore);
-    };
-    if (built) {
-      window.addEventListener('afterprint', restore);
-      setTimeout(restore, 1500);
-    }
-    printWith('is-print-pair');
+  // Landscape has to be arranged here rather than left to the print dialog: @page fixes a
+  // card at letter portrait, so choosing landscape in the dialog changes nothing at all
+  // (measured, the PDF came out portrait either way). The sheet claims a landscape @page
+  // of its own, so printing it needs nothing asked for in the dialog.
+  container.querySelector('#week-view-pair')?.addEventListener('click', () => {
+    pairView = !pairView;
+    onSerialChange(showing);
   });
 
   // Every week from this one to the end of the season, in one run. The cards for the
   // whole stretch are built and put in place of the single week's, printed, then the one
   // week is put back: same markup and same treatment either way, so a printed run cannot
-  // drift from what a week looks like on its own. Restored from the markup rather than
-  // from the decorated DOM, since the passes are not safe to run twice over their own
-  // output.
+  // drift from what a week looks like on its own. Rebuilt rather than restored from the
+  // decorated DOM, since the passes are not safe to run twice over their own output.
   container.querySelector('#week-print-rest')?.addEventListener('click', () => {
     const wrap = container.querySelector('.week-cards');
     wrap.innerHTML = serials.slice(at).map((s) => weekCardsHtml(s, index, state, settings)).join('');
     decorateCards(wrap);
     fitLinesToPage(wrap);
+    // Put back by re-rendering rather than by rebuilding the cards here. The screen may
+    // have been on the one-sheet view when this was pressed, and putting the two cards
+    // back by hand would have dropped it.
+    let done = false;
     const restore = () => {
-      wrap.innerHTML = cardsHtml;
-      decorateCards(wrap);
-      fitLinesToPage(container);
-      fitPagesToWindow(container);
+      if (done) return;
+      done = true;
       window.removeEventListener('afterprint', restore);
+      onSerialChange(showing);
     };
     window.addEventListener('afterprint', restore);
     window.print();

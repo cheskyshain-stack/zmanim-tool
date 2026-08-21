@@ -980,13 +980,11 @@ body.is-luach .week-cards { align-items: center; }
 .week-pair .week-card > .week-legend { display: none; }
 .week-pair-legend { margin-top: 0.08in; padding-top: 0.08in; }
 .week-pair > .week-foot { padding-top: 0.12in; }
-/* An 11in sheet is wider than the window it is briefly built in. Clipped rather than
-   allowed to push a sideways scrollbar onto the page for the moment it is there; print
-   puts it back, where 11in of sheet has 11in of paper to sit on. */
-.week-cards.is-pairing { overflow: hidden; max-width: 100%; }
-/* The fit-to-window zoom is for a portrait card in a narrow window and has no business
-   on this sheet, which is in inches. Left on, it changed what the type fitting measured:
-   the same sheet came out fitted at 1.60 on a 412px window and 0.70 on a 1280px one. */
+/* An 11in sheet is wider than most windows, so it is scaled to fit by fitSheetToWindow,
+   which puts the zoom on the sheet itself. The cards' own fit-to-window must not also
+   reach the columns inside it: two zooms between the sheet and the times changed what the
+   type fitting measured, and the same sheet came out fitted at 1.60 in a 412px window and
+   0.70 in a 1280px one. */
 .week-cards.is-pairing .week-card { zoom: 1 !important; }
 
 /* --- Guide ------------------------------------------------------------------------ */

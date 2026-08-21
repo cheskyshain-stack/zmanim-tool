@@ -77,24 +77,23 @@
   .week-line { break-inside: avoid; }
 }
 
-/* Both week cards on one landscape sheet, side by side.
+/* Both week cards on one landscape sheet, under one header.
 
-   This cannot be driven by the print dialog's own landscape setting. @page fixes a card
-   at letter portrait, so choosing landscape there changes nothing at all (measured: the
-   PDF comes out 612x792 either way), and an (orientation: landscape) query can never
-   match a page CSS has already made portrait. So it is a button in the app, which sets
-   the class below and lets the stylesheet set the paper up to match.
-
-   0.64: two 8.5in cards side by side is 17in, which has to come down inside 11in. That
-   leaves them 7.04in tall on an 8.5in sheet. */
+   The landscape paper cannot be asked for in the print dialog. @page fixes a card at
+   letter portrait, so choosing landscape there changes nothing at all (measured: the PDF
+   came out 612x792 either way), and an (orientation: landscape) query can never match a
+   page CSS has already made portrait. So the sheet claims a landscape page of its own. */
 @page pair { size: letter landscape; margin: 0; }
 @media print {
-  body.is-print-pair .week-cards { display: block; overflow: visible; }
-  /* The sheet is already 11in by 8.5in and laid out to fill it (see .week-pair in
-     app.css), so there is nothing to scale here. The old rule squeezed two whole 8.5in
-     cards into 11in at 0.64, which is where the small type and the blank strip along the
-     bottom came from. */
-  body.is-print-pair .week-pair {
+  /* No body class gating this any more. The sheet is a view now: it is either on the
+     screen, in which case it is what should be printed, or it does not exist. That also
+     means the landscape paper needs nothing asked for in the print dialog.
+
+     The sheet is already 11in by 8.5in and laid out to fill it (see .week-pair in
+     app.css), so there is nothing to scale here beyond undoing the fit-to-window zoom.
+     The version before this squeezed two whole 8.5in cards into 11in at 0.64, which is
+     where the small type and the blank strip along the bottom came from. */
+  .week-pair {
     page: pair;
     zoom: 1 !important;
     border: none;
@@ -103,9 +102,10 @@
     break-after: auto;
     break-inside: avoid;
   }
-  body.is-print-pair .week-pair, body.is-print-pair .week-pair * {
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
+  /* The columns are .week-card and would otherwise claim the portrait weekcard page from
+     inside a landscape one, which is two page contexts for one box. */
+  .week-pair .week-card { page: pair; break-after: auto; }
+  .week-pair, .week-pair * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* There was a block here for printing a single page on its own: every other page hidden
