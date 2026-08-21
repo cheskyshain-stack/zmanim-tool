@@ -29,6 +29,15 @@ const ICON_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none"
 </svg>`;
 const CHEVRON = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>`;
 
+/** The two things this site offers, named once.
+ *
+ *  The button on the menu and the bar at the top of the page it opens say the same words,
+ *  so pressing one lands somewhere that confirms what you pressed. They used to disagree:
+ *  Weekly Zmanim opened a page headed "This week's schedule" and Zmanim chart opened one
+ *  headed "The chart", which is two names for each of two things on a site that only has
+ *  two things. Written here rather than in both places, so they cannot drift apart again. */
+const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart' };
+
 /** A gold hairline with a diamond in the middle. Decoration, so it says nothing to a
  *  screen reader. */
 const rule = () => '<div class="luach-rule" aria-hidden="true"><i></i></div>';
@@ -58,10 +67,10 @@ function homeHtml(published) {
     <div class="luach-home">
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
-        ${ICON_CLOCK}<span class="luach-item-title">Weekly Zmanim</span>${CHEVRON}
+        ${ICON_CLOCK}<span class="luach-item-title">${esc(PAGE_NAMES.week)}</span>${CHEVRON}
       </a>
       <a class="luach-item" href="#chart">
-        ${ICON_CALENDAR}<span class="luach-item-title">Zmanim chart</span>${CHEVRON}
+        ${ICON_CALENDAR}<span class="luach-item-title">${esc(PAGE_NAMES.chart)}</span>${CHEVRON}
       </a>
     </nav>
     ${rule()}
@@ -81,7 +90,7 @@ function renderWeekPage(published) {
   let serial = null;
   const draw = () => {
     main.className = '';
-    main.innerHTML = backBar("This week's schedule") + '<div id="week-host"></div>';
+    main.innerHTML = backBar(PAGE_NAMES.week) + '<div id="week-host"></div>';
     renderWeek(
       main.querySelector('#week-host'),
       state,
@@ -99,7 +108,7 @@ function renderWeekPage(published) {
 function renderChartPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   main.className = '';
-  main.innerHTML = backBar('The chart') + '<div id="chart-host"></div>';
+  main.innerHTML = backBar(PAGE_NAMES.chart) + '<div id="chart-host"></div>';
   renderChartBrowser(main.querySelector('#chart-host'), state);
 }
 
