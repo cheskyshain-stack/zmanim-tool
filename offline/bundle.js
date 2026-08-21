@@ -3952,12 +3952,23 @@ const PUBLISH_PATH = 'data/published.json';
 const TOKEN_KEY = 'zmanim-publish-token';
 
 function getPublishToken() {
-  return localStorage.getItem(TOKEN_KEY) || '';
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    // A browser that refuses storage has no token to give. The admin app is the only
+    // thing that asks, and it will say the token is missing rather than fall over.
+    return '';
+  }
 }
 
 function setPublishToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token.trim());
-  else localStorage.removeItem(TOKEN_KEY);
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Nothing to do: publishing this session still works, the token just will not be
+    // remembered for the next one.
+  }
 }
 
 /** UTF-8 safe base64, which is what the API wants the file contents as. btoa alone
@@ -4962,7 +4973,33 @@ function specialDaysInWeek(shabbosSerial, settings) {
  *  file - so a setting kept there could not reach the very page this button is on. The
  *  publishing token is kept out on its own for a like reason. */
 const CARD_ORDER_KEY = 'zmanim-week-card-order';
-const cardOrder = () => (localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos');
+
+/** Reading and writing that one key, wrapped so that a browser refusing storage cannot
+ *  take the page down with it.
+ *
+ *  localStorage is not always readable. Touching it from a page inside someone else's site
+ *  throws outright where third party storage is blocked, which is now the default in most
+ *  browsers, and it throws in a private window in some of them too. Unguarded, that landed
+ *  in the middle of building the week and nothing rendered at all: measured, a week page
+ *  in an iframe came up empty with "SecurityError: Failed to read the 'localStorage'
+ *  property". Which page comes first is a preference; losing the whole schedule over it is
+ *  not a trade worth making, so it falls back to the default and carries on. */
+function cardOrder() {
+  try {
+    return localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos';
+  } catch {
+    return 'shabbos';
+  }
+}
+
+function rememberCardOrder(value) {
+  try {
+    localStorage.setItem(CARD_ORDER_KEY, value);
+  } catch {
+    // Nothing to do: the choice still applies to this page, it just will not be
+    // remembered next time.
+  }
+}
 
 /** Whether the week is being shown as one landscape sheet rather than two pages.
  *
@@ -6069,7 +6106,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // fit-to-page pass) and those passes are not safe to run over their own output, which
   // is the same reason the print-rest run restores from raw markup.
   container.querySelector('#week-order')?.addEventListener('change', (e) => {
-    localStorage.setItem(CARD_ORDER_KEY, e.target.value === 'weekday' ? 'weekday' : 'shabbos');
+    rememberCardOrder(e.target.value === 'weekday' ? 'weekday' : 'shabbos');
     onSerialChange(showing);
   });
 

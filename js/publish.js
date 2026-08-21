@@ -89,12 +89,23 @@ const PUBLISH_PATH = 'data/published.json';
 const TOKEN_KEY = 'zmanim-publish-token';
 
 export function getPublishToken() {
-  return localStorage.getItem(TOKEN_KEY) || '';
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    // A browser that refuses storage has no token to give. The admin app is the only
+    // thing that asks, and it will say the token is missing rather than fall over.
+    return '';
+  }
 }
 
 export function setPublishToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token.trim());
-  else localStorage.removeItem(TOKEN_KEY);
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Nothing to do: publishing this session still works, the token just will not be
+    // remembered for the next one.
+  }
 }
 
 /** UTF-8 safe base64, which is what the API wants the file contents as. btoa alone
