@@ -51,6 +51,14 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 - Generates the JS **import map** in `index.html`, giving every module a content-hashed
   URL.
 
+`make-icons.py` is separate and is **not** part of the deploy loop. It builds `icons/*`
+and `favicon.ico` from `icons/source.png`, needs Pillow, and is only run when the artwork
+itself changes. The icon links live in the head of both `index.html` and
+`admin/index.html`; the admin one is wrapped in `<!-- icons --> ... <!-- /icons -->` and
+`build-offline.py` strips that block, because the paths are site absolute and a web
+manifest cannot be fetched over `file://` at all. Both manifests are `display: browser`
+on purpose: a standalone window on an iPhone cannot print, and printing is the point.
+
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache
 stamping the live site depends on happens in the same script.

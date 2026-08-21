@@ -20,6 +20,10 @@ How it works:
     relative file works fine under file://, unlike fetch/modules). The
     Hebrew webfont is the exception: a font file is subject to CORS even
     from file://, so it's inlined into the CSS as a data: URI instead.
+  - The favicon and home screen icon links come out. They are site absolute
+    (/icons/...), which under file:// points at the root of the disk, and a
+    web manifest cannot be fetched from file:// at all: Chrome logs an error
+    for it. None of it means anything for a folder on a stick anyway.
 
 Re-run this any time the js/ source changes to refresh offline/.
 """
@@ -286,6 +290,10 @@ def main():
     # and the site-absolute asset paths go back to relative ones.
     html = (ROOT / "admin" / "index.html").read_text(encoding="utf-8")
     html = html.replace('href="../css/', 'href="css/').replace('src="/assets/', 'src="assets/')
+    # The block admin/index.html marks off with <!-- icons --> ... <!-- /icons -->.
+    html = re.sub(r"[ \t]*<!-- icons -->.*?<!-- /icons -->\n", "", html, flags=re.S)
+    if "webmanifest" in html:
+        raise RuntimeError("offline build: the icon links were left in")
     html = re.sub(re.escape(JS_MAP_MARKER) + r'\n<script type="importmap">.*?</script>\n', "", html, flags=re.S)
     html = re.sub(
         r'<script type="module" src="(?:\.\./)?js/' + re.escape(ENTRY) + r'(?:\?v=[0-9a-f]+)?"></script>',

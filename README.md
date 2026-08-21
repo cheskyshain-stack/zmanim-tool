@@ -43,6 +43,22 @@ offline copy before recopying it to a USB drive:
 python build-offline.py
 ```
 
+## Putting it on a phone's home screen
+
+Open the site, then **Add to Home screen** (Chrome's menu on Android, the Share button on
+an iPhone). It gets the LC Shul Zmanim icon and opens the same as it does now, in the
+browser, with all its printing and sharing.
+
+The icons in `icons/` are built from `icons/source.png`. To change the artwork, replace
+that file and run:
+
+```bash
+python make-icons.py
+```
+
+It needs Pillow (`pip install pillow`), which nothing else here does. Everything else in
+`icons/`, and `favicon.ico`, is its output: don't edit those by hand.
+
 ## How your data is stored
 
 Everything (Settings, generated sheets with their per-cell overrides, and Rules) is

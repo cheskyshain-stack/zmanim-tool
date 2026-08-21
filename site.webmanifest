@@ -1,0 +1,18 @@
+{
+  "name": "קהל לב מנחם - זמנים",
+  "short_name": "LC Zmanim",
+  "description": "The week's zmanim and the season chart for קהל לב מנחם, Bais Medrash Lakewood Commons.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "background_color": "#f1f2f5",
+  "theme_color": "#f1f2f5",
+  "dir": "auto",
+  "lang": "he",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
