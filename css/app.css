@@ -984,30 +984,106 @@ kbd {
 .week-days { display: inline-block; direction: ltr; font-weight: 500; font-size: var(--fs-sm); color: var(--muted); }
 
 /* --- The congregation site ----------------------------------------------------------
-   The front door at lczmanim.cjaffa.com. Deliberately plain: someone opening this wants
-   the times, and everything here is either the way in or the way back. */
-body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
-.luach-home { max-width: 34rem; margin: 2rem auto 0; text-align: center; }
-.luach-masthead { margin-bottom: 2rem; }
-.luach-logo { width: min(20rem, 80%); height: auto; }
-.luach-place { margin: 0.4rem 0 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.1rem; }
-.luach-menu { display: flex; flex-direction: column; gap: 0.9rem; text-align: right; }
-.luach-item {
-  display: block; padding: 1.1rem 1.25rem; text-decoration: none; color: inherit;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.luach-item:hover { border-color: var(--ui-accent); box-shadow: var(--shadow-md); }
-/* Reads left to right. The menu is right-aligned because these titles used to be Hebrew;
-   now that they are not, a right-set title in a left-set block read as two columns. */
-.luach-item-title { display: block; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.5rem; font-weight: 700; direction: ltr; text-align: left; }
-.luach-foot { margin-top: 2.5rem; color: var(--muted); font-size: var(--fs-sm); }
+   The front door at lczmanim.cjaffa.com. Someone opening this wants the times, so
+   everything here is either the way in or the way back.
 
-/* The strip above a page: back to the menu, and the print button. */
-.luach-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
-.luach-back { color: var(--ui-accent-dark); text-decoration: none; font-weight: 600; }
+   The two colours are the icon's own, so the thing on the home screen and the page it
+   opens are recognisably one thing. Nothing else on the page is allowed a colour: the
+   two menu items are what you came to tap, and they are the only saturated thing on it.
+
+   This is the site's chrome only. The week cards and the chart pages below it are the
+   printed boards and are deliberately untouched, on screen and on paper alike. */
+body.is-luach {
+  --luach-navy: #12274f;
+  --luach-navy-deep: #0a172f;
+  --luach-ink: #14264a;
+  --luach-amber: #e2a63c;
+  --luach-gold: #c39a4e;
+  --luach-cream: #f6f0e2;
+  /* Warm parchment rather than the app's cool grey. The boards themselves stay white. */
+  background: var(--luach-cream);
+}
+body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
+
+/* The menu is four short things on a tall screen, so left to itself it huddles at the
+   top with the rest of the phone empty under it. Instead it takes the whole height and
+   the address is pushed to the bottom of it, which is where the eye expects the foot of
+   a page to be. dvh rather than vh: on a phone vh is the height with the browser's own
+   bars hidden, so a page sized in vh is taller than what you can actually see and the
+   address ends up just off the bottom. vh first as the fallback for anything old. */
+body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+.luach-home { max-width: 34rem; margin: 0 auto; width: 100%; text-align: center; flex: 1; display: flex; flex-direction: column; }
+.luach-home > .luach-rule { margin-top: auto; }
+
+/* The navy cap at the top of every screen here: curved along the bottom and edged in
+   gold, the same shape on the menu and on the pages behind it, so that going in and
+   coming out look like one site rather than two.
+   The negative margins are main's own padding, undone, so the cap reaches all three
+   edges of the screen. Keep them in step if that padding changes.
+   The curve is the bottom border-radius given a wide horizontal and a shallow vertical
+   radius, and the gold is a border rather than a separate line, so it follows the arc
+   instead of cutting straight across it. */
+.luach-bar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  margin: -1.25rem -1rem 1.6rem; padding: 0.85rem 1.25rem 1.5rem;
+  background: linear-gradient(180deg, var(--luach-navy-deep), var(--luach-navy));
+  border-bottom: 2px solid var(--luach-amber);
+  border-radius: 0 0 50% 50% / 0 0 1.1rem 1.1rem;
+}
+/* On the menu the cap carries nothing, so it is a shape and no more. Taller there, since
+   it is the top of the screen and has the whole name below it rather than one link. */
+.luach-bar-plain { display: block; min-height: 7rem; margin-bottom: 2.4rem; padding: 0; border-radius: 0 0 50% 50% / 0 0 1.6rem 1.6rem; }
+
+/* The name sits on the parchment below the cap, not on the navy.
+   The wordmark was drawn as black ink on a transparent background. Rather than ship a
+   second copy of it in navy, the file is used as a mask over a navy fill, so the one
+   artwork follows the palette. A browser without mask support simply shows the artwork
+   as it is, in black, which is what the page looked like before. */
+.luach-masthead { text-align: center; margin-bottom: 2.4rem; }
+.luach-logo { width: min(18rem, 74%); height: auto; }
+.luach-place { margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.15rem; color: var(--luach-ink); }
+
+/* A gold hairline with a diamond set in it, above the place name and above the address.
+   The lines fade out at the far ends so they stop without a hard edge. */
+/* width and align-self are load-bearing, not belt and braces. In the column that fills
+   the screen this rule is a flex item, and an item with auto side margins stops being
+   stretched: it shrank to the width of the diamond and both hairlines measured zero. */
+.luach-rule {
+  display: flex; align-items: center; gap: 0.7rem;
+  width: 100%; max-width: 22rem; align-self: center;
+  margin: 1.1rem auto;
+}
+.luach-rule::before, .luach-rule::after {
+  content: ""; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--luach-gold) 25%, var(--luach-gold) 75%, transparent);
+}
+.luach-rule > i { width: 7px; height: 7px; background: var(--luach-gold); transform: rotate(45deg); }
+
+.luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
+.luach-item {
+  display: flex; align-items: center; gap: 0.95rem;
+  padding: 1.15rem 1.15rem; text-decoration: none; color: var(--luach-ink);
+  background: #fffdf8; border: none; border-radius: 18px;
+  box-shadow: 0 3px 12px rgba(18,39,79,0.09), 0 1px 2px rgba(18,39,79,0.06);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.luach-item:hover { box-shadow: 0 10px 26px rgba(18,39,79,0.15), 0 2px 4px rgba(18,39,79,0.08); }
+.luach-item:active { transform: translateY(1px); }
+.luach-item-icon { width: 30px; height: 30px; flex: none; }
+/* Reads left to right. The menu used to be right-aligned because these titles were once
+   Hebrew; now that they are not, the row is laid out left to right like the words. */
+.luach-item-title { flex: 1; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.45rem; font-weight: 700; direction: ltr; text-align: left; }
+.luach-item-go { width: 19px; height: 19px; flex: none; color: var(--luach-ink); opacity: 0.55; }
+
+.luach-foot {
+  margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
+}
+
+/* Back to the menu, on the cap. */
+.luach-back { color: #f3ecdc; text-decoration: none; font-weight: 600; }
 .luach-back:hover { text-decoration: underline; }
-.luach-bar-title { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
+.luach-bar-title { color: #b7c4dd; font-size: var(--fs-sm); margin-right: auto; }
 
 /* Choosing which half of This week to look at: the week's two pages, or the wall chart.
    The same two things the congregation's menu offers. One at a time rather than stacked,

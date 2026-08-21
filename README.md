@@ -57,7 +57,8 @@ python make-icons.py
 ```
 
 It needs Pillow (`pip install pillow`), which nothing else here does. Everything else in
-`icons/`, and `favicon.ico`, is its output: don't edit those by hand.
+`icons/`, plus `favicon.ico` and `assets/logo-text-navy.png`, is its output: don't edit
+those by hand.
 
 ## How your data is stored
 

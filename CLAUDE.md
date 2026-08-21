@@ -52,8 +52,11 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   URL.
 
 `make-icons.py` is separate and is **not** part of the deploy loop. It builds `icons/*`
-and `favicon.ico` from `icons/source.png`, needs Pillow, and is only run when the artwork
-itself changes. The icon links live in the head of both `index.html` and
+and `favicon.ico` from `icons/source.png`, plus `assets/logo-text-navy.png` from the black
+`assets/logo-text.png`, needs Pillow, and is only run when the artwork itself changes.
+The navy wordmark is a real file rather than a CSS trick on purpose: a mask over an
+`<img>` only clips it and the black artwork still paints through, and the filter chain
+that fakes a tint is a row of magic numbers nobody can check. The icon links live in the head of both `index.html` and
 `admin/index.html`; the admin one is wrapped in `<!-- icons --> ... <!-- /icons -->` and
 `build-offline.py` strips that block, because the paths are site absolute and a web
 manifest cannot be fetched over `file://` at all.

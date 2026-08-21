@@ -1,8 +1,15 @@
-"""Build the home screen and browser tab icons from icons/source.png.
+"""Build the artwork that is derived from other artwork.
 
-Run it after replacing icons/source.png, and not otherwise: everything else in
-icons/ is output. It needs Pillow (pip install pillow), which nothing else here
-does, so it is a separate script rather than part of build-offline.py.
+Two jobs:
+
+- The home screen and browser tab icons, from icons/source.png.
+- assets/logo-text-navy.png, the congregation site's wordmark in the site's
+  navy, from the black assets/logo-text.png.
+
+Run it after replacing either source, and not otherwise: everything else in
+icons/, and the navy wordmark, are output. It needs Pillow (pip install
+pillow), which nothing else here does, so it is a separate script rather than
+part of build-offline.py.
 
 Why several files rather than one:
 
@@ -94,6 +101,25 @@ def resized(im, size):
     return im.resize((size, size), Image.LANCZOS)
 
 
+def wordmark():
+    """The congregation site's name in navy rather than black.
+
+    A real file rather than a CSS trick. Masking the <img> only clips it, the
+    black artwork still paints through, and the filter chain that fakes a tint
+    is a string of magic numbers nobody can check. The artwork is black ink on
+    transparency, so recolouring is only a matter of keeping the alpha and
+    replacing the colour underneath it."""
+    src = ROOT / "assets" / "logo-text.png"
+    if not src.exists():
+        raise SystemExit(f"no wordmark at {src}")
+    im = Image.open(src).convert("RGBA")
+    ink = Image.new("RGBA", im.size, (20, 38, 74, 0))
+    ink.putalpha(im.getchannel("A"))
+    out = ROOT / "assets" / "logo-text-navy.png"
+    ink.save(out, optimize=True)
+    return out.name, out.stat().st_size
+
+
 def main():
     if not SOURCE.exists():
         raise SystemExit(f"no source artwork at {SOURCE}")
@@ -139,6 +165,8 @@ def main():
     ico = ROOT / "favicon.ico"
     resized(mark, 64).save(ico, sizes=[(16, 16), (32, 32), (48, 48)])
     written.append(("../favicon.ico", ico.stat().st_size))
+
+    written.append(wordmark())
 
     for name, size in written:
         print(f"  {name:26} {size / 1024:6.1f} KB")
