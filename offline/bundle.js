@@ -5610,14 +5610,56 @@ function buildPairSheet(wrap) {
   if (cards.length < 2) return false;
   const header = cards[0].querySelector('.page-header');
   const foot = cards[0].querySelector('.week-foot');
+
+  // The parsha, once, in the middle. Read off the שבת card, whose title is the parsha
+  // line on its own; the חול card's has "זמני חול · " in front of it and would have to be
+  // unpicked. The button is only offered when both cards exist, so there is always one.
+  const shabbosCard = cards.find((card) => !card.classList.contains('is-weekday-card'));
+  const parsha = shabbosCard?.querySelector('.week-title')?.textContent.trim() || '';
+
   const sheet = document.createElement('section');
   sheet.className = 'week-pair';
   if (header) sheet.appendChild(header.cloneNode(true));
+  if (parsha) {
+    const title = document.createElement('h2');
+    title.className = 'week-pair-title';
+    title.textContent = parsha;
+    sheet.appendChild(title);
+  }
+
   const cols = document.createElement('div');
   cols.className = 'week-pair-cols';
-  // appendChild moves them, so wrap is left empty and the sheet takes their place.
-  cards.forEach((card) => cols.appendChild(card));
+  cards.forEach((card) => {
+    // With the parsha said once above, each column only has to say which half it is.
+    const title = card.querySelector('.week-title');
+    if (title) title.textContent = card.classList.contains('is-weekday-card') ? 'זמני חול' : 'זמני שבת';
+    // appendChild moves them, so wrap is left empty and the sheet takes their place.
+    cols.appendChild(card);
+  });
   sheet.appendChild(cols);
+
+  // One note under the pair, carrying every line either column needed and each of them
+  // once. Both columns explain the same underline, and set out twice on one sheet that
+  // reads as two different notes rather than one said twice. The star lines are only on
+  // the column that uses them, so a straight merge keeps whatever is relevant and drops
+  // nothing: taken in column order, first seen wins.
+  const seen = new Set();
+  const merged = [];
+  cards.forEach((card) => {
+    card.querySelectorAll('.week-legend .week-legend-line').forEach((el) => {
+      const key = `${el.getAttribute('dir')}|${el.textContent.trim()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(el.cloneNode(true));
+    });
+  });
+  if (merged.length) {
+    const legend = document.createElement('div');
+    legend.className = 'week-legend week-pair-legend';
+    merged.forEach((el) => legend.appendChild(el));
+    sheet.appendChild(legend);
+  }
+
   if (foot) sheet.appendChild(foot.cloneNode(true));
   wrap.appendChild(sheet);
   wrap.classList.add('is-pairing');
@@ -5811,11 +5853,12 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         </button>
       </div>
       <details class="panel week-print-panel no-print">
-        <summary>Printing options</summary>
+        <summary>More options</summary>
         <div class="panel-body">
           <!-- Print is in here rather than out on the nav row above it. Everything to do
                with paper is then in one place, and the row above stays what it is for:
-               moving from week to week. -->
+               moving from week to week. The panel is called More options rather than
+               Printing options because Print itself now lives in it. -->
           <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
           <div class="week-nav-row week-nav-print">
             ${

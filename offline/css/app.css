@@ -946,7 +946,14 @@ body.is-luach .week-cards { align-items: center; }
   padding: 0; border: none; box-shadow: none; background: none;
 }
 .week-pair .week-card > .page-header, .week-pair .week-card > .week-foot { display: none; }
-.week-pair .week-title { margin-top: 0.1in; }
+ /* The parsha, once, across the whole sheet, with each column saying only which half of
+    the week it is. Both columns used to carry the parsha, one of them with "זמני חול · "
+    in front of it, which said the same thing twice and left neither column room. */
+.week-pair-title { margin: 0.08in 0 0; text-align: center; direction: rtl; font-size: 21pt; font-weight: 700; color: var(--ink); }
+.week-pair .week-title { margin-top: 0.1in; font-size: 15pt; }
+/* One note for the sheet, not one per column. buildPairSheet merges them. */
+.week-pair .week-card > .week-legend { display: none; }
+.week-pair-legend { margin-top: 0.08in; padding-top: 0.08in; }
 .week-pair > .week-foot { padding-top: 0.12in; }
 /* An 11in sheet is wider than the window it is briefly built in. Clipped rather than
    allowed to push a sideways scrollbar onto the page for the moment it is there; print
@@ -1383,10 +1390,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .week-nav-print-one > .print-btn { flex: 0 1 11rem; }
 .week-print-panel .week-nav-print-one { margin-top: 0; }
 .week-print-panel .week-nav-print-one > .print-btn { flex: 1 1 0; max-width: 22rem; }
+/* Stacked, not side by side. "Print every week to the end of the season" is nine words,
+   and in half a phone's width it wrapped to three lines and the pair of them read as a
+   squeezed block rather than two buttons. Full width each, one under the other. */
+.week-print-panel .week-nav-print { flex-direction: column; align-items: center; gap: 0.55rem; margin-top: 0.75rem; padding-top: 0.75rem; }
+.week-print-panel .week-nav-print > button { flex: none; width: 100%; max-width: 22rem; }
+.week-print-panel .week-order { margin-top: 0.9rem; }
+.week-print-panel .print-hint { margin-top: 0.7rem; }
 .week-print-panel { margin-top: 0.6rem; }
 .week-print-panel > .panel-body { padding-top: 0.2rem; }
-/* Inside the panel the row has the panel's own rule above it already. */
-.week-print-panel .week-nav-print { margin-top: 0; padding-top: 0; border-top: 0; }
+/* The row used to be the first thing in the panel, with the panel's own rule above it,
+   so it wanted no line of its own. Print sits above it now and the line separates the two
+   again, which is why the spacing set further up is left to stand. */
 /* The first of the two download headings follows the lede, which already has space under
    it, so it does not need the gap the second one uses to separate the two groups. */
 .dl-heading-first { margin-top: 1rem; }
