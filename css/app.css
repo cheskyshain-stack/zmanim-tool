@@ -1104,10 +1104,14 @@ body.is-luach {
   --luach-cream: #f9f6ef;
   /* How far the arc under the cap rises from the edges to the middle. Measured on the
      design at 4.3% of the screen's width, which is what the vw is. Capped, because on a
-     wide window the same fraction would be a canyon. The drawn curve rises nine tenths
-     of this height and the box is drawn 2px taller than the variable (see the arc below),
-     so the vw is 4.3 over 0.9 with those 2px taken back off. */
-  --luach-arc: clamp(13px, calc(4.78vw - 2px), 27px);
+     wide window the same fraction would be a canyon.
+     The numbers are not the fraction on its own: the drawn curve rises four fifths of
+     this box rather than all of it, and the box is drawn 2px taller than the variable
+     (see the arc below). They were set by measuring the rise on the page and matching
+     what was already live, at 375, 412, 768, 1280, 1600 and 1920px wide: 15.5 against
+     15.3, 17.2 against 17.5, then 24.8, 33.8, 39.0 against 39.3 and 39.0 against 39.3.
+     If you change the curve, measure again rather than scaling these. */
+  --luach-arc: clamp(15px, calc(4.92vw - 2px), 28px);
   /* Warm parchment rather than the app's cool grey. The boards themselves stay white. */
   background: var(--luach-cream);
 }
@@ -1165,16 +1169,28 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    edges. Both were tried on the page; this is the one that matches.
 
    preserveAspectRatio="none" lets the curve stretch to whatever the cap is, and a
-   parabola stretched is still a parabola. The control point is -8 rather than -10 so the
-   top of the stroke stays inside the box; at -10 the gold was shaved in half at the
-   centre. That also makes the rise nine tenths of the height, which the clamp allows for.
+   parabola stretched is still a parabola. The curve is inset from every edge of the
+   viewBox by more than half the stroke, which is what keeps the gold whole:
+     - the crest sits at y=1 in a box that starts at 0, so the top is not shaved. An
+       earlier control point of -10 put the crest on y=0 and halved the gold in the middle.
+     - the two ends sit at y=10.6 in a box 12 deep. They used to sit on the very bottom
+       edge, and the lower half of the stroke fell outside and was cut off: measured at a
+       3x pixel ratio the line ran 5 rows deep for the first 8.7px of a 412px screen and
+       the first 27px of a 1280px one, against 10 rows across the middle. That is the
+       thinning the design's ends do not have.
+   stroke-linecap="square" finishes the job. A butt cap is cut square to the line, and the
+   line is steep at the ends, so the very edge of the screen still lost a wedge: full
+   thickness only started 3px in on a wide window. A square cap runs on past the endpoint
+   and the SVG's own viewport trims it flat. Measured after: full thickness in the
+   outermost device pixel at 375, 412, 768, 1280, 1600 and 1920px wide.
+   The rise is four fifths of the box height, which the clamp above allows for.
 
    Flush with the cap's own edges. Overhanging them by a pixel to hide the antialiasing
    pushed the document 1px wider than the window, which is a sideways scrollbar on a
    phone: 413px of content in a 412px window.
 
-   The fill runs on to y=20, past the bottom of a viewBox that ends at 10, on purpose. Cut
-   off at exactly 10 its bottom edge is antialiased against nothing, which leaves a row of
+   The fill runs on to y=24, past the bottom of a viewBox that ends at 12, on purpose. Cut
+   off at exactly 12 its bottom edge is antialiased against nothing, which leaves a row of
    part transparent pixels with the cap's navy showing through them: a faint grey line
    right under the navy, the whole way across. Measured before the fix, at four pixel
    ratios, it turned up on 60, 111, 338 and 169 columns, at worst 250 off the parchment.
@@ -1186,7 +1202,7 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 .luach-bar::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -2px; z-index: 0;
   height: calc(var(--luach-arc) + 2px);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q50 -8 100 10 L100 20 L0 20 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10 Q50 -8 100 10' fill='none' stroke='%23d1ad5f' stroke-width='1.6'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6 L100 24 L0 24 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6' fill='none' stroke='%23d1ad5f' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
 /* Above the arc, or the parchment dome would be painted over the words. */
 .luach-back, .luach-bar-title { position: relative; z-index: 1; }
@@ -1363,7 +1379,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    So above 48rem the cap and the type grow, and the menu is centred in what is left under
    the masthead rather than pinned to the top of it. A phone keeps the design as given. */
 @media (min-width: 48rem) {
-  body.is-luach { --luach-arc: clamp(27px, calc(3vw - 2px), 44px); }
+  body.is-luach { --luach-arc: clamp(29px, calc(3.25vw - 2px), 47px); }
   /* Sized against the height of the window, not a fixed number of rem. A window can be
      1440px tall or 600px, and the same cap is a masthead in one and most of the screen in
      the other. The floor keeps it off the short windows: at 600px tall the whole page
