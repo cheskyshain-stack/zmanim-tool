@@ -995,7 +995,13 @@ body.is-luach .week-cards { align-items: center; }
   /* A page is a page: nothing may spill past it onto a second sheet. */
   overflow: hidden;
 }
-.week-pair-cols { display: flex; flex: 1; gap: 0.3in; min-height: 0; }
+/* row-reverse, so the first of the two pages is the right-hand column.
+   Everything on these sheets is read right to left, and the switch above the page calls
+   one of them first: laid out left to right, the one it called first was the one your eye
+   reached second. The order in the markup is still first-then-second, which is what the
+   switch sets and what printing two separate pages puts out, so only the painting is
+   turned round. */
+.week-pair-cols { display: flex; flex-direction: row-reverse; flex: 1; gap: 0.3in; min-height: 0; }
 /* Each column is the card it already was, moved across whole, with the header and the
    address it no longer needs taken off it. Moved rather than rebuilt, so the legend, the
    line caps and the colon axis all carry over exactly as they were worked out. */
