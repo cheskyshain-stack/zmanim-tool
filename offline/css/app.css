@@ -759,12 +759,57 @@ td.ruled .cell { background: var(--ruled); }
    them. Stacked, the same controls read the same way at any width. */
 .week-nav { margin: 0 0 1.1rem; }
 .week-nav-when { text-align: center; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.5rem; }
-/* Which of a week's two pages comes first, on screen and on paper alike. */
-.week-order { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; color: var(--muted); font-size: var(--fs-sm); }
-.week-order select {
-  font-family: inherit; font-size: var(--fs-sm); padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
+/* Which of a week's two pages comes first, on screen and on paper alike. A switch with
+   both answers on it rather than a dropdown: see orderSwitchHtml in week-view.js.
+
+   Wrapping is allowed. At 320px the label and the switch together do not fit on one line,
+   and left unwrapped the switch was pushed off the right-hand edge of the panel. */
+.week-order {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 0.4rem 0.6rem; margin-top: 0.6rem; color: var(--muted); font-size: var(--fs-sm);
 }
+/* The track. position: relative for the thumb, which is painted inside it. */
+.week-order-switch {
+  position: relative; display: flex; padding: 3px;
+  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--accent-soft);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+/* The real radios, off the screen but still focusable and still what the labels drive.
+   display: none would take them out of the tab order and off every screen reader with
+   them, which is the whole reason they are radios rather than two buttons. */
+.week-order-radio {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.week-order-side {
+  position: relative; z-index: 1; cursor: pointer; user-select: none;
+  padding: 0.32rem 0.85rem; border-radius: 999px; line-height: 1.3;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted);
+  transition: color 0.18s ease;
+  /* Both sides the same width whichever is chosen, so the thumb below can be half the
+     track and the row does not shuffle sideways when it moves. */
+  flex: 1 1 0; min-width: 5.5rem; text-align: center;
+}
+.week-order-radio:checked + .week-order-side { color: var(--ink); }
+.week-order-side:hover { color: var(--ink); }
+/* The filled half, sliding rather than appearing: which side it lands on is the only
+   thing this switch has to say, and a thing that moves says it better than a thing that
+   changes colour. Exactly half the track, less the 3px padding at each end. */
+.week-order-thumb {
+  position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px;
+  width: calc(50% - 3px); border-radius: 999px;
+  background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.14);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.week-order-switch:has(#week-order-weekday:checked) .week-order-thumb { transform: translateX(100%); }
+/* :has() is what moves the thumb, and where it is missing the thumb would sit under the
+   left-hand side for ever, saying the opposite of the truth half the time. So where it is
+   missing there is no thumb at all and the chosen side is filled in directly. */
+@supports not selector(:has(*)) {
+  .week-order-thumb { display: none; }
+  .week-order-radio:checked + .week-order-side { background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.14); }
+}
+.week-order-radio:focus-visible + .week-order-side { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 /* The Hebrew date on its own line under the English one. In a <bdi> with its own
    direction: dropped into an otherwise-LTR line, the two would be reordered against each
    other, which is how "28 · 5787 · שבת חורף weeks" happened elsewhere in this app. */
@@ -778,7 +823,7 @@ td.ruled .cell { background: var(--ruled); }
    nudge the desktop ones use - a nudge is invisible under a finger.
    touch-action keeps the tap immediate, and the tap-highlight is turned off because the
    :active rule below replaces it with something that matches the rest of the app. */
-.week-nav button, .week-order select {
+.week-nav button {
   background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); font-family: inherit; font-size: var(--fs-md); font-weight: 600;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -1273,8 +1318,7 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    ring rather than the browser's blue outline.
 
    Scoped to body.is-luach throughout. The admin app keeps its own plain buttons. */
-body.is-luach .week-nav button,
-body.is-luach .week-order select {
+body.is-luach .week-nav button {
   background: #fff; color: var(--luach-ink);
   border: 1px solid rgba(22,42,67,0.14);
   border-radius: 13px;
@@ -1303,8 +1347,7 @@ body.is-luach .week-nav button:active:not(:disabled) {
   transform: translateY(1px) scale(0.985);
   transition-duration: 0.04s;
 }
-body.is-luach .week-nav button:focus-visible,
-body.is-luach .week-order select:focus-visible {
+body.is-luach .week-nav button:focus-visible {
   outline: none;
   border-color: var(--luach-gold);
   box-shadow: 0 0 0 3px rgba(209,173,95,0.45), 0 2px 8px rgba(18,39,79,0.08);
@@ -1368,6 +1411,29 @@ body.is-luach .week-print-panel > summary { color: var(--luach-ink); }
 body.is-luach .week-print-panel > summary:hover { color: var(--luach-navy); }
 body.is-luach .week-print-panel { border-color: rgba(22,42,67,0.12); }
 body.is-luach .week-order { color: var(--luach-ink); }
+/* The switch in the site's own colours: a sunken navy-tinted track, the chosen side a
+   white pill with the same shadow the buttons above it carry, and the gold ring for
+   focus. The thumb is white rather than navy on purpose. Navy is what a pressed button
+   goes, and a setting that sits there looking pressed reads as something still happening. */
+body.is-luach .week-order-switch {
+  background: rgba(22,42,67,0.07);
+  border-color: rgba(22,42,67,0.12);
+}
+body.is-luach .week-order-side { color: rgba(22,42,67,0.55); }
+body.is-luach .week-order-side:hover,
+body.is-luach .week-order-radio:checked + .week-order-side { color: var(--luach-ink); }
+body.is-luach .week-order-thumb { box-shadow: 0 1px 2px rgba(18,39,79,0.1), 0 2px 8px rgba(18,39,79,0.09); }
+/* Only where there is no thumb to carry it. With one, this would be a second shadow
+   stacked on the first. */
+@supports not selector(:has(*)) {
+  body.is-luach .week-order-radio:checked + .week-order-side {
+    box-shadow: 0 1px 2px rgba(18,39,79,0.1), 0 2px 8px rgba(18,39,79,0.09);
+  }
+}
+body.is-luach .week-order-radio:focus-visible + .week-order-side {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(209,173,95,0.45);
+}
 body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
 /* On a computer the same page laid out for a phone comes out wrong in two ways, both of

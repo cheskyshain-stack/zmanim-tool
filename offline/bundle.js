@@ -5035,6 +5035,38 @@ function rememberCardOrder(value) {
   }
 }
 
+/** Which page comes first, as a two-sided switch rather than a dropdown.
+ *
+ *  There are two answers and there will only ever be two, and a dropdown hides one of them
+ *  behind a tap: you cannot see what the other choice is without opening it, and on a phone
+ *  opening it throws up the system picker over the page. Both sides are on the screen here,
+ *  the chosen one filled in, so the setting reads at a glance and changes in one tap.
+ *
+ *  Real radio buttons under the labels, not two <button>s keeping track between them. That
+ *  is what a browser already understands as "one of these": the arrow keys move between the
+ *  two, a screen reader says "1 of 2", and the checked one is the browser's own state
+ *  rather than a class this code has to remember to take off the other one.
+ *
+ *  The label says "Which page first" and each side names one page, so the two read as one
+ *  sentence. Spelling it out on both sides ("שבת, then weekday") is what the dropdown did,
+ *  and side by side that is the same four words twice. The Hebrew is in a <bdi>: it sits in
+ *  an otherwise-LTR line and would otherwise be reordered against what is around it. */
+function orderSwitchHtml() {
+  const now = cardOrder();
+  const side = (value, label) => `
+    <input type="radio" name="week-order" id="week-order-${value}" value="${value}"
+      class="week-order-radio"${now === value ? ' checked' : ''}>
+    <label class="week-order-side" for="week-order-${value}">${label}</label>`;
+  return `<div class="week-order">
+    <span class="week-order-label" id="week-order-label">Which page first</span>
+    <div class="week-order-switch" role="radiogroup" aria-labelledby="week-order-label">
+      ${side('shabbos', '<bdi>שבת</bdi>')}
+      ${side('weekday', 'Weekday')}
+      <span class="week-order-thumb" aria-hidden="true"></span>
+    </div>
+  </div>`;
+}
+
 /** Whether the week is being shown as one landscape sheet rather than two pages.
  *
  *  A view, not a print action. It used to build the sheet, hand it to the print dialog and
@@ -5047,6 +5079,20 @@ function rememberCardOrder(value) {
  *  outlive a single render, though, since paging to another week re-renders from scratch
  *  and the sheet should still be a sheet afterwards. */
 let pairView = false;
+
+/** Whether More options is open, kept for the same reason and in the same way.
+ *
+ *  Every control in that panel re-renders the week, and the panel was rebuilt closed each
+ *  time, so it shut the moment you used anything inside it. With the dropdown that was an
+ *  irritation. With the switch it is worse: the thing you just moved goes off the screen
+ *  before you can see where it landed, and the keyboard is dropped with it, because focus
+ *  cannot stay on a control inside a closed <details> and falls back to the page. Measured:
+ *  pressing the right arrow on the switch left document.activeElement as BODY, so a second
+ *  arrow press did nothing at all.
+ *
+ *  Not in localStorage, again like pairView: opening the page fresh should show the panel
+ *  closed, the same as it always has. */
+let optionsOpen = false;
 
 /** Which season a week belongs to, as something two weeks can be compared by.
  *
@@ -6005,7 +6051,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
       </div>
-      <details class="panel week-print-panel no-print">
+      <details class="panel week-print-panel no-print" ${optionsOpen ? 'open' : ''}>
         <summary>More options</summary>
         <div class="panel-body">
           <!-- Print is in here rather than out on the nav row above it. Everything to do
@@ -6022,12 +6068,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
             }
             <button type="button" id="week-print-rest">Print every week to the end of the season</button>
           </div>
-          <label class="week-order">Which page first
-            <select id="week-order">
-              <option value="shabbos" ${cardOrder() === 'shabbos' ? 'selected' : ''}>שבת, then weekday</option>
-              <option value="weekday" ${cardOrder() === 'weekday' ? 'selected' : ''}>Weekday, then שבת</option>
-            </select>
-          </label>
+          ${orderSwitchHtml()}
           <!-- There was a note here telling a phone to turn the paper round: the sheet
                used to be landscape and the print dialog opens portrait. It is portrait
                itself now, on the same paper a card uses, so there is nothing to say. -->
@@ -6139,9 +6180,28 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // the cards are decorated after they are built (line caps, colon axis, legend, the
   // fit-to-page pass) and those passes are not safe to run over their own output, which
   // is the same reason the print-rest run restores from raw markup.
-  container.querySelector('#week-order')?.addEventListener('change', (e) => {
+  container.querySelector('.week-order-switch')?.addEventListener('change', (e) => {
+    if (!e.target.matches('.week-order-radio')) return;
     rememberCardOrder(e.target.value === 'weekday' ? 'weekday' : 'shabbos');
     onSerialChange(showing);
+    // The whole week is drawn again, which throws away the switch that was just pressed
+    // along with everything else. Put the keyboard back on the side now chosen, or the
+    // next arrow press goes nowhere: measured, without this document.activeElement came
+    // back as BODY and a second press on the arrow keys did nothing at all.
+    //
+    // Off the document, not off `container`. On the congregation site the callback rebuilds
+    // the whole page, so the #week-host this closure is holding is a detached node by the
+    // time it returns and the radio found inside it is a copy nobody can see. Focusing that
+    // is what left the page on BODY even after the panel was made to stay open.
+    //
+    // preventScroll because the radio itself is a 1px box tucked under the label: without
+    // it the browser is entitled to scroll that speck to the middle of the screen.
+    document.querySelector('.week-order-radio:checked')?.focus({ preventScroll: true });
+  });
+  // Remembering it is the whole point (see optionsOpen). toggle fires on open and close
+  // alike, and .open is the state it has just reached.
+  container.querySelector('.week-print-panel')?.addEventListener('toggle', (e) => {
+    optionsOpen = e.target.open;
   });
 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
