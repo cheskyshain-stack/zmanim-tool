@@ -759,17 +759,37 @@ td.ruled .cell { background: var(--ruled); }
    them. Stacked, the same controls read the same way at any width. */
 .week-nav { margin: 0 0 1.1rem; }
 .week-nav-when { text-align: center; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; margin-bottom: 0.5rem; }
-/* Which of a week's two pages comes first, on screen and on paper alike. A switch with
-   both answers on it rather than a dropdown: see orderSwitchHtml in week-view.js.
+/* The panel's two settings, how many pages go on a sheet and which of them comes first.
+   Switches with both answers on them rather than a dropdown or a button that toggles: see
+   switchHtml in week-view.js.
 
-   Wrapping is allowed. At 320px the label and the switch together do not fit on one line,
-   and left unwrapped the switch was pushed off the right-hand edge of the panel. */
-.week-order {
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
-  gap: 0.4rem 0.6rem; margin-top: 0.6rem; color: var(--muted); font-size: var(--fs-sm);
+   One grid over both, question in the left column and switch in the right, so the two
+   tracks start at the same place. Laid out a row each they did not: the rows are centred
+   and the questions are different lengths, so the tracks sat 9px apart and the pair read
+   as ragged rather than as a list. */
+/* minmax(0, ...) on the question rather than a bare max-content, so that where it does not
+   fit it wraps to a second line instead of pushing the grid out past the panel. These
+   labels are English and measured, but the font is whatever the device has, and a sideways
+   scrollbar on a phone is the one thing this page must not grow. */
+.week-switches {
+  display: grid; grid-template-columns: minmax(0, max-content) max-content;
+  justify-content: center; align-items: center;
+  gap: 0.45rem 0.6rem; margin-top: 0.6rem; color: var(--muted); font-size: var(--fs-sm);
+}
+.week-switch-label { text-align: right; }
+/* Narrow enough and the two columns do not fit: side by side the question and the switch
+   need 287px, and the panel gives the window less 69px, so anything under about 356px is
+   too tight. Stacked below 384, which leaves 34px of slack at the first width that is not,
+   rather than cutting it as fine as the measurement allows. Stacked is question over
+   switch, both centred. */
+@media (max-width: 24rem) {
+  .week-switches { grid-template-columns: max-content; justify-items: center; gap: 0.25rem; }
+  .week-switch-label { text-align: center; }
+  /* A gap between the two settings, but not between a question and its own switch. */
+  .week-switch + .week-switch-label { margin-top: 0.55rem; }
 }
 /* The track. position: relative for the thumb, which is painted inside it. */
-.week-order-switch {
+.week-switch {
   position: relative; display: flex; padding: 3px;
   border: 1px solid var(--border-strong); border-radius: 999px; background: var(--accent-soft);
   touch-action: manipulation; -webkit-tap-highlight-color: transparent;
@@ -777,11 +797,11 @@ td.ruled .cell { background: var(--ruled); }
 /* The real radios, off the screen but still focusable and still what the labels drive.
    display: none would take them out of the tab order and off every screen reader with
    them, which is the whole reason they are radios rather than two buttons. */
-.week-order-radio {
+.week-switch-radio {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
-.week-order-side {
+.week-switch-side {
   position: relative; z-index: 1; cursor: pointer; user-select: none;
   padding: 0.32rem 0.85rem; border-radius: 999px; line-height: 1.3;
   font-size: var(--fs-sm); font-weight: 600; color: var(--muted);
@@ -790,26 +810,28 @@ td.ruled .cell { background: var(--ruled); }
      track and the row does not shuffle sideways when it moves. */
   flex: 1 1 0; min-width: 5.5rem; text-align: center;
 }
-.week-order-radio:checked + .week-order-side { color: var(--ink); }
-.week-order-side:hover { color: var(--ink); }
+.week-switch-radio:checked + .week-switch-side { color: var(--ink); }
+.week-switch-side:hover { color: var(--ink); }
 /* The filled half, sliding rather than appearing: which side it lands on is the only
    thing this switch has to say, and a thing that moves says it better than a thing that
    changes colour. Exactly half the track, less the 3px padding at each end. */
-.week-order-thumb {
+.week-switch-thumb {
   position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px;
   width: calc(50% - 3px); border-radius: 999px;
   background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.14);
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
-.week-order-switch:has(#week-order-weekday:checked) .week-order-thumb { transform: translateX(100%); }
+/* input:last-of-type is the second of the two radios, whatever the switch is called. Named
+   that way rather than by id so one rule serves both switches in the panel. */
+.week-switch:has(.week-switch-radio:last-of-type:checked) .week-switch-thumb { transform: translateX(100%); }
 /* :has() is what moves the thumb, and where it is missing the thumb would sit under the
    left-hand side for ever, saying the opposite of the truth half the time. So where it is
    missing there is no thumb at all and the chosen side is filled in directly. */
 @supports not selector(:has(*)) {
-  .week-order-thumb { display: none; }
-  .week-order-radio:checked + .week-order-side { background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.14); }
+  .week-switch-thumb { display: none; }
+  .week-switch-radio:checked + .week-switch-side { background: var(--surface); box-shadow: 0 1px 2px rgba(15,23,42,0.14); }
 }
-.week-order-radio:focus-visible + .week-order-side { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.week-switch-radio:focus-visible + .week-switch-side { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 /* The Hebrew date on its own line under the English one. In a <bdi> with its own
    direction: dropped into an otherwise-LTR line, the two would be reordered against each
    other, which is how "28 · 5787 · שבת חורף weeks" happened elsewhere in this app. */
@@ -1416,27 +1438,27 @@ body.is-luach .week-nav-when { color: rgba(22,42,67,0.62); }
 body.is-luach .week-print-panel > summary { color: var(--luach-ink); }
 body.is-luach .week-print-panel > summary:hover { color: var(--luach-navy); }
 body.is-luach .week-print-panel { border-color: rgba(22,42,67,0.12); }
-body.is-luach .week-order { color: var(--luach-ink); }
+body.is-luach .week-switches { color: var(--luach-ink); }
 /* The switch in the site's own colours: a sunken navy-tinted track, the chosen side a
    white pill with the same shadow the buttons above it carry, and the gold ring for
    focus. The thumb is white rather than navy on purpose. Navy is what a pressed button
    goes, and a setting that sits there looking pressed reads as something still happening. */
-body.is-luach .week-order-switch {
+body.is-luach .week-switch {
   background: rgba(22,42,67,0.07);
   border-color: rgba(22,42,67,0.12);
 }
-body.is-luach .week-order-side { color: rgba(22,42,67,0.55); }
-body.is-luach .week-order-side:hover,
-body.is-luach .week-order-radio:checked + .week-order-side { color: var(--luach-ink); }
-body.is-luach .week-order-thumb { box-shadow: 0 1px 2px rgba(18,39,79,0.1), 0 2px 8px rgba(18,39,79,0.09); }
+body.is-luach .week-switch-side { color: rgba(22,42,67,0.55); }
+body.is-luach .week-switch-side:hover,
+body.is-luach .week-switch-radio:checked + .week-switch-side { color: var(--luach-ink); }
+body.is-luach .week-switch-thumb { box-shadow: 0 1px 2px rgba(18,39,79,0.1), 0 2px 8px rgba(18,39,79,0.09); }
 /* Only where there is no thumb to carry it. With one, this would be a second shadow
    stacked on the first. */
 @supports not selector(:has(*)) {
-  body.is-luach .week-order-radio:checked + .week-order-side {
+  body.is-luach .week-switch-radio:checked + .week-switch-side {
     box-shadow: 0 1px 2px rgba(18,39,79,0.1), 0 2px 8px rgba(18,39,79,0.09);
   }
 }
-body.is-luach .week-order-radio:focus-visible + .week-order-side {
+body.is-luach .week-switch-radio:focus-visible + .week-switch-side {
   outline: none;
   box-shadow: 0 0 0 3px rgba(209,173,95,0.45);
 }
@@ -1564,7 +1586,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    squeezed block rather than two buttons. Full width each, one under the other. */
 .week-print-panel .week-nav-print { flex-direction: column; align-items: center; gap: 0.55rem; margin-top: 0.75rem; padding-top: 0.75rem; }
 .week-print-panel .week-nav-print > button { flex: none; width: 100%; max-width: 22rem; }
-.week-print-panel .week-order { margin-top: 0.9rem; }
+.week-print-panel .week-switches { margin-top: 0.9rem; }
 .week-print-panel .print-hint { margin-top: 0.7rem; }
 .week-print-panel { margin-top: 0.6rem; }
 .week-print-panel > .panel-body { padding-top: 0.2rem; }
