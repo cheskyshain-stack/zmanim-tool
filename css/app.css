@@ -1387,21 +1387,40 @@ body.is-luach .week-nav button:disabled {
 }
 
 /* Print is the one thing on the screen worth pressing, so it is the only filled one. The
-   gold hairline is inset rather than a border, so it does not add to the button's size. */
-body.is-luach .week-nav .print-btn,
-body.is-luach .week-nav #print-btn {
+   gold hairline is inset rather than a border, so it does not add to the button's size.
+
+   By class only. This used to name the id as well, and an id outranks any number of
+   classes: body.is-luach .week-nav #print-btn scores 1-3-1 against the 0-5-1 of the hover
+   rule below it, so the resting shadow won and Print never had a hover state at all, on a
+   site where the buttons were gone over specifically to make them react. printButtonHtml
+   puts both the class and the id on every one of these, so the id was saying nothing the
+   class did not. The one Print carrying an id and no class is in the admin sheet toolbar,
+   which is neither inside .week-nav nor on this site. */
+body.is-luach .week-nav .print-btn {
   background: linear-gradient(180deg, #22406a 0%, var(--luach-navy) 100%);
   color: var(--luach-cream);
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.38), 0 2px 5px rgba(18,39,79,0.22),
-              0 8px 18px rgba(18,39,79,0.16);
+  /* The same shadow as every other button here, exactly, and that matters for more than
+     tidiness. Print and "Print every week to the end of the season" are the same 352px box
+     in the same place, but Print used to carry a far wider halo: measured at a 2x pixel
+     ratio it painted 15 device pixels past its own edge on each side against the other
+     button's 2. Two buttons the same size, one of them plainly bigger. Matched, both now
+     paint 2 past the edge at rest and 14 on hover.
+     What is left is what should have been carrying it anyway: this is the only navy button
+     on the screen and the only one ringed in gold. The hairline is inset, so it costs
+     nothing outside the box. */
+  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.38), 0 1px 2px rgba(18,39,79,0.06),
+              0 2px 8px rgba(18,39,79,0.05);
   letter-spacing: 0.01em;
 }
 body.is-luach .week-nav .print-btn:hover:not(:disabled) {
   background: linear-gradient(180deg, #2a4d7d 0%, #1a3055 100%);
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.75), 0 4px 9px rgba(18,39,79,0.26),
-              0 14px 30px rgba(18,39,79,0.22);
+  /* The lift on hover, again the same as the buttons around it, so the two do not go back
+     to being different sizes the moment a mouse is over one of them. The gradient going
+     lighter and the hairline going from 0.38 to 0.75 are what answer the mouse here. */
+  box-shadow: inset 0 0 0 1px rgba(209,173,95,0.75), 0 2px 4px rgba(18,39,79,0.08),
+              0 8px 20px rgba(18,39,79,0.13);
   transform: translateY(-1px);
 }
 body.is-luach .week-nav .print-btn:active:not(:disabled) {
