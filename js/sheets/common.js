@@ -32,12 +32,27 @@ export function inPlagWindow(serial, settings) {
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
  *  formula in both sheets. Printed across two lines, split as evenly as possible
- *  (more options on the second line when the count is odd). */
+ *  (more options on the second line when the count is odd).
+ *
+ *  While the clocks are forward, nothing is offered before 1:35. That is the shul's rule
+ *  and it is a deliberate departure from the workbook, which does not have it.
+ *
+ *  It matters for one stretch: חורף opens at Sukkos but the clocks do not go back until
+ *  the start of November, so the first weeks of the winter schedule are still on DST.
+ *  Through those weeks Mincha Gedola Lechumra sits just under 1:20 (measured across the
+ *  5787 winter: 1:16, 1:15, 1:15, 1:15, 1:15 on the five Fridays from 2 October to 30
+ *  October) and the early minyan below fired on its own, putting a 1:15 in front of the
+ *  1:35 on a day nobody davens that early. From 6 November it is on standard time and the
+ *  whole early set is right again, and by late March, when the clocks go forward at the
+ *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
+ *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
+ *  nothing there changes either way. */
 export function fridayMainMinchaMenu(fridayDate, settings) {
   const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
+  const onStandardTime = !Z.dstLocal(fridayDate, settings);
   const items = flattenNonEmpty([
-    !Z.dstLocal(fridayDate, settings) ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
-    mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
+    onStandardTime ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
+    onStandardTime && mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
     underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
     '1:50',
     '2:15',

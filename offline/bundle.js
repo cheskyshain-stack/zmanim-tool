@@ -1138,12 +1138,27 @@ function inPlagWindow(serial, settings) {
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
  *  formula in both sheets. Printed across two lines, split as evenly as possible
- *  (more options on the second line when the count is odd). */
+ *  (more options on the second line when the count is odd).
+ *
+ *  While the clocks are forward, nothing is offered before 1:35. That is the shul's rule
+ *  and it is a deliberate departure from the workbook, which does not have it.
+ *
+ *  It matters for one stretch: חורף opens at Sukkos but the clocks do not go back until
+ *  the start of November, so the first weeks of the winter schedule are still on DST.
+ *  Through those weeks Mincha Gedola Lechumra sits just under 1:20 (measured across the
+ *  5787 winter: 1:16, 1:15, 1:15, 1:15, 1:15 on the five Fridays from 2 October to 30
+ *  October) and the early minyan below fired on its own, putting a 1:15 in front of the
+ *  1:35 on a day nobody davens that early. From 6 November it is on standard time and the
+ *  whole early set is right again, and by late March, when the clocks go forward at the
+ *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
+ *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
+ *  nothing there changes either way. */
 function fridayMainMinchaMenu(fridayDate, settings) {
   const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
+  const onStandardTime = !Z.dstLocal(fridayDate, settings);
   const items = flattenNonEmpty([
-    !Z.dstLocal(fridayDate, settings) ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
-    mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
+    onStandardTime ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
+    onStandardTime && mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
     underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
     '1:50',
     '2:15',
@@ -1778,9 +1793,9 @@ const KAYITZ_RULES = {
   },
   L: {
     plain:
-      'The main ערב שבת מנחה. On standard time it opens with 12:30 and 1:00. Then an early one around 1:15, then 1:35, then 1:50, 2:15 and 3:00. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
+      'The main ערב שבת מנחה. While the clocks are forward nothing is offered before 1:35, so the list is 1:35, 1:50, 2:15 and 3:00. On standard time it opens earlier, with 12:30, 1:00 and one around 1:15 in front of those. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
     exact:
-      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00. Then, only when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second.',
+      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00, then, when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then, on any day, מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second. The three early ones are held to standard time because חורף opens at Sukkos while the clocks are still forward, and through those weeks מנחה גדולה לחומרא sits just under 1:20, which used to put a 1:15 in front of the 1:35.',
   },
 };
 

@@ -123,9 +123,9 @@ const KAYITZ_RULES = {
   },
   L: {
     plain:
-      'The main ערב שבת מנחה. On standard time it opens with 12:30 and 1:00. Then an early one around 1:15, then 1:35, then 1:50, 2:15 and 3:00. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
+      'The main ערב שבת מנחה. While the clocks are forward nothing is offered before 1:35, so the list is 1:35, 1:50, 2:15 and 3:00. On standard time it opens earlier, with 12:30, 1:00 and one around 1:15 in front of those. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
     exact:
-      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00. Then, only when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second.',
+      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00, then, when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then, on any day, מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second. The three early ones are held to standard time because חורף opens at Sukkos while the clocks are still forward, and through those weeks מנחה גדולה לחומרא sits just under 1:20, which used to put a 1:15 in front of the 1:35.',
   },
 };
 
