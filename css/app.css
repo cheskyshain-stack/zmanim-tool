@@ -1317,92 +1317,93 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.8rem; }
    One bordered box above the menu with the next מנין in it, and on an Erev Shabbos a
    second beside it with הדלקת נרות.
 
+   Gold, like the hairlines and the diamonds and the arc under the cap. An earlier version
+   had this box in the navy the menu below it uses, and beside the gold one on a Friday it
+   read as the plainer of the two, which is backwards: this is the answer the page is
+   opened for and the menu is the way on from it.
+
    A wrapping row rather than a fixed pair, because most days there is only one box and it
    should have the whole width. The 10rem basis is what decides where two stop fitting
    side by side: measured, they sit together from 375px wide (two 160px boxes and a 10px
    gap inside the 343px the page gives them) and stack at 360 and below, which is better
    than two boxes too narrow for "CANDLE LIGHTING" to sit on one line.
 
-   Kept to a line each inside. The menu is laid out to fill the screen with the address at
-   its foot and it only just does: measured before any of this existed, the page came to
-   exactly the window at 375x667 and at 412x732. */
+   The menu is laid out to fill the screen with the address at its foot and it only just
+   does, so the box is kept to three short lines: heading, the thing itself, how far off. */
 .luach-next {
   display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem;
 }
 .luach-next-box {
   flex: 1 1 10rem; min-width: 0; container-type: inline-size;
-  border: 1px solid var(--tone-line); border-radius: 14px;
-  background: var(--tone-fill); padding: 0.55rem 0.7rem 0.5rem;
+  border: 1.5px solid var(--tone-line); border-radius: 18px;
+  background: var(--tone-fill); padding: 0.7rem 0.8rem 0.6rem;
   text-align: center;
-  /* The two tones, set here so everything inside can just read them. */
-  --tone-line: rgba(22,42,67,0.26);
-  --tone-fill: rgba(22,42,67,0.045);
-  --tone-ink: rgba(22,42,67,0.62);
-}
-.luach-next-box.is-candles {
-  --tone-line: rgba(184,143,58,0.55);
+  --tone-line: rgba(184,143,58,0.62);
   --tone-fill: rgba(209,173,95,0.13);
   --tone-ink: #97721f;
 }
 /* The heading, with a hairline running out to each side of it. */
 .luach-next-head {
-  display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.35rem;
-  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 0.55rem; margin: 0 0 0.4rem;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--tone-ink); white-space: nowrap;
 }
 .luach-next-head::before, .luach-next-head::after {
   content: ""; flex: 1 1 0; height: 1px; background: var(--tone-line);
 }
-/* The mark, a divider, then the name and the time. */
-.luach-next-body { display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
+/* The mark, then the name, then the time, with the rule between the last two: the mark
+   says which box this is and belongs with the heading above it, while the rule separates
+   the two things that are being read. */
+.luach-next-body { display: flex; align-items: center; justify-content: center; gap: 0.65rem; }
 .luach-next-mark {
-  flex: none; width: 2.2rem; height: 2.2rem; border-radius: 50%;
-  border: 1.5px solid var(--tone-line); color: var(--tone-ink);
+  flex: none; width: 2.65rem; height: 2.65rem; border-radius: 50%;
+  border: 1.6px solid var(--tone-line); color: var(--tone-ink);
   display: flex; align-items: center; justify-content: center;
 }
-.luach-next-mark svg { width: 1.25rem; height: 1.25rem; }
+.luach-next-mark svg { width: 1.5rem; height: 1.5rem; }
 .luach-next-main {
   display: flex; flex-direction: column; align-items: center; min-width: 0;
-  padding-left: 0.6rem; border-left: 1px solid var(--tone-line);
 }
 .luach-next-what {
   font-family: "Times New Roman", "Frank Ruhl Libre", serif;
-  font-size: 1.35rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
+  font-size: 1.5rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
 }
-.luach-next-where { font-size: 0.8rem; font-weight: 400; color: var(--tone-ink); }
+.luach-next-where { font-size: 0.82rem; font-weight: 400; color: var(--tone-ink); }
 /* The time itself, which is the one thing on this box anybody is actually reading. */
 .luach-next-time {
-  font-size: 1.35rem; font-weight: 700; color: var(--luach-ink);
+  font-size: 1.5rem; font-weight: 700; color: var(--luach-ink);
   font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2;
 }
-.luach-next-time small { font-size: 0.62em; font-weight: 600; margin-left: 0.18em; }
+.luach-next-time small { font-size: 0.7em; font-weight: 700; margin-left: 0.22em; }
 .luach-next-when {
-  display: flex; align-items: center; justify-content: center; gap: 0.3rem;
-  margin: 0.3rem 0 0; font-size: 0.82rem; color: var(--tone-ink);
+  display: flex; align-items: center; justify-content: center; gap: 0.32rem;
+  margin: 0.3rem 0 0; font-size: 0.86rem; color: var(--tone-ink);
 }
-.luach-next-wait { width: 0.9rem; height: 0.9rem; flex: none; }
+.luach-next-wait { width: 0.95rem; height: 0.95rem; flex: none; }
+
+/* Room enough in the box and the name and the time sit on one line with a rule between
+   them, which is the shape a box has when it has the row to itself.
+
+   A container query, because it is the box's own width that decides this and not the
+   window's: the same 412px phone has one wide box on most days and two narrow ones on a
+   Friday. It queries the content box, which is 26px narrower here than the box itself once
+   the padding and border come off, and getting that the wrong way round is how an earlier
+   threshold ended up 24px too generous. Measured: on a 412px phone the single box has
+   354px of content and a paired one 159px. */
+@container (min-width: 17.5rem) {
+  .luach-next-main { flex-direction: row; align-items: baseline; gap: 0.8rem; }
+  .luach-next-time { border-left: 1.5px solid var(--tone-line); padding-left: 0.8rem; }
+}
 /* In a box too narrow to hold the mark and the name on one line, the mark goes. Measured
    at 375px wide, where two boxes share the row at 167px each: with the mark, "הדלקת נרות"
    broke over two lines and both boxes grew from 107px tall to 132. The name and the time
    are what the box is for; the mark is decoration and is the thing that can be spared.
-   A container query, so it is the box's own width that decides rather than the window's,
-   which is the only thing that can answer this: the same 375px window has one wide box on
-   most days and two narrow ones on a Friday. The threshold sits between the two widths
-   that were measured, the 167px box that wrapped and the 185px one that did not, rather
-   than on either of them: at 11.4rem it landed within 3px of the box a 412px phone makes
-   and flipped from one render to the next. Where container queries are missing nothing
-   is hidden and the name wraps, which is what it did before. */
-@container (max-width: 9.8rem) {
+   9.8rem is 157px of content, just above the widest that still wrapped: sweeping the
+   window from 360 to 430, the last box to break the name over two lines had 154px of
+   content and the first that did not had 155px. Where container queries are missing
+   nothing is hidden and the name wraps, which is what it did before. */
+@container (max-width: 12rem) {
   .luach-next-mark { display: none; }
-  .luach-next-main { padding-left: 0; border-left: none; }
-}
-
-/* Wide enough and the name and the time sit side by side with the divider between them,
-   which is what the box looks like when it has the row to itself. */
-@media (min-width: 30rem) {
-  .luach-next-box:only-child .luach-next-main {
-    flex-direction: row; align-items: baseline; gap: 0.7rem;
-  }
 }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
