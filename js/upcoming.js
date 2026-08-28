@@ -302,16 +302,27 @@ export function meridiem(mins) {
 }
 
 /** How far off, in the coarsest words that are still true: "in 25 minutes", "in 2 hours",
- *  "tomorrow", "Monday". A countdown to the minute would be stale a minute after it was
- *  drawn, and is not what anyone is asking the page. */
+ *  "tomorrow", "Monday". A countdown to the second would be stale the moment it was drawn,
+ *  and is not what anyone is asking the page.
+ *
+ *  `item.in` is not a whole number of minutes. shulNow reads the clock to the millisecond,
+ *  which is what the search wants so that a מנין starting this very minute is not skipped,
+ *  and every one of these branches has to round it before saying it out loud. It did not,
+ *  and the card read "in 1.1569500006735325 minutes".
+ *
+ *  Minutes round up. Anything still to come is at least a minute away until it has
+ *  actually arrived, and rounding down would count the last thirty seconds as "in 0
+ *  minutes". Hours round to the nearest, where being half an hour out either way is the
+ *  whole point of saying "in 3 hours" rather than a number of minutes. */
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 export function howFar(item) {
   if (!item) return '';
   // Already gone by. Only הדלקת נרות can be, since it is the day's own time rather than
   // the next one, and "in -40 minutes" or "now" would both be untrue of it by then.
   if (item.in < 0) return '';
-  if (item.in === 0) return 'now';
-  if (item.in < 60) return `in ${item.in} minute${item.in === 1 ? '' : 's'}`;
+  const minutes = Math.ceil(item.in);
+  if (minutes === 0) return 'now';
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
   if (item.daysOff === 0) {
     const hours = Math.round(item.in / 60);
     return `in ${hours} hour${hours === 1 ? '' : 's'}`;
