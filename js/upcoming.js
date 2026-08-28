@@ -55,16 +55,27 @@ const SEASON_CELLS = {
   choref: { B: SHABBOS_CELLS.B, C: SHABBOS_CELLS.C, E: SHABBOS_CELLS.E, F: SHABBOS_CELLS.F, G: SHABBOS_CELLS.G, I: SHABBOS_CELLS.L },
 };
 
+/** A heading line that is only a room in brackets: "(למטה)", "(בעזר'״נ)". Two of the קיץ
+ *  columns carry one, and it is the room rather than the name of the מנין. */
+const ROOM_LINE = /^\(.+\)$/;
+
 /** What to call a מנין, taken from the column's own printed heading so the home page and
- *  the board cannot drift apart. The heading's later lines are kept, since they say which
- *  room it is in ("מנחה (למטה)") or which מנין it is ("מנחה ערב שבת"), except a פלג line,
- *  which names the זמן the מנין is set against rather than the מנין. */
+ *  the board cannot drift apart. The heading's later lines are kept where they say which
+ *  מנין it is ("מנחה ערב שבת"), and dropped where they say something else: a פלג line names
+ *  the זמן the מנין is set against, and a bracketed line names the room, which the card
+ *  shows in its own smaller type underneath (roomFromHeader). */
 function nameFromHeader(header) {
   return String(header)
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('פלג'))
+    .filter((line) => line && !line.startsWith('פלג') && !ROOM_LINE.test(line))
     .join(' ');
+}
+
+/** The room out of the heading, unbracketed, or nothing. */
+function roomFromHeader(header) {
+  const line = String(header).split('\n').map((l) => l.trim()).find((l) => ROOM_LINE.test(l));
+  return line ? line.slice(1, -1).trim() : '';
 }
 
 /* Where a מנין davens, as the printed board says it: a plain time is the main בית מדרש, an
@@ -180,10 +191,13 @@ export function minyanimForDay(serial, state, settings) {
       const cell = cells[column.key];
       if (!cell || cell.day !== dow) continue;
       const name = nameFromHeader(column.header);
+      // The room comes off the heading where the heading gives one, and off the time's own
+      // underline otherwise. The פלג columns do both, naming the room in their heading and
+      // underlining the time as well, which is the same thing said twice: taking the
+      // heading's first and falling back to the time's says it once.
+      const room = roomFromHeader(column.header);
       for (const t of parseCell(row[column.key], cell)) {
-        // "מנחה (למטה) למטה": the פלג columns name the room in their heading and underline
-        // the time as well, which is the same thing said twice.
-        out.push({ ...t, name, place: name.includes(t.place) ? '' : t.place });
+        out.push({ ...t, name, place: room || t.place });
       }
     }
     // Friday morning is the weekday שחרית, and it has to be added here because neither
