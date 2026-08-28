@@ -1809,6 +1809,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    first thing inside Printing options, where the rest of the paper business is. */
 .week-nav-print-one { margin-top: 0.6rem; }
 .week-nav-print-one > .print-btn { flex: 0 1 11rem; }
+/* Narrower than Print and sitting beside it, because it is the second answer to the
+   question rather than the first. Only the chart browser offers it, and only where the
+   vendored libraries loaded, so on most screens this rule matches nothing. */
+.week-nav-print-one > .pdf-btn { flex: 0 1 6rem; }
 .week-print-panel .week-nav-print-one { margin-top: 0; }
 .week-print-panel .week-nav-print-one > .print-btn { flex: 1 1 0; max-width: 22rem; }
 /* Stacked, not side by side. "Print every week to the end of the season" is nine words,

@@ -11,6 +11,7 @@
 // cannot drift apart.
 import { buildSheetPages, syncPageHeights } from './sheet-view.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
+import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 import { jewishDateString } from '../hebrew-calendar.js';
@@ -145,7 +146,7 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>
-        <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
+        <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
     const pagesEl = container.querySelector('.pages');
@@ -161,12 +162,24 @@ export function renderChartBrowser(container, state, opts = {}) {
       draw();
     };
     wirePrintButton(container);
+    // The container is rebuilt on every Previous/Next, so the pages are looked up when the
+    // button is pressed rather than captured here. The file is named for the stretch it
+    // covers, since these get saved and mailed on and "zmanim.pdf" twice over is no help.
+    wirePdfButton(container, () => container.querySelector('.pages'), () => pdfName(label.english));
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
     if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
   };
   draw();
+}
+
+/** A filename from the spread's own dates: "Zmanim July 25 2026 to September 19 2026.pdf".
+ *  Everything a filesystem or a mail client might object to comes out, which on a date
+ *  string is the commas. */
+function pdfName(english) {
+  const plain = String(english).replace(/[^A-Za-z0-9 ]+/g, '').replace(/\s+/g, ' ').trim();
+  return `Zmanim ${plain}.pdf`;
 }
 
 function chartEsc(str) {

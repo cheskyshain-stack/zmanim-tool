@@ -294,6 +294,14 @@ def main():
     html = re.sub(r"[ \t]*<!-- icons -->.*?<!-- /icons -->\n", "", html, flags=re.S)
     if "webmanifest" in html:
         raise RuntimeError("offline build: the icon links were left in")
+    # And the block it marks off with <!-- pdf --> ... <!-- /pdf -->: the two vendored
+    # libraries behind the PDF button. Two thirds of a megabyte of third-party code that a
+    # USB stick for making sheets has no use for, and the button is there for a phone that
+    # will not print at the right size, which is not a problem this copy has. The app asks
+    # pdfReady() before offering the button, so with them gone it simply is not there.
+    html = re.sub(r"[ \t]*<!-- pdf -->.*?<!-- /pdf -->\n", "", html, flags=re.S)
+    if "jspdf" in html or "html2canvas" in html:
+        raise RuntimeError("offline build: the PDF libraries were left in")
     html = re.sub(re.escape(JS_MAP_MARKER) + r'\n<script type="importmap">.*?</script>\n', "", html, flags=re.S)
     html = re.sub(
         r'<script type="module" src="(?:\.\./)?js/' + re.escape(ENTRY) + r'(?:\?v=[0-9a-f]+)?"></script>',
