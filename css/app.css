@@ -1420,17 +1420,31 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 }
 .luach-next-wait { width: 0.95rem; height: 0.95rem; flex: none; }
 
-/* Room enough in the box and the name and the time sit on one line with a rule between
-   them, which is the shape a box has when it has the row to itself.
+/* One question decides both whether the time shares the line and whether the rule between
+   them is drawn, because the two have to agree.
+
+   They did not. The wrap was left to the content and the rule to a query, so a box wide
+   enough for a short מנין but not a long one came out with שחרית and its time on one line
+   and no rule between them, while the box beside it, holding הדלקת נרות, wrapped to two.
+   Measured side by side at 732x412: 241px of content each, one on one line and one on two,
+   neither with a rule.
+
+   So below the threshold the time always takes its own line, whatever it would have fitted
+   on, and above it the two always share one with the rule between. The number is the widest
+   the row is ever asked to hold: over the 451 distinct combinations of מנין, room and time
+   the published year produces, the longest on one line is "מנחה ערב שבת למטה 12:30PM" at
+   302px, so 19rem is 304.
 
    A container query, because it is the box's own width that decides this and not the
    window's: the same 412px phone has one wide box on most days and two narrow ones on a
-   Friday. It queries the content box, which is 26px narrower here than the box itself once
-   the padding and border come off, and getting that the wrong way round is how an earlier
-   threshold ended up 24px too generous. Measured: on a 412px phone the single box has
-   354px of content and a paired one 159px. */
-@container (min-width: 17.5rem) {
+   Friday. It queries the content box, 26px narrower than the box itself once the padding
+   and border come off, and getting that the wrong way round is how an earlier threshold
+   ended up 24px too generous. Measured: on a 412px phone the single box has 354px of
+   content and a paired one 159px. */
+.luach-next-time { flex-basis: 100%; }
+@container (min-width: 19rem) {
   .luach-next-main { column-gap: 0.8rem; }
+  .luach-next-time { flex-basis: auto; }
   /* On the right of the time, which is the side facing the words, since the time sits at
      the left-hand end of a row that runs right to left. Physical rather than logical: the
      time carries its own direction: ltr, so its inline-start is its left, which is the far
@@ -1447,6 +1461,16 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    nothing is hidden and the name wraps, which is what it did before. */
 @container (max-width: 12rem) {
   .luach-next-mark { display: none; }
+}
+/* A smaller name in a box narrow enough to be sharing the row, so the long ones still sit
+   on one line and the box stays two lines deep rather than three. The time keeps its size:
+   it is what the box is for, and it has a line to itself here anyway.
+   1.2rem is the largest that does it. Measured over the 14 name-and-room combinations the
+   published year produces, in a box with the 158px of content a 412px phone gives a paired
+   box: at 1.5rem the worst of them, מנחה ערב שבת למטה, takes two lines, at 1.3rem it still
+   does, and at 1.2rem it takes one. */
+@container (max-width: 19rem) {
+  .luach-next-what { font-size: 1.2rem; }
 }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
