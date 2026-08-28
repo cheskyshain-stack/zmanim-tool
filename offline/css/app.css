@@ -1189,6 +1189,10 @@ body.is-luach {
   background: var(--luach-cream);
 }
 body.is-luach main { max-width: none; margin: 0; padding: 1.25rem 1rem 3rem; }
+/* The menu ends at the address, and the 3rem below it is space nothing is ever drawn in.
+   On the pages behind it that room separates the last board from the bottom of the screen
+   and is worth having; here it was 48px of the reason the page had begun to scroll. */
+body.is-luach main.is-home { padding-bottom: 1.25rem; }
 
 /* The menu is four short things on a tall screen, so left to itself it huddles at the
    top with the rest of the phone empty under it. Instead it takes the whole height and
@@ -1282,7 +1286,13 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 
 /* On the menu the cap carries nothing, so it is a shape and no more. Taller there, since
    it is the top of the screen and has the whole name below it rather than one link. */
-.luach-bar-plain { display: block; min-height: 5.6rem; margin-bottom: 2.4rem; padding: 0; }
+/* Shorter than it was. The menu is laid out to fill the screen with the address at its
+   foot, and adding the "what is on next" box above it pushed the page past the window on
+   phones where it used to end exactly at the bottom. The cap is the largest piece of the
+   page that is only a shape, so it is where the room comes from. Measured at 412x732, the
+   size this is most looked at on: with the box and the old 5.6rem cap the page ran 7px
+   over on an Erev Shabbos, and at 4.6rem it ends inside the window on both kinds of day. */
+.luach-bar-plain { display: block; min-height: 4.6rem; margin-bottom: 2.4rem; padding: 0; }
 
 /* The name sits on the parchment below the cap, not on the navy.
    The wordmark was drawn as black ink on a transparent background. Rather than ship a
@@ -1293,7 +1303,7 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
 /* Less air under the name when the "what is on next" card follows it, since the card and
    its gold hairline already separate the name from the menu. Worth 10px on a screen that
    is counting them: see .luach-next. */
-main:has(.luach-next) .luach-masthead { margin-bottom: 1.8rem; }
+main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-logo { width: min(18rem, 74%); height: auto; }
 .luach-place { margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.15rem; color: var(--luach-ink); }
 
@@ -1323,18 +1333,19 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.8rem; }
    opened for and the menu is the way on from it.
 
    A wrapping row rather than a fixed pair, because most days there is only one box and it
-   should have the whole width. The 10rem basis is what decides where two stop fitting
-   side by side: measured, they sit together from 375px wide (two 160px boxes and a 10px
-   gap inside the 343px the page gives them) and stack at 360 and below, which is better
-   than two boxes too narrow for "CANDLE LIGHTING" to sit on one line.
+   should have the whole width. The 8rem basis is what decides where two stop fitting side
+   by side, and it is set low on purpose: stacking them doubles what the card costs in
+   height, and on a 360px phone that was 118px of the reason the page had started to scroll.
+   Measured at 8rem, two boxes sit together from 320px wide and every one of them comes out
+   118px tall with the heading on one line and the name on one line, nothing wrapped.
 
    The menu is laid out to fill the screen with the address at its foot and it only just
    does, so the box is kept to three short lines: heading, the thing itself, how far off. */
 .luach-next {
-  display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem;
+  display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem;
 }
 .luach-next-box {
-  flex: 1 1 10rem; min-width: 0; container-type: inline-size;
+  flex: 1 1 8rem; min-width: 0; container-type: inline-size;
   border: 1.5px solid var(--tone-line); border-radius: 18px;
   background: var(--tone-fill); padding: 0.7rem 0.8rem 0.6rem;
   text-align: center;

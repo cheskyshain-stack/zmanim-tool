@@ -171,18 +171,55 @@ function homeHtml(published) {
 
 /** Keeps the "what is on next" card honest on a page nobody has closed.
  *
- *  A phone left on the counter would otherwise still be saying "in 25 minutes" an hour
- *  later. Half a minute is often enough for the minute count to stay true without the card
- *  flickering, and it is cheap: the whole thing is a couple of chart rows and some
- *  arithmetic, with no network and no storage behind it.
+ *  Two things drive it, and the second is the one that matters on a phone.
  *
- *  Cleared whenever the page changes, and only the card is redrawn, never the menu, so a
- *  finger already on its way to Weekly Zmanim does not have the button rebuilt underneath
- *  it. */
+ *  A timer, every half minute, for a page somebody is looking at: often enough that the
+ *  minute count stays true without the card flickering, and cheap, being a couple of chart
+ *  rows and some arithmetic with no network and no storage behind it.
+ *
+ *  And the moment the page comes back, because a phone stops running timers for a page
+ *  that is not on the screen. Lock the phone or switch apps and the timer stops; come back
+ *  and the card is still showing the count from whenever you left, which is exactly what
+ *  was reported: it said "in 25 minutes" long after those minutes had gone, and only a
+ *  refresh put it right. visibilitychange covers the screen going off and the app being
+ *  switched away from, pageshow covers coming back through the browser's back button, when
+ *  the whole page is restored from a cache rather than run again, and focus covers a
+ *  desktop window being clicked back into. All three can fire for one return, which is
+ *  harmless: drawing the same card twice looks like drawing it once.
+ *
+ *  Only the card is redrawn, never the menu, so a finger already on its way to Weekly
+ *  Zmanim does not have the button rebuilt underneath it. */
 let nextUpTimer = null;
+let nextUpWake = null;
 function stopNextUp() {
   clearInterval(nextUpTimer);
   nextUpTimer = null;
+  if (nextUpWake) {
+    document.removeEventListener('visibilitychange', nextUpWake);
+    window.removeEventListener('pageshow', nextUpWake);
+    window.removeEventListener('focus', nextUpWake);
+    nextUpWake = null;
+  }
+}
+
+function startNextUp(published) {
+  stopNextUp();
+  const draw = () => {
+    const card = main.querySelector('.luach-next');
+    if (!card) return stopNextUp(); // the page moved on
+    // Replaced rather than written into, so a card that has just become empty (or has
+    // just gained a box it did not have) comes out right either way.
+    card.outerHTML = nextUpHtml(published, resolveSettings(published.settings)) || '';
+  };
+  nextUpTimer = setInterval(draw, 30000);
+  nextUpWake = () => {
+    // visibilitychange fires on the way out as well as on the way back.
+    if (document.visibilityState === 'hidden') return;
+    draw();
+  };
+  document.addEventListener('visibilitychange', nextUpWake);
+  window.addEventListener('pageshow', nextUpWake);
+  window.addEventListener('focus', nextUpWake);
 }
 
 function renderHome(published) {
@@ -191,15 +228,7 @@ function renderHome(published) {
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
   openTheDoor();
-  stopNextUp();
-  nextUpTimer = setInterval(() => {
-    const card = main.querySelector('.luach-next');
-    const fresh = nextUpHtml(published, resolveSettings(published.settings));
-    if (!card) return stopNextUp(); // the page moved on
-    // Replaced rather than written into, so a card that has just become empty (or has
-    // just gained a half it did not have) comes out right either way.
-    card.outerHTML = fresh || '';
-  }, 30000);
+  startNextUp(published);
 }
 
 /** Three taps in the navy cap go to the generator. Wired after every render, since each
