@@ -1364,10 +1364,16 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 }
 /* The mark, then the name, then the time, with the rule between the last two: the mark
    says which box this is and belongs with the heading above it, while the rule separates
-   the two things that are being read. */
-.luach-next-body { display: flex; align-items: center; justify-content: center; gap: 0.65rem; }
+   the two things that are being read.
+
+   The mark is taken out of the flow and hung on the left-hand edge, so that what is
+   centred here is the words and the time rather than the words, the time and the mark
+   together. In the flow it pushed them half its own width and a gap to the right of the
+   middle, which on a box this wide is 26px off centre. */
+.luach-next-body { position: relative; display: flex; align-items: center; justify-content: center; }
 .luach-next-mark {
-  flex: none; width: 2.65rem; height: 2.65rem; border-radius: 50%;
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 2.65rem; height: 2.65rem; border-radius: 50%;
   border: 1.6px solid var(--tone-line); color: var(--tone-ink);
   display: flex; align-items: center; justify-content: center;
 }
@@ -1455,12 +1461,22 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    at 375px wide, where two boxes share the row at 167px each: with the mark, "הדלקת נרות"
    broke over two lines and both boxes grew from 107px tall to 132. The name and the time
    are what the box is for; the mark is decoration and is the thing that can be spared.
-   9.8rem is 157px of content, just above the widest that still wrapped: sweeping the
-   window from 360 to 430, the last box to break the name over two lines had 154px of
-   content and the first that did not had 155px. Where container queries are missing
-   nothing is hidden and the name wraps, which is what it did before. */
-@container (max-width: 12rem) {
+   16rem is 256px of content, which is what it takes to hang the mark and still leave the
+   words their full width: the longest of them in a box this narrow is 152px, and the mark
+   has to be kept clear on both sides at 105px the pair. Below that the mark goes and the
+   words get the room. Where container queries are missing nothing is hidden and the words
+   wrap, which is what they did before. */
+@container (max-width: 16rem) {
   .luach-next-mark { display: none; }
+}
+/* Where the mark is hung, the words are kept clear of it on both sides at once: on both,
+   because the point of hanging it was to leave the words centred in the box, and a limit
+   on one side only would push them off it again. Measured without this, the longest row
+   the year produces reached across the mark by 42px in a box sharing the row and 17px in
+   one that has it to itself. Over the limit the row wraps, which is what it does when it
+   runs out of width anywhere else. */
+@container (min-width: 16rem) {
+  .luach-next-main { max-width: calc(100% - 6.6rem); }
 }
 /* A smaller name in a box narrow enough to be sharing the row, so the long ones still sit
    on one line and the box stays two lines deep rather than three. The time keeps its size:
