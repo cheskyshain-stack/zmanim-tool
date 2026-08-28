@@ -1813,6 +1813,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    question rather than the first. Only the chart browser offers it, and only where the
    vendored libraries loaded, so on most screens this rule matches nothing. */
 .week-nav-print-one > .pdf-btn { flex: 0 1 6rem; }
+/* Smaller again, and quiet. It puts the Erev Shabbos message on the clipboard, which is a
+   small errand beside printing the board, and it says so rather than showing an icon: a
+   clipboard glyph would be one more thing to work out. */
+.week-nav-print-one > .copy-btn { flex: 0 1 7rem; }
 .week-print-panel .week-nav-print-one { margin-top: 0; }
 .week-print-panel .week-nav-print-one > .print-btn { flex: 1 1 0; max-width: 22rem; }
 /* Stacked, not side by side. "Print every week to the end of the season" is nine words,

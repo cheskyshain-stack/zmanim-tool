@@ -21,6 +21,8 @@ import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSit
 import { SLASH } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
+import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
+import { loadTables } from '../data-loader.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
@@ -1169,7 +1171,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                with paper is then in one place, and the row above stays what it is for:
                moving from week to week. The panel is called More options rather than
                Printing options because Print itself now lives in it. -->
-          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}${
+            // Only where there is a שבת row to build it from. A week whose Shabbos is Yom
+            // Tov has no parsha and no row, and an Erev Shabbos message for it would be
+            // an empty one.
+            sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy text</button>' : ''
+          }</div>
           ${
             // Both switches, or neither. Each of them is a question about two pages, and a
             // week that has only one (a Shabbos that is Yom Tov comes through on its
@@ -1252,6 +1259,48 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     return plain ? `Zmanim ${plain}.pdf` : 'Zmanim week.pdf';
   };
   wirePrintButton(container);
+
+  /* The Erev Shabbos message, onto the clipboard, built off the same row the card is (see
+     js/erev-text.js for what every piece of it comes from).
+
+     The tables are loaded for the English parsha name. They are cached after the first
+     call, so this is a promise that has already settled by the time anyone can press the
+     button, and the await costs nothing.
+
+     The clipboard is asked for twice over: navigator.clipboard is refused outside a secure
+     context and on some older phones, and a message nobody can paste is no use, so the old
+     hidden-textarea route is kept behind it. The result is said on the button rather than
+     in an alert, the way the PDF button does it. */
+  const copyBtn = container.querySelector('#week-copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const said = copyBtn.textContent;
+      try {
+        const { week: w, sheet: s } = index.get(showing);
+        if (!s) throw new Error('this week has no שבת row');
+        const { columns, row } = rowFor(w, s, state, settings);
+        const tables = await loadTables();
+        const text = erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+        else {
+          const box = document.createElement('textarea');
+          box.value = text;
+          box.setAttribute('readonly', '');
+          box.style.position = 'fixed';
+          box.style.opacity = '0';
+          document.body.appendChild(box);
+          box.select();
+          document.execCommand('copy');
+          box.remove();
+        }
+        copyBtn.textContent = 'Copied';
+      } catch (err) {
+        console.error('copy failed', err);
+        copyBtn.textContent = 'Copy failed';
+      }
+      setTimeout(() => { copyBtn.textContent = said; }, 2000);
+    });
+  }
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
   // one of these at the right size either, and a PDF states the paper in the file rather
