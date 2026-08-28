@@ -614,20 +614,15 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .header-rabbi { font-size: var(--sheet-font-size); text-align: right; white-space: pre-line; flex-shrink: 0; line-height: 1.3; }
 
 table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size); flex: 1; table-layout: auto; }
-/* --rule-ink rather than the colour itself, because how heavy these lines look depends on
-   how far the page has been shrunk to fit the window. A border is never drawn thinner
-   than one pixel however small the zoom, so at 0.34 on a phone the 1px rule stays 1px
-   while the cell around it shrinks to a third. Measured: the rule is 1.6% of a cell's
-   height on the desktop and 4.7% on a phone, three times the weight, which is the grid
-   looking black on a phone and grey on a screen. It cannot be drawn thinner, so it is
-   drawn lighter instead: fitChartToWindow sets --rule-fade to the zoom it applied and the
-   ink is mixed back towards the paper by the same fraction, which keeps the amount of ink
-   per cell about where it is at full size. Print pins the fade back to 1 (print.css). */
-.pages { --rule-fade: 1; --rule-ink: #9aa7b3; }
-@supports (color: color-mix(in srgb, #000 50%, #fff)) {
-  .pages { --rule-ink: color-mix(in srgb, #9aa7b3 calc(var(--rule-fade) * 100%), #ffffff); }
-}
-th, td { border: 1px solid var(--rule-ink); padding: 0.035in 0.05in; vertical-align: middle; text-align: center; }
+/* The grid is heavier on a phone than on a desktop and this is not the place it can be
+   fixed. Shrinking the page to fit does not thin these rules: a border is never painted
+   thinner than one pixel however small the zoom, so at 0.34 the 1px rule still lands on
+   3 device pixels of an iPhone's screen where its share of the cell asks for about 1.
+   Fading the colour to compensate was tried and reverted. It cannot touch the width, so
+   all it produced was a pale line of the same thickness, which reads worse than a crisp
+   dark one. The width is a property of zoom, and only moving the fit to transform would
+   change it. */
+th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: middle; text-align: center; }
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
@@ -742,7 +737,7 @@ td.ruled .cell { background: var(--ruled); }
   align-items: center;
   gap: 0.12in;
 }
-.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--rule-ink), transparent); }
+.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #9aa7b3, transparent); }
 .footer-text { font-size: calc(var(--sheet-font-size) - 2.5pt); color: #444; text-align: center; white-space: pre-line; line-height: 1.3; }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 

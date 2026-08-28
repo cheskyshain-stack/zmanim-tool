@@ -16,16 +16,8 @@
   main,
   body.is-luach main { padding: 0; max-width: none; margin: 0; }
   /* !important because Fit to screen sets this inline - it's a way of reading the sheet
-     on a small screen and must never reach the paper. --rule-fade goes with it: it is the
-     inline companion of that zoom, lightening the grid to make up for a border that will
-     not draw thinner than a pixel. On paper the page is full size and the rules must come
-     out at their proper weight, so it is pinned back to 1.
-
-     The colour is pinned too, and not merely to the same value. A fade of 1 does resolve
-     to the same three numbers, but it resolves them through color-mix, which computes in
-     color(srgb ...) and antialiases a hairline fractionally differently: printed pages
-     came out one hash off HEAD with everything else untouched. Paper gets the literal. */
-  .pages { margin: 0; zoom: 1 !important; --rule-fade: 1 !important; --rule-ink: #9aa7b3 !important; }
+     on a small screen and must never reach the paper. */
+  .pages { margin: 0; zoom: 1 !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
      already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
   #sheet-stack.is-side-by-side > .pages { display: block; }

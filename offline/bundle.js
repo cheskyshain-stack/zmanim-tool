@@ -3038,17 +3038,10 @@ function fitChartToWindow(pagesEl) {
   const apply = () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.zoom = '';
-    pagesEl.style.removeProperty('--rule-fade');
     const available = pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
-    const scale = available / content;
-    pagesEl.style.zoom = scale.toFixed(4);
-    /* A border is never drawn thinner than a pixel, so shrinking the page leaves the grid
-       at full weight while the cells around it shrink. Hand the scale to the CSS, which
-       fades the rules by the same fraction to keep the ink per cell where it is at full
-       size (see --rule-ink in app.css). Floored, or the lines disappear on a phone. */
-    pagesEl.style.setProperty('--rule-fade', String(Math.max(0.4, scale).toFixed(3)));
+    pagesEl.style.zoom = (available / content).toFixed(4);
   };
   apply();
   requestAnimationFrame(apply);
