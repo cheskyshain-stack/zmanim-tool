@@ -16,8 +16,16 @@
   main,
   body.is-luach main { padding: 0; max-width: none; margin: 0; }
   /* !important because Fit to screen sets this inline - it's a way of reading the sheet
-     on a small screen and must never reach the paper. */
-  .pages { margin: 0; zoom: 1 !important; }
+     on a small screen and must never reach the paper. --rule-fade goes with it: it is the
+     inline companion of that zoom, lightening the grid to make up for a border that will
+     not draw thinner than a pixel. On paper the page is full size and the rules must come
+     out at their proper weight, so it is pinned back to 1.
+
+     The colour is pinned too, and not merely to the same value. A fade of 1 does resolve
+     to the same three numbers, but it resolves them through color-mix, which computes in
+     color(srgb ...) and antialiases a hairline fractionally differently: printed pages
+     came out one hash off HEAD with everything else untouched. Paper gets the literal. */
+  .pages { margin: 0; zoom: 1 !important; --rule-fade: 1 !important; --rule-ink: #9aa7b3 !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
      already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
   #sheet-stack.is-side-by-side > .pages { display: block; }
@@ -34,6 +42,42 @@
   }
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
+}
+
+/* --- When the browser will not give us the 11in the page is built for ----------------
+   @page above asks for letter landscape with no margin, and a desktop obliges: the print
+   box comes out at exactly 11in and the page fills it. iOS Safari does not. It ignores
+   the size descriptor, uses whatever paper and orientation the person picks in the print
+   sheet, and imposes margins of its own that cannot be zeroed. The page went on being
+   1056px wide regardless, so it hung outside the sheet: measured here, an 8.5in box left
+   240px of the chart past the right-hand edge. On the phone that came out as the right
+   columns sliced off and a two-sheet chart paginating into four.
+
+   So when the box is smaller than the page, scale the page to the box. Same chart, same
+   proportions, smaller, which is what shrinking to fit should have done.
+
+   Two passes on purpose. The steps come first and are safe everywhere: each one is sized
+   for the narrowest box in its band, so it always fits, at worst a few percent small.
+   The exact figure follows and overrides it where dividing a length by a length in calc()
+   is supported (it is: verified resolving to 0.9545 in a 10.5in box). Where it is not,
+   the declaration is invalid and dropped, and the steps still stand. Either way nothing
+   here can reach a desktop, whose box is the full 11in and matches no query below.
+
+   The side-by-side selector is repeated because the rule that pins it to zoom: 1 carries
+   an id and would otherwise outrank a bare .page. */
+@media print and (max-width: 10.99in) { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.94; } }
+@media print and (max-width: 10.4in)  { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.90; } }
+@media print and (max-width: 9.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.85; } }
+@media print and (max-width: 9.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.80; } }
+@media print and (max-width: 8.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.76; } }
+@media print and (max-width: 8.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.71; } }
+@media print and (max-width: 7.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.67; } }
+@media print and (max-width: 7.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.62; } }
+@media print and (max-width: 10.99in) {
+  .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: calc(100vw / 11in); }
+}
+
+@media print {
   /* Browsers drop background colours when printing unless told otherwise, which would
      wipe the dark header row, the tinted parsha column and the striped body rows - the
      things that make the printed board readable at a glance. */
