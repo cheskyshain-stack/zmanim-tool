@@ -265,17 +265,27 @@ export function shulNow(now, settings) {
   return { serial, mins: local - Math.floor(local / 1440) * 1440 };
 }
 
-/** The first entry from `forDay` at or after now, looking into the following days until
- *  one turns up.
+/** The first entry from `forDay` at or after now, rolling on to tomorrow once today's are
+ *  done, and stopping at the first day there is no schedule for.
  *
- *  A week ahead is the limit. Only the end of what has been published can run the search
- *  out, and there the honest answer is nothing rather than a time from a chart that does
- *  not exist. */
+ *  Rolling on is the ordinary case: at eleven at night the answer to "what is next" is the
+ *  morning, and saying so is right. Stopping is the case this cannot get wrong. Three weeks
+ *  a year have no row on the שבת chart, the Erev Shabbos and Shabbos of a Yom Tov, and the
+ *  published charts run out at the end of a season. Searching past those turned up a real
+ *  time from a real day and put it on the card as though it were next, so on an Erev Yom
+ *  Tov the page offered a מנין several days off with nothing to say it was not tomorrow.
+ *  A day nothing is known about ends the search, and the card is left off the page
+ *  altogether rather than answering a question it cannot answer.
+ *
+ *  Eight days is the far limit, which nothing should ever reach now that an empty day stops
+ *  it, and is here so a bad state cannot spin. */
 function nextFrom(forDay, now, settings, days = 8) {
   const { serial, mins } = shulNow(now, settings);
   for (let offset = 0; offset < days; offset++) {
     const day = serial + offset;
-    for (const item of forDay(day)) {
+    const list = forDay(day);
+    if (!list.length) return null; // no schedule for this day: say nothing at all
+    for (const item of list) {
       if (offset === 0 && item.mins < mins) continue;
       return { ...item, serial: day, daysOff: offset, in: item.mins - mins + offset * 1440 };
     }

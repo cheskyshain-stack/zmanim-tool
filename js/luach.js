@@ -234,12 +234,20 @@ function startNextUp(published) {
   stopNextUp();
   const settings = resolveSettings(published.settings);
   const draw = () => {
-    const card = main.querySelector('.luach-next');
-    if (!card) return stopNextUp(); // the page moved on
+    // The menu, not the card, is what says we are still on this page. Watching for the
+    // card instead meant a day with no schedule stopped the clock for good: there is no
+    // card to find on such a day, the first tick took that for having left the page, and
+    // the card could not come back when midnight rolled into a day that has one.
+    const home = main.querySelector('.luach-home');
+    if (!home) return stopNextUp(); // the page moved on
     const items = nextUpState(published, settings);
+    const html = nextUpHtml(items);
+    const card = home.querySelector('.luach-next');
     // Replaced rather than written into, so a card that has just become empty (or has
-    // just gained a box it did not have) comes out right either way.
-    card.outerHTML = nextUpHtml(items) || '';
+    // just gained a box it did not have) comes out right either way, and put back at the
+    // top of the menu when there was none at all.
+    if (card) card.outerHTML = html || '';
+    else if (html) home.insertAdjacentHTML('afterbegin', html);
     clearTimeout(nextUpTimer);
     nextUpTimer = setTimeout(draw, untilNextChange(items));
   };
