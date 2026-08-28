@@ -63,7 +63,14 @@ function spreadLabel(spread) {
 
 /** A chart page is a fixed 11in wide, so on anything narrower it is scaled down rather
  *  than scrolled sideways: the whole page should be visible at once. Print resets it
- *  (see print.css), since paper has no such problem. */
+ *  (see print.css), since paper has no such problem.
+ *
+ *  Measured once, this fits whatever the page happened to be at that instant. The Hebrew
+ *  serifs are loaded with font-display: swap, so on a slow connection the first paint is
+ *  in a fallback and the real font arrives afterwards at a different width - the fit was
+ *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
+ *  the next frame for anything else that settles late. Each pass starts from a clean
+ *  measurement (zoom cleared first), so re-running it is not cumulative. */
 function fitChartToWindow(pagesEl) {
   const apply = () => {
     if (!document.body.contains(pagesEl)) return;
@@ -74,6 +81,8 @@ function fitChartToWindow(pagesEl) {
     pagesEl.style.zoom = (available / content).toFixed(4);
   };
   apply();
+  requestAnimationFrame(apply);
+  document.fonts?.ready?.then(apply);
   window.addEventListener('resize', apply);
 }
 

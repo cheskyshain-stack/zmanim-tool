@@ -70,6 +70,15 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
+/* Safari on iPhone runs a text autosizer: in a block much wider than the viewport it
+   inflates the font on its own, to make body copy on a desktop-width page readable
+   without pinching. A chart page is a fixed 11in (1056px) inside a ~390px phone, which
+   is exactly the shape it goes after, so it grew the table text past the columns the
+   layout had measured, and the right-hand columns ran off the page and were clipped.
+   Chromium has no autosizer at all, which is why this only ever showed up on an iPhone.
+   Every size here is deliberate and several are in points because they end up on paper,
+   so the browser must not second-guess any of them. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* The hidden attribute only sets display:none at the UA level, so any element given an
    explicit display (e.g. .form-grid's flex) ignores it and stays on screen. */
 [hidden] { display: none !important; }
