@@ -15,9 +15,14 @@
      onto a blank third sheet. Named explicitly so both mains flatten for paper. */
   main,
   body.is-luach main { padding: 0; max-width: none; margin: 0; }
-  /* !important because Fit to screen sets this inline - it's a way of reading the sheet
-     on a small screen and must never reach the paper. */
-  .pages { margin: 0; zoom: 1 !important; }
+  /* !important because Fit to screen sets these inline - they are a way of reading the
+     sheet on a small screen and must never reach the paper. zoom is what the sheet view
+     uses; the chart browser scales with a transform instead (so the grid's hairlines
+     scale too, see fitChartToWindow), holding .pages at its natural width and sizing the
+     wrapper to what the transform covers. All four have to come off for print, or a phone
+     would put a third-size chart on the paper inside a clipped box. */
+  .pages { margin: 0; zoom: 1 !important; transform: none !important; width: auto !important; }
+  .pages-fit { height: auto !important; overflow: visible !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
      already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
   #sheet-stack.is-side-by-side > .pages { display: block; }

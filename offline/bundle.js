@@ -3028,20 +3028,47 @@ function spreadLabel(spread) {
  *  than scrolled sideways: the whole page should be visible at once. Print resets it
  *  (see print.css), since paper has no such problem.
  *
+ *  transform rather than zoom, and this is the one place in the app where that is the
+ *  right way round. zoom will not paint a border thinner than a pixel however far it
+ *  scales, so at 0.34 on a phone the grid's 1px rules stayed a full pixel wide while the
+ *  cells around them shrank to a third, and the chart came out looking ruled in black.
+ *  Fading the colour was tried first and reverted: it cannot reach the width, so it only
+ *  turned a heavy line into a pale one of the same thickness, which reads worse. A
+ *  transform scales the rule with everything else. Measured on a phone at this scale,
+ *  reading the painted pixels: zoom draws 3 device pixels at contrast 91, transform draws
+ *  2 at contrast 47, and the second is 94 units of ink against the 93 the design asks for.
+ *
+ *  What zoom gave for free was the layout: it shrinks the box as well as the paint, while
+ *  a transform leaves the original footprint behind and would reserve 11in of width and
+ *  the full height on a phone. So the wrapper is sized here instead, to what the transform
+ *  actually covers, and clipped. Hence .pages-fit existing at all.
+ *
  *  Measured once, this fits whatever the page happened to be at that instant. The Hebrew
  *  serifs are loaded with font-display: swap, so on a slow connection the first paint is
  *  in a fallback and the real font arrives afterwards at a different width - the fit was
  *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
- *  the next frame for anything else that settles late. Each pass starts from a clean
- *  measurement (zoom cleared first), so re-running it is not cumulative. */
+ *  the next frame for anything else that settles late. Every pass starts by clearing what
+ *  the last one set, so re-running it is not cumulative. */
 function fitChartToWindow(pagesEl) {
+  const fit = pagesEl.parentElement;
   const apply = () => {
     if (!document.body.contains(pagesEl)) return;
-    pagesEl.style.zoom = '';
-    const available = pagesEl.clientWidth;
+    pagesEl.style.transform = '';
+    pagesEl.style.width = '';
+    if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
+    const available = fit ? fit.clientWidth : pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
-    pagesEl.style.zoom = (available / content).toFixed(4);
+    const scale = available / content;
+    // Held at its natural width, or the transform would scale a box that had already
+    // shrunk to the window and the page would come out at the square of the scale.
+    pagesEl.style.width = `${content}px`;
+    pagesEl.style.transformOrigin = 'top left';
+    pagesEl.style.transform = `scale(${scale.toFixed(4)})`;
+    if (fit) {
+      fit.style.height = `${Math.ceil(pagesEl.scrollHeight * scale)}px`;
+      fit.style.overflow = 'hidden';
+    }
   };
   apply();
   requestAnimationFrame(apply);
@@ -3083,7 +3110,7 @@ function renderChartBrowser(container, state, opts = {}) {
         </div>
         <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
       </div>
-      <div class="pages"></div>`;
+      <div class="pages-fit"><div class="pages"></div></div>`;
     const pagesEl = container.querySelector('.pages');
     const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
     const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
