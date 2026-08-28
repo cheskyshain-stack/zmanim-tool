@@ -299,8 +299,18 @@ export function shulNow(now, settings) {
   return { serial, mins: local - Math.floor(local / 1440) * 1440 };
 }
 
-/** The first entry from `forDay` at or after now, rolling on to tomorrow once today's are
- *  done, and stopping at the first day there is no schedule for.
+/** How long a מנין stays on the card after its own time has come. Someone glancing at the
+ *  page a minute after שחרית started is being told about the one that is running, not sent
+ *  on to מנחה: the time has arrived, it has not finished, and the answer to "what is on
+ *  now" is still this one. Rolling straight on at the stroke of the minute also made the
+ *  card hardest to read exactly when it was most wanted, on the way in the door.
+ *
+ *  Five minutes, and it is the start that is being counted from, not the end, because a
+ *  מנין's length is not something the boards know. */
+const MINYAN_GRACE = 5;
+
+/** The first entry from `forDay` at or after now (less the grace above), rolling on to
+ *  tomorrow once today's are done, and stopping at the first day there is no schedule for.
  *
  *  Rolling on is the ordinary case: at eleven at night the answer to "what is next" is the
  *  morning, and saying so is right. Stopping is the case this cannot get wrong. Three weeks
@@ -320,7 +330,7 @@ function nextFrom(forDay, now, settings, days = 8) {
     const list = forDay(day);
     if (!list.length) return null; // no schedule for this day: say nothing at all
     for (const item of list) {
-      if (offset === 0 && item.mins < mins) continue;
+      if (offset === 0 && item.mins < mins - MINYAN_GRACE) continue;
       return { ...item, serial: day, daysOff: offset, in: item.mins - mins + offset * 1440 };
     }
   }
@@ -374,8 +384,12 @@ export function meridiem(mins) {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 export function howFar(item) {
   if (!item) return '';
-  // Already gone by. Only הדלקת נרות can be, since it is the day's own time rather than
-  // the next one, and "in -40 minutes" or "now" would both be untrue of it by then.
+  // Started, but only just: a מנין held on the card for its grace, or הדלקת נרות in the
+  // few minutes after. "now" is true of both, and is what the line should say while the
+  // time it names is the one happening.
+  if (item.in < 0 && item.in >= -MINYAN_GRACE) return 'now';
+  // Well and truly gone by. Only הדלקת נרות reaches here, since it is the day's own time
+  // rather than the next one, and "in -40 minutes" or "now" would both be untrue of it.
   if (item.in < 0) return '';
   const minutes = Math.ceil(item.in);
   if (minutes === 0) return 'now';
