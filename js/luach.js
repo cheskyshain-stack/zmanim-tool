@@ -98,14 +98,19 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
  *
  *  aria-live, so that when the card redraws itself on the timer a screen reader is told
  *  what changed instead of the page silently becoming something else. */
-function nextUpHtml(published, settings) {
+function nextUpState(published, settings) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   const now = new Date();
   // A chart that cannot be read must not take the page down with it: the menu below is
   // the point of this screen and it works whether or not this card has anything to say.
   const safely = (fn) => { try { return fn(); } catch { return null; } };
-  const minyan = safely(() => nextMinyan(now, state, settings));
-  const candles = safely(() => todaysCandleLighting(now, state, settings));
+  return [
+    safely(() => nextMinyan(now, state, settings)),
+    safely(() => todaysCandleLighting(now, state, settings)),
+  ];
+}
+
+function nextUpHtml([minyan, candles]) {
   if (!minyan && !candles) return '';
 
   const box = (kind, icon, item, tone) => {
@@ -152,7 +157,7 @@ function homeHtml(published) {
       ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
-    ${nextUpHtml(published, resolveSettings(published.settings))}
+    ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
         ${ICON_CLOCK}<span class="luach-item-title">${esc(PAGE_NAMES.week)}</span>${CHEVRON}
@@ -169,13 +174,36 @@ function homeHtml(published) {
   </div>`;
 }
 
+/** When the card next needs redrawing: the moment the number on it changes.
+ *
+ *  howFar rounds the minutes up, so a מנין 25 minutes and 7 seconds off reads "in 26
+ *  minutes" and becomes "in 25" in 7 seconds' time, not in 30. Waiting a fixed half minute
+ *  meant the change landed up to half a minute late and never twice in the same place;
+ *  waiting exactly the remainder puts every change on the second it is true, and every one
+ *  after it a minute apart.
+ *
+ *  The fraction of a minute still to run is the wait, except when there is none left,
+ *  which is the boundary itself and means a whole minute to the next one. Where the card
+ *  shows two boxes it is the earlier of the two that decides. It can never be more than a
+ *  minute, so nothing here needs a ceiling, and the floor is for a timer that fires a
+ *  hair early: rather than redraw in three milliseconds and again straight after, it
+ *  waits a moment and lands the far side of the boundary. */
+function untilNextChange(items) {
+  const waits = items.filter(Boolean).map((item) => {
+    const left = item.in - Math.floor(item.in);
+    return (left === 0 ? 1 : left) * 60000;
+  });
+  return waits.length ? Math.max(250, Math.min(...waits)) : 60000;
+}
+
 /** Keeps the "what is on next" card honest on a page nobody has closed.
  *
  *  Two things drive it, and the second is the one that matters on a phone.
  *
- *  A timer, every half minute, for a page somebody is looking at: often enough that the
- *  minute count stays true without the card flickering, and cheap, being a couple of chart
- *  rows and some arithmetic with no network and no storage behind it.
+ *  A timer that is re-set after every redraw for exactly as long as the number showing has
+ *  left to live (see untilNextChange), for a page somebody is looking at. It is also less
+ *  work than the fixed half minute it replaced: at most one redraw a minute instead of two,
+ *  and each one actually changes something.
  *
  *  And the moment the page comes back, because a phone stops running timers for a page
  *  that is not on the screen. Lock the phone or switch apps and the timer stops; come back
@@ -192,7 +220,7 @@ function homeHtml(published) {
 let nextUpTimer = null;
 let nextUpWake = null;
 function stopNextUp() {
-  clearInterval(nextUpTimer);
+  clearTimeout(nextUpTimer);
   nextUpTimer = null;
   if (nextUpWake) {
     document.removeEventListener('visibilitychange', nextUpWake);
@@ -204,14 +232,18 @@ function stopNextUp() {
 
 function startNextUp(published) {
   stopNextUp();
+  const settings = resolveSettings(published.settings);
   const draw = () => {
     const card = main.querySelector('.luach-next');
     if (!card) return stopNextUp(); // the page moved on
+    const items = nextUpState(published, settings);
     // Replaced rather than written into, so a card that has just become empty (or has
     // just gained a box it did not have) comes out right either way.
-    card.outerHTML = nextUpHtml(published, resolveSettings(published.settings)) || '';
+    card.outerHTML = nextUpHtml(items) || '';
+    clearTimeout(nextUpTimer);
+    nextUpTimer = setTimeout(draw, untilNextChange(items));
   };
-  nextUpTimer = setInterval(draw, 30000);
+  nextUpTimer = setTimeout(draw, untilNextChange(nextUpState(published, settings)));
   nextUpWake = () => {
     // visibilitychange fires on the way out as well as on the way back.
     if (document.visibilityState === 'hidden') return;
