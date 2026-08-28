@@ -167,10 +167,9 @@ export function minyanimForDay(serial, state, settings) {
   const out = [];
 
   if (dow === FRIDAY || dow === SHABBOS) {
-    // Friday and Shabbos, off the שבת chart. A week whose Shabbos is Yom Tov has no row
-    // on that chart at all, and then there is nothing here to offer.
-    // A stand-in row is not anchored on a Shabbos and has no Friday or Shabbos columns
-    // to read, and a week whose Shabbos is Yom Tov has no row on the שבת chart at all.
+    // Friday and Shabbos, off the שבת chart. A stand-in row is not anchored on a Shabbos
+    // and has no Friday or Shabbos columns to read, and a week whose Shabbos is Yom Tov
+    // has no row on the שבת chart at all.
     if (!entry.sheet || excelWeekday(anchor) !== SHABBOS) return [];
     const { row, columns } = rowFor(entry.week, entry.sheet, state, settings);
     // Which letters mean what is decided by the columns rowFor handed back, not by the
@@ -186,6 +185,20 @@ export function minyanimForDay(serial, state, settings) {
         // the time as well, which is the same thing said twice.
         out.push({ ...t, name, place: name.includes(t.place) ? '' : t.place });
       }
+    }
+    // Friday morning is the weekday שחרית, and it has to be added here because neither
+    // chart carries it. The Weekday chart runs Sunday through Thursday, since that is
+    // where its מנחה and מעריב differ from an Erev Shabbos, and the שבת chart's שחרית
+    // column is Shabbos morning. Between the two, Friday morning fell down the gap: after
+    // Thursday's last מעריב the card jumped straight to "מנחה ערב שבת 1:35, tomorrow",
+    // with the whole of Friday שחרית missing.
+    //
+    // Adding it is not an assumption about the schedule. שחרית is one fixed list out of
+    // Settings, the same every weekday, which is exactly why the chart prints it once as
+    // a merged cell rather than working it out day by day.
+    if (dow === FRIDAY) {
+      const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
+      for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
     }
   } else {
     // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
