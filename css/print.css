@@ -56,25 +56,35 @@
    So when the box is smaller than the page, scale the page to the box. Same chart, same
    proportions, smaller, which is what shrinking to fit should have done.
 
-   Two passes on purpose. The steps come first and are safe everywhere: each one is sized
-   for the narrowest box in its band, so it always fits, at worst a few percent small.
-   The exact figure follows and overrides it where dividing a length by a length in calc()
-   is supported (it is: verified resolving to 0.9545 in a 10.5in box). Where it is not,
-   the declaration is invalid and dropped, and the steps still stand. Either way nothing
-   here can reach a desktop, whose box is the full 11in and matches no query below.
+   The first attempt scaled by calc(100vw / 11in). On a desktop that is exact, because
+   there 100vw is the print box. On an iPhone it is not: the chart came back printing at
+   about a third of the sheet, which is what that arithmetic gives if 100vw is still the
+   ~390px layout viewport rather than the paper. It did cure the cut-off (two sheets
+   again, nothing sliced), by shrinking far too much.
+
+   Sizing against the real box instead of a reported width would be better, and works for
+   the width: a block's 100% is its containing block whatever a media feature claims. It
+   cannot work for the height. .pages holds both sheets stacked, so no ancestor of a page
+   is ever one sheet tall and there is nothing for a percentage height to resolve against.
+   A page has to fit the paper in both directions, so a scale it is.
+
+   Then the scale must not trust that width either, so it is bounded rather than believed.
+   The floor is the scale that fits an 11in x 8.5in page on letter in the worse of the two
+   orientations: portrait needs 8/11 = 0.727, landscape needs about 0.94, so 0.72 clears
+   both with room. Where 100vw really is the box the middle term wins and the fit is
+   exact; where it is nonsense the floor catches it and the chart prints whole at 72%
+   rather than at a third. A desktop's box is the full 11in, matches no query here, and
+   keeps the fixed 11in x 8.5in page untouched.
 
    The side-by-side selector is repeated because the rule that pins it to zoom: 1 carries
    an id and would otherwise outrank a bare .page. */
-@media print and (max-width: 10.99in) { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.94; } }
-@media print and (max-width: 10.4in)  { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.90; } }
-@media print and (max-width: 9.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.85; } }
-@media print and (max-width: 9.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.80; } }
-@media print and (max-width: 8.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.76; } }
-@media print and (max-width: 8.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.71; } }
-@media print and (max-width: 7.9in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.67; } }
-@media print and (max-width: 7.4in)   { .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: 0.62; } }
 @media print and (max-width: 10.99in) {
-  .page, #sheet-stack.is-side-by-side > .pages > .page { zoom: calc(100vw / 11in); }
+  .page, #sheet-stack.is-side-by-side > .pages > .page {
+    /* The smaller of the two ratios, or it fits the width and overruns the height: a box
+       with 0.25in margins is 0.955 of the page's width but only 0.941 of its height, and
+       fitting the width alone left it 11px too tall, which is a second sheet. */
+    zoom: clamp(0.72, min(calc(100vw / 11in), calc(100vh / 8.5in)), 1);
+  }
 }
 
 @media print {
