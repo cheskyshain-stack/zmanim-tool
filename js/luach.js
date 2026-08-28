@@ -8,6 +8,8 @@
 // Where it goes is in the URL hash (#week, #chart), so the browser's back button works
 // and a page can be linked to directly, with no server configuration to arrange.
 import { loadPublished } from './publish.js';
+import { resolveSettings } from './settings.js';
+import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
@@ -60,6 +62,73 @@ const DONATE = { name: 'Donate', href: 'https://secure.cardknox.com/bmoflakewood
  *  screen reader. */
 const rule = () => '<div class="luach-rule" aria-hidden="true"><i></i></div>';
 
+/* The two marks on the "what is on next" boxes. A minyan is people, and הדלקת נרות is
+   candles: both are drawn in the same line weight as the menu's own marks and take their
+   colour from the box they sit in. */
+const ICON_MINYAN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="12" cy="8.4" r="2.9"/><path d="M6.6 18.4a5.4 5.4 0 0 1 10.8 0"/>
+  <circle cx="4.4" cy="10.6" r="2"/><path d="M1.6 17.4a3 3 0 0 1 3.4-2.9"/>
+  <circle cx="19.6" cy="10.6" r="2"/><path d="M22.4 17.4a3 3 0 0 0-3.4-2.9"/>
+</svg>`;
+const ICON_CANDLES = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M9 6.2c0-1.6 1.4-2.4 1.4-3.9 1.3 1 1.9 2.3 1.9 3.9a1.65 1.65 0 0 1-3.3 0z" fill="currentColor" stroke="none"/>
+  <path d="M15.4 8.1c0-1.3 1.1-2 1.1-3.2 1.1.8 1.6 1.9 1.6 3.2a1.35 1.35 0 0 1-2.7 0z" fill="currentColor" stroke="none"/>
+  <path d="M8.6 9.4h3.4v10.2H8.6zM15.1 11.3h3.3v8.3h-3.3z"/>
+  <path d="M5.4 19.6h13.6"/>
+</svg>`;
+/* The little hourglass before "in 27 minutes". */
+const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M7 3h10M7 21h10M7 3c0 4.5 5 5.6 5 9 0-3.4 5-4.5 5-9M7 21c0-4.5 5-5.6 5-9 0 3.4 5 4.5 5 9"/>
+</svg>`;
+
+/** What is on next: the next מנין, and on an Erev Shabbos הדלקת נרות beside it.
+ *
+ *  The first thing on the page, because it is the one question the site is opened to
+ *  answer most of the time. Everything it says comes out of upcoming.js, which reads the
+ *  published charts rather than working the times out again, so this can never quote a
+ *  time the week's own page disagrees with.
+ *
+ *  One box on most days and two on a Friday, which is why they are a wrapping row rather
+ *  than a fixed pair: alone, a box takes the whole width; together they share it, and on a
+ *  narrow enough phone they stack instead of being squeezed.
+ *
+ *  Either box can be missing. Past the end of what has been published there is no מנין
+ *  left to name, and הדלקת נרות only ever appears on a Friday. Nothing is drawn at all
+ *  rather than a box with a dash in it.
+ *
+ *  aria-live, so that when the card redraws itself on the timer a screen reader is told
+ *  what changed instead of the page silently becoming something else. */
+function nextUpHtml(published, settings) {
+  const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  const now = new Date();
+  // A chart that cannot be read must not take the page down with it: the menu below is
+  // the point of this screen and it works whether or not this card has anything to say.
+  const safely = (fn) => { try { return fn(); } catch { return null; } };
+  const minyan = safely(() => nextMinyan(now, state, settings));
+  const candles = safely(() => todaysCandleLighting(now, state, settings));
+  if (!minyan && !candles) return '';
+
+  const box = (kind, icon, item, tone) => {
+    if (!item) return '';
+    const when = howFar(item);
+    const where = item.place ? ` <bdi class="luach-next-where">${esc(item.place)}</bdi>` : '';
+    return `<div class="luach-next-box ${tone}">
+      <p class="luach-next-head">${esc(kind)}</p>
+      <div class="luach-next-body">
+        <span class="luach-next-mark" aria-hidden="true">${icon}</span>
+        <div class="luach-next-main">
+          <span class="luach-next-what"><bdi>${esc(item.name)}</bdi>${where}</span>
+          <span class="luach-next-time">${esc(clock(item.mins))}<small>${esc(meridiem(item.mins))}</small></span>
+        </div>
+      </div>
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}${esc(when)}</p>` : ''}
+    </div>`;
+  };
+  return `<div class="luach-next" aria-live="polite">
+    ${box('Next minyan', ICON_MINYAN, minyan, 'is-minyan')}${box('Candle lighting', ICON_CANDLES, candles, 'is-candles')}
+  </div>`;
+}
+
 /** The navy cap at the top of every screen here, curved and edged in gold. It carries
  *  nothing on the menu and the way back on the pages behind it, so that going in and
  *  coming out look like one site. */
@@ -83,6 +152,7 @@ function homeHtml(published) {
       ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
+    ${nextUpHtml(published, resolveSettings(published.settings))}
     <nav class="luach-menu">
       <a class="luach-item" href="#week">
         ${ICON_CLOCK}<span class="luach-item-title">${esc(PAGE_NAMES.week)}</span>${CHEVRON}
@@ -99,12 +169,37 @@ function homeHtml(published) {
   </div>`;
 }
 
+/** Keeps the "what is on next" card honest on a page nobody has closed.
+ *
+ *  A phone left on the counter would otherwise still be saying "in 25 minutes" an hour
+ *  later. Half a minute is often enough for the minute count to stay true without the card
+ *  flickering, and it is cheap: the whole thing is a couple of chart rows and some
+ *  arithmetic, with no network and no storage behind it.
+ *
+ *  Cleared whenever the page changes, and only the card is redrawn, never the menu, so a
+ *  finger already on its way to Weekly Zmanim does not have the button rebuilt underneath
+ *  it. */
+let nextUpTimer = null;
+function stopNextUp() {
+  clearInterval(nextUpTimer);
+  nextUpTimer = null;
+}
+
 function renderHome(published) {
   // The menu, and only the menu, is laid out to fill the screen (see is-home in app.css).
   // The pages behind it are as tall as the board on them and must not be stretched.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
   openTheDoor();
+  stopNextUp();
+  nextUpTimer = setInterval(() => {
+    const card = main.querySelector('.luach-next');
+    const fresh = nextUpHtml(published, resolveSettings(published.settings));
+    if (!card) return stopNextUp(); // the page moved on
+    // Replaced rather than written into, so a card that has just become empty (or has
+    // just gained a half it did not have) comes out right either way.
+    card.outerHTML = fresh || '';
+  }, 30000);
 }
 
 /** Three taps in the navy cap go to the generator. Wired after every render, since each
@@ -114,6 +209,7 @@ function openTheDoor() {
 }
 
 function renderWeekPage(published) {
+  stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
   const draw = () => {
@@ -135,6 +231,7 @@ function renderWeekPage(published) {
 }
 
 function renderChartPage(published) {
+  stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   main.className = '';
   main.innerHTML = backBar(PAGE_NAMES.chart) + '<div id="chart-host"></div>';

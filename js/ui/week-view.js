@@ -31,7 +31,7 @@ import { currentSerial, wireSwipe } from './nav-helpers.js';
  *  the Shabbos sheets left those weeks off the site altogether: שבועות, ראש השנה and
  *  סוכות each had a full set of weekday times published and no way to reach them. Such a
  *  week comes through with no Shabbos sheet, and renders as the חול card on its own. */
-function weekIndex(state) {
+export function weekIndex(state) {
   const sheets = [...state.sheets].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const bySerial = new Map();
   // A saved week's date is an ISO string, not a Date: it went through localStorage. The
@@ -52,7 +52,7 @@ function weekIndex(state) {
 
 /** The Weekday chart holding a given week, whether it came in beside a Shabbos sheet or
  *  is the only chart that has the week at all. */
-function weekdayChartFor(sheet, serial, state) {
+export function weekdayChartFor(sheet, serial, state) {
   if (sheet) return weekdayCompanionOf(sheet, state);
   return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
 }
@@ -65,7 +65,7 @@ function weekdayCompanionOf(sheet, state) {
 
 /** The chart row for one week, with rules and manual overrides applied, exactly as the
  *  printed chart would show it. */
-function rowFor(week, sheet, state, settings) {
+export function rowFor(week, sheet, state, settings) {
   const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
   const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
   const build = effectiveSeason === 'kayitz' ? buildKayitzRow : buildChorefRow;
