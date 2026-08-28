@@ -165,7 +165,13 @@ export function renderChartBrowser(container, state, opts = {}) {
     // The container is rebuilt on every Previous/Next, so the pages are looked up when the
     // button is pressed rather than captured here. The file is named for the stretch it
     // covers, since these get saved and mailed on and "zmanim.pdf" twice over is no help.
-    wirePdfButton(container, () => container.querySelector('.pages'), () => pdfName(label.english));
+    wirePdfButton(container, {
+      host: () => container.querySelector('.pages'),
+      name: () => pdfName(label.english),
+      sheet: '.page',
+      orientation: 'landscape',
+      size: [11, 8.5],
+    });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));

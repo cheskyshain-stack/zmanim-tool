@@ -20,6 +20,7 @@ import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
+import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { currentSerial, wireSwipe } from './nav-helpers.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
@@ -1168,7 +1169,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                with paper is then in one place, and the row above stays what it is for:
                moving from week to week. The panel is called More options rather than
                Printing options because Print itself now lives in it. -->
-          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}</div>
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
           ${
             // Both switches, or neither. Each of them is a question about two pages, and a
             // week that has only one (a Shabbos that is Yom Tov comes through on its
@@ -1237,7 +1238,36 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
 
   // The one Print button: the whole screen goes to the dialog and the choosing happens
   // there, which is where a person can pick a single page anyway.
+  //
+  /** The English half of the line above the buttons, which is this week's Shabbos date,
+   *  read back off the screen rather than rebuilt: it is already formatted there and there
+   *  is no sense in two places deciding what a week is called. The Hebrew half is in its
+   *  own bdi and is left out, since a filename is no place to be sorting out which
+   *  direction a mixed string runs in. */
+  const weekPdfName = (root) => {
+    const when = root.querySelector('.week-nav-when');
+    const hebrew = when?.querySelector('.week-nav-hebrew');
+    const english = when ? when.textContent.replace(hebrew ? hebrew.textContent : '', '') : '';
+    const plain = english.replace(/[^A-Za-z0-9 ]+/g, '').replace(/\s+/g, ' ').trim();
+    return plain ? `Zmanim ${plain}.pdf` : 'Zmanim week.pdf';
+  };
   wirePrintButton(container);
+
+  // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
+  // one of these at the right size either, and a PDF states the paper in the file rather
+  // than asking for it. Portrait here, since a card is 8.5in by 11in.
+  //
+  // What counts as a sheet depends on the view. One-sheet mode puts both cards on a single
+  // .week-pair, which is one piece of paper: photographing the .week-cards inside it would
+  // put out two pages and undo the very thing that view is for. So the pair is looked for
+  // first, and only when there is none is a card a sheet.
+  wirePdfButton(container, {
+    host: () => container.querySelector('.week-cards'),
+    name: () => weekPdfName(container),
+    sheet: container.querySelector('.week-pair') ? '.week-pair' : '.week-card',
+    orientation: 'portrait',
+    size: [8.5, 11],
+  });
 
   // The two switches, wired the same way. Both answers change what the week looks like, so
   // both draw it again rather than rearranging it in place: the cards are decorated after

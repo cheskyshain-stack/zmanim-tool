@@ -80,12 +80,25 @@ const COLOUR_PROPS = [
   'borderBottomColor', 'borderLeftColor', 'outlineColor', 'textDecorationColor',
 ];
 
-/** Rewrite any color() the library cannot read into the rgb() it means.
+/** Everything the library needs helping with, done on its own clone.
  *
- *  Done on html2canvas's own clone, never on the page in front of the person: it hands the
- *  copy it is about to photograph to onclone, so the live chart is not touched, nothing
- *  flickers, and there is nothing to put back if this throws. */
-function flattenModernColours(root) {
+ *  html2canvas hands the copy it is about to photograph to onclone, so none of this
+ *  touches the chart in front of the person: nothing flickers, and there is nothing to put
+ *  back if it throws.
+ *
+ *  Two jobs. The colours, above. And the underlines, which mark an alternate time and are
+ *  the whole point of half the times on the board: the library does not implement
+ *  text-underline-offset, so it drew every one of them hard against the digits. Measured
+ *  by scanning the rows of both renderings of the same cell, the browser leaves a clear
+ *  band of paper between the bottom of the digits and the line, and the PDF ran the line
+ *  straight on from them, which is what came back as "the underline is attached to the
+ *  time".
+ *
+ *  A border stands in for the decoration, because a border it does implement, and a
+ *  border on an inline box sits below the descender rather than tight under the baseline.
+ *  It is not the browser's own placement to the pixel: measured, the gap comes out a
+ *  little larger than print's. It is separated, which is what the line is for. */
+function prepareClone(root) {
   const view = root.ownerDocument.defaultView;
   if (!view) return;
   const all = [root, ...root.querySelectorAll('*')];
@@ -95,70 +108,175 @@ function flattenModernColours(root) {
       const plain = srgbToRgb(cs[prop]);
       if (plain) el.style[prop] = plain;
     }
+    if (cs.textDecorationLine.includes('underline')) {
+      el.style.textDecoration = 'none';
+      el.style.borderBottom = `1px solid ${srgbToRgb(cs.color) || cs.color}`;
+    }
+  }
+  redrawZoomAsScale(root, view);
+}
+
+/** html2canvas does not implement zoom, and the week card uses one inside itself.
+ *
+ *  .week-lines-inner is magnified by --fit-scale to fill the height of the card, which on
+ *  a typical week is about 1.5. The library ignored it and drew that block at its
+ *  unmagnified size, so the weekday times came out small, loosely spaced and sitting away
+ *  from their labels: measured, the browser paints that block 197px wide where
+ *  html2canvas rendered 131.
+ *
+ *  Clearing the zoom is not an option, because here it is not a fit-to-window that can be
+ *  thrown away, it is how the card is laid out. So it is restated as the transform that
+ *  means the same thing, which the library does implement. The catch is that the two size
+ *  boxes differently: under zoom a percentage width resolves against the parent divided by
+ *  the zoom, while under a transform it resolves against the parent itself and would come
+ *  out magnified twice over. Pinning the element to the size it already computed to,
+ *  before anything is changed, is what keeps the two equivalent.
+ *
+ *  Where it ends up then has to be put right, and no fixed transform-origin does that on
+ *  its own. A zoomed box is laid out at its shrunken size and painted outwards from
+ *  wherever that box sits, and where it sits depends on how its parent aligns it:
+ *  .week-lines-inner is centred with margin-inline: auto, so scaling it from the top left
+ *  walked it rightwards until the labels were clipped off the edge of the card. Rather
+ *  than guess an origin per element, each one is measured against its own parent before
+ *  and after and translated back by the difference, which is right however it is aligned.
+ *
+ *  Three passes, and the order matters: read every element before changing any, or
+ *  resizing one moves another still to be read. Positions are taken relative to the
+ *  parent rather than the viewport so that correcting an outer element does not
+ *  invalidate the reading for something inside it. */
+function redrawZoomAsScale(root, view) {
+  const near = (el) => {
+    const parent = el.parentElement;
+    const r = el.getBoundingClientRect();
+    if (!parent) return { x: r.left, y: r.top };
+    const p = parent.getBoundingClientRect();
+    return { x: r.left - p.left, y: r.top - p.top };
+  };
+  const found = [];
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    const z = parseFloat(view.getComputedStyle(el).zoom);
+    if (z && Math.abs(z - 1) > 0.001) found.push({ el, z, w: el.offsetWidth, h: el.offsetHeight, was: near(el) });
+  }
+  for (const { el, z, w, h } of found) {
+    el.style.zoom = '1';
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+    el.style.transformOrigin = 'top left';
+    el.style.transform = `scale(${z})`;
+  }
+  for (const { el, z, was } of found) {
+    const now = near(el);
+    const dx = was.x - now.x;
+    const dy = was.y - now.y;
+    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+      el.style.transform = `translate(${dx}px, ${dy}px) scale(${z})`;
+    }
   }
 }
 
-/** Photograph each .page and put one on each sheet of a letter landscape PDF.
+/** Undo whatever the screen has done to fit these sheets into a window, and give back a
+ *  function that puts it all back.
  *
- *  The pages are photographed where they stand, which means whatever the screen has done
- *  to them has to be undone first. On a phone the chart browser holds .pages at a
- *  transform (fitChartToWindow), and html2canvas reads the transform: without this the PDF
- *  came out with the chart a third of the size in the corner of the sheet, which is the
- *  very fault this is here to fix. So the transform comes off, the shot is taken at full
- *  size, and it goes back on in a finally, including if anything throws. */
-export async function buildChartPdf(pagesEl, filename = 'zmanim.pdf') {
-  if (!pdfReady()) throw new Error('PDF libraries are not loaded');
-  const pages = [...pagesEl.querySelectorAll('.page')];
-  if (!pages.length) throw new Error('there is no chart on the screen to turn into a PDF');
-
+ *  The sheets are photographed where they stand, and html2canvas reads the scaling: with
+ *  it left on, the first PDF came out with the chart a third of the size in the corner of
+ *  the sheet, which is the very fault this file exists to fix.
+ *
+ *  Three fits are covered, because the screens shrink in three different ways and
+ *  html2canvas is fooled by all of them. The chart browser puts a transform on .pages and
+ *  sizes the wrapper round it (fitChartToWindow). The week cards set --page-zoom on their
+ *  container and carry is-scaled (fitPagesToWindow). And the one-sheet week view puts an
+ *  inline zoom on the .week-pair itself (fitSheetToWindow), which is the one that caught
+ *  this out: clearing only the container left the sheet's own zoom in place, and since
+ *  html2canvas does not implement zoom at all the PDF came back a third of the size in the
+ *  corner of the page with the text piled on itself.
+ *
+ *  So any inline zoom anywhere inside is cleared, rather than the two places known about
+ *  today. A rule-driven zoom is left alone deliberately: --fit-scale shrinks a long week's
+ *  times to keep them on the card, and clearing that would not undo a fit, it would
+ *  overflow the page. */
+function unscale(hostEl) {
+  const fit = hostEl.parentElement;
+  const zoomed = [hostEl, ...hostEl.querySelectorAll('*')]
+    .filter((el) => el.style && el.style.zoom)
+    .map((el) => [el, el.style.zoom]);
   const held = {
-    transform: pagesEl.style.transform,
-    width: pagesEl.style.width,
-    fitHeight: pagesEl.parentElement ? pagesEl.parentElement.style.height : null,
-    fitOverflow: pagesEl.parentElement ? pagesEl.parentElement.style.overflow : null,
+    transform: hostEl.style.transform,
+    width: hostEl.style.width,
+    pageZoom: hostEl.style.getPropertyValue('--page-zoom'),
+    scaled: hostEl.classList.contains('is-scaled'),
+    fitHeight: fit ? fit.style.height : null,
+    fitOverflow: fit ? fit.style.overflow : null,
   };
-  try {
-    pagesEl.style.transform = 'none';
-    pagesEl.style.width = '';
-    if (pagesEl.parentElement) {
-      pagesEl.parentElement.style.height = 'auto';
-      pagesEl.parentElement.style.overflow = 'visible';
+  for (const [el] of zoomed) el.style.removeProperty('zoom');
+  hostEl.style.transform = 'none';
+  hostEl.style.width = '';
+  hostEl.style.removeProperty('--page-zoom');
+  hostEl.classList.remove('is-scaled');
+  if (fit) {
+    fit.style.height = 'auto';
+    fit.style.overflow = 'visible';
+  }
+  return () => {
+    for (const [el, value] of zoomed) el.style.zoom = value;
+    hostEl.style.transform = held.transform;
+    hostEl.style.width = held.width;
+    if (held.pageZoom) hostEl.style.setProperty('--page-zoom', held.pageZoom);
+    if (held.scaled) hostEl.classList.add('is-scaled');
+    if (fit) {
+      fit.style.height = held.fitHeight;
+      fit.style.overflow = held.fitOverflow;
     }
+  };
+}
 
+/** Photograph each sheet inside hostEl and put one on each page of a letter PDF.
+ *
+ *  @param {object} opts
+ *    - sheet: what counts as one sheet of paper. '.page' for the wall chart, '.week-card'
+ *      or '.week-pair' for the week, since a paired sheet is one piece of paper holding
+ *      two cards and must not be photographed as two.
+ *    - orientation/size: the wall chart is landscape 11 x 8.5, the week portrait 8.5 x 11.
+ *      They travel together and must agree, or the image is laid on a page turned the
+ *      other way and everything this was built for is lost.
+ *
+ *  Whatever the screen did to fit the sheets is undone first and put back in a finally,
+ *  including if anything throws. */
+export async function buildPdf(hostEl, opts = {}) {
+  const { sheet = '.page', orientation = 'landscape', size = [11, 8.5], filename = 'zmanim.pdf' } = opts;
+  if (!pdfReady()) throw new Error('PDF libraries are not loaded');
+  const restore = unscale(hostEl);
+  try {
+    const sheets = [...hostEl.querySelectorAll(sheet)];
+    if (!sheets.length) throw new Error('there is nothing on the screen to turn into a PDF');
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+    const doc = new jsPDF({ orientation, unit: 'in', format: 'letter' });
     const scale = PDF_DPI / CSS_DPI;
-    for (let i = 0; i < pages.length; i++) {
-      const canvas = await window.html2canvas(pages[i], {
+    for (let i = 0; i < sheets.length; i++) {
+      const canvas = await window.html2canvas(sheets[i], {
         scale,
         backgroundColor: '#ffffff',
         // The shot is of this element at its own size, not of a scrolled window. Left to
         // work it out, html2canvas measured the phone's viewport and cropped the page to
         // it, so the sheet came out with only the left-hand columns on it.
-        width: pages[i].offsetWidth,
-        height: pages[i].offsetHeight,
-        windowWidth: pages[i].offsetWidth,
-        windowHeight: pages[i].offsetHeight,
+        width: sheets[i].offsetWidth,
+        height: sheets[i].offsetHeight,
+        windowWidth: sheets[i].offsetWidth,
+        windowHeight: sheets[i].offsetHeight,
         scrollX: 0,
         scrollY: 0,
         useCORS: true,
         logging: false,
-        onclone: (_doc, el) => flattenModernColours(el),
+        onclone: (_doc, el) => prepareClone(el),
       });
-      if (i > 0) doc.addPage('letter', 'landscape');
-      // Corner to corner: the page is already 11 x 8.5, and the PDF page is too, so there
-      // is no fitting to do and no margin to add. Anything else would reintroduce the
-      // shrink-to-fit this whole file exists to avoid.
-      doc.addImage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, 11, 8.5, undefined, 'FAST');
+      if (i > 0) doc.addPage('letter', orientation);
+      // Corner to corner: the sheet on the screen is already letter and so is the PDF
+      // page, so there is no fitting to do and no margin to add. Anything else would
+      // reintroduce the shrink-to-fit this whole file exists to avoid.
+      doc.addImage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, size[0], size[1], undefined, 'FAST');
     }
     return { doc, filename };
   } finally {
-    pagesEl.style.transform = held.transform;
-    pagesEl.style.width = held.width;
-    if (pagesEl.parentElement) {
-      pagesEl.parentElement.style.height = held.fitHeight;
-      pagesEl.parentElement.style.overflow = held.fitOverflow;
-    }
+    restore();
   }
 }
 
@@ -186,22 +304,29 @@ function deliver(doc, filename, tab) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-/** @param {() => Element|null} getPages - looked up at click time, because the chart
- *  browser rebuilds its container on every Previous/Next and a reference taken when the
- *  button was wired would be pointing at a page that has since been thrown away. */
-export function wirePdfButton(root, getPages, nameFor, id = 'pdf-btn') {
+/** @param {object} opts
+ *    - host: () => Element, and a function rather than an element because both screens
+ *      rebuild their container whenever the week or the spread changes, so anything held
+ *      from when the button was wired would be pointing at markup already thrown away.
+ *    - name: () => string, the filename. These get saved and mailed on, so they are named
+ *      for what they cover.
+ *    - sheet/orientation/size: handed straight to buildPdf. */
+export function wirePdfButton(root, opts = {}) {
+  const { host, name, sheet, orientation, size, id = 'pdf-btn' } = opts;
   const btn = root.querySelector(`#${id}`);
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    const pagesEl = getPages();
-    if (!pagesEl) return;
+    const hostEl = host && host();
+    if (!hostEl) return;
     // Opened now, while the tap is still what is happening. See deliver().
     const tab = window.open('', '_blank');
     const said = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Working...';
     try {
-      const { doc, filename } = await buildChartPdf(pagesEl, nameFor ? nameFor() : 'zmanim.pdf');
+      const { doc, filename } = await buildPdf(hostEl, {
+        sheet, orientation, size, filename: name ? name() : 'zmanim.pdf',
+      });
       deliver(doc, filename, tab);
     } catch (err) {
       if (tab && !tab.closed) tab.close();
