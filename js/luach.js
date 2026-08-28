@@ -113,16 +113,20 @@ function nextUpState(published, settings) {
 function nextUpHtml([minyan, candles]) {
   if (!minyan && !candles) return '';
 
+  // The name, the room and the time are three siblings rather than the name and the room
+  // being one lump, because the row they sit in runs right to left and each of them has to
+  // take its own place in that order: שחרית, then למטה, then the time. The mark is outside
+  // that row, so it keeps the left-hand end whichever way the words run.
   const box = (kind, icon, item, tone) => {
     if (!item) return '';
     const when = howFar(item);
-    const where = item.place ? ` <bdi class="luach-next-where">${esc(item.place)}</bdi>` : '';
     return `<div class="luach-next-box ${tone}">
       <p class="luach-next-head">${esc(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
         <div class="luach-next-main">
-          <span class="luach-next-what"><bdi>${esc(item.name)}</bdi>${where}</span>
+          <bdi class="luach-next-what">${esc(item.name)}</bdi>
+          ${item.place ? `<bdi class="luach-next-where">${esc(item.place)}</bdi>` : ''}
           <span class="luach-next-time">${esc(clock(item.mins))}<small>${esc(meridiem(item.mins))}</small></span>
         </div>
       </div>

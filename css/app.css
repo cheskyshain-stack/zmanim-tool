@@ -1372,16 +1372,33 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   display: flex; align-items: center; justify-content: center;
 }
 .luach-next-mark svg { width: 1.5rem; height: 1.5rem; }
+/* Right to left, which is the order these three are read in: the name, then the room it
+   davens in, then the time. They are siblings in one row for that reason, and the row is
+   told which way it runs rather than being left to the bidi algorithm to guess from the
+   mix of Hebrew words and Latin digits it is handed.
+
+   It wraps, and the wrapping is the narrow layout: with room the three sit on one line,
+   and without it the time drops to a second line under the two Hebrew words, which is
+   what a box sharing the row with another one looks like. No query decides that, the
+   content does.
+
+   The mark stays outside this row, in .luach-next-body, which runs the other way, so it
+   keeps the left-hand end however the words inside are ordered. */
 .luach-next-main {
-  display: flex; flex-direction: column; align-items: center; min-width: 0;
+  display: flex; flex-wrap: wrap; direction: rtl;
+  align-items: baseline; align-content: center; justify-content: center;
+  column-gap: 0.5rem; min-width: 0;
 }
 .luach-next-what {
   font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.5rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
 }
 .luach-next-where { font-size: 0.82rem; font-weight: 400; color: var(--tone-ink); }
-/* The time itself, which is the one thing on this box anybody is actually reading. */
+/* The time itself, which is the one thing on this box anybody is actually reading. Its own
+   direction, because it is digits and a Latin AM or PM and belongs the other way round
+   from the words beside it. */
 .luach-next-time {
+  direction: ltr;
   font-size: 1.5rem; font-weight: 700; color: var(--luach-ink);
   font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2;
 }
@@ -1402,8 +1419,12 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    threshold ended up 24px too generous. Measured: on a 412px phone the single box has
    354px of content and a paired one 159px. */
 @container (min-width: 17.5rem) {
-  .luach-next-main { flex-direction: row; align-items: baseline; gap: 0.8rem; }
-  .luach-next-time { border-left: 1.5px solid var(--tone-line); padding-left: 0.8rem; }
+  .luach-next-main { column-gap: 0.8rem; }
+  /* On the right of the time, which is the side facing the words, since the time sits at
+     the left-hand end of a row that runs right to left. Physical rather than logical: the
+     time carries its own direction: ltr, so its inline-start is its left, which is the far
+     end from where this rule belongs. */
+  .luach-next-time { border-right: 1.5px solid var(--tone-line); padding-right: 0.8rem; }
 }
 /* In a box too narrow to hold the mark and the name on one line, the mark goes. Measured
    at 375px wide, where two boxes share the row at 167px each: with the mark, "הדלקת נרות"
