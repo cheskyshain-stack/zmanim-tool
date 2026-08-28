@@ -1353,7 +1353,14 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next {
   display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem;
 }
+/* A column, so that what is under the heading can be centred in the height the two boxes
+   end up sharing. They are stretched to a common height but do not hold the same number
+   of lines: a מנין carries the room it davens in, הדלקת נרות has no room. Top-aligned,
+   the shorter box hung the whole difference as dead space underneath and the pair read as
+   lopsided. Measured at 393px: 30px above the words and 11px below them on the left,
+   against 30px and 29px on the right. */
 .luach-next-box {
+  display: flex; flex-direction: column;
   flex: 1 1 8rem; min-width: 0; container-type: inline-size;
   border: 1.5px solid var(--tone-line); border-radius: 18px;
   background: var(--tone-fill); padding: 0.7rem 0.8rem 0.6rem;
@@ -1379,7 +1386,14 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    centred here is the words and the time rather than the words, the time and the mark
    together. In the flow it pushed them half its own width and a gap to the right of the
    middle, which on a box this wide is 26px off centre. */
-.luach-next-body { position: relative; display: flex; align-items: center; justify-content: center; }
+/* The heading stays at the top, where the two boxes have to line up with each other, and
+   everything below it is centred in what is left. The auto margins split the free space:
+   this one above the words, the countdown's below itself. :last-child is the box with no
+   countdown line at all, which has to centre on its own. Should the content ever outgrow
+   the box the autos collapse to 0 and it falls back to top-aligned, which is where it
+   started, so nothing is ever pushed out of sight. */
+.luach-next-body { position: relative; display: flex; align-items: center; justify-content: center; margin-top: auto; }
+.luach-next-body:last-child { margin-bottom: auto; }
 .luach-next-mark {
   position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 2.65rem; height: 2.65rem; border-radius: 50%;
@@ -1431,7 +1445,7 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next-time small { font-size: 0.7em; font-weight: 700; margin-left: 0.22em; }
 .luach-next-when {
   display: flex; align-items: center; justify-content: center; gap: 0.32rem;
-  margin: 0.3rem 0 0; font-size: 0.86rem; color: var(--tone-ink);
+  margin: 0.3rem 0 auto; font-size: 0.86rem; color: var(--tone-ink);
 }
 .luach-next-wait { width: 0.95rem; height: 0.95rem; flex: none; }
 
