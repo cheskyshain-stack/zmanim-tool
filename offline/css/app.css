@@ -1393,12 +1393,23 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.5rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
 }
-.luach-next-where { font-size: 0.82rem; font-weight: 400; color: var(--tone-ink); }
-/* The time itself, which is the one thing on this box anybody is actually reading. Its own
-   direction, because it is digits and a Latin AM or PM and belongs the other way round
-   from the words beside it. */
+/* The same face as the name it sits beside, and for a second reason as well as matching:
+   it is Hebrew, and the system stack this used to fall through has no Hebrew serif on
+   Android, so the room was set in a sans face next to a name set in a serif one. */
+.luach-next-where {
+  font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 0.95rem; font-weight: 400; color: var(--tone-ink);
+}
+/* The time itself, which is the one thing on this box anybody is actually reading.
+   In the page's own face rather than the system sans it was falling through to. Everything
+   here that is content rather than a label is set in this serif, the menu, the place under
+   the name, the address, and the מנין's name a few pixels to its right at the same size and
+   the same weight, which is what made the sans obvious.
+   Its own direction, because it is digits and a Latin AM or PM and belongs the other way
+   round from the words beside it. */
 .luach-next-time {
   direction: ltr;
+  font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.5rem; font-weight: 700; color: var(--luach-ink);
   font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2;
 }
