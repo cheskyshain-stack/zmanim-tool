@@ -1581,9 +1581,34 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    The padding lives on the summary and on the panel rather than on the card, so the whole
    width of a shut drawer is pressable. */
 .luach-give-card {
+  --give-open: 0.26s;
   text-align: left;
   background: #ffffff; border-radius: 16px;
   box-shadow: 0 2px 8px rgba(18,39,79,0.07), 0 1px 2px rgba(18,39,79,0.05);
+}
+/* Opening one wipes the drawer out from under its header rather than showing it whole.
+   ::details-content is the only box there is to animate: <details> wraps the opened part in
+   a pseudo element and in nothing else, so without it there is no height to run. That
+   height goes 0 to auto, which needs interpolate-size, set on the card rather than on
+   :root so no other part of the app quietly gains keyword animation.
+
+   The panel also rides up under the header and comes back down, which is what makes it read
+   as coming out of the top rather than as a box simply growing taller. Both use the same
+   duration and easing on purpose: the panel is always at least as tall as the window it is
+   seen through, so the two can never fall out of step and leave a gap under it.
+
+   A browser without any of this gets the drawer opening at once, as it did before. Nothing
+   here can leave a drawer stuck shut: the height is written back to auto by the [open] rule
+   whether or not it animates on the way. */
+@media (prefers-reduced-motion: no-preference) {
+  .luach-give-card { interpolate-size: allow-keywords; }
+  .luach-give-card::details-content {
+    block-size: 0; overflow: clip; border-radius: 0 0 16px 16px;
+    transition: block-size var(--give-open) ease, content-visibility var(--give-open) allow-discrete;
+  }
+  .luach-give-card[open]::details-content { block-size: auto; }
+  .luach-give-open { transform: translateY(-10px); transition: transform var(--give-open) ease; }
+  .luach-give-card[open] .luach-give-open { transform: none; }
 }
 /* Mark, words and the chevron. align-items: center so a one line description does not
    leave the mark floating above it. The marker is taken off both ways over: the modern
@@ -1604,7 +1629,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-give-card[open] > .luach-give-head { border-bottom: 1px solid rgba(184,143,58,0.42); }
 .luach-give-chev {
   width: 1.35rem; height: 1.35rem; flex: none; margin-left: auto;
-  color: var(--luach-ink); opacity: 0.45; transition: transform 0.18s ease, opacity 0.18s ease;
+  color: var(--luach-ink); opacity: 0.45;
+  transition: transform var(--give-open) ease, opacity var(--give-open) ease;
 }
 .luach-give-head:hover .luach-give-chev { opacity: 0.75; }
 .luach-give-card[open] > .luach-give-head .luach-give-chev { transform: rotate(180deg); opacity: 0.75; }
@@ -1674,6 +1700,47 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-chips::-webkit-scrollbar-track { background: transparent; }
 .luach-chips::-webkit-scrollbar-thumb { background: rgba(184,143,58,0.5); border-radius: 2px; }
 .luach-chips:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 3px; border-radius: 4px; }
+
+/* The line softens away at whichever end it carries on past, so a fund cut in half by the
+   card's edge reads as "there is more of this" rather than as a fund whose name got
+   chopped. A fade says it far better than a scrollbar does, since a phone hides the
+   scrollbar until a finger is already on the row.
+
+   The scroll position itself drives it, so it is honest at both ends: only the right end
+   fades before anything has been scrolled, only the left end once the far end is reached,
+   and both while in between. A row short enough to fit whole never scrolls, its timeline
+   never becomes active, and it keeps the base values below, which fade nothing. That last
+   case is what rules out a plain always-on fade: the Building Fund's two funds fit, and a
+   fade over them would promise a third that is not there.
+
+   --fade-l / --fade-r are 0 for a hard edge and 1 for a faded one. They have to be
+   registered or they cannot be animated at all: an unregistered custom property is a string
+   to the animator and would jump between the keyframes rather than move through them. Both
+   are 0 to begin with, so a browser with no scroll timelines simply gets the row as it was,
+   which is the same thing it gets for prefers-reduced-motion. */
+@property --fade-l { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --fade-r { syntax: '<number>'; inherits: false; initial-value: 0; }
+@keyframes luach-chips-edges {
+  /* The near end hardens and softens over the first and last few per cent of the travel,
+     rather than across the whole of it, so the middle of a long row has both ends fully
+     faded instead of both half faded. */
+  0% { --fade-l: 0; --fade-r: 1; }
+  5% { --fade-l: 1; --fade-r: 1; }
+  95% { --fade-l: 1; --fade-r: 1; }
+  100% { --fade-l: 1; --fade-r: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .luach-chips {
+    /* An end that is not fading is black all the way to the edge, which masks nothing. */
+    mask-image: linear-gradient(to right,
+      rgba(0,0,0,calc(1 - var(--fade-l))) 0,
+      #000 2.4rem,
+      #000 calc(100% - 2.4rem),
+      rgba(0,0,0,calc(1 - var(--fade-r))) 100%);
+    animation: luach-chips-edges linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
 /* Nothing shrinks and nothing wraps: a fund keeps its own width and the row grows past the
    card instead, which is the whole point of the scroll. */
 .luach-chip {
