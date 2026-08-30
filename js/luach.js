@@ -130,7 +130,7 @@ const giveIcon = (key, cls) =>
  */
 const DONATE = {
   name: 'Donate',
-  heading: 'Ways to Give',
+  heading: 'Donation Options',
   thanks: 'Thank you for supporting Bais Medrash of Lakewood Commons.',
   ways: [
     {
