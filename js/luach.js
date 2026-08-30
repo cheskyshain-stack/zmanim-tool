@@ -686,10 +686,21 @@ function renderDonatePage(published) {
   // is-give only trims the room under the address, which the page has no use for: it ends
   // at the footer and there is nothing below to scroll to. See app.css.
   main.className = 'is-give';
+  /* The shul's own masthead and address, the same two the menu carries, so a donor who
+     lands here from a message rather than from the menu is looking at the shul's page and
+     not at an anonymous list of payment links. Written out rather than shared with
+     homeHtml: the menu's masthead sits under an empty navy cap and this one sits under the
+     back bar, and the two want different room above them.
+
+     One rule, in the masthead, exactly as on the menu. The heading below it carried its own
+     before, and with the masthead in front that read as two lines ruled off from nothing. */
   main.innerHTML = `${backBar(PAGE_NAMES.donate)}
     <div class="luach-home luach-give-page">
+      <header class="luach-masthead luach-give-masthead">
+        <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"></h1>
+        ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
+      </header>
       <header class="luach-give-head-block">
-        ${rule()}
         <h2 class="luach-give-heading">${esc(DONATE.heading)}</h2>
         <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
       </header>

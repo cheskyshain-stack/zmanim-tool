@@ -1218,10 +1218,13 @@ body.is-luach main.is-home { padding-bottom: 1.25rem; }
 /* The menu is four short things on a tall screen, so left to itself it huddles at the
    top with the rest of the phone empty under it. Instead it takes the whole height and
    the address is pushed to the bottom of it, which is where the eye expects the foot of
-   a page to be. dvh rather than vh: on a phone vh is the height with the browser's own
+   a page to be. The donation page is three shut drawers and just as short, and it carries
+   the same masthead and the same address, so it gets the same treatment: without this its
+   footer sat 159px up the screen with empty page under it. dvh rather than vh: on a phone vh is the height with the browser's own
    bars hidden, so a page sized in vh is taller than what you can actually see and the
    address ends up just off the bottom. vh first as the fallback for anything old. */
-body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body.is-luach main.is-home,
+body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 .luach-home { max-width: 34rem; margin: 0 auto; width: 100%; text-align: center; flex: 1; display: flex; flex-direction: column; }
 /* The auto is what pushes the address to the foot of the screen. The padding is what
    keeps the rule off the last card when there is no room to push into: an auto margin
@@ -1802,8 +1805,13 @@ body.is-luach .week-print-panel { max-width: 8.5in; margin-inline: auto; }
    inside a plain block header, where the auto margins are the only thing centring it.
    Writing 0 here left that one flush against the left of the column: 4px off on a phone,
    where it passed unnoticed, and 112px off at every width from 768 up. */
-.luach-give-page .luach-rule { margin: 0.2rem auto; }
-.luach-give-page .luach-foot { font-size: 0.95rem; }
+/* The rule between the last card and the address, and the one in the masthead, are left to
+   the sizes the menu gives them: this page carries the same header and footer, so it should
+   carry them at the same size. Only the gap over the first card is this page's own. */
+.luach-give-page > .luach-give-head-block + .luach-give-card { margin-top: 0.2rem; }
+/* The masthead sits under the back bar here rather than under an empty cap, so it needs
+   less room over it than the menu's does. */
+.luach-give-masthead { margin-bottom: 1rem; }
 body.is-luach main.is-give { padding-bottom: 1.25rem; }
 
 .luach-foot {
