@@ -685,10 +685,7 @@ function renderDonatePage(published) {
       </header>
       ${DONATE.ways.map(donateWayHtml).join('')}
       ${rule()}
-      <p class="luach-foot">
-        <span class="luach-foot-mark" aria-hidden="true">${giveIcon('shul', 'luach-foot-svg')}</span>
-        ${esc(s.footerAddress)}
-      </p>
+      <p class="luach-foot">${esc(s.footerAddress)}</p>
     </div>`;
   wireDonateChips(main);
   wireDonateFrames(main);

@@ -1763,9 +1763,6 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
 .luach-frame-help a { color: inherit; }
 @media print { .luach-give-frame { display: none !important; } }
 
-/* The small mark over the address at the foot of the page. */
-.luach-foot-mark { display: block; color: #b08d3a; margin-bottom: 0.15rem; }
-.luach-foot-svg { width: 1.2rem; height: 1.2rem; }
 /* The rule and the address close up on this page: it is a list to be got through rather
    than a masthead to be admired. */
 /* More options paints a bordered box, and every other box on this page is a week card at
@@ -1775,7 +1772,12 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
    this panel out in its own column. */
 body.is-luach .week-print-panel { max-width: 8.5in; margin-inline: auto; }
 
-.luach-give-page .luach-rule { margin: 0.2rem 0; }
+/* auto on the sides, not 0. The rule under the address is a flex item of the page column
+   and align-self centres it whatever the margins say, but the one over Ways to Give sits
+   inside a plain block header, where the auto margins are the only thing centring it.
+   Writing 0 here left that one flush against the left of the column: 4px off on a phone,
+   where it passed unnoticed, and 112px off at every width from 768 up. */
+.luach-give-page .luach-rule { margin: 0.2rem auto; }
 .luach-give-page .luach-foot { font-size: 0.95rem; }
 body.is-luach main.is-give { padding-bottom: 1.25rem; }
 
