@@ -46,7 +46,7 @@ DEFAULT_SETTINGS = {
     "headerRabbiLine": 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
     "headerIconImage": None,
     "footerNote": "All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.",
-    "footerAddress": "Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701",
+    "footerAddress": "Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701",
     # מנחה and מעריב are intentionally blank and have no settings field: those differ every
     # week. The keys stay so older saved backups still load cleanly.
     "weekdayDefaultMincha": "",

@@ -6,6 +6,7 @@ import {
   DEFAULT_WEEKDAY_SHACHARIS,
   LEGACY_WEEKDAY_SHACHARIS,
   LEGACY_WEEKDAY_FOOTER,
+  LEGACY_FOOTER_ADDRESS,
   DEFAULT_ACCENT_COLOR,
   LEGACY_ACCENT_COLORS,
   splitCombinedShacharis,
@@ -113,6 +114,7 @@ function normalizeSettings(raw) {
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
+  if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
   // שחרית used to be one field holding both schedules. Anything saved back then is cut
   // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had

@@ -62,6 +62,17 @@ export const LEGACY_WEEKDAY_FOOTER = [
   'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
 ];
 
+/** The footer address without the "of", carried forward the same way as the two above.
+ *
+ *  The shul's name was written both ways across the site: the footer said "Bais Medrash
+ *  Lakewood Commons" while the donation page, the page title and the domain all say "Bais
+ *  Medrash of Lakewood Commons". One name, one spelling, and the one with the "of" is the
+ *  one the shul goes by. An install that never edited this line is moved onto it; anything
+ *  typed by hand stays exactly as typed. */
+export const LEGACY_FOOTER_ADDRESS = [
+  'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+];
+
 /** The chart's header colour, which the parsha column is painted in too. Light gray with
  *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
  *  every page is a lot of toner, and the user asked for the light one. */
@@ -93,7 +104,7 @@ export const DEFAULT_SETTINGS = {
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
-  footerAddress: 'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+  footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
   // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
   // field: those times differ every week, so every cell starts empty and is typed in on
   // the sheet. The keys are kept so older saved backups still load cleanly.
