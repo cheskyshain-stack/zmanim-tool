@@ -1577,13 +1577,13 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   display: flex; align-items: center; justify-content: center; flex: none;
 }
 .luach-give-mark-svg { width: 1.3rem; height: 1.3rem; }
+/* A real logo is drawn to fill its own roundel, so at the size that suits a line drawing it
+   sits in the middle looking shrunken. Zelle and The Donors' Fund get the same larger size
+   as each other, which keeps the two brand marks a pair. */
+.luach-give-mark-svg.is-brand { width: 1.85rem; height: 1.85rem; }
 /* Zelle's own purple, which is the one colour on this page that is not the site's own. It
    is what makes the card read as Zelle before the title is. */
 .luach-give-mark.is-zelle { background: #6d1ed4; border-color: #6d1ed4; color: #fff; }
-.luach-zelle-z {
-  font-family: Georgia, "Times New Roman", serif; font-style: italic;
-  font-weight: 700; font-size: 1.25rem; line-height: 1; color: #fff;
-}
 .luach-give-body { flex: 1; min-width: 0; }
 .luach-give-title {
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
@@ -1613,6 +1613,23 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-chips.is-tall .luach-chip { flex-direction: column; gap: 0.2rem; padding: 0.45rem 0.3rem; }
 .luach-chips:not(.is-tall) { grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
 .luach-chip-icon { width: 1.05rem; height: 1.05rem; color: #b08d3a; flex: none; }
+/* .luach-chip sets display: flex, which beats the browser's own rule for [hidden] because
+   the two score the same and this sheet comes later. A folded chip needs saying outright. */
+.luach-chip[hidden] { display: none; }
+
+/* More, the one thing in the row that can be pressed. Its li steps out of the way so the
+   button is the grid item and gets a cell the size of the chips beside it. Marked out from
+   them by weight rather than by another colour: it is still a chip, not a second button
+   competing with Donate underneath. */
+.luach-chip-slot { display: contents; }
+button.luach-chip {
+  font: inherit; font-size: 0.75rem; font-weight: 600;
+  cursor: pointer; -webkit-appearance: none; appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+button.luach-chip:hover { background: rgba(209,173,95,0.16); border-color: rgba(184,143,58,0.6); }
+button.luach-chip:active { background: rgba(209,173,95,0.24); }
+button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 2px; }
 
 .luach-give-all {
   display: inline-flex; align-items: center; gap: 0.3rem;
@@ -1620,6 +1637,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   color: var(--luach-ink); text-decoration: none;
 }
 .luach-give-all:hover { text-decoration: underline; }
+/* Same as the chips: inline-flex here would otherwise outrank the browser's [hidden]. */
+.luach-give-all[hidden] { display: none; }
 
 /* Donate. The one filled thing on a card, navy with gold on it, which is the pairing the
    site's own Print button uses. Full width under the funds, and on a row card it sits

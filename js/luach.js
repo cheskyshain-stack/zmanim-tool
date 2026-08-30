@@ -55,7 +55,23 @@ const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', donate: 'Dona
 const GIVE_ICONS = {
   shul: '<path d="M4.4 20.6V11l7.6-4.8 7.6 4.8v9.6"/><path d="M2.8 20.6h18.4"/><path d="M12 6.2V3.1M12 3.1h3l-1 1.2 1 1.2h-3"/><path d="M9.9 20.6v-3.9a2.1 2.1 0 0 1 4.2 0v3.9"/><path d="M7.4 12.6h.01M16.6 12.6h.01"/>',
   crane: '<path d="M6.4 20.6V4.4"/><path d="M4.2 20.6h4.4"/><path d="M6.4 6.6h13.4"/><path d="M6.4 4.4l3.2 2.2M6.4 4.4l-2.6 2.2"/><path d="M17.4 6.6v3.2"/><path d="M15.6 9.8h3.6l-1.8 2.4z"/><path d="M11 13.6h7.8v7h-7.8z" opacity="0.9"/>',
-  swirl: '<path d="M12 4.2a7.8 7.8 0 0 1 5.7 13.1c-1.4 1.4-3.6.4-3.1-1.5"/><path d="M19.2 14.7A7.8 7.8 0 0 1 6.2 18c-1.3-1.5-.1-3.6 1.7-2.9"/><path d="M6.9 18.6A7.8 7.8 0 0 1 8.4 5.4c1.8-.7 3.4 1 2.3 2.5"/>',
+  /* The Donors' Fund's own mark: one unit is a broad crescent with a thin one tucked behind
+     it, and the mark is that unit at 0, 120 and 240 degrees. Traced off the artwork the user
+     supplied, since the container cannot reach thedonorsfund.org to take the real file: the
+     gold was masked out of the picture, the six shapes separated, and the outline of one
+     pair followed and simplified to within a pixel. Drawn once and turned, rather than all
+     six traced, so the three units are exactly alike where the picture's were a few degrees
+     out. If the real SVG turns up, replace these two strings with its paths. */
+  swirl: [0, 120, 240].map((a) => [
+    'M19.12 9.81L19.68 10.68L20.08 11.64L20.39 12.71L20.59 13.98L20.59 16.42L20.34 17.95L20.08 18.91L19.57 20.24L19.22 20.9L18.71 21.61L17.85 22.42L17.19 22.83L16.42 23.08L15.46 23.13L14.9 23.03L14.14 22.73L13.42 22.22L13.12 21.86L13.88 21.71L14.59 21.46L15.41 21.05L16.07 20.59L16.73 19.98L17.19 19.42L18.1 17.85L18.86 15.81L19.32 13.73L19.42 11.75L19.32 10.73Z',
+    'M18.46 9.25L18.66 10.07L18.81 11.54L18.71 13.73L18.3 15.71L17.8 17.13L17.29 18.2L16.58 19.27L15.71 20.08L15.05 20.44L14.29 20.64L13.47 20.64L12.76 20.44L12 20.03L11.49 19.52L11.39 19.27L12.61 19.17L13.47 18.91L14.14 18.61L14.95 18.05L16.42 16.47L17.49 14.69L18.25 12.61L18.51 11.08Z',
+  ].map((d) => `<path fill="currentColor" stroke="none" transform="rotate(${a} 12 12)" d="${d}"/>`).join('')).join(''),
+  /* Zelle's own Z, the published glyph rather than a drawing of one: the outline from the
+     simple-icons set, which takes it from zellepay.com and puts the icons under CC0. The
+     name and the mark stay Zelle's; this is here to say which service the card means, which
+     is what a payment mark is for. It fills the box top to bottom, so the size that suits
+     the line icons leaves it looking shrunken. See .luach-give-mark-svg.is-brand. */
+  zelle: '<path fill="currentColor" stroke="none" d="M13.559 24h-2.841a.483.483 0 0 1-.483-.483v-2.765H5.638a.667.667 0 0 1-.666-.666v-2.234a.67.67 0 0 1 .142-.412l8.139-10.382h-7.25a.667.667 0 0 1-.667-.667V3.914c0-.367.299-.666.666-.666h4.23V.483c0-.266.217-.483.483-.483h2.841c.266 0 .483.217.483.483v2.765h4.323c.367 0 .666.299.666.666v2.137a.67.67 0 0 1-.141.41l-8.19 10.481h7.665c.367 0 .666.299.666.666v2.477a.667.667 0 0 1-.666.667h-4.32v2.765a.483.483 0 0 1-.483.483Z"/>',
   heart: '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>',
   building: '<path d="M5 21V5.4A1.4 1.4 0 0 1 6.4 4h11.2A1.4 1.4 0 0 1 19 5.4V21"/><path d="M3.2 21h17.6"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01"/><path d="M10.3 21v-4.2h3.4V21"/>',
   hand: '<path d="M3.4 13.6l3-1.2a3 3 0 0 1 2.2 0l2.6 1a2.4 2.4 0 0 0 .9.2h2.3a1.5 1.5 0 0 1 0 3h-3.6"/><path d="M3.4 13.6V20m0-1.4l4.2 1.6a3 3 0 0 0 1.8.1l8.2-2.2a1.9 1.9 0 0 0 1.4-1.8"/><path d="M14.6 9.6s-2.9-1.7-2.9-3.6a1.7 1.7 0 0 1 2.9-1.1 1.7 1.7 0 0 1 2.9 1.1c0 1.9-2.9 3.6-2.9 3.6z"/>',
@@ -65,6 +81,7 @@ const GIVE_ICONS = {
   drop: '<path d="M12 3.4s5.4 5.6 5.4 9.2a5.4 5.4 0 0 1-10.8 0C6.6 9 12 3.4 12 3.4z"/>',
   flame: '<path d="M12 21c3.3 0 5.6-2.1 5.6-5 0-4.2-4.4-5.6-3.6-9.6-2.4 1-3.6 3-3.6 5 0 1.4-.7 2-1.4 2s-1.3-.6-1.3-1.8C6.9 13 6.4 14.3 6.4 16c0 2.9 2.3 5 5.6 5z"/>',
   more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+  less: '<path d="M6 14.5l6-5.5 6 5.5"/>',
 };
 const giveIcon = (key, cls) =>
   `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GIVE_ICONS[key] || ''}</svg>`;
@@ -83,9 +100,11 @@ const giveIcon = (key, cls) =>
  *
  *  `funds` are what that page carries once it is reached, read off its own two menus, so a
  *  donor can see whether what they want is behind a link without opening it and hunting.
- *  `show` is how many are named on the card before the rest become "More"; the count in
- *  "View all N options" is the length of the list rather than a number typed here, so it
- *  cannot come to disagree with the chips beside it.
+ *  A long list is folded down to a single row ending in More, which opens the rest in
+ *  place. `show` is only the guess the page is first drawn with; how many actually fit on
+ *  the row is measured off the grid (see fitDonateChips), so it is right at any width. The
+ *  count in "View all N options" is the length of the list rather than a number typed
+ *  here, so it cannot come to disagree with the chips beside it.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
  *  what Zelle is. A way with neither href nor copy still lists its name and says its
@@ -94,7 +113,7 @@ const giveIcon = (key, cls) =>
 const DONATE = {
   name: 'Donate',
   heading: 'Ways to Give',
-  thanks: 'Thank you for supporting Bais Medrash Lakewood Commons.',
+  thanks: 'Thank you for supporting Bais Medrash of Lakewood Commons.',
   ways: [
     {
       title: 'Give to the Shul',
@@ -425,20 +444,32 @@ function renderChartPage(published) {
  *  A way with nowhere to go yet carries no Donate button. A button that did nothing would
  *  be worse than the line saying its details are still to come. */
 function donateWayHtml(way) {
-  const shown = way.funds ? way.funds.slice(0, way.show || way.funds.length) : [];
-  const rest = way.funds ? way.funds.length - shown.length : 0;
-  const chip = (f) =>
-    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
-  const chips = shown.length
-    ? `<ul class="luach-chips${shown.some((f) => f.icon) ? ' is-tall' : ''}">
-        ${shown.map(chip).join('')}
-        ${rest ? `<li class="luach-chip">${giveIcon('more', 'luach-chip-icon')}<span>More</span></li>` : ''}
+  /* Every fund is written out, and the ones past the first row are folded away rather than
+     left out: More opens them where they already are, so nothing has to be fetched or
+     re-rendered to see the rest. The fold starts at `show` and is corrected to the real
+     row by fitDonateChips as soon as the card is in the page. */
+  const funds = way.funds || [];
+  const folds = Boolean(way.show) && funds.length > way.show;
+  const chip = (f, i) =>
+    `<li class="luach-chip"${folds && i >= way.show ? ' hidden' : ''}>${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
+  /* The More chip is the one thing in the row that can be pressed, so it is a real button.
+     Its li steps out of the way with display: contents, leaving the button itself as the
+     grid item, so it sits in a cell the same size as the chips beside it. */
+  const more = folds
+    ? `<li class="luach-chip-slot"><button type="button" class="luach-chip is-more" aria-expanded="false">
+        ${giveIcon('more', 'luach-chip-icon')}<span class="luach-chip-more-label">More</span>
+      </button></li>`
+    : '';
+  const chips = funds.length
+    ? `<ul class="luach-chips${funds.some((f) => f.icon) ? ' is-tall' : ''}">
+        ${funds.map(chip).join('')}${more}
       </ul>`
     : '';
-  // Only where some are hidden: with every fund already named, "View all" would lead to
-  // exactly what is on the screen.
-  const all = rest && way.href
-    ? `<a class="luach-give-all" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">View all ${way.funds.length} options <span aria-hidden="true">&rarr;</span></a>`
+  // Only where some are folded away: with every fund already named, "View all" would lead
+  // to exactly what is on the screen. Opening More names them all, so it goes then too,
+  // which is why this is hidden rather than dropped.
+  const all = folds && way.href
+    ? `<a class="luach-give-all" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">View all ${funds.length} options <span aria-hidden="true">&rarr;</span></a>`
     : '';
   const copy = way.copy
     ? (way.copy.address || way.copy.name
@@ -451,10 +482,14 @@ function donateWayHtml(way) {
         ${esc(way.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
       </a>`
     : '';
-  // Zelle's mark is its own, in its own colour, because that is what makes it recognisable
-  // as Zelle at a glance. Every other mark is the site's gold.
-  const markClass = way.icon === 'zelle' ? 'luach-give-mark is-zelle' : 'luach-give-mark';
-  const mark = way.icon === 'zelle' ? '<span class="luach-zelle-z">Z</span>' : giveIcon(way.icon, 'luach-give-mark-svg');
+  /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
+     a donor recognises the service before reading the title. Zelle keeps its purple, the
+     one colour on this page that is not the site's own. Both are set larger than the line
+     icons beside them: a logo drawn to fill its roundel looks shrunken at the size that
+     suits a line drawing. */
+  const brand = way.icon === 'zelle' || way.icon === 'swirl';
+  const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}`;
+  const mark = giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
   /* Two shapes, one set of proportions. A card that lists funds puts them and its Donate
      button across the full width under the heading, because a grid of chips squeezed into
      the column beside a mark is unreadable. A card that has none is a row: mark, words,
@@ -472,6 +507,62 @@ function donateWayHtml(way) {
     </div>
     ${wide ? `${chips}${all}${button}` : ''}
   </section>`;
+}
+
+/** Fold a fund list down to one row, ending in More.
+ *
+ *  How many chips fit is the grid's own answer rather than a number kept here: the row is
+ *  laid out with everything in it, the resolved column count is read back, and one column
+ *  is given up to More. That keeps it right at every width without this file repeating the
+ *  minimum chip width the stylesheet already sets.
+ *
+ *  Measured with the whole list showing, because auto-fit collapses tracks it has nothing
+ *  to put in and a folded row would report its own smaller width back as the answer. */
+function fitDonateChips(list) {
+  const more = list.querySelector('.luach-chip.is-more');
+  if (!more || list.dataset.open === 'yes') return;
+  const chips = [...list.querySelectorAll('li.luach-chip')];
+  for (const c of chips) c.hidden = false;
+  const tracks = getComputedStyle(list).gridTemplateColumns;
+  // A grid that has not been laid out answers with the rule rather than the tracks it came
+  // out to. Nothing to go on, so leave the row as it was drawn.
+  if (/repeat|minmax|none/.test(tracks)) return;
+  const columns = tracks.split(/\s+/).filter(Boolean).length;
+  const room = Math.max(1, columns - 1);
+  chips.forEach((c, i) => { c.hidden = i >= room; });
+}
+
+/** More opens the rest of the funds where they are. Nothing is fetched and nothing is
+ *  re-rendered: they were written into the page folded away, and this unfolds them. */
+function wireDonateChips(root) {
+  for (const list of root.querySelectorAll('.luach-chips')) {
+    const more = list.querySelector('.luach-chip.is-more');
+    if (!more) continue;
+    const label = more.querySelector('.luach-chip-more-label');
+    const all = list.parentElement.querySelector('.luach-give-all');
+    fitDonateChips(list);
+    // Only a change of width can change how many fit. Folding chips away changes the
+    // list's height, and refitting on that would be a loop that never settles.
+    let was = Math.round(list.getBoundingClientRect().width);
+    new ResizeObserver(() => {
+      const now = Math.round(list.getBoundingClientRect().width);
+      if (now === was) return;
+      was = now;
+      fitDonateChips(list);
+    }).observe(list);
+    more.addEventListener('click', () => {
+      const open = list.dataset.open !== 'yes';
+      list.dataset.open = open ? 'yes' : 'no';
+      more.setAttribute('aria-expanded', String(open));
+      label.textContent = open ? 'Fewer' : 'More';
+      // Re-read the mark rather than holding on to it: replacing it leaves the old node
+      // detached, and a handler keeping that would be writing to nothing on the next press.
+      more.querySelector('.luach-chip-icon').outerHTML = giveIcon(open ? 'less' : 'more', 'luach-chip-icon');
+      if (all) all.hidden = open;
+      if (open) for (const c of list.querySelectorAll('li.luach-chip')) c.hidden = false;
+      else fitDonateChips(list);
+    });
+  }
 }
 
 function renderDonatePage(published) {
@@ -494,6 +585,7 @@ function renderDonatePage(published) {
         ${esc(s.footerAddress)}
       </p>
     </div>`;
+  wireDonateChips(main);
   openTheDoor();
 }
 
