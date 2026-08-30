@@ -86,3 +86,17 @@ export function normalizeRichText(html) {
     .replace(/&nbsp;/g, ' ')
     .trim();
 }
+
+/** The room in a column heading, set a little smaller than the name of the מנין above it.
+ *
+ *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר'\"נ)", and the bracketed half is
+ *  not the name of the מנין but where it davens. At the same size the two read as one long
+ *  title and the column is wider than it needs to be for the word that matters.
+ *
+ *  Applied to already escaped text, so the span it adds survives. The brackets themselves
+ *  are never escaped and no entity contains one, so matching them here is safe. Both places
+ *  a heading is drawn call this: the chart's own th and the week card's label, so the two
+ *  cannot come to disagree about how a room looks. */
+export function markHeaderRoom(escaped) {
+  return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
+}

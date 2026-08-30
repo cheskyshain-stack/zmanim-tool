@@ -445,6 +445,20 @@ function normalizeRichText(html) {
     .trim();
 }
 
+/** The room in a column heading, set a little smaller than the name of the מנין above it.
+ *
+ *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר'\"נ)", and the bracketed half is
+ *  not the name of the מנין but where it davens. At the same size the two read as one long
+ *  title and the column is wider than it needs to be for the word that matters.
+ *
+ *  Applied to already escaped text, so the span it adds survives. The brackets themselves
+ *  are never escaped and no entity contains one, so matching them here is safe. Both places
+ *  a heading is drawn call this: the chart's own th and the week card's label, so the two
+ *  cannot come to disagree about how a room looks. */
+function markHeaderRoom(escaped) {
+  return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
+}
+
 // ==== zmanim/solar.js ====
 // Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
@@ -3692,7 +3706,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
@@ -6776,7 +6790,7 @@ function fillLegend(card) {
  *  No other header wants one: "הדלקת נרות" and "מנחה ערב שבת" are single names that only
  *  wrapped because the chart column was narrow. */
 function formatLabel(label) {
-  return weekEsc(label.replace(/\s+/g, ' ').trim())
+  return markHeaderRoom(weekEsc(label.replace(/\s+/g, ' ').trim()))
     .replace(/ (פלג )/, '<br>$1')
     // Matched after escaping, so the gershayim may be a real ״ or the &quot; that a plain
     // double quote in the header turns into.

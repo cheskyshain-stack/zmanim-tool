@@ -16,7 +16,7 @@ import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
-import { UL_START, UL_END } from '../format.js';
+import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH, DAY_NAMES } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -703,7 +703,7 @@ function fillLegend(card) {
  *  No other header wants one: "הדלקת נרות" and "מנחה ערב שבת" are single names that only
  *  wrapped because the chart column was narrow. */
 function formatLabel(label) {
-  return weekEsc(label.replace(/\s+/g, ' ').trim())
+  return markHeaderRoom(weekEsc(label.replace(/\s+/g, ' ').trim()))
     .replace(/ (פלג )/, '<br>$1')
     // Matched after escaping, so the gershayim may be a real ״ or the &quot; that a plain
     // double quote in the header turns into.

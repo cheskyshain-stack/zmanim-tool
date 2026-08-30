@@ -941,6 +941,10 @@ body.is-luach .week-cards { align-items: center; }
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
 .week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
+/* The bracketed room in a heading, on the chart and on the card alike. In em so it follows
+   whatever size the heading is set to, which on the chart is a slider. 0.86 rather than
+   anything smaller: it still has to be read across a room. */
+.head-room { font-size: 0.86em; }
 /* Set to the left edge of its column, mirroring the name set to the right edge of its
    own. Centred, the times floated inward and left a gap on the left about twice the one
    on the right, so the row looked lopsided; flush, the two sides are inset by the same

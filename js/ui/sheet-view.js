@@ -7,7 +7,7 @@ import { inSpringDstWindow } from '../sheets/common.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
-import { UL_START, UL_END, normalizeRichText } from '../format.js';
+import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
@@ -447,7 +447,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th>${nl2br(c.header)}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
