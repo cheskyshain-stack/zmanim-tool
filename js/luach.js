@@ -110,10 +110,10 @@ const giveIcon = (key, cls) =>
  *  how many there are would only be one more thing that could come to disagree with them.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
- *  what Zelle and The Donors' Fund are: `value` is the thing itself and gets a button that
- *  puts it on the clipboard, since this is read on a phone and the other app is a tap away,
- *  and `note` says what it is. `how` is the sentence above it, for when handing over the
- *  value is not the whole of what somebody has to do. A way with neither href nor copy
+ *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
+ *  itself, which gets a button that puts it on the clipboard, since this is read on a phone
+ *  and the other app is a tap away. `how` is the sentence above it, for when handing over
+ *  the value is not the whole of what somebody has to do. A way with neither href nor copy
  *  still lists its name and says its details are to follow, so the page says what exists
  *  rather than pretending it does not.
  */
@@ -156,7 +156,7 @@ const DONATE = {
       cta: 'Give with Zelle',
       // Blank until the address is confirmed. One invented to fill the space would send
       // somebody's money somewhere, and that is not a thing to guess at.
-      copy: { value: '', note: '' },
+      copy: { label: '', value: '' },
     },
     {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
@@ -165,13 +165,8 @@ const DONATE = {
       title: 'The Donors’ Fund',
       blurb: 'Donate using funds from your Donors’ Fund account.',
       icon: 'swirl',
-      /* The shul is listed several times over under the one tax ID, once for the shul
-         itself and once for each thing given to, so the number alone is not enough to
-         land on: whoever is giving has to pick which of them. Saying so here is the
-         difference between a donation arriving where it was meant to and arriving in
-         the wedding fund. */
-      how: 'Search our tax ID in your Donors’ Fund account, then choose the right listing: the shul is on there more than once.',
-      copy: { value: '26-4527675', note: 'Tax ID' },
+      how: 'Search using our Tax ID.',
+      copy: { label: 'Tax ID', value: '26-4527675' },
     },
   ],
 };
@@ -479,10 +474,10 @@ function donateWayHtml(way) {
       </ul>`
     : '';
   const copy = way.copy
-    ? (way.copy.value || way.copy.note
+    ? (way.copy.value || way.copy.label
         ? `<p class="luach-copy">
+            ${way.copy.label ? `<span class="luach-copy-label">${esc(way.copy.label)}:</span>` : ''}
             <span class="luach-copy-value">${esc(way.copy.value)}</span>
-            <span class="luach-copy-note">${esc(way.copy.note)}</span>
             ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${esc(way.copy.value)}">Copy</button>` : ''}
           </p>`
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
