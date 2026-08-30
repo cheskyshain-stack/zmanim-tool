@@ -59,14 +59,9 @@ function erevPlain(value) {
     .replace(/&gt;/g, '>');
 }
 
-/** Every clock time in a cell, in order, each with where it davens and which line of the
- *  cell it sat on. The line matters because the פלג of a column is written under its מנחה
- *  rather than beside it.
- *
- *  Where it davens is written two ways on the boards and both are read here: an underline
- *  means למטה, and stars after the time mean the rooms the printed footer names, one for
- *  בעזרת נשים and two for באולם השמחות. The שבת card only ever underlines, so the שבת
- *  message never looks at the stars; the weekday card uses both. */
+/** Every clock time in a cell, in order, each with whether it was underlined and which
+ *  line of the cell it sat on. The line matters because the פלג of a column is written
+ *  under its מנחה rather than beside it. */
 function erevTimes(value) {
   const text = erevPlain(value);
   const out = [];
@@ -79,9 +74,9 @@ function erevTimes(value) {
     if (ch === '\n') { line++; continue; }
     if (ch === UL_START) { underlined = true; continue; }
     if (ch === UL_END) { underlined = false; continue; }
-    const m = /^\d{1,2}:\d{2}(\*{0,2})/.exec(text.slice(i));
+    const m = /^\d{1,2}:\d{2}/.exec(text.slice(i));
     if (m) {
-      out.push({ text: m[0].replace(/\*+$/, ''), underlined, stars: m[1].length, line, before: text.slice(0, i) });
+      out.push({ text: m[0], underlined, line, before: text.slice(0, i) });
       i += m[0].length - 1;
     }
   }
@@ -171,73 +166,4 @@ export function erevParshaEnglish(hebrewParsha, parshaNames) {
   const want = String(hebrewParsha ?? '').trim();
   const row = parshaNames?.rows?.find((r) => String(r[0]).trim() === want);
   return (row && row[1]) || want;
-}
-
-/* --- The weekday message ---------------------------------------------------------------
-   The same idea for the חול card: one line of text somebody can paste into a chat, built
-   off the very row the card is built from.
-
-   A worked example, in the shape it was asked for:
-
-     Week P' Ki Savo
-     Shacharis 7:00m, 7:20en, 7:35d, 8:00m, 8:20en, 8:40d, Mincha: 1:35d, 1:50m, 4:15d,
-     6:35d, 7:20d, Mariv: 8:45m, 9:30d, 10:00d, 10:30m, 11:00d
-
-   All of it on one line after the heading, which is how the message is written, so the
-   line above is only wrapped here to fit the page.
-
-   Where each piece comes from:
-
-     Week P'    the parsha in English, the same lookup the Erev Shabbos message uses.
-     d / m      underlined is למטה, plain is the main בית מדרש. Same as the שבת message.
-     en         one star, which the printed footer calls בעזרת נשים.
-     hall       two stars, באולם השמחות. It does not appear on any published week so far,
-                and is here so a week that does grow one is not silently mislabelled.
-
-   שחרית is not a computed column: it is the rich text out of Settings, the same value the
-   card prints, so a week's second schedule on a ר"ח or a תענית is not in it. The card shows
-   that as its own line and this message does not carry it. */
-
-/** Which group a weekday column is, by what its heading says. */
-function weekdayKindOf(header) {
-  const h = String(header ?? '').replace(/\s+/g, ' ');
-  if (h.includes('שחרית')) return { label: 'Shacharis', order: 0 };
-  if (h.includes('מנחה')) return { label: 'Mincha:', order: 1 };
-  if (h.includes('מעריב')) return { label: 'Mariv:', order: 2 };
-  return null;
-}
-
-/** d, m, en or hall: where this מנין davens, off the underline and the stars. */
-function weekdayWhere(time) {
-  if (time.stars >= 2) return 'hall';
-  if (time.stars === 1) return 'en';
-  return time.underlined ? 'd' : 'm';
-}
-
-/** The weekday message for one week.
- *
- *  @param columns/row - the weekday columns and the row already built and overridden, so
- *    this reads exactly what the card reads.
- *  @param shacharis - the שחרית rich text out of Settings, which is where that column's
- *    times live rather than in the row.
- *  @param name - {english, yomTov}. Three weeks a year the Shabbos is Yom Tov and there is
- *    no parsha, so there is nothing for "P'" to introduce and the week is named for its Yom
- *    Tov instead, the way the card itself names it. Without this those weeks read
- *    "Week P' ראש השנה", which calls a Yom Tov a parsha.
- *
- *  Read in the order the day happens in: שחרית, then מנחה, then מעריב. That is the printed
- *  order of the columns reversed, the same way round the שבת message reads them. */
-export function weekdayScheduleText(columns, row, shacharis, name) {
-  const groups = [];
-  for (const col of [...columns].reverse()) {
-    const kind = weekdayKindOf(col.header);
-    if (!kind) continue;
-    const times = erevTimes(kind.order === 0 ? shacharis : row[col.key]);
-    if (!times.length) continue;
-    groups.push({ order: kind.order, text: `${kind.label} ${times.map((t) => t.text + weekdayWhere(t)).join(', ')}` });
-  }
-  if (!groups.length) return '';
-  groups.sort((a, b) => a.order - b.order);
-  const heading = name.yomTov ? `Week of ${name.english}` : `Week P' ${name.english}`;
-  return `${heading}\n${groups.map((g) => g.text).join(', ')}`;
 }

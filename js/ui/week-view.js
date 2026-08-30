@@ -21,7 +21,7 @@ import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSit
 import { SLASH, DAY_NAMES } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
-import { erevShabbosText, erevParshaEnglish, weekdayScheduleText } from '../erev-text.js';
+import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
 import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { weekEndsMins } from '../upcoming.js';
@@ -1205,26 +1205,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                with paper is then in one place, and the row above stays what it is for:
                moving from week to week. The panel is called More options rather than
                Printing options because Print itself now lives in it. -->
-          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
-          ${
-            /* The two message buttons on a row of their own. Beside Print and PDF they made
-               four across, which on a 320px phone ran 43px past the row and took the page
-               with it; wrapped, the labels broke to three lines each. Copying a message and
-               printing a board are two different errands anyway.
-
-               Each button appears only where its own card does. A week can have one card
-               without the other, and a button for a card that is not there would put an
-               empty message on the clipboard. */
-            sheet || weekdayChartFor(sheet, showing, state)
-              ? `<div class="week-nav-row week-nav-copy">${
-                  sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy שבת text</button>' : ''
-                }${
-                  weekdayChartFor(sheet, showing, state)
-                    ? '<button type="button" class="copy-btn" id="weekday-copy-btn">Copy weekday text</button>'
-                    : ''
-                }</div>`
-              : ''
-          }
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}${
+            // Only where there is a שבת row to build it from. A week whose Shabbos is Yom
+            // Tov has no parsha and no row, and an Erev Shabbos message for it would be
+            // an empty one.
+            sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy text</button>' : ''
+          }</div>
           ${
             // Both switches, or neither. Each of them is a question about two pages, and a
             // week that has only one (a Shabbos that is Yom Tov comes through on its
@@ -1321,15 +1307,16 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
      context and on some older phones, and a message nobody can paste is no use, so the old
      hidden-textarea route is kept behind it. The result is said on the button rather than
      in an alert, the way the PDF button does it. */
-  /* Both copy buttons run through here, since everything but the message they build is
-     the same: ask the clipboard, say so on the button, put the label back. */
-  const wireCopy = (id, build) => {
-    const btn = container.querySelector('#' + id);
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      const said = btn.textContent;
+  const copyBtn = container.querySelector('#week-copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const said = copyBtn.textContent;
       try {
-        const text = await build();
+        const { week: w, sheet: s } = index.get(showing);
+        if (!s) throw new Error('this week has no שבת row');
+        const { columns, row } = rowFor(w, s, state, settings);
+        const tables = await loadTables();
+        const text = erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
         if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
         else {
           const box = document.createElement('textarea');
@@ -1342,38 +1329,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           document.execCommand('copy');
           box.remove();
         }
-        btn.textContent = 'Copied';
+        copyBtn.textContent = 'Copied';
       } catch (err) {
         console.error('copy failed', err);
-        btn.textContent = 'Copy failed';
+        copyBtn.textContent = 'Copy failed';
       }
-      setTimeout(() => { btn.textContent = said; }, 2000);
+      setTimeout(() => { copyBtn.textContent = said; }, 2000);
     });
-  };
-
-  wireCopy('week-copy-btn', async () => {
-    const { week: w, sheet: s } = index.get(showing);
-    if (!s) throw new Error('this week has no שבת row');
-    const { columns, row } = rowFor(w, s, state, settings);
-    const tables = await loadTables();
-    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
-  });
-
-  /* The חול card's own message. Built from the very row the card is built from, שחרית
-     included, which for that column is the rich text out of Settings rather than anything
-     computed (see weekCardsHtml, which reads it the same way). */
-  wireCopy('weekday-copy-btn', async () => {
-    const { week: w, sheet: s } = index.get(showing);
-    const weekday = weekdayChartFor(s, showing, state);
-    const weekdayWeek = weekday?.weeks.find((x) => x.serial === showing);
-    if (!weekdayWeek) throw new Error('this week has no חול row');
-    const { row } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
-    const tables = await loadTables();
-    return weekdayScheduleText(WEEKDAY_COLUMNS, row, state.settings.weekdayShacharis, {
-      english: erevParshaEnglish(w.parsha, tables.parshaNames),
-      yomTov: isYomTovWeekLabel(w.parsha),
-    });
-  });
+  }
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
   // one of these at the right size either, and a PDF states the paper in the file rather

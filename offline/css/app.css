@@ -2090,11 +2090,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The one Print button. On the chart it sits under the paging row; on the week it is the
    first thing inside Printing options, where the rest of the paper business is. */
 .week-nav-print-one { margin-top: 0.6rem; }
-/* The two message buttons, on their own row under Print and PDF. Side by side and equal,
-   with room for the label to sit on one line: on the print row they were four across, which
-   overran a 320px phone, and wrapping them there broke each label into three lines. */
-.week-nav-copy { margin-top: 0.5rem; }
-.week-nav-copy > .copy-btn { flex: 1 1 0; max-width: 12rem; }
 .week-nav-print-one > .print-btn { flex: 0 1 11rem; }
 /* Narrower than Print and sitting beside it, because it is the second answer to the
    question rather than the first. Only the chart browser offers it, and only where the
