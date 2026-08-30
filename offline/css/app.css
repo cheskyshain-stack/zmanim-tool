@@ -1729,8 +1729,18 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
 }
 .luach-frame-shut:hover { background: rgba(18,39,79,0.08); opacity: 1; }
 .luach-frame-shut:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 1px; }
-.luach-frame { display: block; width: 100%; height: 34rem; border: 0; background: #ffffff; }
-@media (min-width: 34rem) { .luach-frame { height: 42rem; } }
+/* The form runs to billing, card and amount, well past any height this side would pick, so
+   it is going to scroll inside the box whatever happens. The box therefore takes most of
+   the screen, to keep that scrolling to as few turns as possible. Written twice over: dvh
+   is the height left once a phone's own toolbars are counted, and the rem before it is what
+   a browser that does not know dvh keeps. */
+.luach-frame {
+  display: block; width: 100%; border: 0; background: #ffffff;
+  height: 34rem; height: min(82dvh, 44rem);
+}
+@media (min-width: 34rem) {
+  .luach-frame { height: 42rem; height: min(80dvh, 48rem); }
+}
 /* Last resort, and the reason it is worded as a question: a payment page is entitled to
    refuse to be framed, and when one does this panel is simply blank. */
 .luach-frame-help {
