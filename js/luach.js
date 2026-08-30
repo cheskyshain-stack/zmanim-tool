@@ -50,27 +50,6 @@ const OUTWARD = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stro
  *  two things. Written here rather than in both places, so they cannot drift apart again. */
 const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', donate: 'Donate' };
 
-/** The ways to give, and the page that lists them.
- *
- *  Donate used to be one button that left the site for one payment page. There is more
- *  than one way to give and more than one thing to give to, so it opens a page of them
- *  instead, and this list is that page. Adding a way, or filling one in, is a line here
- *  and nothing else.
- *
- *  Two kinds of entry:
- *
- *  A `href` is somewhere to go, and it opens in a new tab on purpose. Someone reading the
- *  zmanim keeps the page they were on, and, more to the point, this site can be installed
- *  to a home screen and run in a window with no address bar: sent to a payment page inside
- *  that window there would be no URL and no padlock to check it by. A new tab is a real
- *  browser, with both.
- *
- *  A `detail` is something to copy rather than somewhere to go, which is what Zelle and
- *  the rest are: an address or a number typed into another app. Left empty until the
- *  details arrive, and an empty one still lists its name, so the page says what exists
- *  rather than pretending it does not.
- *
- *  `note` is the smaller line under a title, for what a link covers once it is reached. */
 /* The marks on the giving cards, drawn in the same weight as the menu's own and ringed in
    gold, so a card is recognisable before its title is read. */
 const GIVE_ICONS = {
@@ -154,15 +133,13 @@ const DONATE = {
       copy: { address: '', name: '' },
     },
     {
+      // An outside donor-advised fund, not something the shul holds. Somebody with money
+      // already in their own Donors' Fund account gives to the shul out of it, so the
+      // words are about spending an account they have rather than opening one here.
       title: 'The Donors’ Fund',
       blurb: 'Donate using funds from your Donors’ Fund account.',
       icon: 'swirl',
       cta: 'Give through Donors’ Fund',
-    },
-    {
-      title: 'Daf Yomi Initiative',
-      blurb: 'Support the daily learning of Daf Yomi and the growth of Torah in our community.',
-      icon: 'book',
     },
   ],
 };
@@ -478,24 +455,34 @@ function donateWayHtml(way) {
   // as Zelle at a glance. Every other mark is the site's gold.
   const markClass = way.icon === 'zelle' ? 'luach-give-mark is-zelle' : 'luach-give-mark';
   const mark = way.icon === 'zelle' ? '<span class="luach-zelle-z">Z</span>' : giveIcon(way.icon, 'luach-give-mark-svg');
-  return `<section class="luach-give-card">
-    <span class="${markClass}" aria-hidden="true">${mark}</span>
-    <div class="luach-give-body">
-      <h2 class="luach-give-title">${esc(way.title)}</h2>
-      <p class="luach-give-blurb">${esc(way.blurb)}</p>
-      ${chips}${copy}${soon}${all}
+  /* Two shapes, one set of proportions. A card that lists funds puts them and its Donate
+     button across the full width under the heading, because a grid of chips squeezed into
+     the column beside a mark is unreadable. A card that has none is a row: mark, words,
+     and whatever it offers beside them where there is room and under them where there is
+     not. Both keep the same corner, shadow, mark and title, so they read as one set. */
+  const wide = Boolean(chips);
+  return `<section class="luach-give-card${wide ? '' : ' is-row'}">
+    <div class="luach-give-head">
+      <span class="${markClass}" aria-hidden="true">${mark}</span>
+      <div class="luach-give-body">
+        <h2 class="luach-give-title">${esc(way.title)}</h2>
+        <p class="luach-give-blurb">${esc(way.blurb)}</p>
+      </div>
+      ${wide ? '' : `<div class="luach-give-aside">${copy}${soon}${button}</div>`}
     </div>
-    ${button}
+    ${wide ? `${chips}${all}${button}` : ''}
   </section>`;
 }
 
 function renderDonatePage(published) {
   stopNextUp();
   const s = resolveSettings(published.settings);
-  main.className = '';
+  // is-give only trims the room under the address, which the page has no use for: it ends
+  // at the footer and there is nothing below to scroll to. See app.css.
+  main.className = 'is-give';
   main.innerHTML = `${backBar(PAGE_NAMES.donate)}
     <div class="luach-home luach-give-page">
-      <header class="luach-give-head">
+      <header class="luach-give-head-block">
         ${rule()}
         <h1 class="luach-give-heading">${esc(DONATE.heading)}</h1>
         <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
