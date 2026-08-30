@@ -1,0 +1,18 @@
+# What a search engine may look at.
+#
+# Everything the congregation is meant to find is at the root: the week's zmanim, the
+# season chart, and the donation page. Two folders are asked away from:
+#
+#   /admin/     the tool the boards are generated with. Not what anybody is searching for,
+#               and it carries its own noindex tag as well, for a crawler that arrives by a
+#               link rather than through here.
+#   /offline/   a self-contained copy of the same generator, built for a USB stick. It is
+#               the same words again at a second address, which is the thing search engines
+#               call duplicate content and rank both copies worse for.
+#
+# The Sitemap line goes in once the site has a settled address, since it has to be an
+# absolute URL and there is nothing yet to make it absolute against.
+
+User-agent: *
+Disallow: /admin/
+Disallow: /offline/
