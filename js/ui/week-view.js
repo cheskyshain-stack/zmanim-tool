@@ -24,7 +24,7 @@ import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
-import { splitWeeksIntoPages } from '../pagination.js';
+import { chartSpreads } from './chart-view.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
  *  saved sheet resolves to the most recently generated one.
@@ -1114,15 +1114,32 @@ function weekCardsHtml(showing, index, state, settings) {
 }
 
 
-/** The weeks printed on the same page of the chart as this one, in order, or null where
- *  there is no sheet behind it to ask. A Yom Tov week has no שבת sheet, and holding the
- *  view to a page that does not exist would leave it with nowhere to go at all. */
-function chartPageSerials(showing, index) {
-  const sheet = index.get(showing)?.sheet;
-  if (!sheet?.weeks?.length) return null;
-  const page = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes)
-    .find((weeks) => weeks.some((w) => w.serial === showing));
-  return page?.length ? page.map((w) => w.serial).sort((a, b) => a - b) : null;
+/** Every week the chart covering this one is the chart for, in order.
+ *
+ *  The stretch a chart page covers, rather than the list of weeks printed on it, and the
+ *  difference is the weeks that have no row. A Yom Tov Shabbos has no parsha and so nothing
+ *  on the שבת chart, but its weekdays are real and its card is worth reading. Going by the
+ *  printed rows dropped them: from האזינו the congregation could not reach סוכות the week
+ *  after, and could not reach ראש השנה the week before either, which sits inside the very
+ *  dates the chart covers.
+ *
+ *  So a chart owns from its own first week until the next chart begins, and the last one
+ *  owns everything after it. That is the honest span: the summer chart is what is on the
+ *  wall through Sukkos, because the winter chart does not start until בראשית.
+ *
+ *  chartSpreads is the chart browser's own list, already in date order across the seasons,
+ *  so the two views cannot disagree about where one chart ends and the next starts. */
+function chartStretchSerials(showing, index, state) {
+  const spreads = chartSpreads(state);
+  if (!spreads.length) return null;
+  const starts = spreads.map((s) => Math.min(...s.serials));
+  let i = -1;
+  for (let n = 0; n < starts.length; n++) if (starts[n] <= showing) i = n;
+  if (i === -1) return null; // before the first chart there is: nothing to be held to
+  const from = starts[i];
+  const until = i + 1 < starts.length ? starts[i + 1] : Infinity;
+  const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
+  return within.length ? within : null;
 }
 
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
@@ -1151,15 +1168,13 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
      but what is on the wall is one page of it, and the weeks on that page are the ones
      worth being able to look at: the rest is either months behind or months ahead.
 
-     The pages are the chart's own, split exactly as the printed sheet splits them
-     (splitWeeksIntoPages, the same call the chart browser makes), so "the end of the
-     chart" here means the end of the sheet of paper rather than some number of weeks
-     picked here.
+     "The chart that is up" is the stretch it covers rather than the rows printed on it,
+     so a Yom Tov week with no row of its own is still reachable: see chartStretchSerials.
 
      Three taps on the chart lets the whole season out again (navUnlocked in nav-helpers),
      and the admin app is never held at all. */
   const held = luach && !navUnlocked();
-  if (held) serials = chartPageSerials(showing, index) || serials;
+  if (held) serials = chartStretchSerials(showing, index, state) || serials;
   const at = serials.indexOf(showing);
   const { sheet } = index.get(showing);
   const week = index.get(showing).week;
