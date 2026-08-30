@@ -48,15 +48,50 @@ const OUTWARD = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stro
  *  Weekly Zmanim opened a page headed "This week's schedule" and Zmanim chart opened one
  *  headed "The chart", which is two names for each of two things on a site that only has
  *  two things. Written here rather than in both places, so they cannot drift apart again. */
-const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart' };
+const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', donate: 'Donate' };
 
-/** The shul's donation page, which is not part of this site.
+/** The ways to give, and the page that lists them.
  *
- *  It opens in a new tab on purpose. Someone reading the zmanim keeps the page they were
- *  on, and, more to the point, this site can be installed to a home screen and run in a
- *  window with no address bar: sent to a payment page inside that window there would be no
- *  URL and no padlock to check it by. A new tab is a real browser, with both. */
-const DONATE = { name: 'Donate', href: 'https://secure.cardknox.com/bmoflakewoodcommons1' };
+ *  Donate used to be one button that left the site for one payment page. There is more
+ *  than one way to give and more than one thing to give to, so it opens a page of them
+ *  instead, and this list is that page. Adding a way, or filling one in, is a line here
+ *  and nothing else.
+ *
+ *  Two kinds of entry:
+ *
+ *  A `href` is somewhere to go, and it opens in a new tab on purpose. Someone reading the
+ *  zmanim keeps the page they were on, and, more to the point, this site can be installed
+ *  to a home screen and run in a window with no address bar: sent to a payment page inside
+ *  that window there would be no URL and no padlock to check it by. A new tab is a real
+ *  browser, with both.
+ *
+ *  A `detail` is something to copy rather than somewhere to go, which is what Zelle and
+ *  the rest are: an address or a number typed into another app. Left empty until the
+ *  details arrive, and an empty one still lists its name, so the page says what exists
+ *  rather than pretending it does not.
+ *
+ *  `note` is the smaller line under a title, for what a link covers once it is reached. */
+const DONATE = {
+  name: 'Donate',
+  lead: '',
+  ways: [
+    {
+      title: 'Select from all options',
+      // What that page actually offers, in its two menus, so a donor can see whether the
+      // thing they want is behind this link without opening it and hunting for it.
+      note: 'Aliyos · Hall · Mikva · Ner tamid · Rabbi Fendel’s learning programs · Eiruv · Membership · Tzorchei Yom Tov · Ravs Fund · Kimcha Dpischa · Matanos Le’evyonim',
+      href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
+    },
+    {
+      title: 'Building Fund',
+      note: 'Eiruv · Other',
+      href: 'https://secure.cardknox.com/lckerenhabinyan',
+    },
+    { title: 'Zelle', detail: '' },
+    { title: 'Donor’s Fund', detail: '' },
+    { title: 'Daf', detail: '' },
+  ],
+};
 
 /** A gold hairline with a diamond in the middle. Decoration, so it says nothing to a
  *  screen reader. */
@@ -169,8 +204,8 @@ function homeHtml(published) {
       <a class="luach-item" href="#chart">
         ${ICON_CALENDAR}<span class="luach-item-title">${esc(PAGE_NAMES.chart)}</span>${CHEVRON}
       </a>
-      <a class="luach-item" href="${esc(DONATE.href)}" target="_blank" rel="noopener noreferrer">
-        ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${OUTWARD}
+      <a class="luach-item" href="#donate">
+        ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
     ${rule()}
@@ -315,10 +350,56 @@ function renderChartPage(published) {
   renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
 }
 
+/** The ways to give, one card each.
+ *
+ *  The same card the menu uses, so the page reads as part of the site rather than as a
+ *  form bolted to it: a link carries the outward arrow the menu's own outward link used
+ *  to, and something to copy carries no arrow at all, because nothing happens when it is
+ *  pressed. A way whose details have not arrived yet says so in the smaller type, which is
+ *  the honest thing to put there and disappears the moment the line above it is filled in.
+ *
+ *  Nothing is rendered from published data here, so this page works whatever is or is not
+ *  on the site, which is the point: giving should not depend on there being a chart up. */
+function donateWayHtml(way) {
+  const note = way.note ? `<span class="luach-give-note">${esc(way.note)}</span>` : '';
+  if (way.href) {
+    return `<a class="luach-item luach-give" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">
+      <span class="luach-give-lines">
+        <span class="luach-item-title">${esc(way.title)}</span>
+        ${note}
+      </span>${OUTWARD}
+    </a>`;
+  }
+  const detail = way.detail
+    ? `<span class="luach-give-detail">${esc(way.detail)}</span>`
+    : '<span class="luach-give-note luach-give-soon">Details to follow</span>';
+  return `<div class="luach-item luach-give luach-give-still">
+    <span class="luach-give-lines">
+      <span class="luach-item-title">${esc(way.title)}</span>
+      ${note}${detail}
+    </span>
+  </div>`;
+}
+
+function renderDonatePage(published) {
+  stopNextUp();
+  const s = resolveSettings(published.settings);
+  main.className = '';
+  main.innerHTML = `${backBar(PAGE_NAMES.donate)}
+    <div class="luach-home luach-give-page">
+      ${DONATE.lead ? `<p class="luach-give-lead">${esc(DONATE.lead)}</p>` : ''}
+      <nav class="luach-menu">${DONATE.ways.map(donateWayHtml).join('')}</nav>
+      ${rule()}
+      <p class="luach-foot">${esc(s.footerAddress)}</p>
+    </div>`;
+  openTheDoor();
+}
+
 function route(published) {
   const where = location.hash.replace('#', '');
   if (where === 'week') return renderWeekPage(published);
   if (where === 'chart') return renderChartPage(published);
+  if (where === 'donate') return renderDonatePage(published);
   return renderHome(published);
 }
 

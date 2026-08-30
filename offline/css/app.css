@@ -1536,6 +1536,38 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-item-title { flex: 1; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.45rem; font-weight: 700; direction: ltr; text-align: left; }
 .luach-item-go { width: 19px; height: 19px; flex: none; color: var(--luach-ink); opacity: 0.55; }
 
+/* --- The ways to give ----------------------------------------------------------------
+   The menu's own card, reused rather than restyled, so this page belongs to the site
+   instead of looking like a form bolted to it. What changes is that a card here can carry
+   a second line, and that some of them are not links at all. */
+.luach-give-lead {
+  margin: 0 0 0.9rem; text-align: center;
+  font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 1.1rem; color: var(--luach-ink); opacity: 0.72;
+}
+/* The title and its smaller line stack, and take the width the row has left over, so the
+   arrow stays where it is on the menu's own cards however long the note is. */
+/* text-align, because the page centres its own text (the masthead, the address) and only
+   the title carried an override: the notes came out centred under a left-aligned heading. */
+.luach-give-lines { flex: 1; display: flex; flex-direction: column; gap: 0.12rem; min-width: 0; text-align: left; }
+.luach-give-lines > .luach-item-title { flex: none; }
+.luach-give-note {
+  font-size: 0.92rem; line-height: 1.35; color: var(--luach-ink); opacity: 0.62;
+}
+/* An address or a number to be typed into another app, so it is set in the face digits
+   line up in and left selectable, which is what somebody will do with it. */
+.luach-give-detail {
+  font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 1.05rem; font-variant-numeric: tabular-nums;
+  color: var(--luach-ink); user-select: text; word-break: break-word;
+}
+.luach-give-soon { font-style: italic; }
+/* Nothing happens when this one is pressed, so it does not lift, does not follow the
+   pointer, and is quieter than the cards that do something. */
+.luach-give-still { cursor: default; background: rgba(255,255,255,0.72); box-shadow: 0 1px 3px rgba(18,39,79,0.07); }
+.luach-give-still:hover { box-shadow: 0 1px 3px rgba(18,39,79,0.07); }
+.luach-give-still:active { transform: none; }
+
 .luach-foot {
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
