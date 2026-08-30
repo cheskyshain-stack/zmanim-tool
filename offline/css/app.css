@@ -1341,20 +1341,25 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
    roomy case still measures the same 228px it did. */
 .luach-home > .luach-rule { margin-top: auto; padding-top: 1.9rem; }
 
-/* The shul, under the menu. Rounded and shadowed like the cards above it so it belongs to
-   the same page rather than sitting on it. aspect-ratio holds the shape from the tag's own
-   width and height, so the space is reserved before the file lands and nothing below it is
-   shoved down when it does. */
-.luach-photo { margin: 1.1rem 0 0; }
-.luach-photo img {
-  display: block; width: 100%; height: auto; aspect-ratio: 1400 / 821;
-  border-radius: 18px; object-fit: cover;
-  box-shadow: 0 2px 8px rgba(18,39,79,0.07), 0 1px 2px rgba(18,39,79,0.05);
+/* The shul, small, in the top left of the navy cap.
+   Placed rather than laid out, so it cannot push the wordmark off centre or move anything
+   under it: the cap already sets its own height and this sits inside that. Left and top
+   match the padding .luach-bar gives the back link on every other screen, so the corner of
+   the menu and the corner of the pages behind it hold their marks in the same spot.
+   The hairline is what keeps it from bleeding into the navy: this photograph runs to a
+   pale sky and a pale wall at its edges, and against the cap those simply dissolve. */
+.luach-cap-photo {
+  position: absolute; top: 0.85rem; left: 1.25rem;
+  width: 3.6rem; height: auto; aspect-ratio: 1400 / 821;
+  object-fit: cover; border-radius: 7px;
+  border: 1px solid rgba(209,173,95,0.55);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.28);
 }
-@media (min-width: 34rem) { .luach-photo img { border-radius: 20px; } }
-/* Nothing on the menu is printed, and a photograph least of all: this page reaches paper
-   only by somebody hitting print on the wrong screen, and it should not spend their ink. */
-@media print { .luach-photo { display: none !important; } }
+@media (min-width: 34rem) { .luach-cap-photo { width: 4.4rem; top: 1.1rem; left: 1.6rem; } }
+/* The cap is not printed and neither is this, but it is positioned rather than in the flow,
+   so it needs saying separately: without it the picture would sit over whatever the print
+   stylesheet leaves at the top of the page. */
+@media print { .luach-cap-photo { display: none !important; } }
 
 /* The navy cap at the top of every screen here, the same shape on the menu and on the
    pages behind it, so that going in and coming out look like one site rather than two.

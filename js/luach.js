@@ -135,31 +135,24 @@ const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
  *  and two places to write it is one place for a digit to go wrong. */
 const SHUL_TAX_ID = '26-4527675';
 
-/** The shul itself, under the menu.
+/** The shul, small, in the top left of the cap.
  *
- *  Under the menu and not above it on purpose. Somebody opening this on a phone wants the
- *  next minyan, which is the card at the top, and a picture between them and it would push
- *  the one useful thing off the first screen to make room for something nobody came for. It
- *  reads better at the end anyway: the times, then the building they are in.
+ *  The cap is empty on the menu and carries the back link and the page name on every other
+ *  screen, so the left of it is the one place on this page already understood as the corner
+ *  where a thing sits. It goes there rather than in the flow, which keeps the wordmark
+ *  centred and leaves the next minyan card exactly where it was: on a phone that card is
+ *  why the site was opened, and nothing should push it down.
  *
- *  Three sizes rather than one. The original is 2454px wide and 2.4MB, which is a quarter of
- *  a second of a phone's data allowance spent on a photograph on a page whose whole point is
- *  opening fast. Measured, at 393px wide: a plain screen takes the 700 at 66KB, a 2x phone
- *  the 1000 at 126KB, a 3x phone the 1400 at 228KB, and a desktop the 700 or the 1400 by its
- *  own density. The middle rung is there because without it a 2x phone needs 722px, finds
- *  nothing between 700 and 1400, and takes the 1400: the commonest phone there is would have
- *  been the one paying the most.
+ *  One file at 240px and 11KB. The original is 2454px and 2.4MB, and at this size even a
+ *  three times screen only asks for about 174px across, so a single small copy covers every
+ *  phone there is with room to spare. width and height are on the tag so the corner is the
+ *  right shape before the file lands.
  *
- *  width and height are on the tag so the space is reserved before the file arrives. Without
- *  them the rule and the address under it are laid out, then shoved down when the picture
- *  lands, which is the jump that moves what somebody is already reading. */
-const SHUL_PHOTO = `<figure class="luach-photo">
-      <img src="/assets/shul-1400.jpg"
-           srcset="/assets/shul-700.jpg 700w, /assets/shul-1000.jpg 1000w, /assets/shul-1400.jpg 1400w"
-           sizes="(max-width: 34rem) 100vw, 34rem"
-           width="1400" height="821" decoding="async"
-           alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">
-    </figure>`;
+ *  Not a link and not a button: it says whose site this is, the way the wordmark under it
+ *  does, and there is nowhere for it to go that the menu does not already offer. */
+const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
+      width="240" height="141" decoding="async"
+      alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">`;
 
 /** The footer that ends every page: the address, and the tax ID under it.
  *
@@ -325,7 +318,7 @@ function backBar(title) {
  *  1280. On a phone the two are the same thing, which is how it went unnoticed. */
 function homeHtml(published) {
   const s = published.settings;
-  return `<div class="luach-bar luach-bar-plain no-print" aria-hidden="true"></div>
+  return `<div class="luach-bar luach-bar-plain no-print">${SHUL_PHOTO}</div>
     <header class="luach-masthead">
       <!-- The wordmark is a picture, so on its own it leaves this heading with no words in
            it. The English name goes in beside it, clipped out of the layout but not out of
@@ -349,7 +342,6 @@ function homeHtml(published) {
         ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
-    ${SHUL_PHOTO}
     ${rule()}
     ${footHtml(s)}
   </div>`;
