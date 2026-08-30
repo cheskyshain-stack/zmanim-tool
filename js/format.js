@@ -89,7 +89,7 @@ export function normalizeRichText(html) {
 
 /** The room in a column heading, set a little smaller than the name of the מנין above it.
  *
- *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר'\"נ)", and the bracketed half is
+ *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר״נ)", and the bracketed half is
  *  not the name of the מנין but where it davens. At the same size the two read as one long
  *  title and the column is wider than it needs to be for the word that matters.
  *

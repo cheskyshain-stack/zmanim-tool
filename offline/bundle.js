@@ -447,7 +447,7 @@ function normalizeRichText(html) {
 
 /** The room in a column heading, set a little smaller than the name of the מנין above it.
  *
- *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר'\"נ)", and the bracketed half is
+ *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר״נ)", and the bracketed half is
  *  not the name of the מנין but where it davens. At the same size the two read as one long
  *  title and the column is wider than it needs to be for the word that matters.
  *
@@ -1408,7 +1408,7 @@ const KAYITZ_COLUMNS = [
   // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
   // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
   // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר\'"נ)\nפלג מ"א 72' },
+  { key: 'I', header: 'מנחה\n(בעזר״נ)\nפלג מ"א 72' },
   { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
   { key: 'K', header: 'מנחה\nפלג גר"א' },
   { key: 'L', header: 'מנחה\nערב שבת' },
@@ -2027,7 +2027,7 @@ const SEASON_CELLS = {
   choref: { B: SHABBOS_CELLS.B, C: SHABBOS_CELLS.C, E: SHABBOS_CELLS.E, F: SHABBOS_CELLS.F, G: SHABBOS_CELLS.G, I: SHABBOS_CELLS.L },
 };
 
-/** A heading line that is only a room in brackets: "(למטה)", "(בעזר'״נ)". Two of the קיץ
+/** A heading line that is only a room in brackets: "(למטה)", "(בעזר״נ)". Two of the קיץ
  *  columns carry one, and it is the room rather than the name of the מנין. */
 const ROOM_LINE = /^\(.+\)$/;
 

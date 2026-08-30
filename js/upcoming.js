@@ -57,7 +57,7 @@ const SEASON_CELLS = {
   choref: { B: SHABBOS_CELLS.B, C: SHABBOS_CELLS.C, E: SHABBOS_CELLS.E, F: SHABBOS_CELLS.F, G: SHABBOS_CELLS.G, I: SHABBOS_CELLS.L },
 };
 
-/** A heading line that is only a room in brackets: "(למטה)", "(בעזר'״נ)". Two of the קיץ
+/** A heading line that is only a room in brackets: "(למטה)", "(בעזר״נ)". Two of the קיץ
  *  columns carry one, and it is the room rather than the name of the מנין. */
 const ROOM_LINE = /^\(.+\)$/;
 
