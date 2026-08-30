@@ -80,8 +80,6 @@ const GIVE_ICONS = {
   people: '<circle cx="9.2" cy="8.4" r="2.9"/><path d="M3.8 18.4a5.4 5.4 0 0 1 10.8 0"/><circle cx="17.4" cy="9.8" r="2.2"/><path d="M15.6 15.2a4 4 0 0 1 4.9 3.2"/>',
   drop: '<path d="M12 3.4s5.4 5.6 5.4 9.2a5.4 5.4 0 0 1-10.8 0C6.6 9 12 3.4 12 3.4z"/>',
   flame: '<path d="M12 21c3.3 0 5.6-2.1 5.6-5 0-4.2-4.4-5.6-3.6-9.6-2.4 1-3.6 3-3.6 5 0 1.4-.7 2-1.4 2s-1.3-.6-1.3-1.8C6.9 13 6.4 14.3 6.4 16c0 2.9 2.3 5 5.6 5z"/>',
-  more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
-  less: '<path d="M6 14.5l6-5.5 6 5.5"/>',
   // Beside the host name over an embedded form. A form in a frame has no address bar of its
   // own, so this line is the only place a donor can see whose page they are typing into.
   lock: '<path d="M6.6 10.4h10.8a1.6 1.6 0 0 1 1.6 1.6v6.4a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 18.4V12a1.6 1.6 0 0 1 1.6-1.6Z"/><path d="M8.4 10.4V7.9a3.6 3.6 0 0 1 7.2 0v2.5"/>',
@@ -114,11 +112,10 @@ const giveIcon = (key, cls) =>
  *
  *  `funds` are what a payment page carries once it is reached, read off its own menus, so
  *  a donor can see whether what they want is behind a link without opening it and hunting.
- *  A long list is folded down to a single row ending in More, which opens the rest in
- *  place. `show` is only the guess the page is first drawn with; how many actually fit on
- *  the row is measured off the grid (see fitDonateChips), so it is right at any width. No
- *  count is written anywhere: More opens the whole list where it stands, so a number saying
- *  how many there are would only be one more thing that could come to disagree with them.
+ *  All of them are written out on one line and the line scrolls sideways where it does not
+ *  fit, so the list is never folded and never has to be asked to open. No count is written
+ *  anywhere either: a number saying how many there are would only be one more thing that
+ *  could come to disagree with the names beside it.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
  *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
@@ -142,7 +139,6 @@ const DONATE = {
           title: 'Give to the Shul',
           blurb: 'Support the many needs of our shul and community.',
           href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
-          show: 5,
           funds: [
             { label: 'Aliyos', icon: 'book' },
             { label: 'Membership', icon: 'people' },
@@ -161,7 +157,7 @@ const DONATE = {
           title: 'Building Fund',
           blurb: 'Help build for the future of our community.',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
-          funds: [{ label: 'Eiruv' }, { label: 'Building Projects' }, { label: 'Other' }],
+          funds: [{ label: 'Eiruv', icon: 'crane' }, { label: 'Building Projects', icon: 'building' }],
         },
       ],
     },
@@ -471,16 +467,14 @@ function renderChartPage(published) {
  *  through separate merchant pages and a donor has to land on the right one. */
 function donateAccountHtml(acc) {
   const funds = acc.funds || [];
-  const folds = Boolean(acc.show) && funds.length > acc.show;
-  const chip = (f, i) =>
-    `<li class="luach-chip"${folds && i >= acc.show ? ' hidden' : ''}>${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
-  const more = folds
-    ? `<li class="luach-chip-slot"><button type="button" class="luach-chip is-more" aria-expanded="false">
-        ${giveIcon('more', 'luach-chip-icon')}<span class="luach-chip-more-label">More</span>
-      </button></li>`
-    : '';
+  const chip = (f) =>
+    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
+  /* Every fund on one line, and the line scrolls sideways where it does not fit. No fold
+     and no More: the list is a glance at what is behind the link, and a glance should not
+     need a press. What is cut off at the edge is the cue that there is more of it, which is
+     how a row of anything scrollable says so. */
   const chips = funds.length
-    ? `<ul class="luach-chips${funds.some((f) => f.icon) ? ' is-tall' : ''}">${funds.map(chip).join('')}${more}</ul>`
+    ? `<ul class="luach-chips" tabindex="0" role="list" aria-label="${esc(acc.title)} funds">${funds.map(chip).join('')}</ul>`
     : '';
   return `<div class="luach-give-account">
     <h4 class="luach-account-title">${esc(acc.title)}</h4>
@@ -534,60 +528,6 @@ function donateWayHtml(way) {
     </summary>
     <div class="luach-give-open">${how}${copy}${soon}${accounts}</div>
   </details>`;
-}
-
-/** Fold a fund list down to one row, ending in More.
- *
- *  How many chips fit is the grid's own answer rather than a number kept here: the row is
- *  laid out with everything in it, the resolved column count is read back, and one column
- *  is given up to More. That keeps it right at every width without this file repeating the
- *  minimum chip width the stylesheet already sets.
- *
- *  Measured with the whole list showing, because auto-fit collapses tracks it has nothing
- *  to put in and a folded row would report its own smaller width back as the answer. */
-function fitDonateChips(list) {
-  const more = list.querySelector('.luach-chip.is-more');
-  if (!more || list.dataset.open === 'yes') return;
-  const chips = [...list.querySelectorAll('li.luach-chip')];
-  for (const c of chips) c.hidden = false;
-  const tracks = getComputedStyle(list).gridTemplateColumns;
-  // A grid that has not been laid out answers with the rule rather than the tracks it came
-  // out to. Nothing to go on, so leave the row as it was drawn.
-  if (/repeat|minmax|none/.test(tracks)) return;
-  const columns = tracks.split(/\s+/).filter(Boolean).length;
-  const room = Math.max(1, columns - 1);
-  chips.forEach((c, i) => { c.hidden = i >= room; });
-}
-
-/** More opens the rest of the funds where they are. Nothing is fetched and nothing is
- *  re-rendered: they were written into the page folded away, and this unfolds them. */
-function wireDonateChips(root) {
-  for (const list of root.querySelectorAll('.luach-chips')) {
-    const more = list.querySelector('.luach-chip.is-more');
-    if (!more) continue;
-    const label = more.querySelector('.luach-chip-more-label');
-    fitDonateChips(list);
-    // Only a change of width can change how many fit. Folding chips away changes the
-    // list's height, and refitting on that would be a loop that never settles.
-    let was = Math.round(list.getBoundingClientRect().width);
-    new ResizeObserver(() => {
-      const now = Math.round(list.getBoundingClientRect().width);
-      if (now === was) return;
-      was = now;
-      fitDonateChips(list);
-    }).observe(list);
-    more.addEventListener('click', () => {
-      const open = list.dataset.open !== 'yes';
-      list.dataset.open = open ? 'yes' : 'no';
-      more.setAttribute('aria-expanded', String(open));
-      label.textContent = open ? 'Fewer' : 'More';
-      // Re-read the mark rather than holding on to it: replacing it leaves the old node
-      // detached, and a handler keeping that would be writing to nothing on the next press.
-      more.querySelector('.luach-chip-icon').outerHTML = giveIcon(open ? 'less' : 'more', 'luach-chip-icon');
-      if (open) for (const c of list.querySelectorAll('li.luach-chip')) c.hidden = false;
-      else fitDonateChips(list);
-    });
-  }
 }
 
 /** Put a card's detail on the clipboard, since the app it is wanted in is a tap away.
@@ -697,7 +637,11 @@ function renderDonatePage(published) {
   main.innerHTML = `${backBar(PAGE_NAMES.donate)}
     <div class="luach-home luach-give-page">
       <header class="luach-masthead luach-give-masthead">
-        <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"></h1>
+        <!-- The wordmark is not a heading here, the way it is on the menu: the bar above
+             already carries this page's h1 and names it "Donate". Two h1s on one page is
+             one too many, and the shul's name is the site's mark rather than the title of
+             what is on the page. The alt text still says whose site it is. -->
+        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}">
         ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
       </header>
       <header class="luach-give-head-block">
@@ -708,7 +652,6 @@ function renderDonatePage(published) {
       ${rule()}
       <p class="luach-foot">${esc(s.footerAddress)}</p>
     </div>`;
-  wireDonateChips(main);
   wireDonateFrames(main);
   wireDonateCopy(main);
   openTheDoor();

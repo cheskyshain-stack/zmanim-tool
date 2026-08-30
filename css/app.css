@@ -1648,38 +1648,36 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    not buttons on purpose: the page they lead to asks which fund in a menu of its own, so a
    chip that looked pressable would promise to choose and then not. They answer "is the
    thing I want in here", which is the question somebody has before pressing Donate. */
+/* One line, scrolled rather than wrapped or folded. Its own overflow container, so a list
+   too long for the card scrolls inside itself and never takes the page sideways with it.
+   overscroll-behavior stops a swipe that reaches the end of the row from carrying on into
+   the page behind it, which on a phone reads as the page lurching. */
 .luach-chips {
-  list-style: none; margin: 0.65rem 0 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(4.3rem, 1fr)); gap: 0.35rem;
+  list-style: none; margin: 0.6rem 0 0; padding: 0 0 0.15rem;
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 0 0.55rem;
+  font-size: 0.82rem; line-height: 1.35;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(184,143,58,0.5) transparent;
 }
+.luach-chips::-webkit-scrollbar { height: 4px; }
+.luach-chips::-webkit-scrollbar-track { background: transparent; }
+.luach-chips::-webkit-scrollbar-thumb { background: rgba(184,143,58,0.5); border-radius: 2px; }
+.luach-chips:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 3px; border-radius: 4px; }
+/* Nothing shrinks and nothing wraps: a fund keeps its own width and the row grows past the
+   card instead, which is the whole point of the scroll. */
 .luach-chip {
-  display: flex; align-items: center; justify-content: center; gap: 0.3rem;
-  padding: 0.4rem 0.4rem; border-radius: 10px;
-  border: 1px solid rgba(184,143,58,0.38); background: rgba(209,173,95,0.06);
-  font-size: 0.75rem; line-height: 1.2; text-align: center; color: var(--luach-ink);
+  display: inline-flex; align-items: center; gap: 0.32rem;
+  flex: none; white-space: nowrap; color: var(--luach-ink);
 }
-/* Marked chips stack, which is what makes the row read as a set of things rather than a
-   sentence. Unmarked ones stay on one line and take only the room their word needs. */
-.luach-chips.is-tall .luach-chip { flex-direction: column; gap: 0.2rem; padding: 0.45rem 0.3rem; }
-.luach-chips:not(.is-tall) { grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
 .luach-chip-icon { width: 1.05rem; height: 1.05rem; color: #b08d3a; flex: none; }
-/* .luach-chip sets display: flex, which beats the browser's own rule for [hidden] because
-   the two score the same and this sheet comes later. A folded chip needs saying outright. */
-.luach-chip[hidden] { display: none; }
 
-/* More, the one thing in the row that can be pressed. Its li steps out of the way so the
-   button is the grid item and gets a cell the size of the chips beside it. Marked out from
-   them by weight rather than by another colour: it is still a chip, not a second button
-   competing with Donate underneath. */
-.luach-chip-slot { display: contents; }
-button.luach-chip {
-  font: inherit; font-size: 0.75rem; font-weight: 600;
-  cursor: pointer; -webkit-appearance: none; appearance: none;
-  transition: background 0.15s ease, border-color 0.15s ease;
+/* A gold dot between one fund and the next, which is what carries the list now that the
+   boxes are gone. */
+.luach-chip + .luach-chip::before {
+  content: "\2022";
+  color: var(--luach-gold-soft);
+  margin-right: 0.23rem;
 }
-button.luach-chip:hover { background: rgba(209,173,95,0.16); border-color: rgba(184,143,58,0.6); }
-button.luach-chip:active { background: rgba(209,173,95,0.24); }
-button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 2px; }
 
 /* Donate. The one filled thing on a card, navy with gold on it, which is the pairing the
    site's own Print button uses. Full width under the funds, and on a row card it sits
