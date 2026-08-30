@@ -4,16 +4,31 @@
 // the chart view had to import it, and week-view imports the chart view to put the chart
 // under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
 // into one flat script.
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 
-/** The week the congregation should be looking at: the next Shabbos still to come.
+
+/** The week the congregation should be looking at: the first one not yet finished.
  *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-export function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+ *  A week is finished five minutes after the last מנין printed on it, which on a שבת card
+ *  is the last מעריב of מוצאי שבת. That is the moment nothing on the card is still to
+ *  happen, and from then on what somebody opening the page wants is the week ahead. It is a
+ *  few hours earlier than the midnight this used to wait for, and those few hours are the
+ *  emptiest on the board.
+ *
+ *  `endsAt(serial)` gives that moment as minutes after midnight on the week's own Shabbos,
+ *  and is passed in rather than worked out here: it has to read the week's printed times,
+ *  which means the sheets, the rules and the overrides, and nothing else this module does
+ *  needs any of that. Without it there is nothing to read, so it falls back to the calendar
+ *  day and rolls at midnight, which is what it always did. */
+export function currentSerial(serials, settings = null, endsAt = null) {
+  const now = new Date();
+  if (settings && endsAt) {
+    const { serial: today, mins } = shulNow(now, settings);
+    const over = (s) => s < today || (s === today && mins >= endsAt(s));
+    const ahead = serials.filter((s) => !over(s));
+    return ahead.length ? Math.min(...ahead) : Math.max(...serials);
+  }
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
   return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
 }

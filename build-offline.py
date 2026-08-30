@@ -112,6 +112,17 @@ def transform_module(key, text, all_exports):
     # Strip the `export ` keyword, leaving the declaration itself.
     text = re.sub(r"^export\s+(?=(async\s+)?function\s)", "", text, flags=re.M)
     text = re.sub(r"^export\s+(?=const\s)", "", text, flags=re.M)
+    # Only the two declaration forms above are understood. A bare `export { a, b }` is
+    # left standing by both, and a stray export keyword in a plain script is a syntax
+    # error that takes the whole offline app down with nothing on screen to say why. It
+    # cost a build that looked fine and came up blank, so it is caught here instead: put
+    # the name in one module and import it, rather than re-exporting it from a second.
+    leftover = re.search(r"^export\s*[{*]", text, flags=re.M)
+    if leftover:
+        raise RuntimeError(
+            f"offline build: {key} has a re-export the flattener cannot strip "
+            f"({leftover.group(0).strip()!r}). Import the name from where it is declared."
+        )
     return text.strip("\n"), namespace_consts
 
 

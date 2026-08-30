@@ -18,67 +18,16 @@ import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH } from '../util.js';
+import { SLASH, DAY_NAMES } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
+import { dateFromSerial, shulNow } from '../zmanim/solar.js';
+import { weekEndsMins } from '../upcoming.js';
+import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
 import { chartSpreads } from './chart-view.js';
-
-/** Every week worth showing, newest sheet first, so a week that appears in more than one
- *  saved sheet resolves to the most recently generated one.
- *
- *  Shabbos sheets first, then any week a Weekday chart has that they do not. A Yom Tov
- *  Shabbos has no parsha, so it is left out of the Shabbos chart, but the days before it
- *  are ordinary days that are davened and its Weekday chart carries them. Indexing only
- *  the Shabbos sheets left those weeks off the site altogether: שבועות, ראש השנה and
- *  סוכות each had a full set of weekday times published and no way to reach them. Such a
- *  week comes through with no Shabbos sheet, and renders as the חול card on its own. */
-export function weekIndex(state) {
-  const sheets = [...state.sheets].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  const bySerial = new Map();
-  // A saved week's date is an ISO string, not a Date: it went through localStorage. The
-  // zmanim code calls Date methods on it, so revive it the way sheet-view does.
-  const add = (week, sheet) => {
-    if (!bySerial.has(week.serial)) bySerial.set(week.serial, { week: { ...week, date: new Date(week.date) }, sheet });
-  };
-  for (const sheet of sheets) {
-    if (sheet.season === 'weekday') continue;
-    for (const week of sheet.weeks) add(week, sheet);
-  }
-  for (const sheet of sheets) {
-    if (sheet.season !== 'weekday') continue;
-    for (const week of sheet.weeks) add(week, null); // null: no Shabbos chart covers it
-  }
-  return bySerial;
-}
-
-/** The Weekday chart holding a given week, whether it came in beside a Shabbos sheet or
- *  is the only chart that has the week at all. */
-export function weekdayChartFor(sheet, serial, state) {
-  if (sheet) return weekdayCompanionOf(sheet, state);
-  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
-}
-
-/** The weekday chart generated alongside a given Shabbos sheet, if there is one. */
-function weekdayCompanionOf(sheet, state) {
-  return state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
-}
-
-
-/** The chart row for one week, with rules and manual overrides applied, exactly as the
- *  printed chart would show it. */
-export function rowFor(week, sheet, state, settings) {
-  const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
-  const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
-  const build = effectiveSeason === 'kayitz' ? buildKayitzRow : buildChorefRow;
-  const hebrew = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
-  const computed = build(week, settings);
-  const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
-  const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-  return { row, columns, overriddenKeys };
-}
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -87,7 +36,6 @@ export function rowFor(week, sheet, state, settings) {
  *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 
 function specialDaysInWeek(shabbosSerial, settings) {
   // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
@@ -127,17 +75,61 @@ const CARD_ORDER_KEY = 'zmanim-week-card-order';
  *  in an iframe came up empty with "SecurityError: Failed to read the 'localStorage'
  *  property". Which page comes first is a preference; losing the whole schedule over it is
  *  not a trade worth making, so it falls back to the default and carries on. */
-function cardOrder() {
+/** Which card a week leads with when nobody has said otherwise: the one whose times are
+ *  the next to be used.
+ *
+ *  Sunday through Thursday that is the weekday card. From Friday it is the שבת card, and
+ *  it stays the שבת card until Shabbos is out 72 minutes after שקיעה, at which point the
+ *  page has already moved on to the coming week and its weekdays are what is next.
+ *
+ *  Read off the shul's clock rather than the browser's, the same as everything else that
+ *  asks what time it is here. */
+function autoCardOrder(state, settings) {
   try {
-    return localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos';
+    const { serial, mins } = shulNow(new Date(), settings);
+    const day = dateFromSerial(serial).getUTCDay();
+    if (day === 5) return 'shabbos';
+    // On Shabbos itself it stays the שבת card until the card is spent, the same moment the
+    // page moves on to the next week. Read off the week's own last מנין rather than off a
+    // clock, so the two cannot disagree about when Shabbos is done with.
+    if (day === 6) return mins < weekEndsMins(serial, state, settings) ? 'shabbos' : 'weekday';
+    return 'weekday';
   } catch {
     return 'shabbos';
   }
 }
 
-function rememberCardOrder(value) {
+/** The order in force: whatever was picked, until the page has moved on from what it was
+ *  picked for.
+ *
+ *  A pick is remembered against the week it was made on and the automatic answer it was
+ *  made against, and it holds only while both still stand. So somebody on a Friday who
+ *  wants the weekday times first keeps them for the rest of that Shabbos, and once the
+ *  week rolls over the page is choosing for itself again.
+ *
+ *  Both halves are needed. Against the automatic answer alone a pick never really expires,
+ *  because that answer only ever has two values and comes back round to the same one every
+ *  Friday: a pick made one Friday would quietly reappear the next. Against the week alone
+ *  it would survive Friday's turn from weekday to שבת within the same week, which is the
+ *  one moment it most ought to give way.
+ *
+ *  Expiring at all is the point. This switch sits inside a panel most of the congregation
+ *  will never open, and a pick kept for good would silently turn the whole thing off for
+ *  anyone who ever touched it once. */
+function cardOrder(showing, state, settings) {
+  const auto = autoCardOrder(state, settings);
   try {
-    localStorage.setItem(CARD_ORDER_KEY, value);
+    const [pick, week, against] = (localStorage.getItem(CARD_ORDER_KEY) || '').split('|');
+    if ((pick === 'shabbos' || pick === 'weekday') && week === String(showing) && against === auto) return pick;
+  } catch {
+    // Storage refused: the automatic answer is the answer.
+  }
+  return auto;
+}
+
+function rememberCardOrder(value, showing, state, settings) {
+  try {
+    localStorage.setItem(CARD_ORDER_KEY, `${value}|${showing}|${autoCardOrder(state, settings)}`);
   } catch {
     // Nothing to do: the choice still applies to this page, it just will not be
     // remembered next time.
@@ -1110,7 +1102,7 @@ function weekCardsHtml(showing, index, state, settings) {
   // The two are ordered the same way on screen as on paper, here rather than only in the
   // print run: this page's whole bargain is that what you see is what comes out, so an
   // order that applied to the printer alone would be a surprise waiting to happen.
-  return cardOrder() === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
+  return cardOrder(showing, state, settings) === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
 }
 
 
@@ -1162,7 +1154,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : currentSerial(serials);
+  const showing = serials.includes(serial) ? serial : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones
@@ -1232,8 +1224,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                     { value: 'two', label: 'Two', on: pairView },
                   ])}
                   ${switchHtml('week-order', 'Which page first', [
-                    { value: 'shabbos', label: '<bdi>שבת</bdi>', on: cardOrder() === 'shabbos' },
-                    { value: 'weekday', label: 'Weekday', on: cardOrder() === 'weekday' },
+                    { value: 'shabbos', label: '<bdi>שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
+                    { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
                   ])}
                 </div>`
               : ''
@@ -1395,7 +1387,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       });
   };
   onSwitch('week-pages', (value) => { pairView = value === 'two'; });
-  onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos'));
+  onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
 
   // Every week from this one to the end of the season, in one run. Each week is built and
   // treated exactly as it is when it is on the screen on its own, so a printed run cannot

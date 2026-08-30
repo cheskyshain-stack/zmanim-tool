@@ -9,6 +9,8 @@
 //
 // Shared between the congregation's site and the admin's This week screen, so the two
 // cannot drift apart.
+import { resolveSettings } from '../settings.js';
+import { weekEndsMins } from '../upcoming.js';
 import { buildSheetPages, syncPageHeights } from './sheet-view.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
@@ -37,9 +39,9 @@ export function chartSpreads(state) {
 
 /** The spread covering now: the one holding the same week the week view opens on, so the
  *  two never disagree about which Shabbos is "this" one. */
-function spreadIndexForNow(spreads) {
+function spreadIndexForNow(spreads, state, settings) {
   if (!spreads.length) return 0;
-  const target = currentSerial(spreads.flatMap((s) => s.serials));
+  const target = currentSerial(spreads.flatMap((s) => s.serials), settings, (s) => weekEndsMins(s, state, settings));
   const found = spreads.findIndex((s) => s.serials.includes(target));
   return found === -1 ? 0 : found;
 }
@@ -128,7 +130,10 @@ function fitChartToWindow(pagesEl) {
 export function renderChartBrowser(container, state, opts = {}) {
   const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
   const spreads = chartSpreads(state);
-  let at = spreadIndexForNow(spreads);
+  // Settings for the same reason the week view needs them: which Shabbos is "this" one
+  // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
+  const settings = resolveSettings(state.settings);
+  let at = spreadIndexForNow(spreads, state, settings);
 
   const draw = () => {
     // Asked every draw rather than once, so the redraw that follows the taps comes out
@@ -183,7 +188,7 @@ export function renderChartBrowser(container, state, opts = {}) {
     });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
-    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
     // Swiping is the same journey as the buttons, so it goes with them.
     if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
     // Three taps on the chart itself lets the rest of the season out. On the pages rather

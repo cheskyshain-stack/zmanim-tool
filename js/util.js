@@ -6,6 +6,12 @@
 export const NBSP = ' ';
 export const SLASH = `${NBSP}/${NBSP}`;
 
+/* The days of the week as the boards name them, Sunday first so it indexes straight off
+   excelWeekday less one. Here rather than in either of the two files that want it, which
+   had a copy each: the offline build flattens every module into one scope and two consts
+   of the same name in it is a hard error, which is how the pair was found. */
+export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+
 export function textjoin(delim, ignoreEmpty, parts) {
   const flat = [];
   for (const p of parts) {

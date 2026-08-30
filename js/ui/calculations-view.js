@@ -18,6 +18,7 @@ import { KAYITZ_COLUMNS, buildKayitzRow } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS, buildChorefRow } from '../sheets/choref.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from '../sheets/weekday.js';
 import { currentSerial } from './nav-helpers.js';
+import { weekEndsMins } from '../upcoming.js';
 import { resolveSettings } from '../settings.js';
 import { UL_START, UL_END } from '../format.js';
 
@@ -181,11 +182,11 @@ const printedOrder = (columns) => [...columns].reverse();
 
 /** A week to work the examples on: whichever the rest of the app is showing, if this
  *  chart covers it, and otherwise the nearest one that chart has. */
-function exampleWeek(state, season) {
+function exampleWeek(state, season, settings) {
   const sheets = (state.sheets || []).filter((s) => (season === 'weekday' ? s.season === 'weekday' : s.season === season));
   const weeks = sheets.flatMap((s) => s.weeks || []);
   if (!weeks.length) return null;
-  const serial = currentSerial(weeks.map((w) => w.serial));
+  const serial = currentSerial(weeks.map((w) => w.serial), settings, (s) => weekEndsMins(s, state, settings));
   const found = weeks.find((w) => w.serial === serial) || weeks[0];
   return { ...found, date: new Date(found.date) };
 }
@@ -194,7 +195,7 @@ const fmtWeek = (week) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(week.date);
 
 function chartHtml(chart, state, settings) {
-  const week = exampleWeek(state, chart.key);
+  const week = exampleWeek(state, chart.key, settings);
   let row = {};
   if (week) {
     try {

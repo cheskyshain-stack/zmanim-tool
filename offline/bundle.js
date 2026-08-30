@@ -645,6 +645,71 @@ function sunEvent(rise, date, horizonDeg, settings, useElevation) {
   return eventUTC + offsetHours / 24;
 }
 
+/* Where the shul is, right now, in the frame every zman here is written in: which
+   calendar day it is there and how far into it. It lives beside timezoneOffset, the
+   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
+   into the week view, so anything importing it from there dragged the week view along
+   and put nav-helpers in a cycle with it. */
+/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
+ *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
+ *  second (see untilNextChange in luach.js).
+ *
+ *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
+ *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
+ *  still on another zone should be told when מנחה is there, not have the countdown quietly
+ *  shifted by however far it has travelled.
+ *
+ *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
+ *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
+ *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
+ *  into a wall clock is a different question and the whole-day answer is wrong on the two
+ *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
+ *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
+ *  the switch at 2am each time.
+ *
+ *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
+ *  or a settings entry with no name to look up, where being an hour out for two hours a
+ *  year is better than not knowing the time at all. */
+function shulNow(now, settings) {
+  const zone = settings.timezone?.id;
+  if (zone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const at = {};
+      for (const part of parts) at[part.type] = part.value;
+      const serial = Math.round(
+        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
+      );
+      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
+      // milliseconds are added back off the instant itself, since the parts stop at seconds.
+      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
+        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
+      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
+    } catch {
+      // No Intl timezone support: fall through to the arithmetic.
+    }
+  }
+  const utcMinutes = now.getTime() / 60000;
+  // The offset is looked up for the day the moment falls on, which needs the day, which
+  // needs the offset. Standard time first, then again on the day that lands on: an hour
+  // either way can only change the answer within an hour of midnight, and the second pass
+  // is on the right side of the DST change by then.
+  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
+  for (let pass = 0; pass < 2; pass++) {
+    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+    const local = utcMinutes + offsetHours * 60;
+    const next = Math.floor(local / 1440) + 25569;
+    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+    serial = next;
+  }
+  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+  const local = utcMinutes + offsetHours * 60;
+  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+}
+
 // ==== hebrew-calendar.js ====
 // Hebrew calendar engine, ported 1:1 from the workbook's own defined names
 // (ROSH_HASHANA, JEWISH_DATE_AS_ARRAY_EXTENDED, GET_DATE_FROM_JEWISH_DATE_ARRAY,
@@ -965,6 +1030,12 @@ function hasTaanis(serial, settings) {
 // narrow - only the sheet's own explicit \n line breaks should ever create a new line.
 const NBSP = ' ';
 const SLASH = `${NBSP}/${NBSP}`;
+
+/* The days of the week as the boards name them, Sunday first so it indexes straight off
+   excelWeekday less one. Here rather than in either of the two files that want it, which
+   had a copy each: the offline build flattens every module into one scope and two consts
+   of the same name in it is a hard error, which is how the pair was found. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 
 function textjoin(delim, ignoreEmpty, parts) {
   const flat = [];
@@ -1583,14 +1654,28 @@ const WEEKDAY_COLUMNS = [
 // under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
 // into one flat script.
 
-/** The week the congregation should be looking at: the next Shabbos still to come.
+/** The week the congregation should be looking at: the first one not yet finished.
  *
- *  It rolls over once Shabbos is behind us, so Sunday morning already shows the coming
- *  week. Compared as a date rather than a moment, so the switch happens at midnight on
- *  Motzei Shabbos rather than at an exact tzais. */
-function currentSerial(serials) {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+ *  A week is finished five minutes after the last מנין printed on it, which on a שבת card
+ *  is the last מעריב of מוצאי שבת. That is the moment nothing on the card is still to
+ *  happen, and from then on what somebody opening the page wants is the week ahead. It is a
+ *  few hours earlier than the midnight this used to wait for, and those few hours are the
+ *  emptiest on the board.
+ *
+ *  `endsAt(serial)` gives that moment as minutes after midnight on the week's own Shabbos,
+ *  and is passed in rather than worked out here: it has to read the week's printed times,
+ *  which means the sheets, the rules and the overrides, and nothing else this module does
+ *  needs any of that. Without it there is nothing to read, so it falls back to the calendar
+ *  day and rolls at midnight, which is what it always did. */
+function currentSerial(serials, settings = null, endsAt = null) {
+  const now = new Date();
+  if (settings && endsAt) {
+    const { serial: today, mins } = shulNow(now, settings);
+    const over = (s) => s < today || (s === today && mins >= endsAt(s));
+    const ahead = serials.filter((s) => !over(s));
+    return ahead.length ? Math.min(...ahead) : Math.max(...serials);
+  }
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
   return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
 }
@@ -1700,6 +1785,558 @@ function unlockNav() {
   navIsUnlocked = true;
 }
 
+// ==== overrides.js ====
+// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
+// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
+function getOverride(sheet, weekSerial, columnKey) {
+  return sheet.overrides?.[weekSerial]?.[columnKey];
+}
+function setOverride(sheet, weekSerial, columnKey, value) {
+  if (!sheet.overrides) sheet.overrides = {};
+  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
+  sheet.overrides[weekSerial][columnKey] = value;
+}
+function clearOverride(sheet, weekSerial, columnKey) {
+  if (sheet.overrides?.[weekSerial]) {
+    delete sheet.overrides[weekSerial][columnKey];
+    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
+  }
+}
+
+/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
+function mergeRow(computedRow, sheet, weekSerial) {
+  const overriddenKeys = new Set();
+  const row = { ...computedRow };
+  const weekOverrides = sheet.overrides?.[weekSerial];
+  if (weekOverrides) {
+    for (const [key, value] of Object.entries(weekOverrides)) {
+      row[key] = value;
+      overriddenKeys.add(key);
+    }
+  }
+  return { row, overriddenKeys };
+}
+
+// ==== rules.js ====
+// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
+// HaGadol have a different Mincha time because of the drasha"). Applied to every
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
+// the intended distinction between rules (recurring, reapplies every year) and
+// overrides (tied to one generated sheet instance).
+//
+// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
+// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
+// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
+// touching the wrong column on the other sheet.
+//
+// A condition can combine any of:
+//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
+//   parsha:        [names]      - matches week.parsha
+//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
+//   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
+function conditionMatches(condition, week) {
+  if (condition.always) return true;
+  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
+  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
+  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
+  return false;
+}
+
+/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
+ *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
+ *  compatibility with data saved before that format existed, bare keys ("L") and the
+ *  older singular columnKey field (applied to any sheet). */
+function targetColumnsForSeason(rule, season) {
+  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+  return raw
+    .map((entry) => {
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
+      const [entrySeason, key] = entry.split(':');
+      return entrySeason === season ? key : null;
+    })
+    .filter(Boolean);
+}
+
+/** Applies every enabled rule to a row of computed cell text, returning a new object
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
+function applyRules(row, week, rules, season, appliedColumns) {
+  let out = row;
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (!conditionMatches(rule.condition, week)) continue;
+    for (const col of targetColumnsForSeason(rule, season)) {
+      if (!(col in out)) continue;
+      if (out === row) out = { ...row };
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      if (appliedColumns) appliedColumns.add(col);
+    }
+  }
+  return out;
+}
+
+// ==== sheets/rows.js ====
+// Building a week's printed row, and finding which sheet holds a given week.
+//
+// Its own module rather than part of the week view, because upcoming.js needs exactly
+// these and nothing else the view has. Taking them from the view made upcoming.js depend
+// on the UI, and through it on the chart view, which put anything importing upcoming.js
+// into a cycle with the very views that wanted it.
+
+
+
+
+
+
+/** Every week worth showing, newest sheet first, so a week that appears in more than one
+ *  saved sheet resolves to the most recently generated one.
+ *
+ *  Shabbos sheets first, then any week a Weekday chart has that they do not. A Yom Tov
+ *  Shabbos has no parsha, so it is left out of the Shabbos chart, but the days before it
+ *  are ordinary days that are davened and its Weekday chart carries them. Indexing only
+ *  the Shabbos sheets left those weeks off the site altogether: שבועות, ראש השנה and
+ *  סוכות each had a full set of weekday times published and no way to reach them. Such a
+ *  week comes through with no Shabbos sheet, and renders as the חול card on its own. */
+function weekIndex(state) {
+  const sheets = [...state.sheets].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const bySerial = new Map();
+  // A saved week's date is an ISO string, not a Date: it went through localStorage. The
+  // zmanim code calls Date methods on it, so revive it the way sheet-view does.
+  const add = (week, sheet) => {
+    if (!bySerial.has(week.serial)) bySerial.set(week.serial, { week: { ...week, date: new Date(week.date) }, sheet });
+  };
+  for (const sheet of sheets) {
+    if (sheet.season === 'weekday') continue;
+    for (const week of sheet.weeks) add(week, sheet);
+  }
+  for (const sheet of sheets) {
+    if (sheet.season !== 'weekday') continue;
+    for (const week of sheet.weeks) add(week, null); // null: no Shabbos chart covers it
+  }
+  return bySerial;
+}
+
+/** The Weekday chart holding a given week, whether it came in beside a Shabbos sheet or
+ *  is the only chart that has the week at all. */
+function weekdayChartFor(sheet, serial, state) {
+  if (sheet) return weekdayCompanionOf(sheet, state);
+  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
+}
+
+/** The weekday chart generated alongside a given Shabbos sheet, if there is one. */
+function weekdayCompanionOf(sheet, state) {
+  return state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
+}
+
+
+/** The chart row for one week, with rules and manual overrides applied, exactly as the
+ *  printed chart would show it. */
+function rowFor(week, sheet, state, settings) {
+  const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
+  const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
+  const build = effectiveSeason === 'kayitz' ? buildKayitzRow : buildChorefRow;
+  const hebrew = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  const computed = build(week, settings);
+  const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
+  const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
+  return { row, columns, overriddenKeys };
+}
+
+// ==== upcoming.js ====
+// What is on next: the מנין the congregation page leads with, and the next זמן beside it.
+//
+// Everything here is read back out of the charts rather than worked out again. The times
+// on the boards come from the workbook's ported formulas, they are then reshaped by the
+// season's rules and by anything typed over a cell by hand, and a home page quoting its
+// own numbers would sooner or later disagree with the page it links to. So this builds
+// the very same row the week's card is built from, through the same rules and the same
+// overrides, and reads the times off it.
+//
+// Reading them off means parsing "h:mm" back out of a printed cell, which is only safe
+// because it is this app's own output in a format it controls. Every time recovered is
+// formatted again and checked against the text it came from, and anything that does not
+// come back identical is dropped rather than guessed at. See parseCell.
+//
+// הדלקת נרות is read the same way and for the same reason: its column is שקיעה floored to
+// the minute less the figure set in Settings, and it can be reshaped by a rule or typed
+// over, so computing it again here would quietly disagree with the board on the weeks
+// where any of that made a difference.
+
+
+
+
+
+
+
+
+
+/* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
+ *
+ *  Not every column is a מנין. ס"ז קר"ש and הדלקת נרות are זמנים and are left out here;
+ *  they come back below through the זמנים list, computed rather than parsed.
+ *
+ *  `firstLine` is for the three פלג מנחה columns, which print the מנין on the first line
+ *  and the פלג it is set against on the second. The מנין is the one to offer; the פלג is
+ *  a זמן and would otherwise be read as a second מנין a quarter of an hour later.
+ *
+ *  The day matters because a שבת chart row covers two days: its Friday columns and its
+ *  Shabbos ones, anchored on the same Saturday. */
+const FRIDAY = 6;
+const SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Saturday
+const SHABBOS_CELLS = {
+  B: { day: SHABBOS },
+  C: { day: SHABBOS },
+  E: { day: SHABBOS, morning: true },
+  F: { day: FRIDAY },
+  G: { day: FRIDAY },
+  I: { day: FRIDAY, firstLine: true },
+  J: { day: FRIDAY, firstLine: true },
+  K: { day: FRIDAY, firstLine: true },
+  L: { day: FRIDAY },
+};
+/* חורף has no פלג columns, and its column I is the ערב שבת מנחה that קיץ calls L. Keyed by
+   season so a column letter can mean different things on the two charts, which I does. */
+const SEASON_CELLS = {
+  kayitz: SHABBOS_CELLS,
+  choref: { B: SHABBOS_CELLS.B, C: SHABBOS_CELLS.C, E: SHABBOS_CELLS.E, F: SHABBOS_CELLS.F, G: SHABBOS_CELLS.G, I: SHABBOS_CELLS.L },
+};
+
+/** A heading line that is only a room in brackets: "(למטה)", "(בעזר'״נ)". Two of the קיץ
+ *  columns carry one, and it is the room rather than the name of the מנין. */
+const ROOM_LINE = /^\(.+\)$/;
+
+/** What to call a מנין, taken from the column's own printed heading so the home page and
+ *  the board cannot drift apart. The heading's later lines are kept where they say which
+ *  מנין it is ("מנחה ערב שבת"), and dropped where they say something else: a פלג line names
+ *  the זמן the מנין is set against, and a bracketed line names the room, which the card
+ *  shows in its own smaller type underneath (roomFromHeader). */
+function nameFromHeader(header) {
+  return String(header)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('פלג') && !ROOM_LINE.test(line))
+    .join(' ');
+}
+
+/** The room out of the heading, unbracketed, or nothing. */
+function roomFromHeader(header) {
+  const line = String(header).split('\n').map((l) => l.trim()).find((l) => ROOM_LINE.test(l));
+  return line ? line.slice(1, -1).trim() : '';
+}
+
+/* Where a מנין davens, as the printed board says it: a plain time is the main בית מדרש, an
+   underlined one is למטה, one star is בעזר״נ and two is באולם השמחות. */
+const PLACES = { u: 'למטה', '*': 'בעזר״נ', '**': 'באולם השמחות' };
+
+/** Every time in one printed cell, in minutes after midnight, with where it davens.
+ *
+ *  Two things make this safe to do by hand rather than with a real parser. The cell is
+ *  this app's own output, so a time is always "h:mm" on a 12-hour clock with no meridiem.
+ *  And every time recovered is formatted again and compared with the text it was read
+ *  from: if the two do not match exactly the entry is thrown away, so a cell shaped in
+ *  some way not thought of here goes missing rather than showing a wrong time.
+ *
+ *  The meridiem is not in the text and has to be worked out. Only the שחרית columns are
+ *  in the morning; everything else on these boards runs from מנחה גדולה to מעריב. Within
+ *  a cell the times only ever go forwards, so any time that reads as earlier than the one
+ *  before it has half a day added, which is what turns the 12:00 at the end of a מעריב
+ *  list running 10:30, 11:00, 11:30 into midnight rather than noon. */
+function parseCell(cell, { morning = false, firstLine = false } = {}) {
+  if (cell == null) return [];
+  let text = String(cell);
+  if (firstLine) text = text.split('\n')[0];
+  const out = [];
+  let previous = -1;
+  // The underline sentinels are plain characters at this stage (see format.js), so the
+  // mark travels with its own time and cannot be attached to the wrong one. Built from
+  // the exported constants rather than written out, so the two cannot fall out of step.
+  const token = new RegExp(`(${UL_START}?)\\s*(\\d{1,2}):(\\d{2})(\\*{0,2})(${UL_END}?)`, 'g');
+  for (const m of text.matchAll(token)) {
+    const [, ulStart, hh, mm, stars, ulEnd] = m;
+    const hour12 = Number(hh);
+    const minute = Number(mm);
+    if (hour12 < 1 || hour12 > 12 || minute > 59) continue;
+    let mins = (morning ? hour12 % 12 : (hour12 % 12) + 12) * 60 + minute;
+    while (mins <= previous) mins += 12 * 60;
+    // The round trip. Anything that does not format back to what it was read from is not
+    // a time this code understands, and is left out.
+    if (formatTime((mins % 1440) / 1440) !== `${hour12}:${mm}`) continue;
+    previous = mins;
+    const underlined = ulStart === UL_START || ulEnd === UL_END;
+    out.push({ mins, place: PLACES[stars || (underlined ? 'u' : '')] || '' });
+  }
+  return out;
+}
+
+/** The שחרית schedule for one weekday, out of Settings.
+ *
+ *  It is rich text rather than a computed column, and on a ר"ח, בה"ב or תענית the shul
+ *  runs a second, earlier schedule, which the card prints as its own line. Whichever one
+ *  applies to this particular day is the one to read. */
+function weekdayShacharis(serial, state, settings) {
+  const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
+    .some(Boolean);
+  const text = (special && state.settings.weekdayShacharisSpecial) || state.settings.weekdayShacharis || '';
+  // Written in Settings as HTML, where an underline is a real <u> rather than the
+  // sentinel a computed cell carries, so it is turned back into the sentinel form
+  // parseCell reads before the times are picked out of it.
+  const marked = String(text)
+    .replace(/<u\b[^>]*>/gi, UL_START)
+    .replace(/<\/u>/gi, UL_END)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+  return parseCell(marked, { morning: true });
+}
+
+/** The published week a calendar day belongs to, and the serial that week is filed under.
+ *
+ *  Found by the Sunday the two have in common, not by the Shabbos. A row is normally
+ *  anchored on its Shabbos, but two rows on a Weekday chart are anchored on a stand-in
+ *  date instead: the season's trailing gap before Yom Tov, and a Chol Hamoed row (see
+ *  weeks.js). Looking for "the Saturday of this day's week" walked straight past those:
+ *  measured on the published charts, the row filed under serial 46499 is a Thursday, and
+ *  every day of that week came back with no מנינים at all even though its Weekday chart
+ *  has them.
+ *
+ *  A Shabbos-anchored row wins where both exist, since only it carries Friday and Shabbos
+ *  columns. */
+function entryForDay(serial, state) {
+  const sundayOf = (s) => s - (excelWeekday(s) - 1);
+  const sunday = sundayOf(serial);
+  let standIn = null;
+  for (const [anchor, entry] of weekIndex(state)) {
+    if (sundayOf(anchor) !== sunday) continue;
+    if (excelWeekday(anchor) === SHABBOS) return { anchor, entry };
+    standIn = standIn || { anchor, entry };
+  }
+  return standIn;
+}
+
+/** Every מנין on one calendar day, earliest first.
+ *
+ *  A day is served by whichever chart covers it: Sunday through Thursday by the Weekday
+ *  chart, Friday and Shabbos by the שבת chart for that week. */
+function minyanimForDay(serial, state, settings) {
+  const dow = excelWeekday(serial);
+  const found = entryForDay(serial, state);
+  if (!found) return [];
+  const { anchor, entry } = found;
+  const out = [];
+
+  if (dow === FRIDAY || dow === SHABBOS) {
+    // Friday and Shabbos, off the שבת chart. A stand-in row is not anchored on a Shabbos
+    // and has no Friday or Shabbos columns to read, and a week whose Shabbos is Yom Tov
+    // has no row on the שבת chart at all.
+    if (!entry.sheet || excelWeekday(anchor) !== SHABBOS) return [];
+    const { row, columns } = rowFor(entry.week, entry.sheet, state, settings);
+    // Which letters mean what is decided by the columns rowFor handed back, not by the
+    // sheet's own season: a חורף sheet is built as קיץ inside the spring DST window, and
+    // there its column I is a פלג מנחה rather than the ערב שבת one.
+    const cells = columns === KAYITZ_COLUMNS ? SEASON_CELLS.kayitz : SEASON_CELLS.choref;
+    for (const column of columns) {
+      const cell = cells[column.key];
+      if (!cell || cell.day !== dow) continue;
+      const name = nameFromHeader(column.header);
+      // The room comes off the heading where the heading gives one, and off the time's own
+      // underline otherwise. The פלג columns do both, naming the room in their heading and
+      // underlining the time as well, which is the same thing said twice: taking the
+      // heading's first and falling back to the time's says it once.
+      const room = roomFromHeader(column.header);
+      for (const t of parseCell(row[column.key], cell)) {
+        out.push({ ...t, name, place: room || t.place });
+      }
+    }
+    // Friday morning is the weekday שחרית, and it has to be added here because neither
+    // chart carries it. The Weekday chart runs Sunday through Thursday, since that is
+    // where its מנחה and מעריב differ from an Erev Shabbos, and the שבת chart's שחרית
+    // column is Shabbos morning. Between the two, Friday morning fell down the gap: after
+    // Thursday's last מעריב the card jumped straight to "מנחה ערב שבת 1:35, tomorrow",
+    // with the whole of Friday שחרית missing.
+    //
+    // Adding it is not an assumption about the schedule. שחרית is one fixed list out of
+    // Settings, the same every weekday, which is exactly why the chart prints it once as
+    // a merged cell rather than working it out day by day.
+    if (dow === FRIDAY) {
+      const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
+      for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
+    }
+  } else {
+    // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
+    // may be typed over; שחרית is a Settings schedule and is not part of that row.
+    const chart = weekdayChartFor(entry.sheet, anchor, state);
+    const week = chart?.weeks.find((w) => w.serial === anchor);
+    if (!chart || !week) return [];
+    const { row } = mergeRow(buildWeekdayRow(week, settings), chart, anchor);
+    for (const column of WEEKDAY_COLUMNS) {
+      if (column.key === 'E') continue; // שחרית, handled below
+      const name = nameFromHeader(column.header);
+      for (const t of parseCell(row[column.key])) out.push({ ...t, name });
+    }
+    const shacharisName = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
+    for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
+  }
+  out.sort((a, b) => a.mins - b.mins);
+  return out;
+}
+
+/** הדלקת נרות on one calendar day, or nothing if that day is not an Erev Shabbos with a
+ *  chart row behind it.
+ *
+ *  Read off the chart's own הדלקת נרות column rather than worked out here. The column is
+ *  שקיעה floored to the minute, less the number of minutes set in Settings, and it can be
+ *  reshaped by a rule or typed over like any other cell. Computing it again would have got
+ *  the same answer most weeks and quietly disagreed with the printed board on the ones
+ *  where the flooring or an override made a minute of difference. */
+function candleLightingForDay(serial, state, settings) {
+  if (excelWeekday(serial) !== FRIDAY) return null;
+  const found = entryForDay(serial, state);
+  if (!found || !found.entry.sheet || excelWeekday(found.anchor) !== SHABBOS) return null;
+  const { row, columns } = rowFor(found.entry.week, found.entry.sheet, state, settings);
+  // H on both charts. The cell carries שקיעה on a second line, so only the first is read.
+  const column = columns.find((c) => c.key === 'H');
+  if (!column) return null;
+  const [first] = parseCell(row.H, { firstLine: true });
+  return first ? { name: 'הדלקת נרות', mins: first.mins, place: '' } : null;
+}
+
+
+/** How long a מנין stays on the card after its own time has come. Someone glancing at the
+ *  page a minute after שחרית started is being told about the one that is running, not sent
+ *  on to מנחה: the time has arrived, it has not finished, and the answer to "what is on
+ *  now" is still this one. Rolling straight on at the stroke of the minute also made the
+ *  card hardest to read exactly when it was most wanted, on the way in the door.
+ *
+ *  Five minutes, and it is the start that is being counted from, not the end, because a
+ *  מנין's length is not something the boards know. */
+const MINYAN_GRACE = 5;
+
+/** The first entry from `forDay` at or after now (less the grace above), rolling on to
+ *  tomorrow once today's are done, and stopping at the first day there is no schedule for.
+ *
+ *  Rolling on is the ordinary case: at eleven at night the answer to "what is next" is the
+ *  morning, and saying so is right. Stopping is the case this cannot get wrong. Three weeks
+ *  a year have no row on the שבת chart, the Erev Shabbos and Shabbos of a Yom Tov, and the
+ *  published charts run out at the end of a season. Searching past those turned up a real
+ *  time from a real day and put it on the card as though it were next, so on an Erev Yom
+ *  Tov the page offered a מנין several days off with nothing to say it was not tomorrow.
+ *  A day nothing is known about ends the search, and the card is left off the page
+ *  altogether rather than answering a question it cannot answer.
+ *
+ *  Eight days is the far limit, which nothing should ever reach now that an empty day stops
+ *  it, and is here so a bad state cannot spin. */
+function nextFrom(forDay, now, settings, days = 8) {
+  const { serial, mins } = shulNow(now, settings);
+  for (let offset = 0; offset < days; offset++) {
+    const day = serial + offset;
+    const list = forDay(day);
+    if (!list.length) return null; // no schedule for this day: say nothing at all
+    for (const item of list) {
+      if (offset === 0 && item.mins < mins - MINYAN_GRACE) continue;
+      return { ...item, serial: day, daysOff: offset, in: item.mins - mins + offset * 1440 };
+    }
+  }
+  return null;
+}
+
+/** When a week stops being worth looking at: five minutes past the last מנין on it.
+ *
+ *  A week's card is anchored on its Shabbos and runs from the Sunday before, so the last
+ *  time on it is the last מעריב of מוצאי שבת. Once that has been and gone there is nothing
+ *  left on the card still to happen, and what somebody opening the page wants is the week
+ *  that has not started yet.
+ *
+ *  Five minutes for the same reason the "what is on next" card holds a מנין for five
+ *  minutes after it starts: the time being read off is when a מנין begins, not when it
+ *  ends, and the boards do not know how long one runs.
+ *
+ *  A Shabbos that is Yom Tov has no row on the chart and so no times to read. There is
+ *  nothing to count from, so the answer falls back to 72 minutes after שקיעה, which is when
+ *  that Shabbos is out whether or not anything was printed for it.
+ *
+ *  Returned as minutes after midnight on the Shabbos's own day, the frame shulNow answers
+ *  in, so the two can be compared without either becoming a real instant. */
+function weekEndsMins(serial, state, settings) {
+  const list = minyanimForDay(serial, state, settings);
+  if (!list.length) return tzais72(dateFromSerial(serial), settings) * 1440;
+  return Math.max(...list.map((item) => item.mins)) + MINYAN_GRACE;
+}
+
+/** The next מנין, and the next זמן. Both may be null: before anything is published, or
+ *  past the end of what is. */
+function nextMinyan(now, state, settings) {
+  return nextFrom((day) => minyanimForDay(day, state, settings), now, settings);
+}
+/** הדלקת נרות for today, and only when today is an Erev Shabbos.
+ *
+ *  Not "the next one": it is the day's own number and stays on the card all Friday, after
+ *  the time itself has gone by as much as before it. Rolling on to next week's the moment
+ *  candles are lit would replace the one figure anybody is still checking that evening
+ *  with one that is a week away. */
+function todaysCandleLighting(now, state, settings) {
+  const { serial, mins } = shulNow(now, settings);
+  const one = candleLightingForDay(serial, state, settings);
+  return one ? { ...one, serial, daysOff: 0, in: one.mins - mins } : null;
+}
+
+/** "1:50" for a time held as minutes after midnight, on the same 12-hour clock the boards
+ *  use. Minutes past a day roll round, which is how a מעריב at midnight prints as 12:00. */
+function clock(mins) {
+  return formatTime((((mins % 1440) + 1440) % 1440) / 1440);
+}
+
+/** "AM" or "PM". The printed boards never say which, and never need to: they are a whole
+ *  day laid out in order, so a 7:30 among the מנחה times cannot be read as the morning.
+ *  One time on its own has no such column to sit in, and 8:45 with nothing beside it is a
+ *  genuine question. */
+function meridiem(mins) {
+  return (((mins % 1440) + 1440) % 1440) < 720 ? 'AM' : 'PM';
+}
+
+/** How far off, in the coarsest words that are still true: "in 25 minutes", "in 2 hours",
+ *  "tomorrow", "Monday". A countdown to the second would be stale the moment it was drawn,
+ *  and is not what anyone is asking the page.
+ *
+ *  `item.in` is not a whole number of minutes. shulNow reads the clock to the millisecond,
+ *  which is what the search wants so that a מנין starting this very minute is not skipped,
+ *  and every one of these branches has to round it before saying it out loud. It did not,
+ *  and the card read "in 1.1569500006735325 minutes".
+ *
+ *  Minutes round up. Anything still to come is at least a minute away until it has
+ *  actually arrived, and rounding down would count the last thirty seconds as "in 0
+ *  minutes". Hours round to the nearest, where being half an hour out either way is the
+ *  whole point of saying "in 3 hours" rather than a number of minutes. */
+function howFar(item) {
+  if (!item) return '';
+  // Started, but only just: a מנין held on the card for its grace, or הדלקת נרות in the
+  // few minutes after. "now" is true of both, and is what the line should say while the
+  // time it names is the one happening.
+  if (item.in < 0 && item.in >= -MINYAN_GRACE) return 'now';
+  // Well and truly gone by. Only הדלקת נרות reaches here, since it is the day's own time
+  // rather than the next one, and "in -40 minutes" or "now" would both be untrue of it.
+  if (item.in < 0) return '';
+  const minutes = Math.ceil(item.in);
+  if (minutes === 0) return 'now';
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  if (item.daysOff === 0) {
+    const hours = Math.round(item.in / 60);
+    return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  if (item.daysOff === 1) return 'tomorrow';
+  return DAY_NAMES[excelWeekday(item.serial) - 1];
+}
+
 // ==== ui/calculations-view.js ====
 // Every column on every chart, and how its times are worked out.
 //
@@ -1716,6 +2353,7 @@ function unlockNav() {
 //
 // The worked examples are not written down either: they are produced by calling the real
 // build functions for a real week, so a number on this page is the number on that board.
+
 
 
 
@@ -1883,11 +2521,11 @@ const printedOrder = (columns) => [...columns].reverse();
 
 /** A week to work the examples on: whichever the rest of the app is showing, if this
  *  chart covers it, and otherwise the nearest one that chart has. */
-function exampleWeek(state, season) {
+function exampleWeek(state, season, settings) {
   const sheets = (state.sheets || []).filter((s) => (season === 'weekday' ? s.season === 'weekday' : s.season === season));
   const weeks = sheets.flatMap((s) => s.weeks || []);
   if (!weeks.length) return null;
-  const serial = currentSerial(weeks.map((w) => w.serial));
+  const serial = currentSerial(weeks.map((w) => w.serial), settings, (s) => weekEndsMins(s, state, settings));
   const found = weeks.find((w) => w.serial === serial) || weeks[0];
   return { ...found, date: new Date(found.date) };
 }
@@ -1896,7 +2534,7 @@ const fmtWeek = (week) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(week.date);
 
 function chartHtml(chart, state, settings) {
-  const week = exampleWeek(state, chart.key);
+  const week = exampleWeek(state, chart.key, settings);
   let row = {};
   if (week) {
     try {
@@ -2388,108 +3026,6 @@ function printButtonHtml(id = 'print-btn') {
 
 function wirePrintButton(root, id = 'print-btn') {
   root.querySelector(`#${id}`)?.addEventListener('click', () => window.print());
-}
-
-// ==== overrides.js ====
-// Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
-// which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
-function getOverride(sheet, weekSerial, columnKey) {
-  return sheet.overrides?.[weekSerial]?.[columnKey];
-}
-function setOverride(sheet, weekSerial, columnKey, value) {
-  if (!sheet.overrides) sheet.overrides = {};
-  if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
-  sheet.overrides[weekSerial][columnKey] = value;
-}
-function clearOverride(sheet, weekSerial, columnKey) {
-  if (sheet.overrides?.[weekSerial]) {
-    delete sheet.overrides[weekSerial][columnKey];
-    if (Object.keys(sheet.overrides[weekSerial]).length === 0) delete sheet.overrides[weekSerial];
-  }
-}
-
-/** Merges computed values with any stored overrides, returning {row, overriddenKeys}. */
-function mergeRow(computedRow, sheet, weekSerial) {
-  const overriddenKeys = new Set();
-  const row = { ...computedRow };
-  const weekOverrides = sheet.overrides?.[weekSerial];
-  if (weekOverrides) {
-    for (const [key, value] of Object.entries(weekOverrides)) {
-      row[key] = value;
-      overriddenKeys.add(key);
-    }
-  }
-  return { row, overriddenKeys };
-}
-
-// ==== rules.js ====
-// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
-// HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides - that's
-// the intended distinction between rules (recurring, reapplies every year) and
-// overrides (tied to one generated sheet instance).
-//
-// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
-// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
-// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
-// touching the wrong column on the other sheet.
-//
-// A condition can combine any of:
-//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
-//   parsha:        [names]      - matches week.parsha
-//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
-//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
-//                                 (month 5 = Av). Recurs every year, unlike dateISO.
-//   always:        true         - matches every week (for a blanket override)
-//
-// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
-// isn't stored on saved sheets, so it's computed at render time and works for sheets
-// generated before hebrewDate conditions existed.
-function conditionMatches(condition, week) {
-  if (condition.always) return true;
-  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
-  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
-  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
-  return false;
-}
-
-/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
- *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
- *  compatibility with data saved before that format existed, bare keys ("L") and the
- *  older singular columnKey field (applied to any sheet). */
-function targetColumnsForSeason(rule, season) {
-  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-  return raw
-    .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
-      const [entrySeason, key] = entry.split(':');
-      return entrySeason === season ? key : null;
-    })
-    .filter(Boolean);
-}
-
-/** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
- *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
- *
- *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
- *  'append' adds rule.value as an extra line onto whatever the cell already computed
- *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
-function applyRules(row, week, rules, season, appliedColumns) {
-  let out = row;
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    if (!conditionMatches(rule.condition, week)) continue;
-    for (const col of targetColumnsForSeason(rule, season)) {
-      if (!(col in out)) continue;
-      if (out === row) out = { ...row };
-      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
-      if (appliedColumns) appliedColumns.add(col);
-    }
-  }
-  return out;
 }
 
 // ==== ui/rich-text.js ====
@@ -3358,6 +3894,8 @@ function esc(str) {
 
 
 
+
+
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
@@ -3378,9 +3916,9 @@ function chartSpreads(state) {
 
 /** The spread covering now: the one holding the same week the week view opens on, so the
  *  two never disagree about which Shabbos is "this" one. */
-function spreadIndexForNow(spreads) {
+function spreadIndexForNow(spreads, state, settings) {
   if (!spreads.length) return 0;
-  const target = currentSerial(spreads.flatMap((s) => s.serials));
+  const target = currentSerial(spreads.flatMap((s) => s.serials), settings, (s) => weekEndsMins(s, state, settings));
   const found = spreads.findIndex((s) => s.serials.includes(target));
   return found === -1 ? 0 : found;
 }
@@ -3469,7 +4007,10 @@ function fitChartToWindow(pagesEl) {
 function renderChartBrowser(container, state, opts = {}) {
   const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
   const spreads = chartSpreads(state);
-  let at = spreadIndexForNow(spreads);
+  // Settings for the same reason the week view needs them: which Shabbos is "this" one
+  // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
+  const settings = resolveSettings(state.settings);
+  let at = spreadIndexForNow(spreads, state, settings);
 
   const draw = () => {
     // Asked every draw rather than once, so the redraw that follows the taps comes out
@@ -3524,7 +4065,7 @@ function renderChartBrowser(container, state, opts = {}) {
     });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
-    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
     // Swiping is the same journey as the buttons, so it goes with them.
     if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
     // Three taps on the chart itself lets the rest of the season out. On the pages rather
@@ -5558,59 +6099,8 @@ function erevParshaEnglish(hebrewParsha, parshaNames) {
 
 
 
-/** Every week worth showing, newest sheet first, so a week that appears in more than one
- *  saved sheet resolves to the most recently generated one.
- *
- *  Shabbos sheets first, then any week a Weekday chart has that they do not. A Yom Tov
- *  Shabbos has no parsha, so it is left out of the Shabbos chart, but the days before it
- *  are ordinary days that are davened and its Weekday chart carries them. Indexing only
- *  the Shabbos sheets left those weeks off the site altogether: שבועות, ראש השנה and
- *  סוכות each had a full set of weekday times published and no way to reach them. Such a
- *  week comes through with no Shabbos sheet, and renders as the חול card on its own. */
-function weekIndex(state) {
-  const sheets = [...state.sheets].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  const bySerial = new Map();
-  // A saved week's date is an ISO string, not a Date: it went through localStorage. The
-  // zmanim code calls Date methods on it, so revive it the way sheet-view does.
-  const add = (week, sheet) => {
-    if (!bySerial.has(week.serial)) bySerial.set(week.serial, { week: { ...week, date: new Date(week.date) }, sheet });
-  };
-  for (const sheet of sheets) {
-    if (sheet.season === 'weekday') continue;
-    for (const week of sheet.weeks) add(week, sheet);
-  }
-  for (const sheet of sheets) {
-    if (sheet.season !== 'weekday') continue;
-    for (const week of sheet.weeks) add(week, null); // null: no Shabbos chart covers it
-  }
-  return bySerial;
-}
-
-/** The Weekday chart holding a given week, whether it came in beside a Shabbos sheet or
- *  is the only chart that has the week at all. */
-function weekdayChartFor(sheet, serial, state) {
-  if (sheet) return weekdayCompanionOf(sheet, state);
-  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
-}
-
-/** The weekday chart generated alongside a given Shabbos sheet, if there is one. */
-function weekdayCompanionOf(sheet, state) {
-  return state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
-}
 
 
-/** The chart row for one week, with rules and manual overrides applied, exactly as the
- *  printed chart would show it. */
-function rowFor(week, sheet, state, settings) {
-  const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
-  const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
-  const build = effectiveSeason === 'kayitz' ? buildKayitzRow : buildChorefRow;
-  const hebrew = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
-  const computed = build(week, settings);
-  const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
-  const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-  return { row, columns, overriddenKeys };
-}
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -5619,7 +6109,6 @@ function rowFor(week, sheet, state, settings) {
  *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 
 function specialDaysInWeek(shabbosSerial, settings) {
   // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
@@ -5659,17 +6148,61 @@ const CARD_ORDER_KEY = 'zmanim-week-card-order';
  *  in an iframe came up empty with "SecurityError: Failed to read the 'localStorage'
  *  property". Which page comes first is a preference; losing the whole schedule over it is
  *  not a trade worth making, so it falls back to the default and carries on. */
-function cardOrder() {
+/** Which card a week leads with when nobody has said otherwise: the one whose times are
+ *  the next to be used.
+ *
+ *  Sunday through Thursday that is the weekday card. From Friday it is the שבת card, and
+ *  it stays the שבת card until Shabbos is out 72 minutes after שקיעה, at which point the
+ *  page has already moved on to the coming week and its weekdays are what is next.
+ *
+ *  Read off the shul's clock rather than the browser's, the same as everything else that
+ *  asks what time it is here. */
+function autoCardOrder(state, settings) {
   try {
-    return localStorage.getItem(CARD_ORDER_KEY) === 'weekday' ? 'weekday' : 'shabbos';
+    const { serial, mins } = shulNow(new Date(), settings);
+    const day = dateFromSerial(serial).getUTCDay();
+    if (day === 5) return 'shabbos';
+    // On Shabbos itself it stays the שבת card until the card is spent, the same moment the
+    // page moves on to the next week. Read off the week's own last מנין rather than off a
+    // clock, so the two cannot disagree about when Shabbos is done with.
+    if (day === 6) return mins < weekEndsMins(serial, state, settings) ? 'shabbos' : 'weekday';
+    return 'weekday';
   } catch {
     return 'shabbos';
   }
 }
 
-function rememberCardOrder(value) {
+/** The order in force: whatever was picked, until the page has moved on from what it was
+ *  picked for.
+ *
+ *  A pick is remembered against the week it was made on and the automatic answer it was
+ *  made against, and it holds only while both still stand. So somebody on a Friday who
+ *  wants the weekday times first keeps them for the rest of that Shabbos, and once the
+ *  week rolls over the page is choosing for itself again.
+ *
+ *  Both halves are needed. Against the automatic answer alone a pick never really expires,
+ *  because that answer only ever has two values and comes back round to the same one every
+ *  Friday: a pick made one Friday would quietly reappear the next. Against the week alone
+ *  it would survive Friday's turn from weekday to שבת within the same week, which is the
+ *  one moment it most ought to give way.
+ *
+ *  Expiring at all is the point. This switch sits inside a panel most of the congregation
+ *  will never open, and a pick kept for good would silently turn the whole thing off for
+ *  anyone who ever touched it once. */
+function cardOrder(showing, state, settings) {
+  const auto = autoCardOrder(state, settings);
   try {
-    localStorage.setItem(CARD_ORDER_KEY, value);
+    const [pick, week, against] = (localStorage.getItem(CARD_ORDER_KEY) || '').split('|');
+    if ((pick === 'shabbos' || pick === 'weekday') && week === String(showing) && against === auto) return pick;
+  } catch {
+    // Storage refused: the automatic answer is the answer.
+  }
+  return auto;
+}
+
+function rememberCardOrder(value, showing, state, settings) {
+  try {
+    localStorage.setItem(CARD_ORDER_KEY, `${value}|${showing}|${autoCardOrder(state, settings)}`);
   } catch {
     // Nothing to do: the choice still applies to this page, it just will not be
     // remembered next time.
@@ -6642,7 +7175,7 @@ function weekCardsHtml(showing, index, state, settings) {
   // The two are ordered the same way on screen as on paper, here rather than only in the
   // print run: this page's whole bargain is that what you see is what comes out, so an
   // order that applied to the printer alone would be a surprise waiting to happen.
-  return cardOrder() === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
+  return cardOrder(showing, state, settings) === 'weekday' ? weekdayCard + shabbosCard : shabbosCard + weekdayCard;
 }
 
 
@@ -6694,7 +7227,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : currentSerial(serials);
+  const showing = serials.includes(serial) ? serial : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones
@@ -6764,8 +7297,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
                     { value: 'two', label: 'Two', on: pairView },
                   ])}
                   ${switchHtml('week-order', 'Which page first', [
-                    { value: 'shabbos', label: '<bdi>שבת</bdi>', on: cardOrder() === 'shabbos' },
-                    { value: 'weekday', label: 'Weekday', on: cardOrder() === 'weekday' },
+                    { value: 'shabbos', label: '<bdi>שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
+                    { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
                   ])}
                 </div>`
               : ''
@@ -6927,7 +7460,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       });
   };
   onSwitch('week-pages', (value) => { pairView = value === 'two'; });
-  onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos'));
+  onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
 
   // Every week from this one to the end of the season, in one run. Each week is built and
   // treated exactly as it is when it is on the screen on its own, so a printed run cannot

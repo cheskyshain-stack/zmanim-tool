@@ -196,3 +196,68 @@ export function sunEvent(rise, date, horizonDeg, settings, useElevation) {
   const { offsetHours } = timezoneOffset(dateFromSerial(serial + eventUTC), settings.timezone);
   return eventUTC + offsetHours / 24;
 }
+
+/* Where the shul is, right now, in the frame every zman here is written in: which
+   calendar day it is there and how far into it. It lives beside timezoneOffset, the
+   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
+   into the week view, so anything importing it from there dragged the week view along
+   and put nav-helpers in a cycle with it. */
+/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
+ *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
+ *  second (see untilNextChange in luach.js).
+ *
+ *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
+ *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
+ *  still on another zone should be told when מנחה is there, not have the countdown quietly
+ *  shifted by however far it has travelled.
+ *
+ *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
+ *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
+ *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
+ *  into a wall clock is a different question and the whole-day answer is wrong on the two
+ *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
+ *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
+ *  the switch at 2am each time.
+ *
+ *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
+ *  or a settings entry with no name to look up, where being an hour out for two hours a
+ *  year is better than not knowing the time at all. */
+export function shulNow(now, settings) {
+  const zone = settings.timezone?.id;
+  if (zone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const at = {};
+      for (const part of parts) at[part.type] = part.value;
+      const serial = Math.round(
+        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
+      );
+      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
+      // milliseconds are added back off the instant itself, since the parts stop at seconds.
+      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
+        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
+      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
+    } catch {
+      // No Intl timezone support: fall through to the arithmetic.
+    }
+  }
+  const utcMinutes = now.getTime() / 60000;
+  // The offset is looked up for the day the moment falls on, which needs the day, which
+  // needs the offset. Standard time first, then again on the day that lands on: an hour
+  // either way can only change the answer within an hour of midnight, and the second pass
+  // is on the right side of the DST change by then.
+  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
+  for (let pass = 0; pass < 2; pass++) {
+    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+    const local = utcMinutes + offsetHours * 60;
+    const next = Math.floor(local / 1440) + 25569;
+    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+    serial = next;
+  }
+  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+  const local = utcMinutes + offsetHours * 60;
+  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+}

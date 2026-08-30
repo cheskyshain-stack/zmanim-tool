@@ -16,13 +16,15 @@
 // the minute less the figure set in Settings, and it can be reshaped by a rule or typed
 // over, so computing it again here would quietly disagree with the board on the weeks
 // where any of that made a difference.
-import { dateFromSerial, timezoneOffset } from './zmanim/solar.js';
+import { dateFromSerial, timezoneOffset, shulNow } from './zmanim/solar.js';
+import { tzais72 } from './zmanim/zmanim.js';
 import { formatTime, UL_START, UL_END } from './format.js';
+import { DAY_NAMES } from './util.js';
 import { KAYITZ_COLUMNS } from './sheets/kayitz.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
 import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
 import { mergeRow } from './overrides.js';
-import { rowFor, weekIndex, weekdayChartFor } from './ui/week-view.js';
+import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -253,65 +255,6 @@ export function candleLightingForDay(serial, state, settings) {
   return first ? { name: 'הדלקת נרות', mins: first.mins, place: '' } : null;
 }
 
-/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
- *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
- *  second (see untilNextChange in luach.js).
- *
- *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
- *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
- *  still on another zone should be told when מנחה is there, not have the countdown quietly
- *  shifted by however far it has travelled.
- *
- *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
- *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
- *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
- *  into a wall clock is a different question and the whole-day answer is wrong on the two
- *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
- *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
- *  the switch at 2am each time.
- *
- *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
- *  or a settings entry with no name to look up, where being an hour out for two hours a
- *  year is better than not knowing the time at all. */
-export function shulNow(now, settings) {
-  const zone = settings.timezone?.id;
-  if (zone) {
-    try {
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-      }).formatToParts(now);
-      const at = {};
-      for (const part of parts) at[part.type] = part.value;
-      const serial = Math.round(
-        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
-      );
-      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
-      // milliseconds are added back off the instant itself, since the parts stop at seconds.
-      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
-        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
-      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
-    } catch {
-      // No Intl timezone support: fall through to the arithmetic.
-    }
-  }
-  const utcMinutes = now.getTime() / 60000;
-  // The offset is looked up for the day the moment falls on, which needs the day, which
-  // needs the offset. Standard time first, then again on the day that lands on: an hour
-  // either way can only change the answer within an hour of midnight, and the second pass
-  // is on the right side of the DST change by then.
-  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
-  for (let pass = 0; pass < 2; pass++) {
-    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-    const local = utcMinutes + offsetHours * 60;
-    const next = Math.floor(local / 1440) + 25569;
-    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
-    serial = next;
-  }
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-  const local = utcMinutes + offsetHours * 60;
-  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
-}
 
 /** How long a מנין stays on the card after its own time has come. Someone glancing at the
  *  page a minute after שחרית started is being told about the one that is running, not sent
@@ -349,6 +292,29 @@ function nextFrom(forDay, now, settings, days = 8) {
     }
   }
   return null;
+}
+
+/** When a week stops being worth looking at: five minutes past the last מנין on it.
+ *
+ *  A week's card is anchored on its Shabbos and runs from the Sunday before, so the last
+ *  time on it is the last מעריב of מוצאי שבת. Once that has been and gone there is nothing
+ *  left on the card still to happen, and what somebody opening the page wants is the week
+ *  that has not started yet.
+ *
+ *  Five minutes for the same reason the "what is on next" card holds a מנין for five
+ *  minutes after it starts: the time being read off is when a מנין begins, not when it
+ *  ends, and the boards do not know how long one runs.
+ *
+ *  A Shabbos that is Yom Tov has no row on the chart and so no times to read. There is
+ *  nothing to count from, so the answer falls back to 72 minutes after שקיעה, which is when
+ *  that Shabbos is out whether or not anything was printed for it.
+ *
+ *  Returned as minutes after midnight on the Shabbos's own day, the frame shulNow answers
+ *  in, so the two can be compared without either becoming a real instant. */
+export function weekEndsMins(serial, state, settings) {
+  const list = minyanimForDay(serial, state, settings);
+  if (!list.length) return tzais72(dateFromSerial(serial), settings) * 1440;
+  return Math.max(...list.map((item) => item.mins)) + MINYAN_GRACE;
 }
 
 /** The next מנין, and the next זמן. Both may be null: before anything is published, or
@@ -395,7 +361,6 @@ export function meridiem(mins) {
  *  actually arrived, and rounding down would count the last thirty seconds as "in 0
  *  minutes". Hours round to the nearest, where being half an hour out either way is the
  *  whole point of saying "in 3 hours" rather than a number of minutes. */
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 export function howFar(item) {
   if (!item) return '';
   // Started, but only just: a מנין held on the card for its grace, or הדלקת נרות in the
