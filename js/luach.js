@@ -82,6 +82,9 @@ const GIVE_ICONS = {
   flame: '<path d="M12 21c3.3 0 5.6-2.1 5.6-5 0-4.2-4.4-5.6-3.6-9.6-2.4 1-3.6 3-3.6 5 0 1.4-.7 2-1.4 2s-1.3-.6-1.3-1.8C6.9 13 6.4 14.3 6.4 16c0 2.9 2.3 5 5.6 5z"/>',
   more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
   less: '<path d="M6 14.5l6-5.5 6 5.5"/>',
+  // Beside the host name over an embedded form. A form in a frame has no address bar of its
+  // own, so this line is the only place a donor can see whose page they are typing into.
+  lock: '<path d="M6.6 10.4h10.8a1.6 1.6 0 0 1 1.6 1.6v6.4a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 18.4V12a1.6 1.6 0 0 1 1.6-1.6Z"/><path d="M8.4 10.4V7.9a3.6 3.6 0 0 1 7.2 0v2.5"/>',
 };
 const giveIcon = (key, cls) =>
   `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GIVE_ICONS[key] || ''}</svg>`;
@@ -477,11 +480,17 @@ function donateWayHtml(way) {
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
   const soon = !way.href && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
+  /* Still written as a link to the payment page, and still opening a tab if nothing wires
+     it up. wireDonateFrames catches the click and brings the form onto this page instead,
+     so a broken script costs a donor an extra tab rather than the ability to give. */
   const button = way.href
     ? `<a class="luach-give-go" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">
         ${esc(way.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
       </a>`
     : '';
+  // Filled in when the button is pressed, and emptied again when it is closed, so a page
+  // with four ways on it never has a payment form loading behind the one being read.
+  const frame = way.href ? '<div class="luach-give-frame" hidden></div>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
      a donor recognises the service before reading the title. Zelle keeps its purple, the
      one colour on this page that is not the site's own. Both are set larger than the line
@@ -506,6 +515,7 @@ function donateWayHtml(way) {
       ${wide ? '' : `<div class="luach-give-aside">${copy}${soon}${button}</div>`}
     </div>
     ${wide ? `${chips}${all}${button}` : ''}
+    ${frame}
   </section>`;
 }
 
@@ -565,6 +575,62 @@ function wireDonateChips(root) {
   }
 }
 
+/** The panel that holds a payment form, built when the button is first pressed.
+ *
+ *  The bar across the top is not decoration. A form inside a frame has no address bar of its
+ *  own, and this site can be run from a home screen in a window that has no address bar
+ *  either, so without this a donor has nothing to tell them whose page they are typing a
+ *  card into. It names the host, and it keeps a way out to a real tab, which is also the
+ *  answer if the form will not frame at all: a payment page is entitled to refuse to be
+ *  embedded, and when one does the frame comes up blank with nothing to catch from here. */
+function donateFrameHtml(href, label) {
+  let host = '';
+  try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
+  const out = `href="${esc(href)}" target="_blank" rel="noopener noreferrer"`;
+  return `<div class="luach-frame-bar">
+      <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${esc(host)}</span>
+      <a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>
+      <button type="button" class="luach-frame-shut" aria-label="Close the donation form">&times;</button>
+    </div>
+    <iframe class="luach-frame" title="${esc(label)}" src="${esc(href)}" allow="payment"></iframe>
+    <p class="luach-frame-help">Nothing showing? <a ${out}>Open the form in a new tab</a>.</p>`;
+}
+
+/** Bring the payment page onto this page rather than sending the donor to a tab.
+ *
+ *  The link is left as a link and its click intercepted, so this is the enhancement and the
+ *  tab is the floor. A modified or middle click is left alone: someone asking for a tab
+ *  outright should get one. Only one form is ever loaded, and closing empties the panel, so
+ *  a card's form is not sitting live behind another card's. */
+function wireDonateFrames(root) {
+  const panels = [...root.querySelectorAll('.luach-give-frame')];
+  const shut = (panel) => {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    const go = panel.closest('.luach-give-card').querySelector('.luach-give-go');
+    if (go) go.setAttribute('aria-expanded', 'false');
+  };
+  for (const go of root.querySelectorAll('.luach-give-go')) {
+    const card = go.closest('.luach-give-card');
+    const panel = card && card.querySelector('.luach-give-frame');
+    if (!panel) continue;
+    go.setAttribute('aria-expanded', 'false');
+    go.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      e.preventDefault();
+      const opening = panel.hidden;
+      for (const other of panels) if (other !== panel && !other.hidden) shut(other);
+      if (!opening) { shut(panel); return; }
+      const title = card.querySelector('.luach-give-title');
+      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`);
+      panel.hidden = false;
+      go.setAttribute('aria-expanded', 'true');
+      panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+}
+
 function renderDonatePage(published) {
   stopNextUp();
   const s = resolveSettings(published.settings);
@@ -586,6 +652,7 @@ function renderDonatePage(published) {
       </p>
     </div>`;
   wireDonateChips(main);
+  wireDonateFrames(main);
   openTheDoor();
 }
 
