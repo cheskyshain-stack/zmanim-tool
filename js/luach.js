@@ -576,12 +576,22 @@ function donateFrameHtml(href, label) {
   let host = '';
   try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
   const out = `href="${esc(href)}" target="_blank" rel="noopener noreferrer"`;
+  // The waiting state sits over the frame rather than in place of it, so the frame is
+  // loading underneath the whole time and there is nothing to swap in when it arrives: the
+  // cover is simply taken away. It is opaque because a form paints itself in pieces, and
+  // half a form showing through would look broken rather than unfinished.
   return `<div class="luach-frame-bar">
       <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${esc(host)}</span>
       <a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>
       <button type="button" class="luach-frame-shut" aria-label="Close the donation form">&times;</button>
     </div>
-    <iframe class="luach-frame" title="${esc(label)}" src="${esc(href)}" allow="payment"></iframe>
+    <div class="luach-frame-wrap">
+      <iframe class="luach-frame" title="${esc(label)}" src="${esc(href)}" allow="payment"></iframe>
+      <div class="luach-frame-load" role="status">
+        <span class="luach-frame-spin" aria-hidden="true"></span>
+        <span>Loading the secure form&hellip;</span>
+      </div>
+    </div>
     <p class="luach-frame-help">Nothing showing? <a ${out}>Open the form in a new tab</a>.</p>`;
 }
 
@@ -593,15 +603,21 @@ function donateFrameHtml(href, label) {
  *  a card's form is not sitting live behind another card's. */
 function wireDonateFrames(root) {
   const panels = [...root.querySelectorAll('.luach-give-frame')];
+  // Scoped to the account and not to the card, which is the whole of a bug this had: the
+  // card and ACH way holds two payment pages, so asking the card for "the" frame handed
+  // both Donate buttons the first one. Pressing Building Fund opened its form in the panel
+  // belonging to Give to the Shul, under that heading, which on a page about money is not a
+  // cosmetic mix-up.
+  const accountOf = (el) => el.closest('.luach-give-account') || el.closest('.luach-give-card');
   const shut = (panel) => {
     panel.hidden = true;
     panel.innerHTML = '';
-    const go = panel.closest('.luach-give-card').querySelector('.luach-give-go');
+    const go = accountOf(panel).querySelector('.luach-give-go');
     if (go) go.setAttribute('aria-expanded', 'false');
   };
   for (const go of root.querySelectorAll('.luach-give-go')) {
     const card = go.closest('.luach-give-card');
-    const panel = card && card.querySelector('.luach-give-frame');
+    const panel = accountOf(go).querySelector('.luach-give-frame');
     if (!panel) continue;
     go.setAttribute('aria-expanded', 'false');
     go.addEventListener('click', (e) => {
@@ -610,11 +626,24 @@ function wireDonateFrames(root) {
       const opening = panel.hidden;
       for (const other of panels) if (other !== panel && !other.hidden) shut(other);
       if (!opening) { shut(panel); return; }
-      const title = card.querySelector('.luach-give-title');
+      // The account's own name where there is one, so two forms in one card are told apart
+      // by anything reading the frame's title out.
+      const title = accountOf(go).querySelector('.luach-account-title')
+        || card.querySelector('.luach-give-title');
       panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`);
       panel.hidden = false;
       go.setAttribute('aria-expanded', 'true');
       panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
+      // Uncover the form once it is there. A cross-origin frame tells us nothing about what
+      // it holds, but load still fires on the element, which is all this needs to know.
+      // The timer is for the case where it never does: better a blank frame under the help
+      // line asking whether anything is showing than a spinner turning for ever, which
+      // claims something is still on its way when nothing is.
+      const frame = panel.querySelector('.luach-frame');
+      const cover = panel.querySelector('.luach-frame-load');
+      const uncover = () => cover.remove();
+      frame.addEventListener('load', uncover, { once: true });
+      setTimeout(uncover, 20000);
       panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
