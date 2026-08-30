@@ -71,25 +71,99 @@ const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', donate: 'Dona
  *  rather than pretending it does not.
  *
  *  `note` is the smaller line under a title, for what a link covers once it is reached. */
+/* The marks on the giving cards, drawn in the same weight as the menu's own and ringed in
+   gold, so a card is recognisable before its title is read. */
+const GIVE_ICONS = {
+  shul: '<path d="M4.4 20.6V11l7.6-4.8 7.6 4.8v9.6"/><path d="M2.8 20.6h18.4"/><path d="M12 6.2V3.1M12 3.1h3l-1 1.2 1 1.2h-3"/><path d="M9.9 20.6v-3.9a2.1 2.1 0 0 1 4.2 0v3.9"/><path d="M7.4 12.6h.01M16.6 12.6h.01"/>',
+  crane: '<path d="M6.4 20.6V4.4"/><path d="M4.2 20.6h4.4"/><path d="M6.4 6.6h13.4"/><path d="M6.4 4.4l3.2 2.2M6.4 4.4l-2.6 2.2"/><path d="M17.4 6.6v3.2"/><path d="M15.6 9.8h3.6l-1.8 2.4z"/><path d="M11 13.6h7.8v7h-7.8z" opacity="0.9"/>',
+  swirl: '<path d="M12 4.2a7.8 7.8 0 0 1 5.7 13.1c-1.4 1.4-3.6.4-3.1-1.5"/><path d="M19.2 14.7A7.8 7.8 0 0 1 6.2 18c-1.3-1.5-.1-3.6 1.7-2.9"/><path d="M6.9 18.6A7.8 7.8 0 0 1 8.4 5.4c1.8-.7 3.4 1 2.3 2.5"/>',
+  heart: '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>',
+  building: '<path d="M5 21V5.4A1.4 1.4 0 0 1 6.4 4h11.2A1.4 1.4 0 0 1 19 5.4V21"/><path d="M3.2 21h17.6"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01"/><path d="M10.3 21v-4.2h3.4V21"/>',
+  hand: '<path d="M3.4 13.6l3-1.2a3 3 0 0 1 2.2 0l2.6 1a2.4 2.4 0 0 0 .9.2h2.3a1.5 1.5 0 0 1 0 3h-3.6"/><path d="M3.4 13.6V20m0-1.4l4.2 1.6a3 3 0 0 0 1.8.1l8.2-2.2a1.9 1.9 0 0 0 1.4-1.8"/><path d="M14.6 9.6s-2.9-1.7-2.9-3.6a1.7 1.7 0 0 1 2.9-1.1 1.7 1.7 0 0 1 2.9 1.1c0 1.9-2.9 3.6-2.9 3.6z"/>',
+  book: '<path d="M12 6.6C10.4 5.3 8.4 4.7 5 4.7A1 1 0 0 0 4 5.7v11.1a1 1 0 0 0 1 1c3.4 0 5.4.6 7 1.9 1.6-1.3 3.6-1.9 7-1.9a1 1 0 0 0 1-1V5.7a1 1 0 0 0-1-1c-3.4 0-5.4.6-7 1.9z"/><path d="M12 6.6V19.7"/>',
+  send: '<path d="M20.6 3.4L10.4 13.6"/><path d="M20.6 3.4l-6.5 17.2-3.7-7-7-3.7z"/>',
+  people: '<circle cx="9.2" cy="8.4" r="2.9"/><path d="M3.8 18.4a5.4 5.4 0 0 1 10.8 0"/><circle cx="17.4" cy="9.8" r="2.2"/><path d="M15.6 15.2a4 4 0 0 1 4.9 3.2"/>',
+  drop: '<path d="M12 3.4s5.4 5.6 5.4 9.2a5.4 5.4 0 0 1-10.8 0C6.6 9 12 3.4 12 3.4z"/>',
+  flame: '<path d="M12 21c3.3 0 5.6-2.1 5.6-5 0-4.2-4.4-5.6-3.6-9.6-2.4 1-3.6 3-3.6 5 0 1.4-.7 2-1.4 2s-1.3-.6-1.3-1.8C6.9 13 6.4 14.3 6.4 16c0 2.9 2.3 5 5.6 5z"/>',
+  more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+};
+const giveIcon = (key, cls) =>
+  `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GIVE_ICONS[key] || ''}</svg>`;
+
+/** The ways to give, and the page that lists them.
+ *
+ *  Donate used to be one button that left the site for one payment page. There is more
+ *  than one way to give and more than one thing to give to, so it opens a page of them
+ *  instead, and this list is that page. Adding a way, or filling one in, is a line here.
+ *
+ *  `href` is somewhere to go, and it opens in a new tab on purpose. Someone reading the
+ *  zmanim keeps the page they were on, and, more to the point, this site can be installed
+ *  to a home screen and run in a window with no address bar: sent to a payment page inside
+ *  that window there would be no URL and no padlock to check it by. A new tab is a real
+ *  browser, with both.
+ *
+ *  `funds` are what that page carries once it is reached, read off its own two menus, so a
+ *  donor can see whether what they want is behind a link without opening it and hunting.
+ *  `show` is how many are named on the card before the rest become "More"; the count in
+ *  "View all N options" is the length of the list rather than a number typed here, so it
+ *  cannot come to disagree with the chips beside it.
+ *
+ *  `copy` is something to be typed into another app rather than somewhere to go, which is
+ *  what Zelle is. A way with neither href nor copy still lists its name and says its
+ *  details are to follow, so the page says what exists rather than pretending it does not.
+ */
 const DONATE = {
   name: 'Donate',
-  lead: '',
+  heading: 'Ways to Give',
+  thanks: 'Thank you for supporting Bais Medrash Lakewood Commons.',
   ways: [
     {
-      title: 'Select from all options',
-      // What that page actually offers, in its two menus, so a donor can see whether the
-      // thing they want is behind this link without opening it and hunting for it.
-      note: 'Aliyos · Hall · Mikva · Ner tamid · Rabbi Fendel’s learning programs · Eiruv · Membership · Tzorchei Yom Tov · Ravs Fund · Kimcha Dpischa · Matanos Le’evyonim',
+      title: 'Give to the Shul',
+      blurb: 'Support the many needs of our shul and community.',
+      icon: 'shul',
       href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
+      show: 5,
+      funds: [
+        { label: 'Aliyos', icon: 'book' },
+        { label: 'Membership', icon: 'people' },
+        { label: 'Hall', icon: 'building' },
+        { label: 'Mikva', icon: 'drop' },
+        { label: 'Ner tamid', icon: 'flame' },
+        { label: 'Rabbi Fendel’s learning programs' },
+        { label: 'Eiruv' },
+        { label: 'Tzorchei Yom Tov' },
+        { label: 'Ravs Fund' },
+        { label: 'Kimcha Dpischa' },
+        { label: 'Matanos Le’evyonim' },
+      ],
     },
     {
       title: 'Building Fund',
-      note: 'Eiruv · Other',
+      blurb: 'Help build for the future of our community.',
+      icon: 'crane',
       href: 'https://secure.cardknox.com/lckerenhabinyan',
+      funds: [{ label: 'Eiruv' }, { label: 'Building Projects' }, { label: 'Other' }],
     },
-    { title: 'Zelle', detail: '' },
-    { title: 'Donor’s Fund', detail: '' },
-    { title: 'Daf', detail: '' },
+    {
+      title: 'Give with Zelle',
+      blurb: 'Give quickly and securely with Zelle.',
+      icon: 'zelle',
+      cta: 'Give with Zelle',
+      // Blank until the address is confirmed. One invented to fill the space would send
+      // somebody's money somewhere, and that is not a thing to guess at.
+      copy: { address: '', name: '' },
+    },
+    {
+      title: 'The Donors’ Fund',
+      blurb: 'Donate using funds from your Donors’ Fund account.',
+      icon: 'swirl',
+      cta: 'Give through Donors’ Fund',
+    },
+    {
+      title: 'Daf Yomi Initiative',
+      blurb: 'Support the daily learning of Daf Yomi and the growth of Torah in our community.',
+      icon: 'book',
+    },
   ],
 };
 
@@ -360,25 +434,59 @@ function renderChartPage(published) {
  *
  *  Nothing is rendered from published data here, so this page works whatever is or is not
  *  on the site, which is the point: giving should not depend on there being a chart up. */
+/** One way to give.
+ *
+ *  The card is a card rather than a link, because more than one thing on it can be
+ *  pressed: the funds it covers, the whole list of them, and Donate itself. A card that
+ *  was one big link could hold only one of those.
+ *
+ *  The chips are the funds, named. They are not links and not buttons: the page they lead
+ *  to asks which fund in a menu of its own, so a chip that looked pressable would promise
+ *  to choose for you and then not. They are there to answer "is the thing I want in here",
+ *  which is the question somebody has before they press Donate.
+ *
+ *  A way with nowhere to go yet carries no Donate button. A button that did nothing would
+ *  be worse than the line saying its details are still to come. */
 function donateWayHtml(way) {
-  const note = way.note ? `<span class="luach-give-note">${esc(way.note)}</span>` : '';
-  if (way.href) {
-    return `<a class="luach-item luach-give" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">
-      <span class="luach-give-lines">
-        <span class="luach-item-title">${esc(way.title)}</span>
-        ${note}
-      </span>${OUTWARD}
-    </a>`;
-  }
-  const detail = way.detail
-    ? `<span class="luach-give-detail">${esc(way.detail)}</span>`
-    : '<span class="luach-give-note luach-give-soon">Details to follow</span>';
-  return `<div class="luach-item luach-give luach-give-still">
-    <span class="luach-give-lines">
-      <span class="luach-item-title">${esc(way.title)}</span>
-      ${note}${detail}
-    </span>
-  </div>`;
+  const shown = way.funds ? way.funds.slice(0, way.show || way.funds.length) : [];
+  const rest = way.funds ? way.funds.length - shown.length : 0;
+  const chip = (f) =>
+    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
+  const chips = shown.length
+    ? `<ul class="luach-chips${shown.some((f) => f.icon) ? ' is-tall' : ''}">
+        ${shown.map(chip).join('')}
+        ${rest ? `<li class="luach-chip">${giveIcon('more', 'luach-chip-icon')}<span>More</span></li>` : ''}
+      </ul>`
+    : '';
+  // Only where some are hidden: with every fund already named, "View all" would lead to
+  // exactly what is on the screen.
+  const all = rest && way.href
+    ? `<a class="luach-give-all" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">View all ${way.funds.length} options <span aria-hidden="true">&rarr;</span></a>`
+    : '';
+  const copy = way.copy
+    ? (way.copy.address || way.copy.name
+        ? `<p class="luach-copy"><span class="luach-copy-address">${esc(way.copy.address)}</span><span class="luach-copy-name">${esc(way.copy.name)}</span></p>`
+        : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
+    : '';
+  const soon = !way.href && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
+  const button = way.href
+    ? `<a class="luach-give-go" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">
+        ${esc(way.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
+      </a>`
+    : '';
+  // Zelle's mark is its own, in its own colour, because that is what makes it recognisable
+  // as Zelle at a glance. Every other mark is the site's gold.
+  const markClass = way.icon === 'zelle' ? 'luach-give-mark is-zelle' : 'luach-give-mark';
+  const mark = way.icon === 'zelle' ? '<span class="luach-zelle-z">Z</span>' : giveIcon(way.icon, 'luach-give-mark-svg');
+  return `<section class="luach-give-card">
+    <span class="${markClass}" aria-hidden="true">${mark}</span>
+    <div class="luach-give-body">
+      <h2 class="luach-give-title">${esc(way.title)}</h2>
+      <p class="luach-give-blurb">${esc(way.blurb)}</p>
+      ${chips}${copy}${soon}${all}
+    </div>
+    ${button}
+  </section>`;
 }
 
 function renderDonatePage(published) {
@@ -387,10 +495,17 @@ function renderDonatePage(published) {
   main.className = '';
   main.innerHTML = `${backBar(PAGE_NAMES.donate)}
     <div class="luach-home luach-give-page">
-      ${DONATE.lead ? `<p class="luach-give-lead">${esc(DONATE.lead)}</p>` : ''}
-      <nav class="luach-menu">${DONATE.ways.map(donateWayHtml).join('')}</nav>
+      <header class="luach-give-head">
+        ${rule()}
+        <h1 class="luach-give-heading">${esc(DONATE.heading)}</h1>
+        <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
+      </header>
+      ${DONATE.ways.map(donateWayHtml).join('')}
       ${rule()}
-      <p class="luach-foot">${esc(s.footerAddress)}</p>
+      <p class="luach-foot">
+        <span class="luach-foot-mark" aria-hidden="true">${giveIcon('shul', 'luach-foot-svg')}</span>
+        ${esc(s.footerAddress)}
+      </p>
     </div>`;
   openTheDoor();
 }
