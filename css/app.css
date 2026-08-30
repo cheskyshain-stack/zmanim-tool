@@ -67,6 +67,9 @@
   --radius-sm: 7px;
   --shadow-sm: 0 1px 2px rgba(16,24,32,0.05), 0 1px 1px rgba(16,24,32,0.04);
   --shadow-md: 0 6px 20px rgba(16,24,32,0.10);
+  /* How long a drop-down takes to open, anywhere in the app. One number, so the panels on
+     the generator and the cards on the congregation site move at the same speed. */
+  --drawer-open: 0.26s;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -280,11 +283,50 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .panel > summary::-webkit-details-marker { display: none; }
 .panel > summary::before {
   content: '▸'; display: inline-block; width: 1em; margin-right: 0.3rem;
-  color: var(--muted); transition: transform 0.15s ease;
+  color: var(--muted); transition: transform var(--drawer-open) ease;
 }
 .panel[open] > summary::before { transform: rotate(90deg); }
 .panel[open] > summary { border-bottom: 1px solid var(--border); }
 .panel > summary:hover { color: var(--ui-accent-dark); }
+
+/* A panel opens the same way the donation page's cards do: the body wipes out from under
+   the summary rather than appearing whole. ::details-content is the only box there is to
+   animate, since <details> wraps the opened part in a pseudo element and in nothing else,
+   and its height runs 0 to auto through interpolate-size, set on the panel rather than on
+   :root so no other part of the app gains keyword animation.
+
+   The body also rides up under the summary and comes back down, which is what makes it
+   read as coming out of the top. Same duration and easing for both, so the body is always
+   at least as tall as the window it is seen through and no gap can open under it.
+
+   Only the vertical axis is clipped, and that pairing is the whole reason to reach for clip
+   rather than hidden: clip is the one value a browser will let stand beside visible on the
+   other axis. Clipping both cost the numbered lists their numbers. A list marker sits
+   outside its list's content box, so the Guide's and Settings' steps came out reading ".0."
+   and "l1." where they should say "10." and "11." - caught by opening every panel on every
+   screen and diffing the settled page against the build before this. Nothing needs clipping
+   sideways anyway: the wipe only ever moves things up and down.
+
+   The clip stays on once a panel is open, so with the axis right the settled page is
+   identical to what it was. A panel nested in a panel is fine, since the outer one is at
+   auto height by the time the inner one moves.
+
+   No radius is needed on the clip: the panel pads its content 1.1rem in from each side, so
+   its rounded corners are outside the box being clipped. */
+@media (prefers-reduced-motion: no-preference) {
+  .panel, .calc-exact { interpolate-size: allow-keywords; }
+  .panel::details-content, .calc-exact::details-content {
+    block-size: 0; overflow: visible clip;
+    transition: block-size var(--drawer-open) ease, content-visibility var(--drawer-open) allow-discrete;
+  }
+  .panel[open]::details-content, .calc-exact[open]::details-content { block-size: auto; }
+  /* Every child but the summary, rather than .panel-body by name: two of the Generate
+     panels hold a bare <ol class="week-list"> and would otherwise not move with the rest. */
+  .panel > :not(summary), .calc-exact > :not(summary) {
+    transform: translateY(-10px); transition: transform var(--drawer-open) ease;
+  }
+  .panel[open] > :not(summary), .calc-exact[open] > :not(summary) { transform: none; }
+}
 .panel-body { padding: 0.9rem 0 1rem; }
 /* .form-grid already spaces its children with gap, so the panel's own margin would
    double it up in Settings, where the sections are panels inside the form. */
@@ -1581,7 +1623,6 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    The padding lives on the summary and on the panel rather than on the card, so the whole
    width of a shut drawer is pressable. */
 .luach-give-card {
-  --give-open: 0.26s;
   text-align: left;
   background: #ffffff; border-radius: 16px;
   box-shadow: 0 2px 8px rgba(18,39,79,0.07), 0 1px 2px rgba(18,39,79,0.05);
@@ -1604,10 +1645,10 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   .luach-give-card { interpolate-size: allow-keywords; }
   .luach-give-card::details-content {
     block-size: 0; overflow: clip; border-radius: 0 0 16px 16px;
-    transition: block-size var(--give-open) ease, content-visibility var(--give-open) allow-discrete;
+    transition: block-size var(--drawer-open) ease, content-visibility var(--drawer-open) allow-discrete;
   }
   .luach-give-card[open]::details-content { block-size: auto; }
-  .luach-give-open { transform: translateY(-10px); transition: transform var(--give-open) ease; }
+  .luach-give-open { transform: translateY(-10px); transition: transform var(--drawer-open) ease; }
   .luach-give-card[open] .luach-give-open { transform: none; }
 }
 /* Mark, words and the chevron. align-items: center so a one line description does not
@@ -1630,7 +1671,7 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-give-chev {
   width: 1.35rem; height: 1.35rem; flex: none; margin-left: auto;
   color: var(--luach-ink); opacity: 0.45;
-  transition: transform var(--give-open) ease, opacity var(--give-open) ease;
+  transition: transform var(--drawer-open) ease, opacity var(--drawer-open) ease;
 }
 .luach-give-head:hover .luach-give-chev { opacity: 0.75; }
 .luach-give-card[open] > .luach-give-head .luach-give-chev { transform: rotate(180deg); opacity: 0.75; }
