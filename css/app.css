@@ -1321,6 +1321,15 @@ body.is-luach main.is-home { min-height: 100vh; min-height: 100dvh; display: fle
    its gold hairline already separate the name from the menu. Worth 10px on a screen that
    is counting them: see .luach-next. */
 main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
+/* The shul's name is the page's heading, and it is a picture of lettering rather than type,
+   so the h1 wraps the image and the alt text is what a screen reader reads out as the
+   heading. display: contents rather than a box set back to inherit: the image is inline and
+   sits on a text baseline, and any box around it brings a line box of its own that moves
+   it, by 2px with the line box zeroed and by 14px with it left alone. This way the h1 lays
+   out as though it were not there and the picture sits exactly where it always did, while
+   the heading stays in the accessibility tree. Checked in Chrome: the node still comes back
+   as role heading, named from the alt. */
+.luach-masthead-name { display: contents; }
 .luach-logo { width: min(18rem, 74%); height: auto; }
 .luach-place { margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.15rem; color: var(--luach-ink); }
 
@@ -1743,9 +1752,13 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
 }
 /* Last resort, and the reason it is worded as a question: a payment page is entitled to
    refuse to be framed, and when one does this panel is simply blank. */
+/* 0.72 rather than the 0.6 it started at: measured off the rendered pixels, 0.6 came out
+   at 4.09 against the white behind it, under the 4.5 small text is asked for. This is the
+   line that matters most exactly when the frame above it has failed, so it has to be
+   readable then. 0.72 measures 5.1. */
 .luach-frame-help {
   margin: 0; padding: 0.45rem 0.65rem; font-size: 0.78rem;
-  color: var(--luach-ink); opacity: 0.6; border-top: 1px solid rgba(18,39,79,0.08);
+  color: var(--luach-ink); opacity: 0.72; border-top: 1px solid rgba(18,39,79,0.08);
 }
 .luach-frame-help a { color: inherit; }
 @media print { .luach-give-frame { display: none !important; } }
@@ -1755,6 +1768,13 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
 .luach-foot-svg { width: 1.2rem; height: 1.2rem; }
 /* The rule and the address close up on this page: it is a list to be got through rather
    than a masthead to be admired. */
+/* More options paints a bordered box, and every other box on this page is a week card at
+   8.5in. Left to fill the window it ran 1408px against the card's 816px at a 1440 screen,
+   which only shows on a desktop: on a phone the card is the full width too and the two
+   agreed. Held to the card, and only on the congregation site, since the admin app lays
+   this panel out in its own column. */
+body.is-luach .week-print-panel { max-width: 8.5in; margin-inline: auto; }
+
 .luach-give-page .luach-rule { margin: 0.2rem 0; }
 .luach-give-page .luach-foot { font-size: 0.95rem; }
 body.is-luach main.is-give { padding-bottom: 1.25rem; }
@@ -1764,10 +1784,22 @@ body.is-luach main.is-give { padding-bottom: 1.25rem; }
   font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
 }
 
-/* Back to the menu, on the cap. */
-.luach-back { color: #f3ecdc; text-decoration: none; font-weight: 600; }
+/* Back to the menu, on the cap. It is the only way off every page but the menu itself, and
+   as bare text it was 62 by 18, under the 24 a finger is reckoned to need. The padding is
+   pulled straight back off again as negative margin, so the target grows without anything
+   on the bar moving. */
+.luach-back {
+  color: #f3ecdc; text-decoration: none; font-weight: 600;
+  padding: 0.4rem 0.55rem; margin: -0.4rem -0.55rem; border-radius: 8px;
+}
 .luach-back:hover { text-decoration: underline; }
-.luach-bar-title { color: #b7c4dd; font-size: var(--fs-sm); margin-right: auto; }
+/* An h1 rather than a span: the bar is what names the page, and without it these pages had
+   no heading at all. Sized and weighted back to what the span was, so it is a change of
+   meaning and not of appearance. */
+.luach-bar-title {
+  color: #b7c4dd; font-size: var(--fs-sm); font-weight: 400;
+  margin: 0; margin-right: auto;
+}
 
 /* --- The congregation site's buttons ------------------------------------------------
    Previous, Today, Next, Print and the two inside Printing options. In the app these are

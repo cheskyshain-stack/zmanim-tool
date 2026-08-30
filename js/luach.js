@@ -257,7 +257,7 @@ function nextUpHtml([minyan, candles]) {
 function backBar(title) {
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="#">&larr; Menu</a>
-    <span class="luach-bar-title">${esc(title)}</span>
+    <h1 class="luach-bar-title">${esc(title)}</h1>
   </div>`;
 }
 
@@ -270,7 +270,7 @@ function homeHtml(published) {
   const s = published.settings;
   return `<div class="luach-bar luach-bar-plain no-print" aria-hidden="true"></div>
     <header class="luach-masthead">
-      <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}">
+      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"></h1>
       ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
@@ -515,7 +515,7 @@ function donateWayHtml(way) {
     <div class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
       <div class="luach-give-body">
-        <h2 class="luach-give-title">${esc(way.title)}</h2>
+        <h3 class="luach-give-title">${esc(way.title)}</h3>
         <p class="luach-give-blurb">${esc(way.blurb)}</p>
         ${how}
       </div>
@@ -680,7 +680,7 @@ function renderDonatePage(published) {
     <div class="luach-home luach-give-page">
       <header class="luach-give-head-block">
         ${rule()}
-        <h1 class="luach-give-heading">${esc(DONATE.heading)}</h1>
+        <h2 class="luach-give-heading">${esc(DONATE.heading)}</h2>
         <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
       </header>
       ${DONATE.ways.map(donateWayHtml).join('')}
