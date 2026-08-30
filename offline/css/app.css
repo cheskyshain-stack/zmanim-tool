@@ -1595,15 +1595,26 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 }
 .luach-give-head::-webkit-details-marker { display: none; }
 .luach-give-head:focus-visible { outline: 2px solid rgba(184,143,58,0.9); outline-offset: -2px; border-radius: 16px; }
-.luach-give-card[open] > .luach-give-head { padding-bottom: 0.5rem; }
+/* Open, the summary keeps the card's own white and the drawer under it changes colour, so
+   the header still looks like the thing that was pressed while what it opened is plainly a
+   surface of its own. Tinting the header instead was tried and is the weaker of the two:
+   a band is thin, so the same wash reads as much less, and it dulls the gold roundel
+   sitting on it. The rule between them is the site's gold, the same as every other line on
+   the page. */
+.luach-give-card[open] > .luach-give-head { border-bottom: 1px solid rgba(184,143,58,0.42); }
 .luach-give-chev {
   width: 1.35rem; height: 1.35rem; flex: none; margin-left: auto;
   color: var(--luach-ink); opacity: 0.45; transition: transform 0.18s ease, opacity 0.18s ease;
 }
 .luach-give-head:hover .luach-give-chev { opacity: 0.75; }
 .luach-give-card[open] > .luach-give-head .luach-give-chev { transform: rotate(180deg); opacity: 0.75; }
-/* What the drawer holds. */
-.luach-give-open { padding: 0 0.95rem 0.95rem; }
+/* What the drawer holds, on a surface of its own. Deeper than the page behind the card
+   rather than matching it, so it does not read as a hole cut through the card. The bottom
+   corners are the card's own, since this is what reaches them once a card is open. */
+.luach-give-open {
+  padding: 0.9rem 0.95rem 0.95rem;
+  background: #f6f1e4; border-radius: 0 0 16px 16px;
+}
 .luach-give-open > :first-child { margin-top: 0; }
 
 /* One payment page inside the card and ACH drawer. Two of them, so each is named and ruled
