@@ -4,7 +4,7 @@
 // the board already, so it can be built from the same row the שבת card is built from, and
 // then there is one place the times come from rather than two.
 //
-// A worked example, checked against a real message for כי תבא:
+// A worked example, checked against a real message for כי תבוא:
 //
 //   Erev P' Ki Savo
 //   Mincha 1:35d, 1:50m, 2:15m, 3:00m
@@ -18,7 +18,7 @@
 // Where each piece comes from:
 //
 //   Erev P'          the parsha, in English, out of data/parsha_names.json, which already
-//                    carries "Ki Savo" beside כי תבא for the chart's own use.
+//                    carries "Ki Savo" beside כי תבוא for the chart's own use.
 //   d                the time is underlined on the board. The printed footer already says
 //                    "All underlined מנינים will be למטה", so underlined is downstairs and
 //                    d is what the message calls it.
@@ -159,7 +159,7 @@ export function erevShabbosText(columns, row, parshaEnglish) {
   return lines.join('\n');
 }
 
-/** "Ki Savo" for כי תבא, out of the table the chart already uses. Falls back to the Hebrew
+/** "Ki Savo" for כי תבוא, out of the table the chart already uses. Falls back to the Hebrew
  *  rather than to nothing: a message naming the parsha in Hebrew is still usable, one
  *  naming no parsha at all is not. */
 export function erevParshaEnglish(hebrewParsha, parshaNames) {
