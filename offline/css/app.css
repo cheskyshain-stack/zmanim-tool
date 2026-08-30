@@ -1570,15 +1570,49 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   font-size: 0.88rem; line-height: 1.35; color: var(--luach-ink); opacity: 0.62;
 }
 
+/* Each way is a drawer, and the whole page is three of them shut: mark, name, one line.
+   The padding lives on the summary and on the panel rather than on the card, so the whole
+   width of a shut drawer is pressable. */
 .luach-give-card {
   text-align: left;
-  padding: 0.85rem 0.95rem;
   background: #ffffff; border-radius: 16px;
   box-shadow: 0 2px 8px rgba(18,39,79,0.07), 0 1px 2px rgba(18,39,79,0.05);
 }
-/* Mark, words, and on a row card whatever it offers. align-items: center so a one line
-   description does not leave the mark floating above it. */
-.luach-give-head { display: flex; align-items: center; gap: 0.7rem; }
+/* Mark, words and the chevron. align-items: center so a one line description does not
+   leave the mark floating above it. The marker is taken off both ways over: the modern
+   property, and the old WebKit pseudo element that ignores it. */
+.luach-give-head {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.85rem 0.95rem; cursor: pointer;
+  list-style: none; -webkit-tap-highlight-color: transparent;
+}
+.luach-give-head::-webkit-details-marker { display: none; }
+.luach-give-head:focus-visible { outline: 2px solid rgba(184,143,58,0.9); outline-offset: -2px; border-radius: 16px; }
+.luach-give-card[open] > .luach-give-head { padding-bottom: 0.5rem; }
+.luach-give-chev {
+  width: 1.35rem; height: 1.35rem; flex: none; margin-left: auto;
+  color: var(--luach-ink); opacity: 0.45; transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.luach-give-head:hover .luach-give-chev { opacity: 0.75; }
+.luach-give-card[open] > .luach-give-head .luach-give-chev { transform: rotate(180deg); opacity: 0.75; }
+/* What the drawer holds. */
+.luach-give-open { padding: 0 0.95rem 0.95rem; }
+.luach-give-open > :first-child { margin-top: 0; }
+
+/* One payment page inside the card and ACH drawer. Two of them, so each is named and ruled
+   off from the next: without the line the second one's title reads as a heading over the
+   first one's button. */
+.luach-give-account + .luach-give-account {
+  margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid rgba(18,39,79,0.1);
+}
+.luach-account-title {
+  margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 1.05rem; font-weight: 700; color: var(--luach-ink); letter-spacing: -0.01em;
+}
+.luach-account-blurb {
+  margin: 0.1rem 0 0; font-size: 0.82rem; line-height: 1.35;
+  color: var(--luach-ink); opacity: 0.64;
+}
 .luach-give-mark {
   width: 2.5rem; height: 2.5rem; border-radius: 50%;
   border: 1.5px solid rgba(184,143,58,0.5); color: #b08d3a;
@@ -1657,16 +1691,6 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
 }
 .luach-give-go:active { transform: translateY(1px) scale(0.985); }
 
-/* What a row card offers: its details, or its button. Under the words on a phone, beside
-   them once there is room for both. */
-.luach-give-aside { flex: none; width: 100%; }
-.luach-give-card.is-row .luach-give-head { flex-wrap: wrap; }
-.luach-give-card.is-row .luach-give-aside > :first-child { margin-top: 0.55rem; }
-@media (min-width: 34rem) {
-  .luach-give-card.is-row .luach-give-head { flex-wrap: nowrap; }
-  .luach-give-aside { width: auto; max-width: 20rem; }
-  .luach-give-card.is-row .luach-give-aside > :first-child { margin-top: 0; }
-}
 
 /* Something to be typed into another app, set apart and left selectable. Quiet rather than
    unfinished: a card waiting on its details should look like it is waiting, not broken. */

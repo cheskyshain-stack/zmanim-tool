@@ -85,6 +85,11 @@ const GIVE_ICONS = {
   // Beside the host name over an embedded form. A form in a frame has no address bar of its
   // own, so this line is the only place a donor can see whose page they are typing into.
   lock: '<path d="M6.6 10.4h10.8a1.6 1.6 0 0 1 1.6 1.6v6.4a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 18.4V12a1.6 1.6 0 0 1 1.6-1.6Z"/><path d="M8.4 10.4V7.9a3.6 3.6 0 0 1 7.2 0v2.5"/>',
+  // A card with its stripe. The one way on this page that is not a named service, so it is
+  // drawn as the thing itself rather than as anybody's mark.
+  card: '<path d="M4.4 5.6h15.2a2 2 0 0 1 2 2v8.8a2 2 0 0 1-2 2H4.4a2 2 0 0 1-2-2V7.6a2 2 0 0 1 2-2Z"/><path d="M2.4 10.2h19.2"/><path d="M6 14.6h3.4"/>',
+  // The chevron on a closed drawer, which turns to point up when it opens.
+  chev: '<path d="M6.4 9.6l5.6 5.4 5.6-5.4"/>',
 };
 const giveIcon = (key, cls) =>
   `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GIVE_ICONS[key] || ''}</svg>`;
@@ -95,14 +100,20 @@ const giveIcon = (key, cls) =>
  *  than one way to give and more than one thing to give to, so it opens a page of them
  *  instead, and this list is that page. Adding a way, or filling one in, is a line here.
  *
- *  `href` is somewhere to go, and it opens in a new tab on purpose. Someone reading the
- *  zmanim keeps the page they were on, and, more to the point, this site can be installed
- *  to a home screen and run in a window with no address bar: sent to a payment page inside
- *  that window there would be no URL and no padlock to check it by. A new tab is a real
- *  browser, with both.
+ *  Three ways to give, each a drawer that opens where it stands. Collapsed, a way is its
+ *  mark, its name and a line saying what it is, so the whole page is three lines long and
+ *  a donor picks before reading anything else. What is inside differs by way:
  *
- *  `funds` are what that page carries once it is reached, read off its own two menus, so a
- *  donor can see whether what they want is behind a link without opening it and hunting.
+ *  `accounts` is one or more payment pages, which is what the card and ACH way holds: the
+ *  shul and the building fund bill through two separate merchant pages, so each is named
+ *  and gets its own Donate. A `href` opens in a new tab if nothing wires it up, and
+ *  wireDonateFrames catches the click and brings the form onto this page instead. The tab
+ *  is the floor rather than the intent: this site can be installed to a home screen and run
+ *  in a window with no address bar, and a payment page in there would have no URL and no
+ *  padlock to check it by, so the frame carries the host name itself.
+ *
+ *  `funds` are what a payment page carries once it is reached, read off its own menus, so
+ *  a donor can see whether what they want is behind a link without opening it and hunting.
  *  A long list is folded down to a single row ending in More, which opens the rest in
  *  place. `show` is only the guess the page is first drawn with; how many actually fit on
  *  the row is measured off the grid (see fitDonateChips), so it is right at any width. No
@@ -113,9 +124,9 @@ const giveIcon = (key, cls) =>
  *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
  *  itself, which gets a button that puts it on the clipboard, since this is read on a phone
  *  and the other app is a tap away. `how` is the sentence above it, for when handing over
- *  the value is not the whole of what somebody has to do. A way with neither href nor copy
- *  still lists its name and says its details are to follow, so the page says what exists
- *  rather than pretending it does not.
+ *  the value is not the whole of what somebody has to do. A way with nothing in it yet says
+ *  its details are to follow, so the page says what exists rather than pretending it does
+ *  not.
  */
 const DONATE = {
   name: 'Donate',
@@ -123,37 +134,41 @@ const DONATE = {
   thanks: 'Thank you for supporting Bais Medrash of Lakewood Commons.',
   ways: [
     {
-      title: 'Give to the Shul',
-      blurb: 'Support the many needs of our shul and community.',
-      icon: 'shul',
-      href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
-      show: 5,
-      funds: [
-        { label: 'Aliyos', icon: 'book' },
-        { label: 'Membership', icon: 'people' },
-        { label: 'Hall', icon: 'building' },
-        { label: 'Mikva', icon: 'drop' },
-        { label: 'Ner tamid', icon: 'flame' },
-        { label: 'Rabbi Fendel’s learning programs' },
-        { label: 'Eiruv' },
-        { label: 'Tzorchei Yom Tov' },
-        { label: 'Ravs Fund' },
-        { label: 'Kimcha Dpischa' },
-        { label: 'Matanos Le’evyonim' },
+      title: 'Credit/Debit Card \u00b7 ACH',
+      blurb: 'Give securely online using your credit or debit card, or via ACH.',
+      icon: 'card',
+      accounts: [
+        {
+          title: 'Give to the Shul',
+          blurb: 'Support the many needs of our shul and community.',
+          href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
+          show: 5,
+          funds: [
+            { label: 'Aliyos', icon: 'book' },
+            { label: 'Membership', icon: 'people' },
+            { label: 'Hall', icon: 'building' },
+            { label: 'Mikva', icon: 'drop' },
+            { label: 'Ner tamid', icon: 'flame' },
+            { label: 'Rabbi Fendel\u2019s learning programs' },
+            { label: 'Eiruv' },
+            { label: 'Tzorchei Yom Tov' },
+            { label: 'Ravs Fund' },
+            { label: 'Kimcha Dpischa' },
+            { label: 'Matanos Le\u2019evyonim' },
+          ],
+        },
+        {
+          title: 'Building Fund',
+          blurb: 'Help build for the future of our community.',
+          href: 'https://secure.cardknox.com/lckerenhabinyan',
+          funds: [{ label: 'Eiruv' }, { label: 'Building Projects' }, { label: 'Other' }],
+        },
       ],
     },
     {
-      title: 'Building Fund',
-      blurb: 'Help build for the future of our community.',
-      icon: 'crane',
-      href: 'https://secure.cardknox.com/lckerenhabinyan',
-      funds: [{ label: 'Eiruv' }, { label: 'Building Projects' }, { label: 'Other' }],
-    },
-    {
-      title: 'Give with Zelle',
+      title: 'Zelle',
       blurb: 'Give quickly and securely with Zelle.',
       icon: 'zelle',
-      cta: 'Give with Zelle',
       // Blank until the address is confirmed. One invented to fill the space would send
       // somebody's money somewhere, and that is not a thing to guess at.
       copy: { label: '', value: '' },
@@ -162,8 +177,8 @@ const DONATE = {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
       // already in their own Donors' Fund account gives to the shul out of it, so the
       // words are about spending an account they have rather than opening one here.
-      title: 'The Donors’ Fund',
-      blurb: 'Donate using funds from your Donors’ Fund account.',
+      title: 'The Donors\u2019 Fund',
+      blurb: 'Donate using funds from your Donors\u2019 Fund account.',
       icon: 'swirl',
       how: 'Search using our Tax ID.',
       copy: { label: 'Tax ID', value: '26-4527675' },
@@ -451,28 +466,43 @@ function renderChartPage(published) {
  *
  *  A way with nowhere to go yet carries no Donate button. A button that did nothing would
  *  be worse than the line saying its details are still to come. */
-function donateWayHtml(way) {
-  /* Every fund is written out, and the ones past the first row are folded away rather than
-     left out: More opens them where they already are, so nothing has to be fetched or
-     re-rendered to see the rest. The fold starts at `show` and is corrected to the real
-     row by fitDonateChips as soon as the card is in the page. */
-  const funds = way.funds || [];
-  const folds = Boolean(way.show) && funds.length > way.show;
+/** One payment page inside the card and ACH drawer: its name, the funds it carries, and
+ *  the button that opens it. Two of them, because the shul and the building fund bill
+ *  through separate merchant pages and a donor has to land on the right one. */
+function donateAccountHtml(acc) {
+  const funds = acc.funds || [];
+  const folds = Boolean(acc.show) && funds.length > acc.show;
   const chip = (f, i) =>
-    `<li class="luach-chip"${folds && i >= way.show ? ' hidden' : ''}>${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
-  /* The More chip is the one thing in the row that can be pressed, so it is a real button.
-     Its li steps out of the way with display: contents, leaving the button itself as the
-     grid item, so it sits in a cell the same size as the chips beside it. */
+    `<li class="luach-chip"${folds && i >= acc.show ? ' hidden' : ''}>${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
   const more = folds
     ? `<li class="luach-chip-slot"><button type="button" class="luach-chip is-more" aria-expanded="false">
         ${giveIcon('more', 'luach-chip-icon')}<span class="luach-chip-more-label">More</span>
       </button></li>`
     : '';
   const chips = funds.length
-    ? `<ul class="luach-chips${funds.some((f) => f.icon) ? ' is-tall' : ''}">
-        ${funds.map(chip).join('')}${more}
-      </ul>`
+    ? `<ul class="luach-chips${funds.some((f) => f.icon) ? ' is-tall' : ''}">${funds.map(chip).join('')}${more}</ul>`
     : '';
+  return `<div class="luach-give-account">
+    <h4 class="luach-account-title">${esc(acc.title)}</h4>
+    ${acc.blurb ? `<p class="luach-account-blurb">${esc(acc.blurb)}</p>` : ''}
+    ${chips}
+    <a class="luach-give-go" href="${esc(acc.href)}" target="_blank" rel="noopener noreferrer">
+      ${esc(acc.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
+    </a>
+    <div class="luach-give-frame" hidden></div>
+  </div>`;
+}
+
+/** A way to give, as a drawer.
+ *
+ *  A native details rather than a div and a click handler: it opens on Enter and Space,
+ *  says whether it is open without being told to, and a browser that finds text inside a
+ *  closed one opens it by itself. The name attribute is what makes the three exclusive
+ *  where it is supported, and where it is not the only cost is two open at once.
+ *
+ *  Closed, every way is the same three things: mark, name, one line. That is the whole
+ *  page, so the choice is made before anything else is read. */
+function donateWayHtml(way) {
   const copy = way.copy
     ? (way.copy.value || way.copy.label
         ? `<p class="luach-copy">
@@ -482,21 +512,9 @@ function donateWayHtml(way) {
           </p>`
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
-  // Under the description rather than beside it: it is a sentence about what to do, and the
-  // narrow column a row card keeps for its details is no place to read one.
   const how = way.how ? `<p class="luach-give-how">${esc(way.how)}</p>` : '';
-  const soon = !way.href && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
-  /* Still written as a link to the payment page, and still opening a tab if nothing wires
-     it up. wireDonateFrames catches the click and brings the form onto this page instead,
-     so a broken script costs a donor an extra tab rather than the ability to give. */
-  const button = way.href
-    ? `<a class="luach-give-go" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">
-        ${esc(way.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
-      </a>`
-    : '';
-  // Filled in when the button is pressed, and emptied again when it is closed, so a page
-  // with four ways on it never has a payment form loading behind the one being read.
-  const frame = way.href ? '<div class="luach-give-frame" hidden></div>' : '';
+  const accounts = (way.accounts || []).map(donateAccountHtml).join('');
+  const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
      a donor recognises the service before reading the title. Zelle keeps its purple, the
      one colour on this page that is not the site's own. Both are set larger than the line
@@ -505,25 +523,17 @@ function donateWayHtml(way) {
   const brand = way.icon === 'zelle' || way.icon === 'swirl';
   const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}`;
   const mark = giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
-  /* Two shapes, one set of proportions. A card that lists funds puts them and its Donate
-     button across the full width under the heading, because a grid of chips squeezed into
-     the column beside a mark is unreadable. A card that has none is a row: mark, words,
-     and whatever it offers beside them where there is room and under them where there is
-     not. Both keep the same corner, shadow, mark and title, so they read as one set. */
-  const wide = Boolean(chips);
-  return `<section class="luach-give-card${wide ? '' : ' is-row'}">
-    <div class="luach-give-head">
+  return `<details class="luach-give-card" name="luach-give">
+    <summary class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
       <div class="luach-give-body">
         <h3 class="luach-give-title">${esc(way.title)}</h3>
         <p class="luach-give-blurb">${esc(way.blurb)}</p>
-        ${how}
       </div>
-      ${wide ? '' : `<div class="luach-give-aside">${copy}${soon}${button}</div>`}
-    </div>
-    ${wide ? `${chips}${button}` : ''}
-    ${frame}
-  </section>`;
+      ${giveIcon('chev', 'luach-give-chev')}
+    </summary>
+    <div class="luach-give-open">${how}${copy}${soon}${accounts}</div>
+  </details>`;
 }
 
 /** Fold a fund list down to one row, ending in More.
