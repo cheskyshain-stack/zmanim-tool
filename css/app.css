@@ -1570,6 +1570,9 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 /* Mark, words, and on a row card whatever it offers. align-items: center so a one line
    description does not leave the mark floating above it. */
 .luach-give-head { display: flex; align-items: center; gap: 0.7rem; }
+/* Centring is right against two lines and wrong against five: on a card that also carries
+   an instruction the mark ends up beside the middle of a paragraph rather than the title. */
+.luach-give-card:has(.luach-give-how) .luach-give-head { align-items: flex-start; }
 .luach-give-mark {
   width: 2.5rem; height: 2.5rem; border-radius: 50%;
   border: 1.5px solid rgba(184,143,58,0.5); color: #b08d3a;
@@ -1631,15 +1634,6 @@ button.luach-chip:hover { background: rgba(209,173,95,0.16); border-color: rgba(
 button.luach-chip:active { background: rgba(209,173,95,0.24); }
 button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 2px; }
 
-.luach-give-all {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  margin-top: 0.55rem; font-size: 0.85rem; font-weight: 600;
-  color: var(--luach-ink); text-decoration: none;
-}
-.luach-give-all:hover { text-decoration: underline; }
-/* Same as the chips: inline-flex here would otherwise outrank the browser's [hidden]. */
-.luach-give-all[hidden] { display: none; }
-
 /* Donate. The one filled thing on a card, navy with gold on it, which is the pairing the
    site's own Print button uses. Full width under the funds, and on a row card it sits
    beside the words until the screen is too narrow for that. */
@@ -1677,8 +1671,26 @@ button.luach-chip:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outli
   font-size: 0.85rem; color: var(--luach-ink); user-select: text;
 }
 .luach-give-card:has(.is-zelle) .luach-copy { background: rgba(109,30,212,0.07); }
-.luach-copy-address { font-weight: 600; word-break: break-word; }
-.luach-copy-name { opacity: 0.7; }
+.luach-copy-value { font-weight: 600; word-break: break-word; }
+.luach-copy-note { opacity: 0.7; }
+/* Pushed to the end of the row, so the thing being copied reads first and the button is
+   where a thumb already is. */
+.luach-copy-btn {
+  margin-left: auto; flex: none; font: inherit; font-size: 0.75rem; font-weight: 600;
+  padding: 0.25rem 0.55rem; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(18,39,79,0.2); background: #ffffff; color: var(--luach-ink);
+  -webkit-appearance: none; appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.luach-copy-btn:hover { background: rgba(18,39,79,0.06); border-color: rgba(18,39,79,0.35); }
+.luach-copy-btn:active { background: rgba(18,39,79,0.12); }
+.luach-copy-btn:focus-visible { outline: 2px solid rgba(184,143,58,0.8); outline-offset: 2px; }
+/* What to do with it, under the description. Quieter than the description, because it is
+   read once and then acted on. */
+.luach-give-how {
+  margin: 0.35rem 0 0; font-size: 0.82rem; line-height: 1.4;
+  color: var(--luach-ink); opacity: 0.72;
+}
 .luach-copy-soon, .luach-give-soon { font-style: italic; opacity: 0.62; }
 .luach-give-soon {
   margin: 0; padding: 0.45rem 0.65rem; border-radius: 10px;

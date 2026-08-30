@@ -105,13 +105,17 @@ const giveIcon = (key, cls) =>
  *  donor can see whether what they want is behind a link without opening it and hunting.
  *  A long list is folded down to a single row ending in More, which opens the rest in
  *  place. `show` is only the guess the page is first drawn with; how many actually fit on
- *  the row is measured off the grid (see fitDonateChips), so it is right at any width. The
- *  count in "View all N options" is the length of the list rather than a number typed
- *  here, so it cannot come to disagree with the chips beside it.
+ *  the row is measured off the grid (see fitDonateChips), so it is right at any width. No
+ *  count is written anywhere: More opens the whole list where it stands, so a number saying
+ *  how many there are would only be one more thing that could come to disagree with them.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
- *  what Zelle is. A way with neither href nor copy still lists its name and says its
- *  details are to follow, so the page says what exists rather than pretending it does not.
+ *  what Zelle and The Donors' Fund are: `value` is the thing itself and gets a button that
+ *  puts it on the clipboard, since this is read on a phone and the other app is a tap away,
+ *  and `note` says what it is. `how` is the sentence above it, for when handing over the
+ *  value is not the whole of what somebody has to do. A way with neither href nor copy
+ *  still lists its name and says its details are to follow, so the page says what exists
+ *  rather than pretending it does not.
  */
 const DONATE = {
   name: 'Donate',
@@ -152,7 +156,7 @@ const DONATE = {
       cta: 'Give with Zelle',
       // Blank until the address is confirmed. One invented to fill the space would send
       // somebody's money somewhere, and that is not a thing to guess at.
-      copy: { address: '', name: '' },
+      copy: { value: '', note: '' },
     },
     {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
@@ -161,7 +165,13 @@ const DONATE = {
       title: 'The Donors’ Fund',
       blurb: 'Donate using funds from your Donors’ Fund account.',
       icon: 'swirl',
-      cta: 'Give through Donors’ Fund',
+      /* The shul is listed several times over under the one tax ID, once for the shul
+         itself and once for each thing given to, so the number alone is not enough to
+         land on: whoever is giving has to pick which of them. Saying so here is the
+         difference between a donation arriving where it was meant to and arriving in
+         the wedding fund. */
+      how: 'Search our tax ID in your Donors’ Fund account, then choose the right listing: the shul is on there more than once.',
+      copy: { value: '26-4527675', note: 'Tax ID' },
     },
   ],
 };
@@ -468,17 +478,18 @@ function donateWayHtml(way) {
         ${funds.map(chip).join('')}${more}
       </ul>`
     : '';
-  // Only where some are folded away: with every fund already named, "View all" would lead
-  // to exactly what is on the screen. Opening More names them all, so it goes then too,
-  // which is why this is hidden rather than dropped.
-  const all = folds && way.href
-    ? `<a class="luach-give-all" href="${esc(way.href)}" target="_blank" rel="noopener noreferrer">View all ${funds.length} options <span aria-hidden="true">&rarr;</span></a>`
-    : '';
   const copy = way.copy
-    ? (way.copy.address || way.copy.name
-        ? `<p class="luach-copy"><span class="luach-copy-address">${esc(way.copy.address)}</span><span class="luach-copy-name">${esc(way.copy.name)}</span></p>`
+    ? (way.copy.value || way.copy.note
+        ? `<p class="luach-copy">
+            <span class="luach-copy-value">${esc(way.copy.value)}</span>
+            <span class="luach-copy-note">${esc(way.copy.note)}</span>
+            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${esc(way.copy.value)}">Copy</button>` : ''}
+          </p>`
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
+  // Under the description rather than beside it: it is a sentence about what to do, and the
+  // narrow column a row card keeps for its details is no place to read one.
+  const how = way.how ? `<p class="luach-give-how">${esc(way.how)}</p>` : '';
   const soon = !way.href && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Still written as a link to the payment page, and still opening a tab if nothing wires
      it up. wireDonateFrames catches the click and brings the form onto this page instead,
@@ -511,10 +522,11 @@ function donateWayHtml(way) {
       <div class="luach-give-body">
         <h2 class="luach-give-title">${esc(way.title)}</h2>
         <p class="luach-give-blurb">${esc(way.blurb)}</p>
+        ${how}
       </div>
       ${wide ? '' : `<div class="luach-give-aside">${copy}${soon}${button}</div>`}
     </div>
-    ${wide ? `${chips}${all}${button}` : ''}
+    ${wide ? `${chips}${button}` : ''}
     ${frame}
   </section>`;
 }
@@ -549,7 +561,6 @@ function wireDonateChips(root) {
     const more = list.querySelector('.luach-chip.is-more');
     if (!more) continue;
     const label = more.querySelector('.luach-chip-more-label');
-    const all = list.parentElement.querySelector('.luach-give-all');
     fitDonateChips(list);
     // Only a change of width can change how many fit. Folding chips away changes the
     // list's height, and refitting on that would be a loop that never settles.
@@ -568,9 +579,42 @@ function wireDonateChips(root) {
       // Re-read the mark rather than holding on to it: replacing it leaves the old node
       // detached, and a handler keeping that would be writing to nothing on the next press.
       more.querySelector('.luach-chip-icon').outerHTML = giveIcon(open ? 'less' : 'more', 'luach-chip-icon');
-      if (all) all.hidden = open;
       if (open) for (const c of list.querySelectorAll('li.luach-chip')) c.hidden = false;
       else fitDonateChips(list);
+    });
+  }
+}
+
+/** Put a card's detail on the clipboard, since the app it is wanted in is a tap away.
+ *
+ *  Asked for twice over, the same as the week card's Copy text button: navigator.clipboard
+ *  is refused outside a secure context and on some older phones, so the old hidden textarea
+ *  is kept behind it. The result is said on the button rather than in an alert, and the
+ *  value stays selectable text either way, so a phone that can do neither is not stuck. */
+function wireDonateCopy(root) {
+  for (const btn of root.querySelectorAll('.luach-copy-btn')) {
+    btn.addEventListener('click', async () => {
+      const said = btn.textContent;
+      const text = btn.dataset.copy || '';
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+        else {
+          const box = document.createElement('textarea');
+          box.value = text;
+          box.setAttribute('readonly', '');
+          box.style.position = 'fixed';
+          box.style.opacity = '0';
+          document.body.appendChild(box);
+          box.select();
+          document.execCommand('copy');
+          box.remove();
+        }
+        btn.textContent = 'Copied';
+      } catch (err) {
+        console.error('copy failed', err);
+        btn.textContent = 'Copy failed';
+      }
+      setTimeout(() => { btn.textContent = said; }, 2000);
     });
   }
 }
@@ -653,6 +697,7 @@ function renderDonatePage(published) {
     </div>`;
   wireDonateChips(main);
   wireDonateFrames(main);
+  wireDonateCopy(main);
   openTheDoor();
 }
 
