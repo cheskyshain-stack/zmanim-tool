@@ -13,7 +13,7 @@ import { buildSheetPages, syncPageHeights } from './sheet-view.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
-import { currentSerial, wireSwipe } from './nav-helpers.js';
+import { currentSerial, wireSwipe, wireSecretTaps, navUnlocked, unlockNav } from './nav-helpers.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 
@@ -118,13 +118,22 @@ function fitChartToWindow(pagesEl) {
  *    - empty: what to say when there is no chart to show at all
  *    - swipe: false to leave the gesture off, for an embed sitting inside something that
  *      already swipes - two handlers on nested elements would both fire and the page
- *      would move twice at once. */
+ *      would move twice at once.
+ *    - confine: hold this to the one chart covering now, which is what the congregation's
+ *      site asks for. A chart is a season's worth of weeks and the sheet on the wall is
+ *      one of them; paging off it to a chart from two months ago is not what that page is
+ *      for. There is exactly one chart to look at, so rather than leave Previous and Next
+ *      sitting there permanently dead, the row goes: nothing on the screen is offering
+ *      something it cannot do. Three taps on the chart itself opens it (navUnlocked). */
 export function renderChartBrowser(container, state, opts = {}) {
-  const { empty = 'Nothing has been published yet.', swipe = true } = opts;
+  const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
   const spreads = chartSpreads(state);
   let at = spreadIndexForNow(spreads);
 
   const draw = () => {
+    // Asked every draw rather than once, so the redraw that follows the taps comes out
+    // with the navigation on it.
+    const held = confine && !navUnlocked();
     const spread = spreads[at];
     if (!spread) {
       container.innerHTML = `<p class="hint">${empty}</p>`;
@@ -137,7 +146,7 @@ export function renderChartBrowser(container, state, opts = {}) {
           ${chartEsc(label.english)}
           <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
         </div>
-        <div class="week-nav-row">
+        ${held ? '' : `<div class="week-nav-row">
           <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>
             <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
           </button>
@@ -145,7 +154,7 @@ export function renderChartBrowser(container, state, opts = {}) {
           <button type="button" class="chart-next" ${at >= spreads.length - 1 ? 'disabled' : ''}>
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
-        </div>
+        </div>`}
         <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
@@ -175,7 +184,17 @@ export function renderChartBrowser(container, state, opts = {}) {
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
-    if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+    // Swiping is the same journey as the buttons, so it goes with them.
+    if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+    // Three taps on the chart itself lets the rest of the season out. On the pages rather
+    // than the whole screen, so the buttons above are not part of the gesture, and the
+    // redraw is what puts the navigation on the page.
+    if (held) {
+      wireSecretTaps(pagesEl, () => {
+        unlockNav();
+        draw();
+      });
+    }
   };
   draw();
 }

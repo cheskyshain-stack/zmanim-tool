@@ -23,7 +23,8 @@ import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
-import { currentSerial, wireSwipe } from './nav-helpers.js';
+import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
+import { splitWeeksIntoPages } from '../pagination.js';
 
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
  *  saved sheet resolves to the most recently generated one.
@@ -1113,6 +1114,17 @@ function weekCardsHtml(showing, index, state, settings) {
 }
 
 
+/** The weeks printed on the same page of the chart as this one, in order, or null where
+ *  there is no sheet behind it to ask. A Yom Tov week has no שבת sheet, and holding the
+ *  view to a page that does not exist would leave it with nowhere to go at all. */
+function chartPageSerials(showing, index) {
+  const sheet = index.get(showing)?.sheet;
+  if (!sheet?.weeks?.length) return null;
+  const page = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes)
+    .find((weeks) => weeks.some((w) => w.serial === showing));
+  return page?.length ? page.map((w) => w.serial).sort((a, b) => a - b) : null;
+}
+
 export function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
@@ -1122,7 +1134,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const heading = !luach && opts.heading !== false;
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
-  const serials = [...index.keys()].sort((a, b) => a - b);
+  const allSerials = [...index.keys()].sort((a, b) => a - b);
+  let serials = allSerials;
 
   if (!serials.length) {
     container.innerHTML = luach
@@ -1133,6 +1146,20 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   }
 
   const showing = serials.includes(serial) ? serial : currentSerial(serials);
+  /* On the congregation's site, Previous and Next reach only the weeks printed on the
+     chart that is up now, and stop at its first and last. A published sheet is a season,
+     but what is on the wall is one page of it, and the weeks on that page are the ones
+     worth being able to look at: the rest is either months behind or months ahead.
+
+     The pages are the chart's own, split exactly as the printed sheet splits them
+     (splitWeeksIntoPages, the same call the chart browser makes), so "the end of the
+     chart" here means the end of the sheet of paper rather than some number of weeks
+     picked here.
+
+     Three taps on the chart lets the whole season out again (navUnlocked in nav-helpers),
+     and the admin app is never held at all. */
+  const held = luach && !navUnlocked();
+  if (held) serials = chartPageSerials(showing, index) || serials;
   const at = serials.indexOf(showing);
   const { sheet } = index.get(showing);
   const week = index.get(showing).week;
@@ -1209,7 +1236,9 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         // here are the published ones, and a season stops where the next season begins:
         // Next runs out at Sukkos because the winter chart is not up, which looks like a
         // broken button unless it says so.
-        at >= serials.length - 1 && nextSeasonLabel(index, serials)
+        // Not while the view is held to one page of the chart: running out of that page is
+        // not running out of what is published, and saying so would be untrue.
+        !held && at >= serials.length - 1 && nextSeasonLabel(index, serials)
           ? `<p class="hint no-print week-end-note">This is the last week published. <bdi>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
           : ''
       }

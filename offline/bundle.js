@@ -1652,6 +1652,16 @@ function wireSwipe(container, onPrev, onNext) {
  *  and an absolute path would resolve against the root of the disk. */
 function wireSecretDoor(el, href, taps = 3, withinMs = 750) {
   if (!el || !/^https?:$/.test(location.protocol)) return;
+  wireSecretTaps(el, () => { location.href = href; }, taps, withinMs);
+}
+
+/** The counting behind the door above, on its own so the same gesture can open something
+ *  other than a URL. Same rules, and they are the rules that make it safe to hide a thing
+ *  behind: a tap on something that already does something belongs to that thing and resets
+ *  the count, and the run has to be unbroken, so three taps spread over a minute of
+ *  ordinary reading never add up to anything. */
+function wireSecretTaps(el, onOpen, taps = 3, withinMs = 750) {
+  if (!el) return;
   let run = 0;
   let last = 0;
   el.addEventListener('click', (event) => {
@@ -1664,8 +1674,30 @@ function wireSecretDoor(el, href, taps = 3, withinMs = 750) {
     last = now;
     if (run < taps) return;
     run = 0;
-    location.href = href;
+    onOpen();
   });
+}
+
+/* Whether the congregation's page has been let out of the week it is showing.
+ *
+ * The published charts hold a season at a time, but the congregation is being shown the
+ * sheet that is on the wall, and paging off it to a chart from two months ago or two
+ * months ahead is not what that page is for. So on that site the views are held to the
+ * chart covering now: the week view can move between the weeks printed on it and stops at
+ * its first and last, and the chart view has nowhere to go at all, there being one chart.
+ *
+ * Whoever runs the place still needs the rest of it on a phone, so three taps on the chart
+ * opens it, the same gesture and for the same reason as the door into the admin app above.
+ *
+ * In memory only, and deliberately: it lasts as long as the page is open and no longer, so
+ * nothing is written to anybody's phone and a congregant who stumbles on it has an
+ * ordinary page again the moment they come back. */
+let navIsUnlocked = false;
+function navUnlocked() {
+  return navIsUnlocked;
+}
+function unlockNav() {
+  navIsUnlocked = true;
 }
 
 // ==== ui/calculations-view.js ====
@@ -3427,13 +3459,22 @@ function fitChartToWindow(pagesEl) {
  *    - empty: what to say when there is no chart to show at all
  *    - swipe: false to leave the gesture off, for an embed sitting inside something that
  *      already swipes - two handlers on nested elements would both fire and the page
- *      would move twice at once. */
+ *      would move twice at once.
+ *    - confine: hold this to the one chart covering now, which is what the congregation's
+ *      site asks for. A chart is a season's worth of weeks and the sheet on the wall is
+ *      one of them; paging off it to a chart from two months ago is not what that page is
+ *      for. There is exactly one chart to look at, so rather than leave Previous and Next
+ *      sitting there permanently dead, the row goes: nothing on the screen is offering
+ *      something it cannot do. Three taps on the chart itself opens it (navUnlocked). */
 function renderChartBrowser(container, state, opts = {}) {
-  const { empty = 'Nothing has been published yet.', swipe = true } = opts;
+  const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
   const spreads = chartSpreads(state);
   let at = spreadIndexForNow(spreads);
 
   const draw = () => {
+    // Asked every draw rather than once, so the redraw that follows the taps comes out
+    // with the navigation on it.
+    const held = confine && !navUnlocked();
     const spread = spreads[at];
     if (!spread) {
       container.innerHTML = `<p class="hint">${empty}</p>`;
@@ -3446,7 +3487,7 @@ function renderChartBrowser(container, state, opts = {}) {
           ${chartEsc(label.english)}
           <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
         </div>
-        <div class="week-nav-row">
+        ${held ? '' : `<div class="week-nav-row">
           <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>
             <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
           </button>
@@ -3454,7 +3495,7 @@ function renderChartBrowser(container, state, opts = {}) {
           <button type="button" class="chart-next" ${at >= spreads.length - 1 ? 'disabled' : ''}>
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
-        </div>
+        </div>`}
         <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
@@ -3484,7 +3525,17 @@ function renderChartBrowser(container, state, opts = {}) {
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads)));
-    if (swipe) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+    // Swiping is the same journey as the buttons, so it goes with them.
+    if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
+    // Three taps on the chart itself lets the rest of the season out. On the pages rather
+    // than the whole screen, so the buttons above are not part of the gesture, and the
+    // redraw is what puts the navigation on the page.
+    if (held) {
+      wireSecretTaps(pagesEl, () => {
+        unlockNav();
+        draw();
+      });
+    }
   };
   draw();
 }
@@ -5506,6 +5557,7 @@ function erevParshaEnglish(hebrewParsha, parshaNames) {
 
 
 
+
 /** Every week worth showing, newest sheet first, so a week that appears in more than one
  *  saved sheet resolves to the most recently generated one.
  *
@@ -6594,6 +6646,17 @@ function weekCardsHtml(showing, index, state, settings) {
 }
 
 
+/** The weeks printed on the same page of the chart as this one, in order, or null where
+ *  there is no sheet behind it to ask. A Yom Tov week has no שבת sheet, and holding the
+ *  view to a page that does not exist would leave it with nowhere to go at all. */
+function chartPageSerials(showing, index) {
+  const sheet = index.get(showing)?.sheet;
+  if (!sheet?.weeks?.length) return null;
+  const page = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes)
+    .find((weeks) => weeks.some((w) => w.serial === showing));
+  return page?.length ? page.map((w) => w.serial).sort((a, b) => a - b) : null;
+}
+
 function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
@@ -6603,7 +6666,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const heading = !luach && opts.heading !== false;
   const settings = resolveSettings(state.settings);
   const index = weekIndex(state);
-  const serials = [...index.keys()].sort((a, b) => a - b);
+  const allSerials = [...index.keys()].sort((a, b) => a - b);
+  let serials = allSerials;
 
   if (!serials.length) {
     container.innerHTML = luach
@@ -6614,6 +6678,20 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   }
 
   const showing = serials.includes(serial) ? serial : currentSerial(serials);
+  /* On the congregation's site, Previous and Next reach only the weeks printed on the
+     chart that is up now, and stop at its first and last. A published sheet is a season,
+     but what is on the wall is one page of it, and the weeks on that page are the ones
+     worth being able to look at: the rest is either months behind or months ahead.
+
+     The pages are the chart's own, split exactly as the printed sheet splits them
+     (splitWeeksIntoPages, the same call the chart browser makes), so "the end of the
+     chart" here means the end of the sheet of paper rather than some number of weeks
+     picked here.
+
+     Three taps on the chart lets the whole season out again (navUnlocked in nav-helpers),
+     and the admin app is never held at all. */
+  const held = luach && !navUnlocked();
+  if (held) serials = chartPageSerials(showing, index) || serials;
   const at = serials.indexOf(showing);
   const { sheet } = index.get(showing);
   const week = index.get(showing).week;
@@ -6690,7 +6768,9 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         // here are the published ones, and a season stops where the next season begins:
         // Next runs out at Sukkos because the winter chart is not up, which looks like a
         // broken button unless it says so.
-        at >= serials.length - 1 && nextSeasonLabel(index, serials)
+        // Not while the view is held to one page of the chart: running out of that page is
+        // not running out of what is published, and saying so would be untrue.
+        !held && at >= serials.length - 1 && nextSeasonLabel(index, serials)
           ? `<p class="hint no-print week-end-note">This is the last week published. <bdi>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
           : ''
       }

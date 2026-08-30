@@ -309,7 +309,10 @@ function renderChartPage(published) {
   main.className = '';
   main.innerHTML = backBar(PAGE_NAMES.chart) + '<div id="chart-host"></div>';
   openTheDoor();
-  renderChartBrowser(main.querySelector('#chart-host'), state);
+  // confine: the congregation is shown the chart that is up now and no other. Three taps
+  // on the chart itself opens the rest, which is also what lets the week view out of the
+  // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
+  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
 }
 
 function route(published) {

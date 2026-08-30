@@ -75,6 +75,16 @@ export function wireSwipe(container, onPrev, onNext) {
  *  and an absolute path would resolve against the root of the disk. */
 export function wireSecretDoor(el, href, taps = 3, withinMs = 750) {
   if (!el || !/^https?:$/.test(location.protocol)) return;
+  wireSecretTaps(el, () => { location.href = href; }, taps, withinMs);
+}
+
+/** The counting behind the door above, on its own so the same gesture can open something
+ *  other than a URL. Same rules, and they are the rules that make it safe to hide a thing
+ *  behind: a tap on something that already does something belongs to that thing and resets
+ *  the count, and the run has to be unbroken, so three taps spread over a minute of
+ *  ordinary reading never add up to anything. */
+export function wireSecretTaps(el, onOpen, taps = 3, withinMs = 750) {
+  if (!el) return;
   let run = 0;
   let last = 0;
   el.addEventListener('click', (event) => {
@@ -87,6 +97,28 @@ export function wireSecretDoor(el, href, taps = 3, withinMs = 750) {
     last = now;
     if (run < taps) return;
     run = 0;
-    location.href = href;
+    onOpen();
   });
+}
+
+/* Whether the congregation's page has been let out of the week it is showing.
+ *
+ * The published charts hold a season at a time, but the congregation is being shown the
+ * sheet that is on the wall, and paging off it to a chart from two months ago or two
+ * months ahead is not what that page is for. So on that site the views are held to the
+ * chart covering now: the week view can move between the weeks printed on it and stops at
+ * its first and last, and the chart view has nowhere to go at all, there being one chart.
+ *
+ * Whoever runs the place still needs the rest of it on a phone, so three taps on the chart
+ * opens it, the same gesture and for the same reason as the door into the admin app above.
+ *
+ * In memory only, and deliberately: it lasts as long as the page is open and no longer, so
+ * nothing is written to anybody's phone and a congregant who stumbles on it has an
+ * ordinary page again the moment they come back. */
+let navIsUnlocked = false;
+export function navUnlocked() {
+  return navIsUnlocked;
+}
+export function unlockNav() {
+  navIsUnlocked = true;
 }
