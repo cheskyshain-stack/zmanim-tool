@@ -73,6 +73,58 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
+
+/* Everything a finger can land on.
+ *
+ * Android paints a translucent blue box over whatever was tapped, and it sizes that box to
+ * the element's own box rather than to the thing the eye reads as the button. On the week
+ * view's More options that was plainly wrong: the summary is 324px inside a 362px card, so
+ * the flash came up as a rectangle sitting 19px in from each edge of the card it was
+ * supposed to be lighting up. It was on 50 of the 78 pressable things in the app, which is
+ * why it is turned off here rather than one control at a time, and replaced below with a
+ * pressed state of ours that always covers the whole control.
+ *
+ * touch-action: manipulation goes with it. Without it a browser holds a tap for a moment in
+ * case a second one is coming to zoom, which is felt as the button being slow. It was
+ * missing from 41 of the 78. Left off inputs and selects, which want their own text
+ * selection and scrolling gestures. */
+button, a, summary, label[for], [role="button"], .luach-chips,
+input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, summary, label[for], [role="button"] { touch-action: manipulation; }
+
+/* The replacement. A wash rather than a nudge: a 1px nudge is a fine desktop affordance and
+ * invisible under a thumb.
+ *
+ * It is an inset shadow spread across the whole border box rather than a background colour,
+ * because a background colour has to know what it is covering. The app's buttons are white,
+ * navy, gold and transparent, and one colour cannot be right on all four: setting the wash
+ * as a background would repaint a primary button's own colour on press and do nothing at
+ * all for a button that paints no background. An overlay darkens whatever is underneath,
+ * follows the control's border-radius, and is exactly the size of the control, which is the
+ * whole point of replacing what Android was drawing. Disabled buttons are left out; they
+ * should not look pressable.
+ *
+ * Anything with a pressed state of its own further down still wins on specificity and keeps
+ * it, so this only reaches what had nothing. */
+button:active:not(:disabled), a:active, label[for]:active, [role="button"]:active {
+  box-shadow: inset 0 0 0 100vmax rgba(16,24,32,0.10);
+}
+/* Both of these sit on navy, where a dark wash is no wash at all. */
+.nav-btn:active, .luach-back:active { box-shadow: inset 0 0 0 100vmax rgba(255,255,255,0.16); }
+
+/* A summary's own box stops inside its card's padding, so lighting the summary would repeat
+ * the very inset that started this. The card is what the eye reads as the button and the
+ * card is what was pressed, so the card is what lights up. Here it is a background rather
+ * than an overlay, the other way round from the buttons above, and for the same reason: a
+ * card's colour is known (both of these are white) and its drop shadow is not something to
+ * be overwritten while a finger is down. */
+.panel:has(> summary:active) { background-color: var(--accent-soft); }
+.luach-give-card:has(> summary:active) { background-color: #f4f1e9; }
+/* The exact rule is a line of text rather than a card, so it answers a press the way a line
+ * of text can. */
+.calc-exact > summary:active { opacity: 0.6; }
 /* Safari on iPhone runs a text autosizer: in a block much wider than the viewport it
    inflates the font on its own, to make body copy on a desktop-width page readable
    without pinching. A chart page is a fixed 11in (1056px) inside a ~390px phone, which
@@ -423,6 +475,17 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 }
 /* Keyboard focus still needs to show, even though the dot itself is hidden. */
 .form-grid .season-picker .season-radio:focus-visible + .season-option { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 45%, transparent); }
+/* Pressed. The app-wide press wash near the top of this file cannot reach these cards, so
+   the state is written here where the specificities are. Both the unpicked card and the
+   picked one are spelled out: the rules above set box-shadow on each of them separately,
+   the picked one from five classes deep, and a press has to outrank whichever it lands on.
+   The picked card keeps its ring and takes the wash on top of it, so pressing the one that
+   is already chosen still answers. */
+.form-grid .season-picker .season-option:active,
+.form-grid .season-picker .season-radio:checked + .season-option:active {
+  box-shadow: inset 0 0 0 100vmax rgba(16,24,32,0.10),
+              0 0 0 3px color-mix(in srgb, var(--ui-accent) 15%, transparent);
+}
 
 /* Label on the left, stepper centred in the card. Three columns with the label and an
    empty spacer either side of it, so the stepper sits on the card's centre line rather
