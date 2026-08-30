@@ -22,7 +22,7 @@ KAYITZ_COLUMNS = [
     # I and J are both פלג מ"א; the difference is the tzais the day is measured to, 72
     # minutes here and 50 in J. The "72" says which is which and sits after פלג מ"א on its
     # own line, matching the printed board.
-    ("I", "מנחה\n(בעזר״נ)\nפלג מ\"א 72"),
+    ("I", "מנחה\n(בעזר\"נ)\nפלג מ\"א 72"),
     ("J", "מנחה\n(למטה)\nפלג מ\"א"),
     ("K", "מנחה\nפלג גר\"א"),
     ("L", "מנחה\nערב שבת"),
