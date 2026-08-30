@@ -1341,6 +1341,21 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
    roomy case still measures the same 228px it did. */
 .luach-home > .luach-rule { margin-top: auto; padding-top: 1.9rem; }
 
+/* The shul, under the menu. Rounded and shadowed like the cards above it so it belongs to
+   the same page rather than sitting on it. aspect-ratio holds the shape from the tag's own
+   width and height, so the space is reserved before the file lands and nothing below it is
+   shoved down when it does. */
+.luach-photo { margin: 1.1rem 0 0; }
+.luach-photo img {
+  display: block; width: 100%; height: auto; aspect-ratio: 1400 / 821;
+  border-radius: 18px; object-fit: cover;
+  box-shadow: 0 2px 8px rgba(18,39,79,0.07), 0 1px 2px rgba(18,39,79,0.05);
+}
+@media (min-width: 34rem) { .luach-photo img { border-radius: 20px; } }
+/* Nothing on the menu is printed, and a photograph least of all: this page reaches paper
+   only by somebody hitting print on the wrong screen, and it should not spend their ink. */
+@media print { .luach-photo { display: none !important; } }
+
 /* The navy cap at the top of every screen here, the same shape on the menu and on the
    pages behind it, so that going in and coming out look like one site rather than two.
    The negative margins are main's own padding, undone, so the cap reaches all three
@@ -2037,9 +2052,10 @@ body.is-luach main.is-give { padding-bottom: 1.25rem; }
 }
 /* The tax ID under the address. Quieter than the address above it, since it is a number to
    be looked up rather than read: whoever wants it is looking for it, and everyone else
-   should be able to pass over it. Quieter than that it cannot go: 0.62 was tried first and
+   should be able to pass over it. Quieter than this it cannot go: 0.62 was tried first and
    measured 4.2 against the cream behind it, under the 4.5 small text is held to, and this
-   is a line somebody copies a number off. Its digits are forced left to right, or a Hebrew
+   is a line somebody copies a number off. 0.72 measures 5.68. Its digits are forced left to
+   right, or a Hebrew
    word anywhere near it in a right to left run could reorder the two halves of it. */
 .luach-foot-tax {
   margin: 0.25rem 0 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;

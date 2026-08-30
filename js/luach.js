@@ -135,6 +135,32 @@ const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
  *  and two places to write it is one place for a digit to go wrong. */
 const SHUL_TAX_ID = '26-4527675';
 
+/** The shul itself, under the menu.
+ *
+ *  Under the menu and not above it on purpose. Somebody opening this on a phone wants the
+ *  next minyan, which is the card at the top, and a picture between them and it would push
+ *  the one useful thing off the first screen to make room for something nobody came for. It
+ *  reads better at the end anyway: the times, then the building they are in.
+ *
+ *  Three sizes rather than one. The original is 2454px wide and 2.4MB, which is a quarter of
+ *  a second of a phone's data allowance spent on a photograph on a page whose whole point is
+ *  opening fast. Measured, at 393px wide: a plain screen takes the 700 at 66KB, a 2x phone
+ *  the 1000 at 126KB, a 3x phone the 1400 at 228KB, and a desktop the 700 or the 1400 by its
+ *  own density. The middle rung is there because without it a 2x phone needs 722px, finds
+ *  nothing between 700 and 1400, and takes the 1400: the commonest phone there is would have
+ *  been the one paying the most.
+ *
+ *  width and height are on the tag so the space is reserved before the file arrives. Without
+ *  them the rule and the address under it are laid out, then shoved down when the picture
+ *  lands, which is the jump that moves what somebody is already reading. */
+const SHUL_PHOTO = `<figure class="luach-photo">
+      <img src="/assets/shul-1400.jpg"
+           srcset="/assets/shul-700.jpg 700w, /assets/shul-1000.jpg 1000w, /assets/shul-1400.jpg 1400w"
+           sizes="(max-width: 34rem) 100vw, 34rem"
+           width="1400" height="821" decoding="async"
+           alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">
+    </figure>`;
+
 /** The footer that ends every page: the address, and the tax ID under it.
  *
  *  The tax ID is here rather than only on the donation page because of what it is for. A
@@ -323,6 +349,7 @@ function homeHtml(published) {
         ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
+    ${SHUL_PHOTO}
     ${rule()}
     ${footHtml(s)}
   </div>`;

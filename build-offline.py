@@ -252,12 +252,22 @@ def stamp_site_url(page: Path):
     block = f"""{SITE_URL_MARKER}
 <link rel="canonical" href="{SITE_URL}/">
 <meta property="og:url" content="{SITE_URL}/">
-<meta property="og:image" content="{SITE_URL}/icons/icon-512.png">"""
-    pattern = re.escape(SITE_URL_MARKER) + r'\n(?:<link rel="canonical".*?>\n|<meta property="og:(?:url|image)".*?>\n)*'
+<meta property="og:image" content="{SITE_URL}/assets/shul-1400.jpg">
+<meta property="og:image:alt" content="Bais Medrash of Lakewood Commons, 44 Coles Way, Lakewood">"""
+    pattern = re.escape(SITE_URL_MARKER) + r'\n(?:<link rel="canonical".*?>\n|<meta property="og:(?:url|image|image:alt)".*?>\n)*'
     if SITE_URL_MARKER in html:
         html = re.sub(pattern, block + "\n", html, flags=re.S)
     else:
         html = html.replace("</head>", block + "\n</head>")
+    # The picture named in the structured data, which wants a whole address too. Written in
+    # the page as a plain path so it reads as one, and given its host here so the domain is
+    # still only spelled out in this file. The optional host in the pattern is what makes a
+    # second run replace rather than double up.
+    html = re.sub(
+        r'("image":\s*")(?:https?://[^"]*)?(/assets/[^"]+")',
+        lambda m: m.group(1) + SITE_URL + m.group(2),
+        html,
+    )
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
