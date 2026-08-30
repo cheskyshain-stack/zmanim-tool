@@ -5976,9 +5976,14 @@ function erevPlain(value) {
     .replace(/&gt;/g, '>');
 }
 
-/** Every clock time in a cell, in order, each with whether it was underlined and which
- *  line of the cell it sat on. The line matters because the פלג of a column is written
- *  under its מנחה rather than beside it. */
+/** Every clock time in a cell, in order, each with where it davens and which line of the
+ *  cell it sat on. The line matters because the פלג of a column is written under its מנחה
+ *  rather than beside it.
+ *
+ *  Where it davens is written two ways on the boards and both are read here: an underline
+ *  means למטה, and stars after the time mean the rooms the printed footer names, one for
+ *  בעזרת נשים and two for באולם השמחות. The שבת card only ever underlines, so the שבת
+ *  message never looks at the stars; the weekday card uses both. */
 function erevTimes(value) {
   const text = erevPlain(value);
   const out = [];
@@ -5991,9 +5996,9 @@ function erevTimes(value) {
     if (ch === '\n') { line++; continue; }
     if (ch === UL_START) { underlined = true; continue; }
     if (ch === UL_END) { underlined = false; continue; }
-    const m = /^\d{1,2}:\d{2}/.exec(text.slice(i));
+    const m = /^\d{1,2}:\d{2}(\*{0,2})/.exec(text.slice(i));
     if (m) {
-      out.push({ text: m[0], underlined, line, before: text.slice(0, i) });
+      out.push({ text: m[0].replace(/\*+$/, ''), underlined, stars: m[1].length, line, before: text.slice(0, i) });
       i += m[0].length - 1;
     }
   }
@@ -6083,6 +6088,75 @@ function erevParshaEnglish(hebrewParsha, parshaNames) {
   const want = String(hebrewParsha ?? '').trim();
   const row = parshaNames?.rows?.find((r) => String(r[0]).trim() === want);
   return (row && row[1]) || want;
+}
+
+/* --- The weekday message ---------------------------------------------------------------
+   The same idea for the חול card: one line of text somebody can paste into a chat, built
+   off the very row the card is built from.
+
+   A worked example, in the shape it was asked for:
+
+     Week P' Ki Savo
+     Shacharis 7:00m, 7:20en, 7:35d, 8:00m, 8:20en, 8:40d, Mincha: 1:35d, 1:50m, 4:15d,
+     6:35d, 7:20d, Mariv: 8:45m, 9:30d, 10:00d, 10:30m, 11:00d
+
+   All of it on one line after the heading, which is how the message is written, so the
+   line above is only wrapped here to fit the page.
+
+   Where each piece comes from:
+
+     Week P'    the parsha in English, the same lookup the Erev Shabbos message uses.
+     d / m      underlined is למטה, plain is the main בית מדרש. Same as the שבת message.
+     en         one star, which the printed footer calls בעזרת נשים.
+     hall       two stars, באולם השמחות. It does not appear on any published week so far,
+                and is here so a week that does grow one is not silently mislabelled.
+
+   שחרית is not a computed column: it is the rich text out of Settings, the same value the
+   card prints, so a week's second schedule on a ר"ח or a תענית is not in it. The card shows
+   that as its own line and this message does not carry it. */
+
+/** Which group a weekday column is, by what its heading says. */
+function weekdayKindOf(header) {
+  const h = String(header ?? '').replace(/\s+/g, ' ');
+  if (h.includes('שחרית')) return { label: 'Shacharis', order: 0 };
+  if (h.includes('מנחה')) return { label: 'Mincha:', order: 1 };
+  if (h.includes('מעריב')) return { label: 'Mariv:', order: 2 };
+  return null;
+}
+
+/** d, m, en or hall: where this מנין davens, off the underline and the stars. */
+function weekdayWhere(time) {
+  if (time.stars >= 2) return 'hall';
+  if (time.stars === 1) return 'en';
+  return time.underlined ? 'd' : 'm';
+}
+
+/** The weekday message for one week.
+ *
+ *  @param columns/row - the weekday columns and the row already built and overridden, so
+ *    this reads exactly what the card reads.
+ *  @param shacharis - the שחרית rich text out of Settings, which is where that column's
+ *    times live rather than in the row.
+ *  @param name - {english, yomTov}. Three weeks a year the Shabbos is Yom Tov and there is
+ *    no parsha, so there is nothing for "P'" to introduce and the week is named for its Yom
+ *    Tov instead, the way the card itself names it. Without this those weeks read
+ *    "Week P' ראש השנה", which calls a Yom Tov a parsha.
+ *
+ *  Read in the order the day happens in: שחרית, then מנחה, then מעריב. That is the printed
+ *  order of the columns reversed, the same way round the שבת message reads them. */
+function weekdayScheduleText(columns, row, shacharis, name) {
+  const groups = [];
+  for (const col of [...columns].reverse()) {
+    const kind = weekdayKindOf(col.header);
+    if (!kind) continue;
+    const times = erevTimes(kind.order === 0 ? shacharis : row[col.key]);
+    if (!times.length) continue;
+    groups.push({ order: kind.order, text: `${kind.label} ${times.map((t) => t.text + weekdayWhere(t)).join(', ')}` });
+  }
+  if (!groups.length) return '';
+  groups.sort((a, b) => a.order - b.order);
+  const heading = name.yomTov ? `Week of ${name.english}` : `Week P' ${name.english}`;
+  return `${heading}\n${groups.map((g) => g.text).join(', ')}`;
 }
 
 // ==== ui/week-view.js ====
@@ -7292,12 +7366,26 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
                with paper is then in one place, and the row above stays what it is for:
                moving from week to week. The panel is called More options rather than
                Printing options because Print itself now lives in it. -->
-          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}${
-            // Only where there is a שבת row to build it from. A week whose Shabbos is Yom
-            // Tov has no parsha and no row, and an Erev Shabbos message for it would be
-            // an empty one.
-            sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy text</button>' : ''
-          }</div>
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
+          ${
+            /* The two message buttons on a row of their own. Beside Print and PDF they made
+               four across, which on a 320px phone ran 43px past the row and took the page
+               with it; wrapped, the labels broke to three lines each. Copying a message and
+               printing a board are two different errands anyway.
+
+               Each button appears only where its own card does. A week can have one card
+               without the other, and a button for a card that is not there would put an
+               empty message on the clipboard. */
+            sheet || weekdayChartFor(sheet, showing, state)
+              ? `<div class="week-nav-row week-nav-copy">${
+                  sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy שבת text</button>' : ''
+                }${
+                  weekdayChartFor(sheet, showing, state)
+                    ? '<button type="button" class="copy-btn" id="weekday-copy-btn">Copy weekday text</button>'
+                    : ''
+                }</div>`
+              : ''
+          }
           ${
             // Both switches, or neither. Each of them is a question about two pages, and a
             // week that has only one (a Shabbos that is Yom Tov comes through on its
@@ -7394,16 +7482,15 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
      context and on some older phones, and a message nobody can paste is no use, so the old
      hidden-textarea route is kept behind it. The result is said on the button rather than
      in an alert, the way the PDF button does it. */
-  const copyBtn = container.querySelector('#week-copy-btn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      const said = copyBtn.textContent;
+  /* Both copy buttons run through here, since everything but the message they build is
+     the same: ask the clipboard, say so on the button, put the label back. */
+  const wireCopy = (id, build) => {
+    const btn = container.querySelector('#' + id);
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const said = btn.textContent;
       try {
-        const { week: w, sheet: s } = index.get(showing);
-        if (!s) throw new Error('this week has no שבת row');
-        const { columns, row } = rowFor(w, s, state, settings);
-        const tables = await loadTables();
-        const text = erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+        const text = await build();
         if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
         else {
           const box = document.createElement('textarea');
@@ -7416,14 +7503,38 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
           document.execCommand('copy');
           box.remove();
         }
-        copyBtn.textContent = 'Copied';
+        btn.textContent = 'Copied';
       } catch (err) {
         console.error('copy failed', err);
-        copyBtn.textContent = 'Copy failed';
+        btn.textContent = 'Copy failed';
       }
-      setTimeout(() => { copyBtn.textContent = said; }, 2000);
+      setTimeout(() => { btn.textContent = said; }, 2000);
     });
-  }
+  };
+
+  wireCopy('week-copy-btn', async () => {
+    const { week: w, sheet: s } = index.get(showing);
+    if (!s) throw new Error('this week has no שבת row');
+    const { columns, row } = rowFor(w, s, state, settings);
+    const tables = await loadTables();
+    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+  });
+
+  /* The חול card's own message. Built from the very row the card is built from, שחרית
+     included, which for that column is the rich text out of Settings rather than anything
+     computed (see weekCardsHtml, which reads it the same way). */
+  wireCopy('weekday-copy-btn', async () => {
+    const { week: w, sheet: s } = index.get(showing);
+    const weekday = weekdayChartFor(s, showing, state);
+    const weekdayWeek = weekday?.weeks.find((x) => x.serial === showing);
+    if (!weekdayWeek) throw new Error('this week has no חול row');
+    const { row } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
+    const tables = await loadTables();
+    return weekdayScheduleText(WEEKDAY_COLUMNS, row, state.settings.weekdayShacharis, {
+      english: erevParshaEnglish(w.parsha, tables.parshaNames),
+      yomTov: isYomTovWeekLabel(w.parsha),
+    });
+  });
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
   // one of these at the right size either, and a PDF states the paper in the file rather
