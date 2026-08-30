@@ -1441,7 +1441,30 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
    page that is only a shape, so it is where the room comes from. Measured at 412x732, the
    size this is most looked at on: with the box and the old 5.6rem cap the page ran 7px
    over on an Erev Shabbos, and at 4.6rem it ends inside the window on both kinds of day. */
-.luach-bar-plain { display: block; min-height: 4.6rem; margin-bottom: 2.4rem; padding: 0; }
+/* margin-bottom matches .luach-bar's own 1.6rem for the same reason as the height below:
+   the menu had 38px of air under its cap against the donation page's 26px, and half of the
+   26px jolt was that rather than the cap itself. */
+.luach-bar-plain { display: block; margin-bottom: 1.6rem; padding: 0; }
+/* The donation page is the only other screen carrying the wordmark, and its cap is sized by
+   the back link inside it rather than by the rule above, so the two disagreed: 74px against
+   60px, with 38px of air under one and 26px under the other. Flipping between the menu and
+   Donate moved the shul's name 26px up the screen, which on a phone is a visible jolt on a
+   page whose top half is the same picture both times.
+
+   They are matched by bringing the menu's cap down to the donation page's height, not by
+   pushing the donation page's up to the menu's. That was tried first and cost 26px the
+   donation page did not have: at 320x800 it went from fitting the window to 817px and
+   scrolling. Downwards only ever hands space back, and the menu has room to spare, which is
+   the same reason the cap was cut to 4.6rem in the first place.
+
+   The floor is written in the same parts the other cap is built from rather than as a
+   number, so the two stay together when the arc grows with the viewport: the padding above,
+   the back link's own height once its negative margins are taken off it (30.8px of link
+   pulled in by 0.8rem, so 18px of it counts), and the arc plus the padding below.
+
+   #week and #chart need nothing here. They carry no wordmark, so there is nothing to line
+   up, and their caps are already this height by being built this way. */
+.luach-bar-plain { min-height: calc(0.85rem + 1.125rem + var(--luach-arc) + 0.7rem); }
 
 /* The name sits on the parchment below the cap, not on the navy.
    The wordmark was drawn as black ink on a transparent background. Rather than ship a

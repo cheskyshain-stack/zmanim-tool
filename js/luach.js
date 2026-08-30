@@ -160,9 +160,17 @@ const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
  *  donor giving through a donor advised fund, an employer's matching scheme or their own
  *  accountant is asked for it away from this site entirely, often long after they have
  *  left it, so it wants to be on whatever page they happen to have open rather than behind
- *  a card on one of them. */
-const footHtml = (s) => `<p class="luach-foot">${esc(s.footerAddress)}</p>
-    <p class="luach-foot-tax">Tax ID ${SHUL_TAX_ID}</p>`;
+ *  a card on one of them.
+ *
+ *  The two lines are wrapped rather than loose. The donation page lays its children out with
+ *  a 0.6rem gap between them, and with the lines loose that gap landed between the address
+ *  and the tax ID as well: 14px apart there against 4px on the menu, so the footer was a
+ *  different shape on the two pages. Wrapped, the pair is one child and the gap falls
+ *  outside it, where it belongs. */
+const footHtml = (s) => `<div class="luach-footer">
+      <p class="luach-foot">${esc(s.footerAddress)}</p>
+      <p class="luach-foot-tax">Tax ID ${SHUL_TAX_ID}</p>
+    </div>`;
 
 const DONATE = {
   name: 'Donate',
@@ -196,7 +204,7 @@ const DONATE = {
           title: 'Building Fund',
           blurb: 'Help build for the future of our community.',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
-          funds: [{ label: 'Eiruv', icon: 'crane' }, { label: 'Building Projects', icon: 'building' }],
+          funds: [{ label: 'Building Fund', icon: 'building' }, { label: 'Eiruv', icon: 'crane' }],
         },
       ],
     },
