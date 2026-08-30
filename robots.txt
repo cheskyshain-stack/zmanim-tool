@@ -10,9 +10,12 @@
 #               the same words again at a second address, which is the thing search engines
 #               call duplicate content and rank both copies worse for.
 #
-# The Sitemap line goes in once the site has a settled address, since it has to be an
-# absolute URL and there is nothing yet to make it absolute against.
+# The Sitemap line below is written by build-offline.py from SITE_URL, the same one place
+# the canonical tag and the structured data are stamped from. Do not edit it by hand: the
+# next build will put it back.
 
 User-agent: *
 Disallow: /admin/
 Disallow: /offline/
+
+Sitemap: https://lczmanim.cjaffa.com/sitemap.xml

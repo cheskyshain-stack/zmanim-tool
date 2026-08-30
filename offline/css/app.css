@@ -1442,6 +1442,23 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    the heading stays in the accessibility tree. Checked in Chrome: the node still comes back
    as role heading, named from the alt. */
 .luach-masthead-name { display: contents; }
+/* Text that is there to be read by something other than an eye. The shul's wordmark is a
+   picture, so the heading it sits in had no words in it at all: a crawler saw an empty h1
+   and a screen reader read the alt text alone. The English name goes here, taken out of the
+   layout without being taken out of the page - display:none or visibility:hidden would hide
+   it from the very things it is for. Clipped to a pixel rather than moved off-screen with a
+   negative offset, which is the version that does not make the page scrollable sideways. */
+.luach-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+/* The line under the wordmark in the served page, before the app replaces it. Sized and
+   coloured like the rest of the front page so the frame it is visible for reads as this
+   page loading rather than as another one going past. */
+.luach-intro {
+  max-width: 34rem; margin: 0 auto 1.1rem; text-align: center;
+  font-size: 0.92rem; line-height: 1.55; color: var(--luach-ink); opacity: 0.75;
+}
 .luach-logo { width: min(18rem, 74%); height: auto; }
 .luach-place { margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.15rem; color: var(--luach-ink); }
 
@@ -2017,6 +2034,17 @@ body.is-luach main.is-give { padding-bottom: 1.25rem; }
 .luach-foot {
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
+}
+/* The tax ID under the address. Quieter than the address above it, since it is a number to
+   be looked up rather than read: whoever wants it is looking for it, and everyone else
+   should be able to pass over it. Quieter than that it cannot go: 0.62 was tried first and
+   measured 4.2 against the cream behind it, under the 4.5 small text is held to, and this
+   is a line somebody copies a number off. Its digits are forced left to right, or a Hebrew
+   word anywhere near it in a right to left run could reorder the two halves of it. */
+.luach-foot-tax {
+  margin: 0.25rem 0 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
+  font-size: 0.85rem; line-height: 1.5; color: var(--luach-ink); opacity: 0.72;
+  direction: ltr;
 }
 
 /* Back to the menu, on the cap. It is the only way off every page but the menu itself, and

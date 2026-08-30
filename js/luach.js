@@ -125,10 +125,30 @@ const giveIcon = (key, cls) =>
  *  its details are to follow, so the page says what exists rather than pretending it does
  *  not.
  */
+/** The shul's name in English, which the wordmark cannot supply because it is a picture and
+ *  the Hebrew one cannot because it is Hebrew. Written once here and read from both the
+ *  masthead and the donation page's thanks line, so the two can never come to disagree. */
+const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
+
+/** The shul's federal tax ID, in the footer of every page and on the Donors' Fund card.
+ *  One constant for both: it is the number somebody types into another app to give money,
+ *  and two places to write it is one place for a digit to go wrong. */
+const SHUL_TAX_ID = '26-4527675';
+
+/** The footer that ends every page: the address, and the tax ID under it.
+ *
+ *  The tax ID is here rather than only on the donation page because of what it is for. A
+ *  donor giving through a donor advised fund, an employer's matching scheme or their own
+ *  accountant is asked for it away from this site entirely, often long after they have
+ *  left it, so it wants to be on whatever page they happen to have open rather than behind
+ *  a card on one of them. */
+const footHtml = (s) => `<p class="luach-foot">${esc(s.footerAddress)}</p>
+    <p class="luach-foot-tax">Tax ID ${SHUL_TAX_ID}</p>`;
+
 const DONATE = {
   name: 'Donate',
   heading: 'Donation Options',
-  thanks: 'Thank you for supporting Bais Medrash of Lakewood Commons.',
+  thanks: `Thank you for supporting ${SHUL_ENGLISH}.`,
   ways: [
     {
       title: 'Credit/Debit Card \u00b7 ACH',
@@ -177,7 +197,7 @@ const DONATE = {
       blurb: 'Donate using funds from your Donors\u2019 Fund account.',
       icon: 'swirl',
       how: 'Search using our Tax ID.',
-      copy: { label: 'Tax ID', value: '26-4527675' },
+      copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },
   ],
 };
@@ -281,7 +301,13 @@ function homeHtml(published) {
   const s = published.settings;
   return `<div class="luach-bar luach-bar-plain no-print" aria-hidden="true"></div>
     <header class="luach-masthead">
-      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"></h1>
+      <!-- The wordmark is a picture, so on its own it leaves this heading with no words in
+           it. The English name goes in beside it, clipped out of the layout but not out of
+           the page, which is what a crawler and a screen reader read. Hardcoded rather than
+           a setting, the same as the thanks line on the donation page: this repository is
+           this shul's, and a second place to type the name is a second place for it to end
+           up written differently. -->
+      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
       ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
@@ -298,7 +324,7 @@ function homeHtml(published) {
       </a>
     </nav>
     ${rule()}
-    <p class="luach-foot">${esc(s.footerAddress)}</p>
+    ${footHtml(s)}
   </div>`;
 }
 
@@ -679,7 +705,7 @@ function renderDonatePage(published) {
       </header>
       ${DONATE.ways.map(donateWayHtml).join('')}
       ${rule()}
-      <p class="luach-foot">${esc(s.footerAddress)}</p>
+      ${footHtml(s)}
     </div>`;
   wireDonateFrames(main);
   wireDonateCopy(main);
