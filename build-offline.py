@@ -397,6 +397,11 @@ def write_route_pages():
             raise RuntimeError(f"/{name}/: a path was left relative and would 404 a folder down")
         if "application/ld+json" in html:
             raise RuntimeError(f"/{name}/: the structured data was left in")
+        # Inherited from index.html rather than written here, so it is worth checking it
+        # actually came across: a route page that can be machine translated is the bug
+        # these were added for, and it would show on the page a donation is made from.
+        if 'translate="no"' not in html or 'content="notranslate"' not in html:
+            raise RuntimeError(f"/{name}/: the do-not-translate markers did not come across")
         out = ROOT / name
         out.mkdir(exist_ok=True)
         (out / "index.html").write_text(html, encoding="utf-8", newline="\n")

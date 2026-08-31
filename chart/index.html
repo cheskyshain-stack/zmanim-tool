@@ -3,11 +3,31 @@
      search engine can use are English, and declaring the whole document Hebrew tells it to
      read them as Hebrew and tells a screen reader to say them in a Hebrew voice. The Hebrew
      that is here is names and headings, marked where it sits. Nothing in the CSS or the JS
-     keys off this attribute, so it is only ever read by things outside the page. -->
-<html lang="en">
+     keys off this attribute, so it is only ever read by things outside the page.
+
+     translate="no" is the other half of that, and it is here because a phone did it: with
+     a page carrying both scripts, Chrome offered to translate and made "ליקוואוד קאמענס"
+     into "Liquid Commons", "Zelle" into "Cell", and "Building Fund" into "Building
+     Projects". The last two are on the donation page, where somebody looking for the way
+     they pay is now looking for a word the shul has never used.
+
+     It is the whole document rather than the names one at a time, and that is on purpose.
+     Nearly everything here is a name: the shul's, the town's, the minyanim, the funds, the
+     payment services, and the printed board is Hebrew from end to end. What is left that a
+     translation could help with is about three sentences of description. Marking the names
+     one by one means being right every time, forever, including in whatever gets added
+     next, and the cost of missing one is what these screenshots are. So the rule is the
+     simple one: nothing on this site is translated.
+
+     The attribute is the standard one and is what Google Translate reads. The meta tag
+     below is Google's own way of saying it and stops the offer being made at all, so a
+     visitor is not invited to break the page and then left wondering why the shul calls it
+     Cell. Both, because they are read by different parts of the same thing. -->
+<html lang="en" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google" content="notranslate">
 <title>Zmanim chart &middot; Bais Medrash of Lakewood Commons</title>
 <!-- The title used to be the Hebrew name alone, which is why searching the shul in English
      found nothing at all: the English name appeared nowhere a search engine reads. Both
