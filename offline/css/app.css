@@ -1781,6 +1781,15 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   margin: 0.15rem 0 0; text-align: center;
   font-size: 0.88rem; line-height: 1.35; color: var(--luach-ink); opacity: 0.62;
 }
+/* What the shul is, under the ways to give. Quiet, because it is not what the page is for,
+   but not as quiet as it could be: 0.72 against the cream measures 5.68, and this is a line
+   somebody reads carefully before typing a card number rather than one they skim. Held to
+   34rem because at a desktop width it would otherwise run the full column as one long line
+   and read as small print stretched out. */
+.luach-give-legal {
+  margin: 0.5rem auto 0; max-width: 34rem; text-align: center;
+  font-size: 0.8rem; line-height: 1.45; color: var(--luach-ink); opacity: 0.72;
+}
 
 /* Each way is a drawer, and the whole page is three of them shut: mark, name, one line.
    The padding lives on the summary and on the panel rather than on the card, so the whole

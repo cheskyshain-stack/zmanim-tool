@@ -178,6 +178,20 @@ const DONATE = {
   name: 'Donate',
   heading: 'Donation Options',
   thanks: `Thank you for supporting ${SHUL_ENGLISH}.`,
+  /* What the shul is, for the donor deciding. Under the ways to give rather than over
+     them: it is not what the page is for, it is the reassurance somebody wants once they
+     have decided to give and before they type a card number.
+   *
+   * The address and the tax ID are not repeated here, though they were in the wording this
+   * came from. They are in the footer two lines below and on every other page of the site,
+   * and saying them twice within an inch reads as a form rather than as a sentence.
+   *
+   * "to the extent permitted by law" is the standard wording and is not a hedge invented
+   * here: what a particular donor may actually deduct depends on their own return, not on
+   * the shul, and a flat promise that every donation is deductible is a claim the shul is
+   * not in a position to make for somebody else. */
+  legal: `${SHUL_ENGLISH} is a New Jersey registered not for profit, exempt under section
+    501(c)(3). Donations are tax deductible to the extent permitted by law.`,
   ways: [
     {
       title: 'Credit/Debit Card \u00b7 ACH',
@@ -783,6 +797,7 @@ function renderDonatePage(published) {
         <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
       </header>
       ${DONATE.ways.map(donateWayHtml).join('')}
+      <p class="luach-give-legal">${DONATE.legal}</p>
       ${rule()}
       ${footHtml(s)}
     </div>`;
