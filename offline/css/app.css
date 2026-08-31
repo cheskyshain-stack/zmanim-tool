@@ -1350,12 +1350,30 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
    pale sky and a pale wall at its edges, and against the cap those simply dissolve. */
 .luach-cap-photo {
   position: absolute; top: 0.85rem; left: 1.25rem;
-  width: 3.6rem; height: auto; aspect-ratio: 1400 / 821;
+  /* Sized from the cap rather than in rem, and this is the whole difference between it
+     working and not. The cap is 58px on a phone, 61px lying on its side and 182px in a
+     browser asked for the desktop site, and the arc eats the bottom of it: 15px on a narrow
+     phone, 29px and up once past 48rem. A fixed height was fine at one of those and wrong at
+     the rest, and it was measured overlapping the arc by 7px upright and 29px on its side,
+     where the parchment dome is painted straight over the picture.
+     Here it takes whatever the cap has left once the padding above and the arc below are
+     taken out, between a floor and a ceiling. Both ends are needed. Without the ceiling a
+     browser asked for the desktop site gives the cap 182px and the mark grows to 93px and
+     stops being a mark; without the floor the short wide case leaves 3px and it disappears
+     altogether. Between them it comes out 44x26 on a phone, clear of the arc, and 71x42 with
+     room to spare on a desktop. The one case the floor cannot clear is lying down, where the
+     arc alone is half the cap; there it sits over the dome exactly as the back link does on
+     every other screen, and the z-index below is what keeps both of them legible. */
+  height: clamp(1.6rem, calc(100% - 0.85rem - var(--luach-arc) - 0.7rem), 2.6rem);
+  width: auto; aspect-ratio: 1400 / 821;
   object-fit: cover; border-radius: 7px;
   border: 1px solid rgba(209,173,95,0.55);
   box-shadow: 0 1px 3px rgba(0,0,0,0.28);
+  /* Above the arc, for the same reason .luach-back and .luach-bar-title are: the dome is
+     painted after this and would otherwise cover it. */
+  z-index: 1;
 }
-@media (min-width: 34rem) { .luach-cap-photo { width: 4.4rem; top: 1.1rem; left: 1.6rem; } }
+@media (min-width: 34rem) { .luach-cap-photo { top: 1.1rem; left: 1.6rem; } }
 /* The cap is not printed and neither is this, but it is positioned rather than in the flow,
    so it needs saying separately: without it the picture would sit over whatever the print
    stylesheet leaves at the top of the page. */
