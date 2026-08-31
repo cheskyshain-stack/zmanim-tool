@@ -40,7 +40,7 @@ Every change follows this, in order:
    and compare against the local `index.html`. Do not tell the user it is live until the
    hash matches.
 
-### build-offline.py does three jobs
+### build-offline.py does five jobs
 
 Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 
@@ -50,6 +50,12 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 - Stamps `css/*.css` links in `index.html` with a content hash.
 - Generates the JS **import map** in `index.html`, giving every module a content-hashed
   URL.
+- Stamps the whole-address tags (canonical, `og:url`, `og:image`) from `SITE_URL`, the one
+  place the domain is written. Moving to another domain is that line and a rebuild.
+- Writes `week/`, `chart/` and `donate/` out of `index.html`, and `sitemap.xml` with them.
+  Those three folders and the sitemap are **build output**: do not hand-edit them, the same
+  as the import map and `offline/`. The per-page titles and blurbs live in the `ROUTES`
+  table at the top of the script, which is the only place to change them.
 
 `make-icons.py` is separate and is **not** part of the deploy loop. It builds `icons/*`
 and `favicon.ico` from `icons/source.png`, plus `assets/logo-text-navy.png` from the black
@@ -152,6 +158,13 @@ Export/Import in Settings moves it between devices.
 Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
 seeded rules firing (look for "דרשה" on מצורע/הגדול in a חורף sheet), no console errors,
 no horizontal overflow at 375px on every screen, and the live hash matches after deploy.
+
+If you touched the congregation site's routing, also check `/week/`, `/chart/` and
+`/donate/` load directly, the old `/#week` style links still land, back and forward work,
+and every page still reads with JavaScript off. And remember that the three-tap unlock is
+in memory: it survives tapping the links, which stay in one document, and is meant to be
+lost on a reload. A test that navigates with `page.goto` between pages reloads and will
+see the lock back on.
 
 ## Two things to know about the user
 
