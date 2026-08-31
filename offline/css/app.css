@@ -2160,10 +2160,66 @@ body.is-luach main.is-give { padding-bottom: 0.5rem; }
 /* An h1 rather than a span: the bar is what names the page, and without it these pages had
    no heading at all. Sized and weighted back to what the span was, so it is a change of
    meaning and not of appearance. */
+/* flex: 1 1 0 rather than margin-right: auto, which is what used to push Donate to the far
+   end. The two do the same thing while there is room to spare and differ when there is not:
+   an auto margin holds the title at its full width and the bar wraps instead. Measured at
+   320px, the narrowest phone worth supporting, where "Weekly Zmanim" wants 97px and 78px
+   are left after the Menu link and Donate: the bar wrapped to two lines and the cap grew
+   from 70px to 104px. The title now takes what is left and clips with an ellipsis, and the
+   cap stays one line at every width from 320 to 1280. It only ever clips at 320, since at
+   360 there are still 54px to spare.
+
+   The basis has to be 0 and not auto, which is the part that is easy to get wrong and was:
+   the bar is flex-wrap: wrap, and wrapping decides which items share a line from their base
+   sizes before any shrinking happens. At basis auto the title still counted its full 97px
+   towards that decision and the bar still wrapped, min-width: 0 or not. At basis 0 it
+   contributes nothing to the line breaking and simply takes the space that is left. */
 .luach-bar-title {
   color: #b7c4dd; font-size: var(--fs-sm); font-weight: 400;
-  margin: 0; margin-right: auto;
+  margin: 0; flex: 1 1 0; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Donate, at the far end of the bar on the week and the chart. The title before it carries
+   margin-right: auto, so this sits at the right without either of them being positioned.
+
+   A gold outline rather than plain text like the Menu link beside it, and rather than a
+   solid gold button. Plain text would read as a second way back and be missed by the person
+   it is there for. A solid one would be the loudest thing on a page whose job is telling
+   somebody what time mincha is, and a shul's own board is not the place to shout for money.
+   An outline says it is a button without taking the page over.
+
+   It never wraps to a line of its own: the title beside it gives up its width first, which
+   is what flex: 1 and min-width: 0 on .luach-bar-title are for. Measured on both pages at
+   every width from 320 to 1280, the cap stays one line and the same height it was before
+   this went in.
+
+   Padding for the finger and no negative margin pulling it back, unlike .luach-back: that
+   one is bare text and needs its target grown without moving the words, this one is a box
+   whose edge is drawn where it is pressed. */
+.luach-bar-give {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  color: #f3ecdc; text-decoration: none;
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1;
+  /* The negative block margin is the same trick .luach-back plays and for the same reason,
+     one step further on. Left alone the pill stands 31px tall against the Menu link's
+     effective 18, and the cap on the week and the chart came out 12.6px taller than the
+     one on the donation page, which has no pill on it. The user has already asked once why
+     the header moves between two pages, and this would have been that again. Cancelling its
+     own vertical padding lets the pill keep its full height and its finger-sized target
+     while contributing 17.6px, so all three caps measure the same. It bleeds into the bar's
+     13.6px of top padding to do it, which is exactly what the Menu link beside it does. */
+  padding: 0.42rem 0.7rem; margin-block: -0.42rem; border-radius: 999px;
+  border: 1px solid rgba(209,173,95,0.7);
+  background: rgba(209,173,95,0.1);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.luach-bar-give-icon { width: 0.95rem; height: 0.95rem; flex: none; }
+.luach-bar-give:hover { background: rgba(209,173,95,0.22); border-color: var(--luach-gold); }
+/* The bar's own press wash is white at 0.16 (see the press states near the top of this
+   file) and lands on this too. It sits on a box that is already lighter than the navy
+   around it, so the gold edge is what has to answer instead. */
+.luach-bar-give:active { background: rgba(209,173,95,0.3); border-color: var(--luach-gold); }
 
 /* --- The congregation site's buttons ------------------------------------------------
    Previous, Today, Next, Print and the two inside Printing options. In the app these are

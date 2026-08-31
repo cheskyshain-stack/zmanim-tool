@@ -425,10 +425,21 @@ def route_shell(name: str, meta: dict) -> str:
         f'      <a class="luach-item" href="/{n}/"><span class="luach-item-title">{h}</span></a>'
         for n, h in others
     )
+    # The same Donate the app puts in the bar, and left off the donation page's own bar the
+    # same way, so the frame before the app takes over is the page arriving rather than a
+    # button appearing a moment later. The heart is backBar's, copied rather than shared
+    # because this file cannot import from a JS module.
+    give = "" if name == "donate" else (
+        '\n    <a class="luach-bar-give" href="/donate/">'
+        '<svg class="luach-bar-give-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>'
+        '</svg>Donate</a>'
+    )
     return f"""<main id="main">
   <div class="luach-bar no-print">
     <a class="luach-back" href="/">&larr; Menu</a>
-    <h1 class="luach-bar-title">{meta['heading']}</h1>
+    <h1 class="luach-bar-title">{meta['heading']}</h1>{give}
   </div>
   <div class="luach-home">
     <p class="luach-intro">

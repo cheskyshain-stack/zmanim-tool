@@ -35,6 +35,13 @@ const ICON_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none"
 const ICON_HEART = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
 </svg>`;
+/* The same heart as the menu's, at the size the navy bar wants. Its own string rather than
+   the menu's with a second class on it: that one is sized and stroked for a card two thirds
+   of an inch tall, and reusing it here meant overriding both in CSS to undo what the class
+   is for. aria-hidden, since the word beside it says it. */
+const ICON_HEART_SMALL = `<svg class="luach-bar-give-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
+</svg>`;
 const CHEVRON = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>`;
 /* An arrow leaving a box rather than the chevron the other two carry. A chevron says the
    site goes on somewhere; this one leaves the site altogether, and the mark should say so
@@ -327,11 +334,28 @@ function nextUpHtml([minyan, candles]) {
 
 /** The navy cap at the top of every screen here, curved and edged in gold. It carries
  *  nothing on the menu and the way back on the pages behind it, so that going in and
- *  coming out look like one site. */
-function backBar(title) {
+ *  coming out look like one site.
+ *
+ *  It also carries Donate, at the far end, on the two pages that are not the donation
+ *  page. The reason is what these pages are: somebody opens the week's times twice a day
+ *  for years, and the donation page perhaps once, so the times are the only thing that
+ *  regularly puts this site in front of the people who daven here. Before this, a person
+ *  looking up mincha had no way to give without backing out to the menu first and going
+ *  in again, which is a road nobody takes while checking a time.
+ *
+ *  Takes the route rather than the title now, because it has to know which page it is on:
+ *  a link to the page you are already reading is furniture, so the donation page gets the
+ *  bar without it.
+ *
+ *  In the bar rather than anywhere else on the page for two reasons. The bar is already
+ *  marked no-print, so this can never reach the printed board, and the chart underneath it
+ *  is a sheet of paper that must not be written on. And it stays at the top rather than
+ *  moving with a long list of times, so it is in the same place on both pages. */
+function backBar(where) {
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="/">&larr; Menu</a>
-    <h1 class="luach-bar-title">${esc(title)}</h1>
+    <h1 class="luach-bar-title">${esc(PAGE_NAMES[where] || '')}</h1>
+    ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
 }
 
@@ -530,7 +554,7 @@ function renderWeekPage(published) {
   let serial = null;
   const draw = () => {
     main.className = '';
-    main.innerHTML = backBar(PAGE_NAMES.week) + '<div id="week-host"></div>';
+    main.innerHTML = backBar('week') + '<div id="week-host"></div>';
     openTheDoor();
     renderWeek(
       main.querySelector('#week-host'),
@@ -550,7 +574,7 @@ function renderChartPage(published) {
   stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   main.className = '';
-  main.innerHTML = backBar(PAGE_NAMES.chart) + '<div id="chart-host"></div>';
+  main.innerHTML = backBar('chart') + '<div id="chart-host"></div>';
   openTheDoor();
   // confine: the congregation is shown the chart that is up now and no other. Three taps
   // on the chart itself opens the rest, which is also what lets the week view out of the
@@ -782,7 +806,7 @@ function renderDonatePage(published) {
 
      One rule, in the masthead, exactly as on the menu. The heading below it carried its own
      before, and with the masthead in front that read as two lines ruled off from nothing. */
-  main.innerHTML = `${backBar(PAGE_NAMES.donate)}
+  main.innerHTML = `${backBar('donate')}
     <div class="luach-home luach-give-page">
       <header class="luach-masthead luach-give-masthead">
         <!-- The wordmark is not a heading here, the way it is on the menu: the bar above
