@@ -1681,11 +1681,28 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 @container (min-width: 19rem) {
   .luach-next-main { column-gap: 0.8rem; }
   .luach-next-time { flex-basis: auto; }
-  /* On the right of the time, which is the side facing the words, since the time sits at
-     the left-hand end of a row that runs right to left. Physical rather than logical: the
-     time carries its own direction: ltr, so its inline-start is its left, which is the far
-     end from where this rule belongs. */
-  .luach-next-time { border-right: 1.5px solid var(--tone-line); padding-right: 0.8rem; }
+}
+/* On the right of the time, which is the side facing the words, since the time sits at the
+   left-hand end of a row that runs right to left. Physical rather than logical: the time
+   carries its own direction: ltr, so its inline-start is its left, which is the far end
+   from where this rule belongs.
+
+   Drawn only once something has confirmed the time really is beside the words, which is
+   what .is-inline says (see markNextInline). It used to hang off the container query above,
+   and that was wrong in a way that showed: the query asks how wide the box is, which is not
+   the same question as whether this row fits in it. The threshold was set from the width of
+   the widest text, 302px, and never counted the two column gaps, this padding or this
+   border. Measured properly the widest row needs 402px of content box, so on a 393px phone
+   the query said yes at 333px and three real combinations wrapped anyway, leaving the rule
+   hanging off the end of a line with nothing after it.
+
+   Raising the number would not have fixed it either. The reported case wrapped a
+   combination that measures as fitting here, so the true width depends on the font the
+   device actually resolves, which this side cannot know. Asking the laid-out row is the
+   only version that is right on a phone whose metrics differ from ours. Default off, so a
+   row that has not been checked yet is missing a rule rather than showing a stray one. */
+.luach-next-main.is-inline > .luach-next-time {
+  border-right: 1.5px solid var(--tone-line); padding-right: 0.8rem;
 }
 /* In a box too narrow to hold the mark and the name on one line, the mark goes. Measured
    at 375px wide, where two boxes share the row at 167px each: with the mark, "הדלקת נרות"

@@ -400,6 +400,43 @@ function untilNextChange(items) {
  *  Zmanim does not have the button rebuilt underneath it. */
 let nextUpTimer = null;
 let nextUpWake = null;
+let nextUpFit = null;
+/** Say which "what is on next" rows ended up with the time beside the words rather than
+ *  under them, so only those draw the rule between the two.
+ *
+ *  CSS cannot answer this. It can ask how wide the box is, which is a different question
+ *  from whether this particular row fits in it, and the difference is not small: the widest
+ *  row this card is ever asked to hold needs 402px of content box, while the threshold that
+ *  used to turn the rule on was 304px. On a 393px phone that said yes at 333px and rows like
+ *  "שחרית בעזרת נשים 10:45PM" wrapped regardless, leaving the rule hanging off the end of a
+ *  line with nothing after it.
+ *
+ *  A bigger threshold would not have settled it. The case that was reported wrapped a
+ *  combination that measures as fitting in the browser this was written in, so how wide the
+ *  row really is depends on the face the device resolves for Hebrew, which is not knowable
+ *  from here. This asks the row after it has been laid out, which is right everywhere.
+ *
+ *  Same line is decided by whether the two boxes overlap vertically, not by a shared top:
+ *  the row is baseline aligned and the time is set larger than the room beside it, so their
+ *  tops differ by a few pixels while they sit on one line. */
+function markNextInline(root) {
+  for (const row of root.querySelectorAll('.luach-next-main')) {
+    const time = row.querySelector('.luach-next-time');
+    const what = row.querySelector('.luach-next-what');
+    if (!time || !what) continue;
+    // Measured with the rule on, always, and that is not incidental. The rule and the
+    // padding beside it are about 14px of width, so they are part of what has to fit: asking
+    // the question with them off can answer yes, and adding them then pushes the row over and
+    // wraps it. Worse, the answer would depend on what the last call left behind, which is a
+    // loop that never settles: on, too wide, off, fits, on. Turning it on first and reading
+    // the row in that one state gives the same answer every time, from any starting point.
+    row.classList.add('is-inline');
+    const t = time.getBoundingClientRect();
+    const w = what.getBoundingClientRect();
+    row.classList.toggle('is-inline', t.top < w.bottom - 1 && w.top < t.bottom - 1);
+  }
+}
+
 function stopNextUp() {
   clearTimeout(nextUpTimer);
   nextUpTimer = null;
@@ -408,6 +445,10 @@ function stopNextUp() {
     window.removeEventListener('pageshow', nextUpWake);
     window.removeEventListener('focus', nextUpWake);
     nextUpWake = null;
+  }
+  if (nextUpFit) {
+    window.removeEventListener('resize', nextUpFit);
+    nextUpFit = null;
   }
 }
 
@@ -429,6 +470,8 @@ function startNextUp(published) {
     // top of the menu when there was none at all.
     if (card) card.outerHTML = html || '';
     else if (html) home.insertAdjacentHTML('afterbegin', html);
+    // The card is replaced whole on every tick, so the class goes on again each time.
+    markNextInline(home);
     clearTimeout(nextUpTimer);
     nextUpTimer = setTimeout(draw, untilNextChange(items));
   };
@@ -441,6 +484,10 @@ function startNextUp(published) {
   document.addEventListener('visibilitychange', nextUpWake);
   window.addEventListener('pageshow', nextUpWake);
   window.addEventListener('focus', nextUpWake);
+  // Turning a phone on its side changes what fits without changing what is on the card, so
+  // the row has to be asked again without redrawing it.
+  nextUpFit = () => markNextInline(main);
+  window.addEventListener('resize', nextUpFit);
 }
 
 function renderHome(published) {
@@ -448,6 +495,9 @@ function renderHome(published) {
   // The pages behind it are as tall as the board on them and must not be stretched.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  // The card is drawn here as well as by the ticker, so the row is asked here too rather
+  // than waiting for the first tick, which may be an hour off.
+  markNextInline(main);
   openTheDoor();
   startNextUp(published);
 }
