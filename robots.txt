@@ -1,7 +1,9 @@
 # What a search engine may look at.
 #
-# Everything the congregation is meant to find is at the root: the week's zmanim, the
-# season chart, and the donation page. Two folders are asked away from:
+# Everything the congregation is meant to find is the menu at the root and the three
+# pages behind it, each at an address of its own: /week/, /chart/ and /donate/. Those
+# three are written by build-offline.py and are listed in the sitemap. Two folders are
+# asked away from:
 #
 #   /admin/     the tool the boards are generated with. Not what anybody is searching for,
 #               and it carries its own noindex tag as well, for a crawler that arrives by a

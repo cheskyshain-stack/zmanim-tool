@@ -5,8 +5,9 @@
 // of the admin app's saved sheets. Until a season is published there is nothing to show,
 // which the page says plainly rather than looking broken.
 //
-// Where it goes is in the URL hash (#week, #chart), so the browser's back button works
-// and a page can be linked to directly, with no server configuration to arrange.
+// Each of the three pages has an address of its own: /week/, /chart/, /donate/. They are
+// real files, written by build-offline.py out of this page, which is what a static host
+// needs in place of a rewrite rule. See the routing block near the bottom of this file.
 import { loadPublished } from './publish.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
@@ -314,7 +315,7 @@ function nextUpHtml([minyan, candles]) {
  *  coming out look like one site. */
 function backBar(title) {
   return `<div class="luach-bar no-print">
-    <a class="luach-back" href="#">&larr; Menu</a>
+    <a class="luach-back" href="/">&larr; Menu</a>
     <h1 class="luach-bar-title">${esc(title)}</h1>
   </div>`;
 }
@@ -340,13 +341,13 @@ function homeHtml(published) {
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
-      <a class="luach-item" href="#week">
+      <a class="luach-item" href="/week/">
         ${ICON_CLOCK}<span class="luach-item-title">${esc(PAGE_NAMES.week)}</span>${CHEVRON}
       </a>
-      <a class="luach-item" href="#chart">
+      <a class="luach-item" href="/chart/">
         ${ICON_CALENDAR}<span class="luach-item-title">${esc(PAGE_NAMES.chart)}</span>${CHEVRON}
       </a>
-      <a class="luach-item" href="#donate">
+      <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
@@ -789,12 +790,100 @@ function renderDonatePage(published) {
   openTheDoor();
 }
 
+/* --- Where we are, and how we got there ---------------------------------------------
+ *
+ * The three pages have addresses of their own now: /week/, /chart/, /donate/. They used
+ * to be hashes, and a hash never reaches a server, so every one of them arrived at a
+ * search engine as the same blank address and the site was one page as far as the world
+ * outside the browser was concerned. Each of those folders is a real file with its own
+ * title and its own description, written by build-offline.py out of this same page, so
+ * the address a phone shares is the address that says what is on the other end of it.
+ *
+ * Inside the browser nothing has changed: a tap still swaps the contents of <main> and
+ * never reloads, which is what keeps the week's times up in the same tick. The links are
+ * real links to real files all the same, so a middle click, a long press, "open in new
+ * tab" and a crawler with no JavaScript all get a page rather than nothing.
+ */
+const ROUTES = ['week', 'chart', 'donate'];
+
+/** The route from the address bar, whichever of the two ways it is written. */
+function whereAmI() {
+  // A hash still answers. Links to #week went out on WhatsApp before these pages had
+  // addresses, they are printed on a board somewhere by now, and they must keep landing
+  // where they always did. route() rewrites the bar to the real path once it is here.
+  const hash = location.hash.replace('#', '');
+  if (ROUTES.includes(hash)) return hash;
+  // A path only means anything over http. Opened off a disk the pathname is a folder
+  // somebody's file happens to sit in, and reading a route out of it would send the page
+  // somewhere on the strength of what a directory is called.
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return '';
+  const first = location.pathname.split('/').filter(Boolean)[0] || '';
+  return ROUTES.includes(first) ? first : '';
+}
+
+const PAGE_TITLE = {
+  '': 'Bais Medrash of Lakewood Commons · קהל לב מנחם · Zmanim',
+  week: 'Weekly Zmanim · Bais Medrash of Lakewood Commons',
+  chart: 'Zmanim chart · Bais Medrash of Lakewood Commons',
+  donate: 'Donate · Bais Medrash of Lakewood Commons',
+};
+
+/** Keep the tab, the canonical link and the address bar saying the same thing.
+ *
+ *  The file the server hands over already has all three right; this is for the taps that
+ *  never touch the server. Google reads the rendered page, so a canonical left pointing
+ *  at the menu would tell it these are all the one address after all, which is the whole
+ *  thing this change is undoing. */
+function stampPage(where) {
+  document.title = PAGE_TITLE[where] || PAGE_TITLE[''];
+  const canon = document.querySelector('link[rel="canonical"]');
+  if (canon) canon.href = new URL(where ? `/${where}/` : '/', location.href).href;
+}
+
 function route(published) {
-  const where = location.hash.replace('#', '');
+  const where = whereAmI();
+  // One address per page. Arriving on /#week leaves the bar reading /#week, which is a
+  // second way of writing an address that already has a first one: replaceState rather
+  // than pushState, so the back button still goes back where it came from rather than
+  // to the same page written the other way.
+  if (location.protocol.startsWith('http') && location.hash) {
+    history.replaceState(null, '', where ? `/${where}/` : '/');
+  }
+  stampPage(where);
   if (where === 'week') return renderWeekPage(published);
   if (where === 'chart') return renderChartPage(published);
   if (where === 'donate') return renderDonatePage(published);
   return renderHome(published);
+}
+
+/** One listener for every link on the site, added once rather than after each render.
+ *
+ *  Only a plain left click on a link of ours is taken over. A modifier, a middle click,
+ *  a download, a target, another origin: all of those are the browser's business and it
+ *  does them better than this would. */
+function wireNav(published) {
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+  document.addEventListener('click', (ev) => {
+    if (ev.defaultPrevented || ev.button !== 0) return;
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    const a = ev.target.closest && ev.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    let url;
+    try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+    if (url.origin !== location.origin) return;
+    const first = url.pathname.split('/').filter(Boolean)[0] || '';
+    // The menu is '' and the three pages are named. Anything else on this origin is a
+    // real page of its own: /admin/, a PDF, the manifest.
+    if (first !== '' && !ROUTES.includes(first)) return;
+    ev.preventDefault();
+    if (url.pathname === location.pathname) return;
+    history.pushState(null, '', url.pathname);
+    route(published);
+    // A tap that swaps the page but leaves the scroll where it was reads as a page that
+    // did not answer: on a long week list the new page opens halfway down itself.
+    window.scrollTo(0, 0);
+  });
+  window.addEventListener('popstate', () => route(published));
 }
 
 function esc(str) {
@@ -807,6 +896,9 @@ function esc(str) {
     main.innerHTML = '<div class="luach-home"><p class="hint">Nothing has been published yet.</p></div>';
     return;
   }
+  wireNav(published);
   route(published);
+  // Still listened for: a link with a hash in it can come from outside the page, and the
+  // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
