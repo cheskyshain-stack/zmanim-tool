@@ -451,7 +451,6 @@ def route_shell(name: str, meta: dict) -> str:
     </nav>
     <div class="luach-footer">
       <p class="luach-foot">Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701</p>
-      <p class="luach-foot-tax">Tax ID 26-4527675</p>
     </div>
   </div>
 </main>"""

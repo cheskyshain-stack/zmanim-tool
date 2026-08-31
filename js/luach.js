@@ -163,22 +163,22 @@ const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
       width="240" height="141" decoding="async"
       alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">`;
 
-/** The footer that ends every page: the address, and the tax ID under it.
+/** The footer that ends every page: the address.
  *
- *  The tax ID is here rather than only on the donation page because of what it is for. A
- *  donor giving through a donor advised fund, an employer's matching scheme or their own
- *  accountant is asked for it away from this site entirely, often long after they have
- *  left it, so it wants to be on whatever page they happen to have open rather than behind
- *  a card on one of them.
+ *  The tax ID used to sit under it here, on every page, on the reasoning that a donor is
+ *  asked for it away from this site entirely and it should be on whatever page they happen
+ *  to have open. It has moved into the 501(c)(3) line on the donation page, which is a
+ *  better home than that reasoning allowed for: on its own in a footer it was a number with
+ *  no account of itself, and beside the words saying what the shul is and that a donation is
+ *  deductible it is the thing those words are about. Somebody copying it for an accountant
+ *  now copies it from a sentence that says what it is.
  *
- *  The two lines are wrapped rather than loose. The donation page lays its children out with
- *  a 0.6rem gap between them, and with the lines loose that gap landed between the address
- *  and the tax ID as well: 14px apart there against 4px on the menu, so the footer was a
- *  different shape on the two pages. Wrapped, the pair is one child and the gap falls
- *  outside it, where it belongs. */
+ *  Still wrapped in a div rather than left as one loose line. The donation page lays its
+ *  children out with a 0.6rem gap and the wrapper is what keeps that gap outside the footer
+ *  rather than inside it, which is what used to make the footer a different shape on the two
+ *  pages. It matters again the moment a second line comes back. */
 const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${esc(s.footerAddress)}</p>
-      <p class="luach-foot-tax">Tax ID ${SHUL_TAX_ID}</p>
     </div>`;
 
 const DONATE = {
@@ -189,16 +189,25 @@ const DONATE = {
      them: it is not what the page is for, it is the reassurance somebody wants once they
      have decided to give and before they type a card number.
    *
-   * The address and the tax ID are not repeated here, though they were in the wording this
-   * came from. They are in the footer two lines below and on every other page of the site,
-   * and saying them twice within an inch reads as a form rather than as a sentence.
+   * The tax ID is in it, and this is now the only place on the site it is written out. It
+   * was in the footer of every page before there was anywhere better for it: a number on
+   * its own with nothing saying what it was. Here it sits with the words it belongs to, so
+   * somebody copying it for an accountant copies it from a sentence that says what it is.
+   * The address is still left out, since the footer says it two lines below and saying it
+   * twice within an inch reads as a form rather than as a sentence.
+   *
+   * The digits are in a bdi. Nothing in this paragraph is Hebrew today, so nothing reorders
+   * today, but a tax ID is two numbers around a hyphen, which is exactly the shape that
+   * comes out backwards if a Hebrew word ever lands beside it. The isolation costs nothing
+   * and travels with the number wherever this line is moved to next.
    *
    * "to the extent permitted by law" is the standard wording and is not a hedge invented
    * here: what a particular donor may actually deduct depends on their own return, not on
    * the shul, and a flat promise that every donation is deductible is a claim the shul is
    * not in a position to make for somebody else. */
   legal: `${SHUL_ENGLISH} is a New Jersey registered not for profit, exempt under section
-    501(c)(3). Donations are tax deductible to the extent permitted by law.`,
+    501(c)(3). Tax ID <bdi>${SHUL_TAX_ID}</bdi>. Donations are tax deductible to the extent
+    permitted by law.`,
   ways: [
     {
       title: 'Credit/Debit Card \u00b7 ACH',

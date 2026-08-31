@@ -2135,18 +2135,13 @@ body.is-luach main.is-give { padding-bottom: 0.5rem; }
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
 }
-/* The tax ID under the address. Quieter than the address above it, since it is a number to
-   be looked up rather than read: whoever wants it is looking for it, and everyone else
-   should be able to pass over it. Quieter than this it cannot go: 0.62 was tried first and
-   measured 4.2 against the cream behind it, under the 4.5 small text is held to, and this
-   is a line somebody copies a number off. 0.72 measures 5.68. Its digits are forced left to
-   right, or a Hebrew
-   word anywhere near it in a right to left run could reorder the two halves of it. */
-.luach-foot-tax {
-  margin: 0.25rem 0 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
-  font-size: 0.85rem; line-height: 1.5; color: var(--luach-ink); opacity: 0.72;
-  direction: ltr;
-}
+/* .luach-foot-tax was here: the tax ID on its own line under the address, on every page.
+   It has moved into the 501(c)(3) sentence on the donation page, where the number sits with
+   the words that say what it is, so the rule went with it rather than being left behind for
+   nothing to use. What it knew is worth carrying over and is now on .luach-give-legal: 0.62
+   opacity measured 4.2 against the cream, under the 4.5 small text is held to, and 0.72
+   measures 5.68, which is where both ended up. The bdi around the digits does what its
+   direction: ltr did. */
 
 /* Back to the menu, on the cap. It is the only way off every page but the menu itself, and
    as bare text it was 62 by 18, under the 24 a finger is reckoned to need. The padding is
