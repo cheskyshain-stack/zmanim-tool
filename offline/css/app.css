@@ -1704,6 +1704,11 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next-main.is-inline > .luach-next-time {
   border-right: 1.5px solid var(--tone-line); padding-right: 0.8rem;
 }
+/* And where the rule does not go on, the time takes a line of its own rather than creeping
+   up beside the words without one. There is a width where the row fits without the rule but
+   not with it, and left alone it came out as a third arrangement: on one line, no rule,
+   unlike either of its neighbours. Two states read better than three. */
+.luach-next-main:not(.is-inline) > .luach-next-time { flex-basis: 100%; }
 /* In a box too narrow to hold the mark and the name on one line, the mark goes. Measured
    at 375px wide, where two boxes share the row at 167px each: with the mark, "הדלקת נרות"
    broke over two lines and both boxes grew from 107px tall to 132. The name and the time
@@ -2102,12 +2107,20 @@ body.is-luach .week-print-panel { max-width: 8.5in; margin-inline: auto; }
    where it passed unnoticed, and 112px off at every width from 768 up. */
 /* The rule between the last card and the address, and the one in the masthead, are left to
    the sizes the menu gives them: this page carries the same header and footer, so it should
-   carry them at the same size. Only the gap over the first card is this page's own. */
-.luach-give-page > .luach-give-head-block + .luach-give-card { margin-top: 0.2rem; }
+   carry them at the same size. Only the gap over the first card is this page's own, and it
+   is the page's own row gap and nothing more: the extra 0.2rem it used to carry was three
+   of the twelve pixels this page was over by. */
 /* The masthead sits under the back bar here rather than under an empty cap, so it needs
    less room over it than the menu's does. */
 .luach-give-masthead { margin-bottom: 1rem; }
-body.is-luach main.is-give { padding-bottom: 1.25rem; }
+/* Was 1.25rem, and those 20px were the whole of the problem on a shortish phone: the page
+   asks for a full viewport and then ran 12.5px past one at 360x740 and 10px at 412x732,
+   which buys a scrollbar and a bounce for nothing. Measured after: 737 and 726 against
+   740 and 732. Below the last line of the last page is the cheapest space on the site, and
+   0.5rem is the page's own row gap, so the footer ends on the rhythm the cards keep. A
+   375x667 phone still scrolls by 54px, and should: five blocks and an address do not fit
+   in 667px and no amount of trimming makes them. */
+body.is-luach main.is-give { padding-bottom: 0.5rem; }
 
 .luach-foot {
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
@@ -2304,8 +2317,14 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   /* Sized against the height of the window, not a fixed number of rem. A window can be
      1440px tall or 600px, and the same cap is a masthead in one and most of the screen in
      the other. The floor keeps it off the short windows: at 600px tall the whole page
-     came to 629px and scrolled by 29px, which is now 596px and does not. */
-  .luach-bar-plain { min-height: clamp(6rem, 13vh, 13rem); margin-bottom: 2.8rem; }
+     came to 629px and scrolled by 29px, which is now 596px and does not.
+
+     The ceiling comes down from 13rem to 9rem, which is what a phone asked for the desktop
+     site runs into: a narrow window that is also very tall, 1024 by 1400, where 13vh gave
+     the cap 182px and the top of the page was a field of navy with a small mark adrift in
+     the corner of it. Ordinary windows are untouched, since neither 1280x900 at 117px nor
+     1920x1080 at 140px was near the old ceiling in the first place. */
+  .luach-bar-plain { min-height: clamp(6rem, 13vh, 9rem); margin-bottom: 2.8rem; }
   .luach-logo { width: 24rem; }
   .luach-place { font-size: 1.3rem; }
   .luach-rule { max-width: 26rem; }
