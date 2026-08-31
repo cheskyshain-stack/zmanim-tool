@@ -4,6 +4,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
+import { hebrewLang } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -447,7 +448,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
@@ -506,7 +507,7 @@ ${special}` : '');
         // data-season records which season this *page* rendered as, so a later edit
         // (see the blur handler below) recomputes its "did this really change?"
         // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -518,7 +519,7 @@ ${special}` : '');
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}>${nl2br(parshaCell)}</td>`;
+      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${nl2br(parshaCell)}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');
@@ -529,10 +530,10 @@ ${special}` : '');
       <div class="header-row">
         <img class="header-icon" src="${state.settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="/assets/logo-text.png" alt="${esc(state.settings.shulName)}">
-          ${state.settings.headerSubtitle ? `<div class="header-subtitle">${esc(state.settings.headerSubtitle)}</div>` : ''}
+          <img class="header-logo" src="/assets/logo-text.png" alt="${esc(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
+          ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${esc(state.settings.headerSubtitle)}</div>` : ''}
         </div>
-        <div class="header-rabbi">${nl2br(esc(state.settings.headerRabbiLine))}</div>
+        <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(esc(state.settings.headerRabbiLine))}</div>
       </div>
     </div>
     <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">

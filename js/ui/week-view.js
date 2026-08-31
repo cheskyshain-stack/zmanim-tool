@@ -18,7 +18,7 @@ import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, DAY_NAMES } from '../util.js';
+import { SLASH, DAY_NAMES, hebrewLang } from '../util.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
@@ -715,8 +715,8 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
-    <span class="week-label">${labelHtml || formatLabel(label)}</span>
-    <span class="week-time">${isHtml ? text : weekNl2br(text)}</span>
+    <span class="week-label"${hebrewLang(labelHtml || formatLabel(label))}>${labelHtml || formatLabel(label)}</span>
+    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}>${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
 
@@ -738,7 +738,7 @@ function publishPanelHtml(sheet, state, open = false) {
     .map(
       (g) =>
         `<div class="published-row">
-          <span><bdi>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
+          <span><bdi${hebrewLang(label(g.sheet))}>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
           <button type="button" class="btn-primary publish-btn" data-id="${g.sheet.id}">Publish</button>
         </div>`
     )
@@ -752,7 +752,7 @@ function publishPanelHtml(sheet, state, open = false) {
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
              ${
                groups.length && missing.length
-                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
+                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi${hebrewLang(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi${hebrewLang(SEASON_LABELS[missing[0]])}>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
                  : ''
              }
              <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
@@ -774,13 +774,13 @@ function cardHtml(title, linesHtml, settings, kind = '') {
       <div class="header-row">
         <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}">
-          ${settings.headerSubtitle ? `<div class="header-subtitle">${weekEsc(settings.headerSubtitle)}</div>` : ''}
+          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}"${hebrewLang(settings.shulName)}>
+          ${settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${weekEsc(settings.headerSubtitle)}</div>` : ''}
         </div>
-        <div class="header-rabbi">${weekNl2br(settings.headerRabbiLine)}</div>
+        <div class="header-rabbi"${hebrewLang(settings.headerRabbiLine)}>${weekNl2br(settings.headerRabbiLine)}</div>
       </div>
     </div>
-    <h3 class="week-title">${weekEsc(title)}</h3>
+    <h3 class="week-title"${hebrewLang(title)}>${weekEsc(title)}</h3>
     <div class="week-lines"><div class="week-lines-inner">${linesHtml}</div></div>
     <div class="week-legend"></div>
     <div class="week-foot">${weekEsc(settings.footerAddress)}</div>
@@ -908,7 +908,10 @@ function buildPairSheet(wrap) {
   cards.forEach((card) => {
     // With the parsha said once above, each column only has to say which half it is.
     const title = card.querySelector('.week-title');
-    if (title) title.textContent = card.classList.contains('is-weekday-card') ? 'זמני חול' : 'זמני שבת';
+    if (title) {
+      title.textContent = card.classList.contains('is-weekday-card') ? 'זמני חול' : 'זמני שבת';
+      title.lang = 'he';
+    }
     // appendChild moves them, so wrap is left empty and the sheet takes their place.
     cols.appendChild(card);
   });
@@ -1187,7 +1190,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     <div class="week-nav no-print">
       <div class="week-nav-when">
         ${fmtShabbosDate(week.date)}
-        <bdi class="week-nav-hebrew">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
+        <bdi class="week-nav-hebrew" lang="he">${weekEsc(jewishDateString(week.serial, false, settings.useGregorianBefore1582))}</bdi>
       </div>
       <div class="week-nav-row">
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
@@ -1224,7 +1227,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                     { value: 'two', label: 'Two', on: pairView },
                   ])}
                   ${switchHtml('week-order', 'Which page first', [
-                    { value: 'shabbos', label: '<bdi>שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
+                    { value: 'shabbos', label: '<bdi lang="he">שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
                     { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
                   ])}
                 </div>`
@@ -1246,7 +1249,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         // Not while the view is held to one page of the chart: running out of that page is
         // not running out of what is published, and saying so would be untrue.
         !held && at >= serials.length - 1 && nextSeasonLabel(index, serials)
-          ? `<p class="hint no-print week-end-note">This is the last week published. <bdi>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
+          ? `<p class="hint no-print week-end-note">This is the last week published. <bdi${hebrewLang(nextSeasonLabel(index, serials))}>${weekEsc(nextSeasonLabel(index, serials))}</bdi> is not up yet${luach ? '' : ', so generate it and publish it below'}.</p>`
           : ''
       }
     </div>
@@ -1481,7 +1484,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         live
           .map(
             (s) => `<div class="published-row">
-              <span><bdi>${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${s.hebrewYear} <span class="hint">(${s.weeks.length} weeks)</span></span>
+              <span><bdi lang="he">${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${s.hebrewYear} <span class="hint">(${s.weeks.length} weeks)</span></span>
               <button type="button" class="btn-danger unpublish-btn" data-season="${s.season}" data-year="${s.hebrewYear}" data-id="${s.id}">Unpublish</button>
             </div>`
           )

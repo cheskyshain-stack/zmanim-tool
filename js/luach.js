@@ -9,6 +9,7 @@
 // real files, written by build-offline.py out of this page, which is what a static host
 // needs in place of a rewrite rule. See the routing block near the bottom of this file.
 import { loadPublished } from './publish.js';
+import { hebrewLang } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
@@ -297,8 +298,8 @@ function nextUpHtml([minyan, candles]) {
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
         <div class="luach-next-main">
-          <bdi class="luach-next-what">${esc(item.name)}</bdi>
-          ${item.place ? `<bdi class="luach-next-where">${esc(item.place)}</bdi>` : ''}
+          <bdi class="luach-next-what"${hebrewLang(item.name)}>${esc(item.name)}</bdi>
+          ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${esc(item.place)}</bdi>` : ''}
           <span class="luach-next-time">${esc(clock(item.mins))}<small>${esc(meridiem(item.mins))}</small></span>
         </div>
       </div>
@@ -335,8 +336,8 @@ function homeHtml(published) {
            a setting, the same as the thanks line on the donation page: this repository is
            this shul's, and a second place to type the name is a second place for it to end
            up written differently. -->
-      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
+      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"${hebrewLang(s.shulName)}><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
+      ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${esc(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
@@ -774,8 +775,8 @@ function renderDonatePage(published) {
              already carries this page's h1 and names it "Donate". Two h1s on one page is
              one too many, and the shul's name is the site's mark rather than the title of
              what is on the page. The alt text still says whose site it is. -->
-        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}">
-        ${s.headerSubtitle ? `${rule()}<p class="luach-place">${esc(s.headerSubtitle)}</p>` : ''}
+        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"${hebrewLang(s.shulName)}>
+        ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${esc(s.headerSubtitle)}</p>` : ''}
       </header>
       <header class="luach-give-head-block">
         <h2 class="luach-give-heading">${esc(DONATE.heading)}</h2>

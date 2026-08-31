@@ -149,7 +149,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       <div class="week-nav no-print">
         <div class="week-nav-when">
           ${chartEsc(label.english)}
-          <bdi class="week-nav-hebrew">${chartEsc(label.hebrew)}</bdi>
+          <bdi class="week-nav-hebrew" lang="he">${chartEsc(label.hebrew)}</bdi>
         </div>
         ${held ? '' : `<div class="week-nav-row">
           <button type="button" class="chart-prev" ${at <= 0 ? 'disabled' : ''}>

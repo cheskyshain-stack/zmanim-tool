@@ -12,6 +12,41 @@ export const SLASH = `${NBSP}/${NBSP}`;
    of the same name in it is a hard error, which is how the pair was found. */
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
 
+/* ' lang="he"' for a string that is Hebrew, and nothing for one that is not, to be dropped
+   straight into a template: `<p class="x"${hebrewLang(value)}>`.
+ *
+ * The documents declare themselves English (the congregation's) or Hebrew (the admin app),
+ * and neither is true of every line inside them. Without this a screen reader says שחרית
+ * in an English voice, letter by letter or as nonsense, which on the week's list is most of
+ * the words on the page.
+ *
+ * It is asked of the string rather than written into the markup by hand because most of
+ * these words are settings somebody types. The subtitle is Hebrew at this shul and could be
+ * English at another, and a cell holds "פלג 6:48" one week and "6:48" the next. Marking the
+ * element in the template would be a guess about the contents that is right today.
+ *
+ * A Latin letter anywhere means no, and that is the point of the rule rather than a
+ * shortcut: the footer and the legend line read "All underlined מנינים will be...", one
+ * Hebrew word in an English sentence, and calling that whole line Hebrew would be the
+ * mistake this is meant to fix, only louder. Those keep no marking at all, which leaves one
+ * word said in the wrong voice instead of a sentence. Marking the word itself means wrapping
+ * runs mid-string, and those two strings are rich text that carries the underline markup the
+ * boards are printed with, so it is not worth the risk to that for one word.
+ *
+ * Digits and punctuation are neither way and are ignored: a time beside a Hebrew word does
+ * not stop the word being Hebrew. */
+const HEBREW_LETTER = /[֐-׿]/;
+const LATIN_LETTER = /[A-Za-z]/;
+export function hebrewLang(text) {
+  // Several of these strings arrive as HTML rather than as words: a cell carries the <br>
+  // its line breaks became, and the boards' rich text carries the underline markup. Asked
+  // of the markup, every one of them has Latin letters in it (the "br", the "u") and none
+  // of them would ever be called Hebrew. The tags and any entities come out first, so what
+  // is judged is what is actually read out.
+  const plain = String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ' ');
+  return HEBREW_LETTER.test(plain) && !LATIN_LETTER.test(plain) ? ' lang="he"' : '';
+}
+
 export function textjoin(delim, ignoreEmpty, parts) {
   const flat = [];
   for (const p of parts) {
