@@ -961,6 +961,20 @@ td.ruled .cell { background: var(--ruled); }
 .week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
 /* Equal widths, so the group does not shift sideways as the labels change length. */
 .week-nav-row > button { flex: 1 1 0; max-width: 11rem; }
+
+/* In the app, the date and these three buttons line up with everything else on the screen
+   instead of being centred in it.
+ *
+ * Measured on This week at 1650px, where the column runs 268 to 1204: the heading, the two
+ * pane buttons, More options and the card itself all began at 268, while the date was
+ * centred text and Previous began at 464. Three things down the left and two down the
+ * middle in one column, which is what "the buttons are randomly set up" was pointing at.
+ *
+ * Only in the app. The congregation's own week page is a centred design, masthead, rule and
+ * place line all down the middle, and these two belong to that there. Hence the :not, and
+ * hence not simply changing the rules above. */
+body:not(.is-luach) .week-nav-when { text-align: left; }
+body:not(.is-luach) .week-nav-row { justify-content: flex-start; }
 /* These carried no styling of their own at all: they were the browser's default buttons,
    which is why pressing one showed nothing on a phone. Same look as the app's other
    buttons, with a pressed state that is a real change of colour rather than only the 1px
