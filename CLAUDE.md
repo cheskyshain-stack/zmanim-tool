@@ -40,7 +40,7 @@ Every change follows this, in order:
    and compare against the local `index.html`. Do not tell the user it is live until the
    hash matches.
 
-### build-offline.py does five jobs
+### build-offline.py does six jobs
 
 Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 
@@ -52,6 +52,15 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   URL.
 - Stamps the whole-address tags (canonical, `og:url`, `og:image`) from `SITE_URL`, the one
   place the domain is written. Moving to another domain is that line and a rebuild.
+- Writes `dist/`, the copy of the site that gets published, with every comment taken out.
+  **Comments live in this repository and must not reach a browser.** They were 54% of what
+  a visitor downloaded and they carry the reasoning behind every decision here. The
+  strippers scan rather than pattern-match, because `accept="image/*"`, `data/*.json` and
+  `https://secure.cardknox.com/...` all look like comments to a regex and breaking any of
+  them is silent. The build refuses to write `dist/` if its own scanners still find a
+  comment in the output. `/*!` licence banners are kept and `vendor/` is copied byte for
+  byte. HTML comments written into markup by the JS are stripped too: they become real
+  comment nodes in the DOM and are just as readable in devtools.
 - Writes `week/`, `chart/` and `donate/` out of `index.html`, and `sitemap.xml` with them.
   Those three folders and the sitemap are **build output**: do not hand-edit them, the same
   as the import map and `offline/`. The per-page titles and blurbs live in the `ROUTES`

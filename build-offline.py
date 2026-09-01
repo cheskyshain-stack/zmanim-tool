@@ -113,6 +113,208 @@ IMPORT_NAMED_RE = re.compile(r"^import\s*\{[^}]*\}\s*from\s*['\"][^'\"]+['\"];?\
 IMPORT_STAR_RE = re.compile(r"^import\s*\*\s*as\s+([A-Za-z0-9_]+)\s*from\s*['\"]([^'\"]+)['\"];?\s*$", re.M)
 
 
+# --- Comments: kept in this repository, kept out of what a browser downloads ----------
+#
+# Every explanation in this project is written where the code is, which is why the layout
+# invariants have survived as long as they have. It also meant a visitor could open the
+# page and read the lot: 326KB of it, more than half of every file, including the reasoning
+# behind decisions and the bugs that caused them.
+#
+# So the comments stay in the source and come out of the copy in dist/, which is what gets
+# published. That is also 134KB less for every fresh visitor after gzip, 54% of the whole
+# transfer, on a site whose point is opening fast on a phone.
+#
+# The whole risk of this job is one line in luach.js:
+#
+#     href: 'https://secure.cardknox.com/bmoflakewoodcommons1'
+#
+# A regex deleting from // to the end of the line eats that string and the donation link
+# with it, without a word. So the scanners below track what they are inside of: strings,
+# template literals (and the arbitrary code inside ${}, which can hold more of both), and
+# regex literals, which is the other thing a / starts.
+
+def _js_comment_spans(src):
+    """Every comment in JavaScript source, as (start, end) offsets."""
+    i, n, spans, stack, depth, prev = 0, len(src), [], [], 0, ''
+
+    def read_template():
+        """Inside a `...`, up to its end or to the ${ that hands control back."""
+        nonlocal i, depth
+        while i < n:
+            if src[i] == '\\':
+                i += 2
+                continue
+            if src[i] == '`':
+                i += 1
+                stack.pop()
+                return
+            if src[i] == '$' and i + 1 < n and src[i + 1] == '{':
+                depth += 1
+                i += 2
+                return
+            i += 1
+
+    while i < n:
+        c, nxt = src[i], src[i + 1] if i + 1 < n else ''
+        if c == '/' and nxt == '/':
+            j = src.find('\n', i)
+            j = n if j == -1 else j
+            spans.append((i, j))
+            i = j
+        elif c == '/' and nxt == '*':
+            j = src.find('*/', i + 2)
+            j = n if j == -1 else j + 2
+            spans.append((i, j))
+            i = j
+        elif c in '"\'':
+            q = c
+            i += 1
+            while i < n:
+                if src[i] == '\\':
+                    i += 2
+                    continue
+                if src[i] == q:
+                    i += 1
+                    break
+                i += 1
+            prev = q
+        elif c == '`':
+            stack.append(depth)
+            i += 1
+            read_template()
+            prev = '`'
+        elif c == '{':
+            depth += 1
+            prev = c
+            i += 1
+        elif c == '}':
+            depth -= 1
+            i += 1
+            if stack and depth == stack[-1]:
+                read_template()   # the ${ } closed: back into the template
+                prev = '`'
+            else:
+                prev = c
+        elif c == '/':
+            # A / is division after something that can end an expression, and the start of
+            # a regex otherwise. Without this, `a / b` swallows the rest of the file.
+            if prev and (prev.isalnum() or prev in '_$)]`'):
+                prev = c
+                i += 1
+                continue
+            i += 1
+            in_class = False
+            while i < n:
+                if src[i] == '\\':
+                    i += 2
+                    continue
+                if src[i] == '[':
+                    in_class = True
+                elif src[i] == ']':
+                    in_class = False
+                elif src[i] == '/' and not in_class:
+                    i += 1
+                    break
+                elif src[i] == '\n':
+                    break
+                i += 1
+            prev = '/'
+        else:
+            if not c.isspace():
+                prev = c
+            i += 1
+    return spans
+
+
+def _css_comment_spans(src):
+    """Every /* */ in CSS, skipping any that opens inside a string."""
+    i, n, spans = 0, len(src), []
+    while i < n:
+        c = src[i]
+        if c in '"\'':
+            q = c
+            i += 1
+            while i < n:
+                if src[i] == '\\':
+                    i += 2
+                    continue
+                if src[i] == q:
+                    i += 1
+                    break
+                i += 1
+        elif c == '/' and i + 1 < n and src[i + 1] == '*':
+            j = src.find('*/', i + 2)
+            j = n if j == -1 else j + 2
+            spans.append((i, j))
+            i = j
+        else:
+            i += 1
+    return spans
+
+
+def _keep_comment(text):
+    """A licence notice stays.
+
+    /*! is the convention every minifier honours for this and the only test used here.
+    Matching the word "License" anywhere was tried first and was too broad: it kept the
+    note at the top of app.css that merely mentions the fonts' OFL. The licence itself is
+    not that note, it is assets/fonts/OFL-*.txt, which ships to dist untouched beside the
+    fonts, which is what the OFL actually asks for."""
+    return text.startswith('/*!')
+
+
+def _cut_comments(src, spans):
+    """Remove the spans, refusing to remove anything that is not a comment.
+
+    The check is the point. If a scanner above ever loses its place, this turns a silent
+    corruption of somebody's donation link into a build that stops."""
+    out, last = [], 0
+    for a, b in spans:
+        text = src[a:b]
+        if not (text.startswith('//') or text.startswith('/*')):
+            raise RuntimeError(f"refusing to cut a non-comment: {text[:60]!r}")
+        if _keep_comment(text):
+            continue
+        out.append(src[last:a])
+        # A block comment leaves a space behind: a/**/b must not become ab.
+        out.append('' if text.startswith('//') else ' ')
+        last = b
+    out.append(src[last:])
+    return "".join(out)
+
+
+# An HTML comment inside a template literal is not a JavaScript comment, so the scanner
+# above rightly leaves it alone. It still ends up in the page: these become real comment
+# nodes in the DOM when the app writes its markup, and they are as readable in devtools as
+# anything in the static head. Three of them, in luach.js and program-view.js.
+HTML_COMMENT_IN_JS = re.compile(r"[ \t]*<!--.*?-->\n?", re.S)
+
+
+def strip_js(text):
+    return HTML_COMMENT_IN_JS.sub("", _cut_comments(text, _js_comment_spans(text)))
+
+
+def strip_css(text):
+    return _cut_comments(text, _css_comment_spans(text))
+
+
+def strip_html(text):
+    """HTML comments out, and JS comments out of any inline script.
+
+    ld+json and importmap are left alone. They are JSON, which has no comments, and the
+    addresses inside them are full of // that only a JavaScript scanner would understand.
+    """
+    def scripts(m):
+        attrs, body = m.group(1), m.group(2)
+        if "json" in attrs:
+            return m.group(0)
+        return f"<script{attrs}>{strip_js(body)}</script>"
+
+    text = re.sub(r"<script([^>]*)>(.*?)</script>", scripts, text, flags=re.S)
+    text = re.sub(r"[ \t]*<!--(?!\[if).*?-->\n?", "", text, flags=re.S)
+    return text
+
+
 def all_js_files():
     return sorted(JS_DIR.rglob("*.js"))
 
@@ -520,6 +722,93 @@ def stamp_js_versions(page: Path, prefix: str, entry: str):
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
+DIST_DIR = ROOT / "dist"
+
+# What the public repository holds, and nothing else.
+#
+# Everything a browser asks for, stripped of comments. Not in here: the desktop port, the
+# fixtures, the build scripts, CLAUDE.md and README.md. None of them is ever served, and
+# between them they are most of the writing in this repository.
+DIST_STRIP = {
+    ".html": "html",
+    ".css": "css",
+    ".js": "js",
+}
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", "week", "chart", "donate",
+              "admin", "offline"]
+DIST_FILES = ["index.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
+              "CNAME"]
+# Third-party, minified, and carrying licences that have to travel with it. Copied byte for
+# byte: there is nothing of ours in it to take out, and re-emitting somebody else's MIT code
+# through our scanner is a risk taken for no gain.
+DIST_VERBATIM = {"vendor"}
+
+
+def write_dist():
+    """The published copy of the site, with the comments taken out.
+
+    Run last, so it picks up the stamped hashes, the import map and the route pages exactly
+    as the rest of this script just wrote them.
+    """
+    import shutil
+
+    if DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+    DIST_DIR.mkdir()
+
+    strippers = {"html": strip_html, "css": strip_css, "js": strip_js}
+    kept = stripped = 0
+
+    def put(rel: Path):
+        nonlocal kept, stripped
+        src_path = ROOT / rel
+        dest = DIST_DIR / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        kind = DIST_STRIP.get(src_path.suffix)
+        if kind is None or rel.parts[0] in DIST_VERBATIM:
+            dest.write_bytes(src_path.read_bytes())
+            kept += 1
+            return
+        text = src_path.read_text(encoding="utf-8")
+        dest.write_text(strippers[kind](text), encoding="utf-8", newline="\n")
+        stripped += 1
+
+    for name in DIST_FILES:
+        if (ROOT / name).exists():
+            put(Path(name))
+    for tree in DIST_TREES:
+        base = ROOT / tree
+        if not base.exists():
+            continue
+        for f in sorted(base.rglob("*")):
+            if f.is_file():
+                put(f.relative_to(ROOT))
+
+    # Nothing of ours may reach dist with a comment still in it. Asked of the same
+    # scanners that did the stripping rather than by searching for "/*": a substring search
+    # reports every accept="image/*" and every data/*.json as a leak, which are strings the
+    # stripping is supposed to leave alone and breaking them would break a file picker.
+    leaked = []
+    for f in sorted(DIST_DIR.rglob("*")):
+        if not f.is_file() or f.suffix not in DIST_STRIP:
+            continue
+        if f.relative_to(DIST_DIR).parts[0] in DIST_VERBATIM:
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if f.suffix == ".css":
+            found = _css_comment_spans(text)
+        elif f.suffix == ".js":
+            found = _js_comment_spans(text) or HTML_COMMENT_IN_JS.findall(text)
+        else:
+            found = re.findall(r"<!--(?!\[if).*?-->", text, re.S)
+        if found:
+            leaked.append(str(f.relative_to(DIST_DIR)))
+    if leaked:
+        raise RuntimeError("dist: comments left behind in " + ", ".join(leaked[:5]))
+
+    print(f"Built {DIST_DIR} ({stripped} files stripped, {kept} copied as they are)")
+
+
 def main():
     files = all_js_files()
     texts, deps = build_dep_graph(files)
@@ -606,6 +895,8 @@ def main():
         (css_out / f.name).write_text(inline_fonts(f.read_text(encoding="utf-8")), encoding="utf-8")
 
     print(f"Built {OUT_DIR} ({len(order)} modules, {len(bundle.splitlines())} lines)")
+
+    write_dist()
 
 
 if __name__ == "__main__":
