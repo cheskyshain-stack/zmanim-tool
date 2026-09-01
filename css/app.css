@@ -962,19 +962,23 @@ td.ruled .cell { background: var(--ruled); }
 /* Equal widths, so the group does not shift sideways as the labels change length. */
 .week-nav-row > button { flex: 1 1 0; max-width: 11rem; }
 
-/* In the app, the date and these three buttons line up with everything else on the screen
-   instead of being centred in it.
+/* In the app, the controls above the card are held to the card's own width rather than to
+   the column's, so that centring them centres them over the card.
  *
- * Measured on This week at 1650px, where the column runs 268 to 1204: the heading, the two
- * pane buttons, More options and the card itself all began at 268, while the date was
- * centred text and Previous began at 464. Three things down the left and two down the
- * middle in one column, which is what "the buttons are randomly set up" was pointing at.
+ * Measured on This week at 1650px: the column runs 268 to 1204 but the card is 8.5in and
+ * runs 268 to 1084. Centred in the column, the date and the Previous/Today/Next row sat at
+ * 736 while the card's middle is 676, so they read as belonging to neither the left edge
+ * everything else starts at nor the sheet underneath them. Left-aligning them was tried
+ * first and was worse: the row then had three buttons bunched at one end of a wide space.
+ * Held to 8.5in they start where everything else starts and centre where the card centres.
  *
- * Only in the app. The congregation's own week page is a centred design, masthead, rule and
- * place line all down the middle, and these two belong to that there. Hence the :not, and
- * hence not simply changing the rules above. */
-body:not(.is-luach) .week-nav-when { text-align: left; }
-body:not(.is-luach) .week-nav-row { justify-content: flex-start; }
+ * The print panel goes with them for the same reason, and because the congregation's copy
+ * of it is already held to 8.5in a few rules above: the two screens now agree.
+ *
+ * Only in the app. The congregation's week page centres on the page itself, masthead, rule
+ * and place line all down the middle, and its own panel rule already covers it. */
+body:not(.is-luach) .week-nav,
+body:not(.is-luach) .week-print-panel { max-width: 8.5in; }
 /* These carried no styling of their own at all: they were the browser's default buttons,
    which is why pressing one showed nothing on a phone. Same look as the app's other
    buttons, with a pressed state that is a real change of colour rather than only the 1px
@@ -1040,11 +1044,28 @@ body.is-luach .week-cards { align-items: center; }
 .week-lines { margin: 0.22in 0 0; flex: 1; overflow: hidden; }
 /* Held to the width the two columns actually need and centred, rather than being left to
    span the page. Stretched full width the name sat against the right edge and the time
-   against the left, with a hand's width of nothing between them. */
+   against the left, with a hand's width of nothing between them.
+ *
+ * 5.6in was not narrow enough, and the reason is worth writing down because the number on
+ * its own looks arbitrary. Each row reserves 40% of this block for the times and 40% for
+ * the name, which is what makes every name start in the same place down the card. On the
+ * weekday card the content needs nothing like that: "7:00" fills 64px of a 214px column
+ * and "שחרית" 66px of its own, so at 5.6in the times floated at the far left of the sheet
+ * and the names at the far right with 354px of nothing between them. That only shows at
+ * the width a sheet of paper gives it, which is why it went unseen on a phone and turned
+ * up in the PDF, where the card is always 8.5in wide whatever made it.
+ *
+ * At 3.6in the block is 346px of the 816px card and the pair reads as one thing again.
+ *
+ * A phone is not untouched, which is worth saying because the first draft of this note
+ * claimed it was and the measurement said otherwise: on a 380px card the block goes from
+ * 250px to 161px. Rendered and looked at rather than assumed, it is better there too, the
+ * times and the name sitting together instead of at opposite ends of the box. Both were
+ * checked at 412px wide before and after. */
 /* The measure is divided by the growth factor so that growing the type leaves the block
    the same width on paper (see fitLinesToPage). --fit-width stays 1 when shrinking, where
    the block is meant to come in with everything else. */
-.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: calc(5.6in / var(--fit-width, 1)); margin-inline: auto; }
+.week-lines-inner { zoom: var(--fit-scale, 1); width: 100%; max-width: calc(3.6in / var(--fit-width, 1)); margin-inline: auto; }
 /* Name on the right, time on the left, in two fixed columns so every name starts at the
    same place and every time sits in the same band. Fixed rather than content-sized
    because each row is its own grid: only a fixed track lines up down the card. */
