@@ -2802,11 +2802,16 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* Same again for the other pair, where the two columns are different kinds of box: סליחות is
    rows and צום גדליה is headed blocks. The blocks spread themselves with space-around, which
    keeps half a gap above the first one, so that column started 24px lower than its neighbour.
-   space-between puts the first block at the top where a row is, and the two boxes are given
-   the same padding above so both columns open level under their titles. */
+   space-between puts the first block at the top where a row is.
+
+   Then both boxes take the same padding, top and bottom, so the two columns start and end
+   level. They do not agree on their own: the סליחות box carries 0.85in under it, which is
+   what holds its מנחה line down the page on its own sheet, and the blocks box carries none,
+   so the two columns of that sheet ended 81px apart, measured. Zero under both, and the
+   filling is left to the leading and to space-between. */
 .poster.is-pair .poster-sets { justify-content: space-between; }
 .poster.is-pair .poster-rows,
-.poster.is-pair .poster-sets { padding-top: 0.16in; }
+.poster.is-pair .poster-sets { padding: 0.16in 0 0; }
 .poster.is-pair .poster-rows { display: flex; flex-direction: column; }
 /* The wall charts' header rather than the Word posters', on the sheets that carry two
    schedules. Not a copy of it: the same .page-header / .header-row / .header-center /
