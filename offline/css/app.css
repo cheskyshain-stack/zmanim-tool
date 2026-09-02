@@ -2736,6 +2736,17 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The שקיעה on the צום גדליה sheet, which stands between מנחה and מעריב with no heading:
    set at the size of a line of times, since it reads as one. */
 .poster-set-note { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
+/* --- All of them, one after another -------------------------------------------------
+   A way of looking through the season's sheets rather than a poster of its own: every one
+   for the chosen year, stacked, each drawn by its own renderer so what is in the run is
+   exactly what that poster gives on its own. The name over each is no-print. */
+.poster-all { display: flex; flex-direction: column; align-items: center; gap: 1.6rem; width: 100%; }
+.poster-all-item { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.poster-all-name {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted);
+  margin: 0 0 0.4rem; text-align: center;
+}
+
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }
 

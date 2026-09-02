@@ -247,7 +247,87 @@ const POSTERS = [
     },
     render: renderSlichosPoster,
   },
+  // Last in the list, because it is a way of looking at the others rather than a poster.
+  {
+    key: 'all',
+    label: 'All of them, one after another',
+    covers: (y) => `Every poster for ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    // No Page picker on this one. A run is portrait throughout, which is not a choice made
+    // here: Chrome puts one page size on a whole PDF, so a run cannot mix the two. Measured,
+    // printing the run with the pair sheets set landscape put those two 11in sheets onto
+    // 8.5in pages and cut them. Six of the eight are portrait only anyway. Either pair sheet
+    // can still be printed landscape by picking it on its own.
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => buildEveryPoster(state, settings, y),
+      }));
+    },
+    render: renderAllPosters,
+  },
 ];
+
+/** Every poster for one year, in the order the picker lists them.
+ *
+ *  Each is built by its own entry's own source, so this knows nothing about what any of them
+ *  needs: it asks the table. One that cannot be built for a year is left out rather than
+ *  breaking the run, which is what happens to שבת שובה in a year with no chart saved for it,
+ *  and the ones that were left out are named under the sheets so it is not a silent gap.
+ *
+ *  A שבת שובה built from two charts that disagree takes the first, since this view has no
+ *  one poster to hang the "which chart" picker off. Choosing the poster on its own still
+ *  offers the choice. */
+function buildEveryPoster(state, settings, year) {
+  const items = [];
+  const missing = [];
+  for (const p of POSTERS) {
+    if (p.key === 'all') continue;
+    const source = p.sources(state, settings).find((s) => s.year === year);
+    let result = null;
+    try {
+      result = source ? source.build() : null;
+    } catch {
+      result = null;
+    }
+    if (result && result.poster) items.push({ key: p.key, label: p.label, poster: result.poster, render: p.render });
+    else missing.push(p.label);
+  }
+  if (!items.length) return { missing: 'Nothing to build for this year.' };
+  const spans = items.map((i) => i.poster.span).filter(Boolean);
+  return {
+    poster: {
+      hebrewYear: year,
+      items,
+      notBuilt: missing,
+      span: spans.length
+        ? { from: Math.min(...spans.map((s) => s.from)), to: Math.max(...spans.map((s) => s.to)) }
+        : { from: roshHashana(year - 3761), to: roshHashana(year - 3761) },
+    },
+  };
+}
+
+/** Every sheet stacked down the page, each drawn by its own renderer.
+ *
+ *  Nothing is redrawn for this view: an item is the poster's own markup, so what is in the
+ *  run is what comes out when that poster is picked on its own. The name above each is
+ *  no-print, so paper gets the sheets and nothing else. */
+function renderAllPosters(built, settings) {
+  return `<div class="poster-all">
+    ${built.items.map((it) => `<div class="poster-all-item">
+        <p class="poster-all-name no-print">${esc(it.label)}</p>
+        ${it.render(it.poster, settings, { landscape: false })}
+      </div>`).join('')}
+    ${built.notBuilt.length
+      ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${esc(built.notBuilt.join(', '))}</p>`
+      : ''}
+    <p class="hint no-print">Every sheet here is portrait, because one print run can only be one way up. To print either of the two on one page sheets landscape, pick it on its own above.</p>
+  </div>`;
+}
 
 /** One saved chart, named so it can be told from another of the same season and year.
  *  Which is the whole reason this is ever shown: the two only differ by when they were
@@ -597,21 +677,27 @@ let fitHandler = null;
  *
  *  No button beside it, unlike the charts. There is one page and nothing to choose. */
 function fitPoster(container) {
-  const el = container.querySelector('.poster');
-  if (!el) return;
+  // All of them at once is a run of sheets rather than one, and they are not all the same
+  // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
+  // measured and scaled on its own, so a portrait sheet is not shrunk to fit a landscape
+  // one that happens to be under it.
+  const all = [...container.querySelectorAll('.poster')];
+  if (!all.length) return;
   const decide = () => {
-    el.style.zoom = ''; // always measure unscaled
-    const box = el.parentElement;
-    const cs = getComputedStyle(box);
-    const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    const wide = el.getBoundingClientRect().width;
-    if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+    for (const el of all) {
+      el.style.zoom = ''; // always measure unscaled
+      const box = el.parentElement;
+      const cs = getComputedStyle(box);
+      const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const wide = el.getBoundingClientRect().width;
+      if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+    }
   };
   decide();
   // Rotating a phone changes what fits. One listener, replaced each render so it always
-  // points at the poster currently on screen.
+  // points at the posters currently on screen.
   if (fitHandler) window.removeEventListener('resize', fitHandler);
-  fitHandler = () => { if (document.body.contains(el)) decide(); };
+  fitHandler = () => { if (document.body.contains(all[0])) decide(); };
   window.addEventListener('resize', fitHandler);
 }
 

@@ -201,18 +201,34 @@
      Pinning the boxes the poster sits in to the size of the sheet leaves nothing to tile.
      Measured by counting /Count in the PDF: three pages before, one after. Scoped to
      :has(.poster) so the charts, which are landscape and print correctly, are untouched. */
-  body:has(.poster),
-  body:has(.poster) .app-shell,
-  body:has(.poster) main {
+  body:has(.poster):not(:has(.poster-all)),
+  body:has(.poster):not(:has(.poster-all)) .app-shell,
+  body:has(.poster):not(:has(.poster-all)) main {
     width: 8.5in; height: 11in;
     margin: 0; padding: 0;
     overflow: hidden;
   }
   /* Same again for the landscape sheet, the other way round. One class more specific than
      the rule above, so it wins wherever it applies and the portrait rule is left alone. */
-  body:has(.poster.is-landscape),
-  body:has(.poster.is-landscape) .app-shell,
-  body:has(.poster.is-landscape) main {
+  body:has(.poster.is-landscape):not(:has(.poster-all)),
+  body:has(.poster.is-landscape):not(:has(.poster-all)) .app-shell,
+  body:has(.poster.is-landscape):not(:has(.poster-all)) main {
     width: 11in; height: 8.5in;
   }
+  /* The run of every poster is the one case where there is more than one sheet on the tab,
+     so the boxes above it cannot be pinned to one sheet: doing that clipped everything after
+     the first. They are still pinned in width, which is what stopped Chrome tiling, but to
+     the widest sheet in the run and with the height left to the content. Each sheet then
+     takes its own page, and the wrapper round it carries the break so a name above a sheet
+     cannot be orphaned onto the page before it. */
+  body:has(.poster-all),
+  body:has(.poster-all) .app-shell,
+  body:has(.poster-all) main {
+    width: max-content; height: auto;
+    margin: 0; padding: 0;
+    overflow: visible;
+  }
+  .poster-all { gap: 0; }
+  .poster-all-item { break-after: page; break-inside: avoid; }
+  .poster-all-item:last-child { break-after: auto; }
 }
