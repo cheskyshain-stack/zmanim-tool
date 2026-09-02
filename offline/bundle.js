@@ -5432,8 +5432,11 @@ function posterYears(state) {
  *  same call the charts print their dates with, so a poster and a board never disagree
  *  about what day something is. */
 const heDate = (serial) => jewishDateString(serial, false);
-const enDate = (serial) => dateFromSerial(serial)
-  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+/** The day name comes from DAY_NAMES rather than the locale, which would say Saturday.
+ *  No locale has Shabbos in it, and there is no reason to call it Saturday on a shul's own
+ *  page: same reasoning, and the same list, as the week cards' fmtShabbosDate. */
+const enDate = (serial) => `${DAY_NAMES[excelWeekday(serial) - 1]}, ${dateFromSerial(serial)
+  .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
 /** The dates a poster covers, said in full above it. Not on the sheet itself, which the
  *  shul wants clean, but on the screen it is chosen from, where the whole question is

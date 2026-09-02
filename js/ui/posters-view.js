@@ -17,11 +17,11 @@
 import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, SLICHOS_TEXT } from '../posters/slichos.js';
-import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang } from '../util.js';
+import { hebrewLang, DAY_NAMES } from '../util.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -66,8 +66,11 @@ function posterYears(state) {
  *  same call the charts print their dates with, so a poster and a board never disagree
  *  about what day something is. */
 const heDate = (serial) => jewishDateString(serial, false);
-const enDate = (serial) => dateFromSerial(serial)
-  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+/** The day name comes from DAY_NAMES rather than the locale, which would say Saturday.
+ *  No locale has Shabbos in it, and there is no reason to call it Saturday on a shul's own
+ *  page: same reasoning, and the same list, as the week cards' fmtShabbosDate. */
+const enDate = (serial) => `${DAY_NAMES[excelWeekday(serial) - 1]}, ${dateFromSerial(serial)
+  .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
 /** The dates a poster covers, said in full above it. Not on the sheet itself, which the
  *  shul wants clean, but on the screen it is chosen from, where the whole question is
