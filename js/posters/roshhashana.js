@@ -26,8 +26,8 @@ const rhSerial = (year) => roshHashana(year - 3761);
 /** To the nearest 5 minutes. The דרשה is announced to a round time rather than to the
  *  minute the arithmetic lands on. */
 const toNearest5 = (t) => Math.round(t * 288) / 288;
-/** Up to the next 5 minutes, which is how the afternoon מנחה is set. */
-const upTo5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
+/** Down to the last 5 minutes, which is how the afternoon מנחה is set. */
+const downTo5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
 
 /** Nine seasonal hours into the day, on each of the two reckonings the boards use: the
  *  גר"א day runs sunrise to sunset, the מ"א day עלות 72 to צאת 72. Only printed on a first
@@ -82,11 +82,11 @@ export function buildRoshHashanaPoster(year, settings) {
   const at = (t) => [tm(t)];
   const pair = (a, b) => [tm(a), tm(b)];
 
-  // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well. It is
-  // the first day, unless that is Shabbos, when תשליך is pushed off and so is this. Both
-  // sheets put it exactly 55 minutes before the main מנחה: 5:00 against 5:55 on תשפ"ו day
-  // one, 5:15 against 6:10 on תשפ"ד day two.
+  // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
+  // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
+  // is pushed off and so is this.
   const tashlichDay = shabbosDay === 0 ? 1 : 0;
+  const TASHLICH_EARLIER = 50;
 
   const blocks = days.map((day, i) => {
     const night = i === 0 ? erev : days[0];
@@ -120,11 +120,11 @@ export function buildRoshHashanaPoster(year, settings) {
       lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }]));
     }
 
-    // The afternoon מנחה, an hour before that day's own שקיעה, taken up to the next 5, with
-    // the earlier תשליך one in front of it on the day that has one.
-    const mainMincha = upTo5(dayShkia - 60 * RH_MIN);
+    // The afternoon מנחה, an hour before that day's own שקיעה taken down to the last 5, on
+    // both days, with the earlier תשליך one in front of it on the day that has one.
+    const mainMincha = downTo5(dayShkia - 60 * RH_MIN);
     lines.push(line(RH_TEXT.mincha, i === tashlichDay
-      ? [tm(mainMincha - 55 * RH_MIN, true), tm(mainMincha)]
+      ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
       : at(mainMincha)));
 
     // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
