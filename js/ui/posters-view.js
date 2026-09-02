@@ -298,12 +298,21 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   // far corner free, which is where the year goes, so the year is written once on the sheet
   // instead of once on each of the two column headings.
   const head = cornerYear
-    ? `<div class="poster-head-row" dir="ltr">
-         <div class="poster-head-year" lang="he" dir="rtl">${esc(cornerYear)}</div>
-         <div class="poster-head-center">${wordmark}</div>
-         ${rabbiBlock}
-       </div>
-       <img class="poster-rule" src="/assets/poster-rule.png" alt="" width="1897" height="85">`
+    // The wall chart's header, copied: the same markup and the same classes, so the two are
+    // one thing rather than a likeness of one that drifts. The only change is the corner:
+    // where a chart puts the building, this puts the year. No rule under it either, because
+    // a chart does not have one.
+    ? `<div class="page-header" dir="ltr">
+         <div class="header-row">
+           <div class="header-year" lang="he" dir="rtl">${esc(cornerYear)}</div>
+           <div class="header-center">
+             <img class="header-logo" src="/assets/logo-text.png"
+                  alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)}>
+             <div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+           </div>
+           <div class="header-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
+         </div>
+       </div>`
     : `${wordmark}
     <img class="poster-rule" src="/assets/poster-rule.png" alt="" width="1897" height="85">
     ${rabbiBlock}`;

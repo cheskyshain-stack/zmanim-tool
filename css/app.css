@@ -2758,37 +2758,32 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* A rule between the two, so the eye does not run a ראש השנה row into a יום כיפור one. */
 .poster-pair-col + .poster-pair-col { border-inline-start: 1px solid #000; }
 .poster.is-pair .poster-pair-col { padding-inline: 0.1in; }
-/* The letterhead is the sheet's rather than a column's, and it is set smaller here than on
-   a single sheet. It has to be: this page is carrying two schedules and the letterhead is
-   what they are competing with. On the portrait sheet the limit is the width of a column,
-   on the landscape one it is the height, and the letterhead takes from both. Same artwork,
-   same proportions, just smaller. */
-.poster.is-pair .poster-wordmark { width: 3.9in; }
-.poster.is-pair .poster-subtitle { font-size: 11.5pt; margin: 0.07in 0 0.01in; }
-.poster.is-pair .poster-rule { width: 4.17in; margin-bottom: 0.07in; }
-.poster.is-pair .poster-rabbi { font-size: 9.5pt; margin-bottom: 0.1in; }
-/* The wall charts' header rather than the Word posters': one row, wordmark in the middle,
-   the rabbi's line beside it instead of stacked under it. Shorter, which this sheet needs,
-   and it leaves the far corner free for the year.
-   Set dir="ltr" on the row by the markup, so the year lands on the left and the rabbi's
-   line on the right, the same way round as on a chart. Each of the two is Hebrew and sets
-   its own direction inside. */
-.poster-head-row { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 0.15in; }
-.poster-head-center { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
-/* The year, once, in the corner. It comes off the two column headings to get here: written
-   above each schedule as well it appeared twice on one sheet. */
-.poster-head-year { font-size: 15pt; font-weight: 700; flex-shrink: 0; }
-/* In the row it is a cell, not a block set against the sheet's right margin. */
-.poster.is-chart-head .poster-head-row .poster-rabbi {
-  align-self: auto; margin-bottom: 0; flex-shrink: 0;
+/* The wall charts' header rather than the Word posters', on the sheet that carries both
+   schedules. Not a copy of it: the same .page-header / .header-row / .header-center /
+   .header-logo / .header-subtitle / .header-rabbi rules the charts use, written once, above.
+   All this block does is give them the two variables they are written against, since a
+   poster is not a .pages container, and settle the two things that are this sheet's own.
+
+   dir="ltr" is on the header in the markup, so the corner lands on the left and the rabbi's
+   line on the right, the same way round as a chart. Each is Hebrew and sets its own
+   direction inside. */
+.poster.is-chart-head .page-header {
+  --sheet-font-size: 10pt;
+  --sheet-header-scale: 1;
+  width: 100%; margin-bottom: 0.16in;
 }
-.poster.is-chart-head .poster-rule { margin-bottom: 0.14in; }
-/* Smaller again on the landscape sheet, which is the one short of height. Every tenth of an
-   inch the letterhead gives up here is a tenth the two columns get. */
-.poster.is-pair.is-landscape .poster-wordmark { width: 3.2in; }
-.poster.is-pair.is-landscape .poster-subtitle { font-size: 10pt; margin: 0.05in 0 0.01in; }
-.poster.is-pair.is-landscape .poster-rule { width: 3.42in; margin-bottom: 0.05in; }
-.poster.is-pair.is-landscape .poster-rabbi { font-size: 9pt; margin-bottom: 0.07in; }
+/* The year, where a chart puts the building.
+   A chart's wordmark comes out centred on the page by luck: .header-center takes the space
+   left between the two ends, so the middle only lands on the page's middle when the two ends
+   are the same width, and there the icon is 141px against the rabbi's 145px. A year is far
+   narrower than that line, so left as flex items the wordmark would sit off to one side.
+   Giving both ends the same basis makes the centring hold whatever is in them. */
+.poster.is-chart-head .header-year,
+.poster.is-chart-head .header-rabbi { flex: 1 1 0; }
+.poster.is-chart-head .header-year { font-size: 16pt; font-weight: 700; }
+/* Smaller again on the landscape sheet, which is the one short of height. One number does
+   it, the same one the charts scale their own header by. */
+.poster.is-pair.is-landscape .page-header { --sheet-header-scale: 0.85; margin-bottom: 0.12in; }
 
 /* One number sets the whole sheet, --pair-row, and everything on it is written as a
    multiple of that. So finding the size is finding one number, and the proportions between
@@ -2800,12 +2795,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
    Portrait comes out bigger than landscape, which is the opposite of what it looks like it
    should be. With the box moved to the foot (see renderPairPoster) it is the height that
-   caps portrait: 13.5pt leaves 53px clear on the tightest of the three years and 14.5pt
+   caps portrait: 13.5pt leaves 66px clear on the tightest of the three years and 14.5pt
    runs over. So 13.5pt, a size and a half up from the 12pt the single sheets set their rows
    at. One list, the שחרית יום ג', breaks over two lines from 13pt up, which is what the box
    rows do on the single sheet as well.
 
-   Landscape has the width but not the height. 12pt leaves 25px clear on all three years and
+   Landscape has the width but not the height. 12pt leaves 26px clear on all three years and
    13pt runs over. Both numbers went up a full point when the header became the charts' one
    row instead of the Word posters' stack: that is what a shorter header buys.
 
