@@ -2724,18 +2724,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    sheet's type, which has to fit a whole day onto the same page.
    The ceiling is the longest line of times. Every year from תשפ"ו to תק"ף was run through
    buildAfterYomKippur and none puts more than six on a line, so the six slot מנחה is the
-   widest this sheet ever gets: at 21pt it measures 378px of the 720px it has, and the
-   three blocks 418px of 615px. Deliberately short of what would fit. The page would take
-   half as much again, and set that large it stopped reading as a schedule. */
+   widest either sheet ever gets: at 23pt it measures 414px of the 720px it has, and the
+   three blocks 454px of 615px. Deliberately short of what would fit. The page would take
+   a third as much again, and set that large it stopped reading as a schedule. */
 .poster-set-head {
-  font-size: 25pt; font-weight: 700; text-decoration: underline;
+  font-size: 27pt; font-weight: 700; text-decoration: underline;
   text-underline-offset: 0.06em; margin: 0 0 0.18in;
 }
-.poster-set-line { font-size: 21pt; font-weight: 700; line-height: 1.5; margin: 0; }
+.poster-set-line { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
 .poster-set-line u { text-underline-offset: 0.12em; }
 /* The שקיעה on the צום גדליה sheet, which stands between מנחה and מעריב with no heading:
    set at the size of a line of times, since it reads as one. */
-.poster-set-note { font-size: 21pt; font-weight: 700; line-height: 1.5; margin: 0; }
+.poster-set-note { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }
 
