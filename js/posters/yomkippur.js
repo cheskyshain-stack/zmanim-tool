@@ -142,6 +142,9 @@ export function afterEarlyMaariv(earliestShkia) {
 const AFTER_MAARIV_REST = [
   [20, 0, true], [20, 30, true], [20, 45, false], [21, 0, true], [21, 30, true],
   [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],
+  // Midnight, written as the 24th hour so it stays in order after 11:30 rather than
+  // sorting to the front of the day. formatTime prints it as 12:00.
+  [24, 0, true],
 ];
 
 /** The everyday schedule that runs from after יו"כ until סוכות.

@@ -5510,6 +5510,9 @@ function afterEarlyMaariv(earliestShkia) {
 const AFTER_MAARIV_REST = [
   [20, 0, true], [20, 30, true], [20, 45, false], [21, 0, true], [21, 30, true],
   [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],
+  // Midnight, written as the 24th hour so it stays in order after 11:30 rather than
+  // sorting to the front of the day. formatTime prints it as 12:00.
+  [24, 0, true],
 ];
 
 /** The everyday schedule that runs from after יו"כ until סוכות.
@@ -6377,10 +6380,10 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '' } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
-    + `${landscape ? ' is-landscape' : ''}${cornerYear ? ' is-chart-head' : ''}`;
+    + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
@@ -6388,20 +6391,18 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   // Two headers. The single sheets stack theirs: wordmark, rule, then the rabbi's line under
   // it against the right margin, which is how the Word posters are built.
   //
-  // The sheet carrying both schedules uses the wall charts' header instead: one row, with
-  // the wordmark in the middle and the rabbi's line beside it rather than under it. It is
-  // the better arrangement here for two reasons. It is shorter, and on that sheet every
-  // tenth of an inch of header is a tenth the two columns do not get. And it leaves the
-  // far corner free, which is where the year goes, so the year is written once on the sheet
-  // instead of once on each of the two column headings.
-  const head = cornerYear
+  // The sheets carrying two schedules use the wall charts' header instead: one row, with the
+  // wordmark in the middle and the rabbi's line beside it rather than under it. It is
+  // shorter, and on those sheets every tenth of an inch of header is a tenth the two columns
+  // do not get.
+  const head = chartHead
     // The wall chart's header, copied: the same markup and the same classes, so the two are
-    // one thing rather than a likeness of one that drifts. The only change is the corner:
-    // where a chart puts the building, this puts the year. No rule under it either, because
-    // a chart does not have one.
+    // one thing rather than a likeness of one that drifts. Where a chart puts the building,
+    // this leaves the corner empty: it held the year for a while and the year came off. No
+    // rule under it either, because a chart does not have one.
     ? `<div class="page-header" dir="ltr">
          <div class="header-row">
-           <div class="header-year" lang="he" dir="rtl">${esc(cornerYear)}</div>
+           <div class="header-year" aria-hidden="true"></div>
            <div class="header-center">
              <img class="header-logo" src="assets/logo-text.png"
                   alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)}>
@@ -6564,7 +6565,7 @@ function renderPairPoster(poster, settings, { landscape = false } = {}) {
       <div class="poster-pair-col">${ykBody(poster.yk, { year: false })}</div>
     </div>`;
   return posterShell(settings, body, poster.legend || [], {
-    dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
+    dense: true, pair: true, landscape, chartHead: true,
   });
 }
 
@@ -6636,7 +6637,7 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
       <div class="poster-pair-col">${tzomGedaliaBody(poster.tzom)}</div>
     </div>`;
   return posterShell(settings, body, poster.legend || [], {
-    dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
+    dense: true, pair: true, landscape, chartHead: true,
   });
 }
 

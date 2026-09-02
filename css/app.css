@@ -2810,6 +2810,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    so the two columns of that sheet ended 81px apart, measured. Zero under both, and the
    filling is left to the leading and to space-between. */
 .poster.is-pair .poster-sets { justify-content: space-between; }
+/* The gaps around the parts of a row are trimmed on that sheet: its rows are a label, a list
+   and a note in brackets, which is more to fit across a column than the other sheet has. */
+.poster.is-pair:has(.poster-sets) .poster-row-label { margin-inline-end: 0.08in; }
+.poster.is-pair:has(.poster-sets) .poster-row-note { margin-inline-start: 0.06in; }
 .poster.is-pair .poster-rows,
 .poster.is-pair .poster-sets { padding: 0.16in 0 0; }
 .poster.is-pair .poster-rows { display: flex; flex-direction: column; }
@@ -2834,18 +2838,17 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   --sheet-header-scale: 0.75;
   width: 100%; margin-bottom: 0.16in;
 }
-/* The year, where a chart puts the building.
+/* The corner where a chart puts the building, left empty here.
    A chart's wordmark comes out centred on the page by luck: .header-center takes the space
    left between the two ends, so the middle only lands on the page's middle when the two ends
-   are the same width, and there the icon is 141px against the rabbi's 145px. A year is far
-   narrower than that line, so left as flex items the wordmark would sit off to one side.
-   Giving both ends the same basis makes the centring hold whatever is in them. */
+   are the same width, and there the icon is 141px against the rabbi's 145px. Nothing at all
+   is narrower than that line still, so left as flex items the wordmark would sit off to one
+   side. Giving both ends the same basis makes the centring hold whatever is in them. */
 .poster.is-chart-head .header-year,
 .poster.is-chart-head .header-rabbi { flex: 1 1 0; }
-/* Hard against the left margin, the way the rabbi's line is hard against the right one, so
-   the two ends of the row answer each other. It needs saying: the year is Hebrew and carries
-   dir="rtl", under which "start" is the right-hand end, so left to itself it sat in the
-   middle of the sheet's left half instead of at the edge of it. */
+/* The corner is empty now, the year having come off it, but it still has to be there: it is
+   what balances the rabbi's line at the other end and keeps the wordmark on the sheet's
+   middle. */
 .poster.is-chart-head .header-year { font-size: 16pt; font-weight: 700; text-align: left; }
 /* The landscape sheet is 11in wide, the same as a chart, so it takes the chart's own two
    numbers and its header is a copy of one to the pixel. */
@@ -2868,6 +2871,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair.is-landscape .poster-legend {
   display: flex; justify-content: center; align-items: baseline;
   gap: 0.35in; flex-wrap: wrap;
+  /* Less air above it than the 0.2in every other sheet gets. This is the one sheet with no
+     height to spare, and at 0.2in the key's own box went 1px past the bottom margin. */
+  padding-top: 0.12in;
 }
 
 .poster-box { border: 1px solid #000; padding: 0.13in 0.14in 0.15in; margin-top: 0.1in; width: 100%; }
@@ -2885,7 +2891,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    runs מנחה straight into the list. margin-inline-end, so in a right-to-left line it opens
    on the left, which is the side the times are on. */
 .poster-row-label { margin-inline-end: 0.14in; }
-.poster-row-note { margin-inline-start: 0.1in; }
+/* The note in brackets on a סליחות row, which says the one day a time is different: "(יום ה'
+   6:20)". It is one time and it is kept whole. The row around it is free to wrap wherever it
+   needs to in a narrow column, and does, but the note is never the thing that gets broken:
+   split, the day it names ends up on one line and the time on the next. */
+.poster-row-note { margin-inline-start: 0.1in; white-space: nowrap; }
 /* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
    of it so it does not run into the first row's time, and it inherits .poster-row-label for
    the gap between its own word and its own time. */
@@ -2906,6 +2916,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    as the week card's legend, and as the printed chart's own footer. */
 .poster-legend {
   margin-top: auto;
+  /* Air between the last line of the schedule and the key, on every poster. Without it the
+     two ran together: the boxes above are flex: 1 and stretch to the key, so the last line
+     sits hard against it. */
+  padding-top: 0.2in;
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
 
