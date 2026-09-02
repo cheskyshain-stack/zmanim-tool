@@ -2767,6 +2767,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair .poster-subtitle { font-size: 11.5pt; margin: 0.07in 0 0.01in; }
 .poster.is-pair .poster-rule { width: 4.17in; margin-bottom: 0.07in; }
 .poster.is-pair .poster-rabbi { font-size: 9.5pt; margin-bottom: 0.1in; }
+/* The wall charts' header rather than the Word posters': one row, wordmark in the middle,
+   the rabbi's line beside it instead of stacked under it. Shorter, which this sheet needs,
+   and it leaves the far corner free for the year.
+   Set dir="ltr" on the row by the markup, so the year lands on the left and the rabbi's
+   line on the right, the same way round as on a chart. Each of the two is Hebrew and sets
+   its own direction inside. */
+.poster-head-row { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 0.15in; }
+.poster-head-center { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+/* The year, once, in the corner. It comes off the two column headings to get here: written
+   above each schedule as well it appeared twice on one sheet. */
+.poster-head-year { font-size: 15pt; font-weight: 700; flex-shrink: 0; }
+/* In the row it is a cell, not a block set against the sheet's right margin. */
+.poster.is-chart-head .poster-head-row .poster-rabbi {
+  align-self: auto; margin-bottom: 0; flex-shrink: 0;
+}
+.poster.is-chart-head .poster-rule { margin-bottom: 0.14in; }
 /* Smaller again on the landscape sheet, which is the one short of height. Every tenth of an
    inch the letterhead gives up here is a tenth the two columns get. */
 .poster.is-pair.is-landscape .poster-wordmark { width: 3.2in; }
@@ -2784,16 +2800,19 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
    Portrait comes out bigger than landscape, which is the opposite of what it looks like it
    should be. With the box moved to the foot (see renderPairPoster) it is the height that
-   caps portrait, and 13pt leaves 44px clear on the tightest of the three years, where 13.5pt
-   leaves 16px and 14pt runs over. So 13pt: a size up from the 12pt the single sheets set
-   their rows at, with room for a year that runs a row or two longer. One list, the שחרית
-   יום ג', breaks over two lines at that size, which is what the box rows do on the single
-   sheet as well.
+   caps portrait: 13.5pt leaves 53px clear on the tightest of the three years and 14.5pt
+   runs over. So 13.5pt, a size and a half up from the 12pt the single sheets set their rows
+   at. One list, the שחרית יום ג', breaks over two lines from 13pt up, which is what the box
+   rows do on the single sheet as well.
 
-   Landscape has the width but not the height. 11pt leaves 31px clear and 12pt runs over.
-   That 31px is only there because the letterhead is smaller again on this one. */
-.poster.is-pair { --pair-row: 13pt; }
-.poster.is-pair.is-landscape { --pair-row: 11pt; }
+   Landscape has the width but not the height. 12pt leaves 25px clear on all three years and
+   13pt runs over. Both numbers went up a full point when the header became the charts' one
+   row instead of the Word posters' stack: that is what a shorter header buys.
+
+   Every one of these was measured on all three years and on both shapes the ראש השנה sheet
+   takes, by stepping the number until something gave. */
+.poster.is-pair { --pair-row: 13.5pt; }
+.poster.is-pair.is-landscape { --pair-row: 12pt; }
 .poster.is-pair .poster-title { font-size: calc(2.1 * var(--pair-row)); margin: 0 0 0.5em; }
 .poster.is-pair .poster-rows.is-dense { padding: 0; }
 .poster.is-pair .poster-rows.is-dense .poster-row { font-size: var(--pair-row); line-height: 1.16; }

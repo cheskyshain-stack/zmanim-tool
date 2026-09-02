@@ -6250,15 +6250,35 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '' } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${landscape ? ' is-landscape' : ''}`;
-  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
-    <img class="poster-wordmark" src="assets/logo-text.png"
+  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${landscape ? ' is-landscape' : ''}`
+    + `${cornerYear ? ' is-chart-head' : ''}`;
+  const wordmark = `<img class="poster-wordmark" src="assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
-    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
+  const rabbiBlock = `<div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>`;
+  // Two headers. The single sheets stack theirs: wordmark, rule, then the rabbi's line under
+  // it against the right margin, which is how the Word posters are built.
+  //
+  // The sheet carrying both schedules uses the wall charts' header instead: one row, with
+  // the wordmark in the middle and the rabbi's line beside it rather than under it. It is
+  // the better arrangement here for two reasons. It is shorter, and on that sheet every
+  // tenth of an inch of header is a tenth the two columns do not get. And it leaves the
+  // far corner free, which is where the year goes, so the year is written once on the sheet
+  // instead of once on each of the two column headings.
+  const head = cornerYear
+    ? `<div class="poster-head-row" dir="ltr">
+         <div class="poster-head-year" lang="he" dir="rtl">${esc(cornerYear)}</div>
+         <div class="poster-head-center">${wordmark}</div>
+         ${rabbiBlock}
+       </div>
+       <img class="poster-rule" src="assets/poster-rule.png" alt="" width="1897" height="85">`
+    : `${wordmark}
     <img class="poster-rule" src="assets/poster-rule.png" alt="" width="1897" height="85">
-    <div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
+    ${rabbiBlock}`;
+  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+    ${head}
     ${body}
     ${legend.length
       ? `<div class="poster-legend">${legend
@@ -6322,10 +6342,10 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
 
 /** The ראש השנה schedule itself, title and all, without the page around it. Split out so the
  *  sheet that carries both schedules can call it too and the two cannot drift. */
-function rhBody(poster) {
+function rhBody(poster, { year = true } = {}) {
   const typed = (str) => parseTimes(str);
   return `
-    <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
+    <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
       ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
       ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
@@ -6364,13 +6384,13 @@ function ykAfterBox(poster) {
 }
 
 /** The יום כיפור schedule, with or without that box under it. */
-function ykBody(poster, { box = true } = {}) {
+function ykBody(poster, { box = true, year = true } = {}) {
   // A row whose times are a list of מנינים is comma separated; a row naming one זמן on two
   // reckonings keeps the slash. Same split the סליחות and ראש השנה sheets already make.
   const rows = (lines) => lines.map((ln) =>
     rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
   return `
-    <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
+    <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
       <h3 class="poster-day" lang="he">${esc(YK_TEXT.erevHeading)}</h3>
       ${rows(poster.erevLines)}
@@ -6408,11 +6428,13 @@ function renderYomKippurPoster(poster, settings) {
  *  The type sizes that go with each are in .poster-pair in app.css. */
 function renderPairPoster(poster, settings, { landscape = false } = {}) {
   const body = `<div class="poster-pair">
-      <div class="poster-pair-col">${rhBody(poster.rh)}</div>
-      <div class="poster-pair-col">${ykBody(poster.yk, { box: landscape })}</div>
+      <div class="poster-pair-col">${rhBody(poster.rh, { year: false })}</div>
+      <div class="poster-pair-col">${ykBody(poster.yk, { box: landscape, year: false })}</div>
     </div>
     ${landscape ? '' : `<div class="poster-pair-foot">${ykAfterBox(poster.yk)}</div>`}`;
-  return posterShell(settings, body, poster.legend || [], { dense: true, pair: true, landscape });
+  return posterShell(settings, body, poster.legend || [], {
+    dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
+  });
 }
 
 /** The everyday schedule from after יו"כ to סוכות, given a sheet of its own.
