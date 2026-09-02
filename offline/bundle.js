@@ -5434,9 +5434,15 @@ function posterYears(state) {
 const heDate = (serial) => jewishDateString(serial, false);
 /** The day name comes from DAY_NAMES rather than the locale, which would say Saturday.
  *  No locale has Shabbos in it, and there is no reason to call it Saturday on a shul's own
- *  page: same reasoning, and the same list, as the week cards' fmtShabbosDate. */
-const enDate = (serial) => `${DAY_NAMES[excelWeekday(serial) - 1]}, ${dateFromSerial(serial)
-  .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+ *  page: same reasoning, and the same list, as the week cards' fmtShabbosDate.
+ *
+ *  timeZone: 'UTC' is not optional. dateFromSerial builds a Date at UTC midnight, so
+ *  formatting it in the reader's own zone moves it back a day anywhere west of Greenwich:
+ *  in Lakewood this printed "Shabbos, September 18" for a date that is a Friday, because
+ *  the day name comes from the serial and only the numbers had moved. Every other date
+ *  formatter in the app passes it for the same reason. */
+const enDateFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
+const enDate = (serial) => `${DAY_NAMES[excelWeekday(serial) - 1]}, ${enDateFmt.format(dateFromSerial(serial))}`;
 
 /** The dates a poster covers, said in full above it. Not on the sheet itself, which the
  *  shul wants clean, but on the screen it is chosen from, where the whole question is
@@ -5450,10 +5456,9 @@ function when(from, to) {
 
 /** "תשפ״ז · ר"ה 12 Sep 2026". The Hebrew year on its own is what caused the confusion, so
  *  the date ר"ה actually falls on rides along and there is nothing left to work out. */
+const yearFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
 function yearLabel(y) {
-  const on = dateFromSerial(roshHashana(y - 3761))
-    .toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${hebrewYear(y)} · ר"ה ${on}`;
+  return `${hebrewYear(y)} · ר"ה ${yearFmt.format(dateFromSerial(roshHashana(y - 3761)))}`;
 }
 
 /** The posters this tab knows how to draw. One entry per poster: what to call it, what it
