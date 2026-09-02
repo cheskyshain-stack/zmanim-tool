@@ -6643,6 +6643,30 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
 
 let chosen = POSTERS[0].key;
 let chosenSourceId = null;
+// Told to app.js whenever a picker moves, so the choice can go in the address. Held here
+// rather than passed through every redraw, since redrawInPlace calls back in on its own.
+let onRoute = null;
+
+/** Which poster is on screen and, if it is one that can be set either way up, which way.
+ *  app.js writes this into the address so a refresh comes back to the same sheet.
+ *
+ *  The year is deliberately not in it. It defaults to the yomim noraim coming up, which is
+ *  the right answer on a fresh load; carrying a year in the address would mean a link that
+ *  goes stale. */
+function posterRoute() {
+  const poster = POSTERS.find((p) => p.key === chosen);
+  return poster?.orientations ? [chosen, chosenOrientation] : [chosen];
+}
+
+/** The other way: set the pickers from the address. Anything unrecognised is left alone,
+ *  so an old or hand-typed link falls back to the defaults rather than to nothing. */
+function setPosterRoute(parts = []) {
+  const [key, orient] = parts;
+  if (POSTERS.some((p) => p.key === key)) chosen = key;
+  if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
+  chosenSourceId = null;
+  conflictPick = 0;
+}
 // Which way up the one sheet that can go either way is set. Only the pair poster reads it,
 // and it is remembered across a redraw so changing the year does not put it back.
 let chosenOrientation = 'portrait';
@@ -6705,7 +6729,8 @@ function redrawInPlace(container, state) {
   window.scrollTo(0, y);
 }
 
-function renderPosters(container, state) {
+function renderPosters(container, state, routeChanged) {
+  if (routeChanged !== undefined) onRoute = routeChanged;
   const settings = resolveSettings(state.settings);
   const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
   const sources = poster.sources(state, settings);
@@ -6759,6 +6784,7 @@ function renderPosters(container, state) {
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
     conflictPick = 0;
+    onRoute?.();
     again();
   });
   container.querySelector('#poster-source')?.addEventListener('change', (e) => {
@@ -6768,6 +6794,7 @@ function renderPosters(container, state) {
   });
   container.querySelector('#poster-orient')?.addEventListener('change', (e) => {
     chosenOrientation = e.target.value;
+    onRoute?.();
     again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
@@ -9544,6 +9571,53 @@ const tabs = ['generate', 'week', 'posters', 'saved', 'settings', 'calc', 'progr
 // said "Saved Sheets" and the page said "Saved sheets".
 const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', calc: 'Calculations', program: 'Get the program', guide: 'Guide', week: 'This week', posters: 'Posters' };
 
+/* --- The screen you are on, in the address ------------------------------------------
+   Without this the tab was a variable that started at Generate and was never written
+   anywhere, so every refresh threw you back to Generate no matter what you were looking
+   at, and the browser's back button did nothing.
+
+   The hash rather than the History API, because the offline copy runs from file:// where
+   pushState throws and a hash does not. It also means back and forward walk the tabs, and
+   a screen can be linked to.
+
+   The Posters tab puts its poster and, where the poster has one, its Page choice in the
+   address too, since those are what a refresh was losing. Its year is not in there on
+   purpose: it defaults to the yomim noraim coming up, and a year in a link goes stale. */
+const routeTabs = new Set(tabs);
+
+function routeParts() {
+  return location.hash.replace(/^#/, '').split('/').filter(Boolean);
+}
+
+/** What the address should say for what is on screen now. */
+function currentRoute() {
+  return ['', currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].join('/').replace('/', '#');
+}
+
+/** Put it there. Assigning location.hash, so this leaves a history entry and back works. */
+function writeRoute() {
+  const want = currentRoute();
+  if (location.hash !== want) location.hash = want;
+}
+
+/** Take it from there, on load and on back or forward. Returns whether anything moved, so
+ *  the caller can decide whether a redraw is needed. */
+function readRoute() {
+  const [tab, ...rest] = routeParts();
+  if (!routeTabs.has(tab)) return false;
+  const same = tab === currentTab && !currentSheetId
+    && (tab !== 'posters' || rest.join('/') === posterRoute().join('/'));
+  if (same) return false;
+  currentTab = tab;
+  currentSheetId = null;
+  if (tab === 'posters') setPosterRoute(rest);
+  return true;
+}
+
+// Back and forward. Our own writes come back through here too and are recognised as
+// already applied, so they do not cause a second render.
+window.addEventListener('hashchange', () => { if (readRoute()) render(); });
+
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
 // stays a single self-contained folder with no extra assets to load.
@@ -9588,6 +9662,7 @@ function renderNav() {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;
       currentSheetId = null;
+      writeRoute();
       render();
     });
   });
@@ -9719,7 +9794,7 @@ function render() {
       render();
     });
   } else if (currentTab === 'posters') {
-    renderPosters(main, state);
+    renderPosters(main, state, writeRoute);
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {
@@ -9767,6 +9842,9 @@ wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 loadTables()
   .then((t) => {
     tables = t;
+    // Whatever the address says, before anything is drawn, so a refresh comes back to the
+    // screen it was on instead of flashing Generate first.
+    readRoute();
     render();
   })
   .catch((err) => {

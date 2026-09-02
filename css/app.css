@@ -2622,8 +2622,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   --inner-bottom: 0.549in; /* 0.5625in less 1pt */
   /* thin 1.5pt, gap 1.57pt, thick 3pt (w:sz 24), gap 1.57pt, thin 1.5pt = 9.14pt */
   --art: 9.14pt;
-  /* The text starts at the page margin, and the border is outside it. */
-  padding: 0.5in 0.5in 0.5625in;
+  /* The text starts at the page margin, and the border is outside it.
+     The foot is 0.1in deeper than the 0.5625in that would match: the frame's inner face is
+     at --inner-bottom, 0.0135in inside the text box, which is 1px, so the last line of the
+     key was landing on the rule with its descenders across it. Measured at 1px of clearance
+     on all ten sheets before this and 11px after. Taken here rather than as padding under
+     the key, so nothing has a box hanging past the text box and the checks stay honest. */
+  padding: 0.5in 0.5in 0.6625in;
   display: flex; flex-direction: column; align-items: center;
   /* Times New Roman, the face the Word posters were set in. The stack is written by
      posters-view.js through fontStackFor(), the same function the charts use, so the
@@ -2815,7 +2820,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair:has(.poster-sets) .poster-row-label { margin-inline-end: 0.08in; }
 .poster.is-pair:has(.poster-sets) .poster-row-note { margin-inline-start: 0.06in; }
 .poster.is-pair .poster-rows,
-.poster.is-pair .poster-sets { padding: 0.16in 0 0; }
+.poster.is-pair .poster-sets { padding: 0.13in 0 0; }
 .poster.is-pair .poster-rows { display: flex; flex-direction: column; }
 /* The wall charts' header rather than the Word posters', on the sheets that carry two
    schedules. Not a copy of it: the same .page-header / .header-row / .header-center /
@@ -2872,8 +2877,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   display: flex; justify-content: center; align-items: baseline;
   gap: 0.35in; flex-wrap: wrap;
   /* Less air above it than the 0.2in every other sheet gets. This is the one sheet with no
-     height to spare, and at 0.2in the key's own box went 1px past the bottom margin. */
-  padding-top: 0.12in;
+     height to spare: at 0.2in the key's own box went past the bottom margin, and the deeper
+     foot padding the frame needed took another 2px. */
+  padding-top: 0.08in;
 }
 
 .poster-box { border: 1px solid #000; padding: 0.13in 0.14in 0.15in; margin-top: 0.1in; width: 100%; }
@@ -2920,6 +2926,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      two ran together: the boxes above are flex: 1 and stretch to the key, so the last line
      sits hard against it. */
   padding-top: 0.2in;
+  /* And air under the key, which was sitting on the frame. The text box of a poster ends
+     0.0135in inside the frame, which is 1px, so the key's last line was landing on the rule
+     and its descenders crossing it. See .poster's padding below, which is where the room
+     for that comes from. */
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
 

@@ -641,6 +641,30 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
 
 let chosen = POSTERS[0].key;
 let chosenSourceId = null;
+// Told to app.js whenever a picker moves, so the choice can go in the address. Held here
+// rather than passed through every redraw, since redrawInPlace calls back in on its own.
+let onRoute = null;
+
+/** Which poster is on screen and, if it is one that can be set either way up, which way.
+ *  app.js writes this into the address so a refresh comes back to the same sheet.
+ *
+ *  The year is deliberately not in it. It defaults to the yomim noraim coming up, which is
+ *  the right answer on a fresh load; carrying a year in the address would mean a link that
+ *  goes stale. */
+export function posterRoute() {
+  const poster = POSTERS.find((p) => p.key === chosen);
+  return poster?.orientations ? [chosen, chosenOrientation] : [chosen];
+}
+
+/** The other way: set the pickers from the address. Anything unrecognised is left alone,
+ *  so an old or hand-typed link falls back to the defaults rather than to nothing. */
+export function setPosterRoute(parts = []) {
+  const [key, orient] = parts;
+  if (POSTERS.some((p) => p.key === key)) chosen = key;
+  if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
+  chosenSourceId = null;
+  conflictPick = 0;
+}
 // Which way up the one sheet that can go either way is set. Only the pair poster reads it,
 // and it is remembered across a redraw so changing the year does not put it back.
 let chosenOrientation = 'portrait';
@@ -703,7 +727,8 @@ function redrawInPlace(container, state) {
   window.scrollTo(0, y);
 }
 
-export function renderPosters(container, state) {
+export function renderPosters(container, state, routeChanged) {
+  if (routeChanged !== undefined) onRoute = routeChanged;
   const settings = resolveSettings(state.settings);
   const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
   const sources = poster.sources(state, settings);
@@ -757,6 +782,7 @@ export function renderPosters(container, state) {
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
     conflictPick = 0;
+    onRoute?.();
     again();
   });
   container.querySelector('#poster-source')?.addEventListener('change', (e) => {
@@ -766,6 +792,7 @@ export function renderPosters(container, state) {
   });
   container.querySelector('#poster-orient')?.addEventListener('change', (e) => {
     chosenOrientation = e.target.value;
+    onRoute?.();
     again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {

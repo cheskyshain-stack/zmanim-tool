@@ -6,7 +6,7 @@ import { renderSavedSheets } from './ui/saved-sheets-view.js';
 import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
 import { renderProgram } from './ui/program-view.js';
-import { renderPosters } from './ui/posters-view.js';
+import { renderPosters, posterRoute, setPosterRoute } from './ui/posters-view.js';
 import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
@@ -56,6 +56,53 @@ const tabs = ['generate', 'week', 'posters', 'saved', 'settings', 'calc', 'progr
 // said "Saved Sheets" and the page said "Saved sheets".
 const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', calc: 'Calculations', program: 'Get the program', guide: 'Guide', week: 'This week', posters: 'Posters' };
 
+/* --- The screen you are on, in the address ------------------------------------------
+   Without this the tab was a variable that started at Generate and was never written
+   anywhere, so every refresh threw you back to Generate no matter what you were looking
+   at, and the browser's back button did nothing.
+
+   The hash rather than the History API, because the offline copy runs from file:// where
+   pushState throws and a hash does not. It also means back and forward walk the tabs, and
+   a screen can be linked to.
+
+   The Posters tab puts its poster and, where the poster has one, its Page choice in the
+   address too, since those are what a refresh was losing. Its year is not in there on
+   purpose: it defaults to the yomim noraim coming up, and a year in a link goes stale. */
+const routeTabs = new Set(tabs);
+
+function routeParts() {
+  return location.hash.replace(/^#/, '').split('/').filter(Boolean);
+}
+
+/** What the address should say for what is on screen now. */
+function currentRoute() {
+  return ['', currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].join('/').replace('/', '#');
+}
+
+/** Put it there. Assigning location.hash, so this leaves a history entry and back works. */
+function writeRoute() {
+  const want = currentRoute();
+  if (location.hash !== want) location.hash = want;
+}
+
+/** Take it from there, on load and on back or forward. Returns whether anything moved, so
+ *  the caller can decide whether a redraw is needed. */
+function readRoute() {
+  const [tab, ...rest] = routeParts();
+  if (!routeTabs.has(tab)) return false;
+  const same = tab === currentTab && !currentSheetId
+    && (tab !== 'posters' || rest.join('/') === posterRoute().join('/'));
+  if (same) return false;
+  currentTab = tab;
+  currentSheetId = null;
+  if (tab === 'posters') setPosterRoute(rest);
+  return true;
+}
+
+// Back and forward. Our own writes come back through here too and are recognised as
+// already applied, so they do not cause a second render.
+window.addEventListener('hashchange', () => { if (readRoute()) render(); });
+
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
 // stays a single self-contained folder with no extra assets to load.
@@ -100,6 +147,7 @@ function renderNav() {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;
       currentSheetId = null;
+      writeRoute();
       render();
     });
   });
@@ -231,7 +279,7 @@ function render() {
       render();
     });
   } else if (currentTab === 'posters') {
-    renderPosters(main, state);
+    renderPosters(main, state, writeRoute);
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {
@@ -279,6 +327,9 @@ wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 loadTables()
   .then((t) => {
     tables = t;
+    // Whatever the address says, before anything is drawn, so a refresh comes back to the
+    // screen it was on instead of flashing Generate first.
+    readRoute();
     render();
   })
   .catch((err) => {
