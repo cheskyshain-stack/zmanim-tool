@@ -18,6 +18,7 @@ import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos.js';
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
+import { buildYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -137,6 +138,23 @@ const POSTERS = [
     render: renderRoshHashanaPoster,
   },
   {
+    key: 'yomkippur',
+    label: 'יום כיפור',
+    covers: (y) => `${YK_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildYomKippurPoster(y, settings) }),
+      }));
+    },
+    render: renderYomKippurPoster,
+  },
+  {
     key: 'slichos',
     label: 'סליחות',
     covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}`,
@@ -254,7 +272,7 @@ function renderSlichosPoster(poster, settings) {
  *  Same row shape as the סליחות sheet, so the two read alike and share their spacing. A row
  *  with no times is a line of its own (the דרשה announcements), and `extra` carries the
  *  second label-and-time pair that sits on the שחרית line. */
-function rhRow(label, times, extra, sub) {
+function rhRow(label, times, extra, sub, sep = SLASH) {
   // Slash separated, which is how this sheet writes a pair: "9:47 / 9:11" reads as the two
   // reckonings its label just named. The סליחות sheet uses commas, because its times are a
   // list of מנינים rather than one זמן given two ways.
@@ -262,7 +280,7 @@ function rhRow(label, times, extra, sub) {
   // SLASH is the charts' own separator, a slash with a non breaking space each side. A bare
   // slash sets the two times hard against it and they read as one number.
   const t = times.length
-    ? `<bdi class="poster-row-times">${times.map(timeHtml).join(SLASH)}</bdi>` : '';
+    ? `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>` : '';
   const e = extra
     ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
@@ -285,6 +303,39 @@ function renderRoshHashanaPoster(poster, settings) {
       ${poster.blocks.map((b) => `
         <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
+    </div>`;
+  return posterShell(settings, body, poster.legend || [], { dense: true });
+}
+
+/** The יום כיפור sheet: ערב יו"כ, the day, the morning after, and the box of everyday times
+ *  that runs from then until סוכות. Same rows as the ראש השנה sheet, so the two read alike.
+ *
+ *  The box is a rule around three lines, the way it is on the sheets the shul hangs. Its
+ *  מעריב list is ten times long, so the times are allowed to wrap inside it rather than
+ *  being forced onto one line and squeezing the rest of the sheet. */
+function renderYomKippurPoster(poster, settings) {
+  // A row whose times are a list of מנינים is comma separated; a row naming one זמן on two
+  // reckonings keeps the slash. Same split the סליחות and ראש השנה sheets already make.
+  const rows = (lines) => lines.map((ln) =>
+    rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.list ? ', ' : SLASH)).join('');
+  const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
+    + `<span class="poster-row-label">${esc(label)}</span>`
+    + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;
+  const body = `
+    <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="poster-rows is-dense">
+      <h3 class="poster-day" lang="he">${esc(YK_TEXT.erevHeading)}</h3>
+      ${rows(poster.erevLines)}
+      <h3 class="poster-day" lang="he">${esc(YK_TEXT.dayHeading)}</h3>
+      ${rows(poster.dayLines)}
+      <hr class="poster-divider">
+      ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
+      <div class="poster-box">
+        <h3 class="poster-box-head" lang="he">${esc(YK_TEXT.afterHeading)}</h3>
+        ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
+        ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
+        ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
+      </div>
     </div>`;
   return posterShell(settings, body, poster.legend || [], { dense: true });
 }
