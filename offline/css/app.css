@@ -2583,3 +2583,75 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .calc-exact > summary::before { content: '▸ '; }
 .calc-exact[open] > summary::before { content: '▾ '; }
 .calc-exact > p { margin: 0.5rem 0 0; font-size: var(--fs-sm); line-height: 1.6; color: var(--muted); }
+
+/* --- Posters -------------------------------------------------------------------------
+   The sheets the shul hangs that are not the zmanim board. One page, 8.5in by 11in
+   portrait, drawn in the document at its real size the same way a chart page is, so what
+   is on the screen is what leaves the printer and there is no second layout to keep in
+   step with this one.
+
+   The border is the one the Word posters carried: Word calls it thinThickThinMediumGap at
+   3pt, which is a thin rule, a gap, a thick rule, a gap and a thin rule. Three borders
+   cannot go on one box, so it is the page's own outer rule plus an inset ::before for the
+   pair inside it. */
+.poster {
+  position: relative;
+  width: 8.5in; height: 11in;
+  margin: 0 auto;
+  background: #fff;
+  box-sizing: border-box;
+  padding: 0.62in 0.6in 0.5in;
+  display: flex; flex-direction: column; align-items: center;
+  /* Times New Roman, the face the Word posters were set in. The stack is written by
+     posters-view.js through fontStackFor(), the same function the charts use, so the
+     Android fallback is decided in one place: HEBREW_STAND_IN in sheet-view.js. */
+  font-family: var(--poster-font-family, serif);
+  color: #000;
+  border: 1px solid #000;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.poster::before {
+  content: ""; position: absolute; inset: 0.055in;
+  border: 3px solid #000; border-image: none;
+  pointer-events: none;
+}
+.poster::after {
+  content: ""; position: absolute; inset: 0.105in;
+  border: 1px solid #000;
+  pointer-events: none;
+}
+/* The letterhead, wordmark and the barbell rule under it, lifted whole out of the Word
+   poster at 2016px across, which is 3.5 times the wordmark the site uses elsewhere and
+   the reason it holds up at this size on paper. */
+.poster-head { display: block; width: 6.4in; height: auto; margin: 0 auto 0.12in; }
+/* Set against the right margin, under the rule, the way the Word posters have it. In a
+   right-to-left column flex-start is the right-hand edge: flex-end put it on the left. */
+.poster-rabbi {
+  align-self: flex-start; text-align: right;
+  font-size: 11pt; font-weight: 700; line-height: 1.35; margin-bottom: 0.5in;
+}
+.poster-title {
+  font-size: 30pt; font-weight: 700; text-decoration: underline;
+  text-underline-offset: 0.06em; margin: 0 0 0.42in;
+}
+.poster-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.24in; line-height: 1.25; }
+/* The time the whole sheet is about. The one line somebody crosses the room to read. */
+.poster-at { font-size: 26pt; font-weight: 700; margin: 0.1in 0 0; }
+/* The מנחה line sits well below the דרשה, the way the poster on the wall has it: the
+   speech is the notice, the minyanim are the detail underneath. */
+.poster-mincha { font-size: 18pt; font-weight: 700; margin: 0.75in 0 0; }
+.poster-mincha u { text-underline-offset: 0.12em; }
+/* Only the marks this poster actually carries get explained, so it never defines a star it
+   does not use. Pushed to the foot, above the date. */
+/* Left to right, though the poster around it is not. The line is an English sentence with
+   two Hebrew phrases in it, the same one the charts carry, and in a right-to-left block its
+   halves come out in the wrong order. Same reasoning as .cell on the charts. */
+.poster-legend {
+  margin-top: auto; direction: ltr;
+  font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
+}
+
+.poster-bar {
+  display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem;
+}
+.poster-bar label { display: grid; gap: 0.3rem; font-size: var(--fs-sm); font-weight: 600; }

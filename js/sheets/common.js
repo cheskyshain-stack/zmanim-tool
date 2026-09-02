@@ -64,8 +64,12 @@ export function fridayMainMinchaMenu(fridayDate, settings) {
 /** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
  *  Also printed across two lines, split the same way. */
 /** The names the calendar gives שבת שובה, in both languages, since a rule or a sheet may
- *  carry either. See hebrewCalendar's hasSpecialParsha. */
-const SHUVA_NAMES = ['שובה', 'Shuva'];
+ *  carry either. See hebrewCalendar's hasSpecialParsha.
+ *
+ *  Exported because the poster asks the same question, and the offline build flattens every
+ *  module into one scope where a second const of this name is a hard error. One definition
+ *  of what this Shabbos is called. */
+export const SHUVA_NAMES = ['שובה', 'Shuva'];
 
 /** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
  *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */

@@ -174,3 +174,13 @@
    can only be the half on the screen and there is nothing here to hide. An earlier
    version stacked them and needed rules to keep a landscape wall-chart page out of the
    middle of a week's cards. */
+
+/* A poster is 8.5in by 11in portrait, its own named page so it does not fight the wall
+   charts' landscape @page above. Only the poster carries `page: poster`. */
+@page poster { size: letter portrait; margin: 0; }
+@media print {
+  .poster { page: poster; margin: 0; box-shadow: none; break-inside: avoid; }
+  /* Nothing else on the tab reaches paper: the picker and the Print button are no-print
+     already, and the heading above them goes with them. */
+  body:has(.poster) h2.no-print, body:has(.poster) p.hint { display: none !important; }
+}

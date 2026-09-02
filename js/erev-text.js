@@ -47,8 +47,11 @@ const EREV_ALSO_NASHIM = ['plagGra', 'minchaMaariv'];
 
 /** A cell as it is stored is plain text carrying the underline sentinels, but an override
  *  typed by hand is real HTML. Both are flattened to the same thing here: text, newlines,
- *  and the sentinels marking what is underlined. */
-function erevPlain(value) {
+ *  and the sentinels marking what is underlined.
+ *
+ *  Exported because the שבת שובה poster reads the same cells. One reader for both, or the
+ *  poster would drift from the board it is supposed to be quoting. */
+export function erevPlain(value) {
   return String(value ?? '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/?u\b[^>]*>/gi, (tag) => (tag[1] === '/' ? UL_END : UL_START))
@@ -62,7 +65,7 @@ function erevPlain(value) {
 /** Every clock time in a cell, in order, each with whether it was underlined and which
  *  line of the cell it sat on. The line matters because the פלג of a column is written
  *  under its מנחה rather than beside it. */
-function erevTimes(value) {
+export function erevTimes(value) {
   const text = erevPlain(value);
   const out = [];
   let line = 0;
