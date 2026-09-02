@@ -16,7 +16,8 @@
 // keep in step. See .poster in app.css and the @page rule in print.css.
 import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
-import { buildSlichosPoster, SLICHOS_TEXT } from '../posters/slichos.js';
+import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos.js';
+import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -116,6 +117,24 @@ const POSTERS = [
       }));
     },
     render: renderShuvaPoster,
+  },
+  {
+    key: 'roshhashana',
+    label: 'ראש השנה',
+    covers: (y) => `${RH_TEXT.title} ${hebrewYear(y)}`,
+    // ערב ר"ה through the second day, which is every date on the sheet.
+    when: (built) => when(built.span.from, built.span.to),
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildRoshHashanaPoster(y, settings) }),
+      }));
+    },
+    render: renderRoshHashanaPoster,
   },
   {
     key: 'slichos',
@@ -228,6 +247,36 @@ function renderSlichosPoster(poster, settings) {
   const body = `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
     <div class="poster-rows">${rows}</div>`;
   return posterShell(settings, body, poster.legend);
+}
+
+/** The ראש השנה sheet: the ערב ר"ה lines, then a block per day.
+ *
+ *  Same row shape as the סליחות sheet, so the two read alike and share their spacing. A row
+ *  with no times is a line of its own (the דרשה announcements), and `extra` carries the
+ *  second label-and-time pair that sits on the שחרית line. */
+function rhRow(label, times, extra) {
+  // Slash separated, which is how this sheet writes a pair: "9:47/9:11" reads as the two
+  // reckonings its label just named. The סליחות sheet uses commas, because its times are a
+  // list of מנינים rather than one זמן given two ways.
+  const t = times.length
+    ? `<bdi class="poster-row-times">${times.map(timeHtml).join('/')}</bdi>` : '';
+  const e = extra ? `<bdi class="poster-row-note">${esc(extra)}</bdi>` : '';
+  return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${t}${e}</p>`;
+}
+
+function renderRoshHashanaPoster(poster, settings) {
+  const typed = (str) => parseTimes(str);
+  const body = `
+    <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="poster-rows is-dense">
+      ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
+      ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
+      ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
+      ${poster.blocks.map((b) => `
+        <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
+        ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra)).join('')}`).join('')}
+    </div>`;
+  return posterShell(settings, body, poster.legend || []);
 }
 
 let chosen = POSTERS[0].key;

@@ -2692,6 +2692,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   flex: 1; width: 100%;
   padding: 0.16in 0 0.85in;
 }
+/* The יום א' / יום ב' headings inside the ראש השנה sheet, underlined the way they are on
+   the sheets the shul hangs. */
+.poster-day {
+  font-size: 15pt; font-weight: 700; text-decoration: underline;
+  text-underline-offset: 0.06em; margin: 0.1in 0 0; text-align: center;
+}
+/* The ראש השנה sheet carries about twenty two lines where the סליחות one carries eight, so
+   it is set smaller and tighter. Sized by measuring: at 17pt the block ran off the foot of
+   the page. The sheets the shul hangs are set smaller on this one too. */
+.poster-rows.is-dense { padding: 0.06in 0 0.1in; }
+.poster-rows.is-dense .poster-row { font-size: 12pt; line-height: 1.15; }
+.poster-rows.is-dense .poster-day { font-size: 13pt; margin: 0.06in 0 0; }
 .poster-row { margin: 0; font-size: 17pt; font-weight: 700; line-height: 1.3; text-align: center; }
 /* The gap between a label and the times it introduces, on both posters: a plain word space
    runs מנחה straight into the list. margin-inline-end, so in a right-to-left line it opens
