@@ -378,9 +378,9 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '', pairMod = '' } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '' } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${pairMod ? ' ' + pairMod : ''}`
+  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${cornerYear ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
@@ -441,9 +441,8 @@ function renderShuvaPoster(poster, settings) {
  *  the bracket and the time swap ends. Measured rather than reasoned about, the same as
  *  every other bidi decision in this project. */
 /** The סליחות schedule on its own, so the sheet that pairs it with צום גדליה can call it
- *  too. `dense` is what that sheet asks for: the same tighter rows the ראש השנה and
- *  יום כיפור sheets use, since in a column there is half the width to write them across. */
-function slichosBody(poster, { dense = false } = {}) {
+ *  too and the two cannot drift. */
+function slichosBody(poster) {
   const rows = poster.rows.map((r) => `
     <p class="poster-row" lang="he">
       <span class="poster-row-label">${esc(r.label)}</span>
@@ -451,7 +450,7 @@ function slichosBody(poster, { dense = false } = {}) {
       ${r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : ''}
     </p>`).join('');
   return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
-    <div class="poster-rows${dense ? ' is-dense' : ''}">${rows}</div>`;
+    <div class="poster-rows">${rows}</div>`;
 }
 
 function renderSlichosPoster(poster, settings) {
@@ -551,30 +550,20 @@ function renderYomKippurPoster(poster, settings) {
 
 /** Both schedules on one sheet, in two columns, under one letterhead and one key.
  *
- *  Each column is the sheet's own body, so nothing is re-worded here: what is in a column is
- *  exactly what that poster prints on its own page.
+ *  Each column is the sheet's own body, unchanged: the same rows at the same sizes with the
+ *  same spacing as that poster prints on its own page, box and all. Nothing is re-worded,
+ *  re-laid-out or shrunk to fit.
  *
- *  One thing moves, and where it moves to depends on which way up the sheet is. The two
- *  orientations run out of different things: portrait has height to spare and no width,
- *  landscape has width to spare and no height. So the box of everyday times after יו"כ,
- *  which is the biggest single thing on the page, goes wherever the room is.
- *
- *  Portrait puts it across the foot under both columns. In a column its lists of eleven and
- *  ten times had to wrap three deep, which was what held the whole sheet's type down; across
- *  the sheet each line fits on one line, the יום כיפור column is shorter for it, and the
- *  bottom of the page has something to do. Measured: that took portrait from 12pt to 13.5pt.
- *
- *  Landscape leaves it in the יום כיפור column, because there the sheet is already up
- *  against the bottom margin and a full-width strip has to come out of the columns' own
- *  height. Measured the other way round: moving it to the foot cost landscape 11.1pt to 9pt.
- *
- *  The type sizes that go with each are in .poster-pair in app.css. */
+ *  An earlier version did shrink it, and moved the box of everyday times out to the foot on
+ *  the portrait sheet, on the assumption that two schedules could not sit on one page at full
+ *  size. Measured, that was not true: side by side at their own 12pt they leave 153px clear
+ *  at the foot with no row wrapping. The columns and the header are in .poster-pair in
+ *  app.css and there are no type sizes there any more. */
 function renderPairPoster(poster, settings, { landscape = false } = {}) {
   const body = `<div class="poster-pair">
       <div class="poster-pair-col">${rhBody(poster.rh, { year: false })}</div>
-      <div class="poster-pair-col">${ykBody(poster.yk, { box: landscape, year: false })}</div>
-    </div>
-    ${landscape ? '' : `<div class="poster-pair-foot">${ykAfterBox(poster.yk)}</div>`}`;
+      <div class="poster-pair-col">${ykBody(poster.yk, { year: false })}</div>
+    </div>`;
   return posterShell(settings, body, poster.legend || [], {
     dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
   });
@@ -639,20 +628,16 @@ function renderTzomGedaliaPoster(poster, settings) {
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
  *  ראש השנה and יום כיפור one.
  *
- *  Nothing has to move here the way the box did on that sheet: between them these two carry
- *  about a third of what those two do, so both columns fit either way up with room over. The
- *  צום גדליה column keeps its big headed blocks, which is what that sheet is, and the סליחות
- *  column takes the dense rows because half a page is not the width its own sheet has. */
+ *  Same rule: each column is that poster's own body at its own size, with nothing changed
+ *  about either of them. These two carry about a third of what ראש השנה and יום כיפור do, so
+ *  there is room over in both directions. */
 function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
   const body = `<div class="poster-pair">
-      <div class="poster-pair-col">${slichosBody(poster.slichos, { dense: true })}</div>
+      <div class="poster-pair-col">${slichosBody(poster.slichos)}</div>
       <div class="poster-pair-col">${tzomGedaliaBody(poster.tzom)}</div>
     </div>`;
   return posterShell(settings, body, poster.legend || [], {
     dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
-    // Its own size. Between them these two carry about a third of what ראש השנה and
-    // יום כיפור do, so the sheet would be two thirds empty at their size.
-    pairMod: 'is-pair-roomy',
   });
 }
 
