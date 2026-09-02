@@ -2818,7 +2818,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The gaps around the parts of a row are trimmed on that sheet: its rows are a label, a list
    and a note in brackets, which is more to fit across a column than the other sheet has. */
 .poster.is-pair:has(.poster-sets) .poster-row-label { margin-inline-end: 0.08in; }
-.poster.is-pair:has(.poster-sets) .poster-row-note { margin-inline-start: 0.06in; }
 .poster.is-pair .poster-rows,
 .poster.is-pair .poster-sets { padding: 0.13in 0 0; }
 .poster.is-pair .poster-rows { display: flex; flex-direction: column; }
@@ -2901,7 +2900,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    6:20)". It is one time and it is kept whole. The row around it is free to wrap wherever it
    needs to in a narrow column, and does, but the note is never the thing that gets broken:
    split, the day it names ends up on one line and the time on the next. */
-.poster-row-note { margin-inline-start: 0.1in; white-space: nowrap; }
+/* The note in brackets on a סליחות row, the "(יום ה' 6:20)" that says the one day the first
+   מנין moves. It rides inside the run of times, right after the time it is about, so it
+   cannot be carried off on its own when a narrow column wraps the row. Kept whole: split, the
+   day it names ends on one line and the time on the next. */
+.poster-row-note { margin-inline-start: 0.06in; white-space: nowrap; }
 /* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
    of it so it does not run into the first row's time, and it inherits .poster-row-label for
    the gap between its own word and its own time. */

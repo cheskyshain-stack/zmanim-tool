@@ -6443,12 +6443,36 @@ function renderShuvaPoster(poster, settings) {
 /** The סליחות schedule on its own, so the sheet that pairs it with צום גדליה can call it
  *  too and the two cannot drift. */
 function slichosBody(poster) {
-  const rows = poster.rows.map((r) => `
+  const rows = poster.rows.map((r) => {
+    // The note is set against the first time, not at the end of the row, because that is
+    // the time it is about: it names the days the 6:40 is a 6:35. Written last it was the
+    // last thing in the line, which looked right until a half width column wrapped the row
+    // and left it on a line of its own with no label beside it, nearer the row underneath
+    // than the one it belongs to.
+    //
+    // dir="ltr" on the times, said out loud rather than left to a bdi's dir="auto". The
+    // times are digits, which are not strong characters, so auto was picking LTR by default;
+    // with Hebrew now inside the run, the first strong character is the note's and auto would
+    // turn the whole list around. Measured after the change, not assumed.
+    const parts = r.times.map(timeHtml);
+    const note = r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : '';
+    // On the left of the first time, which is the side it has always been on: it says that
+    // מנין runs five minutes earlier on the days it names, so it belongs against that time
+    // and not against the row's last one.
+    //
+    // At the end of the row it landed there by accident rather than by arrangement. The row
+    // is right to left and the times inside it read left to right, so the first time sits at
+    // the far left and anything written after the times ends up just left of it. That held
+    // until a half width column wrapped the row, and then the note went to the foot of the
+    // row instead, on a line with no label, nearer the row underneath than its own. Written
+    // in front of the times it is beside the first one whether the row wraps or not.
+    const inner = note ? `${note} ${parts.join(', ')}` : parts.join(', ');
+    return `
     <p class="poster-row" lang="he">
       <span class="poster-row-label">${esc(r.label)}</span>
-      <bdi class="poster-row-times">${r.times.map(timeHtml).join(', ')}</bdi>
-      ${r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : ''}
-    </p>`).join('');
+      <bdi class="poster-row-times" dir="ltr">${inner}</bdi>
+    </p>`;
+  }).join('');
   return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
     <div class="poster-rows">${rows}</div>`;
 }
