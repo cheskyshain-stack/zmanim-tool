@@ -2722,15 +2722,16 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* Set large. This sheet carries three תפילות and nothing else, so it is read off a wall
    rather than off a table and there is the room for it: about double the יום כיפור
    sheet's type, which has to fit a whole day onto the same page.
-   The size is bounded by the longest line of times. Every year from תשפ"ו to תק"ף was
-   run through buildAfterYomKippur and none puts more than six on a line, so the six slot
-   מנחה is the widest this sheet ever gets. Measured at this size: the three blocks come
-   to 550px of the 615px they have and that מנחה line to 522px of 720. */
+   The ceiling is the longest line of times. Every year from תשפ"ו to תק"ף was run through
+   buildAfterYomKippur and none puts more than six on a line, so the six slot מנחה is the
+   widest this sheet ever gets: at 21pt it measures 378px of the 720px it has, and the
+   three blocks 418px of 615px. Deliberately short of what would fit. The page would take
+   half as much again, and set that large it stopped reading as a schedule. */
 .poster-set-head {
-  font-size: 34pt; font-weight: 700; text-decoration: underline;
-  text-underline-offset: 0.06em; margin: 0 0 0.2in;
+  font-size: 25pt; font-weight: 700; text-decoration: underline;
+  text-underline-offset: 0.06em; margin: 0 0 0.18in;
 }
-.poster-set-line { font-size: 29pt; font-weight: 700; line-height: 1.45; margin: 0; }
+.poster-set-line { font-size: 21pt; font-weight: 700; line-height: 1.5; margin: 0; }
 .poster-set-line u { text-underline-offset: 0.12em; }
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }
