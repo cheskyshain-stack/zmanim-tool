@@ -2763,22 +2763,51 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    What is left here is the two columns, the rule between them, a little more leading down a
    column than a full width page needs, and the header. */
 .poster.is-landscape { width: 11in; height: 8.5in; }
-/* No flex: 1. Letting the columns claim the leftover height put a dead band between them and
-   anything under them; at their natural height the sheet's slack collects in one place at
-   the foot, where .poster-legend's margin-top: auto holds the key against the bottom
-   margin. */
-.poster-pair { display: flex; align-items: flex-start; width: 100%; }
+/* The columns claim the whole height between the header and the key, and stretch to each
+   other, so the rule between them runs the full way down instead of stopping wherever the
+   shorter column happens to end. */
+.poster-pair { display: flex; align-items: stretch; width: 100%; flex: 1; }
 .poster-pair-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; }
 /* A rule between the two, so the eye does not run a ראש השנה row into a יום כיפור one. */
 .poster-pair-col + .poster-pair-col { border-inline-start: 1px solid #000; }
 .poster.is-pair .poster-pair-col { padding-inline: 0.1in; }
-/* A drop more air down a column than the single sheet has. A column is half the width and
-   the same height, so the same rows leave room going spare, and this spends it down the page
-   rather than banking it all at the foot.
-   Portrait only: a landscape sheet is 8.5in tall against 11in and has no room going spare,
-   which is the whole difference between the two below. */
-.poster.is-pair:not(.is-landscape) .poster-rows.is-dense .poster-row { line-height: 1.3; }
-.poster.is-pair:not(.is-landscape) .poster-rows.is-dense .poster-day { margin-top: 0.14in; }
+
+/* --- Filling the sheet ---------------------------------------------------------------
+   A column is half the width of the page the poster was drawn for and the same height, so
+   the same rows leave room going spare, and how much depends on which two schedules and
+   which way up. Rather than leave it banked at the foot it goes into the leading, so the
+   sheet fills.
+
+   One number does it, --pair-lead, the line-height of a row. The space above a section
+   heading rides on it, so a heading keeps its distance from the rows in proportion and the
+   sections do not run together as the lines open up.
+
+   Each of the four is the value that brings the taller of its two columns down to the key,
+   found by stepping it: see the commit for what each one had spare before and after. The
+   צום גדליה column needs nothing here, its blocks already spread themselves over whatever
+   height they are given (.poster-sets, space-around). */
+.poster.is-pair { --pair-lead: 1.75; }
+.poster.is-pair.is-landscape { --pair-lead: 1.15; }
+/* Which pair it is, without a class for it: only the סליחות sheet has a column of headed
+   blocks. Those two schedules are the shorter pair, so they have further to stretch. */
+.poster.is-pair:has(.poster-sets) { --pair-lead: 2.2; }
+.poster.is-pair:has(.poster-sets).is-landscape { --pair-lead: 1.75; }
+.poster.is-pair .poster-row { line-height: var(--pair-lead); }
+.poster.is-pair .poster-rows.is-dense .poster-day { margin-top: calc(var(--pair-lead) * 0.11in); }
+/* Not on the first thing in a column. The יום כיפור column opens with a section heading and
+   the ראש השנה one opens with a plain row, so the heading's own space above it put the two
+   columns' first lines at different heights under their titles and the sheet looked out of
+   true. Measured: 27px against 6px before this, and level after. */
+.poster.is-pair .poster-rows > .poster-day:first-child { margin-top: 0; }
+/* Same again for the other pair, where the two columns are different kinds of box: סליחות is
+   rows and צום גדליה is headed blocks. The blocks spread themselves with space-around, which
+   keeps half a gap above the first one, so that column started 24px lower than its neighbour.
+   space-between puts the first block at the top where a row is, and the two boxes are given
+   the same padding above so both columns open level under their titles. */
+.poster.is-pair .poster-sets { justify-content: space-between; }
+.poster.is-pair .poster-rows,
+.poster.is-pair .poster-sets { padding-top: 0.16in; }
+.poster.is-pair .poster-rows { display: flex; flex-direction: column; }
 /* The wall charts' header rather than the Word posters', on the sheets that carry two
    schedules. Not a copy of it: the same .page-header / .header-row / .header-center /
    .header-logo / .header-subtitle / .header-rabbi rules the charts use, written once, above.
