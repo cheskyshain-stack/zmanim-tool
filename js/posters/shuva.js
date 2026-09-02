@@ -67,9 +67,11 @@ export function buildShuvaPoster(sheet, state, settings) {
   const flat = erevPlain(cell);
   const starred = (t) => /^\s*\*/.test(flat.slice(t.before.length + t.text.length));
 
+  // mark is the same field the סליחות poster carries, so one renderer draws both: '' is
+  // the main בית מדרש, '*' is בעזרת נשים, '**' is באולם השמחות, and למטה is the underline.
   const mincha = found
     .filter((t) => !isDrasha(t))
-    .map((t) => ({ text: t.text, underlined: t.underlined, nashim: starred(t) }));
+    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '' }));
 
   return {
     week,
@@ -78,7 +80,7 @@ export function buildShuvaPoster(sheet, state, settings) {
     // Only the marks that are actually on this poster get explained.
     legend: [
       mincha.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      mincha.some((t) => t.nashim) ? '*בעזרת נשים' : '',
+      mincha.some((t) => t.mark === '*') ? '*בעזרת נשים' : '',
     ].filter(Boolean),
   };
 }

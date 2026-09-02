@@ -2658,13 +2658,34 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    right-to-left column flex-start is the right-hand edge: flex-end put it on the left. */
 .poster-rabbi {
   align-self: flex-start; text-align: right;
-  font-size: 11pt; font-weight: 700; line-height: 1.35; margin-bottom: 0.5in;
+  font-size: 11pt; font-weight: 700; line-height: 1.35; margin-bottom: 0.34in;
 }
 .poster-title {
   font-size: 30pt; font-weight: 700; text-decoration: underline;
   text-underline-offset: 0.06em; margin: 0 0 0.42in;
 }
 .poster-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.24in; line-height: 1.25; }
+/* The year, small in the corner, the way the hand-made סליחות sheets carried it. Set
+   against the far corner of the text area rather than floated into the flow, so it cannot
+   push the letterhead down. */
+.poster-corner {
+  position: absolute; top: 0.62in; inset-inline-start: 0.62in;
+  font-size: 10.5pt; font-weight: 700;
+}
+/* One line per part of the yomim noraim, spread down the sheet the way the hand-made ones
+   are. Measured off a scan of the poster on the wall: its eight rows sit at an even pitch
+   of 0.075 of the page across 0.53 of its height, so they are given the space between the
+   title and the foot rather than a fixed gap, which is also what keeps the sheet looking
+   the same if a row is ever added. */
+.poster-rows {
+  display: flex; flex-direction: column; justify-content: space-between;
+  flex: 1; width: 100%;
+  padding: 0.16in 0 0.3in;
+}
+.poster-row { margin: 0; font-size: 17pt; font-weight: 700; line-height: 1.3; text-align: center; }
+.poster-row-label { margin-inline-end: 0.14in; }
+.poster-row-note { margin-inline-start: 0.1in; }
+.poster-row u { text-underline-offset: 0.12em; }
 /* The time the whole sheet is about. The one line somebody crosses the room to read. */
 .poster-at { font-size: 26pt; font-weight: 700; margin: 0.1in 0 0; }
 /* The מנחה line sits well below the דרשה, the way the poster on the wall has it: the

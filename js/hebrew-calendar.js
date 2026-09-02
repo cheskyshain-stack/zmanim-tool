@@ -106,7 +106,7 @@ function hebrewNumber(n) {
 /** A year in לפרט קטן, the way one is written: the thousands are left off, so 5786 is
  *  תשפ"ו. Spelled in full it would start with fourteen ת's, since the numeral system has
  *  no letter past 400 and hebrewNumber repeats it - which is what this used to print. */
-function hebrewYear(year) {
+export function hebrewYear(year) {
   const small = year % 1000;
   return hebrewNumber(small || year);
 }

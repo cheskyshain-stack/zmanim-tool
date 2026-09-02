@@ -5139,9 +5139,11 @@ function buildShuvaPoster(sheet, state, settings) {
   const flat = erevPlain(cell);
   const starred = (t) => /^\s*\*/.test(flat.slice(t.before.length + t.text.length));
 
+  // mark is the same field the סליחות poster carries, so one renderer draws both: '' is
+  // the main בית מדרש, '*' is בעזרת נשים, '**' is באולם השמחות, and למטה is the underline.
   const mincha = found
     .filter((t) => !isDrasha(t))
-    .map((t) => ({ text: t.text, underlined: t.underlined, nashim: starred(t) }));
+    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '' }));
 
   return {
     week,
@@ -5150,7 +5152,174 @@ function buildShuvaPoster(sheet, state, settings) {
     // Only the marks that are actually on this poster get explained.
     legend: [
       mincha.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      mincha.some((t) => t.nashim) ? '*בעזרת נשים' : '',
+      mincha.some((t) => t.mark === '*') ? '*בעזרת נשים' : '',
+    ].filter(Boolean),
+  };
+}
+
+// ==== posters/slichos.js ====
+// The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
+//
+// The times on it are the shul's own minyan slots and are not on the zmanim board, so
+// unlike the שבת שובה poster there is no cell to read them out of. They are the table
+// below. What is worked out here is the part that was wrong every few years when this was
+// a Word file: which days each line actually covers.
+//
+// Two lines carry a note that the first מנין is five minutes earlier on the days there is
+// קריאת התורה, because the davening runs longer. On the hand-made posters that note was
+// typed as "יום ב' וה'" or "יום ב'" and left alone the next year, and the days it names
+// change with the day ר"ה falls on. So it is computed.
+//
+// The marks are the boards' marks, not the old poster's. The Word posters used * for
+// בעזרת נשים, ** for למטה and *** for אולם השמחות; the app writes plain for the main בית
+// מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
+// is written in the app's system, so somebody holding the poster and the chart is reading
+// one set of marks.
+
+/** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
+const DOW_SUNDAY = 1;
+const DOW_MONDAY = 2;
+const DOW_THURSDAY = 5;
+const DOW_SHABBOS = 7;
+
+/** The days the Torah is read at shacharis, which is why those mornings start earlier.
+ *  Named in the order the note says them. */
+const KRIAS_HATORAH = [
+  { dow: DOW_MONDAY, he: "יום ב'", both: "יום ב'" },
+  { dow: DOW_THURSDAY, he: "יום ה'", both: "וה'" },
+];
+
+/** ר"ה of a Hebrew year, as an Excel serial. roshHashana() takes the year with the 3761
+ *  taken off it, which is how the workbook's own defined name is written. */
+const roshHashanaSerial = (hebrewYearNum) => roshHashana(hebrewYearNum - 3761);
+
+/** The first morning of סליחות.
+ *
+ *  They begin on a Sunday (the מוצ"ש before it is the first night), and if the Sunday
+ *  before ר"ה would leave fewer than four days they begin the Sunday before that. Which
+ *  is why the run is four days in some years and nine in others. */
+function slichosStart(hebrewYearNum) {
+  const erev = roshHashanaSerial(hebrewYearNum) - 1; // 29 אלול
+  let start = erev - (excelWeekday(erev) - DOW_SUNDAY); // the Sunday on or before it
+  if (erev - start + 1 < 4) start -= 7;
+  return start;
+}
+
+/** צום גדליה: 3 תשרי, pushed to the 4th when the 3rd is Shabbos. Returned as a day of
+ *  תשרי rather than a serial, since that is how the days around it are counted here. */
+function tzomGedaliaDay(rh) {
+  return excelWeekday(rh + 2) === DOW_SHABBOS ? 4 : 3;
+}
+
+/** The mornings each of the two multi-day lines covers, as Excel weekdays.
+ *
+ *  סליחות is every סליחות morning after that first Sunday, up to but not including ערב ר"ה,
+ *  which has a line of its own. עשי"ת is 3 to 8 תשרי, less Shabbos and less צום גדליה,
+ *  which also have their own lines, and less ערב יו"כ on the 9th.
+ *
+ *  Both skip Shabbos, which has no weekday shacharis to print. */
+function posterDays(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+
+  const slichos = [];
+  for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
+
+  const tzom = tzomGedaliaDay(rh);
+  const aseres = [];
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    aseres.push(excelWeekday(d));
+  }
+  return { slichos, aseres };
+}
+
+/** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
+ *  and what time the first מנין is on them.
+ *
+ *  Nothing at all if neither falls in the range, which does happen: the four-day סליחות of
+ *  a year ר"ה is on Thursday runs Sunday to Wednesday and never reaches a Thursday, and the
+ *  עשי"ת of a year ר"ה is on Shabbos runs Tuesday to Friday and never reaches a Monday. */
+function kriasHatorahNote(days, time) {
+  if (!time) return '';
+  const hit = KRIAS_HATORAH.filter((d) => days.includes(d.dow));
+  if (!hit.length) return '';
+  // "יום ב' וה'" when both, and each on its own reads as itself.
+  const named = hit.length === 2 ? `${hit[0].both} ${hit[1].both}` : hit[0].he;
+  return `(${named} ${time})`;
+}
+
+/** The poster, line by line, in the order it is hung.
+ *
+ *  `times` is written the way a chart cell is: a plain time is the main בית מדרש, <u> is
+ *  למטה, a trailing * is בעזרת נשים and ** is באולם השמחות. `earlier` is the five-minutes-
+ *  earlier first מנין on a קריאת התורה morning, and `days` says which range decides which
+ *  of those mornings the line actually has.
+ *
+ *  Here rather than in settings, the same as the שבת שובה wording: these are the shul's
+ *  fixed מנין slots and they have not moved in the posters we have. The year's worth of
+ *  it that does change is computed above. */
+const SLICHOS_ROWS = [
+  { label: 'דרשה מאת הרב שליט"א', times: '12:30' },
+  { label: 'סליחות מוצ"ש', times: '12:55' },
+  { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
+  { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
+  { label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  { label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
+  { label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
+  { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+];
+
+const SLICHOS_TEXT = { title: 'סליחות' };
+
+/** One line's times, split into the pieces the poster draws.
+ *
+ *  Reads the same notation a chart cell uses, so a row above can be written the way the
+ *  board writes it: <u> for למטה, a trailing * for בעזרת נשים and ** for באולם השמחות.
+ *  The marks come off the text and become flags, so the view decides how to draw them and
+ *  the foot can count which ones are actually on the sheet. */
+function parseTimes(str) {
+  return String(str ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const underlined = /^<u>.*<\/u>\**$/.test(part);
+      const bare = part.replace(/<\/?u>/g, '');
+      const stars = (bare.match(/\*+$/) || [''])[0];
+      return { text: bare.slice(0, bare.length - stars.length), underlined, mark: stars };
+    });
+}
+
+/** The finished poster for one Hebrew year.
+ *
+ *  The year is the שבת קיץ / שבת חורף year the sheet was generated for. סליחות and עשי"ת
+ *  both sit at the very start of a Hebrew year, so this is the year they belong to. */
+function buildSlichosPoster(hebrewYearNum) {
+  if (!hebrewYearNum) return null;
+  const days = posterDays(hebrewYearNum);
+  const rows = SLICHOS_ROWS.map((row) => ({
+    label: row.label,
+    times: parseTimes(row.times),
+    note: row.days ? kriasHatorahNote(days[row.days], row.earlier) : '',
+  }));
+  const all = rows.flatMap((r) => r.times);
+
+  // Only the marks that are actually on this poster get explained, same as שבת שובה. The
+  // two star notes share a line and sit in the order the printed chart's footer has them.
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  return {
+    hebrewYear: hebrewYearNum,
+    yearLabel: hebrewYear(hebrewYearNum),
+    rows,
+    days,
+    legend: [
+      all.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
+      stars.join(' '),
     ].filter(Boolean),
   };
 }
@@ -5158,13 +5327,22 @@ function buildShuvaPoster(sheet, state, settings) {
 // ==== ui/posters-view.js ====
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
-// One so far, שבת שובה, and the tab is shaped for the others to follow rather than built
-// around the one: pick a poster on the left, it draws on the right, and Print sends what
-// is on the screen. Announcements and the Yom Tov schedules land here next.
+// Two so far, שבת שובה and סליחות, and the tab is shaped for the others to follow rather
+// than built around either: pick a poster, pick what it should be built from, and Print
+// sends what is on the screen. Announcements and the Yom Tov schedules land here next.
+//
+// What a poster is built from differs, so a poster says for itself. שבת שובה comes from a
+// generated sheet, because it reads its times out of that sheet's מנחה cell; סליחות comes
+// from a Hebrew year, because its times are the shul's own fixed מנין slots and what the
+// calendar decides is which days each line covers. Both answer sources(), so the picker
+// does not need to know which kind it is looking at.
 //
 // A poster is a real 8.5in by 11in page in the document, the same way a chart page is, so
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
+
+
+
 
 
 
@@ -5177,15 +5355,47 @@ function buildShuvaPoster(sheet, state, settings) {
  *  serif Hebrew rather than falling back to a sans. */
 const POSTER_FONT = 'Times New Roman';
 
-/** The posters this tab knows how to draw. One entry per poster: what to call it, which
- *  sheets it can come from, and how to build it. */
+/** The Hebrew years to offer the סליחות poster.
+ *
+ *  Every year a sheet has been generated for, plus the year we are in now and the one
+ *  after it, so the poster can be printed before this year's chart exists. סליחות falls in
+ *  the first days of a Hebrew year, so the year on the poster is the year it starts. */
+function posterYears(state) {
+  const now = hebrewDateExtended(excelSerial(new Date())).year;
+  const years = new Set([now, now + 1]);
+  for (const sheet of state.sheets) if (sheet.hebrewYear) years.add(Number(sheet.hebrewYear));
+  return [...years].sort((a, b) => a - b);
+}
+
+/** The posters this tab knows how to draw. One entry per poster: what to call it, what it
+ *  can be built from, and how to draw it. A source is one option in the picker, carrying
+ *  its own build() so this table is the only place that knows what a given poster needs. */
 const POSTERS = [
   {
     key: 'shuva',
     label: 'שבת שובה דרשה',
-    sheetsFor: (state) => state.sheets.filter((s) => shuvaWeekOf(s)),
-    build: buildShuvaPoster,
+    sourceLabel: 'From',
+    empty: 'No generated chart covers שבת שובה yet. Generate the season that holds it and this fills in.',
+    sources: (state, settings) =>
+      state.sheets.filter((s) => shuvaWeekOf(s)).map((s) => ({
+        id: s.id,
+        label: `${s.season} ${s.hebrewYear}`,
+        build: () => buildShuvaPoster(s, state, settings),
+      })),
     render: renderShuvaPoster,
+  },
+  {
+    key: 'slichos',
+    label: 'סליחות',
+    sourceLabel: 'Year',
+    empty: 'No year to build from.',
+    sources: (state) =>
+      posterYears(state).map((y) => ({
+        id: String(y),
+        label: `${hebrewYear(y)} (${y})`,
+        build: () => buildSlichosPoster(y),
+      })),
+    render: renderSlichosPoster,
   },
 ];
 
@@ -5193,31 +5403,62 @@ function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** One time as the boards write it: plain is the main bais medrash, underlined is למטה,
- *  and a * after it is בעזרת נשים. Same three marks as the chart, so somebody reading both
- *  is reading one system. */
+/** One time as the boards write it: plain is the main בית מדרש, underlined is למטה, a
+ *  trailing * is בעזרת נשים and ** is באולם השמחות. The same marks as the chart, so
+ *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
-  const star = t.nashim ? '*' : '';
-  return t.underlined ? `<u>${esc(t.text)}</u>${star}` : `${esc(t.text)}${star}`;
+  const body = t.underlined ? `<u>${esc(t.text)}</u>` : esc(t.text);
+  return `${body}${esc(t.mark || '')}`;
 }
 
-function renderShuvaPoster(poster, settings) {
+/** The page every poster is drawn on: the letterhead, the rabbi's line under it, whatever
+ *  the poster itself puts in the middle, and the key to the marks at the foot.
+ *
+ *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
+ *  the occasion. `corner` is the small line in the top corner, which only the סליחות sheet
+ *  carries (the year, the way the hand-made ones had it). */
+function posterShell(settings, body, { corner = '' } = {}, legend = []) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+    ${corner ? `<div class="poster-corner" lang="he">${esc(corner)}</div>` : ''}
     <img class="poster-head" src="assets/poster-head.png"
          alt="${esc(settings.shulName)}" width="2016" height="451">
     <div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
+    ${body}
+    ${legend.length ? `<div class="poster-legend">${legend.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function renderShuvaPoster(poster, settings) {
+  const body = `
     <h2 class="poster-title" lang="he">${esc(SHUVA_TEXT.title)}</h2>
     ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${esc(l)}</p>`).join('')}
     ${poster.drasha ? `<p class="poster-at" lang="he">${esc(SHUVA_TEXT.at)} <bdi>${esc(poster.drasha)}</bdi></p>` : ''}
     <p class="poster-mincha" lang="he">${esc(SHUVA_TEXT.minchaLabel)}
-      <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>
-    ${poster.legend.length ? `<div class="poster-legend">${poster.legend.map((l) => `<div>${esc(l)}</div>`).join('')}</div>` : ''}
-  </div>`;
+      <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
+  return posterShell(settings, body, {}, poster.legend);
+}
+
+/** The סליחות sheet: one line per part of the yomim noraim, each a label and its מנינים.
+ *
+ *  The times run left to right inside a right-to-left line, so each list is its own <bdi>.
+ *  So is the note in brackets, which is Hebrew with a time inside it: without the isolate
+ *  the bracket and the time swap ends. Measured rather than reasoned about, the same as
+ *  every other bidi decision in this project. */
+function renderSlichosPoster(poster, settings) {
+  const rows = poster.rows.map((r) => `
+    <p class="poster-row" lang="he">
+      <span class="poster-row-label">${esc(r.label)}</span>
+      <bdi class="poster-row-times">${r.times.map(timeHtml).join(', ')}</bdi>
+      ${r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : ''}
+    </p>`).join('');
+  const body = `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
+    <div class="poster-rows">${rows}</div>`;
+  return posterShell(settings, body, { corner: poster.yearLabel }, poster.legend);
 }
 
 let chosen = POSTERS[0].key;
-let chosenSheetId = null;
+let chosenSourceId = null;
 let fitHandler = null;
 
 /** Shrinks the poster until it fits across the screen, which on a phone it does not: the
@@ -5252,40 +5493,38 @@ function fitPoster(container) {
 function renderPosters(container, state) {
   const settings = resolveSettings(state.settings);
   const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
-  const sheets = poster.sheetsFor(state);
-  const sheet = sheets.find((s) => s.id === chosenSheetId) || sheets[0] || null;
-  const built = sheet ? poster.build(sheet, state, settings) : null;
+  const sources = poster.sources(state, settings);
+  const source = sources.find((s) => s.id === chosenSourceId) || sources[0] || null;
+  const built = source ? source.build() : null;
 
   container.className = 'is-sheet-view';
   container.innerHTML = `
     <h2 class="no-print">Posters</h2>
-    <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. The times come off the chart itself, so a poster is right the year it is printed and every year after.</p>
+    <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. What changes with the year is worked out rather than typed, so a poster is right the year it is printed and every year after.</p>
     <div class="poster-bar no-print">
       <label>Poster
         <select id="poster-pick">
           ${POSTERS.map((p) => `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
         </select>
       </label>
-      ${sheets.length > 1
-        ? `<label>From
-             <select id="poster-sheet">
-               ${sheets.map((s) => `<option value="${esc(s.id)}" ${sheet && s.id === sheet.id ? 'selected' : ''}>${esc(s.season)} ${esc(s.hebrewYear)}</option>`).join('')}
+      ${sources.length > 1
+        ? `<label>${esc(poster.sourceLabel)}
+             <select id="poster-source">
+               ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
              </select>
            </label>`
         : ''}
       ${built ? printButtonHtml() : ''}
     </div>
-    ${built
-      ? poster.render(built, settings)
-      : `<p class="hint no-print">No generated chart covers שבת שובה yet. Generate the season that holds it and this fills in.</p>`}`;
+    ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(poster.empty)}</p>`}`;
 
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
-    chosenSheetId = null;
+    chosenSourceId = null;
     renderPosters(container, state);
   });
-  container.querySelector('#poster-sheet')?.addEventListener('change', (e) => {
-    chosenSheetId = e.target.value;
+  container.querySelector('#poster-source')?.addEventListener('change', (e) => {
+    chosenSourceId = e.target.value;
     renderPosters(container, state);
   });
   if (built) {
