@@ -266,6 +266,25 @@ function fitPoster(container) {
   window.addEventListener('resize', fitHandler);
 }
 
+/** Redraw after a picker changed, without throwing the reader back to the top.
+ *
+ *  A redraw replaces the whole tab's markup, and for the moment the container is empty the
+ *  document has no height, so the browser clamps the scroll position to 0 and it never
+ *  comes back. On a desktop this is invisible, because the page is tall enough either way
+ *  that there is nothing to clamp; on a phone the poster is zoomed down to fit and the page
+ *  is short, so changing the poster or the year jumped straight to the top every time.
+ *
+ *  The scroll goes back after the redraw rather than before, since fitPoster runs during it
+ *  and changes the page's height. Focus goes back to the select that was just used, so the
+ *  next arrow key still moves it, and preventScroll keeps that from undoing the restore. */
+function redrawInPlace(container, state) {
+  const y = window.scrollY;
+  const focused = document.activeElement?.id || '';
+  renderPosters(container, state);
+  if (focused) container.querySelector(`#${focused}`)?.focus({ preventScroll: true });
+  window.scrollTo(0, y);
+}
+
 export function renderPosters(container, state) {
   const settings = resolveSettings(state.settings);
   const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
@@ -308,19 +327,20 @@ export function renderPosters(container, state) {
       : ''}
     ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
 
+  const again = () => redrawInPlace(container, state);
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
     conflictPick = 0;
-    renderPosters(container, state);
+    again();
   });
   container.querySelector('#poster-source')?.addEventListener('change', (e) => {
     chosenSourceId = e.target.value;
     conflictPick = 0;
-    renderPosters(container, state);
+    again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
     conflictPick = Number(e.target.value) || 0;
-    renderPosters(container, state);
+    again();
   });
   if (built) {
     wirePrintButton(container);
