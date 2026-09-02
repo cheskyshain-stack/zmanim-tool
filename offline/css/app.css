@@ -2682,13 +2682,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   text-underline-offset: 0.06em; margin: 0 0 0.42in;
 }
 .poster-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.24in; line-height: 1.25; }
-/* The year, small in the corner, the way the hand-made סליחות sheets carried it. Set
-   against the far corner of the text area rather than floated into the flow, so it cannot
-   push the letterhead down. */
-.poster-corner {
-  position: absolute; top: 0.62in; inset-inline-start: 0.62in;
-  font-size: 10.5pt; font-weight: 700;
-}
 /* One line per part of the yomim noraim, spread down the sheet the way the hand-made ones
    are. Measured off a scan of the poster on the wall: its eight rows sit at an even pitch
    of 0.075 of the page across 0.53 of its height, so they are given the space between the

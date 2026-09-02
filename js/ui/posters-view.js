@@ -89,12 +89,10 @@ function timeHtml(t) {
  *  the poster itself puts in the middle, and the key to the marks at the foot.
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
- *  the occasion. `corner` is the small line in the top corner, which only the סליחות sheet
- *  carries (the year, the way the hand-made ones had it). */
-function posterShell(settings, body, { corner = '' } = {}, legend = []) {
+ *  the occasion. */
+function posterShell(settings, body, legend = []) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
-    ${corner ? `<div class="poster-corner" lang="he">${esc(corner)}</div>` : ''}
     <img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
@@ -115,7 +113,7 @@ function renderShuvaPoster(poster, settings) {
     ${poster.drasha ? `<p class="poster-at" lang="he">${esc(SHUVA_TEXT.at)} <bdi>${esc(poster.drasha)}</bdi></p>` : ''}
     <p class="poster-mincha" lang="he">${esc(SHUVA_TEXT.minchaLabel)}
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
-  return posterShell(settings, body, {}, poster.legend);
+  return posterShell(settings, body, poster.legend);
 }
 
 /** The סליחות sheet: one line per part of the yomim noraim, each a label and its מנינים.
@@ -133,7 +131,7 @@ function renderSlichosPoster(poster, settings) {
     </p>`).join('');
   const body = `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
     <div class="poster-rows">${rows}</div>`;
-  return posterShell(settings, body, { corner: poster.yearLabel }, poster.legend);
+  return posterShell(settings, body, poster.legend);
 }
 
 let chosen = POSTERS[0].key;

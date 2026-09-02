@@ -15,7 +15,7 @@
 // מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
 // is written in the app's system, so somebody holding the poster and the chart is reading
 // one set of marks.
-import { roshHashana, excelWeekday, hebrewYear } from '../hebrew-calendar.js';
+import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 
 /** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
 const DOW_SUNDAY = 1;
@@ -161,7 +161,6 @@ export function buildSlichosPoster(hebrewYearNum) {
   if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   return {
     hebrewYear: hebrewYearNum,
-    yearLabel: hebrewYear(hebrewYearNum),
     rows,
     days,
     legend: [
