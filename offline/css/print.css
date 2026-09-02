@@ -185,4 +185,22 @@
   /* Nothing else on the tab reaches paper: the picker and the Print button are no-print
      already, and the heading above them goes with them. */
   body:has(.poster) h2.no-print, body:has(.poster) p.hint { display: none !important; }
+  /* One sheet of paper, and only one.
+     A poster is exactly 8.5in by 11in inside a page box that is exactly 8.5in by 11in, and
+     the shell around it still laid out at the width of the window. Chrome tiles anything
+     wider or taller than the page, so a one page sheet came out as a three page PDF: the
+     sheet, then the slivers to the right of it and under it. Printing hid that and so did
+     every viewer that shows one page at a time, but anything reading the pages separately
+     showed a fragment with no letterhead and no border, which is what happened when one was
+     uploaded elsewhere.
+     Pinning the boxes the poster sits in to the size of the sheet leaves nothing to tile.
+     Measured by counting /Count in the PDF: three pages before, one after. Scoped to
+     :has(.poster) so the charts, which are landscape and print correctly, are untouched. */
+  body:has(.poster),
+  body:has(.poster) .app-shell,
+  body:has(.poster) main {
+    width: 8.5in; height: 11in;
+    margin: 0; padding: 0;
+    overflow: hidden;
+  }
 }
