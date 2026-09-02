@@ -1362,26 +1362,41 @@ function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
    * Underlined like the מנחה before it: both are downstairs, which is what the underline
    * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
    *
-   * Laid out by the same splitLinesInHalf every other week uses, and that is not a detail.
-   * Giving the דרשה a line of its own was tried first and read better, but it made the cell
-   * three lines deep where every other cell on the page is two, and a taller cell is a
-   * taller row: measured in print, that one row went to 71.66px against 61.77px for the
-   * other seven, where the whole page had been dead level. Every row in a chart is the same
-   * height, and it is the sheet on the wall that says so. Five items over two lines is
-   * nothing unusual here either: the week before this one already carries 1:40 and 5:30,
-   * then 6:00, 6:26 and 6:41. */
+   * The דרשה gets a line to itself, in the middle, and is not underlined. It is not a
+   * minyan: the underline on these boards means downstairs (see the footer, "All underlined
+   * מנינים will be בבית מדרש למטה"), and a speech is not somewhere to daven. The מנחה למטה
+   * above it is underlined, because that one is.
+   *
+   * Three lines where every other cell on the page is two. Making the other rows grow to
+   * match was tried and put back: syncHeaderRowHeight pins every row to an even share of
+   * the table, and flooring that share at the tallest row inflated page 1 from 816.95px to
+   * 988.47px, well past the 8.5in sheet. The comment in that function says as much, from an
+   * earlier attempt at the same thing. So this cell sits deeper than its neighbours exactly
+   * as the cell built by hand for 5786 does, which is what has been printing all along.
+   *
+   * Stored as "דרשה 5:15" and it reaches the paper as "5:15 דרשה", the time to the left of
+   * the word. That is not a fault and it is not worth trying to undo: read the way Hebrew
+   * is read, right to left, it says דרשה and then the time, and it is character for
+   * character what the cell built by hand for 5786 already puts on the board.
+   *
+   * The isolate around the pair is what stops it reaching anything else. It earned its
+   * place when the דרשה shared a line with the times: without it every number after the
+   * Hebrew word joined that word's run and the whole line reversed, measured on the chart
+   * as "6:29 / 6:14 / 5:15 דרשה". Alone on its own line there is nothing left to reverse,
+   * and it stays for the day somebody puts it back among the times. */
   const drasha = SHUVA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
-
-  let afternoon;
   if (drasha !== null) {
-    afternoon = [underlineTime(drasha - 30 / 1440), underlineTime(isolate(`דרשה ${formatTime(drasha)}`))];
-  } else {
-    const candidates = [T(5, 30), T(6, 0), T(6, 30)];
-    const gates = [T(17, 30), T(18, 0), T(18, 30)];
-    afternoon = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+    return [
+      `${early}${SLASH}${underlineTime(drasha - 30 / 1440)}`,
+      isolate(`דרשה ${formatTime(drasha)}`),
+      `${formatTime(main)}${SLASH}${late}`,
+    ].join('\n');
   }
 
-  const items = flattenNonEmpty([early, afternoon, formatTime(main), late]);
+  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
+  const gates = [T(17, 30), T(18, 0), T(18, 30)];
+  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+  const items = flattenNonEmpty([early, kept, formatTime(main), late]);
   return splitLinesInHalf(items);
 }
 function floorMin(x) {
