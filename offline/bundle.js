@@ -6109,7 +6109,7 @@ function renderYomKippurPoster(poster, settings) {
       <hr class="poster-divider">
       ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
       <div class="poster-box">
-        <h3 class="poster-box-head" lang="he">${esc(YK_TEXT.afterHeading)}</h3>
+        <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
         ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
         ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
         ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
