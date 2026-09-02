@@ -5149,10 +5149,15 @@ function buildShuvaPoster(sheet, state, settings) {
     week,
     drasha: drasha ? drasha.text : null,
     mincha,
-    // Only the marks that are actually on this poster get explained.
+    // Only the marks that are actually on this poster get explained. Each line says which
+    // direction it has to be set in: the underline line is an English sentence carrying
+    // Hebrew and reads left to right, the star line is Hebrew and reads right to left, and
+    // setting that one the wrong way puts the star at the far end of the line instead of
+    // against the words it marks. Same split as the week card's legend.
     legend: [
-      mincha.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      mincha.some((t) => t.mark === '*') ? '*בעזרת נשים' : '',
+      mincha.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
     ].filter(Boolean),
   };
 }
@@ -5309,6 +5314,12 @@ function buildSlichosPoster(hebrewYearNum) {
 
   // Only the marks that are actually on this poster get explained, same as שבת שובה. The
   // two star notes share a line and sit in the order the printed chart's footer has them.
+  //
+  // Each line carries the direction it has to be set in, because they do not agree. The
+  // underline line is an English sentence with Hebrew in it and is left to right; the star
+  // line is Hebrew and is right to left, and setting it the other way puts the star on the
+  // far side of the phrase instead of against the word it belongs to. Same split as the
+  // week card's legend in week-view.js, and the same as the printed chart's own footer.
   const stars = [];
   if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
   if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
@@ -5318,8 +5329,9 @@ function buildSlichosPoster(hebrewYearNum) {
     rows,
     days,
     legend: [
-      all.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      stars.join(' '),
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
     ].filter(Boolean),
   };
 }
@@ -5421,11 +5433,16 @@ function posterShell(settings, body, { corner = '' } = {}, legend = []) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
     ${corner ? `<div class="poster-corner" lang="he">${esc(corner)}</div>` : ''}
-    <img class="poster-head" src="assets/poster-head.png"
-         alt="${esc(settings.shulName)}" width="2016" height="451">
+    <img class="poster-wordmark" src="assets/logo-text.png"
+         alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
+    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+    <img class="poster-rule" src="assets/poster-rule.png" alt="" width="1897" height="85">
     <div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
     ${body}
-    ${legend.length ? `<div class="poster-legend">${legend.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>` : ''}
+    ${legend.length
+      ? `<div class="poster-legend">${legend
+          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
+      : ''}
   </div>`;
 }
 

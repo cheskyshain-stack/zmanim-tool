@@ -2593,12 +2593,19 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    The border is the one the Word posters carried: Word calls it thinThickThinMediumGap,
    which is a thin rule, a gap, a thick rule, a gap and a thin rule.
 
-   Where it sits comes out of the file itself. The .docx has 0.5in margins (720 twips) top
-   and sides, 0.5625in (810) at the foot, and pgBorders with w:space of 1pt top and bottom
-   and 4pt at the sides. There is no w:offsetFrom, so Word's default of "text" applies and
-   space is measured out from the text rather than in from the paper: the rules are drawn
-   that far outside the margin, and the whole band of them is roughly 0.4in to 0.5in in
-   from the edge of the sheet. --edge-* below is that, per side.
+   Where it sits is anchored on its INNER face, which is the end Word measures from. The
+   .docx has 0.5in margins (720 twips) top and sides, 0.5625in (810) at the foot, and
+   pgBorders with w:space of 1pt top and bottom and 4pt at the sides. There is no
+   w:offsetFrom, so Word's default of "text" applies, and those are Word's own defaults for
+   measuring from text: the border sits that far outside the text, so its inner face is at
+   margin less space, and the band of rules grows outward from there toward the paper.
+
+   Checked against a scan of the poster on the wall, scaled by the letterhead's known
+   6.000in placement rather than by assuming the scan shows the whole sheet (it does not,
+   0.198in of the width is cropped away). Measured on paper: outer face 0.319in from the
+   edge, band 0.127in deep, so the inner face lands at 0.446in. The model above gives
+   0.444in and 0.317in. An earlier version anchored the outer face at 0.403in instead and
+   put the whole band 0.077in too far in, which is what "further from the edge" was.
 
    Three rules will not go on one box. It is a ::before carrying the thick middle rule,
    with an outline for the outer thin one (outline-offset is the gap, and it is the same
@@ -2609,17 +2616,14 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin: 0 auto;
   background: #fff;
   box-sizing: border-box;
-  /* Outer edge of the border art, per side, from the paper. */
-  --edge-top: 0.444in;
-  --edge-side: 0.403in;
-  --edge-bottom: 0.507in;
-  /* How deep the thin-gap-thick-gap-thin band runs from that outer rule inwards. */
-  --art: 0.105in;
-  /* Text clears the innermost rule by about the 4pt Word leaves it. */
-  padding:
-    calc(var(--edge-top) + var(--art) + 0.055in)
-    calc(var(--edge-side) + var(--art) + 0.055in)
-    calc(var(--edge-bottom) + var(--art) + 0.055in);
+  /* Inner face of the border band: the page margin less the space Word leaves the text. */
+  --inner-top: 0.486in;    /* 0.5in less 1pt */
+  --inner-side: 0.444in;   /* 0.5in less 4pt */
+  --inner-bottom: 0.549in; /* 0.5625in less 1pt */
+  /* thin 1.5pt, gap 1.57pt, thick 3pt (w:sz 24), gap 1.57pt, thin 1.5pt = 9.14pt */
+  --art: 9.14pt;
+  /* The text starts at the page margin, and the border is outside it. */
+  padding: 0.5in 0.5in 0.5625in;
   display: flex; flex-direction: column; align-items: center;
   /* Times New Roman, the face the Word posters were set in. The stack is written by
      posters-view.js through fontStackFor(), the same function the charts use, so the
@@ -2630,30 +2634,43 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      tells the page apart from the app behind it on screen. */
   box-shadow: 0 1px 3px rgba(0,0,0,0.18);
 }
-/* The thick middle rule, with the outer thin one hung off it as an outline. */
+/* The thick middle rule, with the outer thin one hung off it as an outline. Insets are
+   measured from the inner face outwards, and the whole band has to be counted to get here:
+   the inner thin rule is 1.5pt, then a 1.57pt gap, then this one, so its outer edge is
+   6.07pt short of the inner face. Leaving the inner rule's own 1.5pt out of that sum put
+   this rule hard against it and the two printed as one 4.5pt bar. */
 .poster::before {
   content: ""; position: absolute;
   inset:
-    calc(var(--edge-top) + 0.055in)
-    calc(var(--edge-side) + 0.055in)
-    calc(var(--edge-bottom) + 0.055in);
-  border: 3px solid #000; border-image: none;
-  outline: 1px solid #000; outline-offset: 0.055in;
+    calc(var(--inner-top) - 6.07pt)
+    calc(var(--inner-side) - 6.07pt)
+    calc(var(--inner-bottom) - 6.07pt);
+  border: 3pt solid #000; border-image: none;
+  outline: 1.5pt solid #000; outline-offset: 1.57pt;
   pointer-events: none;
 }
 .poster::after {
   content: ""; position: absolute;
   inset:
-    calc(var(--edge-top) + var(--art))
-    calc(var(--edge-side) + var(--art))
-    calc(var(--edge-bottom) + var(--art));
-  border: 1px solid #000;
+    calc(var(--inner-top) - 1.5pt)
+    calc(var(--inner-side) - 1.5pt)
+    calc(var(--inner-bottom) - 1.5pt);
+  border: 1.5pt solid #000;
   pointer-events: none;
 }
-/* The letterhead, wordmark and the barbell rule under it, lifted whole out of the Word
-   poster at 2016px across, which is 3.5 times the wordmark the site uses elsewhere and
-   the reason it holds up at this size on paper. */
-.poster-head { display: block; width: 6.4in; height: auto; margin: 0 auto 0.12in; }
+/* The letterhead, built the way the Word file builds it rather than as one picture.
+   The artwork has a subtitle baked into it that reads לקוואוד קאמאנז, and Word covers that
+   up with a floating text box saying ליקוואוד קאמענס: the yud and the spelling of the second
+   word. Using the picture whole put the old spelling on the poster. So the name is set as
+   text, from settings.headerSubtitle, which already holds the right one and is the same
+   string the charts print.
+
+   Sizes are the artwork's own, at the 6.000in the .docx places it at (wp:extent 5486400
+   EMU), so the ink lands where it does on the sheet: the wordmark is 4.196in of ink and the
+   rule 5.586in, and each file's padding is scaled back out of that. */
+.poster-wordmark { display: block; width: 5.285in; height: auto; margin: 0 auto; }
+.poster-subtitle { font-size: 14pt; font-weight: 700; margin: 0.11in 0 0.02in; }
+.poster-rule { display: block; width: 5.646in; height: auto; margin: 0 auto 0.12in; }
 /* Set against the right margin, under the rule, the way the Word posters have it. In a
    right-to-left column flex-start is the right-hand edge: flex-end put it on the left. */
 .poster-rabbi {
@@ -2680,7 +2697,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster-rows {
   display: flex; flex-direction: column; justify-content: space-between;
   flex: 1; width: 100%;
-  padding: 0.16in 0 0.3in;
+  padding: 0.16in 0 0.85in;
 }
 .poster-row { margin: 0; font-size: 17pt; font-weight: 700; line-height: 1.3; text-align: center; }
 .poster-row-label { margin-inline-end: 0.14in; }
@@ -2694,11 +2711,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster-mincha u { text-underline-offset: 0.12em; }
 /* Only the marks this poster actually carries get explained, so it never defines a star it
    does not use. Pushed to the foot, above the date. */
-/* Left to right, though the poster around it is not. The line is an English sentence with
-   two Hebrew phrases in it, the same one the charts carry, and in a right-to-left block its
-   halves come out in the wrong order. Same reasoning as .cell on the charts. */
+/* Each line sets its own direction, written on it by the builder, because the two lines do
+   not agree: the underline line is an English sentence carrying Hebrew and reads left to
+   right, the star line is Hebrew and reads right to left. Forcing the whole block one way
+   put the star at the far end of its line instead of against the words it marks. Same split
+   as the week card's legend, and as the printed chart's own footer. */
 .poster-legend {
-  margin-top: auto; direction: ltr;
+  margin-top: auto;
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
 

@@ -77,10 +77,15 @@ export function buildShuvaPoster(sheet, state, settings) {
     week,
     drasha: drasha ? drasha.text : null,
     mincha,
-    // Only the marks that are actually on this poster get explained.
+    // Only the marks that are actually on this poster get explained. Each line says which
+    // direction it has to be set in: the underline line is an English sentence carrying
+    // Hebrew and reads left to right, the star line is Hebrew and reads right to left, and
+    // setting that one the wrong way puts the star at the far end of the line instead of
+    // against the words it marks. Same split as the week card's legend.
     legend: [
-      mincha.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      mincha.some((t) => t.mark === '*') ? '*בעזרת נשים' : '',
+      mincha.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
     ].filter(Boolean),
   };
 }

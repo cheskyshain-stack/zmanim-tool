@@ -150,6 +150,12 @@ export function buildSlichosPoster(hebrewYearNum) {
 
   // Only the marks that are actually on this poster get explained, same as שבת שובה. The
   // two star notes share a line and sit in the order the printed chart's footer has them.
+  //
+  // Each line carries the direction it has to be set in, because they do not agree. The
+  // underline line is an English sentence with Hebrew in it and is left to right; the star
+  // line is Hebrew and is right to left, and setting it the other way puts the star on the
+  // far side of the phrase instead of against the word it belongs to. Same split as the
+  // week card's legend in week-view.js, and the same as the printed chart's own footer.
   const stars = [];
   if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
   if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
@@ -159,8 +165,9 @@ export function buildSlichosPoster(hebrewYearNum) {
     rows,
     days,
     legend: [
-      all.some((t) => t.underlined) ? 'All underlined מנינים will be בבית מדרש למטה' : '',
-      stars.join(' '),
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
     ].filter(Boolean),
   };
 }

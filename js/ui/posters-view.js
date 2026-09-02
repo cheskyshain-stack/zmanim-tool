@@ -95,11 +95,16 @@ function posterShell(settings, body, { corner = '' } = {}, legend = []) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
     ${corner ? `<div class="poster-corner" lang="he">${esc(corner)}</div>` : ''}
-    <img class="poster-head" src="/assets/poster-head.png"
-         alt="${esc(settings.shulName)}" width="2016" height="451">
+    <img class="poster-wordmark" src="/assets/logo-text.png"
+         alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
+    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+    <img class="poster-rule" src="/assets/poster-rule.png" alt="" width="1897" height="85">
     <div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
     ${body}
-    ${legend.length ? `<div class="poster-legend">${legend.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>` : ''}
+    ${legend.length
+      ? `<div class="poster-legend">${legend
+          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
+      : ''}
   </div>`;
 }
 
