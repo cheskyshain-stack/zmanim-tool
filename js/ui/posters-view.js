@@ -20,6 +20,7 @@ import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
+import { buildPairPoster } from '../posters/pair.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -174,6 +175,26 @@ const POSTERS = [
     render: renderYomKippurPoster,
   },
   {
+    key: 'pair',
+    label: 'ראש השנה ויום כיפור על דף אחד',
+    covers: (y) => `${RH_TEXT.title} ${YK_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    // The one sheet that can be set either way up, so the tab shows an orientation picker
+    // for it and hands the choice to the renderer.
+    orientations: true,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildPairPoster(y, settings) }),
+      }));
+    },
+    render: renderPairPoster,
+  },
+  {
     key: 'afteryk',
     label: 'Starting after יום כיפור',
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
@@ -259,9 +280,10 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  return `<div class="poster${dense ? ' is-dense' : ''}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${landscape ? ' is-landscape' : ''}`;
+  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
     <img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
@@ -328,9 +350,11 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
   return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${b}${t}${e}</p>`;
 }
 
-function renderRoshHashanaPoster(poster, settings) {
+/** The ראש השנה schedule itself, title and all, without the page around it. Split out so the
+ *  sheet that carries both schedules can call it too and the two cannot drift. */
+function rhBody(poster) {
   const typed = (str) => parseTimes(str);
-  const body = `
+  return `
     <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
     <div class="poster-rows is-dense">
       ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
@@ -340,7 +364,10 @@ function renderRoshHashanaPoster(poster, settings) {
         <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
     </div>`;
-  return posterShell(settings, body, poster.legend || [], { dense: true });
+}
+
+function renderRoshHashanaPoster(poster, settings) {
+  return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
 }
 
 /** The יום כיפור sheet: ערב יו"כ, the day, the morning after, and the box of everyday times
@@ -349,15 +376,30 @@ function renderRoshHashanaPoster(poster, settings) {
  *  The box is a rule around three lines, the way it is on the sheets the shul hangs. Its
  *  מעריב list is ten times long, so the times are allowed to wrap inside it rather than
  *  being forced onto one line and squeezing the rest of the sheet. */
-function renderYomKippurPoster(poster, settings) {
+/** The box of everyday times that runs from after יו"כ until סוכות.
+ *
+ *  Its own function because it does not always sit in the same place: at the foot of the
+ *  יום כיפור column on that sheet, and across the width of the sheet that carries both
+ *  schedules. Same three lines either way. */
+function ykAfterBox(poster) {
+  const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
+    + `<span class="poster-row-label">${esc(label)}</span>`
+    + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;
+  return `<div class="poster-box">
+        <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
+        ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
+        ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
+        ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
+      </div>`;
+}
+
+/** The יום כיפור schedule, with or without that box under it. */
+function ykBody(poster, { box = true } = {}) {
   // A row whose times are a list of מנינים is comma separated; a row naming one זמן on two
   // reckonings keeps the slash. Same split the סליחות and ראש השנה sheets already make.
   const rows = (lines) => lines.map((ln) =>
     rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
-  const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
-    + `<span class="poster-row-label">${esc(label)}</span>`
-    + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;
-  const body = `
+  return `
     <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)} ${esc(hebrewYear(poster.hebrewYear))}</h2>
     <div class="poster-rows is-dense">
       <h3 class="poster-day" lang="he">${esc(YK_TEXT.erevHeading)}</h3>
@@ -366,14 +408,41 @@ function renderYomKippurPoster(poster, settings) {
       ${rows(poster.dayLines)}
       <hr class="poster-divider">
       ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
-      <div class="poster-box">
-        <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
-        ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
-        ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
-        ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
-      </div>
+      ${box ? ykAfterBox(poster) : ''}
     </div>`;
-  return posterShell(settings, body, poster.legend || [], { dense: true });
+}
+
+function renderYomKippurPoster(poster, settings) {
+  return posterShell(settings, ykBody(poster), poster.legend || [], { dense: true });
+}
+
+/** Both schedules on one sheet, in two columns, under one letterhead and one key.
+ *
+ *  Each column is the sheet's own body, so nothing is re-worded here: what is in a column is
+ *  exactly what that poster prints on its own page.
+ *
+ *  One thing moves, and where it moves to depends on which way up the sheet is. The two
+ *  orientations run out of different things: portrait has height to spare and no width,
+ *  landscape has width to spare and no height. So the box of everyday times after יו"כ,
+ *  which is the biggest single thing on the page, goes wherever the room is.
+ *
+ *  Portrait puts it across the foot under both columns. In a column its lists of eleven and
+ *  ten times had to wrap three deep, which was what held the whole sheet's type down; across
+ *  the sheet each line fits on one line, the יום כיפור column is shorter for it, and the
+ *  bottom of the page has something to do. Measured: that took portrait from 12pt to 13.5pt.
+ *
+ *  Landscape leaves it in the יום כיפור column, because there the sheet is already up
+ *  against the bottom margin and a full-width strip has to come out of the columns' own
+ *  height. Measured the other way round: moving it to the foot cost landscape 11.1pt to 9pt.
+ *
+ *  The type sizes that go with each are in .poster-pair in app.css. */
+function renderPairPoster(poster, settings, { landscape = false } = {}) {
+  const body = `<div class="poster-pair">
+      <div class="poster-pair-col">${rhBody(poster.rh)}</div>
+      <div class="poster-pair-col">${ykBody(poster.yk, { box: landscape })}</div>
+    </div>
+    ${landscape ? '' : `<div class="poster-pair-foot">${ykAfterBox(poster.yk)}</div>`}`;
+  return posterShell(settings, body, poster.legend || [], { dense: true, pair: true, landscape });
 }
 
 /** The everyday schedule from after יו"כ to סוכות, given a sheet of its own.
@@ -431,6 +500,9 @@ function renderTzomGedaliaPoster(poster, settings) {
 
 let chosen = POSTERS[0].key;
 let chosenSourceId = null;
+// Which way up the one sheet that can go either way is set. Only the pair poster reads it,
+// and it is remembered across a redraw so changing the year does not put it back.
+let chosenOrientation = 'portrait';
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -510,6 +582,12 @@ export function renderPosters(container, state) {
           ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
         </select>
       </label>
+      ${poster.orientations ? `<label>Page
+        <select id="poster-orient">
+          <option value="portrait" ${chosenOrientation === 'portrait' ? 'selected' : ''}>Portrait</option>
+          <option value="landscape" ${chosenOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
+        </select>
+      </label>` : ''}
       ${built ? printButtonHtml() : ''}
     </div>
     ${built ? (() => { const w = poster.when(built); return `
@@ -524,7 +602,9 @@ export function renderPosters(container, state) {
              ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(chartLabel(b.sheet))}</option>`).join('')}
            </select></p>`
       : ''}
-    ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
+    ${built
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
+      : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
 
   const again = () => redrawInPlace(container, state);
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
@@ -535,6 +615,10 @@ export function renderPosters(container, state) {
   container.querySelector('#poster-source')?.addEventListener('change', (e) => {
     chosenSourceId = e.target.value;
     conflictPick = 0;
+    again();
+  });
+  container.querySelector('#poster-orient')?.addEventListener('change', (e) => {
+    chosenOrientation = e.target.value;
     again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {

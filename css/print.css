@@ -178,7 +178,12 @@
 /* A poster is 8.5in by 11in portrait, its own named page so it does not fight the wall
    charts' landscape @page above. Only the poster carries `page: poster`. */
 @page poster { size: letter portrait; margin: 0; }
+/* The one sheet that can be set the other way up: ראש השנה and יום כיפור together. Its own
+   named page, because @page poster above is portrait and a landscape sheet asked to print on
+   it comes out scaled down inside a portrait box. */
+@page posterland { size: letter landscape; margin: 0; }
 @media print {
+  .poster.is-landscape { page: posterland; }
   /* zoom back to 1, the same guard .pages carries: a phone shrinks the poster on screen so
      it fits across the display, and that must never reach paper. */
   .poster { page: poster; margin: 0; box-shadow: none; break-inside: avoid; zoom: 1 !important; }
@@ -202,5 +207,12 @@
     width: 8.5in; height: 11in;
     margin: 0; padding: 0;
     overflow: hidden;
+  }
+  /* Same again for the landscape sheet, the other way round. One class more specific than
+     the rule above, so it wins wherever it applies and the portrait rule is left alone. */
+  body:has(.poster.is-landscape),
+  body:has(.poster.is-landscape) .app-shell,
+  body:has(.poster.is-landscape) main {
+    width: 11in; height: 8.5in;
   }
 }

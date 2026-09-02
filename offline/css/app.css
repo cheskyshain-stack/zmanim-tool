@@ -2739,6 +2739,89 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }
 
+/* --- ראש השנה and יום כיפור on one sheet --------------------------------------------
+   Two columns, each holding exactly what that poster prints on its own page. The sheet can
+   be set either way up, so there are two sets of sizes here rather than one: the columns
+   are about 3.6in wide on a portrait sheet and 4.9in on a landscape one, and a size that
+   fits the narrow one wastes the wide one.
+
+   The type is smaller than the single sheets' either way, because two schedules that each
+   fill a page have to. Everything below was measured against both years' longest rows, not
+   guessed: see the commit for the numbers. */
+.poster.is-landscape { width: 11in; height: 8.5in; }
+/* No flex: 1. Letting the columns claim the leftover height put a two inch dead band between
+   them and the box at the foot; sitting at their natural height, whatever slack the sheet has
+   collects in one place under the box, where .poster-legend's margin-top: auto holds the key
+   against the bottom margin. */
+.poster-pair { display: flex; align-items: flex-start; width: 100%; }
+.poster-pair-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+/* A rule between the two, so the eye does not run a ראש השנה row into a יום כיפור one. */
+.poster-pair-col + .poster-pair-col { border-inline-start: 1px solid #000; }
+.poster.is-pair .poster-pair-col { padding-inline: 0.1in; }
+/* The letterhead is the sheet's rather than a column's, and it is set smaller here than on
+   a single sheet. It has to be: this page is carrying two schedules and the letterhead is
+   what they are competing with. On the portrait sheet the limit is the width of a column,
+   on the landscape one it is the height, and the letterhead takes from both. Same artwork,
+   same proportions, just smaller. */
+.poster.is-pair .poster-wordmark { width: 3.9in; }
+.poster.is-pair .poster-subtitle { font-size: 11.5pt; margin: 0.07in 0 0.01in; }
+.poster.is-pair .poster-rule { width: 4.17in; margin-bottom: 0.07in; }
+.poster.is-pair .poster-rabbi { font-size: 9.5pt; margin-bottom: 0.1in; }
+/* Smaller again on the landscape sheet, which is the one short of height. Every tenth of an
+   inch the letterhead gives up here is a tenth the two columns get. */
+.poster.is-pair.is-landscape .poster-wordmark { width: 3.2in; }
+.poster.is-pair.is-landscape .poster-subtitle { font-size: 10pt; margin: 0.05in 0 0.01in; }
+.poster.is-pair.is-landscape .poster-rule { width: 3.42in; margin-bottom: 0.05in; }
+.poster.is-pair.is-landscape .poster-rabbi { font-size: 9pt; margin-bottom: 0.07in; }
+
+/* One number sets the whole sheet, --pair-row, and everything on it is written as a
+   multiple of that. So finding the size is finding one number, and the proportions between
+   a day heading, a row and the box cannot drift while it is being tuned. The vertical gaps
+   are in em for the same reason: they grow with the type instead of being re-picked.
+   The two orientations then differ only in that number. */
+   Measured by stepping that number until something gave, on all three years and on both
+   shapes the ראש השנה sheet takes (first day Shabbos and not).
+
+   Portrait comes out bigger than landscape, which is the opposite of what it looks like it
+   should be. With the box moved to the foot (see renderPairPoster) it is the height that
+   caps portrait, and 13pt leaves 44px clear on the tightest of the three years, where 13.5pt
+   leaves 16px and 14pt runs over. So 13pt: a size up from the 12pt the single sheets set
+   their rows at, with room for a year that runs a row or two longer. One list, the שחרית
+   יום ג', breaks over two lines at that size, which is what the box rows do on the single
+   sheet as well.
+
+   Landscape has the width but not the height. 11pt leaves 31px clear and 12pt runs over.
+   That 31px is only there because the letterhead is smaller again on this one. */
+.poster.is-pair { --pair-row: 13pt; }
+.poster.is-pair.is-landscape { --pair-row: 11pt; }
+.poster.is-pair .poster-title { font-size: calc(2.1 * var(--pair-row)); margin: 0 0 0.5em; }
+.poster.is-pair .poster-rows.is-dense { padding: 0; }
+.poster.is-pair .poster-rows.is-dense .poster-row { font-size: var(--pair-row); line-height: 1.16; }
+.poster.is-pair .poster-rows.is-dense .poster-day {
+  font-size: calc(1.32 * var(--pair-row)); margin: 0.42em 0 0.06em;
+}
+.poster.is-pair .poster-row-label { margin-inline-end: 0.7em; }
+.poster.is-pair .poster-row-second { margin-inline-start: 1.2em; }
+.poster.is-pair .poster-divider { width: 1.6in; margin: 0.4em auto 0.25em; }
+/* The box of everyday times after יו"כ. On the portrait sheet it is across the foot under
+   both columns, where its three lists each fit on one line and it can be set at the size of
+   a row. On the landscape sheet it stays in the יום כיפור column, where it has to be smaller
+   and its lists wrap, the same as on the single יום כיפור sheet. See renderPairPoster for
+   why the two differ. */
+.poster-pair-foot { width: 100%; }
+.poster.is-pair .poster-pair-foot .poster-box {
+  padding: 0.45em 0.7em 0.55em; margin-top: 0.5em; width: 100%;
+}
+.poster.is-pair .poster-pair-foot .poster-box-head { font-size: calc(1.05 * var(--pair-row)); }
+.poster.is-pair .poster-pair-foot .poster-box-row {
+  font-size: var(--pair-row) !important; margin-top: 0.2em;
+}
+.poster.is-pair .poster-pair-col .poster-box { padding: 0.5em 0.6em 0.6em; margin-top: 0.5em; }
+.poster.is-pair .poster-box-head { font-size: var(--pair-row); margin-bottom: 0.35em; }
+.poster.is-pair .poster-box-row {
+  font-size: calc(0.86 * var(--pair-row)) !important; line-height: 1.3 !important; margin-top: 0.3em;
+}
+
 .poster-box { border: 1px solid #000; padding: 0.13in 0.14in 0.15in; margin-top: 0.1in; width: 100%; }
 .poster-box-head {
   font-size: 11.5pt; font-weight: 700; text-decoration: underline;
