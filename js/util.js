@@ -6,6 +6,20 @@
 export const NBSP = ' ';
 export const SLASH = `${NBSP}/${NBSP}`;
 
+/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
+   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
+   <bdi> does, in characters rather than markup: these strings are escaped on their way into
+   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
+   where a tag would be wrong and these are simply invisible.
+
+   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
+   every number after the Hebrew word joins its run and the whole line reverses: measured on
+   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
+   order on a board people read a time off. */
+export const ISO_START = '\u2066';
+export const ISO_END = '\u2069';
+export const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
+
 /* The days of the week as the boards name them, Sunday first so it indexes straight off
    excelWeekday less one. Here rather than in either of the two files that want it, which
    had a copy each: the offline build flattens every module into one scope and two consts

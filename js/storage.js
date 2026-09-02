@@ -56,16 +56,24 @@ const DRASHA_RULES = [
     mode: 'append',
     value: 'דרשה',
   },
-  {
-    id: 'rule-shabbos-shuva',
-    name: 'שבת שובה: דרשה',
-    enabled: true,
-    condition: { specialParsha: ['שובה', 'Shuva'] },
-    columnKeys: ['kayitz:C', 'choref:C'],
-    mode: 'append',
-    value: 'דרשה',
-  },
 ];
+
+/** The שבת שובה rule that used to sit beside שבת הגדול above.
+ *
+ *  It appended the bare word "דרשה" and nothing else, so the time had to be typed into the
+ *  cell by hand every year. The דרשה is now worked out in the sheet itself, an hour before
+ *  the מנחה that is 45 minutes before שקיעה, with its מנחה למטה half an hour before that
+ *  (see shabbosMinchaMenu in sheets/common.js). Leaving the rule in place would append a
+ *  second, wordless "דרשה" underneath the computed one.
+ *
+ *  Removed only where it is still exactly as it was seeded. Somebody who edited theirs
+ *  meant something by it, and this quietly deleting that is worse than a duplicate they
+ *  can see and remove. */
+const RETIRED_SHUVA_RULE = {
+  id: 'rule-shabbos-shuva',
+  mode: 'append',
+  value: 'דרשה',
+};
 
 /** True if some rule already covers the same special Shabbos. These two were hand-made
  *  before they were seeded, so on the browser they were made in they exist under their
@@ -82,6 +90,12 @@ function applySeeds(state) {
       if (!alreadyCovered(state.rules, rule)) state.rules.push({ ...rule });
     }
     seeded.drashos = true;
+  }
+  if (!seeded.shuvaComputed) {
+    state.rules = state.rules.filter(
+      (r) => !(r.id === RETIRED_SHUVA_RULE.id && r.mode === RETIRED_SHUVA_RULE.mode && r.value === RETIRED_SHUVA_RULE.value)
+    );
+    seeded.shuvaComputed = true;
   }
   if (!seeded.tishaBav) {
     if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });

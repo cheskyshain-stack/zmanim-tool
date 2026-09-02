@@ -4,7 +4,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { formatTime, underlineTime, ceilToMinute } from '../format.js';
-import { flattenNonEmpty, splitLinesInHalf, NBSP, SLASH } from '../util.js';
+import { flattenNonEmpty, splitLinesInHalf, isolate, NBSP, SLASH } from '../util.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
@@ -63,19 +63,59 @@ export function fridayMainMinchaMenu(fridayDate, settings) {
 
 /** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
  *  Also printed across two lines, split the same way. */
-export function shabbosMinchaMenu(shabbosDate, settings) {
+/** The names the calendar gives שבת שובה, in both languages, since a rule or a sheet may
+ *  carry either. See hebrewCalendar's hasSpecialParsha. */
+const SHUVA_NAMES = ['שובה', 'Shuva'];
+
+/** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
+ *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */
+function roundTo5(dayFraction) {
+  return Math.round(dayFraction * 288) / 288; // 288 = 1440 minutes / 5
+}
+
+export function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
   const sunsetVal = Z.sunset(shabbosDate, settings);
-  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
-  const gates = [T(17, 30), T(18, 0), T(18, 30)];
-  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
-  const items = flattenNonEmpty([
-    Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20',
-    kept,
-    // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
-    // ceilToMinute matches that.
-    formatTime(Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0))),
-    underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30))),
-  ]);
+  const early = Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20';
+  // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
+  // ceilToMinute matches that.
+  const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
+  const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
+
+  /* שבת שובה: the דרשה, and the מנחה that goes with it.
+   *
+   * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
+   * itself, because that is the minyan the דרשה is timed against: an hour before it, to
+   * the nearest 5, and the מנחה למטה half an hour before that. So the whole afternoon
+   * moves with the season, as it should, and no one has to retype it each year.
+   *
+   * The afternoon minyanim the other weeks carry (5:30, 6:00, 6:30) are not here. The
+   * מנחה למטה is what happens instead of them on this Shabbos, which is what the sheet
+   * that was built by hand for 5786 says: 1:40 and 4:45, then the דרשה, then 6:14 and
+   * 6:29, with no 5:30.
+   *
+   * Underlined like the מנחה before it: both are downstairs, which is what the underline
+   * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
+   *
+   * Laid out by the same splitLinesInHalf every other week uses, and that is not a detail.
+   * Giving the דרשה a line of its own was tried first and read better, but it made the cell
+   * three lines deep where every other cell on the page is two, and a taller cell is a
+   * taller row: measured in print, that one row went to 71.66px against 61.77px for the
+   * other seven, where the whole page had been dead level. Every row in a chart is the same
+   * height, and it is the sheet on the wall that says so. Five items over two lines is
+   * nothing unusual here either: the week before this one already carries 1:40 and 5:30,
+   * then 6:00, 6:26 and 6:41. */
+  const drasha = SHUVA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
+
+  let afternoon;
+  if (drasha !== null) {
+    afternoon = [underlineTime(drasha - 30 / 1440), underlineTime(isolate(`דרשה ${formatTime(drasha)}`))];
+  } else {
+    const candidates = [T(5, 30), T(6, 0), T(6, 30)];
+    const gates = [T(17, 30), T(18, 0), T(18, 30)];
+    afternoon = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+  }
+
+  const items = flattenNonEmpty([early, afternoon, formatTime(main), late]);
   return splitLinesInHalf(items);
 }
 function floorMin(x) {

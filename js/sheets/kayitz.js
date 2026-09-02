@@ -23,7 +23,7 @@ export function buildKayitzRow(week, settings) {
   const fridayDate = dateFromSerial(friday);
 
   const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 

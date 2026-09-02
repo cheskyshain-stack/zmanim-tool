@@ -207,16 +207,24 @@ const DRASHA_RULES = [
     mode: 'append',
     value: 'דרשה',
   },
-  {
-    id: 'rule-shabbos-shuva',
-    name: 'שבת שובה: דרשה',
-    enabled: true,
-    condition: { specialParsha: ['שובה', 'Shuva'] },
-    columnKeys: ['kayitz:C', 'choref:C'],
-    mode: 'append',
-    value: 'דרשה',
-  },
 ];
+
+/** The שבת שובה rule that used to sit beside שבת הגדול above.
+ *
+ *  It appended the bare word "דרשה" and nothing else, so the time had to be typed into the
+ *  cell by hand every year. The דרשה is now worked out in the sheet itself, an hour before
+ *  the מנחה that is 45 minutes before שקיעה, with its מנחה למטה half an hour before that
+ *  (see shabbosMinchaMenu in sheets/common.js). Leaving the rule in place would append a
+ *  second, wordless "דרשה" underneath the computed one.
+ *
+ *  Removed only where it is still exactly as it was seeded. Somebody who edited theirs
+ *  meant something by it, and this quietly deleting that is worse than a duplicate they
+ *  can see and remove. */
+const RETIRED_SHUVA_RULE = {
+  id: 'rule-shabbos-shuva',
+  mode: 'append',
+  value: 'דרשה',
+};
 
 /** True if some rule already covers the same special Shabbos. These two were hand-made
  *  before they were seeded, so on the browser they were made in they exist under their
@@ -233,6 +241,12 @@ function applySeeds(state) {
       if (!alreadyCovered(state.rules, rule)) state.rules.push({ ...rule });
     }
     seeded.drashos = true;
+  }
+  if (!seeded.shuvaComputed) {
+    state.rules = state.rules.filter(
+      (r) => !(r.id === RETIRED_SHUVA_RULE.id && r.mode === RETIRED_SHUVA_RULE.mode && r.value === RETIRED_SHUVA_RULE.value)
+    );
+    seeded.shuvaComputed = true;
   }
   if (!seeded.tishaBav) {
     if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
@@ -1057,6 +1071,20 @@ function hasTaanis(serial, settings) {
 const NBSP = ' ';
 const SLASH = `${NBSP}/${NBSP}`;
 
+/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
+   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
+   <bdi> does, in characters rather than markup: these strings are escaped on their way into
+   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
+   where a tag would be wrong and these are simply invisible.
+
+   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
+   every number after the Hebrew word joins its run and the whole line reverses: measured on
+   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
+   order on a board people read a time off. */
+const ISO_START = '\u2066';
+const ISO_END = '\u2069';
+const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
+
 /* The days of the week as the boards name them, Sunday first so it indexes straight off
    excelWeekday less one. Here rather than in either of the two files that want it, which
    had a copy each: the offline build flattens every module into one scope and two consts
@@ -1301,19 +1329,59 @@ function fridayMainMinchaMenu(fridayDate, settings) {
 
 /** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
  *  Also printed across two lines, split the same way. */
-function shabbosMinchaMenu(shabbosDate, settings) {
+/** The names the calendar gives שבת שובה, in both languages, since a rule or a sheet may
+ *  carry either. See hebrewCalendar's hasSpecialParsha. */
+const SHUVA_NAMES = ['שובה', 'Shuva'];
+
+/** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
+ *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */
+function roundTo5(dayFraction) {
+  return Math.round(dayFraction * 288) / 288; // 288 = 1440 minutes / 5
+}
+
+function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
   const sunsetVal = Z.sunset(shabbosDate, settings);
-  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
-  const gates = [T(17, 30), T(18, 0), T(18, 30)];
-  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
-  const items = flattenNonEmpty([
-    Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20',
-    kept,
-    // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
-    // ceilToMinute matches that.
-    formatTime(Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0))),
-    underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30))),
-  ]);
+  const early = Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20';
+  // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
+  // ceilToMinute matches that.
+  const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
+  const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
+
+  /* שבת שובה: the דרשה, and the מנחה that goes with it.
+   *
+   * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
+   * itself, because that is the minyan the דרשה is timed against: an hour before it, to
+   * the nearest 5, and the מנחה למטה half an hour before that. So the whole afternoon
+   * moves with the season, as it should, and no one has to retype it each year.
+   *
+   * The afternoon minyanim the other weeks carry (5:30, 6:00, 6:30) are not here. The
+   * מנחה למטה is what happens instead of them on this Shabbos, which is what the sheet
+   * that was built by hand for 5786 says: 1:40 and 4:45, then the דרשה, then 6:14 and
+   * 6:29, with no 5:30.
+   *
+   * Underlined like the מנחה before it: both are downstairs, which is what the underline
+   * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
+   *
+   * Laid out by the same splitLinesInHalf every other week uses, and that is not a detail.
+   * Giving the דרשה a line of its own was tried first and read better, but it made the cell
+   * three lines deep where every other cell on the page is two, and a taller cell is a
+   * taller row: measured in print, that one row went to 71.66px against 61.77px for the
+   * other seven, where the whole page had been dead level. Every row in a chart is the same
+   * height, and it is the sheet on the wall that says so. Five items over two lines is
+   * nothing unusual here either: the week before this one already carries 1:40 and 5:30,
+   * then 6:00, 6:26 and 6:41. */
+  const drasha = SHUVA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
+
+  let afternoon;
+  if (drasha !== null) {
+    afternoon = [underlineTime(drasha - 30 / 1440), underlineTime(isolate(`דרשה ${formatTime(drasha)}`))];
+  } else {
+    const candidates = [T(5, 30), T(6, 0), T(6, 30)];
+    const gates = [T(17, 30), T(18, 0), T(18, 30)];
+    afternoon = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+  }
+
+  const items = flattenNonEmpty([early, afternoon, formatTime(main), late]);
   return splitLinesInHalf(items);
 }
 function floorMin(x) {
@@ -1359,7 +1427,7 @@ function buildChorefRow(week, settings) {
   const fridayDate = dateFromSerial(friday);
 
   const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 
@@ -1416,7 +1484,7 @@ function buildKayitzRow(week, settings) {
   const fridayDate = dateFromSerial(friday);
 
   const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings);
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 
