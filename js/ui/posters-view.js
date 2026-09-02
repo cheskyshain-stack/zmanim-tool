@@ -20,7 +20,7 @@ import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
-import { buildPairPoster } from '../posters/pair.js';
+import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -195,6 +195,24 @@ const POSTERS = [
     render: renderPairPoster,
   },
   {
+    key: 'slichostzom',
+    label: 'סליחות וצום גדליה על דף אחד',
+    covers: (y) => `${SLICHOS_TEXT.title} ${TZG_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    orientations: true,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildSlichosTzomPoster(y, settings) }),
+      }));
+    },
+    render: renderSlichosTzomPoster,
+  },
+  {
     key: 'afteryk',
     label: 'Starting after יום כיפור',
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
@@ -280,10 +298,10 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '' } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '', pairMod = '' } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${landscape ? ' is-landscape' : ''}`
-    + `${cornerYear ? ' is-chart-head' : ''}`;
+  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${pairMod ? ' ' + pairMod : ''}`
+    + `${landscape ? ' is-landscape' : ''}${cornerYear ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
@@ -342,16 +360,22 @@ function renderShuvaPoster(poster, settings) {
  *  So is the note in brackets, which is Hebrew with a time inside it: without the isolate
  *  the bracket and the time swap ends. Measured rather than reasoned about, the same as
  *  every other bidi decision in this project. */
-function renderSlichosPoster(poster, settings) {
+/** The סליחות schedule on its own, so the sheet that pairs it with צום גדליה can call it
+ *  too. `dense` is what that sheet asks for: the same tighter rows the ראש השנה and
+ *  יום כיפור sheets use, since in a column there is half the width to write them across. */
+function slichosBody(poster, { dense = false } = {}) {
   const rows = poster.rows.map((r) => `
     <p class="poster-row" lang="he">
       <span class="poster-row-label">${esc(r.label)}</span>
       <bdi class="poster-row-times">${r.times.map(timeHtml).join(', ')}</bdi>
       ${r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : ''}
     </p>`).join('');
-  const body = `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
-    <div class="poster-rows">${rows}</div>`;
-  return posterShell(settings, body, poster.legend);
+  return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
+    <div class="poster-rows${dense ? ' is-dense' : ''}">${rows}</div>`;
+}
+
+function renderSlichosPoster(poster, settings) {
+  return posterShell(settings, slichosBody(poster), poster.legend);
 }
 
 /** The ראש השנה sheet: the ערב ר"ה lines, then a block per day.
@@ -512,7 +536,7 @@ function renderAfterYomKippurPoster(poster, settings) {
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
-function renderTzomGedaliaPoster(poster, settings) {
+function tzomGedaliaBody(poster) {
   const timeLine = (times) =>
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
@@ -523,10 +547,33 @@ function renderTzomGedaliaPoster(poster, settings) {
       <h3 class="poster-set-head" lang="he">${esc(s.head)}</h3>
       ${s.lines.map(timeLine).join('')}
     </div>`);
-  const body = `
+  return `
     <h2 class="poster-title" lang="he">${esc(TZG_TEXT.title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
-  return posterShell(settings, body, poster.legend || []);
+}
+
+function renderTzomGedaliaPoster(poster, settings) {
+  return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+/** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
+ *  ראש השנה and יום כיפור one.
+ *
+ *  Nothing has to move here the way the box did on that sheet: between them these two carry
+ *  about a third of what those two do, so both columns fit either way up with room over. The
+ *  צום גדליה column keeps its big headed blocks, which is what that sheet is, and the סליחות
+ *  column takes the dense rows because half a page is not the width its own sheet has. */
+function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
+  const body = `<div class="poster-pair">
+      <div class="poster-pair-col">${slichosBody(poster.slichos, { dense: true })}</div>
+      <div class="poster-pair-col">${tzomGedaliaBody(poster.tzom)}</div>
+    </div>`;
+  return posterShell(settings, body, poster.legend || [], {
+    dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
+    // Its own size. Between them these two carry about a third of what ראש השנה and
+    // יום כיפור do, so the sheet would be two thirds empty at their size.
+    pairMod: 'is-pair-roomy',
+  });
 }
 
 let chosen = POSTERS[0].key;

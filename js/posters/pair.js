@@ -9,6 +9,18 @@
 // module's: see the orientation picker on the Posters tab.
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
+import { buildSlichosPoster } from './slichos.js';
+import { buildTzomGedaliaPoster } from './tzomgedalia.js';
+
+/** One key at the foot of a paired sheet rather than each half's own, so a mark is explained
+ *  once. Merged on the text, since the halves word their lines identically. */
+function pairLegend(...posters) {
+  const legend = [];
+  for (const line of posters.flatMap((p) => p?.legend || [])) {
+    if (!legend.some((l) => l.text === line.text)) legend.push(line);
+  }
+  return legend;
+}
 
 /** Both posters for one Hebrew year, and the key to the marks either of them uses. */
 export function buildPairPoster(year, settings) {
@@ -16,13 +28,6 @@ export function buildPairPoster(year, settings) {
   const rh = buildRoshHashanaPoster(year, settings);
   const yk = buildYomKippurPoster(year, settings);
   if (!rh || !yk) return null;
-
-  // One key at the foot of the sheet rather than each half's own, so a mark is explained
-  // once. Merged on the text, since the two halves word their lines identically.
-  const legend = [];
-  for (const line of [...(rh.legend || []), ...(yk.legend || [])]) {
-    if (!legend.some((l) => l.text === line.text)) legend.push(line);
-  }
 
   return {
     hebrewYear: year,
@@ -33,6 +38,30 @@ export function buildPairPoster(year, settings) {
     },
     rh,
     yk,
-    legend,
+    legend: pairLegend(rh, yk),
+  };
+}
+
+/** סליחות and צום גדליה on one sheet, the other pair.
+ *
+ *  The same shape as the one above and, again, no new arithmetic: each half is built by its
+ *  own module. These two sit together because they are the two small sheets of the season,
+ *  the run up to ר"ה and the fast three days after it, and between them they do not fill a
+ *  page apiece. */
+export function buildSlichosTzomPoster(year, settings) {
+  if (!year) return null;
+  const slichos = buildSlichosPoster(year);
+  const tzom = buildTzomGedaliaPoster(year, settings);
+  if (!slichos || !tzom) return null;
+  return {
+    hebrewYear: year,
+    // First סליחות morning at one end and the fast at the other.
+    span: {
+      from: Math.min(slichos.span.from, tzom.span.from),
+      to: Math.max(slichos.span.to, tzom.span.to),
+    },
+    slichos,
+    tzom,
+    legend: pairLegend(slichos, tzom),
   };
 }

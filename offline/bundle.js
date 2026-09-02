@@ -5252,6 +5252,121 @@ function buildRoshHashanaPoster(year, settings) {
   };
 }
 
+// ==== posters/tzomgedalia.js ====
+// The צום גדליה poster: a fast day, so one page holding שחרית, מנחה, שקיעה and מעריב.
+//
+// Laid out like the sheet that runs the days after יו"כ: a heading per תפילה with its
+// times under it, rather than the label-and-time rows the ראש השנה and יום כיפור sheets
+// use. That is how the shul hangs this one.
+//
+// Everything on the afternoon of the sheet hangs off שקיעה. The last מנין is 45 minutes in
+// front of it, the one before that 45 minutes in front of the last, and the one before that
+// 45 minutes again. Only the two roundings differ, and they are set out in tzomGedaliaMincha.
+//
+// The morning is not calculated at all, and it is not the ר"ח בה"ב ותענ"צ schedule out of
+// Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
+// its own list. It sits in TZG_TEXT with the other slots that are set by hand.
+
+
+
+
+const TZG_MIN = 1 / 1440;
+/** To the nearest 5 minutes, and up to the next quarter hour. */
+const tzgNear5 = (t) => Math.round(t * 288) / 288;
+const tzgUp15 = (t) => Math.ceil(t * 96 - 1e-9) / 96;
+
+/** How far apart the three afternoon מנינים are, and how far the last one is in front of
+ *  שקיעה. One number, because it is the same 45 minutes throughout. */
+const TZG_GAP = 45;
+
+/** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
+const TZG_TEXT = {
+  title: 'צום גדליה',
+  shacharis: 'שחרית',
+  mincha: 'מנחה',
+  shkia: 'שקיעה',
+  maariv: 'מעריב',
+  // The morning, which does not move with the year. The fast day run starts earlier than
+  // the everyday one and is its own list rather than the ר"ח בה"ב ותענ"צ schedule out of
+  // Settings: this is what the sheet the shul hangs prints. Written in the marks this
+  // project uses throughout, which is where the old sheet's three levels of asterisk land:
+  // its ** (בית מדרש למטה) is the underline here, and its *** (באולם השמחות) is **.
+  morning: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00',
+  // The two early ones, which do not move with the year either. Same pair as the everyday
+  // board: the 1:35 is למטה and the 1:50 is the main בית מדרש.
+  earlyMincha: '<u>1:35</u>, 1:50',
+};
+
+/** The day the fast falls on, as an Excel serial.
+ *
+ *  3 תשרי, unless that is Shabbos, when the fast is put off to the Sunday. ר"ה can only
+ *  open on a Monday, Tuesday, Thursday or Shabbos, so the one case that defers is a Thursday
+ *  ר"ה, which puts 3 תשרי on Shabbos. */
+function tzomGedaliaSerial(rh) {
+  const third = rh + 2;
+  return excelWeekday(third) === 7 ? third + 1 : third;
+}
+
+/** The three afternoon מנינים, worked back from שקיעה.
+ *
+ *  The last is 45 minutes before שקיעה, to the nearest 5. The one in front of it is 45
+ *  minutes earlier again, put up to the next quarter hour, which is what keeps the middle of
+ *  the afternoon on a round time. The first is a plain 45 minutes before that and needs no
+ *  rounding of its own, since it is already on a quarter hour.
+ *
+ *  The two roundings go opposite ways, which is not a slip. They are the pair that
+ *  reproduces the תשפ"ו sheet: a 6:49 שקיעה gives 6:04, then 6:05, 5:30 and 4:45, which is
+ *  what that sheet prints. Rounding both down instead gives 6:00, 5:15 and 4:30, a quarter
+ *  hour early. Confirmed with the user against that sheet before this was written. */
+function tzomGedaliaMincha(shkia) {
+  const last = tzgNear5(shkia - TZG_GAP * TZG_MIN);
+  const middle = tzgUp15(last - TZG_GAP * TZG_MIN);
+  return [middle - TZG_GAP * TZG_MIN, middle, last];
+}
+
+/** The finished poster for one Hebrew year. */
+function buildTzomGedaliaPoster(year, settings) {
+  if (!year) return null;
+  const serial = tzomGedaliaSerial(roshHashana(year - 3761));
+  const shkia = Z.sunsetElev(dateFromSerial(serial), settings);
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+
+  const shacharis = parseTimes(TZG_TEXT.morning);
+  const mincha = [
+    ...parseTimes(TZG_TEXT.earlyMincha),
+    // The two that open the run are למטה and the one against שקיעה is the main בית מדרש,
+    // the same way round as the afternoon on the everyday board.
+    ...tzomGedaliaMincha(shkia).map((t, i) => tm(t, i < 2)),
+  ];
+  // 35 and 50 minutes after שקיעה. The later one is the underlined one, which is how the
+  // boards print a two time מעריב.
+  const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
+
+  const all = [...shacharis, ...mincha, ...maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+
+  return {
+    hebrewYear: year,
+    span: { from: serial, to: serial },
+    sets: [
+      { head: TZG_TEXT.shacharis, lines: [shacharis] },
+      { head: TZG_TEXT.mincha, lines: [mincha] },
+      // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
+      // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
+      // name and the time together.
+      { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
+      { head: TZG_TEXT.maariv, lines: [maariv] },
+    ],
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
 // ==== posters/yomkippur.js ====
 // The יום כיפור poster: ערב יו"כ, the day itself, and the schedule that starts after it.
 //
@@ -5536,19 +5651,24 @@ function buildYomKippurPoster(year, settings) {
 // module's: see the orientation picker on the Posters tab.
 
 
+
+
+/** One key at the foot of a paired sheet rather than each half's own, so a mark is explained
+ *  once. Merged on the text, since the halves word their lines identically. */
+function pairLegend(...posters) {
+  const legend = [];
+  for (const line of posters.flatMap((p) => p?.legend || [])) {
+    if (!legend.some((l) => l.text === line.text)) legend.push(line);
+  }
+  return legend;
+}
+
 /** Both posters for one Hebrew year, and the key to the marks either of them uses. */
 function buildPairPoster(year, settings) {
   if (!year) return null;
   const rh = buildRoshHashanaPoster(year, settings);
   const yk = buildYomKippurPoster(year, settings);
   if (!rh || !yk) return null;
-
-  // One key at the foot of the sheet rather than each half's own, so a mark is explained
-  // once. Merged on the text, since the two halves word their lines identically.
-  const legend = [];
-  for (const line of [...(rh.legend || []), ...(yk.legend || [])]) {
-    if (!legend.some((l) => l.text === line.text)) legend.push(line);
-  }
 
   return {
     hebrewYear: year,
@@ -5559,7 +5679,31 @@ function buildPairPoster(year, settings) {
     },
     rh,
     yk,
-    legend,
+    legend: pairLegend(rh, yk),
+  };
+}
+
+/** סליחות and צום גדליה on one sheet, the other pair.
+ *
+ *  The same shape as the one above and, again, no new arithmetic: each half is built by its
+ *  own module. These two sit together because they are the two small sheets of the season,
+ *  the run up to ר"ה and the fast three days after it, and between them they do not fill a
+ *  page apiece. */
+function buildSlichosTzomPoster(year, settings) {
+  if (!year) return null;
+  const slichos = buildSlichosPoster(year);
+  const tzom = buildTzomGedaliaPoster(year, settings);
+  if (!slichos || !tzom) return null;
+  return {
+    hebrewYear: year,
+    // First סליחות morning at one end and the fast at the other.
+    span: {
+      from: Math.min(slichos.span.from, tzom.span.from),
+      to: Math.max(slichos.span.to, tzom.span.to),
+    },
+    slichos,
+    tzom,
+    legend: pairLegend(slichos, tzom),
   };
 }
 
@@ -5853,121 +5997,6 @@ function buildShuvaPoster(sheet, state, settings) {
   };
 }
 
-// ==== posters/tzomgedalia.js ====
-// The צום גדליה poster: a fast day, so one page holding שחרית, מנחה, שקיעה and מעריב.
-//
-// Laid out like the sheet that runs the days after יו"כ: a heading per תפילה with its
-// times under it, rather than the label-and-time rows the ראש השנה and יום כיפור sheets
-// use. That is how the shul hangs this one.
-//
-// Everything on the afternoon of the sheet hangs off שקיעה. The last מנין is 45 minutes in
-// front of it, the one before that 45 minutes in front of the last, and the one before that
-// 45 minutes again. Only the two roundings differ, and they are set out in tzomGedaliaMincha.
-//
-// The morning is not calculated at all, and it is not the ר"ח בה"ב ותענ"צ schedule out of
-// Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
-// its own list. It sits in TZG_TEXT with the other slots that are set by hand.
-
-
-
-
-const TZG_MIN = 1 / 1440;
-/** To the nearest 5 minutes, and up to the next quarter hour. */
-const tzgNear5 = (t) => Math.round(t * 288) / 288;
-const tzgUp15 = (t) => Math.ceil(t * 96 - 1e-9) / 96;
-
-/** How far apart the three afternoon מנינים are, and how far the last one is in front of
- *  שקיעה. One number, because it is the same 45 minutes throughout. */
-const TZG_GAP = 45;
-
-/** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
-const TZG_TEXT = {
-  title: 'צום גדליה',
-  shacharis: 'שחרית',
-  mincha: 'מנחה',
-  shkia: 'שקיעה',
-  maariv: 'מעריב',
-  // The morning, which does not move with the year. The fast day run starts earlier than
-  // the everyday one and is its own list rather than the ר"ח בה"ב ותענ"צ schedule out of
-  // Settings: this is what the sheet the shul hangs prints. Written in the marks this
-  // project uses throughout, which is where the old sheet's three levels of asterisk land:
-  // its ** (בית מדרש למטה) is the underline here, and its *** (באולם השמחות) is **.
-  morning: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00',
-  // The two early ones, which do not move with the year either. Same pair as the everyday
-  // board: the 1:35 is למטה and the 1:50 is the main בית מדרש.
-  earlyMincha: '<u>1:35</u>, 1:50',
-};
-
-/** The day the fast falls on, as an Excel serial.
- *
- *  3 תשרי, unless that is Shabbos, when the fast is put off to the Sunday. ר"ה can only
- *  open on a Monday, Tuesday, Thursday or Shabbos, so the one case that defers is a Thursday
- *  ר"ה, which puts 3 תשרי on Shabbos. */
-function tzomGedaliaSerial(rh) {
-  const third = rh + 2;
-  return excelWeekday(third) === 7 ? third + 1 : third;
-}
-
-/** The three afternoon מנינים, worked back from שקיעה.
- *
- *  The last is 45 minutes before שקיעה, to the nearest 5. The one in front of it is 45
- *  minutes earlier again, put up to the next quarter hour, which is what keeps the middle of
- *  the afternoon on a round time. The first is a plain 45 minutes before that and needs no
- *  rounding of its own, since it is already on a quarter hour.
- *
- *  The two roundings go opposite ways, which is not a slip. They are the pair that
- *  reproduces the תשפ"ו sheet: a 6:49 שקיעה gives 6:04, then 6:05, 5:30 and 4:45, which is
- *  what that sheet prints. Rounding both down instead gives 6:00, 5:15 and 4:30, a quarter
- *  hour early. Confirmed with the user against that sheet before this was written. */
-function tzomGedaliaMincha(shkia) {
-  const last = tzgNear5(shkia - TZG_GAP * TZG_MIN);
-  const middle = tzgUp15(last - TZG_GAP * TZG_MIN);
-  return [middle - TZG_GAP * TZG_MIN, middle, last];
-}
-
-/** The finished poster for one Hebrew year. */
-function buildTzomGedaliaPoster(year, settings) {
-  if (!year) return null;
-  const serial = tzomGedaliaSerial(roshHashana(year - 3761));
-  const shkia = Z.sunsetElev(dateFromSerial(serial), settings);
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-
-  const shacharis = parseTimes(TZG_TEXT.morning);
-  const mincha = [
-    ...parseTimes(TZG_TEXT.earlyMincha),
-    // The two that open the run are למטה and the one against שקיעה is the main בית מדרש,
-    // the same way round as the afternoon on the everyday board.
-    ...tzomGedaliaMincha(shkia).map((t, i) => tm(t, i < 2)),
-  ];
-  // 35 and 50 minutes after שקיעה. The later one is the underlined one, which is how the
-  // boards print a two time מעריב.
-  const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
-
-  const all = [...shacharis, ...mincha, ...maariv];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-
-  return {
-    hebrewYear: year,
-    span: { from: serial, to: serial },
-    sets: [
-      { head: TZG_TEXT.shacharis, lines: [shacharis] },
-      { head: TZG_TEXT.mincha, lines: [mincha] },
-      // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
-      // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
-      // name and the time together.
-      { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
-      { head: TZG_TEXT.maariv, lines: [maariv] },
-    ],
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-  };
-}
-
 // ==== ui/posters-view.js ====
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
@@ -6165,6 +6194,24 @@ const POSTERS = [
     render: renderPairPoster,
   },
   {
+    key: 'slichostzom',
+    label: 'סליחות וצום גדליה על דף אחד',
+    covers: (y) => `${SLICHOS_TEXT.title} ${TZG_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    orientations: true,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildSlichosTzomPoster(y, settings) }),
+      }));
+    },
+    render: renderSlichosTzomPoster,
+  },
+  {
     key: 'afteryk',
     label: 'Starting after יום כיפור',
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
@@ -6250,10 +6297,10 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '' } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, cornerYear = '', pairMod = '' } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${landscape ? ' is-landscape' : ''}`
-    + `${cornerYear ? ' is-chart-head' : ''}`;
+  const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}${pairMod ? ' ' + pairMod : ''}`
+    + `${landscape ? ' is-landscape' : ''}${cornerYear ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
@@ -6312,16 +6359,22 @@ function renderShuvaPoster(poster, settings) {
  *  So is the note in brackets, which is Hebrew with a time inside it: without the isolate
  *  the bracket and the time swap ends. Measured rather than reasoned about, the same as
  *  every other bidi decision in this project. */
-function renderSlichosPoster(poster, settings) {
+/** The סליחות schedule on its own, so the sheet that pairs it with צום גדליה can call it
+ *  too. `dense` is what that sheet asks for: the same tighter rows the ראש השנה and
+ *  יום כיפור sheets use, since in a column there is half the width to write them across. */
+function slichosBody(poster, { dense = false } = {}) {
   const rows = poster.rows.map((r) => `
     <p class="poster-row" lang="he">
       <span class="poster-row-label">${esc(r.label)}</span>
       <bdi class="poster-row-times">${r.times.map(timeHtml).join(', ')}</bdi>
       ${r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : ''}
     </p>`).join('');
-  const body = `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
-    <div class="poster-rows">${rows}</div>`;
-  return posterShell(settings, body, poster.legend);
+  return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
+    <div class="poster-rows${dense ? ' is-dense' : ''}">${rows}</div>`;
+}
+
+function renderSlichosPoster(poster, settings) {
+  return posterShell(settings, slichosBody(poster), poster.legend);
 }
 
 /** The ראש השנה sheet: the ערב ר"ה lines, then a block per day.
@@ -6482,7 +6535,7 @@ function renderAfterYomKippurPoster(poster, settings) {
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
-function renderTzomGedaliaPoster(poster, settings) {
+function tzomGedaliaBody(poster) {
   const timeLine = (times) =>
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
@@ -6493,10 +6546,33 @@ function renderTzomGedaliaPoster(poster, settings) {
       <h3 class="poster-set-head" lang="he">${esc(s.head)}</h3>
       ${s.lines.map(timeLine).join('')}
     </div>`);
-  const body = `
+  return `
     <h2 class="poster-title" lang="he">${esc(TZG_TEXT.title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
-  return posterShell(settings, body, poster.legend || []);
+}
+
+function renderTzomGedaliaPoster(poster, settings) {
+  return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+/** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
+ *  ראש השנה and יום כיפור one.
+ *
+ *  Nothing has to move here the way the box did on that sheet: between them these two carry
+ *  about a third of what those two do, so both columns fit either way up with room over. The
+ *  צום גדליה column keeps its big headed blocks, which is what that sheet is, and the סליחות
+ *  column takes the dense rows because half a page is not the width its own sheet has. */
+function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
+  const body = `<div class="poster-pair">
+      <div class="poster-pair-col">${slichosBody(poster.slichos, { dense: true })}</div>
+      <div class="poster-pair-col">${tzomGedaliaBody(poster.tzom)}</div>
+    </div>`;
+  return posterShell(settings, body, poster.legend || [], {
+    dense: true, pair: true, landscape, cornerYear: hebrewYear(poster.hebrewYear),
+    // Its own size. Between them these two carry about a third of what ראש השנה and
+    // יום כיפור do, so the sheet would be two thirds empty at their size.
+    pairMod: 'is-pair-roomy',
+  });
 }
 
 let chosen = POSTERS[0].key;

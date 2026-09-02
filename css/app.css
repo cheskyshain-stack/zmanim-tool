@@ -2766,10 +2766,17 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
    dir="ltr" is on the header in the markup, so the corner lands on the left and the rabbi's
    line on the right, the same way round as a chart. Each is Hebrew and sets its own
-   direction inside. */
+   direction inside.
+
+   The two numbers are the chart's own, scaled by how much narrower the sheet is. A chart is
+   11in wide and its header row measures 960px; the landscape sheet is 11in too, so it takes
+   the chart's values unchanged and the header is a copy to the pixel. The portrait sheet is
+   8.5in, 720px across, so it takes 720/960 of them. Without that the wordmark, which does
+   not shrink, ate the row: the ends were left 123px each and the rabbi's line broke over
+   three lines. */
 .poster.is-chart-head .page-header {
-  --sheet-font-size: 10pt;
-  --sheet-header-scale: 1;
+  --sheet-font-size: 7.5pt;
+  --sheet-header-scale: 0.75;
   width: 100%; margin-bottom: 0.16in;
 }
 /* The year, where a chart puts the building.
@@ -2780,10 +2787,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    Giving both ends the same basis makes the centring hold whatever is in them. */
 .poster.is-chart-head .header-year,
 .poster.is-chart-head .header-rabbi { flex: 1 1 0; }
-.poster.is-chart-head .header-year { font-size: 16pt; font-weight: 700; }
-/* Smaller again on the landscape sheet, which is the one short of height. One number does
-   it, the same one the charts scale their own header by. */
-.poster.is-pair.is-landscape .page-header { --sheet-header-scale: 0.85; margin-bottom: 0.12in; }
+/* Hard against the left margin, the way the rabbi's line is hard against the right one, so
+   the two ends of the row answer each other. It needs saying: the year is Hebrew and carries
+   dir="rtl", under which "start" is the right-hand end, so left to itself it sat in the
+   middle of the sheet's left half instead of at the edge of it. */
+.poster.is-chart-head .header-year { font-size: 16pt; font-weight: 700; text-align: left; }
+/* The landscape sheet is 11in wide, the same as a chart, so it takes the chart's own two
+   numbers and its header is a copy of one to the pixel. */
+.poster.is-pair.is-landscape .page-header {
+  --sheet-font-size: 10pt;
+  --sheet-header-scale: 1;
+  margin-bottom: 0.12in;
+}
 
 /* One number sets the whole sheet, --pair-row, and everything on it is written as a
    multiple of that. So finding the size is finding one number, and the proportions between
@@ -2800,14 +2815,51 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    at. One list, the שחרית יום ג', breaks over two lines from 13pt up, which is what the box
    rows do on the single sheet as well.
 
-   Landscape has the width but not the height. 12pt leaves 26px clear on all three years and
-   13pt runs over. Both numbers went up a full point when the header became the charts' one
-   row instead of the Word posters' stack: that is what a shorter header buys.
+   Landscape has the width but not the height, and 12pt left only 17px clear once the header
+   became the charts' full size one. The box's מנחה list wraps inside the column there, so a
+   year with one slot more would add a line and eat exactly that. 11.5pt instead.
 
    Every one of these was measured on all three years and on both shapes the ראש השנה sheet
    takes, by stepping the number until something gave. */
 .poster.is-pair { --pair-row: 13.5pt; }
-.poster.is-pair.is-landscape { --pair-row: 12pt; }
+.poster.is-pair.is-landscape { --pair-row: 11.5pt; }
+/* --- The סליחות and צום גדליה sheet -------------------------------------------------
+   Between them these two carry about a third of what ראש השנה and יום כיפור do, so at the
+   sizes above the sheet came out two thirds empty. It is set far larger, and unlike that
+   sheet its two halves are not the same shape, so they do not share one number.
+
+   סליחות is a column of label-and-list rows and is bounded by width: past a certain size a
+   list wraps and the label is left on a line of its own, away from the times it introduces.
+   צום גדליה is short centred blocks that wrap at no size at all, so it is free to be set to
+   whatever fills its column.
+
+   The columns are not equal either, for the same reason: סליחות needs the width and
+   צום גדליה does not.
+
+   And in that column a סליחות row is set as two lines, the name over its times, instead of
+   the one line its own sheet uses. On a full page the label and the list sit side by side
+   with room to spare; in half a page they do not, and letting them wrap tore the label off
+   onto a line of its own away from the times it introduces. Measured: on the portrait sheet
+   only 11pt kept every row on one line, which is nothing next to the column beside it.
+   Stacking them on purpose says the same thing, reads the same way round as the צום גדליה
+   blocks next to it, and takes the size back: portrait goes from 11pt to 19pt before a list
+   runs onto a second line.
+
+   Portrait only. The landscape sheet is 11in across and its columns have the width for a
+   row on one line; there stacking only doubles the number of lines on a sheet that is short
+   of height, and it measured worse, 14pt against 15pt. */
+.poster.is-pair-roomy .poster-pair-col:first-child { flex: 1.45 1 0; }
+.poster.is-pair-roomy:not(.is-landscape) .poster-row { margin-bottom: 0.5em; }
+.poster.is-pair-roomy:not(.is-landscape) .poster-row-label {
+  display: block; margin-inline-end: 0; margin-bottom: 0.1em;
+  font-size: calc(1.12 * var(--pair-row));
+}
+.poster.is-pair-roomy:not(.is-landscape) .poster-row-note { display: block; margin-inline-start: 0; }
+.poster.is-pair-roomy .poster-set-head { font-size: calc(1.3 * var(--pair-set)); }
+.poster.is-pair-roomy .poster-set-line,
+.poster.is-pair-roomy .poster-set-note { font-size: var(--pair-set); }
+.poster.is-pair-roomy { --pair-row: 18pt; --pair-set: 22pt; }
+.poster.is-pair-roomy.is-landscape { --pair-row: 15pt; --pair-set: 22pt; }
 .poster.is-pair .poster-title { font-size: calc(2.1 * var(--pair-row)); margin: 0 0 0.5em; }
 .poster.is-pair .poster-rows.is-dense { padding: 0; }
 .poster.is-pair .poster-rows.is-dense .poster-row { font-size: var(--pair-row); line-height: 1.16; }
@@ -2817,6 +2869,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair .poster-row-label { margin-inline-end: 0.7em; }
 .poster.is-pair .poster-row-second { margin-inline-start: 1.2em; }
 .poster.is-pair .poster-divider { width: 1.6in; margin: 0.4em auto 0.25em; }
+/* The צום גדליה blocks, on the sheet it shares with סליחות. On its own page they are set
+   about double a chart row, because that sheet has three תפילות and nothing else; in a
+   column beside another schedule that reads as two different documents. Tied to --pair-row
+   like the rows are, so the whole sheet is one scale.
+   flex-start rather than the space-around a whole page uses: in a column the blocks belong
+   under the heading, not spread down whatever height the column happens to have. */
+.poster.is-pair .poster-sets { flex: 0 0 auto; justify-content: flex-start; }
+.poster.is-pair .poster-set + .poster-set { margin-top: 0.5em; }
+.poster.is-pair .poster-set-head { font-size: calc(1.32 * var(--pair-row)); margin: 0 0 0.2em; }
+.poster.is-pair .poster-set-line,
+.poster.is-pair .poster-set-note { font-size: calc(1.08 * var(--pair-row)); line-height: 1.3; }
+.poster.is-pair .poster-set-note { margin-top: 0.35em; }
 /* The box of everyday times after יו"כ. On the portrait sheet it is across the foot under
    both columns, where its three lists each fit on one line and it can be set at the size of
    a row. On the landscape sheet it stays in the יום כיפור column, where it has to be smaller
