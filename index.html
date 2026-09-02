@@ -172,13 +172,21 @@
   </div>
 </main>
 <!-- pdf -->
-<!-- The two vendored libraries behind the PDF button, stripped from the offline
-     build by build-offline.py. They are MIT and their licences sit beside them in
-     /vendor. Plain scripts rather than modules, and deferred, so they are in place as
-     globals by the time the app runs without holding up first paint. Nothing waits on
-     them: if they are missing, pdfReady() is false and no button is offered. -->
-<script defer src="vendor/html2canvas.min.js"></script>
-<script defer src="vendor/jspdf.umd.min.js"></script>
+<!-- The two vendored libraries behind the PDF button, currently not loaded, which is what
+     takes the button away: pdf-page.js asks pdfReady() before offering it and answers no
+     when they are absent. Taken out because the PDF it produced was not fit to hand to
+     anybody. On a phone the chart came out with its rules gone, its columns collapsed and
+     the text overlapping, and the week card put the times at one edge of the sheet and the
+     names at the other. It is a rasteriser photographing a page it does not lay out the
+     same way the browser does, and that is a real piece of work to get right rather than a
+     setting to correct.
+
+     To bring it back, put the two script tags back between these markers. Nothing else was
+     removed: pdf-page.js, its wiring in week-view.js and chart-view.js, and /vendor are all
+     still here, so the button returns with the tags.
+
+     Worth knowing before it goes back: they are 608KB, deferred but still fetched by every
+     visitor, on a site whose point is opening fast on a phone. -->
 <!-- /pdf -->
 <script type="module" src="js/luach.js?v=88726bc2"></script>
 </body>
