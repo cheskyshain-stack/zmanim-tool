@@ -106,8 +106,10 @@ export function buildRoshHashanaPoster(year, settings) {
     lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
 
     // The morning.
+    // המלך rides on the שחרית line as a second label and time, not as one run of text, so
+    // it gets the same gap between word and time that every other row has.
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
-      { extra: `${RH_TEXT.hamelech.label} ${RH_TEXT.hamelech.times}` }));
+      { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
     lines.push(line(RH_TEXT.krias, pair(krias.mga, krias.gra)));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.

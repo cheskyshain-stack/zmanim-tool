@@ -2717,6 +2717,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    on the left, which is the side the times are on. */
 .poster-row-label { margin-inline-end: 0.14in; }
 .poster-row-note { margin-inline-start: 0.1in; }
+/* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
+   of it so it does not run into the first row's time, and it inherits .poster-row-label for
+   the gap between its own word and its own time. */
+.poster-row-second { margin-inline-start: 0.24in; }
 .poster-row u { text-underline-offset: 0.12em; }
 /* The time the whole sheet is about. The one line somebody crosses the room to read. */
 .poster-at { font-size: 26pt; font-weight: 700; margin: 0.1in 0 0; }

@@ -5181,8 +5181,10 @@ function buildRoshHashanaPoster(year, settings) {
     lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
 
     // The morning.
+    // המלך rides on the שחרית line as a second label and time, not as one run of text, so
+    // it gets the same gap between word and time that every other row has.
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
-      { extra: `${RH_TEXT.hamelech.label} ${RH_TEXT.hamelech.times}` }));
+      { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
     lines.push(line(RH_TEXT.krias, pair(krias.mga, krias.gra)));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
@@ -5794,7 +5796,10 @@ function rhRow(label, times, extra) {
   // list of מנינים rather than one זמן given two ways.
   const t = times.length
     ? `<bdi class="poster-row-times">${times.map(timeHtml).join('/')}</bdi>` : '';
-  const e = extra ? `<bdi class="poster-row-note">${esc(extra)}</bdi>` : '';
+  const e = extra
+    ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
+      + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join('/')}</bdi>`
+    : '';
   return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${t}${e}</p>`;
 }
 

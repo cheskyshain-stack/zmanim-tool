@@ -260,7 +260,10 @@ function rhRow(label, times, extra) {
   // list of מנינים rather than one זמן given two ways.
   const t = times.length
     ? `<bdi class="poster-row-times">${times.map(timeHtml).join('/')}</bdi>` : '';
-  const e = extra ? `<bdi class="poster-row-note">${esc(extra)}</bdi>` : '';
+  const e = extra
+    ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
+      + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join('/')}</bdi>`
+    : '';
   return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${t}${e}</p>`;
 }
 
