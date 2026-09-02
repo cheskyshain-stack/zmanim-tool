@@ -207,7 +207,7 @@ function renderShuvaPoster(poster, settings) {
     <h2 class="poster-title" lang="he">${esc(SHUVA_TEXT.title)}</h2>
     ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${esc(l)}</p>`).join('')}
     ${poster.drasha ? `<p class="poster-at" lang="he">${esc(SHUVA_TEXT.at)} <bdi>${esc(poster.drasha)}</bdi></p>` : ''}
-    <p class="poster-mincha" lang="he">${esc(SHUVA_TEXT.minchaLabel)}
+    <p class="poster-mincha" lang="he"><span class="poster-row-label">${esc(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
 }
