@@ -2590,33 +2590,63 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    is on the screen is what leaves the printer and there is no second layout to keep in
    step with this one.
 
-   The border is the one the Word posters carried: Word calls it thinThickThinMediumGap at
-   3pt, which is a thin rule, a gap, a thick rule, a gap and a thin rule. Three borders
-   cannot go on one box, so it is the page's own outer rule plus an inset ::before for the
-   pair inside it. */
+   The border is the one the Word posters carried: Word calls it thinThickThinMediumGap,
+   which is a thin rule, a gap, a thick rule, a gap and a thin rule.
+
+   Where it sits comes out of the file itself. The .docx has 0.5in margins (720 twips) top
+   and sides, 0.5625in (810) at the foot, and pgBorders with w:space of 1pt top and bottom
+   and 4pt at the sides. There is no w:offsetFrom, so Word's default of "text" applies and
+   space is measured out from the text rather than in from the paper: the rules are drawn
+   that far outside the margin, and the whole band of them is roughly 0.4in to 0.5in in
+   from the edge of the sheet. --edge-* below is that, per side.
+
+   Three rules will not go on one box. It is a ::before carrying the thick middle rule,
+   with an outline for the outer thin one (outline-offset is the gap, and it is the same
+   gap on all four sides even though the insets are not), and a ::after for the inner. */
 .poster {
   position: relative;
   width: 8.5in; height: 11in;
   margin: 0 auto;
   background: #fff;
   box-sizing: border-box;
-  padding: 0.62in 0.6in 0.5in;
+  /* Outer edge of the border art, per side, from the paper. */
+  --edge-top: 0.444in;
+  --edge-side: 0.403in;
+  --edge-bottom: 0.507in;
+  /* How deep the thin-gap-thick-gap-thin band runs from that outer rule inwards. */
+  --art: 0.105in;
+  /* Text clears the innermost rule by about the 4pt Word leaves it. */
+  padding:
+    calc(var(--edge-top) + var(--art) + 0.055in)
+    calc(var(--edge-side) + var(--art) + 0.055in)
+    calc(var(--edge-bottom) + var(--art) + 0.055in);
   display: flex; flex-direction: column; align-items: center;
   /* Times New Roman, the face the Word posters were set in. The stack is written by
      posters-view.js through fontStackFor(), the same function the charts use, so the
      Android fallback is decided in one place: HEBREW_STAND_IN in sheet-view.js. */
   font-family: var(--poster-font-family, serif);
   color: #000;
-  border: 1px solid #000;
+  /* No rule at the edge of the box. Paper has no printed edge, and the shadow is what
+     tells the page apart from the app behind it on screen. */
   box-shadow: 0 1px 3px rgba(0,0,0,0.18);
 }
+/* The thick middle rule, with the outer thin one hung off it as an outline. */
 .poster::before {
-  content: ""; position: absolute; inset: 0.055in;
+  content: ""; position: absolute;
+  inset:
+    calc(var(--edge-top) + 0.055in)
+    calc(var(--edge-side) + 0.055in)
+    calc(var(--edge-bottom) + 0.055in);
   border: 3px solid #000; border-image: none;
+  outline: 1px solid #000; outline-offset: 0.055in;
   pointer-events: none;
 }
 .poster::after {
-  content: ""; position: absolute; inset: 0.105in;
+  content: ""; position: absolute;
+  inset:
+    calc(var(--edge-top) + var(--art))
+    calc(var(--edge-side) + var(--art))
+    calc(var(--edge-bottom) + var(--art));
   border: 1px solid #000;
   pointer-events: none;
 }
