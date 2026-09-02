@@ -2701,6 +2701,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The ראש השנה sheet carries about twenty two lines where the סליחות one carries eight, so
    it is set smaller and tighter. Sized by measuring: at 17pt the block ran off the foot of
    the page. The sheets the shul hangs are set smaller on this one too. */
+/* The ראש השנה sheet is the one that fills its page, so it takes back the air the other two
+   can afford around the title: less between the rabbi's line and the heading, and less
+   under the heading. */
+.poster.is-dense .poster-rabbi { margin-bottom: 0.16in; }
+.poster.is-dense .poster-title { margin-bottom: 0.16in; }
 .poster-rows.is-dense { padding: 0.06in 0 0.1in; }
 .poster-rows.is-dense .poster-row { font-size: 12pt; line-height: 1.15; }
 .poster-rows.is-dense .poster-day { font-size: 13pt; margin: 0.06in 0 0; }

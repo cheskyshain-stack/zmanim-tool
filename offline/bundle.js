@@ -5153,11 +5153,15 @@ function buildRoshHashanaPoster(year, settings) {
   const shabbosDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_SHABBOS);
 
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
-  const at = (t) => [{ text: formatTime(t), underlined: false, mark: '' }];
-  const pair = (a, b) => [
-    { text: formatTime(a), underlined: false, mark: '' },
-    { text: formatTime(b), underlined: false, mark: '' },
-  ];
+  const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
+  const at = (t) => [tm(t)];
+  const pair = (a, b) => [tm(a), tm(b)];
+
+  // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well. It is
+  // the first day, unless that is Shabbos, when תשליך is pushed off and so is this. Both
+  // sheets put it exactly 55 minutes before the main מנחה: 5:00 against 5:55 on תשפ"ו day
+  // one, 5:15 against 6:10 on תשפ"ד day two.
+  const tashlichDay = shabbosDay === 0 ? 1 : 0;
 
   const blocks = days.map((day, i) => {
     const night = i === 0 ? erev : days[0];
@@ -5191,11 +5195,18 @@ function buildRoshHashanaPoster(year, settings) {
       lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }]));
     }
 
-    // The afternoon מנחה, an hour before that day's own שקיעה, taken up to the next 5.
-    lines.push(line(RH_TEXT.mincha, at(upTo5(dayShkia - 60 * RH_MIN))));
+    // The afternoon מנחה, an hour before that day's own שקיעה, taken up to the next 5, with
+    // the earlier תשליך one in front of it on the day that has one.
+    const mainMincha = upTo5(dayShkia - 60 * RH_MIN);
+    lines.push(line(RH_TEXT.mincha, i === tashlichDay
+      ? [tm(mainMincha - 55 * RH_MIN, true), tm(mainMincha)]
+      : at(mainMincha)));
 
-    // מוצאי יו"ט, the only place the 72 minute צאת is printed.
-    if (i === 1) lines.push(line(RH_TEXT.maariv, pair(dayShkia + 60 * RH_MIN, dayShkia + 72 * RH_MIN)));
+    // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
+    // which is the same way round the boards print a two time מעריב (see calculations-view).
+    if (i === 1) {
+      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)]));
+    }
 
     return {
       heading: RH_TEXT.day[i] + (isShabbos ? ` (${RH_TEXT.shabbos})` : ''),
@@ -5728,9 +5739,9 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = []) {
+function posterShell(settings, body, legend = [], { dense = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+  return `<div class="poster${dense ? ' is-dense' : ''}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
     <img class="poster-wordmark" src="assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
@@ -5799,7 +5810,7 @@ function renderRoshHashanaPoster(poster, settings) {
         <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra)).join('')}`).join('')}
     </div>`;
-  return posterShell(settings, body, poster.legend || []);
+  return posterShell(settings, body, poster.legend || [], { dense: true });
 }
 
 let chosen = POSTERS[0].key;

@@ -205,9 +205,9 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = []) {
+function posterShell(settings, body, legend = [], { dense = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
-  return `<div class="poster" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+  return `<div class="poster${dense ? ' is-dense' : ''}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
     <img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
@@ -276,7 +276,7 @@ function renderRoshHashanaPoster(poster, settings) {
         <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra)).join('')}`).join('')}
     </div>`;
-  return posterShell(settings, body, poster.legend || []);
+  return posterShell(settings, body, poster.legend || [], { dense: true });
 }
 
 let chosen = POSTERS[0].key;
