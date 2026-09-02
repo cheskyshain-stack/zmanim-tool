@@ -19,6 +19,7 @@ import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../po
 import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos.js';
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
+import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -136,6 +137,24 @@ const POSTERS = [
       }));
     },
     render: renderRoshHashanaPoster,
+  },
+  {
+    key: 'tzomgedalia',
+    label: 'צום גדליה',
+    covers: (y) => `${TZG_TEXT.title} ${hebrewYear(y)}`,
+    // One day, so the two ends of the span are the same date.
+    when: (built) => when(built.span.from, built.span.to),
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildTzomGedaliaPoster(y, settings) }),
+      }));
+    },
+    render: renderTzomGedaliaPoster,
   },
   {
     key: 'yomkippur',
@@ -384,6 +403,29 @@ function renderAfterYomKippurPoster(poster, settings) {
       ${section(YK_TEXT.afterBig.mincha, a.mincha)}
       ${section(YK_TEXT.afterBig.maariv, a.maariv)}
     </div>`;
+  return posterShell(settings, body, poster.legend || []);
+}
+
+/** The צום גדליה sheet: the same heading-per-תפילה blocks as the sheet above, but the times
+ *  are given in the lines the poster hands over rather than halved, because the morning's
+ *  two lines are the two the shul typed in Settings and the afternoon is one line of five.
+ *
+ *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
+ *  with no heading of its own. */
+function renderTzomGedaliaPoster(poster, settings) {
+  const timeLine = (times) =>
+    `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
+  const section = (s) => (s.note
+    ? `<div class="poster-set"><p class="poster-set-note" lang="he">${esc(s.note.label)}
+        <bdi>${esc(s.note.text)}</bdi></p></div>`
+    : `
+    <div class="poster-set">
+      <h3 class="poster-set-head" lang="he">${esc(s.head)}</h3>
+      ${s.lines.map(timeLine).join('')}
+    </div>`);
+  const body = `
+    <h2 class="poster-title" lang="he">${esc(TZG_TEXT.title)}</h2>
+    <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
   return posterShell(settings, body, poster.legend || []);
 }
 

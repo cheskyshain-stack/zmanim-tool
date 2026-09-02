@@ -2733,6 +2733,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .poster-set-line { font-size: 21pt; font-weight: 700; line-height: 1.5; margin: 0; }
 .poster-set-line u { text-underline-offset: 0.12em; }
+/* The שקיעה on the צום גדליה sheet, which stands between מנחה and מעריב with no heading:
+   set at the size of a line of times, since it reads as one. */
+.poster-set-note { font-size: 21pt; font-weight: 700; line-height: 1.5; margin: 0; }
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }
 
