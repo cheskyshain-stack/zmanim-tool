@@ -67,10 +67,12 @@ export const RH_TEXT = {
   drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  // The two reckonings are joined with the charts' own SLASH, a slash with a non breaking
-  // space each side, so the label breathes the same way the times under it do.
-  krias: `ס"ז ק"ש מ"א${SLASH}גר"א`,
-  nineHours: `ט' שעות מ"א${SLASH}גר"א`,
+  // Split into the name of the זמן and the two reckonings it is given on, so the row can
+  // put the same gap between them that it puts between any name and its time. The two
+  // reckonings are joined with the charts' own SLASH, a slash with a non breaking space
+  // each side, so that breathes as well.
+  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
+  nineHours: { name: "ט' שעות", basis: `מ"א${SLASH}גר"א` },
   shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
   shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
 };
@@ -116,12 +118,12 @@ export function buildRoshHashanaPoster(year, settings) {
     // it gets the same gap between word and time that every other row has.
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
       { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias, pair(krias.mga, krias.gra)));
+    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { sub: RH_TEXT.krias.basis }));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
     if (isShabbos) {
       lines.push(line(RH_TEXT.drashaBeforeMusaf, []));
-      lines.push(line(RH_TEXT.nineHours, pair(nine.mga, nine.gra)));
+      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { sub: RH_TEXT.nineHours.basis }));
     } else {
       lines.push(line(RH_TEXT.drashaBeforeShofar, []));
       lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }]));

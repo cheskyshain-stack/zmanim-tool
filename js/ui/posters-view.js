@@ -254,7 +254,7 @@ function renderSlichosPoster(poster, settings) {
  *  Same row shape as the סליחות sheet, so the two read alike and share their spacing. A row
  *  with no times is a line of its own (the דרשה announcements), and `extra` carries the
  *  second label-and-time pair that sits on the שחרית line. */
-function rhRow(label, times, extra) {
+function rhRow(label, times, extra, sub) {
   // Slash separated, which is how this sheet writes a pair: "9:47 / 9:11" reads as the two
   // reckonings its label just named. The סליחות sheet uses commas, because its times are a
   // list of מנינים rather than one זמן given two ways.
@@ -267,7 +267,11 @@ function rhRow(label, times, extra) {
     ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
     : '';
-  return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${t}${e}</p>`;
+  // `sub` names the reckonings a זמן is given on, as ס"ז ק"ש is given on מ"א and גר"א. It
+  // wears the label class as well, so it is held off the name in front of it and off the
+  // times after it by the same gap every other row uses.
+  const b = sub ? `<span class="poster-row-label">${esc(sub)}</span>` : '';
+  return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${b}${t}${e}</p>`;
 }
 
 function renderRoshHashanaPoster(poster, settings) {
@@ -280,7 +284,7 @@ function renderRoshHashanaPoster(poster, settings) {
       ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
       ${poster.blocks.map((b) => `
         <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
-        ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra)).join('')}`).join('')}
+        ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
     </div>`;
   return posterShell(settings, body, poster.legend || [], { dense: true });
 }
