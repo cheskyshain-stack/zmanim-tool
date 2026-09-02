@@ -136,8 +136,8 @@ export function parseTimes(str) {
 
 /** The finished poster for one Hebrew year.
  *
- *  The year is the שבת קיץ / שבת חורף year the sheet was generated for. סליחות and עשי"ת
- *  both sit at the very start of a Hebrew year, so this is the year they belong to. */
+ *  The year is the one whose ר"ה this sheet is for, which is the year written on it. The
+ *  סליחות at the top of it are the last days of the year before. */
 export function buildSlichosPoster(hebrewYearNum) {
   if (!hebrewYearNum) return null;
   const days = posterDays(hebrewYearNum);
@@ -163,6 +163,10 @@ export function buildSlichosPoster(hebrewYearNum) {
     hebrewYear: hebrewYearNum,
     rows,
     days,
+    // The days this sheet actually covers, as Excel serials: the first סליחות morning
+    // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
+    // years, since סליחות are the end of one and ערב יו"כ the start of the next.
+    span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

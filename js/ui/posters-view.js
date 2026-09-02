@@ -17,7 +17,7 @@
 import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, SLICHOS_TEXT } from '../posters/slichos.js';
-import { hebrewDateExtended, hebrewYear, roshHashana } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
@@ -62,12 +62,29 @@ function posterYears(state) {
   return { years: [...years].sort((a, b) => a - b), preferred: next };
 }
 
+/** A date the two ways somebody reads it. The Hebrew one comes from jewishDateString, the
+ *  same call the charts print their dates with, so a poster and a board never disagree
+ *  about what day something is. */
+const heDate = (serial) => jewishDateString(serial, false);
+const enDate = (serial) => dateFromSerial(serial)
+  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+/** The dates a poster covers, said in full above it. Not on the sheet itself, which the
+ *  shul wants clean, but on the screen it is chosen from, where the whole question is
+ *  whether this is the right year. A span reads "from עד to" in Hebrew and "from to to" in
+ *  English rather than with a dash, so nothing has to be resolved bidirectionally. */
+function when(from, to) {
+  return to && to !== from
+    ? { he: `${heDate(from)} עד ${heDate(to)}`, en: `${enDate(from)} to ${enDate(to)}` }
+    : { he: heDate(from), en: enDate(from) };
+}
+
 /** "תשפ״ז · ר"ה 12 Sep 2026". The Hebrew year on its own is what caused the confusion, so
  *  the date ר"ה actually falls on rides along and there is nothing left to work out. */
 function yearLabel(y) {
-  const d = dateFromSerial(roshHashana(y - 3761));
-  const when = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${hebrewYear(y)} · ר"ה ${when}`;
+  const on = dateFromSerial(roshHashana(y - 3761))
+    .toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${hebrewYear(y)} · ר"ה ${on}`;
 }
 
 /** The posters this tab knows how to draw. One entry per poster: what to call it, what it
@@ -77,7 +94,9 @@ const POSTERS = [
   {
     key: 'shuva',
     label: 'שבת שובה דרשה',
-    covers: (y) => `The דרשה and מנחה of שבת שובה ${hebrewYear(y)}.`,
+    covers: (y) => `שבת שובה ${hebrewYear(y)}`,
+    // The one Shabbos it is about, read off the week the chart handed back.
+    when: (built) => when(excelSerial(new Date(built.week.date))),
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -93,7 +112,9 @@ const POSTERS = [
   {
     key: 'slichos',
     label: 'סליחות',
-    covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}.`,
+    covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}`,
+    // First סליחות morning through ערב יו"כ, the last line on the sheet.
+    when: (built) => when(built.span.from, built.span.to),
     sources: (state) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -111,11 +132,11 @@ const POSTERS = [
 /** One saved chart, named so it can be told from another of the same season and year.
  *  Which is the whole reason this is ever shown: the two only differ by when they were
  *  generated and by what has been typed over since. */
-function sheetLabel(sheet) {
-  const when = sheet.createdAt
+function chartLabel(sheet) {
+  const made = sheet.createdAt
     ? new Date(sheet.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
     : '';
-  return `${sheet.season} ${sheet.hebrewYear}${when ? `, generated ${when}` : ''}`;
+  return `${sheet.season} ${sheet.hebrewYear}${made ? `, generated ${made}` : ''}`;
 }
 
 /** The שבת שובה poster for a year, found rather than chosen.
@@ -265,11 +286,16 @@ export function renderPosters(container, state) {
       </label>
       ${built ? printButtonHtml() : ''}
     </div>
-    ${source ? `<p class="hint no-print">${esc(poster.covers(source.year))}</p>` : ''}
+    ${built ? (() => { const w = poster.when(built); return `
+      <div class="poster-when no-print">
+        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${esc(poster.covers(source.year))}</div>
+        <div class="poster-when-he" lang="he" dir="rtl">${esc(w.he)}</div>
+        <div class="poster-when-en">${esc(w.en)}</div>
+      </div>`; })() : source ? `<p class="hint no-print">${esc(poster.covers(source.year))}</p>` : ''}
     ${result.conflict
       ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
            <select id="poster-conflict">
-             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(sheetLabel(b.sheet))}</option>`).join('')}
+             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(chartLabel(b.sheet))}</option>`).join('')}
            </select></p>`
       : ''}
     ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;

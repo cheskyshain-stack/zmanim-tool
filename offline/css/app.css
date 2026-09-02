@@ -2714,6 +2714,26 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
 
+/* The dates the poster on screen is for, said in full above it. The sheet itself carries
+   no year (the shul wants it clean), so this is the one place that answers "is this the
+   right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
+   and the English one under each other so neither has to be worked out from the other. */
+.poster-when {
+  margin: 0 0 1.1rem; padding: 0.7rem 0.9rem;
+  border-inline-start: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: 0 6px 6px 0;
+  max-width: 36rem;
+}
+/* Every line flush left, including the Hebrew one, which carries dir="rtl" so its words
+   still run right to left inside the line. Alignment and direction are separate things:
+   without this the Hebrew date hangs off the right of the block while the English sits on
+   the left, and the three lines do not read as one stack. */
+.poster-when > * { text-align: left; }
+.poster-when-what { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 0.3rem; }
+.poster-when-he { font-size: 1.05rem; font-weight: 700; line-height: 1.5; }
+.poster-when-en { font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+
 .poster-bar {
   display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem;
 }
