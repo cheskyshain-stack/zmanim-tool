@@ -4,20 +4,21 @@
 // than built around either: pick a poster, pick what it should be built from, and Print
 // sends what is on the screen. Announcements and the Yom Tov schedules land here next.
 //
-// What a poster is built from differs, so a poster says for itself. שבת שובה comes from a
-// generated sheet, because it reads its times out of that sheet's מנחה cell; סליחות comes
-// from a Hebrew year, because its times are the shul's own fixed מנין slots and what the
-// calendar decides is which days each line covers. Both answer sources(), so the picker
-// does not need to know which kind it is looking at.
+// Both are chosen the same way, by the year of the ר"ה they belong to, because that is the
+// year written on the sheet that gets hung. Where a poster's times come from is this file's
+// problem, not the user's: סליחות works them out from the calendar, and שבת שובה goes and
+// finds the chart that covers it. A chart is named for the season it starts in and a קיץ
+// season runs through to Sukkos of the year after, so קיץ 5786 is the chart holding שבת
+// שובה 5787. Asking "which chart" would have made that everybody's problem.
 //
 // A poster is a real 8.5in by 11in page in the document, the same way a chart page is, so
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
 import { resolveSettings } from '../settings.js';
-import { buildShuvaPoster, shuvaWeekOf, SHUVA_TEXT } from '../posters/shuva.js';
+import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, SLICHOS_TEXT } from '../posters/slichos.js';
-import { hebrewDateExtended, hebrewYear } from '../hebrew-calendar.js';
-import { excelSerial } from '../zmanim/solar.js';
+import { hebrewDateExtended, hebrewYear, roshHashana } from '../hebrew-calendar.js';
+import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
 import { hebrewLang } from '../util.js';
@@ -29,16 +30,44 @@ import { hebrewLang } from '../util.js';
  *  serif Hebrew rather than falling back to a sans. */
 const POSTER_FONT = 'Times New Roman';
 
-/** The Hebrew years to offer the סליחות poster.
+/** The next yomim noraim, as a Hebrew year.
  *
- *  Every year a sheet has been generated for, plus the year we are in now and the one
- *  after it, so the poster can be printed before this year's chart exists. סליחות falls in
- *  the first days of a Hebrew year, so the year on the poster is the year it starts. */
+ *  Both posters are for one ר"ה and the days around it, so that is what they are chosen by.
+ *  The year number turns over at ר"ה, so "this year" stops being the useful answer the
+ *  moment יו"כ is past: in אלול 5786 the calendar still says 5786, but the סליחות a week
+ *  away are for ר"ה 5787. This asks the question the poster asks, which yomim noraim are
+ *  still ahead, and rolls over the day after יו"כ. */
+function nextYomimNoraim(today = new Date()) {
+  const serial = excelSerial(today);
+  const year = hebrewDateExtended(serial).year;
+  const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
+  return serial > yomKippur(year) ? year + 1 : year;
+}
+
+/** The years to offer, and which one to open on.
+ *
+ *  The one coming up, the one before it so last year's sheet can be reprinted, and the one
+ *  after so next year's can be made early. Plus any year a generated chart covers the שבת
+ *  שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const now = hebrewDateExtended(excelSerial(new Date())).year;
-  const years = new Set([now, now + 1]);
-  for (const sheet of state.sheets) if (sheet.hebrewYear) years.add(Number(sheet.hebrewYear));
-  return [...years].sort((a, b) => a - b);
+  const next = nextYomimNoraim();
+  const years = new Set([next - 1, next, next + 1]);
+  for (const sheet of state.sheets) {
+    const week = shuvaWeekOf(sheet);
+    if (!week) continue;
+    // the year that ר"ה opened days before this שבת שובה
+    const y = hebrewDateExtended(excelSerial(new Date(week.date))).year;
+    years.add(y);
+  }
+  return { years: [...years].sort((a, b) => a - b), preferred: next };
+}
+
+/** "תשפ״ז · ר"ה 12 Sep 2026". The Hebrew year on its own is what caused the confusion, so
+ *  the date ר"ה actually falls on rides along and there is nothing left to work out. */
+function yearLabel(y) {
+  const d = dateFromSerial(roshHashana(y - 3761));
+  const when = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${hebrewYear(y)} · ר"ה ${when}`;
 }
 
 /** The posters this tab knows how to draw. One entry per poster: what to call it, what it
@@ -48,30 +77,68 @@ const POSTERS = [
   {
     key: 'shuva',
     label: 'שבת שובה דרשה',
-    sourceLabel: 'From',
-    empty: 'No generated chart covers שבת שובה yet. Generate the season that holds it and this fills in.',
-    sources: (state, settings) =>
-      state.sheets.filter((s) => shuvaWeekOf(s)).map((s) => ({
-        id: s.id,
-        label: `${s.season} ${s.hebrewYear}`,
-        build: () => buildShuvaPoster(s, state, settings),
-      })),
+    covers: (y) => `The דרשה and מנחה of שבת שובה ${hebrewYear(y)}.`,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => buildFromCharts(state, settings, y),
+      }));
+    },
     render: renderShuvaPoster,
   },
   {
     key: 'slichos',
     label: 'סליחות',
-    sourceLabel: 'Year',
-    empty: 'No year to build from.',
-    sources: (state) =>
-      posterYears(state).map((y) => ({
+    covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}.`,
+    sources: (state) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
         id: String(y),
-        label: `${hebrewYear(y)} (${y})`,
-        build: () => buildSlichosPoster(y),
-      })),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildSlichosPoster(y) }),
+      }));
+    },
     render: renderSlichosPoster,
   },
 ];
+
+/** One saved chart, named so it can be told from another of the same season and year.
+ *  Which is the whole reason this is ever shown: the two only differ by when they were
+ *  generated and by what has been typed over since. */
+function sheetLabel(sheet) {
+  const when = sheet.createdAt
+    ? new Date(sheet.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+  return `${sheet.season} ${sheet.hebrewYear}${when ? `, generated ${when}` : ''}`;
+}
+
+/** The שבת שובה poster for a year, found rather than chosen.
+ *
+ *  It reads its times off a chart, but which chart is a question with an answer, so it is
+ *  not put to the user: shuvaSheetsFor finds every generated chart covering that שבת שובה,
+ *  and one of them is normally the only one. Two charts are only worth asking about if they
+ *  actually say different things, which happens when one has a hand-edited cell, so they are
+ *  built and compared and the picker only appears when they genuinely disagree. */
+function buildFromCharts(state, settings, hebrewYearNum) {
+  const sheets = shuvaSheetsFor(state.sheets, hebrewYearNum);
+  if (!sheets.length) {
+    return { missing: `No generated chart covers שבת שובה ${hebrewYear(hebrewYearNum)}. It falls in a קיץ season, which is named for the year before: generate קיץ ${hebrewYearNum - 1} and this fills in.` };
+  }
+  const built = sheets.map((s) => ({ sheet: s, poster: buildShuvaPoster(s, state, settings) }))
+    .filter((b) => b.poster);
+  if (!built.length) return { missing: 'The chart covering that שבת שובה has no מנחה times to read.' };
+  const signature = (p) => JSON.stringify([p.drasha, p.mincha]);
+  const agree = built.every((b) => signature(b.poster) === signature(built[0].poster));
+  if (agree) return { poster: built[0].poster };
+  const pick = built[conflictPick] || built[0];
+  return { poster: pick.poster, conflict: built };
+}
 
 function esc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -136,6 +203,9 @@ function renderSlichosPoster(poster, settings) {
 
 let chosen = POSTERS[0].key;
 let chosenSourceId = null;
+// Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
+// looked at in that case, which is why it is not part of the source id.
+let conflictPick = 0;
 let fitHandler = null;
 
 /** Shrinks the poster until it fits across the screen, which on a phone it does not: the
@@ -171,8 +241,12 @@ export function renderPosters(container, state) {
   const settings = resolveSettings(state.settings);
   const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
   const sources = poster.sources(state, settings);
-  const source = sources.find((s) => s.id === chosenSourceId) || sources[0] || null;
-  const built = source ? source.build() : null;
+  // Opens on the yomim noraim coming up, not on the first year in the list. In אלול the
+  // calendar still says last year, and that is the year somebody would print by mistake.
+  const source = sources.find((s) => s.id === chosenSourceId)
+    || sources.find((s) => s.preferred) || sources[0] || null;
+  const result = source ? source.build() : { missing: 'No year to build from.' };
+  const built = result.poster || null;
 
   container.className = 'is-sheet-view';
   container.innerHTML = `
@@ -184,24 +258,34 @@ export function renderPosters(container, state) {
           ${POSTERS.map((p) => `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
         </select>
       </label>
-      ${sources.length > 1
-        ? `<label>${esc(poster.sourceLabel)}
-             <select id="poster-source">
-               ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
-             </select>
-           </label>`
-        : ''}
+      <label>Year
+        <select id="poster-source">
+          ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+        </select>
+      </label>
       ${built ? printButtonHtml() : ''}
     </div>
-    ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(poster.empty)}</p>`}`;
+    ${source ? `<p class="hint no-print">${esc(poster.covers(source.year))}</p>` : ''}
+    ${result.conflict
+      ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
+           <select id="poster-conflict">
+             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(sheetLabel(b.sheet))}</option>`).join('')}
+           </select></p>`
+      : ''}
+    ${built ? poster.render(built, settings) : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
 
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
-    chosenSourceId = null;
+    conflictPick = 0;
     renderPosters(container, state);
   });
   container.querySelector('#poster-source')?.addEventListener('change', (e) => {
     chosenSourceId = e.target.value;
+    conflictPick = 0;
+    renderPosters(container, state);
+  });
+  container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
+    conflictPick = Number(e.target.value) || 0;
     renderPosters(container, state);
   });
   if (built) {

@@ -16,6 +16,8 @@
 import { rowFor } from '../sheets/rows.js';
 import { erevPlain, erevTimes } from '../erev-text.js';
 import { SHUVA_NAMES } from '../sheets/common.js';
+import { roshHashana } from '../hebrew-calendar.js';
+import { excelSerial } from '../zmanim/solar.js';
 
 /** The lines that are the poster rather than the times: what it is, and who is speaking.
  *
@@ -39,6 +41,29 @@ export function shuvaWeekOf(sheet) {
   // it is not a sheet this poster can come from even though שבת שובה falls inside it.
   if (sheet.season === 'weekday') return null;
   return sheet.weeks.find((w) => SHUVA_NAMES.includes(w.specialParsha)) || null;
+}
+
+/** Every generated chart that carries the שבת שובה of one Hebrew year.
+ *
+ *  This exists because the two numbers do not agree and it is easy to print the wrong
+ *  year. A season is named for the year it starts in, and a קיץ season runs from Pesach
+ *  through to Sukkos of the year AFTER: קיץ 5786 ends 2026-09-19, which is the שבת שובה of
+ *  5787, because ר"ה 5787 is 2026-09-12. So the chart says 5786 and the poster on the wall
+ *  is for 5787. Posters are chosen by the year of the ר"ה they belong to, which is the year
+ *  written on them, and this is what finds the chart behind that.
+ *
+ *  שבת שובה is the Shabbos between ר"ה and יו"כ, so it lands inside the ten days that open
+ *  the year. Normally exactly one chart covers it, but nothing stops two saved sheets from
+ *  covering the same one, so this returns all of them and lets the caller see whether they
+ *  actually disagree. */
+export function shuvaSheetsFor(sheets, hebrewYearNum) {
+  const rh = roshHashana(hebrewYearNum - 3761);
+  return (sheets || []).filter((sheet) => {
+    const week = shuvaWeekOf(sheet);
+    if (!week) return false;
+    const serial = excelSerial(new Date(week.date));
+    return serial > rh && serial < rh + 10;
+  });
 }
 
 /** The poster's content for a sheet, or null when that sheet has no שבת שובה in it.
