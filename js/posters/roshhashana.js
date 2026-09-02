@@ -16,6 +16,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { SLASH } from '../util.js';
 
 const RH_MIN = 1 / 1440;
 const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -66,8 +67,10 @@ export const RH_TEXT = {
   drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  krias: 'ס"ז ק"ש מ"א/ גר"א',
-  nineHours: 'ט\' שעות מ"א/ גר"א',
+  // The two reckonings are joined with the charts' own SLASH, a slash with a non breaking
+  // space each side, so the label breathes the same way the times under it do.
+  krias: `ס"ז ק"ש מ"א${SLASH}גר"א`,
+  nineHours: `ט' שעות מ"א${SLASH}גר"א`,
   shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
   shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
 };
