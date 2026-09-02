@@ -5562,6 +5562,10 @@ function buildShuvaPoster(sheet, state, settings) {
 
 
 
+/** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
+ *  of times: after מעריב, or at half past ten. */
+const YK_AMP = `${NBSP}&${NBSP}`;
+
 const YK_MIN = 1 / 1440;
 const at = (h, m) => (h * 60 + m) / 1440;
 /** Up to the next 5 minutes, and to the nearest 5. */
@@ -5595,7 +5599,9 @@ const YK_TEXT = {
   // where it is in words and the time is underlined as well, which is how the old sheets
   // marked it: the underline is this system's way of saying the same thing.
   maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
-  kiddushLevana: { label: 'קידוש לבנה אחר מעריב &', times: '10:30' },
+  // The gap goes after the name, and what follows is two ways of taking it rather than one
+  // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
+  kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
   nextMorning: 'שחרית יום',
   afterHeading: 'Starting after יום כיפור',
   after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
@@ -5721,7 +5727,8 @@ function buildYomKippurPoster(year, settings) {
     // time מעריב.
     line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
     line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
-    line(YK_TEXT.kiddushLevana.label, [txt(YK_TEXT.kiddushLevana.times)]),
+    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
+      { sep: YK_AMP }),
   ];
 
   // The morning after, which the calendar names and which runs five minutes early.
@@ -6088,7 +6095,7 @@ function renderYomKippurPoster(poster, settings) {
   // A row whose times are a list of מנינים is comma separated; a row naming one זמן on two
   // reckonings keeps the slash. Same split the סליחות and ראש השנה sheets already make.
   const rows = (lines) => lines.map((ln) =>
-    rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.list ? ', ' : SLASH)).join('');
+    rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
     + `<span class="poster-row-label">${esc(label)}</span>`
     + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;

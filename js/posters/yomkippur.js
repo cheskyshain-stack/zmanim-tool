@@ -17,7 +17,11 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
-import { SLASH } from '../util.js';
+import { SLASH, NBSP } from '../util.js';
+
+/** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
+ *  of times: after מעריב, or at half past ten. */
+const YK_AMP = `${NBSP}&${NBSP}`;
 
 const YK_MIN = 1 / 1440;
 const at = (h, m) => (h * 60 + m) / 1440;
@@ -52,7 +56,9 @@ export const YK_TEXT = {
   // where it is in words and the time is underlined as well, which is how the old sheets
   // marked it: the underline is this system's way of saying the same thing.
   maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
-  kiddushLevana: { label: 'קידוש לבנה אחר מעריב &', times: '10:30' },
+  // The gap goes after the name, and what follows is two ways of taking it rather than one
+  // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
+  kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
   nextMorning: 'שחרית יום',
   afterHeading: 'Starting after יום כיפור',
   after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
@@ -178,7 +184,8 @@ export function buildYomKippurPoster(year, settings) {
     // time מעריב.
     line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
     line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
-    line(YK_TEXT.kiddushLevana.label, [txt(YK_TEXT.kiddushLevana.times)]),
+    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
+      { sep: YK_AMP }),
   ];
 
   // The morning after, which the calendar names and which runs five minutes early.

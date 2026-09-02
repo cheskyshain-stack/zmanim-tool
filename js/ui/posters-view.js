@@ -317,7 +317,7 @@ function renderYomKippurPoster(poster, settings) {
   // A row whose times are a list of מנינים is comma separated; a row naming one זמן on two
   // reckonings keeps the slash. Same split the סליחות and ראש השנה sheets already make.
   const rows = (lines) => lines.map((ln) =>
-    rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.list ? ', ' : SLASH)).join('');
+    rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
     + `<span class="poster-row-label">${esc(label)}</span>`
     + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;
