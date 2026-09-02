@@ -22,7 +22,7 @@ import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWee
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang, DAY_NAMES } from '../util.js';
+import { hebrewLang, DAY_NAMES, SLASH } from '../util.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -255,14 +255,17 @@ function renderSlichosPoster(poster, settings) {
  *  with no times is a line of its own (the דרשה announcements), and `extra` carries the
  *  second label-and-time pair that sits on the שחרית line. */
 function rhRow(label, times, extra) {
-  // Slash separated, which is how this sheet writes a pair: "9:47/9:11" reads as the two
+  // Slash separated, which is how this sheet writes a pair: "9:47 / 9:11" reads as the two
   // reckonings its label just named. The סליחות sheet uses commas, because its times are a
   // list of מנינים rather than one זמן given two ways.
+  //
+  // SLASH is the charts' own separator, a slash with a non breaking space each side. A bare
+  // slash sets the two times hard against it and they read as one number.
   const t = times.length
-    ? `<bdi class="poster-row-times">${times.map(timeHtml).join('/')}</bdi>` : '';
+    ? `<bdi class="poster-row-times">${times.map(timeHtml).join(SLASH)}</bdi>` : '';
   const e = extra
     ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
-      + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join('/')}</bdi>`
+      + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
     : '';
   return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${t}${e}</p>`;
 }
