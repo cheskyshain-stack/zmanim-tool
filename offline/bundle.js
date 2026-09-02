@@ -5218,6 +5218,36 @@ function renderShuvaPoster(poster, settings) {
 
 let chosen = POSTERS[0].key;
 let chosenSheetId = null;
+let fitHandler = null;
+
+/** Shrinks the poster until it fits across the screen, which on a phone it does not: the
+ *  page is a real 8.5in and a 375px display is less than half of that, so without this the
+ *  tab opens onto a strip of the sheet with the rest off the side.
+ *
+ *  Same mechanism as the charts' Fit to screen, and for the same reason: `zoom` shrinks the
+ *  box as well as the paint, while `transform: scale` only paints smaller and leaves the
+ *  full-size footprint behind, which is the overflow all over again. print.css forces
+ *  `zoom: 1` back on, so what is on paper is always the full 8.5in.
+ *
+ *  No button beside it, unlike the charts. There is one page and nothing to choose. */
+function fitPoster(container) {
+  const el = container.querySelector('.poster');
+  if (!el) return;
+  const decide = () => {
+    el.style.zoom = ''; // always measure unscaled
+    const box = el.parentElement;
+    const cs = getComputedStyle(box);
+    const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const wide = el.getBoundingClientRect().width;
+    if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+  };
+  decide();
+  // Rotating a phone changes what fits. One listener, replaced each render so it always
+  // points at the poster currently on screen.
+  if (fitHandler) window.removeEventListener('resize', fitHandler);
+  fitHandler = () => { if (document.body.contains(el)) decide(); };
+  window.addEventListener('resize', fitHandler);
+}
 
 function renderPosters(container, state) {
   const settings = resolveSettings(state.settings);
@@ -5258,7 +5288,10 @@ function renderPosters(container, state) {
     chosenSheetId = e.target.value;
     renderPosters(container, state);
   });
-  if (built) wirePrintButton(container);
+  if (built) {
+    wirePrintButton(container);
+    fitPoster(container);
+  }
 }
 
 // ==== ui/program-view.js ====
