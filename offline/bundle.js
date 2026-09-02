@@ -5128,6 +5128,9 @@ const RH_TEXT = {
   chatzos: 'חצות',
   erevMincha: { label: 'מנחה ערב ראש השנה', times: '<u>1:35</u>, 1:50, 2:15, 3:00' },
   shabbos: 'שבת',
+  // Joined to the day with a dot rather than wrapped in brackets: the heading is underlined,
+  // and the underline running under a bracket reads as though it is cutting through it.
+  daySep: ' · ',
   day: ["יום א'", "יום ב'"],
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
@@ -5211,7 +5214,7 @@ function buildRoshHashanaPoster(year, settings) {
     }
 
     return {
-      heading: RH_TEXT.day[i] + (isShabbos ? ` (${RH_TEXT.shabbos})` : ''),
+      heading: RH_TEXT.day[i] + (isShabbos ? RH_TEXT.daySep + RH_TEXT.shabbos : ''),
       isShabbos,
       lines,
     };
