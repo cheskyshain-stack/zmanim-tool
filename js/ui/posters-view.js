@@ -253,11 +253,13 @@ const POSTERS = [
     label: 'All of them, one after another',
     covers: (y) => `Every poster for ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
-    // No Page picker on this one. A run is portrait throughout, which is not a choice made
-    // here: Chrome puts one page size on a whole PDF, so a run cannot mix the two. Measured,
-    // printing the run with the pair sheets set landscape put those two 11in sheets onto
-    // 8.5in pages and cut them. Six of the eight are portrait only anyway. Either pair sheet
-    // can still be printed landscape by picking it on its own.
+    // The Page picker works here too, and a landscape sheet in a run is turned on its side
+    // rather than left out. Chrome puts one page size on a whole PDF, so a run genuinely
+    // cannot mix the two: set landscape and printed straight, those 11in sheets went onto
+    // 8.5in pages and were cut. An 11in by 8.5in sheet rotated a quarter turn is 8.5in by
+    // 11in, which is the page the rest of the run is on, so it fits whole and is read by
+    // turning the paper.
+    orientations: true,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -294,7 +296,14 @@ function buildEveryPoster(state, settings, year) {
     } catch {
       result = null;
     }
-    if (result && result.poster) items.push({ key: p.key, label: p.label, poster: result.poster, render: p.render });
+    if (result && result.poster) {
+      items.push({
+        key: p.key, label: p.label, poster: result.poster, render: p.render,
+        // Whether this one reads the Page picker, which is what decides if it has to be
+        // turned on its side to sit in the run.
+        orientations: Boolean(p.orientations),
+      });
+    }
     else missing.push(p.label);
   }
   if (!items.length) return { missing: 'Nothing to build for this year.' };
@@ -316,16 +325,26 @@ function buildEveryPoster(state, settings, year) {
  *  Nothing is redrawn for this view: an item is the poster's own markup, so what is in the
  *  run is what comes out when that poster is picked on its own. The name above each is
  *  no-print, so paper gets the sheets and nothing else. */
-function renderAllPosters(built, settings) {
+function renderAllPosters(built, settings, { landscape = false } = {}) {
+  // A sheet set landscape is turned a quarter turn and sat on a portrait page, since a run
+  // can only be one page size. The turning is .is-sideways in app.css: the wrapper is the
+  // portrait page and the sheet inside it is taken out of the flow and rotated, so its 11in
+  // width cannot push the page wider.
+  const sideways = landscape;
   return `<div class="poster-all">
-    ${built.items.map((it) => `<div class="poster-all-item">
-        <p class="poster-all-name no-print">${esc(it.label)}</p>
-        ${it.render(it.poster, settings, { landscape: false })}
-      </div>`).join('')}
+    ${built.items.map((it) => {
+      const turned = sideways && it.orientations;
+      return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
+        <p class="poster-all-name no-print">${esc(it.label)}${turned ? ' (turned on its side)' : ''}</p>
+        ${it.render(it.poster, settings, { landscape: turned })}
+      </div>`;
+    }).join('')}
     ${built.notBuilt.length
       ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${esc(built.notBuilt.join(', '))}</p>`
       : ''}
-    <p class="hint no-print">Every sheet here is portrait, because one print run can only be one way up. To print either of the two on one page sheets landscape, pick it on its own above.</p>
+    <p class="hint no-print">${sideways
+      ? 'The two sheets that can be set either way up are on their side here, because one print run can only be one page size. They come out whole on the same paper as the rest; turn the sheet to read them.'
+      : 'Set Page to Landscape to have the two sheets that can be set either way up come out that way, turned on their side so they still fit the run.'}</p>
   </div>`;
 }
 
@@ -712,7 +731,10 @@ function fitPoster(container) {
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
   // measured and scaled on its own, so a portrait sheet is not shrunk to fit a landscape
   // one that happens to be under it.
-  const all = [...container.querySelectorAll('.poster')];
+  // A sheet turned on its side is scaled by its wrapper rather than by itself: rotation
+  // leaves the sheet's own box 11in wide whatever it looks like, and it is the wrapper, the
+  // portrait page it is sitting on, that has to fit the screen.
+  const all = [...container.querySelectorAll('.poster')].map((el) => el.closest('.is-sideways') || el);
   if (!all.length) return;
   const decide = () => {
     for (const el of all) {

@@ -2751,6 +2751,32 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: var(--fs-sm); font-weight: 600; color: var(--muted);
   margin: 0 0 0.4rem; text-align: center;
 }
+/* A landscape sheet in the run, turned a quarter turn so it sits on the same portrait page
+   as everything else. A run can only be one page size, so this is what lets a sheet that is
+   11in by 8.5in be in one at all: turned, it is 8.5in by 11in, which is the page.
+
+   The wrapper is the page. The sheet inside is taken out of the flow before it is rotated,
+   because a rotated box keeps its own width in the layout: left in the flow its 11in would
+   push the page wider and Chrome would tile the print. Out of flow it cannot, and the
+   wrapper stays exactly a portrait sheet.
+
+   Rotated about its own centre, and the centres are made to coincide, so an 11in by 8.5in
+   sheet lands centred on the 8.5in by 11in page with nothing hanging off an edge.
+
+   A quarter turn anticlockwise, which puts the head of the sheet against the left edge of
+   the page. That is the way round a landscape page normally sits in a portrait document:
+   the paper is turned clockwise to read it. */
+.poster-all-item.is-sideways {
+  width: 8.5in; height: 11in;
+  position: relative; overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.poster-all-item.is-sideways .poster {
+  position: absolute; top: 50%; left: 50%;
+  margin: 0; box-shadow: none;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
 
 /* The one poster whose title is an English sentence. */
 .poster-title-ltr { text-align: center; }

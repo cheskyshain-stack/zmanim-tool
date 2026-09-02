@@ -231,4 +231,10 @@
   .poster-all { gap: 0; }
   .poster-all-item { break-after: page; break-inside: avoid; }
   .poster-all-item:last-child { break-after: auto; }
+  /* A turned sheet is on a portrait page like the rest of the run, so it must not claim the
+     landscape one: left to `page: posterland` it would ask for a second page size in a
+     document that can only have one, and Chrome would put the whole run on landscape paper.
+     The wrapper keeps the shadow off paper too. */
+  .poster-all-item.is-sideways { box-shadow: none; }
+  .poster-all-item.is-sideways .poster.is-landscape { page: poster; }
 }
