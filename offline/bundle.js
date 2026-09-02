@@ -5591,6 +5591,10 @@ const YK_TEXT = {
   yizkor: { label: 'יזכור בערך', times: '11:55' },
   mincha: 'מנחה',
   neila: 'נעילה',
+  // A third מעריב for anyone who has not davened yet, on every year's sheet. The label says
+  // where it is in words and the time is underlined as well, which is how the old sheets
+  // marked it: the underline is this system's way of saying the same thing.
+  maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
   kiddushLevana: { label: 'קידוש לבנה אחר מעריב &', times: '10:30' },
   nextMorning: 'שחרית יום',
   afterHeading: 'Starting after יום כיפור',
@@ -5716,6 +5720,7 @@ function buildYomKippurPoster(year, settings) {
     // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
     // time מעריב.
     line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
+    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
     line(YK_TEXT.kiddushLevana.label, [txt(YK_TEXT.kiddushLevana.times)]),
   ];
 
