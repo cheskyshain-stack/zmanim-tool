@@ -18,7 +18,7 @@ import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, shuvaWeekOf, shuvaSheetsFor, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos.js';
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
-import { buildYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
+import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
@@ -153,6 +153,23 @@ const POSTERS = [
       }));
     },
     render: renderYomKippurPoster,
+  },
+  {
+    key: 'afteryk',
+    label: 'Starting after יום כיפור',
+    covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildAfterYomKippurPoster(y, settings) }),
+      }));
+    },
+    render: renderAfterYomKippurPoster,
   },
   {
     key: 'slichos',
@@ -338,6 +355,36 @@ function renderYomKippurPoster(poster, settings) {
       </div>
     </div>`;
   return posterShell(settings, body, poster.legend || [], { dense: true });
+}
+
+/** The everyday schedule from after יו"כ to סוכות, given a sheet of its own.
+ *
+ *  Same times as the box on the יום כיפור sheet, laid out the way the shul hangs this one:
+ *  a heading per תפילה and the times under it, broken over two lines so a run of ten does
+ *  not have to be set small enough to fit on one. */
+function renderAfterYomKippurPoster(poster, settings) {
+  // Halved rather than wrapped, so the two lines are even and always break in the same
+  // place rather than wherever the width happens to run out.
+  const half = (times) => {
+    const cut = Math.ceil(times.length / 2);
+    return [times.slice(0, cut), times.slice(cut)].filter((r) => r.length);
+  };
+  const timeLine = (times) =>
+    `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
+  const section = (title, times) => `
+    <div class="poster-set">
+      <h3 class="poster-set-head" lang="he">${esc(title)}</h3>
+      ${half(times).map(timeLine).join('')}
+    </div>`;
+  const a = poster.after;
+  const body = `
+    <h2 class="poster-title poster-title-ltr" dir="ltr">${esc(YK_TEXT.afterHeading)}</h2>
+    <div class="poster-sets">
+      ${section(YK_TEXT.afterBig.shacharis, a.shacharis)}
+      ${section(YK_TEXT.afterBig.mincha, a.mincha)}
+      ${section(YK_TEXT.afterBig.maariv, a.maariv)}
+    </div>`;
+  return posterShell(settings, body, poster.legend || []);
 }
 
 let chosen = POSTERS[0].key;

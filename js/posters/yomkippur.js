@@ -62,6 +62,9 @@ export const YK_TEXT = {
   nextMorning: 'שחרית יום',
   afterHeading: 'Starting after יום כיפור',
   after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
+  // The same three names again, without the colon, for the sheet that gives the schedule a
+  // page of its own and sets them as headings.
+  afterBig: { shacharis: 'שחרית', mincha: 'מנחה', maariv: 'מעריב' },
 };
 
 /** The everyday שחרית as the boards print it, read out of settings so the poster and the
@@ -141,6 +144,50 @@ const AFTER_MAARIV_REST = [
   [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],
 ];
 
+/** The everyday schedule that runs from after יו"כ until סוכות.
+ *
+ *  Shared, because it is both the box at the foot of the יום כיפור sheet and a sheet of its
+ *  own. The everyday שחרית comes out of settings, so the posters and the boards cannot
+ *  drift. */
+export function buildAfterYomKippur(year, settings) {
+  const rh = roshHashana(year - 3761);
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+  const runDays = afterYomKippurDays(rh, settings);
+  const earliest = runDays.length
+    ? Math.min(...runDays.map((d) => d.shkia))
+    : Z.sunsetElev(dateFromSerial(rh + 9), settings);
+  return {
+    shacharis: weekdayShacharis(settings),
+    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
+    mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
+    maariv: [tm(afterEarlyMaariv(earliest), true),
+      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
+    earliestShkia: formatTime(earliest),
+  };
+}
+
+/** The same schedule as a sheet in its own right, set large with a heading per תפילה. */
+export function buildAfterYomKippurPoster(year, settings) {
+  if (!year) return null;
+  const rh = roshHashana(year - 3761);
+  const after = buildAfterYomKippur(year, settings);
+  const all = [...after.shacharis, ...after.mincha, ...after.maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  return {
+    hebrewYear: year,
+    // From the morning after יו"כ through ערב סוכות, which is what it covers.
+    span: { from: rh + 10, to: rh + 13 },
+    after,
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
 export function buildYomKippurPoster(year, settings) {
   if (!year) return null;
   const rh = roshHashana(year - 3761);
@@ -195,17 +242,8 @@ export function buildYomKippurPoster(year, settings) {
     times: fiveEarlier(weekdayShacharis(settings)),
   };
 
-  // The box: the days between יו"כ and סוכות, set by the earliest שקיעה among them.
-  const runDays = afterYomKippurDays(rh, settings);
-  const earliest = runDays.length ? Math.min(...runDays.map((d) => d.shkia)) : ykShkia;
-  const after = {
-    shacharis: weekdayShacharis(settings),
-    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
-    mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
-    maariv: [tm(afterEarlyMaariv(earliest), true),
-      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
-    earliestShkia: formatTime(earliest),
-  };
+  // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
+  const after = buildAfterYomKippur(year, settings);
 
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
