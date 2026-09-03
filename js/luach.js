@@ -16,7 +16,7 @@ import { wireSecretDoor } from './ui/nav-helpers.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { currentPosters, fitPoster } from './ui/posters-view.js';
-import { printButtonHtml, wirePrintButton } from './ui/print-page.js';
+import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
 
 const main = document.getElementById('main');
 
@@ -618,15 +618,20 @@ function schedulesNow(published) {
  *  by itself: enDate reads the day out of DAY_NAMES rather than out of a locale, and no
  *  locale has Shabbos in it.
  *
- *  Print only when there is one sheet up. Printing a run of them is broken in Chrome (see
- *  the note on the poster run), and a button that puts out blank pages is worse than no
- *  button; one sheet on its own prints correctly. */
+ *  Print takes whatever is up, one sheet a page. It used to appear only where there was a
+ *  single sheet, because a run of them came out as one page and the rest thrown away, and a
+ *  button that does that is worse than no button. Both halves of that are fixed: see
+ *  setPrintPage for the pagination and the .luach-sheet block in print.css for the box the
+ *  sheets are laid out in. */
 function renderSchedulesPage(published) {
   stopNextUp();
   const sheets = schedulesNow(published);
+  // Every sheet that can be up here is portrait: currentPosters leaves out the one that
+  // can be turned. See setPrintPage for why the page size comes from the view.
+  setPrintPage('letter portrait');
   main.className = '';
   main.innerHTML = backBar('schedules') + `<div class="luach-sheets">
-    ${sheets.length === 1 ? `<div class="luach-sheet-print no-print">${printButtonHtml('sheet-print')}</div>` : ''}
+    ${sheets.length ? `<div class="luach-sheet-print no-print">${printButtonHtml('sheet-print')}</div>` : ''}
     ${sheets.length
       ? sheets.map((sh) => `<section class="luach-sheet">
           <h2 class="luach-sheet-name no-print"${hebrewLang(sh.label)}>${escAttr(sh.label)}</h2>
@@ -639,8 +644,10 @@ function renderSchedulesPage(published) {
           <a href="/chart/">${escAttr(PAGE_NAMES.chart)}</a>.</p>`}
   </div>`;
   openTheDoor();
-  if (sheets.length) fitPoster(main.querySelector('.luach-sheets'));
-  if (sheets.length === 1) wirePrintButton(main, 'sheet-print');
+  if (sheets.length) {
+    fitPoster(main.querySelector('.luach-sheets'));
+    wirePrintButton(main, 'sheet-print');
+  }
 }
 
 function renderChartPage(published) {

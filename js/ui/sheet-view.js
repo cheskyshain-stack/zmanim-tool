@@ -10,6 +10,7 @@ import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
+import { setPrintPage } from './print-page.js';
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -128,6 +129,9 @@ export function renderSheet(container, state, sheet, onChange) {
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
   const hist = getHistory(sheet.id);
+  // A board is 11in across. See setPrintPage for why the document's one page size is set
+  // from the view rather than from a named page in the stylesheet.
+  setPrintPage('letter landscape');
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>

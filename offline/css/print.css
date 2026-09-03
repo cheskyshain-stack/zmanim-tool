@@ -1,3 +1,11 @@
+/* The document's one page size, and the only @page in this file. It is landscape because
+   the wall charts are what this site is for, and it is what a browser running no
+   JavaScript gets. Every view that can be printed overrides it from js/ui/print-page.js
+   before it draws, portrait for the cards and the posters, landscape again for a board.
+
+   There were four named pages here instead (weekcard, pair, poster, posterland), which is
+   the textbook answer to a document holding two shapes of sheet. They are gone because
+   they broke printing a run: read setPrintPage for the measurements. */
 @page {
   size: letter landscape;
   margin: 0;
@@ -94,12 +102,8 @@
 /* --- The week cards on paper -------------------------------------------------------
    Almost nothing to do: the card is already a letter page on screen, so printing it is a
    matter of giving it the page to sit on and dropping the app's chrome. What you see is
-   what comes out.
-
-   A named page, because the wall charts above claim @page for letter landscape and a
-   second bare @page would fight them. Only the cards carry `page: weekcard`. */
-@page weekcard { size: letter portrait; margin: 0; }
-
+   what comes out. The paper is turned portrait by renderWeek, which is where every view's
+   page size is now settled. */
 @media print {
   .week-cards { display: block; gap: 0; }
   /* Descendant, not child, deliberately. zoom: 1 here is what keeps the screen's
@@ -107,7 +111,6 @@
      card had been wrapped in something would put a shrunken page on paper. That has
      happened before. */
   .week-cards .week-card {
-    page: weekcard;
     /* The on-screen zoom is a way of fitting a page into a window; paper has no such
        problem and the page must come out at its real size. */
     zoom: 1 !important;
@@ -130,12 +133,7 @@
 
 /* Both week cards on one sheet, under one header. Portrait, the same paper a card uses:
    a column of times wants height rather than width, and this way there is nothing to
-   arrange in the print dialog either.
-
-   Still its own named page rather than borrowing weekcard, because the two want
-   different things of a page break: a card ends with break-after: page so the next one
-   starts on a fresh sheet, and this sheet is the whole run. */
-@page pair { size: letter portrait; margin: 0; }
+   arrange in the print dialog either. */
 @media print {
   /* No body class gating this. The sheet is a view: it is either on the screen, in which
      case it is what should be printed, or it does not exist.
@@ -145,7 +143,6 @@
      before this squeezed two whole cards side by side at 0.64, which is where the small
      type and the blank strip along the bottom came from. */
   .week-pair {
-    page: pair;
     zoom: 1 !important;
     border: none;
     box-shadow: none;
@@ -157,10 +154,10 @@
   }
   .week-cards > .week-pair:last-child,
   .week-cards > :last-child .week-pair { break-after: auto; }
-  /* The columns are .week-card and would otherwise claim the weekcard page from inside
-     this one, which is two page contexts for one box, and weekcard's break-after: page
-     would put a blank sheet out after the pair. */
-  .week-pair .week-card { page: pair; break-after: auto; }
+  /* The columns are .week-card, and the rule above gives every card break-after: page.
+     Inside a pair that would put a blank sheet out after it, so the break is taken back
+     here: the pair itself is the thing that ends the sheet. */
+  .week-pair .week-card { break-after: auto; }
   .week-pair, .week-pair * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
@@ -175,18 +172,14 @@
    version stacked them and needed rules to keep a landscape wall-chart page out of the
    middle of a week's cards. */
 
-/* A poster is 8.5in by 11in portrait, its own named page so it does not fight the wall
-   charts' landscape @page above. Only the poster carries `page: poster`. */
-@page poster { size: letter portrait; margin: 0; }
-/* The one sheet that can be set the other way up: ראש השנה and יום כיפור together. Its own
-   named page, because @page poster above is portrait and a landscape sheet asked to print on
-   it comes out scaled down inside a portrait box. */
-@page posterland { size: letter landscape; margin: 0; }
+/* A poster is 8.5in by 11in portrait, except for the one sheet that can be set the other
+   way up (ראש השנה and יום כיפור together). renderPosters asks which of the two is on the
+   screen and sets the paper to match, and a run of posters is portrait however many turned
+   sheets are in it: they go on their side instead. */
 @media print {
-  .poster.is-landscape { page: posterland; }
   /* zoom back to 1, the same guard .pages carries: a phone shrinks the poster on screen so
      it fits across the display, and that must never reach paper. */
-  .poster { page: poster; margin: 0; box-shadow: none; break-inside: avoid; zoom: 1 !important; }
+  .poster { margin: 0; box-shadow: none; break-inside: avoid; zoom: 1 !important; }
   /* Nothing else on the tab reaches paper: the picker and the Print button are no-print
      already, and the heading above them goes with them. */
   body:has(.poster) h2.no-print, body:has(.poster) p.hint { display: none !important; }
@@ -200,19 +193,29 @@
      uploaded elsewhere.
      Pinning the boxes the poster sits in to the size of the sheet leaves nothing to tile.
      Measured by counting /Count in the PDF: three pages before, one after. Scoped to
-     :has(.poster) so the charts, which are landscape and print correctly, are untouched. */
-  body:has(.poster):not(:has(.poster-all)),
-  body:has(.poster):not(:has(.poster-all)) .app-shell,
-  body:has(.poster):not(:has(.poster-all)) main {
+     :has(.poster) so the charts, which are landscape and print correctly, are untouched.
+
+     Both runs are excluded by name rather than by cascade order. A pin to one sheet clips
+     everything after the first, and a rule that stopped applying because another one below
+     happened to be more specific is not something to be relying on for that. */
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)),
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) .app-shell,
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) main {
     width: 8.5in; height: 11in;
     margin: 0; padding: 0;
     overflow: hidden;
   }
   /* Same again for the landscape sheet, the other way round. One class more specific than
-     the rule above, so it wins wherever it applies and the portrait rule is left alone. */
-  body:has(.poster.is-landscape):not(:has(.poster-all)),
-  body:has(.poster.is-landscape):not(:has(.poster-all)) .app-shell,
-  body:has(.poster.is-landscape):not(:has(.poster-all)) main {
+     the rule above, so it wins wherever it applies and the portrait rule is left alone.
+     Which means it has to carry the same two exclusions, or it stops being more specific
+     and the sheet goes back to being pinned portrait: adding the .luach-sheet one above
+     and not here turned this sheet into two pages, half of it on each. :has() and :not()
+     take the specificity of their most specific argument, and `.luach-sheet +
+     .luach-sheet` is two classes, so leaving it off cost this rule the cascade by a
+     margin rather than by a hair. */
+  body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)),
+  body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) .app-shell,
+  body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) main {
     width: 11in; height: 8.5in;
   }
   /* The run of every poster is the one case where there is more than one sheet on the tab,
@@ -231,10 +234,21 @@
   .poster-all { gap: 0; }
   .poster-all-item { break-after: page; break-inside: avoid; }
   .poster-all-item:last-child { break-after: auto; }
-  /* A turned sheet is on a portrait page like the rest of the run, so it must not claim the
-     landscape one: left to `page: posterland` it would ask for a second page size in a
-     document that can only have one, and Chrome would put the whole run on landscape paper.
-     The wrapper keeps the shadow off paper too.
+  /* The congregation's Special Schedules is the same thing again: more than one sheet on
+     one screen, so the boxes round them cannot be pinned to a single sheet either. The
+     selector asks for two sections rather than for the page, because one sheet up is the
+     ordinary case and it should go on printing the way a single poster does. */
+  body:has(.luach-sheet + .luach-sheet),
+  body:has(.luach-sheet + .luach-sheet) .app-shell,
+  body:has(.luach-sheet + .luach-sheet) main {
+    width: max-content; height: auto;
+    margin: 0; padding: 0;
+    overflow: visible;
+  }
+  .luach-sheets { gap: 0; }
+  .luach-sheet { break-after: page; break-inside: avoid; }
+  .luach-sheet:last-child { break-after: auto; }
+  /* The wrapper keeps a turned sheet's shadow off paper.
 
      zoom: 1 for the same reason .poster carries it, and it has to be said here as well as
      there. Fit to screen scales a turned sheet by this wrapper rather than by the sheet
@@ -244,13 +258,12 @@
      printed at the 0.42 the screen had them at, a small sheet adrift on a letter page.
      A desktop never showed it, having no zoom to reset. */
   .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
-  .poster-all-item.is-sideways .poster.is-landscape { page: poster; }
 }
 
 /* --- The same thing again, for the boxes that are portrait ---------------------------
    Everything above this point about iOS Safari is true of these too, and they never got the
    treatment. A week card, the two-card sheet and a poster are each exactly 8.5in by 11in
-   with a @page asking for letter portrait and no margin. A desktop obliges. An iPhone
+   with the page asked for letter portrait and no margin. A desktop obliges. An iPhone
    ignores the size descriptor, prints on whatever the person picked, and adds margins that
    cannot be zeroed, so an 8.5in box does not fit the printable area it actually gets: it
    hangs off the sheet and the sides are cut. Reported from a phone as the week card coming
@@ -272,8 +285,10 @@
    !important because the rules above pin all three to zoom: 1 to keep the screen's
    fit-to-window off paper, and that pin has to be beaten here without being removed there.
 
-   Not the run of every poster. That does not print correctly on any platform yet and is a
-   thing of its own; scaling it would only make it differently wrong. */
+   Not the run of every poster, which is left at full size for now. The run paginates
+   correctly again, but a turned sheet in it is rotated about its corner and a zoom on top
+   of that is a second thing to be sure of on paper this cannot be measured on. One sheet
+   at a time is the way to print from a phone regardless. */
 @media print and (max-width: 8.49in) {
   .week-pair, .week-cards .week-card, .poster {
     zoom: clamp(0.72, min(calc(100vw / 8.5in), calc(100vh / 11in)), 1) !important;

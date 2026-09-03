@@ -19,7 +19,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateStri
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH, DAY_NAMES, hebrewLang } from '../util.js';
-import { printButtonHtml, wirePrintButton } from './print-page.js';
+import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
@@ -1175,6 +1175,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
   const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
+  // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
+  // rather than width. See setPrintPage for why the document's one page size is set from
+  // the view rather than from a named page in the stylesheet.
+  setPrintPage('letter portrait');
 
   container.innerHTML = `
     ${

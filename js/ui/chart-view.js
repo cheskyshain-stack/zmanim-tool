@@ -12,7 +12,7 @@
 import { resolveSettings } from '../settings.js';
 import { weekEndsMins } from '../upcoming.js';
 import { buildSheetPages, syncPageHeights } from './sheet-view.js';
-import { printButtonHtml, wirePrintButton } from './print-page.js';
+import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { currentSerial, wireSwipe, wireSecretTaps, navUnlocked, unlockNav } from './nav-helpers.js';
@@ -136,6 +136,9 @@ export function renderChartBrowser(container, state, opts = {}) {
   let at = spreadIndexForNow(spreads, state, settings);
 
   const draw = () => {
+    // A board is 11in across. See setPrintPage for why the document's one page size is set
+    // from the view rather than from a named page in the stylesheet.
+    setPrintPage('letter landscape');
     // Asked every draw rather than once, so the redraw that follows the taps comes out
     // with the navigation on it.
     const held = confine && !navUnlocked();

@@ -3709,6 +3709,44 @@ function wirePrintButton(root, id = 'print-btn') {
   root.querySelector(`#${id}`)?.addEventListener('click', () => window.print());
 }
 
+/* --- Which way up the paper goes ------------------------------------------------------
+   The wall charts are landscape and everything else here (week cards, the two-card sheet,
+   the posters) is portrait, so the document needs two page sizes. CSS has an answer for
+   that, named pages: `@page poster { size: letter portrait }` plus `page: poster` on the
+   box. That is what this used to do, and for one sheet on a screen it works.
+
+   It does not survive a run. Printing every poster at once came out as ten sheets of which
+   only four had anything on them, and the cause turned out to be the named pages
+   themselves: with any `page:` in the document Chrome mispaginates the run, whatever the
+   named page says. Measured by counting interior ink page by page in the PDF, over a
+   six sheet run:
+
+     named pages, as shipped ............ 10 pages, 4 with content
+     `page: auto` on the sheets only .... 16 pages, every sheet split across two
+     bare `@page portrait` only .......... 8 pages, every one whole
+
+   So there are no named pages left. There is one bare `@page`, and the view on the screen
+   says what it should be, from here, before anything can be printed. A screen only ever
+   holds one kind of sheet, so one page size is all a document ever needs.
+
+   Written as a style element rather than a stylesheet rule because the size is not known
+   until the view is built, and appended to the head so it comes after css/print.css and
+   wins the cascade against the landscape default there. That default is what a browser
+   with no JavaScript gets, and it is the charts' orientation because the charts are the
+   thing this site is for. */
+function setPrintPage(size) {
+  let el = document.getElementById('print-page-size');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'print-page-size';
+    document.head.appendChild(el);
+  }
+  const css = `@page { size: ${size}; margin: 0; }`;
+  // Only when it changes: rewriting a style element invalidates styles for the whole
+  // document, and these render functions run on every arrow press.
+  if (el.textContent !== css) el.textContent = css;
+}
+
 // ==== ui/rich-text.js ====
 // Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
 // (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
@@ -4053,6 +4091,9 @@ function renderSheet(container, state, sheet, onChange) {
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
   const hist = getHistory(sheet.id);
+  // A board is 11in across. See setPrintPage for why the document's one page size is set
+  // from the view rather than from a named page in the stylesheet.
+  setPrintPage('letter landscape');
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
@@ -4691,6 +4732,9 @@ function renderChartBrowser(container, state, opts = {}) {
   let at = spreadIndexForNow(spreads, state, settings);
 
   const draw = () => {
+    // A board is 11in across. See setPrintPage for why the document's one page size is set
+    // from the view rather than from a named page in the stylesheet.
+    setPrintPage('letter landscape');
     // Asked every draw rather than once, so the redraw that follows the taps comes out
     // with the navigation on it.
     const held = confine && !navUnlocked();
@@ -7219,6 +7263,13 @@ function renderPosters(container, state, routeChanged, tables) {
     again();
   });
   if (built) {
+    /* Which way up the paper goes, asked of the sheet that was actually drawn rather than
+       of the picker, because the two do not always agree: the run holds a landscape sheet
+       and still prints on portrait paper, turned on its side (see .is-sideways). One page
+       size a document, so a run is portrait even where a sheet in it is not. */
+    const landscape = !container.querySelector('.poster-all')
+      && Boolean(container.querySelector('.poster.is-landscape'));
+    setPrintPage(landscape ? 'letter landscape' : 'letter portrait');
     wirePrintButton(container);
     // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
     // would not change where a line breaks, but measuring the unscaled sheet is one less
@@ -9546,6 +9597,10 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
   const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
+  // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
+  // rather than width. See setPrintPage for why the document's one page size is set from
+  // the view rather than from a named page in the stylesheet.
+  setPrintPage('letter portrait');
 
   container.innerHTML = `
     ${

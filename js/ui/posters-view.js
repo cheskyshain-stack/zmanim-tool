@@ -23,7 +23,7 @@ import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
-import { printButtonHtml, wirePrintButton } from './print-page.js';
+import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
 import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
 
@@ -1081,6 +1081,13 @@ export function renderPosters(container, state, routeChanged, tables) {
     again();
   });
   if (built) {
+    /* Which way up the paper goes, asked of the sheet that was actually drawn rather than
+       of the picker, because the two do not always agree: the run holds a landscape sheet
+       and still prints on portrait paper, turned on its side (see .is-sideways). One page
+       size a document, so a run is portrait even where a sheet in it is not. */
+    const landscape = !container.querySelector('.poster-all')
+      && Boolean(container.querySelector('.poster.is-landscape'));
+    setPrintPage(landscape ? 'letter landscape' : 'letter portrait');
     wirePrintButton(container);
     // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
     // would not change where a line breaks, but measuring the unscaled sheet is one less
