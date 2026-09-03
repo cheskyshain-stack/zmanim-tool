@@ -3036,6 +3036,91 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
 
+/* --- The whole season on one sheet ---------------------------------------------------
+   Ten blocks of times where a poster carries one, so everything here is the opposite of what
+   the sheets above are: small type, tight rows, and rules doing the work that white space
+   does on a sheet read from across a room. It is meant for a hand or a fridge, not a wall.
+
+   No frame. The triple rule the posters carry is 9pt of ink round an already crowded page,
+   and what it is there for, telling one sheet from the next on a noticeboard, is not a job
+   this one has. It keeps the letterhead, in the short form the two-schedule sheets use
+   (is-chart-head), which is where the height for a tenth block comes from.
+
+   The type is set by fitOnePage rather than written down, since how much there is to fit is
+   a question about the year: --op-scale multiplies every size below. */
+.poster.is-onepage {
+  --op-scale: 1;
+  --op-ink: #16283f;      /* the navy of the wordmark on the congregation's site */
+  --op-band: #f4efe3;
+  --op-rule: #b99a55;
+  --op-hair: #e2dccc;
+  padding: 0.42in 0.5in 0.42in;
+}
+/* The two rules that make the frame, off. They are a ::before and a ::after on .poster, so
+   there is nothing to unset: the content property is what draws them. */
+.poster.is-onepage::before,
+.poster.is-onepage::after { content: none; }
+.onepage-title {
+  width: 100%; margin: 0 0 0.1in;
+  padding-bottom: 0.05in;
+  border-bottom: 1.5pt solid var(--op-rule);
+  text-align: center; color: var(--op-ink);
+  font-size: calc(15pt * var(--op-scale)); font-weight: 700;
+}
+/* Two columns by CSS rather than by two boxes with the blocks handed out between them, so a
+   year that runs long or short needs nothing said about it here and the blocks stay in one
+   list in the order the days come. The sheet is dir="rtl", so the first column is the
+   right-hand one, which is where a Hebrew page starts.
+
+   column-fill: auto, not balance. Balance is the default and it minimises the height: the two
+   columns come out level with each other and both stop wherever the content ran out, which
+   here was two and a half inches short of the foot with the type already set small to get
+   there. auto fills the first column to the bottom of the box and puts the rest in the
+   second, which is a page filled rather than a page half used, and it is what fitOnePage
+   sizes the type against.
+
+   min-height: 0 because a flex item's default floor is its content, and without it the
+   columns would push the sheet past its 11in instead of the type being set to fit. */
+.onepage-cols {
+  width: 100%; flex: 1; min-height: 0;
+  columns: 2; column-gap: 0.26in; column-fill: auto;
+  column-rule: 0.75pt solid var(--op-hair);
+}
+/* A block never breaks across the two columns: half a schedule at the foot of one and half
+   at the head of the other is worse than an uneven pair of columns. */
+.onepage-sec { break-inside: avoid; margin: 0 0 0.1in; }
+.onepage-sec-head {
+  margin: 0 0 0.01in; padding: 0.03in 0.06in;
+  background: var(--op-band);
+  border-top: 1pt solid var(--op-rule);
+  color: var(--op-ink); text-align: right;
+  font-size: calc(10.5pt * var(--op-scale)); font-weight: 700; line-height: 1.3;
+}
+/* The name on the right and the times on the left, which is how a timetable is read. Baseline
+   alignment keeps the first line of a two-line run of times level with the name beside it.
+
+   The leading and the padding are as tight as they are because every run of מנינים on this
+   sheet is cut in two (see ONEPAGE_PER_LINE), so the sheet carries about seventy-five lines
+   where it carries fifty-nine rows. At 1.3 leading that cut the type from 98% to 85%; at 1.2
+   it comes back to 95%, which is the whole of what these two numbers are for. */
+.onepage-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 0.1in; padding: 0.014in 0.06in;
+  border-bottom: 0.5pt solid var(--op-hair);
+  font-size: calc(9.5pt * var(--op-scale)); line-height: 1.2;
+}
+.onepage-sec > .onepage-row:last-child { border-bottom: 0; }
+.onepage-label { text-align: right; }
+/* The reckonings a זמן is given on (מ"א / גר"א), held off the name in front of it. */
+.onepage-sub { margin-inline-start: 0.05in; }
+/* The times, flush against the left edge of the column. A long run is set as two lines
+   rather than wrapped (see onePageLines), and the two are flush with each other so they read
+   as one list. */
+.onepage-times { font-weight: 700; text-align: left; }
+.onepage-line { display: block; }
+.onepage-times u { text-underline-offset: 0.12em; }
+.onepage-note { white-space: nowrap; }
+
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
    no year (the shul wants it clean), so this is the one place that answers "is this the
    right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
@@ -3100,10 +3185,26 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-weight: 700; font-style: normal; color: var(--muted);
 }
 .poster-bar select option { font-weight: 500; color: var(--ink); }
+/* The one control on this bar that is not a picker: which of the two ways of being given all
+   of them is on the screen. A switch rather than a third dropdown, because it is a question
+   with two answers and both of them fit: see ui/switch.js.
+   Laid out as the labels beside it are, caption over control, so the row still lines up along
+   its bottom edge. The switch's own text-align comes from .week-switch-label, which centres
+   it in the panel it was written for; here it belongs over the left edge of its track. */
+.poster-bar-switch {
+  display: grid; gap: 0.35rem; justify-items: start;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted); letter-spacing: 0.02em;
+}
+.poster-bar-switch .week-switch-label { text-align: start; }
 /* A phone has no room for three controls across, and a picker squeezed to a third of a narrow
    screen cannot show a poster's name. One per line, each the full width. */
 @media (max-width: 32rem) {
   .poster-bar { display: grid; grid-template-columns: 1fr; gap: 0.8rem; }
   .poster-bar select { width: 100%; }
   .poster-bar .print-btn { justify-self: start; }
+  /* The switch takes the row's whole width, like the pickers above it. Held to its content
+     it came out 227px wide, which is 88px a side once the track's padding is off, and
+     "Separate sheets" broke over two lines inside a pill the other side did not fill. */
+  .poster-bar-switch { justify-items: stretch; }
+  .poster-bar-switch .week-switch { width: 100%; }
 }

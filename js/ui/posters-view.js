@@ -26,6 +26,7 @@ import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
 import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
+import { switchHtml, wireSwitch } from './switch.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -278,10 +279,15 @@ const POSTERS = [
   // rather than a poster with a date of its own.
   {
     key: 'all',
-    label: 'All of them, one after another',
+    label: 'All of them',
     covers: (y) => `Every poster for ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     last: true,
+    // Two ways of being given all of it, and the switch in the bar picks between them: the
+    // eight sheets one after another, which is what goes on the wall, or the whole season
+    // set small on one sheet. The other two controls belong to the run alone, so they come
+    // off the bar when the one-page sheet is showing.
+    onepage: true,
     // The Page picker works here too, and a landscape sheet in a run is turned on its side
     // rather than left out. Chrome puts one page size on a whole PDF, so a run genuinely
     // cannot mix the two: set landscape and printed straight, those 11in sheets went onto
@@ -296,10 +302,14 @@ const POSTERS = [
         year: y,
         label: yearLabel(y),
         preferred: y === preferred,
-        build: () => buildEveryPoster(state, settings, y, { combined: chosenCombined }),
+        // The one-page sheet takes one occasion a sheet: it lays the schedules out itself,
+        // so a sheet carrying two of them would put those two on it twice.
+        build: () => buildEveryPoster(state, settings, y, { combined: chosenOnePage ? false : chosenCombined }),
       }));
     },
-    render: renderAllPosters,
+    render: (built, settings, opts) => (chosenOnePage
+      ? renderOnePagePoster(built, settings)
+      : renderAllPosters(built, settings, opts)),
   },
 ];
 
@@ -553,10 +563,11 @@ function timeHtml(t) {
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
-    + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`;
+    + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
+    + `${onepage ? ' is-onepage' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -881,6 +892,218 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
   });
 }
 
+/* --- Everything on one page ------------------------------------------------------------
+   The same yomim noraim the run prints as eight sheets, set as one: two columns of blocks,
+   each block a name over a list of label-and-times rows, read down the right-hand column and
+   then down the left. It answers a different question from the run. The run is what goes on
+   the wall, a sheet per occasion at the size a sheet is read from across a room; this is the
+   whole season at a glance, for a hand or a fridge.
+
+   Nothing here works out a time. Every block is a schedule one of the posters has already
+   built, taken apart into rows and set small: the same builders, the same settings, the same
+   marks. So a time can never differ between the wall and this, and a fix to a poster is a fix
+   to this sheet without anything being said here.
+
+   Which blocks and in what order comes from the posters themselves, in the order
+   postersByDate puts them, so the year where צום גדליה falls behind שבת שובה comes out in the
+   order the days actually run. A poster this table has no entry for is left out rather than
+   guessed at. */
+const ONEPAGE_TEXT = {
+  title: 'זמני הימים הנוראים',
+  // "ראש השנה - יום א'". Both halves are Hebrew, so a plain hyphen between them needs no
+  // isolate: nothing here runs the other way.
+  sep: ' - ',
+};
+
+/** How many times go on one line before the run is cut in two.
+ *
+ *  Cut in half rather than left to wrap, the same as the box on the יום כיפור sheet: a wrap
+ *  fills the first line and drops the remainder, so twelve times came out as eight and four
+ *  with a short line hanging under a full one. Halved, it reads as one list on two lines, and
+ *  the shorter half goes on top, which is the way round the shul asked for on that box.
+ *
+ *  Four, so that every run of מנינים on the sheet is cut and none is left long. It started at
+ *  six, which was the number that stopped a row being wider than its column: the מנחה and
+ *  מעריב after יו"כ are twelve times each and came out 430px wide in a 348px column, hanging
+ *  across the column rule. That fixed the overflow and left the סליחות rows, five and six
+ *  times each, on one line beside them, which reads as two different sheets in one column.
+ *
+ *  Cutting those too costs height, which is what the type is set against: at 1.3 leading it
+ *  took the sheet from 98% to 85%. The leading went to 1.2 and the row padding to 0.014in to
+ *  pay for it, measured back at 95%, so the whole sheet is cut the same way for about half a
+ *  point of type. */
+const ONEPAGE_PER_LINE = 4;
+
+/** A run of times as the lines it should be set on: one line, or two even ones with the
+ *  shorter half on top. The lower amount on top is the shul's own way round, the same as the
+ *  box on the יום כיפור sheet. */
+function onePageLines(times) {
+  if (times.length <= ONEPAGE_PER_LINE) return [times];
+  const cut = Math.floor(times.length / 2);
+  return [times.slice(0, cut), times.slice(cut)];
+}
+
+/** A block: a name and its rows. Rows are the poster's own line shape, `{ label, times }`
+ *  with the same optional `sub`, `extra`, `note` and `sep` the sheets already use, so a row
+ *  can be handed straight over from a poster without being rebuilt. */
+const oneSection = (title, rows, opts = {}) => ({ title, rows, ...opts });
+const oneHead = (a, b) => `${a}${ONEPAGE_TEXT.sep}${b}`;
+const onePlain = (text) => [{ text, underlined: false, mark: '' }];
+
+/** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
+ *  key, so adding a poster to the run and adding it here are the same word twice and a
+ *  poster with no entry simply does not appear. */
+const ONEPAGE_SECTIONS = {
+  slichos: (p) => [oneSection(SLICHOS_TEXT.title, p.rows)],
+  roshhashana: (p) => [
+    oneSection(oneHead(RH_TEXT.title, RH_TEXT.erevHeading), [
+      { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
+      { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
+      { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
+    ]),
+    ...p.blocks.map((b) => oneSection(oneHead(RH_TEXT.title, b.heading), b.lines)),
+  ],
+  tzomgedalia: (p) => [oneSection(TZG_TEXT.title, p.sets.map((s) => (s.note
+    // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
+    // of its own it is a line without a heading; here every line has a label already, so it
+    // is a row like the rest.
+    ? { label: s.note.label, times: onePlain(s.note.text) }
+    : { label: s.head, times: s.lines.flat() })))],
+  shuva: (p) => [oneSection(SHUVA_TEXT.title, [
+    // The two lines of the announcement read as one label with the time beside it. Given a
+    // page of its own this is three lines of 24pt down the middle of the sheet; in a column
+    // an inch and a half wide it is a row.
+    { label: SHUVA_TEXT.lines.join(' '), times: p.drasha ? onePlain(p.drasha) : [] },
+    { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
+  ])],
+  yomkippur: (p) => [
+    oneSection(oneHead(YK_TEXT.title, YK_TEXT.erevHeading), p.erevLines),
+    oneSection(YK_TEXT.dayHeading, p.dayLines),
+    // The morning after names its own day ("שחרית יום ג'"), so the block is named for it and
+    // the row inside says only which תפילה it is.
+    oneSection(p.nextMorning.label, [{ label: YK_TEXT.shacharis.label, times: p.nextMorning.times }]),
+  ],
+  afteryk: (p) => [oneSection(YK_TEXT.afterHeading, [
+    { label: YK_TEXT.afterBig.shacharis, times: p.after.shacharis },
+    { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
+    { label: YK_TEXT.afterBig.maariv, times: p.after.maariv },
+  // The only heading on the sheet that is not Hebrew, because it is the wording the shul
+  // already hangs. Said out loud rather than left to dir="auto", which would take its cue
+  // from the Hebrew half and turn the line round.
+  ], { ltrHead: true })],
+};
+
+/** One row: the name on the right, the times on the left, the way a timetable is read.
+ *
+ *  `extra` becomes a row of its own rather than riding on the end of this one. On a full
+ *  sheet המלך sits beside שחרית because there is a page of width to put it in; in a column
+ *  an inch and a half wide the pair wraps and the second label ends up under the times it
+ *  does not belong to. */
+function onePageRows(r) {
+  const label = `<span class="onepage-label"${hebrewLang(r.label)}>${escAttr(r.label)}`
+    + `${r.sub ? ` <span class="onepage-sub">${escAttr(r.sub)}</span>` : ''}</span>`;
+  // A list of מנינים and a זמן given two ways are both slash separated here. The full sheets
+  // tell them apart with commas because they have the room to; at this size the comma and the
+  // digits either side of it close up into one run and the slash is what keeps them apart.
+  const sep = r.sep || SLASH;
+  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi> ` : '';
+  // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
+  // strong characters, so a note's Hebrew would otherwise turn the whole run around.
+  //
+  // The note goes on the first line, against the first time, which is the time it is about:
+  // it says that מנין runs five minutes earlier on the days it names. The sheets it comes
+  // off put it there for the same reason.
+  const times = r.times.length || note
+    ? `<div class="onepage-times">${onePageLines(r.times).map((line, i) =>
+        `<bdi class="onepage-line" dir="ltr">${i ? '' : note}${line.map(timeHtml).join(sep)}</bdi>`).join('')}</div>`
+    : '';
+  return `<div class="onepage-row">${label}${times}</div>`
+    + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
+}
+
+/** The whole season on one sheet.
+ *
+ *  Two columns by CSS rather than by handing blocks out between two boxes here. The browser
+ *  balances them, which means a year that runs long or short does not need this file to know
+ *  about it, and the blocks stay in one list in date order however they fall. Columns run
+ *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
+ *
+ *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
+function renderOnePagePoster(built, settings) {
+  const sections = [];
+  for (const it of built.items) {
+    const cut = ONEPAGE_SECTIONS[it.key];
+    if (cut) sections.push(...cut(it.poster));
+  }
+  /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
+     Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
+     **באולם השמחות" and one using only the first writes "*בעזרת נשים", which are two
+     different strings saying one thing, and the sheet came out with the key's second line
+     under itself. A line is kept only where no other line already covers it. Asked of the
+     lines rather than of the times, so the wording stays where it is written and this does
+     not become a second place that has to say what a star means. */
+  const lines = [];
+  for (const it of built.items) for (const l of it.poster.legend || []) lines.push(l);
+  const legend = lines.filter((l, i) =>
+    !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
+    // Two identical lines: keep the first.
+    && lines.findIndex((o) => o.text === l.text) === i);
+  const body = `
+    <h2 class="onepage-title" lang="he">${escAttr(ONEPAGE_TEXT.title)} ${escAttr(hebrewYear(built.hebrewYear))}</h2>
+    <div class="onepage-cols">
+      ${sections.map((s) => `<section class="onepage-sec">
+        <h3 class="onepage-sec-head"${s.ltrHead ? ' dir="ltr"' : hebrewLang(s.title)}>${escAttr(s.title)}</h3>
+        ${s.rows.map(onePageRows).join('')}
+      </section>`).join('')}
+    </div>`;
+  return posterShell(settings, body, legend, { onepage: true, chartHead: true })
+    + (built.notBuilt.length
+      ? `<p class="hint no-print">Not on this sheet, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
+      : '');
+}
+
+/** Sets the type on the one-page sheet to the largest that still fits the two columns.
+ *
+ *  How much there is to fit is a question about the year, not about the design: a ר"ה on
+ *  Shabbos adds lines, a fast pushed to the Sunday moves a block, and the מעריב after יו"כ is
+ *  a list of eleven times in a column an inch and a half wide. Written at one size it would
+ *  have to be the size the worst year needs and every other year would print smaller than it
+ *  had to, on a sheet whose whole difficulty is that the type is small already.
+ *
+ *  So it is measured, and upwards rather than downwards: start below anything that could fit,
+ *  grow while it still does, and take the last size that did. Content that needs more than the
+ *  two columns makes a third, which is what scrollWidth reports and the frame would otherwise
+ *  cut off, so "still fits" is one question with one answer.
+ *
+ *  Coarse then fine, because each step is a reflow of the whole sheet and this runs on a phone
+ *  too: eleven steps of 0.05 to find the neighbourhood, then at most five of 0.01 inside it.
+ *  Sixteen reflows against the seventy a single pass of 0.01 would have cost.
+ *
+ *  The ceiling is there because a short year would otherwise grow until the type was larger
+ *  than the wall sheets' own; the floor because a year that will not fit at any readable size
+ *  should spill visibly rather than print at a size nobody can read. Measured across תשפ"ה to
+ *  תשצ"ד, no year has reached either. */
+const OP_MIN = 0.7;
+const OP_MAX = 1.25;
+function fitOnePage(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
+    const cols = sheet.querySelector('.onepage-cols');
+    if (!cols) continue;
+    const set = (v) => sheet.style.setProperty('--op-scale', v);
+    // 1px of slack, since a column box and its content round independently.
+    const fits = () => cols.scrollWidth <= cols.clientWidth + 1;
+    let best = OP_MIN;
+    for (const step of [0.05, 0.01]) {
+      for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
+        set(v);
+        if (!fits()) break;
+        best = v;
+      }
+    }
+    set(best);
+  }
+}
+
 let chosen = POSTERS[0].key;
 let chosenSourceId = null;
 // Told to app.js whenever a picker moves, so the choice can go in the address. Held here
@@ -919,6 +1142,10 @@ let chosenOrientation = 'portrait';
 // remembered across a redraw the same way. Not in the address: the orientation is there
 // because it decides what paper comes out, and this only decides how many sheets.
 let chosenCombined = true;
+// Whether "All of them" is the run of sheets or the whole season on one. Held like the two
+// above, and off the address for the same reason: it is a way of looking at what is already
+// chosen rather than a different thing to look at.
+let chosenOnePage = false;
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -996,6 +1223,9 @@ export function renderPosters(container, state, routeChanged, tables) {
   const groups = posterGroups(orderYear, settings);
   const ordered = groups.flatMap((g) => g.items);
   const poster = ordered.find((p) => p.key === chosen) || ordered[0];
+  // Only the entry that offers both ways of being given everything reads the switch, so
+  // picking another poster does not take its own controls off the bar.
+  const onePage = Boolean(poster.onepage && chosenOnePage);
   const sources = poster.sources(state, settings);
   // Opens on the yomim noraim coming up, not on the first year in the list. In אלול the
   // calendar still says last year, and that is the year somebody would print by mistake.
@@ -1025,13 +1255,17 @@ export function renderPosters(container, state, routeChanged, tables) {
           ${sources.map((s) => `<option value="${escAttr(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${escAttr(s.label)}</option>`).join('')}
         </select>
       </label>
-      ${poster.orientations ? `<label>Page
+      ${poster.onepage ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'All of them as', [
+        { value: 'sheets', label: 'Separate sheets', on: !onePage },
+        { value: 'one', label: 'One page', on: onePage },
+      ])}</div>` : ''}
+      ${poster.orientations && !onePage ? `<label>Page
         <select id="poster-orient">
           <option value="portrait" ${chosenOrientation === 'portrait' ? 'selected' : ''}>Portrait</option>
           <option value="landscape" ${chosenOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
         </select>
       </label>` : ''}
-      ${poster.last ? `<label>Two on a page
+      ${poster.last && !onePage ? `<label>Two on a page
         <select id="poster-combined">
           <option value="yes" ${chosenCombined ? 'selected' : ''}>Include</option>
           <option value="no" ${chosenCombined ? '' : 'selected'}>Leave out</option>
@@ -1076,6 +1310,10 @@ export function renderPosters(container, state, routeChanged, tables) {
     chosenCombined = e.target.value === 'yes';
     again();
   });
+  wireSwitch(container, 'poster-onepage', (value) => {
+    chosenOnePage = value === 'one';
+    again();
+  });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
     conflictPick = Number(e.target.value) || 0;
     again();
@@ -1093,6 +1331,9 @@ export function renderPosters(container, state, routeChanged, tables) {
     // would not change where a line breaks, but measuring the unscaled sheet is one less
     // thing to have to be sure of.
     balanceBoxRows(container);
+    // Also before fitPoster, and for the same reason: the columns are measured at the size
+    // they print at, not at whatever a phone has shrunk the sheet to on screen.
+    fitOnePage(container);
     fitPoster(container);
   }
 }
