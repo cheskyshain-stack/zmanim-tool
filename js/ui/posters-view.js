@@ -48,14 +48,26 @@ function nextYomimNoraim(today = new Date()) {
   return serial > yomKippur(year) ? year + 1 : year;
 }
 
+/** How far either side of the yomim noraim coming up the Year picker reaches.
+ *
+ *  Back far enough to reprint a sheet the shul already hung, forward far enough that nothing
+ *  has to wait for the calendar to turn over. Nothing here is looked up in a table, so a year
+ *  costs nothing until it is picked: every date is worked out from the calendar and every time
+ *  from the sun. The only poster that needs anything saved is שבת שובה, which reads a chart,
+ *  and it says so on its own when there is none.
+ *
+ *  Ten years rather than everything, because it is a list somebody reads. */
+const YEARS_BACK = 2;
+const YEARS_AHEAD = 7;
+
 /** The years to offer, and which one to open on.
  *
- *  The one coming up, the one before it so last year's sheet can be reprinted, and the one
- *  after so next year's can be made early. Plus any year a generated chart covers the שבת
- *  שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
+ *  The one coming up with a few either side of it, plus any year a generated chart covers the
+ *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
   const next = nextYomimNoraim();
-  const years = new Set([next - 1, next, next + 1]);
+  const years = new Set();
+  for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
     const week = shuvaWeekOf(sheet);
     if (!week) continue;
@@ -315,6 +327,36 @@ function postersByDate(year, settings) {
     if (x.from != null && y2.from != null && x.from !== y2.from) return x.from - y2.from;
     return x.i - y2.i;
   });
+}
+
+/** Which heading a poster sits under in the picker.
+ *
+ *  Every sheet so far belongs to the yomim noraim, so that is the default and no entry above
+ *  has to say it. A poster for another yom tov carries `group: 'סוכות'` (or חנוכה, פורים, פסח,
+ *  שבועות) and that is the whole of adding a category: the heading appears, the posters under
+ *  it sort by date like everything else, and the headings themselves come out in the order of
+ *  the year because that is the order their first sheet falls in. */
+const POSTER_GROUP_DEFAULT = 'ימים נוראים';
+
+/** The posters cut into those headings, both in date order.
+ *
+ *  A group takes its place from its earliest sheet, which a Map gives for nothing: the list
+ *  handed in is already in date order, so the order the names are first seen is the order the
+ *  days come. All of them belongs to no yom tov and sits on its own at the end, outside any
+ *  heading, which is where a group of one would look like a mistake. */
+function posterGroups(year, settings) {
+  const byName = new Map();
+  const loose = [];
+  for (const p of postersByDate(year, settings)) {
+    if (p.last) { loose.push(p); continue; }
+    const name = p.group || POSTER_GROUP_DEFAULT;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(p);
+  }
+  return [
+    ...[...byName].map(([name, items]) => ({ name, items })),
+    ...loose.map((p) => ({ name: null, items: [p] })),
+  ];
 }
 
 /** Every poster for one year, in the order the picker lists them.
@@ -866,7 +908,9 @@ export function renderPosters(container, state, routeChanged) {
   // is settled here rather than below, because the order has to be known before the poster is
   // picked out of it. Every poster's sources are the same list of years and a source id is
   // that year, so this is the Year picker's answer without having to build anything first.
-  const ordered = postersByDate(Number(chosenSourceId) || posterYears(state).preferred, settings);
+  const orderYear = Number(chosenSourceId) || posterYears(state).preferred;
+  const groups = posterGroups(orderYear, settings);
+  const ordered = groups.flatMap((g) => g.items);
   const poster = ordered.find((p) => p.key === chosen) || ordered[0];
   const sources = poster.sources(state, settings);
   // Opens on the yomim noraim coming up, not on the first year in the list. In אלול the
@@ -883,7 +927,13 @@ export function renderPosters(container, state, routeChanged) {
     <div class="poster-bar no-print">
       <label>Poster
         <select id="poster-pick">
-          ${ordered.map((p) => `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+          ${(() => {
+            const opts = (items) => items.map((p) =>
+              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
+            return groups.map((g) => (g.name
+              ? `<optgroup label="${esc(g.name)}">${opts(g.items)}</optgroup>`
+              : opts(g.items))).join('');
+          })()}
         </select>
       </label>
       <label>Year

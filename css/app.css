@@ -3004,4 +3004,51 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster-bar {
   display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem;
 }
-.poster-bar label { display: grid; gap: 0.3rem; font-size: var(--fs-sm); font-weight: 600; }
+/* The caption above a picker. Quieter than the control under it: the words Poster and Year
+   are there to be found once, and the answer beside them is what gets read. */
+.poster-bar label {
+  display: grid; gap: 0.35rem;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted);
+  letter-spacing: 0.02em;
+}
+/* The pickers themselves. A native select is whatever grey the operating system draws, which
+   next to the app's own buttons reads as something left unfinished, and on Android it is a
+   full-width slab with a system triangle in it.
+   appearance: none takes the chrome off and the caret comes back as a background image, an
+   inline SVG rather than a glyph, because ▾ is a different shape and weight in every font the
+   phones ship. The padding on the end side is what keeps a long Hebrew label off it.
+   The box is the Print button's box: same border, radius, block padding and font size, so
+   the row lines up along the bottom whatever the labels above them do. */
+.poster-bar select {
+  appearance: none; -webkit-appearance: none;
+  min-width: 12rem; max-width: 100%;
+  padding: 0.55rem 0.9rem; padding-inline-end: 2.1rem;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.65rem auto;
+  color: var(--ink); font-family: inherit; font-size: var(--fs-md); font-weight: 600;
+  line-height: 1.4; cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.poster-bar select:hover { border-color: var(--ui-accent); background-color: var(--ui-accent-soft); }
+.poster-bar select:focus-visible {
+  outline: none; border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 22%, transparent);
+}
+/* The yom tov headings inside the list. Only the open dropdown draws these and every browser
+   draws it its own way, so this is a nudge rather than a design: separate them from the
+   posters under them, and do not let a heading read as something that can be picked. */
+.poster-bar select optgroup {
+  font-weight: 700; font-style: normal; color: var(--muted);
+}
+.poster-bar select option { font-weight: 500; color: var(--ink); }
+/* A phone has no room for three controls across, and a picker squeezed to a third of a narrow
+   screen cannot show a poster's name. One per line, each the full width. */
+@media (max-width: 32rem) {
+  .poster-bar { display: grid; grid-template-columns: 1fr; gap: 0.8rem; }
+  .poster-bar select { width: 100%; }
+  .poster-bar .print-btn { justify-self: start; }
+}
