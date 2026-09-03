@@ -6076,6 +6076,10 @@ function posterFromCell(week, cell) {
 
   return {
     week,
+    // The one Shabbos it is about, said the way every other poster says its dates, so
+    // anything asking "is this sheet current" can ask all of them the same question. This
+    // one was the exception and so it never answered: see currentPosters in posters-view.
+    span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
     mincha,
     // Only the marks that are actually on this poster get explained. Each line says which
@@ -6581,6 +6585,58 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
   </div>`;
 }
 
+/** The sheets that are current on one day, in date order, drawn and ready to show.
+ *
+ *  This is what the congregation's own site puts behind Special Schedules. Current means the
+ *  window the shul wants a sheet seen in: from `lead` days before the first date on it,
+ *  through the end of the last. A sheet is up on the wall before the days it covers and
+ *  comes down when they are over, and this is the same thing on a phone.
+ *
+ *  The two-on-a-page sheets are left out. They exist to save a wall a second sheet of paper,
+ *  and on a screen they are two schedules to read at once where one would do.
+ *
+ *  Only two years are looked at. A sheet's dates all sit within a fortnight of ר"ה, and
+ *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything
+ *  still ahead and the year before it covers the one sheet that runs past יו"כ.
+ *
+ *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at
+ *  all. That is the right way round here rather than a shortcut: the chart is what the board
+ *  says, hand edits and all, and the congregation should be reading the same times as the
+ *  sheet on the wall. */
+function currentPosters(state, settings, { on = excelSerial(new Date()), lead = 5 } = {}) {
+  const next = nextYomimNoraim();
+  const out = [];
+  for (const year of [next - 1, next]) {
+    // Nowhere near, so do not build a thing. This is asked on the congregation's menu, which
+    // is the page every visitor lands on, and building six sheets to find out that none of
+    // them is up cost 120ms on a slow phone. Every date on every sheet sits inside a
+    // fortnight either side of ר"ה, and the widest window is the סליחות sheet's, which opens
+    // eleven days before it, so a month and a half back and three weeks on is far wider than
+    // any of them can reach. The dates come from the calendar, which costs nothing.
+    const rh = roshHashana(year - 3761);
+    if (on < rh - 45 || on > rh + 20) continue;
+    for (const p of postersByDate(year, settings)) {
+      if (p.last || p.combined) continue;
+      const source = p.sources(state, settings).find((s) => s.year === year);
+      if (!source) continue;
+      let built = null;
+      try { built = source.build()?.poster || null; } catch { built = null; }
+      if (!built?.span) continue;
+      const { from, to } = built.span;
+      if (on < from - lead || on > to) continue;
+      out.push({
+        key: p.key,
+        year,
+        label: p.label,
+        span: built.span,
+        when: p.when(built),
+        html: p.render(built, settings),
+      });
+    }
+  }
+  return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
+}
+
 /** One saved chart, named so it can be told from another of the same season and year.
  *  Which is the whole reason this is ever shown: the two only differ by when they were
  *  generated and by what has been typed over since. */
@@ -7015,7 +7071,10 @@ let fitHandler = null;
  *  full-size footprint behind, which is the overflow all over again. print.css forces
  *  `zoom: 1` back on, so what is on paper is always the full 8.5in.
  *
- *  No button beside it, unlike the charts. There is one page and nothing to choose. */
+ *  No button beside it, unlike the charts. There is one page and nothing to choose.
+ *
+ *  Exported because the congregation's Special Schedules page draws the same sheets and has
+ *  the same problem, and a second copy of this would be a second thing to keep right. */
 function fitPoster(container) {
   // All of them at once is a run of sheets rather than one, and they are not all the same
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is

@@ -15,6 +15,8 @@ import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upc
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
+import { currentPosters, fitPoster } from './ui/posters-view.js';
+import { printButtonHtml, wirePrintButton } from './ui/print-page.js';
 
 const main = document.getElementById('main');
 
@@ -42,6 +44,12 @@ const ICON_HEART = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none"
 const ICON_HEART_SMALL = `<svg class="luach-bar-give-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
 </svg>`;
+/* Special Schedules: a sheet of paper with a star over it. Drawn in the same weight and on
+   the same 24 grid as the clock and the calendar, so the menu reads as one set. */
+const ICON_SHEET = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6.2 2.9h7.4l4.2 4.2v14H6.2z"/><path d="M13.4 2.9v4.4h4.4"/>
+  <path d="M9.2 11.4h5.6M9.2 14.6h5.6M9.2 17.8h3.4"/>
+</svg>`;
 const CHEVRON = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5l7.5 7.5L9 19.5"/></svg>`;
 /* An arrow leaving a box rather than the chevron the other two carry. A chevron says the
    site goes on somewhere; this one leaves the site altogether, and the mark should say so
@@ -57,7 +65,7 @@ const OUTWARD = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stro
  *  Weekly Zmanim opened a page headed "This week's schedule" and Zmanim chart opened one
  *  headed "The chart", which is two names for each of two things on a site that only has
  *  two things. Written here rather than in both places, so they cannot drift apart again. */
-const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', donate: 'Donate' };
+const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', schedules: 'Special Schedules', donate: 'Donate' };
 
 /* The marks on the giving cards, drawn in the same weight as the menu's own and ringed in
    gold, so a card is recognisable before its title is read. */
@@ -395,6 +403,9 @@ function homeHtml(published) {
       <a class="luach-item" href="/chart/">
         ${ICON_CALENDAR}<span class="luach-item-title">${escAttr(PAGE_NAMES.chart)}</span>${CHEVRON}
       </a>
+      ${schedulesNow(published).length ? `<a class="luach-item" href="/schedules/">
+        ${ICON_SHEET}<span class="luach-item-title">${escAttr(PAGE_NAMES.schedules)}</span>${CHEVRON}
+      </a>` : ''}
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
@@ -577,6 +588,52 @@ function renderWeekPage(published) {
     );
   };
   draw();
+}
+
+/** The sheets the shul has up right now, or an empty list.
+ *
+ *  Asked in two places, the menu and the page itself, so it is one call here rather than the
+ *  same three lines twice. A sheet is current from five days before the first date on it
+ *  through the end of the last, which is currentPosters' own rule. */
+function schedulesNow(published) {
+  const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+  try {
+    return currentPosters(state, resolveSettings(published.settings));
+  } catch (err) {
+    // A sheet that will not build must not take the whole site down with it. The menu then
+    // has one fewer thing on it, which is the same as there being nothing up.
+    return [];
+  }
+}
+
+/** Special Schedules: the sheets on the wall, on a phone.
+ *
+ *  The same markup the poster tab draws, so what the congregation reads is the sheet, not a
+ *  second telling of it. Each is a real 8.5in page scaled to the window, the way the wall
+ *  chart is on its own page.
+ *
+ *  Print only when there is one sheet up. Printing a run of them is broken in Chrome (see
+ *  the note on the poster run), and a button that puts out blank pages is worse than no
+ *  button; one sheet on its own prints correctly. */
+function renderSchedulesPage(published) {
+  stopNextUp();
+  const sheets = schedulesNow(published);
+  main.className = '';
+  main.innerHTML = backBar('schedules') + `<div class="luach-sheets">
+    ${sheets.length === 1 ? `<div class="luach-sheet-print no-print">${printButtonHtml('sheet-print')}</div>` : ''}
+    ${sheets.length
+      ? sheets.map((sh) => `<section class="luach-sheet">
+          <h2 class="luach-sheet-name no-print"${hebrewLang(sh.label)}>${escAttr(sh.label)}</h2>
+          <p class="luach-sheet-when no-print">${escAttr(sh.when.en)}</p>
+          <div class="luach-sheet-page">${sh.html}</div>
+        </section>`).join('')
+      : `<p class="luach-sheet-none">Nothing extra is up at the moment. The week's times are on
+          <a href="/week/">${escAttr(PAGE_NAMES.week)}</a> and the season's board on
+          <a href="/chart/">${escAttr(PAGE_NAMES.chart)}</a>.</p>`}
+  </div>`;
+  openTheDoor();
+  if (sheets.length) fitPoster(main.querySelector('.luach-sheets'));
+  if (sheets.length === 1) wirePrintButton(main, 'sheet-print');
 }
 
 function renderChartPage(published) {
@@ -853,7 +910,7 @@ function renderDonatePage(published) {
  * real links to real files all the same, so a middle click, a long press, "open in new
  * tab" and a crawler with no JavaScript all get a page rather than nothing.
  */
-const ROUTES = ['week', 'chart', 'donate'];
+const ROUTES = ['week', 'chart', 'schedules', 'donate'];
 
 /** The route from the address bar, whichever of the two ways it is written. */
 function whereAmI() {
@@ -874,6 +931,7 @@ const PAGE_TITLE = {
   '': 'Bais Medrash of Lakewood Commons · קהל לב מנחם · Zmanim',
   week: 'Weekly Zmanim · Bais Medrash of Lakewood Commons',
   chart: 'Zmanim chart · Bais Medrash of Lakewood Commons',
+  schedules: 'Special Schedules · Bais Medrash of Lakewood Commons',
   donate: 'Donate · Bais Medrash of Lakewood Commons',
 };
 
@@ -901,6 +959,7 @@ function route(published) {
   stampPage(where);
   if (where === 'week') return renderWeekPage(published);
   if (where === 'chart') return renderChartPage(published);
+  if (where === 'schedules') return renderSchedulesPage(published);
   if (where === 'donate') return renderDonatePage(published);
   return renderHome(published);
 }

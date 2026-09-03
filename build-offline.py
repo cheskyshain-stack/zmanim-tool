@@ -93,6 +93,20 @@ ROUTES = {
             "Shabbos chart and the weekday chart for Bais Medrash of Lakewood Commons."
         ),
     },
+    "schedules": {
+        "title": "Special Schedules",
+        "description": (
+            "The extra davening schedules Bais Medrash of Lakewood Commons has up now, "
+            "44 Coles Way, Lakewood NJ: selichos, Rosh Hashana, Tzom Gedalia, Shabbos "
+            "Teshuva and Yom Kippur."
+        ),
+        "heading": "Special Schedules",
+        "blurb": (
+            "The sheets Bais Medrash of Lakewood Commons has up for the days that do not "
+            "run on the everyday schedule. Each one appears five days before the first "
+            "date on it and comes down when the last is over."
+        ),
+    },
     "donate": {
         "title": "Donate",
         "description": (
@@ -755,8 +769,11 @@ DIST_STRIP = {
     ".css": "css",
     ".js": "js",
 }
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", "week", "chart", "donate",
-              "admin", "offline"]
+# The route folders come from ROUTES rather than being listed again here. They were listed,
+# and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
+# out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
+# not there. One list, so a new route cannot be half-published.
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "offline"]
 DIST_FILES = ["index.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for

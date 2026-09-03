@@ -1582,6 +1582,33 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 }
 .luach-rule > i { width: 7px; height: 7px; background: var(--luach-gold-soft); transform: rotate(45deg); }
 
+/* --- Special Schedules ---------------------------------------------------------------
+   The sheets the shul has up, on a phone. The sheet itself is the poster's own markup, a
+   real 8.5in page, so nothing here touches how it is drawn: this is the column it sits in
+   and the words above it, which are screen only and never printed.
+
+   .luach-sheet-page is what fitPoster measures against, so it has to be the width actually
+   available and nothing wider. Its own overflow is hidden because a scaled page can leave a
+   fraction of a pixel over and a phone will offer to scroll the whole site sideways for it. */
+/* 8.5in, so a window with room for a whole sheet shows one at its real size and fitPoster
+   has nothing to do. At 46rem it was 736px and every sheet came out scaled even on a
+   desktop. */
+.luach-sheets { max-width: 8.5in; margin: 0 auto; width: 100%; }
+.luach-sheet { margin-bottom: 2rem; }
+.luach-sheet:last-child { margin-bottom: 0; }
+.luach-sheet-name {
+  font-size: 1.15rem; font-weight: 700; color: var(--luach-ink);
+  margin: 0 0 0.15rem; text-align: center;
+}
+.luach-sheet-when { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 0.7rem; text-align: center; }
+.luach-sheet-page { width: 100%; overflow: hidden; display: flex; justify-content: center; }
+/* A sheet is a real 8.5in page and must not be squeezed into a narrower window: a flex item
+   shrinks by default, and that quietly took 816px down to 736 and made the page a different
+   size from the paper. It is scaled instead, by fitPoster, which keeps the proportions. */
+.luach-sheet-page > .poster { flex: 0 0 auto; }
+.luach-sheet-print { display: flex; justify-content: center; margin-bottom: 1.1rem; }
+.luach-sheet-none { max-width: 30rem; margin: 1.5rem auto; text-align: center; color: var(--luach-ink); line-height: 1.6; }
+
 /* --- What is on next -----------------------------------------------------------------
    One bordered box above the menu with the next מנין in it, and on an Erev Shabbos a
    second beside it with הדלקת נרות.

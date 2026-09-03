@@ -117,6 +117,10 @@ function posterFromCell(week, cell) {
 
   return {
     week,
+    // The one Shabbos it is about, said the way every other poster says its dates, so
+    // anything asking "is this sheet current" can ask all of them the same question. This
+    // one was the exception and so it never answered: see currentPosters in posters-view.
+    span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
     mincha,
     // Only the marks that are actually on this poster get explained. Each line says which
