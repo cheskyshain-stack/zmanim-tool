@@ -108,8 +108,8 @@ export function buildRoshHashanaPoster(year, settings) {
      The three lines above the days are ערב ר"ה's own: its שחרית, which is the סליחות מנין,
      and its מנחה. חצות is a זמן and is not one. */
   const M = minyanList();
-  for (const t of parseTimes(RH_TEXT.slichos.times)) M.typed(rh - 1, RH_TEXT.slichos.label, t, MORNING);
-  for (const t of parseTimes(RH_TEXT.erevMincha.times)) M.typed(rh - 1, RH_TEXT.erevMincha.label, t, AFTERNOON);
+  M.list(rh - 1, RH_TEXT.slichos.label, parseTimes(RH_TEXT.slichos.times), MORNING);
+  M.list(rh - 1, RH_TEXT.erevMincha.label, parseTimes(RH_TEXT.erevMincha.times), AFTERNOON);
 
   const blocks = days.map((day, i) => {
     const night = i === 0 ? erev : days[0];
@@ -163,7 +163,7 @@ export function buildRoshHashanaPoster(year, settings) {
     // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
     // its own. ס"ז ק"ש, ט' שעות, the שופר times and the דרשות are זמנים and announcements.
     const dayOn = rh + i;
-    for (const t of parseTimes(RH_TEXT.shacharis.times)) M.typed(dayOn, RH_TEXT.shacharis.label, t, MORNING);
+    M.list(dayOn, RH_TEXT.shacharis.label, parseTimes(RH_TEXT.shacharis.times), MORNING);
     if (i === tashlichDay) M.at(dayOn, RH_TEXT.mincha, mainMincha - TASHLICH_EARLIER * RH_MIN, { underlined: true });
     M.at(dayOn, RH_TEXT.mincha, mainMincha);
 

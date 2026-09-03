@@ -271,14 +271,15 @@ export function buildYomKippurPoster(year, settings) {
      afterYomKippurRow in sheets/weekday.js), so the day is left to it. */
   const erevOn = rh + 8;
   const dayOn = rh + 9;
+  const afterOn = rh + 10;
   const M = minyanList();
-  for (const t of parseTimes(YK_TEXT.erevShacharis.times)) M.typed(erevOn, YK_TEXT.erevShacharis.label, t, MORNING);
-  for (const t of parseTimes(YK_TEXT.erevMincha.times)) M.typed(erevOn, YK_TEXT.erevMincha.label, t, AFTERNOON);
+  M.list(erevOn, YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), MORNING);
+  M.list(erevOn, YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), AFTERNOON);
   // The night that opens יו"כ, which is ערב יו"כ's evening.
   M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
   M.at(erevOn, YK_TEXT.maariv, nightMaariv);
   // The day itself, and its מוצאי.
-  for (const t of parseTimes(YK_TEXT.shacharis.times)) M.typed(dayOn, YK_TEXT.shacharis.label, t, MORNING);
+  M.list(dayOn, YK_TEXT.shacharis.label, parseTimes(YK_TEXT.shacharis.times), MORNING);
   M.at(dayOn, YK_TEXT.mincha, neila - 110 * YK_MIN);
   M.at(dayOn, YK_TEXT.neila, neila);
   M.at(dayOn, YK_TEXT.maariv, motzei60);
@@ -286,9 +287,22 @@ export function buildYomKippurPoster(year, settings) {
   // The third מעריב keeps its time and loses its underline on the way over: its label already
   // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
   // the name and once beside it.
-  for (const t of parseTimes(YK_TEXT.maarivGimmel.times)) {
-    M.typed(dayOn, YK_TEXT.maarivGimmel.label, { text: t.text }, AFTERNOON);
-  }
+  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times).map((t) => ({ text: t.text })), AFTERNOON);
+  // קידוש לבנה is given two ways on the sheet, אחר מעריב or a time. The words are not a time
+  // and nothing can count down to them, so only the clock one goes over; clockMins reads
+  // "אחר מעריב" as no time at all and it is dropped rather than guessed at.
+  M.list(dayOn, YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((text) => ({ text })), AFTERNOON);
+  /* The morning after, and the rest of that day with it.
+     The sheet prints only its שחרית, which is the everyday one five minutes early. Left at
+     that the card would have had a morning and nothing after it, so the day is completed
+     from the box on this very sheet: the schedule that runs from after יו"כ until סוכות,
+     which is what that day's מנחה and מעריב actually are. Both come off the one poster, so
+     the day cannot be half from here and half from somewhere else.
+     Named שחרית rather than "שחרית יום ג'", which is the sheet's own heading: the card
+     already says when it is, and the day would be said twice. */
+  M.list(afterOn, YK_TEXT.shacharis.label, nextMorning.times, MORNING);
+  M.list(afterOn, YK_TEXT.afterBig.mincha, after.mincha, AFTERNOON);
+  M.list(afterOn, YK_TEXT.afterBig.maariv, after.maariv, AFTERNOON);
 
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];

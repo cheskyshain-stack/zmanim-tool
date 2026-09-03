@@ -99,9 +99,9 @@ export function buildTzomGedaliaPoster(year, settings) {
      order. Its times are all afternoon and its שחרית all morning, which on a fast day needs
      no thought: nothing here runs past מעריב. */
   const M = minyanList();
-  for (const t of shacharis) M.typed(serial, TZG_TEXT.shacharis, t, MORNING);
-  for (const t of mincha) M.typed(serial, TZG_TEXT.mincha, t, AFTERNOON);
-  for (const t of maariv) M.typed(serial, TZG_TEXT.maariv, t, AFTERNOON);
+  M.list(serial, TZG_TEXT.shacharis, shacharis, MORNING);
+  M.list(serial, TZG_TEXT.mincha, mincha, AFTERNOON);
+  M.list(serial, TZG_TEXT.maariv, maariv, AFTERNOON);
 
   const all = [...shacharis, ...mincha, ...maariv];
   const stars = [];

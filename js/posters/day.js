@@ -21,13 +21,20 @@ import { roshHashana, hebrewDateExtended } from '../hebrew-calendar.js';
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
+import { slichosMornings } from './slichos.js';
+import { minyanList, MORNING } from './minyanim.js';
 
-/** How far either side of ר"ה a sheet can reach: ערב ר"ה is the day before, and יו"כ's
- *  מוצאי is 9 days after. Every day outside that answers in one calendar call and builds
- *  nothing, which matters because this is asked of eight days in a row every time the home
- *  page draws its card. */
+/** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
+ *  the morning after יו"כ is 10 days after. Every day outside that answers in one calendar
+ *  call and builds nothing, which matters because this is asked of eight days in a row every
+ *  time the home page draws its card. */
 const BEFORE = 1;
-const AFTER = 9;
+const AFTER = 10;
+
+/** How far back the סליחות season can start. They begin on a Sunday and run at least four
+ *  days, and in a year where that would be too few they begin the Sunday before that, which
+ *  at the furthest is fifteen days before ר"ה. Sixteen, to have a day in hand. */
+const SEASON_BEFORE = 16;
 
 /** The three sheets for one year, built once.
  *
@@ -63,6 +70,44 @@ export function specialMinyanim(serial, settings) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;
     const found = sheetsFor(year, settings).filter((m) => m.serial === serial);
+    if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
+  }
+  return [];
+}
+
+/** The סליחות season's mornings, day by day, built once for a year. Same reasoning as
+ *  sheetsFor above: this is asked of eight days in a row and the answer does not move. */
+let mornings = null;
+function morningsFor(year, settings) {
+  if (mornings && mornings.year === year && mornings.settings === settings) return mornings.list;
+  const M = minyanList();
+  try {
+    for (const day of slichosMornings(year)) M.list(day.serial, day.name, day.times, MORNING);
+  } catch {
+    // Same as above: a sheet that will not build leaves the charts answering, which is where
+    // this was before any of it.
+  }
+  mornings = { year, settings, list: M.out };
+  return mornings.list;
+}
+
+/** The morning schedule for one day of the סליחות season, or nothing.
+ *
+ *  Half a day rather than a whole one, and deliberately: through אלול and עשרת ימי תשובה the
+ *  שחרית on the sheet is not the everyday one out of Settings (סליחות are said and the מנין
+ *  starts earlier), while the מנחה and מעריב of those days are ordinary and are on the
+ *  Weekday chart. So this stands in for the morning and the chart answers for the rest of
+ *  the day, where specialMinyanim above hands the whole day over.
+ *
+ *  Never for a day specialMinyanim already covers: slichosMornings leaves out ערב ר"ה, צום
+ *  גדליה and ערב יו"כ for exactly that reason, and the two days of ר"ה and יו"כ are not in
+ *  its range at all. */
+export function specialShacharis(serial, settings) {
+  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  for (const year of [here, here + 1]) {
+    const rh = roshHashana(year - 3761);
+    if (serial < rh - SEASON_BEFORE || serial > rh + AFTER) continue;
+    const found = morningsFor(year, settings).filter((m) => m.serial === serial);
     if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
   }
   return [];

@@ -25,7 +25,7 @@ import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
 import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
-import { specialMinyanim } from './posters/day.js';
+import { specialMinyanim, specialShacharis } from './posters/day.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -223,7 +223,10 @@ export function minyanimForDay(serial, state, settings) {
     // a merged cell rather than working it out day by day.
     if (dow === FRIDAY) {
       const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-      for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
+      // Through the סליחות season the morning is the sheet's, not Settings': see below.
+      const morning = specialShacharis(serial, settings);
+      if (morning.length) out.push(...morning);
+      else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
     }
   } else {
     // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
@@ -237,8 +240,15 @@ export function minyanimForDay(serial, state, settings) {
       const name = nameFromHeader(column.header);
       for (const t of parseCell(row[column.key])) out.push({ ...t, name });
     }
+    /* The morning, which through the סליחות season is not the everyday one. From the Sunday
+       סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the
+       sheet on the wall prints it; Settings holds the ordinary year's schedule and knows
+       nothing about it. The afternoon and evening of those days are ordinary and stay on the
+       chart, which is why this stands in for the one column rather than for the day. */
     const shacharisName = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-    for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
+    const morning = specialShacharis(serial, settings);
+    if (morning.length) out.push(...morning);
+    else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;

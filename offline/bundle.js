@@ -1635,10 +1635,23 @@ function minyanList() {
     at(serial, name, fraction, time) {
       out.push({ serial, name, mins: fracMins(fraction), place: placeOf(time) });
     },
-    /** A time typed into one of the poster's own text tables, which carries no meridiem. */
-    typed(serial, name, time, afternoon) {
-      const mins = clockMins(time?.text, afternoon);
-      if (mins != null) out.push({ serial, name, mins, place: placeOf(time) });
+    /** A run of times typed into one of the poster's own text tables, which carry no
+     *  meridiem: one line's מנינים, in the order the sheet prints them.
+     *
+     *  A run only ever goes forwards, so any time reading as earlier than the one before it
+     *  has half a day added. That is what turns the 12:00 at the end of a מעריב list running
+     *  10:30, 11:00, 11:30 into midnight rather than noon, which is twelve hours out and on
+     *  the wrong side of the day. The charts are read back the same way, for the same reason
+     *  (see parseCell in upcoming.js). */
+    list(serial, name, times, afternoon) {
+      let previous = -1;
+      for (const time of times) {
+        let mins = clockMins(time?.text, afternoon);
+        if (mins == null) continue;
+        while (mins <= previous) mins += 12 * 60;
+        previous = mins;
+        out.push({ serial, name, mins, place: placeOf(time) });
+      }
     },
   };
 }
@@ -1758,7 +1771,76 @@ const SLICHOS_ROWS = [
   { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
 ];
 
-const SLICHOS_TEXT = { title: 'סליחות' };
+const SLICHOS_TEXT = {
+  title: 'סליחות',
+  // What the first day's morning is called on the congregation's "what is on next". סליחות
+  // is a prayer added to שחרית, so every other morning in the season is offered under that
+  // name; the first day has none, its סליחות having been said the night before, and its
+  // morning is a plain שחרית on a schedule of its own.
+  shacharis: 'שחרית',
+};
+
+/** The label of a row in SLICHOS_ROWS, so a caller can pick one out without matching on
+ *  wording that may be reworded. */
+const rowNamed = (label) => SLICHOS_ROWS.find((r) => r.label === label);
+
+/** The morning schedule of every day in the סליחות season, day by day.
+ *
+ *  The sheet is written as a handful of lines, each covering a stretch of days: one for the
+ *  first day, one for every ordinary סליחות morning, one for עשי"ת. This turns that back into
+ *  the days themselves, which is what the congregation's "what is on next" needs.
+ *
+ *  Only the mornings. The מנחה and מעריב of these days are ordinary and are on the Weekday
+ *  chart, which is where they stay: this stands in for the שחרית alone.
+ *
+ *  Named for what is being davened rather than for the line it came off. סליחות is a prayer
+ *  added to שחרית, and offering "שחרית 6:40" on a morning the whole point of which is the
+ *  סליחות says the lesser half of it. The first day is the exception in both directions: its
+ *  סליחות are the night before, at 12:55 after מוצ"ש, and its morning has none, so the night
+ *  is offered as סליחות and the morning as שחרית.
+ *
+ *  ערב ר"ה, צום גדליה and ערב יו"כ have lines on this sheet too and are deliberately not
+ *  here: each of those days is on a sheet of its own, whole, and posters/day.js hands the
+ *  day over to it rather than piecing it together from two. */
+function slichosMornings(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+  const tzom = tzomGedaliaDay(rh);
+  const out = [];
+  /** A line's times for one particular day: the same list the sheet prints, with the first
+   *  מנין five minutes earlier on the mornings there is קריאת התורה, which is the note the
+   *  sheet carries in brackets rather than a second line. */
+  const timesOn = (row, serial) => {
+    const times = parseTimes(row.times);
+    if (row.earlier && times.length && KRIAS_HATORAH.some((d) => d.dow === excelWeekday(serial))) {
+      times[0] = { ...times[0], text: row.earlier };
+    }
+    return times;
+  };
+
+  // The first night and the first morning, both on the Sunday: 12:55 is after midnight, so
+  // it belongs to the day the sheet calls יום א' rather than to the Shabbos behind it.
+  out.push({ serial: start, name: SLICHOS_TEXT.title, times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
+  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
+
+  // Every סליחות morning after it, up to but not including ערב ר"ה, which has its own sheet.
+  const daily = rowNamed('סליחות');
+  for (let d = start + 1; d < erev; d++) {
+    if (excelWeekday(d) === DOW_SHABBOS) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(daily, d) });
+  }
+
+  // עשי"ת: 3 to 8 תשרי, less Shabbos and less צום גדליה. The same range posterDays works out
+  // for the line's own bracket, so the two cannot name different days.
+  const aseres = rowNamed('עשי"ת');
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(aseres, d) });
+  }
+  return out;
+}
 
 /** One line's times, split into the pieces the poster draws.
  *
@@ -2092,14 +2174,15 @@ function buildYomKippurPoster(year, settings) {
      afterYomKippurRow in sheets/weekday.js), so the day is left to it. */
   const erevOn = rh + 8;
   const dayOn = rh + 9;
+  const afterOn = rh + 10;
   const M = minyanList();
-  for (const t of parseTimes(YK_TEXT.erevShacharis.times)) M.typed(erevOn, YK_TEXT.erevShacharis.label, t, MORNING);
-  for (const t of parseTimes(YK_TEXT.erevMincha.times)) M.typed(erevOn, YK_TEXT.erevMincha.label, t, AFTERNOON);
+  M.list(erevOn, YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), MORNING);
+  M.list(erevOn, YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), AFTERNOON);
   // The night that opens יו"כ, which is ערב יו"כ's evening.
   M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
   M.at(erevOn, YK_TEXT.maariv, nightMaariv);
   // The day itself, and its מוצאי.
-  for (const t of parseTimes(YK_TEXT.shacharis.times)) M.typed(dayOn, YK_TEXT.shacharis.label, t, MORNING);
+  M.list(dayOn, YK_TEXT.shacharis.label, parseTimes(YK_TEXT.shacharis.times), MORNING);
   M.at(dayOn, YK_TEXT.mincha, neila - 110 * YK_MIN);
   M.at(dayOn, YK_TEXT.neila, neila);
   M.at(dayOn, YK_TEXT.maariv, motzei60);
@@ -2107,9 +2190,22 @@ function buildYomKippurPoster(year, settings) {
   // The third מעריב keeps its time and loses its underline on the way over: its label already
   // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
   // the name and once beside it.
-  for (const t of parseTimes(YK_TEXT.maarivGimmel.times)) {
-    M.typed(dayOn, YK_TEXT.maarivGimmel.label, { text: t.text }, AFTERNOON);
-  }
+  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times).map((t) => ({ text: t.text })), AFTERNOON);
+  // קידוש לבנה is given two ways on the sheet, אחר מעריב or a time. The words are not a time
+  // and nothing can count down to them, so only the clock one goes over; clockMins reads
+  // "אחר מעריב" as no time at all and it is dropped rather than guessed at.
+  M.list(dayOn, YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((text) => ({ text })), AFTERNOON);
+  /* The morning after, and the rest of that day with it.
+     The sheet prints only its שחרית, which is the everyday one five minutes early. Left at
+     that the card would have had a morning and nothing after it, so the day is completed
+     from the box on this very sheet: the schedule that runs from after יו"כ until סוכות,
+     which is what that day's מנחה and מעריב actually are. Both come off the one poster, so
+     the day cannot be half from here and half from somewhere else.
+     Named שחרית rather than "שחרית יום ג'", which is the sheet's own heading: the card
+     already says when it is, and the day would be said twice. */
+  M.list(afterOn, YK_TEXT.shacharis.label, nextMorning.times, MORNING);
+  M.list(afterOn, YK_TEXT.afterBig.mincha, after.mincha, AFTERNOON);
+  M.list(afterOn, YK_TEXT.afterBig.maariv, after.maariv, AFTERNOON);
 
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
@@ -2716,8 +2812,8 @@ function buildRoshHashanaPoster(year, settings) {
      The three lines above the days are ערב ר"ה's own: its שחרית, which is the סליחות מנין,
      and its מנחה. חצות is a זמן and is not one. */
   const M = minyanList();
-  for (const t of parseTimes(RH_TEXT.slichos.times)) M.typed(rh - 1, RH_TEXT.slichos.label, t, MORNING);
-  for (const t of parseTimes(RH_TEXT.erevMincha.times)) M.typed(rh - 1, RH_TEXT.erevMincha.label, t, AFTERNOON);
+  M.list(rh - 1, RH_TEXT.slichos.label, parseTimes(RH_TEXT.slichos.times), MORNING);
+  M.list(rh - 1, RH_TEXT.erevMincha.label, parseTimes(RH_TEXT.erevMincha.times), AFTERNOON);
 
   const blocks = days.map((day, i) => {
     const night = i === 0 ? erev : days[0];
@@ -2771,7 +2867,7 @@ function buildRoshHashanaPoster(year, settings) {
     // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
     // its own. ס"ז ק"ש, ט' שעות, the שופר times and the דרשות are זמנים and announcements.
     const dayOn = rh + i;
-    for (const t of parseTimes(RH_TEXT.shacharis.times)) M.typed(dayOn, RH_TEXT.shacharis.label, t, MORNING);
+    M.list(dayOn, RH_TEXT.shacharis.label, parseTimes(RH_TEXT.shacharis.times), MORNING);
     if (i === tashlichDay) M.at(dayOn, RH_TEXT.mincha, mainMincha - TASHLICH_EARLIER * RH_MIN, { underlined: true });
     M.at(dayOn, RH_TEXT.mincha, mainMincha);
 
@@ -2920,9 +3016,9 @@ function buildTzomGedaliaPoster(year, settings) {
      order. Its times are all afternoon and its שחרית all morning, which on a fast day needs
      no thought: nothing here runs past מעריב. */
   const M = minyanList();
-  for (const t of shacharis) M.typed(serial, TZG_TEXT.shacharis, t, MORNING);
-  for (const t of mincha) M.typed(serial, TZG_TEXT.mincha, t, AFTERNOON);
-  for (const t of maariv) M.typed(serial, TZG_TEXT.maariv, t, AFTERNOON);
+  M.list(serial, TZG_TEXT.shacharis, shacharis, MORNING);
+  M.list(serial, TZG_TEXT.mincha, mincha, AFTERNOON);
+  M.list(serial, TZG_TEXT.maariv, maariv, AFTERNOON);
 
   const all = [...shacharis, ...mincha, ...maariv];
   const stars = [];
@@ -2976,12 +3072,19 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
-/** How far either side of ר"ה a sheet can reach: ערב ר"ה is the day before, and יו"כ's
- *  מוצאי is 9 days after. Every day outside that answers in one calendar call and builds
- *  nothing, which matters because this is asked of eight days in a row every time the home
- *  page draws its card. */
+
+
+/** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
+ *  the morning after יו"כ is 10 days after. Every day outside that answers in one calendar
+ *  call and builds nothing, which matters because this is asked of eight days in a row every
+ *  time the home page draws its card. */
 const BEFORE = 1;
-const AFTER = 9;
+const AFTER = 10;
+
+/** How far back the סליחות season can start. They begin on a Sunday and run at least four
+ *  days, and in a year where that would be too few they begin the Sunday before that, which
+ *  at the furthest is fifteen days before ר"ה. Sixteen, to have a day in hand. */
+const SEASON_BEFORE = 16;
 
 /** The three sheets for one year, built once.
  *
@@ -3017,6 +3120,44 @@ function specialMinyanim(serial, settings) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;
     const found = sheetsFor(year, settings).filter((m) => m.serial === serial);
+    if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
+  }
+  return [];
+}
+
+/** The סליחות season's mornings, day by day, built once for a year. Same reasoning as
+ *  sheetsFor above: this is asked of eight days in a row and the answer does not move. */
+let mornings = null;
+function morningsFor(year, settings) {
+  if (mornings && mornings.year === year && mornings.settings === settings) return mornings.list;
+  const M = minyanList();
+  try {
+    for (const day of slichosMornings(year)) M.list(day.serial, day.name, day.times, MORNING);
+  } catch {
+    // Same as above: a sheet that will not build leaves the charts answering, which is where
+    // this was before any of it.
+  }
+  mornings = { year, settings, list: M.out };
+  return mornings.list;
+}
+
+/** The morning schedule for one day of the סליחות season, or nothing.
+ *
+ *  Half a day rather than a whole one, and deliberately: through אלול and עשרת ימי תשובה the
+ *  שחרית on the sheet is not the everyday one out of Settings (סליחות are said and the מנין
+ *  starts earlier), while the מנחה and מעריב of those days are ordinary and are on the
+ *  Weekday chart. So this stands in for the morning and the chart answers for the rest of
+ *  the day, where specialMinyanim above hands the whole day over.
+ *
+ *  Never for a day specialMinyanim already covers: slichosMornings leaves out ערב ר"ה, צום
+ *  גדליה and ערב יו"כ for exactly that reason, and the two days of ר"ה and יו"כ are not in
+ *  its range at all. */
+function specialShacharis(serial, settings) {
+  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  for (const year of [here, here + 1]) {
+    const rh = roshHashana(year - 3761);
+    if (serial < rh - SEASON_BEFORE || serial > rh + AFTER) continue;
+    const found = morningsFor(year, settings).filter((m) => m.serial === serial);
     if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
   }
   return [];
@@ -3384,7 +3525,10 @@ function minyanimForDay(serial, state, settings) {
     // a merged cell rather than working it out day by day.
     if (dow === FRIDAY) {
       const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-      for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
+      // Through the סליחות season the morning is the sheet's, not Settings': see below.
+      const morning = specialShacharis(serial, settings);
+      if (morning.length) out.push(...morning);
+      else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
     }
   } else {
     // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
@@ -3398,8 +3542,15 @@ function minyanimForDay(serial, state, settings) {
       const name = nameFromHeader(column.header);
       for (const t of parseCell(row[column.key])) out.push({ ...t, name });
     }
+    /* The morning, which through the סליחות season is not the everyday one. From the Sunday
+       סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the
+       sheet on the wall prints it; Settings holds the ordinary year's schedule and knows
+       nothing about it. The afternoon and evening of those days are ordinary and stay on the
+       chart, which is why this stands in for the one column rather than for the day. */
     const shacharisName = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-    for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
+    const morning = specialShacharis(serial, settings);
+    if (morning.length) out.push(...morning);
+    else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;

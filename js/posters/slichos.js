@@ -113,7 +113,76 @@ export const SLICHOS_ROWS = [
   { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
 ];
 
-export const SLICHOS_TEXT = { title: 'סליחות' };
+export const SLICHOS_TEXT = {
+  title: 'סליחות',
+  // What the first day's morning is called on the congregation's "what is on next". סליחות
+  // is a prayer added to שחרית, so every other morning in the season is offered under that
+  // name; the first day has none, its סליחות having been said the night before, and its
+  // morning is a plain שחרית on a schedule of its own.
+  shacharis: 'שחרית',
+};
+
+/** The label of a row in SLICHOS_ROWS, so a caller can pick one out without matching on
+ *  wording that may be reworded. */
+const rowNamed = (label) => SLICHOS_ROWS.find((r) => r.label === label);
+
+/** The morning schedule of every day in the סליחות season, day by day.
+ *
+ *  The sheet is written as a handful of lines, each covering a stretch of days: one for the
+ *  first day, one for every ordinary סליחות morning, one for עשי"ת. This turns that back into
+ *  the days themselves, which is what the congregation's "what is on next" needs.
+ *
+ *  Only the mornings. The מנחה and מעריב of these days are ordinary and are on the Weekday
+ *  chart, which is where they stay: this stands in for the שחרית alone.
+ *
+ *  Named for what is being davened rather than for the line it came off. סליחות is a prayer
+ *  added to שחרית, and offering "שחרית 6:40" on a morning the whole point of which is the
+ *  סליחות says the lesser half of it. The first day is the exception in both directions: its
+ *  סליחות are the night before, at 12:55 after מוצ"ש, and its morning has none, so the night
+ *  is offered as סליחות and the morning as שחרית.
+ *
+ *  ערב ר"ה, צום גדליה and ערב יו"כ have lines on this sheet too and are deliberately not
+ *  here: each of those days is on a sheet of its own, whole, and posters/day.js hands the
+ *  day over to it rather than piecing it together from two. */
+export function slichosMornings(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+  const tzom = tzomGedaliaDay(rh);
+  const out = [];
+  /** A line's times for one particular day: the same list the sheet prints, with the first
+   *  מנין five minutes earlier on the mornings there is קריאת התורה, which is the note the
+   *  sheet carries in brackets rather than a second line. */
+  const timesOn = (row, serial) => {
+    const times = parseTimes(row.times);
+    if (row.earlier && times.length && KRIAS_HATORAH.some((d) => d.dow === excelWeekday(serial))) {
+      times[0] = { ...times[0], text: row.earlier };
+    }
+    return times;
+  };
+
+  // The first night and the first morning, both on the Sunday: 12:55 is after midnight, so
+  // it belongs to the day the sheet calls יום א' rather than to the Shabbos behind it.
+  out.push({ serial: start, name: SLICHOS_TEXT.title, times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
+  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
+
+  // Every סליחות morning after it, up to but not including ערב ר"ה, which has its own sheet.
+  const daily = rowNamed('סליחות');
+  for (let d = start + 1; d < erev; d++) {
+    if (excelWeekday(d) === DOW_SHABBOS) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(daily, d) });
+  }
+
+  // עשי"ת: 3 to 8 תשרי, less Shabbos and less צום גדליה. The same range posterDays works out
+  // for the line's own bracket, so the two cannot name different days.
+  const aseres = rowNamed('עשי"ת');
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(aseres, d) });
+  }
+  return out;
+}
 
 /** One line's times, split into the pieces the poster draws.
  *

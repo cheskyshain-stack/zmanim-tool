@@ -60,10 +60,23 @@ export function minyanList() {
     at(serial, name, fraction, time) {
       out.push({ serial, name, mins: fracMins(fraction), place: placeOf(time) });
     },
-    /** A time typed into one of the poster's own text tables, which carries no meridiem. */
-    typed(serial, name, time, afternoon) {
-      const mins = clockMins(time?.text, afternoon);
-      if (mins != null) out.push({ serial, name, mins, place: placeOf(time) });
+    /** A run of times typed into one of the poster's own text tables, which carry no
+     *  meridiem: one line's מנינים, in the order the sheet prints them.
+     *
+     *  A run only ever goes forwards, so any time reading as earlier than the one before it
+     *  has half a day added. That is what turns the 12:00 at the end of a מעריב list running
+     *  10:30, 11:00, 11:30 into midnight rather than noon, which is twelve hours out and on
+     *  the wrong side of the day. The charts are read back the same way, for the same reason
+     *  (see parseCell in upcoming.js). */
+    list(serial, name, times, afternoon) {
+      let previous = -1;
+      for (const time of times) {
+        let mins = clockMins(time?.text, afternoon);
+        if (mins == null) continue;
+        while (mins <= previous) mins += 12 * 60;
+        previous = mins;
+        out.push({ serial, name, mins, place: placeOf(time) });
+      }
     },
   };
 }
