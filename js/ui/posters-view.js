@@ -1082,9 +1082,25 @@ function renderOnePagePoster(built, settings) {
  *  The ceiling is there because a short year would otherwise grow until the type was larger
  *  than the wall sheets' own; the floor because a year that will not fit at any readable size
  *  should spill visibly rather than print at a size nobody can read. Measured across תשפ"ה to
- *  תשצ"ד, no year has reached either. */
+ *  תשצ"ד, no year has reached either.
+ *
+ *  It runs after fitPoster rather than before it, and that is the whole of a bug this got
+ *  wrong once. Measured on an unscaled sheet the answer was 95%, and 95% is right on a
+ *  desktop; a phone then shrank the sheet to fit its screen, and under that zoom every row
+ *  rounds to whole device pixels and the column holds a line or two fewer. The first column
+ *  overflowed, the overflow made a third column, and the far end of the sheet printed off the
+ *  side of the paper. Reported from a phone, and it was a real spill and not the rounding I
+ *  first put it down to.
+ *
+ *  So it is measured in the state the sheet is actually in. What that costs is one step of
+ *  type on a phone: at zoom 1 this year fits at 95%, at 0.72 at 94% and at the 0.42 a 375px
+ *  screen gives it at 89%. Printing is the safe direction from there, since print.css never
+ *  scales a sheet below 0.72 and a desktop does not scale it at all, so a fit made at the
+ *  screen's zoom always has room on paper. The extra step off the top is for the difference
+ *  between this and a device whose pixels are not the ones measured here. */
 const OP_MIN = 0.7;
 const OP_MAX = 1.25;
+const OP_STEP = 0.01;
 function fitOnePage(container) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
@@ -1093,14 +1109,14 @@ function fitOnePage(container) {
     // 1px of slack, since a column box and its content round independently.
     const fits = () => cols.scrollWidth <= cols.clientWidth + 1;
     let best = OP_MIN;
-    for (const step of [0.05, 0.01]) {
+    for (const step of [0.05, OP_STEP]) {
       for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
         set(v);
         if (!fits()) break;
         best = v;
       }
     }
-    set(best);
+    set(Math.max(OP_MIN, Math.round((best - OP_STEP) * 100) / 100));
   }
 }
 
@@ -1183,6 +1199,10 @@ export function fitPoster(container) {
       const wide = el.getBoundingClientRect().width;
       if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
     }
+    // The one-page sheet's type is set against the zoom just chosen, so the two are decided
+    // together and a resize cannot leave one of them behind. See fitOnePage for why it has
+    // to be this way round.
+    fitOnePage(container);
   };
   decide();
   // Rotating a phone changes what fits. One listener, replaced each render so it always
@@ -1331,9 +1351,8 @@ export function renderPosters(container, state, routeChanged, tables) {
     // would not change where a line breaks, but measuring the unscaled sheet is one less
     // thing to have to be sure of.
     balanceBoxRows(container);
-    // Also before fitPoster, and for the same reason: the columns are measured at the size
-    // they print at, not at whatever a phone has shrunk the sheet to on screen.
-    fitOnePage(container);
+    // fitPoster sets the one-page sheet's type as well as the sheets' zoom, since the first
+    // depends on the second.
     fitPoster(container);
   }
 }
