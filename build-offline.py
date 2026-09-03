@@ -81,13 +81,13 @@ ROUTES = {
         ),
     },
     "chart": {
-        "title": "Zmanim chart",
+        "title": "Zmanim Chart",
         "description": (
             "The printable season zmanim chart for Bais Medrash of Lakewood Commons, "
             "44 Coles Way, Lakewood NJ: every week of the season on one page, Shabbos and "
             "weekday."
         ),
-        "heading": "Zmanim chart",
+        "heading": "Zmanim Chart",
         "blurb": (
             "The season's zmanim board, laid out week by week and made to be printed: the "
             "Shabbos chart and the weekday chart for Bais Medrash of Lakewood Commons."

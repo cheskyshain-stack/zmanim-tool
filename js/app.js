@@ -159,7 +159,7 @@ function renderNav() {
 function renderWeekTab(showPublish) {
   const panes = [
     { key: 'week', label: 'Weekly Zmanim' },
-    { key: 'chart', label: 'Zmanim chart' },
+    { key: 'chart', label: 'Zmanim Chart' },
   ];
   main.innerHTML = `
     <h2 class="no-print">This week</h2>

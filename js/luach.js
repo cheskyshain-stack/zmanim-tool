@@ -65,7 +65,7 @@ const OUTWARD = `<svg class="luach-item-go" viewBox="0 0 24 24" fill="none" stro
  *  Weekly Zmanim opened a page headed "This week's schedule" and Zmanim chart opened one
  *  headed "The chart", which is two names for each of two things on a site that only has
  *  two things. Written here rather than in both places, so they cannot drift apart again. */
-const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim chart', schedules: 'Special Schedules', donate: 'Donate' };
+const PAGE_NAMES = { week: 'Weekly Zmanim', chart: 'Zmanim Chart', schedules: 'Special Schedules', donate: 'Donate' };
 
 /* The marks on the giving cards, drawn in the same weight as the menu's own and ringed in
    gold, so a card is recognisable before its title is read. */
@@ -612,6 +612,12 @@ function schedulesNow(published) {
  *  second telling of it. Each is a real 8.5in page scaled to the window, the way the wall
  *  chart is on its own page.
  *
+ *  The dates are given twice, the Hebrew above the English, the same way the poster tab
+ *  gives them: the sheet itself carries no dates at all, so this line is the whole answer to
+ *  "is this the one that is up now". The English one names a Saturday Shabbos, which it does
+ *  by itself: enDate reads the day out of DAY_NAMES rather than out of a locale, and no
+ *  locale has Shabbos in it.
+ *
  *  Print only when there is one sheet up. Printing a run of them is broken in Chrome (see
  *  the note on the poster run), and a button that puts out blank pages is worse than no
  *  button; one sheet on its own prints correctly. */
@@ -624,6 +630,7 @@ function renderSchedulesPage(published) {
     ${sheets.length
       ? sheets.map((sh) => `<section class="luach-sheet">
           <h2 class="luach-sheet-name no-print"${hebrewLang(sh.label)}>${escAttr(sh.label)}</h2>
+          <p class="luach-sheet-when-he no-print" lang="he" dir="rtl">${escAttr(sh.when.he)}</p>
           <p class="luach-sheet-when no-print">${escAttr(sh.when.en)}</p>
           <div class="luach-sheet-page">${sh.html}</div>
         </section>`).join('')
@@ -930,7 +937,7 @@ function whereAmI() {
 const PAGE_TITLE = {
   '': 'Bais Medrash of Lakewood Commons · קהל לב מנחם · Zmanim',
   week: 'Weekly Zmanim · Bais Medrash of Lakewood Commons',
-  chart: 'Zmanim chart · Bais Medrash of Lakewood Commons',
+  chart: 'Zmanim Chart · Bais Medrash of Lakewood Commons',
   schedules: 'Special Schedules · Bais Medrash of Lakewood Commons',
   donate: 'Donate · Bais Medrash of Lakewood Commons',
 };

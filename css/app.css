@@ -1600,6 +1600,14 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   font-size: 1.15rem; font-weight: 700; color: var(--luach-ink);
   margin: 0 0 0.15rem; text-align: center;
 }
+/* The dates, Hebrew over English. The Hebrew is the shul's own way of saying them and gets
+   the weight; the English is there to be certain of, so it sits under it in the quieter
+   size. dir="rtl" is on the element in the markup: the string is Hebrew throughout, and its
+   two dates read right to left. */
+.luach-sheet-when-he {
+  font-size: 1.05rem; font-weight: 700; line-height: 1.5; color: var(--luach-ink);
+  margin: 0 0 0.1rem; text-align: center;
+}
 .luach-sheet-when { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 0.7rem; text-align: center; }
 .luach-sheet-page { width: 100%; overflow: hidden; display: flex; justify-content: center; }
 /* A sheet is a real 8.5in page and must not be squeezed into a narrower window: a flex item
