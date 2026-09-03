@@ -555,15 +555,58 @@ function renderRoshHashanaPoster(poster, settings) {
  *  יום כיפור column on that sheet, and across the width of the sheet that carries both
  *  schedules. Same three lines either way. */
 function ykAfterBox(poster) {
+  // One span per time, and the commas between them come from CSS rather than from here.
+  // That is what lets balanceBoxRows below cut a run in two by moving spans: the separators
+  // work themselves out again around the break, where a comma written into the markup would
+  // be left stranded at the end of the first line.
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
     + `<span class="poster-row-label">${esc(label)}</span>`
-    + `<bdi class="poster-row-times">${times.map(timeHtml).join(', ')}</bdi></p>`;
+    + `<bdi class="poster-row-times">`
+    + times.map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')
+    + `</bdi></p>`;
   return `<div class="poster-box">
         <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
         ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
         ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
         ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
       </div>`;
+}
+
+/** Cuts a run of times in the box into two even lines, the shorter one on top, wherever the
+ *  run does not fit on one.
+ *
+ *  Only the narrow sheet needs it: on the portrait pair the box has half a page to work in
+ *  and eleven מעריב times will not sit on one line. Left to the browser that wraps, and a
+ *  wrap fills the first line and drops whatever is left over, so it came out seven and four
+ *  with the remainder hanging under a full line. Halved it reads as one list on two lines.
+ *
+ *  Measured rather than assumed, so a row is only cut when it is actually too long: שחרית is
+ *  six times and fits, and cutting it too would have cost the sheet 19px of the clearance the
+ *  key needs at the foot. Which rows wrap is a question about the box's width and the year's
+ *  times together, so it is asked of the browser after the sheet is on the page.
+ *
+ *  Reading the run first and moving afterwards, because the box is sized to its widest line:
+ *  cutting one row narrows the box under the row being measured next. */
+function balanceBoxRows(container) {
+  // Whether the run got a second line, asked of layout rather than of paint. offsetTop is
+  // measured before any transform; getClientRects is measured after, and in the run of every
+  // poster a landscape sheet is turned a quarter turn, which stands the line up on its end
+  // and gives every time on it a different top. That read as eleven wrapped lines and cut a
+  // row that was sitting comfortably on one.
+  const wrapped = (times) => times.length > 1 && times[times.length - 1].offsetTop > times[0].offsetTop;
+  const cuts = [];
+  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times')) {
+    const times = [...run.querySelectorAll(':scope > .poster-t')];
+    if (!wrapped(times)) continue;
+    const cut = Math.floor(times.length / 2);
+    if (cut) cuts.push({ run, rest: times.slice(cut) });
+  }
+  for (const { run, rest } of cuts) {
+    const more = document.createElement('bdi');
+    more.className = 'poster-row-times poster-box-more';
+    for (const t of rest) more.appendChild(t);
+    run.after(more);
+  }
 }
 
 /** The יום כיפור schedule, with or without that box under it. */
@@ -847,6 +890,10 @@ export function renderPosters(container, state, routeChanged) {
   });
   if (built) {
     wirePrintButton(container);
+    // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
+    // would not change where a line breaks, but measuring the unscaled sheet is one less
+    // thing to have to be sure of.
+    balanceBoxRows(container);
     fitPoster(container);
   }
 }
