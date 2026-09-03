@@ -5969,17 +5969,16 @@ function shabbosShuvaSerial(hebrewYearNum) {
   return rh + ((7 - excelWeekday(rh)) % 7 || 7);
 }
 
-/** The poster's content for a sheet, or null when that sheet has no שבת שובה in it.
+/** The poster's content, read out of one מנחה cell.
  *
  *  Returns the דרשה's time and the מנחה times as they stand on the board, each knowing
  *  whether it was underlined and whether it carried a *, so the view can draw them the way
  *  the chart draws them and the foot can say only what is needed.
+ *
+ *  Split out from buildShuvaPoster because the cell can now come from two places, a saved
+ *  chart or the calendar, and everything after the cell is the same either way.
  */
-function buildShuvaPoster(sheet, state, settings) {
-  const week = shuvaWeekOf(sheet);
-  if (!week) return null;
-  const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-  const cell = row.C;
+function posterFromCell(week, cell) {
   const found = erevTimes(cell);
 
   // The דרשה is the time whose own line says דרשה. Asked of the text in front of it rather
@@ -6016,6 +6015,47 @@ function buildShuvaPoster(sheet, state, settings) {
       mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
     ].filter(Boolean),
   };
+}
+
+/** The poster off a saved chart: the מנחה cell of its שבת שובה week, or nothing if this sheet
+ *  does not cover one.
+ *
+ *  Preferred over the calendar below wherever a chart exists, and that is the whole point of
+ *  reading the cell rather than recomputing beside it: a hand edit to that cell on the board
+ *  is on the poster too, and a season the shul set by hand is the season the poster uses. */
+function buildShuvaPoster(sheet, state, settings) {
+  const week = shuvaWeekOf(sheet);
+  if (!week) return null;
+  const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
+  return posterFromCell(week, row.C);
+}
+
+/** The same poster with no chart at all, worked out from the calendar.
+ *
+ *  The chart was never the source of these times. Its מנחה cell is itself computed, by the
+ *  same rowFor this calls, out of Settings and the rules: what a saved chart adds is the
+ *  season somebody chose for that week and any hand edit made to that one cell. So a year
+ *  with no chart saved is not a year the poster cannot be made for, and with the Year picker
+ *  now offering ten of them it would otherwise be blank for nine.
+ *
+ *  The stand-in sheet is a קיץ one because that is the only season שבת שובה can fall in: a
+ *  קיץ season runs from Pesach to the Sukkos after it, and שבת שובה is inside the ten days
+ *  that open the year, which is before that Sukkos. It carries no overrides, there being no
+ *  sheet for anyone to have edited.
+ *
+ *  Needs the parsha tables, which the app has loaded before anything is drawn. Without them
+ *  it says so rather than guessing at a parsha, since a rule can be keyed on one. */
+function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
+  if (!tables) return null;
+  const serial = shabbosShuvaSerial(hebrewYearNum);
+  const week = {
+    serial,
+    date: dateFromSerial(serial),
+    parsha: hasParsha(serial, settings, tables),
+    specialParsha: hasSpecialParsha(serial, settings),
+  };
+  const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
+  return posterFromCell(week, row.C);
 }
 
 // ==== ui/posters-view.js ====
@@ -6249,7 +6289,7 @@ const POSTERS = [
         year: y,
         label: yearLabel(y),
         preferred: y === preferred,
-        build: () => buildFromCharts(state, settings, y),
+        build: () => buildShuvaFor(state, settings, y),
       }));
     },
     render: renderShuvaPoster,
@@ -6383,8 +6423,9 @@ function posterGroups(year, settings) {
  *
  *  Each is built by its own entry's own source, so this knows nothing about what any of them
  *  needs: it asks the table. One that cannot be built for a year is left out rather than
- *  breaking the run, which is what happens to שבת שובה in a year with no chart saved for it,
- *  and the ones that were left out are named under the sheets so it is not a silent gap.
+ *  breaking the run, and the ones that were left out are named under the sheets so it is not
+ *  a silent gap. Nothing is left out as things stand: שבת שובה used to be, in a year with no
+ *  chart saved, and it now works that week out from the calendar instead.
  *
  *  A שבת שובה built from two charts that disagree takes the first, since this view has no
  *  one poster to hang the "which chart" picker off. Choosing the poster on its own still
@@ -6465,19 +6506,27 @@ function chartLabel(sheet) {
 
 /** The שבת שובה poster for a year, found rather than chosen.
  *
- *  It reads its times off a chart, but which chart is a question with an answer, so it is
- *  not put to the user: shuvaSheetsFor finds every generated chart covering that שבת שובה,
- *  and one of them is normally the only one. Two charts are only worth asking about if they
- *  actually say different things, which happens when one has a hand-edited cell, so they are
- *  built and compared and the picker only appears when they genuinely disagree. */
-function buildFromCharts(state, settings, hebrewYearNum) {
+ *  Off a chart where there is one, because a chart can carry a hand edit to that מנחה cell
+ *  and the poster on the wall must say what the board says. Which chart is a question with an
+ *  answer, so it is not put to the user: shuvaSheetsFor finds every generated chart covering
+ *  that שבת שובה, and one of them is normally the only one. Two are only worth asking about
+ *  if they actually say different things, so they are built and compared and the picker only
+ *  appears when they genuinely disagree.
+ *
+ *  Off the calendar where there is none. The chart was never the source of the times, only of
+ *  the edits: see buildShuvaFromCalendar. */
+function buildShuvaFor(state, settings, hebrewYearNum) {
   const sheets = shuvaSheetsFor(state.sheets, hebrewYearNum);
-  if (!sheets.length) {
-    return { missing: `No generated chart covers שבת שובה ${hebrewYear(hebrewYearNum)}. It falls in a קיץ season, which is named for the year before: generate קיץ ${hebrewYearNum - 1} and this fills in.` };
-  }
   const built = sheets.map((s) => ({ sheet: s, poster: buildShuvaPoster(s, state, settings) }))
     .filter((b) => b.poster);
-  if (!built.length) return { missing: 'The chart covering that שבת שובה has no מנחה times to read.' };
+  if (!built.length) {
+    // No chart for this year, so work the week out from the calendar instead. Same rowFor and
+    // so the same Settings and the same rules; what is not there to be had is a hand edit to
+    // that one cell, which is why a chart is used wherever there is one.
+    const poster = buildShuvaFromCalendar(hebrewYearNum, state, settings, posterTables);
+    if (poster) return { poster };
+    return { missing: `No generated chart covers שבת שובה ${hebrewYear(hebrewYearNum)}, and the Hebrew calendar tables have not loaded to work it out without one.` };
+  }
   const signature = (p) => JSON.stringify([p.drasha, p.mincha]);
   const agree = built.every((b) => signature(b.poster) === signature(built[0].poster));
   if (agree) return { poster: built[0].poster };
@@ -6835,6 +6884,11 @@ let chosenSourceId = null;
 // Told to app.js whenever a picker moves, so the choice can go in the address. Held here
 // rather than passed through every redraw, since redrawInPlace calls back in on its own.
 let onRoute = null;
+// The Hebrew-calendar tables, handed in by app.js once it has loaded them and held here the
+// way onRoute is, since redrawInPlace calls back in without them. Only the שבת שובה poster
+// needs them, and only in a year with no chart saved: it has to know that Shabbos's parsha,
+// because a rule can be keyed on one.
+let posterTables = null;
 
 /** Which poster is on screen and, if it is one that can be set either way up, which way.
  *  app.js writes this into the address so a refresh comes back to the same sheet.
@@ -6921,8 +6975,9 @@ function redrawInPlace(container, state) {
   window.scrollTo(0, y);
 }
 
-function renderPosters(container, state, routeChanged) {
+function renderPosters(container, state, routeChanged, tables) {
   if (routeChanged !== undefined) onRoute = routeChanged;
+  if (tables) posterTables = tables;
   const settings = resolveSettings(state.settings);
   // Ordered by date, so the picker and the run both read down the season. Which year's dates
   // is settled here rather than below, because the order has to be known before the poster is
@@ -10003,7 +10058,7 @@ function render() {
       render();
     });
   } else if (currentTab === 'posters') {
-    renderPosters(main, state, writeRoute);
+    renderPosters(main, state, writeRoute, tables);
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {

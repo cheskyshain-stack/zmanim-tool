@@ -279,7 +279,7 @@ function render() {
       render();
     });
   } else if (currentTab === 'posters') {
-    renderPosters(main, state, writeRoute);
+    renderPosters(main, state, writeRoute, tables);
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {

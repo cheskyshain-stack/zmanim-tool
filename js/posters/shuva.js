@@ -16,8 +16,8 @@
 import { rowFor } from '../sheets/rows.js';
 import { erevPlain, erevTimes } from '../erev-text.js';
 import { SHUVA_NAMES } from '../sheets/common.js';
-import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
-import { excelSerial } from '../zmanim/solar.js';
+import { roshHashana, excelWeekday, hasParsha, hasSpecialParsha } from '../hebrew-calendar.js';
+import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 
 /** The lines that are the poster rather than the times: what it is, and who is speaking.
  *
@@ -84,17 +84,16 @@ export function shabbosShuvaSerial(hebrewYearNum) {
   return rh + ((7 - excelWeekday(rh)) % 7 || 7);
 }
 
-/** The poster's content for a sheet, or null when that sheet has no שבת שובה in it.
+/** The poster's content, read out of one מנחה cell.
  *
  *  Returns the דרשה's time and the מנחה times as they stand on the board, each knowing
  *  whether it was underlined and whether it carried a *, so the view can draw them the way
  *  the chart draws them and the foot can say only what is needed.
+ *
+ *  Split out from buildShuvaPoster because the cell can now come from two places, a saved
+ *  chart or the calendar, and everything after the cell is the same either way.
  */
-export function buildShuvaPoster(sheet, state, settings) {
-  const week = shuvaWeekOf(sheet);
-  if (!week) return null;
-  const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-  const cell = row.C;
+function posterFromCell(week, cell) {
   const found = erevTimes(cell);
 
   // The דרשה is the time whose own line says דרשה. Asked of the text in front of it rather
@@ -131,4 +130,45 @@ export function buildShuvaPoster(sheet, state, settings) {
       mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
     ].filter(Boolean),
   };
+}
+
+/** The poster off a saved chart: the מנחה cell of its שבת שובה week, or nothing if this sheet
+ *  does not cover one.
+ *
+ *  Preferred over the calendar below wherever a chart exists, and that is the whole point of
+ *  reading the cell rather than recomputing beside it: a hand edit to that cell on the board
+ *  is on the poster too, and a season the shul set by hand is the season the poster uses. */
+export function buildShuvaPoster(sheet, state, settings) {
+  const week = shuvaWeekOf(sheet);
+  if (!week) return null;
+  const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
+  return posterFromCell(week, row.C);
+}
+
+/** The same poster with no chart at all, worked out from the calendar.
+ *
+ *  The chart was never the source of these times. Its מנחה cell is itself computed, by the
+ *  same rowFor this calls, out of Settings and the rules: what a saved chart adds is the
+ *  season somebody chose for that week and any hand edit made to that one cell. So a year
+ *  with no chart saved is not a year the poster cannot be made for, and with the Year picker
+ *  now offering ten of them it would otherwise be blank for nine.
+ *
+ *  The stand-in sheet is a קיץ one because that is the only season שבת שובה can fall in: a
+ *  קיץ season runs from Pesach to the Sukkos after it, and שבת שובה is inside the ten days
+ *  that open the year, which is before that Sukkos. It carries no overrides, there being no
+ *  sheet for anyone to have edited.
+ *
+ *  Needs the parsha tables, which the app has loaded before anything is drawn. Without them
+ *  it says so rather than guessing at a parsha, since a rule can be keyed on one. */
+export function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
+  if (!tables) return null;
+  const serial = shabbosShuvaSerial(hebrewYearNum);
+  const week = {
+    serial,
+    date: dateFromSerial(serial),
+    parsha: hasParsha(serial, settings, tables),
+    specialParsha: hasSpecialParsha(serial, settings),
+  };
+  const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
+  return posterFromCell(week, row.C);
 }
