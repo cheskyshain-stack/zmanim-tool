@@ -6271,6 +6271,9 @@ const POSTERS = [
   {
     key: 'slichostzom',
     label: 'סליחות וצום גדליה על דף אחד',
+    // Two sheets on one page. The run can be asked to leave these out, since somebody
+    // printing the lot usually wants one occasion a sheet.
+    combined: true,
     covers: (y) => `${SLICHOS_TEXT.title} ${TZG_TEXT.title} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     orientations: true,
@@ -6309,6 +6312,7 @@ const POSTERS = [
   {
     key: 'pair',
     label: 'ראש השנה ויום כיפור על דף אחד',
+    combined: true,
     covers: (y) => `${RH_TEXT.title} ${YK_TEXT.title} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     // The one sheet that can be set either way up, so the tab shows an orientation picker
@@ -6426,7 +6430,7 @@ const POSTERS = [
         year: y,
         label: yearLabel(y),
         preferred: y === preferred,
-        build: () => buildEveryPoster(state, settings, y),
+        build: () => buildEveryPoster(state, settings, y, { combined: chosenCombined }),
       }));
     },
     render: renderAllPosters,
@@ -6504,11 +6508,16 @@ function posterGroups(year, settings) {
  *  A שבת שובה built from two charts that disagree takes the first, since this view has no
  *  one poster to hang the "which chart" picker off. Choosing the poster on its own still
  *  offers the choice. */
-function buildEveryPoster(state, settings, year) {
+function buildEveryPoster(state, settings, year, { combined = true } = {}) {
   const items = [];
   const missing = [];
+  const left = [];
   for (const p of postersByDate(year, settings)) {
     if (p.last) continue;
+    // The two-on-a-page sheets, left out when the run is asked for one occasion a sheet.
+    // Named under the run rather than silently dropped, the same as one that would not
+    // build, so it is clear they were a choice and not a gap.
+    if (!combined && p.combined) { left.push(p.label); continue; }
     const source = p.sources(state, settings).find((s) => s.year === year);
     let result = null;
     try {
@@ -6533,6 +6542,7 @@ function buildEveryPoster(state, settings, year) {
       hebrewYear: year,
       items,
       notBuilt: missing,
+      leftOut: left,
       span: spans.length
         ? { from: Math.min(...spans.map((s) => s.from)), to: Math.max(...spans.map((s) => s.to)) }
         : { from: roshHashana(year - 3761), to: roshHashana(year - 3761) },
@@ -6562,9 +6572,12 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
     ${built.notBuilt.length
       ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : ''}
-    <p class="hint no-print">${sideways
+    ${(built.leftOut || []).length
+      ? `<p class="hint no-print">Left out, one occasion a sheet: ${escAttr(built.leftOut.join(', '))}</p>`
+      : ''}
+    ${(built.leftOut || []).length ? '' : `<p class="hint no-print">${sideways
       ? 'The two sheets that can be set either way up are on their side here, because one print run can only be one page size. They come out whole on the same paper as the rest; turn the sheet to read them.'
-      : 'Set Page to Landscape to have the two sheets that can be set either way up come out that way, turned on their side so they still fit the run.'}</p>
+      : 'Set Page to Landscape to have the two sheets that can be set either way up come out that way, turned on their side so they still fit the run.'}</p>`}
   </div>`;
 }
 
@@ -6984,6 +6997,10 @@ function setPosterRoute(parts = []) {
 // Which way up the one sheet that can go either way is set. Only the pair poster reads it,
 // and it is remembered across a redraw so changing the year does not put it back.
 let chosenOrientation = 'portrait';
+// Whether the run carries the two-on-a-page sheets. Only the run reads it, and it is
+// remembered across a redraw the same way. Not in the address: the orientation is there
+// because it decides what paper comes out, and this only decides how many sheets.
+let chosenCombined = true;
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -7093,6 +7110,12 @@ function renderPosters(container, state, routeChanged, tables) {
           <option value="landscape" ${chosenOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
         </select>
       </label>` : ''}
+      ${poster.last ? `<label>Two on a page
+        <select id="poster-combined">
+          <option value="yes" ${chosenCombined ? 'selected' : ''}>Include</option>
+          <option value="no" ${chosenCombined ? '' : 'selected'}>Leave out</option>
+        </select>
+      </label>` : ''}
       ${built ? printButtonHtml() : ''}
     </div>
     ${built ? (() => { const w = poster.when(built); return `
@@ -7126,6 +7149,10 @@ function renderPosters(container, state, routeChanged, tables) {
   container.querySelector('#poster-orient')?.addEventListener('change', (e) => {
     chosenOrientation = e.target.value;
     onRoute?.();
+    again();
+  });
+  container.querySelector('#poster-combined')?.addEventListener('change', (e) => {
+    chosenCombined = e.target.value === 'yes';
     again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
