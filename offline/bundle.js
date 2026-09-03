@@ -7179,13 +7179,60 @@ const ONEPAGE_TEXT = {
  *  point of type. */
 const ONEPAGE_PER_LINE = 4;
 
-/** A run of times as the lines it should be set on: one line, or two even ones with the
- *  shorter half on top. The lower amount on top is the shul's own way round, the same as the
- *  box on the יום כיפור sheet. */
-function onePageLines(times) {
-  if (times.length <= ONEPAGE_PER_LINE) return [times];
-  const cut = Math.floor(times.length / 2);
-  return [times.slice(0, cut), times.slice(cut)];
+/** Cuts every long run of times on the sheet into two lines of about the same width.
+ *
+ *  Where the cut goes is a question about width, not about how many times there are. Six
+ *  times split three and three is even only if all six are the same width, and they are not:
+ *  a time carrying ** is wider than a bare one, and an underlined 10:30 is wider than 7:00.
+ *  Three and three came out with one line visibly longer than the other. So every cut is
+ *  tried and the one that leaves the wider line narrowest wins.
+ *
+ *  Measured after the sheet is on the page, the same as balanceBoxRows, because the answer is
+ *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the
+ *  whole sheet with zoom, and a rect read under that is in screen pixels.
+ *
+ *  It runs before the type is fitted, and the answer holds through the fit: every time on the
+ *  line scales by the same factor, so the widths keep their proportions and the best cut stays
+ *  the best cut.
+ *
+ *  The separators come from CSS rather than from the markup, which is what lets a time be
+ *  moved to the second line and the slashes work themselves out around the break. A slash
+ *  written into the markup would be left stranded at the end of the first line. Same trick,
+ *  and the same reason, as the box on the יום כיפור sheet. */
+function balanceOnePageTimes(container) {
+  for (const run of container.querySelectorAll('.onepage-line')) {
+    const times = [...run.querySelectorAll(':scope > .onepage-t')];
+    if (times.length <= ONEPAGE_PER_LINE) continue;
+    const wide = times.map((t) => t.offsetWidth);
+    /* The note at the head of the run counts towards the first line, because it is on it.
+       Left out, the two סליחות rows carrying one came out 180px against 109px: the note is
+       79px of that first line and the cut was being chosen as though it were not there.
+
+       Its own width and nothing else. Taking the gap as well, by the distance from the note's
+       left edge to the first time's, looked more exact and was wrong: the run is measured
+       before it is cut, so it is still wrapping, and a first time that has wrapped to the
+       next visual line reports the same offsetLeft as the note above it. That read as no note
+       at all, and the row with the widest note of the lot was the one it went wrong on. The
+       space between them is about 3px and is not worth a second measurement. */
+    const note = run.querySelector(':scope > .onepage-note');
+    const lead = note ? note.offsetWidth : 0;
+    const total = lead + wide.reduce((a, x) => a + x, 0);
+    let at = 1;
+    let worst = Infinity;
+    let head = lead;
+    for (let i = 1; i < times.length; i++) {
+      head += wide[i - 1];
+      const m = Math.max(head, total - head);
+      // Strictly narrower to win, so a tie leaves the cut where it already is, which is the
+      // earlier one: fewer on the top line, the way round the shul asked for on the box.
+      if (m < worst) { worst = m; at = i; }
+    }
+    const more = document.createElement('bdi');
+    more.className = 'onepage-line';
+    more.dir = 'ltr';
+    for (const t of times.slice(at)) more.appendChild(t);
+    run.after(more);
+  }
 }
 
 /** A block: a name and its rows. Rows are the poster's own line shape, `{ label, times }`
@@ -7247,9 +7294,17 @@ const ONEPAGE_SECTIONS = {
 function onePageRows(r) {
   const label = `<span class="onepage-label"${hebrewLang(r.label)}>${escAttr(r.label)}`
     + `${r.sub ? ` <span class="onepage-sub">${escAttr(r.sub)}</span>` : ''}</span>`;
-  // A list of מנינים and a זמן given two ways are both slash separated here. The full sheets
-  // tell them apart with commas because they have the room to; at this size the comma and the
-  // digits either side of it close up into one run and the slash is what keeps them apart.
+  /* A list of מנינים and a זמן given two ways are both slash separated here. The full sheets
+     tell them apart with commas because they have the room to; at this size the comma and
+     the digits either side of it close up into one run and the slash is what keeps them
+     apart.
+
+     A run long enough to be cut in two is written as one span a time with the slashes coming
+     from CSS, so balanceOnePageTimes can move a span and have the separators work themselves
+     out around the break. A short run keeps its slashes in the markup and can carry its own
+     separator: the only row that does is קידוש לבנה, whose two answers are joined by an &,
+     and two answers are never cut. */
+  const long = r.times.length > ONEPAGE_PER_LINE;
   const sep = r.sep || SLASH;
   const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi> ` : '';
   // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
@@ -7258,9 +7313,11 @@ function onePageRows(r) {
   // The note goes on the first line, against the first time, which is the time it is about:
   // it says that מנין runs five minutes earlier on the days it names. The sheets it comes
   // off put it there for the same reason.
+  const body = long
+    ? r.times.map((t) => `<span class="onepage-t">${timeHtml(t)}</span>`).join('')
+    : r.times.map(timeHtml).join(sep);
   const times = r.times.length || note
-    ? `<div class="onepage-times">${onePageLines(r.times).map((line, i) =>
-        `<bdi class="onepage-line" dir="ltr">${i ? '' : note}${line.map(timeHtml).join(sep)}</bdi>`).join('')}</div>`
+    ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
     : '';
   return `<div class="onepage-row">${label}${times}</div>`
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
@@ -7636,6 +7693,10 @@ function renderPosters(container, state, routeChanged, tables) {
     // would not change where a line breaks, but measuring the unscaled sheet is one less
     // thing to have to be sure of.
     balanceBoxRows(container);
+    // Before the type is fitted, and it can be: every time on a line scales by the same
+    // factor, so where the run should be cut does not change when the size does. The heights
+    // it settles are what the fit then measures.
+    balanceOnePageTimes(container);
     // fitPoster sets the one-page sheet's type as well as the sheets' zoom, since the first
     // depends on the second.
     fitPoster(container);

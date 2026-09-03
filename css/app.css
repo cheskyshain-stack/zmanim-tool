@@ -3137,6 +3137,14 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    as one list. */
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
+/* The slash between one time and the next, on a run long enough to be cut in two. From CSS
+   rather than from the markup so balanceOnePageTimes can move a span to the second line and
+   have the separators work themselves out around the break: the first span on a line has no
+   preceding sibling and so draws no slash, and the one that used to follow the break draws
+   one again. A slash written into the markup would be stranded at the end of the first line.
+   Non-breaking spaces either side, the same as the SLASH the short runs are joined with, so
+   a line can never break between a time and its own slash. */
+.onepage-t + .onepage-t::before { content: "\00a0/\00a0"; }
 .onepage-times u { text-underline-offset: 0.12em; }
 .onepage-note { white-space: nowrap; }
 
