@@ -6,6 +6,7 @@ import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './
 import { getPublishToken, setPublishToken } from '../publish.js';
 import { renderRules } from './rules-view.js';
 import { escAttr } from '../util.js';
+import { switchHtml } from './switch.js';
 
 export function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
@@ -58,12 +59,12 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
       <details class="panel">
         <summary>Display</summary>
         <div class="panel-body">
-        <label>Language
-          <select name="language">
-            <option value="he" ${s.language === 'he' ? 'selected' : ''}>עברית</option>
-            <option value="en" ${s.language === 'en' ? 'selected' : ''}>English</option>
-          </select>
-        </label>
+        <div class="settings-switch">${switchHtml('language', 'Language', [
+          // In a bdi: it sits in an otherwise-LTR line beside English and would be
+          // reordered against it.
+          { value: 'he', label: '<bdi lang="he">עברית</bdi>', on: s.language === 'he' },
+          { value: 'en', label: 'English', on: s.language !== 'he' },
+        ])}</div>
         <label><input type="checkbox" name="inIsrael" ${s.inIsrael ? 'checked' : ''}> Zmanim used in Eretz Yisroel</label>
       </div>
       </details>

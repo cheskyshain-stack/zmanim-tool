@@ -180,6 +180,14 @@
   /* zoom back to 1, the same guard .pages carries: a phone shrinks the poster on screen so
      it fits across the display, and that must never reach paper. */
   .poster { margin: 0; box-shadow: none; break-inside: avoid; zoom: 1 !important; }
+  /* Browsers drop background colours when printing unless told otherwise, and the print
+     dialog's "Background graphics" box is off by default. The wall sheets never needed this
+     line because they are black on white; the one-page sheet is not, and it printed with
+     every block heading's band missing, which is what separates one schedule from the next
+     on a page carrying ten of them. Reported from a phone, where a print of the sheet came
+     back as rules and text with no bands at all. Same line the charts and the week cards
+     have carried from the beginning. */
+  .poster, .poster * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* Nothing else on the tab reaches paper: the picker and the Print button are no-print
      already, and the heading above them goes with them. */
   body:has(.poster) h2.no-print, body:has(.poster) p.hint { display: none !important; }

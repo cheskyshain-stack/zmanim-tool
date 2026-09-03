@@ -3072,23 +3072,42 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    list in the order the days come. The sheet is dir="rtl", so the first column is the
    right-hand one, which is where a Hebrew page starts.
 
-   column-fill: auto, not balance. Balance is the default and it minimises the height: the two
-   columns come out level with each other and both stop wherever the content ran out, which
-   here was two and a half inches short of the foot with the type already set small to get
-   there. auto fills the first column to the bottom of the box and puts the rest in the
-   second, which is a page filled rather than a page half used, and it is what fitOnePage
-   sizes the type against.
+   Two boxes with the blocks handed out between them by fitOnePage, not CSS columns. Columns
+   were the obvious way and they were wrong twice over.
 
-   min-height: 0 because a flex item's default floor is its content, and without it the
-   columns would push the sheet past its 11in instead of the type being set to fit. */
+   With a definite height and column-fill: auto they fill the first column to the foot and
+   put the rest in the second, which looks right on a page that fits and fails badly on one
+   that does not: whatever is left over goes into a third column, and a third column on an
+   8.5in sheet is off the paper. A phone printed that twice, once outright and once after
+   the type had been fitted more carefully, because the fit has to be right to the pixel on
+   a device that cannot be measured from here. With column-fill: balance a third column
+   stops happening, but the browser balances by minimising its own height and the two
+   columns then end wherever the blocks happen to run out, level with each other only by
+   luck.
+
+   Handing them out here answers both. The columns are two flex boxes of the same height, so
+   they start level by construction and cannot spill sideways whatever the type does; each
+   spreads its own blocks with space-between, so they end level too; and fitOnePage picks
+   the split by measuring rather than by cutting the list in the middle, which matters
+   because יום כיפור is fourteen rows and שבת שובה is two.
+
+   min-height: 0 because a flex item's default floor is its content: without it the box
+   could push the sheet past its 11in rather than the type being set to fit. */
 .onepage-cols {
   width: 100%; flex: 1; min-height: 0;
-  columns: 2; column-gap: 0.26in; column-fill: auto;
-  column-rule: 0.75pt solid var(--op-hair);
+  display: flex; align-items: stretch; gap: 0.26in;
 }
-/* A block never breaks across the two columns: half a schedule at the foot of one and half
-   at the head of the other is worse than an uneven pair of columns. */
-.onepage-sec { break-inside: avoid; margin: 0 0 0.1in; }
+.onepage-col {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+/* The rule between them. On the second column's start edge, which in a right-to-left sheet
+   is the edge facing the first one. */
+.onepage-col + .onepage-col {
+  border-inline-start: 0.75pt solid var(--op-hair);
+  padding-inline-start: 0.26in; margin-inline-start: 0;
+}
+.onepage-sec { margin: 0; }
 .onepage-sec-head {
   margin: 0 0 0.01in; padding: 0.03in 0.06in;
   background: var(--op-band);
@@ -3196,6 +3215,27 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: var(--fs-sm); font-weight: 600; color: var(--muted); letter-spacing: 0.02em;
 }
 .poster-bar-switch .week-switch-label { text-align: start; }
+/* The sides on one line each. The switch was written for a panel where both answers are a
+   word ("One", "Two"), so its sides floor at 5.5rem; here they are "Separate sheets" and
+   "Leave out", which broke over two lines inside the pill and left those two switches taller
+   than everything else on the row. The bar wraps to a second line sooner for it, which is
+   what a bar of controls should do. */
+.poster-bar-switch .week-switch-side { min-width: 8rem; white-space: nowrap; }
+
+/* The same switch in Settings, where a question with two answers was a dropdown too.
+   .form-grid label is written for the form's own fields and would reach the switch's two
+   sides, which are labels: display: block and a half rem of margin under each would take
+   the pill apart. Two classes, so it outranks that rule wherever the switch is used. */
+.settings-switch {
+  display: grid; gap: 0.35rem; justify-items: start;
+  margin-bottom: 0.5rem;
+  font-size: var(--fs-md); font-weight: 500;
+}
+.settings-switch .week-switch-label { text-align: start; }
+.settings-switch .week-switch-side {
+  display: inline-block; margin-bottom: 0;
+  font-size: var(--fs-sm); font-weight: 600;
+}
 /* A phone has no room for three controls across, and a picker squeezed to a third of a narrow
    screen cannot show a poster's name. One per line, each the full width. */
 @media (max-width: 32rem) {

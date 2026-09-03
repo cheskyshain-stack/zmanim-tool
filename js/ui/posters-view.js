@@ -1048,13 +1048,20 @@ function renderOnePagePoster(built, settings) {
     !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
     // Two identical lines: keep the first.
     && lines.findIndex((o) => o.text === l.text) === i);
+  /* Both columns are written out, and every block starts in the first one. Which of them
+     each block ends up in is settled by fitOnePage, after the browser has said how tall
+     each is: the split is a measurement, not a number written down here, so a year that
+     runs long or short lands where it should without this file knowing about it. */
   const body = `
     <h2 class="onepage-title" lang="he">${escAttr(ONEPAGE_TEXT.title)} ${escAttr(hebrewYear(built.hebrewYear))}</h2>
     <div class="onepage-cols">
-      ${sections.map((s) => `<section class="onepage-sec">
-        <h3 class="onepage-sec-head"${s.ltrHead ? ' dir="ltr"' : hebrewLang(s.title)}>${escAttr(s.title)}</h3>
-        ${s.rows.map(onePageRows).join('')}
-      </section>`).join('')}
+      <div class="onepage-col">
+        ${sections.map((s) => `<section class="onepage-sec">
+          <h3 class="onepage-sec-head"${s.ltrHead ? ' dir="ltr"' : hebrewLang(s.title)}>${escAttr(s.title)}</h3>
+          ${s.rows.map(onePageRows).join('')}
+        </section>`).join('')}
+      </div>
+      <div class="onepage-col"></div>
     </div>`;
   return posterShell(settings, body, legend, { onepage: true, chartHead: true })
     + (built.notBuilt.length
@@ -1101,13 +1108,49 @@ function renderOnePagePoster(built, settings) {
 const OP_MIN = 0.7;
 const OP_MAX = 1.25;
 const OP_STEP = 0.01;
+/** Room left at the foot before a size counts as fitting, in the sheet's own pixels.
+ *
+ *  A tenth of an inch on eleven, which is the price of not having to be right to the pixel
+ *  on a device that cannot be measured from here. Every phone lays a line of type out a
+ *  little differently: a different rasteriser, a different pixel ratio, a different fallback
+ *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
+ *  line over there, and one line over is a block off the sheet. */
+const OP_ROOM = 11;
 function fitOnePage(container) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
-    if (!cols) continue;
+    const col = cols?.querySelectorAll(':scope > .onepage-col');
+    if (!col || col.length !== 2) continue;
+    const secs = [...cols.querySelectorAll('.onepage-sec')];
+    if (secs.length < 2) continue;
     const set = (v) => sheet.style.setProperty('--op-scale', v);
-    // 1px of slack, since a column box and its content round independently.
-    const fits = () => cols.scrollWidth <= cols.clientWidth + 1;
+    /* Hand the blocks out between the two columns so the taller of them is as short as it
+       can be, and answer with how tall that is.
+       offsetHeight, which is layout and is in the sheet's own pixels: a phone shrinks the
+       whole sheet with zoom to fit its screen, and a rect read under that is in screen
+       pixels, so it could not be compared with the box it has to fit.
+       Every split is tried rather than the halfway point taken, because the blocks are not
+       the same size: יום כיפור is fourteen rows and שבת שובה is two, and cutting the list in
+       the middle leaves one column inches longer than the other. */
+    const layout = () => {
+      const tall = secs.map((s) => s.offsetHeight
+        + parseFloat(getComputedStyle(s).marginBottom || 0));
+      const total = tall.reduce((a, x) => a + x, 0);
+      let at = 1;
+      let worst = Infinity;
+      let run = 0;
+      for (let i = 1; i < secs.length; i++) {
+        run += tall[i - 1];
+        const m = Math.max(run, total - run);
+        if (m < worst) { worst = m; at = i; }
+      }
+      secs.forEach((s, i) => {
+        const want = i < at ? col[0] : col[1];
+        if (s.parentElement !== want) want.appendChild(s);
+      });
+      return worst;
+    };
+    const fits = () => layout() <= cols.clientHeight - OP_ROOM;
     let best = OP_MIN;
     for (const step of [0.05, OP_STEP]) {
       for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
@@ -1116,7 +1159,8 @@ function fitOnePage(container) {
         best = v;
       }
     }
-    set(Math.max(OP_MIN, Math.round((best - OP_STEP) * 100) / 100));
+    set(best);
+    layout();
   }
 }
 
@@ -1279,18 +1323,14 @@ export function renderPosters(container, state, routeChanged, tables) {
         { value: 'sheets', label: 'Separate sheets', on: !onePage },
         { value: 'one', label: 'One page', on: onePage },
       ])}</div>` : ''}
-      ${poster.orientations && !onePage ? `<label>Page
-        <select id="poster-orient">
-          <option value="portrait" ${chosenOrientation === 'portrait' ? 'selected' : ''}>Portrait</option>
-          <option value="landscape" ${chosenOrientation === 'landscape' ? 'selected' : ''}>Landscape</option>
-        </select>
-      </label>` : ''}
-      ${poster.last && !onePage ? `<label>Two on a page
-        <select id="poster-combined">
-          <option value="yes" ${chosenCombined ? 'selected' : ''}>Include</option>
-          <option value="no" ${chosenCombined ? '' : 'selected'}>Leave out</option>
-        </select>
-      </label>` : ''}
+      ${poster.orientations && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Page', [
+        { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
+        { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
+      ])}</div>` : ''}
+      ${poster.last && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'Two on a page', [
+        { value: 'yes', label: 'Include', on: chosenCombined },
+        { value: 'no', label: 'Leave out', on: !chosenCombined },
+      ])}</div>` : ''}
       ${built ? printButtonHtml() : ''}
     </div>
     ${built ? (() => { const w = poster.when(built); return `
@@ -1321,13 +1361,13 @@ export function renderPosters(container, state, routeChanged, tables) {
     conflictPick = 0;
     again();
   });
-  container.querySelector('#poster-orient')?.addEventListener('change', (e) => {
-    chosenOrientation = e.target.value;
+  wireSwitch(container, 'poster-orient', (value) => {
+    chosenOrientation = value;
     onRoute?.();
     again();
   });
-  container.querySelector('#poster-combined')?.addEventListener('change', (e) => {
-    chosenCombined = e.target.value === 'yes';
+  wireSwitch(container, 'poster-combined', (value) => {
+    chosenCombined = value === 'yes';
     again();
   });
   wireSwitch(container, 'poster-onepage', (value) => {
