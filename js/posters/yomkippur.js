@@ -73,7 +73,14 @@ export const YK_TEXT = {
  *  The stored value is rich text: a wrapper span, a line break between the two halves, and
  *  the times separated by spaces rather than commas. All three are flattened to the comma
  *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
-function weekdayShacharis(settings) {
+/** The everyday שחרית out of Settings, as times.
+ *
+ *  Named for what it is rather than "weekday", because upcoming.js has a weekdayShacharis of
+ *  its own that answers a different question (one day's schedule, with the ר"ח/בה"ב/תענית
+ *  variant picked). Two functions of one name are fine across modules and fatal in the offline
+ *  copy, which flattens every module into one scope: whichever is written second wins, and
+ *  every call to the other one silently gets it. That is exactly what had happened here. */
+function everydayShacharis(settings) {
   const html = String(settings.weekdayShacharis || '')
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
@@ -160,7 +167,7 @@ export function buildAfterYomKippur(year, settings) {
     ? Math.min(...runDays.map((d) => d.shkia))
     : Z.sunsetElev(dateFromSerial(rh + 9), settings);
   return {
-    shacharis: weekdayShacharis(settings),
+    shacharis: everydayShacharis(settings),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
     mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
     maariv: [tm(afterEarlyMaariv(earliest), true),
@@ -242,7 +249,7 @@ export function buildYomKippurPoster(year, settings) {
   const dayAfter = rh + 10;
   const nextMorning = {
     label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
-    times: fiveEarlier(weekdayShacharis(settings)),
+    times: fiveEarlier(everydayShacharis(settings)),
   };
 
   // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.

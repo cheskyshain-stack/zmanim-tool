@@ -25,7 +25,7 @@ import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWee
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang, DAY_NAMES, SLASH } from '../util.js';
+import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -421,12 +421,12 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
     ${built.items.map((it) => {
       const turned = sideways && it.orientations;
       return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
-        <p class="poster-all-name no-print">${esc(it.label)}${turned ? ' (turned on its side)' : ''}</p>
+        <p class="poster-all-name no-print">${escAttr(it.label)}${turned ? ' (turned on its side)' : ''}</p>
         ${it.render(it.poster, settings, { landscape: turned })}
       </div>`;
     }).join('')}
     ${built.notBuilt.length
-      ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${esc(built.notBuilt.join(', '))}</p>`
+      ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : ''}
     <p class="hint no-print">${sideways
       ? 'The two sheets that can be set either way up are on their side here, because one print run can only be one page size. They come out whole on the same paper as the rest; turn the sheet to read them.'
@@ -474,16 +474,13 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
   return { poster: pick.poster, conflict: built };
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 /** One time as the boards write it: plain is the main בית מדרש, underlined is למטה, a
  *  trailing * is בעזרת נשים and ** is באולם השמחות. The same marks as the chart, so
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
-  const body = t.underlined ? `<u>${esc(t.text)}</u>` : esc(t.text);
-  return `${body}${esc(t.mark || '')}`;
+  const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
+  return `${body}${escAttr(t.mark || '')}`;
 }
 
 /** The page every poster is drawn on: the letterhead, the rabbi's line under it, whatever
@@ -496,9 +493,9 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
-         alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
-    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
-  const rabbiBlock = `<div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>`;
+         alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
+    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
+  const rabbiBlock = `<div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${escAttr(l)}</div>`).join('')}</div>`;
   // Two headers. The single sheets stack theirs: wordmark, rule, then the rabbi's line under
   // it against the right margin, which is how the Word posters are built.
   //
@@ -516,31 +513,31 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
            <div class="header-year" aria-hidden="true"></div>
            <div class="header-center">
              <img class="header-logo" src="/assets/logo-text.png"
-                  alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)}>
-             <div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+                  alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
+             <div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>
            </div>
-           <div class="header-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
+           <div class="header-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${escAttr(l)}</div>`).join('')}</div>
          </div>
        </div>`
     : `${wordmark}
     <img class="poster-rule" src="/assets/poster-rule.png" alt="" width="1897" height="85">
     ${rabbiBlock}`;
-  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${escAttr(fontStackFor(POSTER_FONT))}">
     ${head}
     ${body}
     ${legend.length
       ? `<div class="poster-legend">${legend
-          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
+          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${escAttr(l.text)}</div>`).join('')}</div>`
       : ''}
   </div>`;
 }
 
 function renderShuvaPoster(poster, settings) {
   const body = `
-    <h2 class="poster-title" lang="he">${esc(SHUVA_TEXT.title)}</h2>
-    ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${esc(l)}</p>`).join('')}
-    ${poster.drasha ? `<p class="poster-at" lang="he">${esc(SHUVA_TEXT.at)} <bdi>${esc(poster.drasha)}</bdi></p>` : ''}
-    <p class="poster-mincha" lang="he"><span class="poster-row-label">${esc(SHUVA_TEXT.minchaLabel)}</span>
+    <h2 class="poster-title" lang="he">${escAttr(SHUVA_TEXT.title)}</h2>
+    ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${escAttr(l)}</p>`).join('')}
+    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${escAttr(poster.drasha)}</bdi></p>` : ''}
+    <p class="poster-mincha" lang="he"><span class="poster-row-label">${escAttr(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
 }
@@ -566,7 +563,7 @@ function slichosBody(poster) {
     // with Hebrew now inside the run, the first strong character is the note's and auto would
     // turn the whole list around. Measured after the change, not assumed.
     const parts = r.times.map(timeHtml);
-    const note = r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : '';
+    const note = r.note ? `<bdi class="poster-row-note">${escAttr(r.note)}</bdi>` : '';
     // On the left of the first time, which is the side it has always been on: it says that
     // מנין runs five minutes earlier on the days it names, so it belongs against that time
     // and not against the row's last one.
@@ -580,11 +577,11 @@ function slichosBody(poster) {
     const inner = note ? `${note} ${parts.join(', ')}` : parts.join(', ');
     return `
     <p class="poster-row" lang="he">
-      <span class="poster-row-label">${esc(r.label)}</span>
+      <span class="poster-row-label">${escAttr(r.label)}</span>
       <bdi class="poster-row-times" dir="ltr">${inner}</bdi>
     </p>`;
   }).join('');
-  return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
+  return `<h2 class="poster-title" lang="he">${escAttr(SLICHOS_TEXT.title)}</h2>
     <div class="poster-rows">${rows}</div>`;
 }
 
@@ -607,14 +604,14 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
   const t = times.length
     ? `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>` : '';
   const e = extra
-    ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
+    ? `<span class="poster-row-label poster-row-second">${escAttr(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
     : '';
   // `sub` names the reckonings a זמן is given on, as ס"ז ק"ש is given on מ"א and גר"א. It
   // wears the label class as well, so it is held off the name in front of it and off the
   // times after it by the same gap every other row uses.
-  const b = sub ? `<span class="poster-row-label">${esc(sub)}</span>` : '';
-  return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${b}${t}${e}</p>`;
+  const b = sub ? `<span class="poster-row-label">${escAttr(sub)}</span>` : '';
+  return `<p class="poster-row" lang="he"><span class="poster-row-label">${escAttr(label)}</span>${b}${t}${e}</p>`;
 }
 
 /** The ראש השנה schedule itself, title and all, without the page around it. Split out so the
@@ -622,13 +619,13 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
 function rhBody(poster, { year = true } = {}) {
   const typed = (str) => parseTimes(str);
   return `
-    <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(RH_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
       ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
       ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
       ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
       ${poster.blocks.map((b) => `
-        <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
+        <h3 class="poster-day" lang="he">${escAttr(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
     </div>`;
 }
@@ -654,12 +651,12 @@ function ykAfterBox(poster) {
   // work themselves out again around the break, where a comma written into the markup would
   // be left stranded at the end of the first line.
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
-    + `<span class="poster-row-label">${esc(label)}</span>`
+    + `<span class="poster-row-label">${escAttr(label)}</span>`
     + `<bdi class="poster-row-times">`
     + times.map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')
     + `</bdi></p>`;
   return `<div class="poster-box">
-        <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
+        <h3 class="poster-box-head" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h3>
         ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
         ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
         ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
@@ -710,11 +707,11 @@ function ykBody(poster, { box = true, year = true } = {}) {
   const rows = (lines) => lines.map((ln) =>
     rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
   return `
-    <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(YK_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
-      <h3 class="poster-day" lang="he">${esc(YK_TEXT.erevHeading)}</h3>
+      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.erevHeading)}</h3>
       ${rows(poster.erevLines)}
-      <h3 class="poster-day" lang="he">${esc(YK_TEXT.dayHeading)}</h3>
+      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.dayHeading)}</h3>
       ${rows(poster.dayLines)}
       <hr class="poster-divider">
       ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
@@ -763,12 +760,12 @@ function renderAfterYomKippurPoster(poster, settings) {
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (title, times) => `
     <div class="poster-set">
-      <h3 class="poster-set-head" lang="he">${esc(title)}</h3>
+      <h3 class="poster-set-head" lang="he">${escAttr(title)}</h3>
       ${half(times).map(timeLine).join('')}
     </div>`;
   const a = poster.after;
   const body = `
-    <h2 class="poster-title poster-title-ltr" dir="ltr">${esc(YK_TEXT.afterHeading)}</h2>
+    <h2 class="poster-title poster-title-ltr" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h2>
     <div class="poster-sets">
       ${section(YK_TEXT.afterBig.shacharis, a.shacharis)}
       ${section(YK_TEXT.afterBig.mincha, a.mincha)}
@@ -787,15 +784,15 @@ function tzomGedaliaBody(poster) {
   const timeLine = (times) =>
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
-    ? `<div class="poster-set"><p class="poster-set-note" lang="he">${esc(s.note.label)}
-        <bdi>${esc(s.note.text)}</bdi></p></div>`
+    ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
+        <bdi>${escAttr(s.note.text)}</bdi></p></div>`
     : `
     <div class="poster-set">
-      <h3 class="poster-set-head" lang="he">${esc(s.head)}</h3>
+      <h3 class="poster-set-head" lang="he">${escAttr(s.head)}</h3>
       ${s.lines.map(timeLine).join('')}
     </div>`);
   return `
-    <h2 class="poster-title" lang="he">${esc(TZG_TEXT.title)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(TZG_TEXT.title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
 }
 
@@ -944,16 +941,16 @@ export function renderPosters(container, state, routeChanged, tables) {
         <select id="poster-pick">
           ${(() => {
             const opts = (items) => items.map((p) =>
-              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
+              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('');
             return groups.map((g) => (g.name
-              ? `<optgroup label="${esc(g.name)}">${opts(g.items)}</optgroup>`
+              ? `<optgroup label="${escAttr(g.name)}">${opts(g.items)}</optgroup>`
               : opts(g.items))).join('');
           })()}
         </select>
       </label>
       <label>Year
         <select id="poster-source">
-          ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+          ${sources.map((s) => `<option value="${escAttr(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${escAttr(s.label)}</option>`).join('')}
         </select>
       </label>
       ${poster.orientations ? `<label>Page
@@ -966,19 +963,19 @@ export function renderPosters(container, state, routeChanged, tables) {
     </div>
     ${built ? (() => { const w = poster.when(built); return `
       <div class="poster-when no-print">
-        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${esc(poster.covers(source.year))}</div>
-        <div class="poster-when-he" lang="he" dir="rtl">${esc(w.he)}</div>
-        <div class="poster-when-en">${esc(w.en)}</div>
-      </div>`; })() : source ? `<p class="hint no-print">${esc(poster.covers(source.year))}</p>` : ''}
+        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${escAttr(poster.covers(source.year))}</div>
+        <div class="poster-when-he" lang="he" dir="rtl">${escAttr(w.he)}</div>
+        <div class="poster-when-en">${escAttr(w.en)}</div>
+      </div>`; })() : source ? `<p class="hint no-print">${escAttr(poster.covers(source.year))}</p>` : ''}
     ${result.conflict
       ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
            <select id="poster-conflict">
-             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(chartLabel(b.sheet))}</option>`).join('')}
+             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${escAttr(chartLabel(b.sheet))}</option>`).join('')}
            </select></p>`
       : ''}
     ${built
       ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-      : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
+      : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
 
   const again = () => redrawInPlace(container, state);
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {

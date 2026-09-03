@@ -1,5 +1,6 @@
 import { getPublishToken, fetchPublished, publishToSite, buildPublishedPayload } from '../publish.js';
 import { SEASON_LABELS } from '../settings.js';
+import { escAttr } from '../util.js';
 
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
@@ -51,7 +52,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange, 
           <td data-label="Folder">
             <select class="folder-select" title="Move this sheet to a folder">
               <option value="${NO_FOLDER}" ${!s.folder ? 'selected' : ''}>No folder</option>
-              ${folders.map((f) => `<option value="${esc(f)}" ${s.folder === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+              ${folders.map((f) => `<option value="${escAttr(f)}" ${s.folder === f ? 'selected' : ''}>${escAttr(f)}</option>`).join('')}
               <option value="${NEW_FOLDER}">New folder…</option>
             </select>
           </td>
@@ -93,7 +94,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange, 
         .map(
           (f) => `
         <details class="panel" open>
-          <summary>📁 ${esc(f)} <span class="hint">(${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'})</span></summary>
+          <summary>📁 ${escAttr(f)} <span class="hint">(${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'})</span></summary>
           <div class="panel-body">${tableHtml(inFolder(f))}</div>
         </details>`
         )
@@ -202,6 +203,3 @@ function created(iso) {
   return `${date}, ${time}`;
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

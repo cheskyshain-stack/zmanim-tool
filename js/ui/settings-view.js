@@ -5,6 +5,7 @@ import { normalizeRichText } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { getPublishToken, setPublishToken } from '../publish.js';
 import { renderRules } from './rules-view.js';
+import { escAttr } from '../util.js';
 
 export function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
@@ -23,11 +24,11 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
         <div class="panel-body">
         <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is. Replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
         <div id="header-photo-cropper"></div>
-        <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${esc(s.shulName)}"></label>
-        <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${esc(s.headerSubtitle)}"></label>
-        <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${esc(s.headerRabbiLine)}</textarea></label>
-        <label>Footer note<textarea name="footerNote" rows="2">${esc(s.footerNote)}</textarea></label>
-        <label>Footer address<input name="footerAddress" value="${esc(s.footerAddress)}"></label>
+        <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${escAttr(s.shulName)}"></label>
+        <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${escAttr(s.headerSubtitle)}"></label>
+        <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${escAttr(s.headerRabbiLine)}</textarea></label>
+        <label>Footer note<textarea name="footerNote" rows="2">${escAttr(s.footerNote)}</textarea></label>
+        <label>Footer address<input name="footerAddress" value="${escAttr(s.footerAddress)}"></label>
       </div>
       </details>
       <details class="panel">
@@ -41,17 +42,17 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
         <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
         <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
         <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
-        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
+        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
       <details class="panel">
         <summary>Location</summary>
         <div class="panel-body">
-        <label>Location name<input name="locationName" value="${esc(s.locationName)}"></label>
+        <label>Location name<input name="locationName" value="${escAttr(s.locationName)}"></label>
         <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
         <label>Longitude<input name="longitude" type="number" step="any" value="${s.longitude}"></label>
         <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${s.elevation}"></label>
-        <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${esc(tz.label)}</option>`).join('')}</select></label>
+        <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${escAttr(tz.label)}</option>`).join('')}</select></label>
       </div>
       </details>
       <details class="panel">
@@ -252,6 +253,3 @@ function showToast(message) {
   }, 2000);
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

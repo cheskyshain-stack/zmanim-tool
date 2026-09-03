@@ -2,6 +2,7 @@ import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, de
 import { resolveSettings } from '../settings.js';
 import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
+import { escText } from '../util.js';
 
 export function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
@@ -156,7 +157,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   el.innerHTML = `
     <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
-      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
       kayitzWeekCount > 0
@@ -183,7 +184,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <p class="hint">Covers ${weekdayWeeks.length} weeks, a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <details class="panel">
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
-          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}</li>`).join('')}</ol>
+          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}</li>`).join('')}</ol>
         </details>
       </fieldset>
       <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
@@ -333,6 +334,3 @@ function fmtDate(date) {
   return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

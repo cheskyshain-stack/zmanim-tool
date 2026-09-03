@@ -1158,6 +1158,30 @@ function splitLinesInHalf(items, delim = SLASH) {
   return [line1, line2].filter(Boolean).join('\n');
 }
 
+/** HTML escaping, in the two shapes this codebase actually uses.
+ *
+ *  They were seven private copies of `esc`, three of one shape and four of the other, and
+ *  under ES modules that is fine: each file has its own scope. The offline copy flattens
+ *  every module into one script, where seven `function esc` are a legal redeclaration and
+ *  the last one written wins for all of them. Which one that is depends on nothing but
+ *  import order, and import order changes when any module gains an import. So they live
+ *  here, one of each, named for what they are.
+ *
+ *  escAttr also escapes the double quote, and is what anything going into an attribute
+ *  needs: a value carrying a " ends the attribute early otherwise.
+ *
+ *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
+ *  built with it and then compared against what the browser reports for that cell, to decide
+ *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
+ *  browser reports a quote as a quote, so escaping it here would make every cell holding one
+ *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
+function escAttr(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escText(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ==== zmanim/zmanim.js ====
 // Named zman functions, ported 1:1 from the workbook's defined names.
 // Every function returns a fractional day (0-1) representing local time-of-day,
@@ -1548,6 +1572,465 @@ const KAYITZ_COLUMNS = [
   { key: 'L', header: 'מנחה\nערב שבת' },
 ];
 
+// ==== posters/slichos.js ====
+// The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
+//
+// The times on it are the shul's own minyan slots and are not on the zmanim board, so
+// unlike the שבת שובה poster there is no cell to read them out of. They are the table
+// below. What is worked out here is the part that was wrong every few years when this was
+// a Word file: which days each line actually covers.
+//
+// Two lines carry a note that the first מנין is five minutes earlier on the days there is
+// קריאת התורה, because the davening runs longer. On the hand-made posters that note was
+// typed as "יום ב' וה'" or "יום ב'" and left alone the next year, and the days it names
+// change with the day ר"ה falls on. So it is computed.
+//
+// The marks are the boards' marks, not the old poster's. The Word posters used * for
+// בעזרת נשים, ** for למטה and *** for אולם השמחות; the app writes plain for the main בית
+// מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
+// is written in the app's system, so somebody holding the poster and the chart is reading
+// one set of marks.
+
+/** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
+const DOW_SUNDAY = 1;
+const DOW_MONDAY = 2;
+const DOW_THURSDAY = 5;
+const DOW_SHABBOS = 7;
+
+/** The days the Torah is read at shacharis, which is why those mornings start earlier.
+ *  Named in the order the note says them. */
+const KRIAS_HATORAH = [
+  { dow: DOW_MONDAY, he: "יום ב'", both: "יום ב'" },
+  { dow: DOW_THURSDAY, he: "יום ה'", both: "וה'" },
+];
+
+/** ר"ה of a Hebrew year, as an Excel serial. roshHashana() takes the year with the 3761
+ *  taken off it, which is how the workbook's own defined name is written. */
+const roshHashanaSerial = (hebrewYearNum) => roshHashana(hebrewYearNum - 3761);
+
+/** The first morning of סליחות.
+ *
+ *  They begin on a Sunday (the מוצ"ש before it is the first night), and if the Sunday
+ *  before ר"ה would leave fewer than four days they begin the Sunday before that. Which
+ *  is why the run is four days in some years and nine in others. */
+function slichosStart(hebrewYearNum) {
+  const erev = roshHashanaSerial(hebrewYearNum) - 1; // 29 אלול
+  let start = erev - (excelWeekday(erev) - DOW_SUNDAY); // the Sunday on or before it
+  if (erev - start + 1 < 4) start -= 7;
+  return start;
+}
+
+/** צום גדליה: 3 תשרי, pushed to the 4th when the 3rd is Shabbos. Returned as a day of
+ *  תשרי rather than a serial, since that is how the days around it are counted here. */
+function tzomGedaliaDay(rh) {
+  return excelWeekday(rh + 2) === DOW_SHABBOS ? 4 : 3;
+}
+
+/** The mornings each of the two multi-day lines covers, as Excel weekdays.
+ *
+ *  סליחות is every סליחות morning after that first Sunday, up to but not including ערב ר"ה,
+ *  which has a line of its own. עשי"ת is 3 to 8 תשרי, less Shabbos and less צום גדליה,
+ *  which also have their own lines, and less ערב יו"כ on the 9th.
+ *
+ *  Both skip Shabbos, which has no weekday shacharis to print. */
+function posterDays(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+
+  const slichos = [];
+  for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
+
+  const tzom = tzomGedaliaDay(rh);
+  const aseres = [];
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    aseres.push(excelWeekday(d));
+  }
+  return { slichos, aseres };
+}
+
+/** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
+ *  and what time the first מנין is on them.
+ *
+ *  Nothing at all if neither falls in the range, which does happen: the four-day סליחות of
+ *  a year ר"ה is on Thursday runs Sunday to Wednesday and never reaches a Thursday, and the
+ *  עשי"ת of a year ר"ה is on Shabbos runs Tuesday to Friday and never reaches a Monday. */
+function kriasHatorahNote(days, time) {
+  if (!time) return '';
+  const hit = KRIAS_HATORAH.filter((d) => days.includes(d.dow));
+  if (!hit.length) return '';
+  // "יום ב' וה'" when both, and each on its own reads as itself.
+  const named = hit.length === 2 ? `${hit[0].both} ${hit[1].both}` : hit[0].he;
+  return `(${named} ${time})`;
+}
+
+/** The poster, line by line, in the order it is hung.
+ *
+ *  `times` is written the way a chart cell is: a plain time is the main בית מדרש, <u> is
+ *  למטה, a trailing * is בעזרת נשים and ** is באולם השמחות. `earlier` is the five-minutes-
+ *  earlier first מנין on a קריאת התורה morning, and `days` says which range decides which
+ *  of those mornings the line actually has.
+ *
+ *  Here rather than in settings, the same as the שבת שובה wording: these are the shul's
+ *  fixed מנין slots and they have not moved in the posters we have. The year's worth of
+ *  it that does change is computed above. */
+const SLICHOS_ROWS = [
+  { label: 'דרשה מאת הרב שליט"א', times: '12:30' },
+  { label: 'סליחות מוצ"ש', times: '12:55' },
+  { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
+  { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
+  { label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  { label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
+  { label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
+  { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+];
+
+const SLICHOS_TEXT = { title: 'סליחות' };
+
+/** One line's times, split into the pieces the poster draws.
+ *
+ *  Reads the same notation a chart cell uses, so a row above can be written the way the
+ *  board writes it: <u> for למטה, a trailing * for בעזרת נשים and ** for באולם השמחות.
+ *  The marks come off the text and become flags, so the view decides how to draw them and
+ *  the foot can count which ones are actually on the sheet. */
+function parseTimes(str) {
+  return String(str ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const underlined = /^<u>.*<\/u>\**$/.test(part);
+      const bare = part.replace(/<\/?u>/g, '');
+      const stars = (bare.match(/\*+$/) || [''])[0];
+      return { text: bare.slice(0, bare.length - stars.length), underlined, mark: stars };
+    });
+}
+
+/** The finished poster for one Hebrew year.
+ *
+ *  The year is the one whose ר"ה this sheet is for, which is the year written on it. The
+ *  סליחות at the top of it are the last days of the year before. */
+function buildSlichosPoster(hebrewYearNum) {
+  if (!hebrewYearNum) return null;
+  const days = posterDays(hebrewYearNum);
+  const rows = SLICHOS_ROWS.map((row) => ({
+    label: row.label,
+    times: parseTimes(row.times),
+    note: row.days ? kriasHatorahNote(days[row.days], row.earlier) : '',
+  }));
+  const all = rows.flatMap((r) => r.times);
+
+  // Only the marks that are actually on this poster get explained, same as שבת שובה. The
+  // two star notes share a line and sit in the order the printed chart's footer has them.
+  //
+  // Each line carries the direction it has to be set in, because they do not agree. The
+  // underline line is an English sentence with Hebrew in it and is left to right; the star
+  // line is Hebrew and is right to left, and setting it the other way puts the star on the
+  // far side of the phrase instead of against the word it belongs to. Same split as the
+  // week card's legend in week-view.js, and the same as the printed chart's own footer.
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  return {
+    hebrewYear: hebrewYearNum,
+    rows,
+    days,
+    // The days this sheet actually covers, as Excel serials: the first סליחות morning
+    // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
+    // years, since סליחות are the end of one and ערב יו"כ the start of the next.
+    span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
+// ==== posters/yomkippur.js ====
+// The יום כיפור poster: ערב יו"כ, the day itself, and the schedule that starts after it.
+//
+// Three parts. The top two are the seder, worked out from the calendar the same way the
+// ראש השנה sheet is. The box at the foot is the ordinary weekday schedule for the days
+// between יו"כ and סוכות, and its late מנחה and early מעריב move with how early the sun is
+// setting by then, so they are worked out too.
+//
+// As on the ראש השנה sheet, a heading gathers the night that opens the day: the שקיעה under
+// יום כיפור is ערב יו"כ's, and the מעריב at the foot of that block is יו"כ's own, which is
+// מוצאי יו"כ.
+//
+// Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
+// תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
+// other way and is not self-consistent with it. See the commit for the line by line.
+
+
+
+
+
+/** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
+ *  of times: after מעריב, or at half past ten. */
+const YK_AMP = `${NBSP}&${NBSP}`;
+
+const YK_MIN = 1 / 1440;
+const at = (h, m) => (h * 60 + m) / 1440;
+/** Up to the next 5 minutes, and to the nearest 5. */
+const ykUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
+const ykNear5 = (t) => Math.round(t * 288) / 288;
+
+/** The Hebrew letter for a weekday, as the sheet names the morning after יו"כ. Shabbos
+ *  cannot happen there (10 תשרי is never a Friday), but it is covered anyway. */
+const YK_DAY_LETTERS = ['', "א'", "ב'", "ג'", "ד'", "ה'", "ו'", 'שבת'];
+
+/** The wording, and the times the shul sets by hand rather than by the sun. */
+const YK_TEXT = {
+  title: 'יום כיפור',
+  erevHeading: 'ערב יום כיפור',
+  dayHeading: 'יום כיפור',
+  erevShacharis: { label: 'שחרית', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+  erevMincha: { label: 'מנחה', times: '1:30, 2:00, 2:30, 3:00, 3:30, 4:00' },
+  candles: 'הדלקת נרות',
+  shkia: 'שקיעה',
+  kolNidrei: 'כל נדרי',
+  drasha: 'דברי התעוררות מאת הרב שליט"א',
+  drashaBeforeNeila: 'דברי התעוררות מאת הרב שליט"א קודם נעילה',
+  maariv: 'מעריב',
+  shacharis: { label: 'שחרית', times: '7:30' },
+  hamelech: { label: 'המלך', times: '8:30' },
+  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
+  yizkor: { label: 'יזכור בערך', times: '11:55' },
+  mincha: 'מנחה',
+  neila: 'נעילה',
+  // A third מעריב for anyone who has not davened yet, on every year's sheet. The label says
+  // where it is in words and the time is underlined as well, which is how the old sheets
+  // marked it: the underline is this system's way of saying the same thing.
+  maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
+  // The gap goes after the name, and what follows is two ways of taking it rather than one
+  // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
+  kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
+  nextMorning: 'שחרית יום',
+  afterHeading: 'Starting after יום כיפור',
+  after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
+  // The same three names again, without the colon, for the sheet that gives the schedule a
+  // page of its own and sets them as headings.
+  afterBig: { shacharis: 'שחרית', mincha: 'מנחה', maariv: 'מעריב' },
+};
+
+/** The everyday שחרית as the boards print it, read out of settings so the poster and the
+ *  charts cannot drift.
+ *
+ *  The stored value is rich text: a wrapper span, a line break between the two halves, and
+ *  the times separated by spaces rather than commas. All three are flattened to the comma
+ *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
+/** The everyday שחרית out of Settings, as times.
+ *
+ *  Named for what it is rather than "weekday", because upcoming.js has a weekdayShacharis of
+ *  its own that answers a different question (one day's schedule, with the ר"ח/בה"ב/תענית
+ *  variant picked). Two functions of one name are fine across modules and fatal in the offline
+ *  copy, which flattens every module into one scope: whichever is written second wins, and
+ *  every call to the other one silently gets it. That is exactly what had happened here. */
+function everydayShacharis(settings) {
+  const html = String(settings.weekdayShacharis || '')
+    .replace(/<span[^>]*>|<\/span>/g, '')
+    .replace(/<br\s*\/?>/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(', ');
+  return parseTimes(html);
+}
+
+/** The same list five minutes earlier, which is what the morning after יו"כ runs on. */
+function fiveEarlier(times) {
+  return times.map((t) => {
+    const [h, m] = t.text.split(':').map(Number);
+    const shifted = at(h === 12 ? 0 : h, m) - 5 * YK_MIN;
+    return { ...t, text: formatTime(shifted) };
+  });
+}
+
+/** The days between יו"כ and סוכות: 11 תשרי through ערב סוכות on the 14th.
+ *
+ *  The late מנחה and the early מעריב have to work on every one of them, so they are set by
+ *  the earliest שקיעה in the run. Only Sunday through Thursday count: Friday and Shabbos
+ *  keep their own schedule and are not what this box is for. */
+function afterYomKippurDays(rh, settings) {
+  const days = [];
+  for (let n = 11; n <= 14; n++) {
+    const serial = rh + n - 1;
+    const dow = excelWeekday(serial);
+    if (dow < 1 || dow > 5) continue; // Sunday to Thursday
+    days.push({ serial, shkia: Z.sunsetElev(dateFromSerial(serial), settings) });
+  }
+  return days;
+}
+
+/** The מנחה list for the box.
+ *
+ *  Four fixed ones, then every 20 minutes from 4:40 for as long as a מנין still lands 15
+ *  minutes or more before שקיעה. Then one last one squeezed in between 15 and 20 minutes
+ *  before שקיעה if there is room for it, which there is only when the 20 minute run stopped
+ *  well short: it has to be at least 15 minutes after the one in front of it. That last one
+ *  is the 6:15 on the תשפ"ו sheet, 16 minutes before a 6:31 שקיעה. */
+function afterMincha(earliestShkia) {
+  const times = [at(13, 15), at(13, 35), at(13, 50), at(16, 15)];
+  for (let t = at(16, 40); t <= earliestShkia - 15 * YK_MIN + 1e-9; t += 20 * YK_MIN) times.push(t);
+  const last = times[times.length - 1];
+  const tail = ykNear5(earliestShkia - 17 * YK_MIN); // the middle of the 15 to 20 window
+  if (tail > last + 15 * YK_MIN - 1e-9
+      && tail <= earliestShkia - 15 * YK_MIN + 1e-9
+      && tail >= earliestShkia - 20 * YK_MIN - 1e-9) times.push(tail);
+  return times;
+}
+
+/** The first מעריב of the box: 7:30 if that is a full 50 minutes after שקיעה, and otherwise
+ *  pushed on in fives until it is, but never past 7:45, which is 15 minutes in front of the
+ *  8:00 behind it. */
+function afterEarlyMaariv(earliestShkia) {
+  let t = at(19, 30);
+  while (t < earliestShkia + 50 * YK_MIN - 1e-9 && t < at(19, 45)) t += 5 * YK_MIN;
+  return t;
+}
+
+/** The rest of the מעריב list, which does not move. 8:30 is added to the everyday run, and
+ *  the marks follow the boards: everything is למטה except 8:45 and 10:30, which are the main
+ *  בית מדרש (see calculations-view for where that comes from). */
+const AFTER_MAARIV_REST = [
+  [20, 0, true], [20, 30, true], [20, 45, false], [21, 0, true], [21, 30, true],
+  [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],
+  // Midnight, written as the 24th hour so it stays in order after 11:30 rather than
+  // sorting to the front of the day. formatTime prints it as 12:00.
+  [24, 0, true],
+];
+
+/** The everyday schedule that runs from after יו"כ until סוכות.
+ *
+ *  Shared, because it is both the box at the foot of the יום כיפור sheet and a sheet of its
+ *  own. The everyday שחרית comes out of settings, so the posters and the boards cannot
+ *  drift. */
+function buildAfterYomKippur(year, settings) {
+  const rh = roshHashana(year - 3761);
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+  const runDays = afterYomKippurDays(rh, settings);
+  const earliest = runDays.length
+    ? Math.min(...runDays.map((d) => d.shkia))
+    : Z.sunsetElev(dateFromSerial(rh + 9), settings);
+  return {
+    shacharis: everydayShacharis(settings),
+    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
+    mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
+    maariv: [tm(afterEarlyMaariv(earliest), true),
+      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
+    earliestShkia: formatTime(earliest),
+  };
+}
+
+/** The same schedule as a sheet in its own right, set large with a heading per תפילה. */
+function buildAfterYomKippurPoster(year, settings) {
+  if (!year) return null;
+  const rh = roshHashana(year - 3761);
+  const after = buildAfterYomKippur(year, settings);
+  const all = [...after.shacharis, ...after.mincha, ...after.maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  return {
+    hebrewYear: year,
+    // From the morning after יו"כ through ערב סוכות, which is what it covers.
+    span: { from: rh + 10, to: rh + 13 },
+    after,
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
+function buildYomKippurPoster(year, settings) {
+  if (!year) return null;
+  const rh = roshHashana(year - 3761);
+  const erev = dateFromSerial(rh + 8);   // 9 תשרי
+  const yk = dateFromSerial(rh + 9);     // 10 תשרי
+  const erevShkia = Z.sunsetElev(erev, settings);
+  const ykShkia = Z.sunsetElev(yk, settings);
+
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark });
+  const line = (label, times, opts = {}) => ({ label, times, ...opts });
+
+  // כל נדרי is the candle lighting taken up to the next 5, and if that leaves less than
+  // four minutes to light in, on to the 5 after it. Both sheets turn on this: תשפ"ו lights
+  // at 6:21 and davens at 6:25, exactly four; תשפ"ד lights at 6:33, where 6:35 would leave
+  // two, so it goes to 6:40.
+  const candles = erevShkia - settings.candleLightingMinutes * YK_MIN;
+  let kolNidrei = ykUp5(candles);
+  if (kolNidrei - candles < 4 * YK_MIN - 1e-9) kolNidrei = ykUp5(kolNidrei + YK_MIN);
+
+  const nightMaariv = erevShkia + 72 * YK_MIN;
+  const motzei60 = ykShkia + 60 * YK_MIN;
+  const neila = ykNear5(motzei60 - 110 * YK_MIN);   // 1:50 before the 60 minute מעריב
+
+  const dayLines = [
+    line(YK_TEXT.candles, [tm(candles)]),
+    line(YK_TEXT.shkia, [tm(erevShkia)]),
+    line(YK_TEXT.kolNidrei, [tm(kolNidrei)]),
+    line(YK_TEXT.drasha, [tm(ykNear5(nightMaariv - 30 * YK_MIN))]),
+    line(YK_TEXT.maariv, [tm(nightMaariv)]),
+    line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
+      { extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
+    line(YK_TEXT.krias.name,
+      [tm(Z.sofZmanShmaMGA72(yk, settings)), tm(Z.sofZmanShmaGRA(yk, settings))],
+      { sub: YK_TEXT.krias.basis }),
+    line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)]),
+    line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)]),   // 1:50 before נעילה
+    line(YK_TEXT.drashaBeforeNeila, []),
+    line(YK_TEXT.neila, [tm(neila)]),
+    // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
+    // time מעריב.
+    line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
+    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
+    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
+      { sep: YK_AMP }),
+  ];
+
+  // The morning after, which the calendar names and which runs five minutes early.
+  const dayAfter = rh + 10;
+  const nextMorning = {
+    label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
+    times: fiveEarlier(everydayShacharis(settings)),
+  };
+
+  // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
+  const after = buildAfterYomKippur(year, settings);
+
+  const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
+    ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+
+  return {
+    hebrewYear: year,
+    span: { from: rh + 8, to: rh + 9 },
+    // Both are lists of מנינים rather than one זמן given two ways, so they are set with
+    // commas; see the renderer.
+    erevLines: [
+      line(YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), { list: true }),
+      line(YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), { list: true }),
+    ],
+    dayLines,
+    nextMorning,
+    after,
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
 // ==== sheets/weekday.js ====
 // Weekday chart מנחה/מעריב schedule.
 //
@@ -1580,6 +2063,7 @@ const KAYITZ_COLUMNS = [
 //
 // Typing over a cell still works and still wins: a hand-typed value is stored as a
 // per-cell override and rendered instead of anything computed here (see overrides.js).
+
 
 
 
@@ -1781,7 +2265,56 @@ function maarivTimes(week, settings) {
   return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
 }
 
+/** One time as the poster hands it over, in the marks this chart prints. Same three: plain
+ *  is the main בית מדרש, underlined is למטה, a trailing * is בעזר״נ. */
+function fromPoster(t) {
+  return `${t.underlined ? underlineTime(t.text) : t.text}${t.mark || ''}`;
+}
+
+/** The days between יו"כ and סוכות do not run on the standing weekday schedule, and this is
+ *  the row that schedules them.
+ *
+ *  They are the shul's own run: מנחה every twenty minutes through the afternoon because
+ *  people are off, and it is already worked out, in buildAfterYomKippur, for the sheet that
+ *  gets hung on the wall for exactly these days. Left to the rules above the row came out
+ *  thinner than the week either side of it: no 4:15, because that is a BMG זמן and BMG is
+ *  between זמנים here, and only 6:35 in the evening.
+ *
+ *  So this asks that schedule rather than restating it. One set of times, and the board and
+ *  the poster on the wall beside it cannot disagree.
+ *
+ *  Which row it is comes from the days themselves: the row whose Sunday to Thursday window
+ *  holds the last day of the run, which is the last weekday before סוכות.
+ *
+ *  The last day rather than any day, because in some years the run is split across two rows
+ *  and only one of them is the week before סוכות. תש"צ is one: יו"כ is a Wednesday, so the
+ *  run is the Thursday after it and then the Sunday, and the Thursday falls in the עשרת ימי
+ *  תשובה row whose other four days are nothing of the kind. Asking for any day would have
+ *  put this schedule on both, and the file already takes the view that a row gets one answer
+ *  (see isBmgWeek). The Sunday is the one that runs up to סוכות, so it is the one that
+ *  decides, and the עשרת ימי תשובה row keeps the standing schedule its other days want.
+ *
+ *  The neighbouring years are checked too, the same way isBmgDay does it, because the AM year
+ *  rolls over in the middle of all this. */
+function afterYomKippurRow(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const { year } = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    const run = afterYomKippurDays(roshHashana(y - 3761), settings);
+    const last = run.length ? run[run.length - 1].serial : null;
+    if (last !== null && days.includes(last)) return buildAfterYomKippur(y, settings);
+  }
+  return null;
+}
+
 function buildWeekdayRow(week, settings) {
+  const after = afterYomKippurRow(week, settings);
+  if (after) {
+    return {
+      B: splitLinesInHalf(after.maariv.map(fromPoster)),
+      C: splitLinesInHalf(after.mincha.map(fromPoster)),
+    };
+  }
   return {
     B: splitLinesInHalf(maarivTimes(week, settings)),
     C: splitLinesInHalf(minchaTimes(week, settings)),
@@ -3682,7 +4215,7 @@ function buildPagePicker(container) {
   if (!picker) return;
   const pages = [...container.querySelectorAll('#pages > .page')];
   picker.innerHTML = pages
-    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${esc(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
+    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${escText(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
     .join('');
   picker.querySelectorAll('input').forEach((cb) => {
     cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
@@ -3876,10 +4409,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           // heading between them, so the wall chart looks exactly as it always has.
           const special = state.settings.weekdayShacharisSpecial;
           const html =
-            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
+            (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
             (special ? `
 
-<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
+<u>${escText(SPECIAL_SHACHARIS_HEADING)}</u>
 ${special}` : '');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
@@ -3922,10 +4455,10 @@ ${special}` : '');
       <div class="header-row">
         <img class="header-icon" src="${state.settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="assets/logo-text.png" alt="${esc(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
-          ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${esc(state.settings.headerSubtitle)}</div>` : ''}
+          <img class="header-logo" src="assets/logo-text.png" alt="${escText(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
+          ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}
         </div>
-        <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(esc(state.settings.headerRabbiLine))}</div>
+        <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(escText(state.settings.headerRabbiLine))}</div>
       </div>
     </div>
     <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
@@ -3936,8 +4469,8 @@ ${special}` : '');
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
-        ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
-        <span class="footer-address">${esc(state.settings.footerAddress)}</span>
+        ${footerNote ? nl2br(escText(footerNote)) + '<br>' : ''}
+        <span class="footer-address">${escText(state.settings.footerAddress)}</span>
       </div>
       <span class="footer-line"></span>
     </div>
@@ -4015,12 +4548,9 @@ function nl2br(str) {
   // gap in a cell is the separator's width and nothing else. The character is a
   // non-breaking space rather than the plain one it looks like in the source, so it is
   // matched as whitespace rather than written out.
-  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
-}
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ==== ui/chart-view.js ====
@@ -4595,7 +5125,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   el.innerHTML = `
     <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
-      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}${w.specialParsha ? ' (' + esc(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
       kayitzWeekCount > 0
@@ -4622,7 +5152,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         <p class="hint">Covers ${weekdayWeeks.length} weeks, a little more than the ${weeks.length} above when a Yom Tov Shabbos week still has a regular weekday in it. It uses the same weeks and the same page breaks as the sheet above, so page 1 of each covers the same stretch of the year.</p>
         <details class="panel">
           <summary>Show the ${weekdayWeeks.length} weekday weeks</summary>
-          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${esc(w.parsha)}</li>`).join('')}</ol>
+          <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}</li>`).join('')}</ol>
         </details>
       </fieldset>
       <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
@@ -4772,10 +5302,6 @@ function fmtDate(date) {
   return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 // ==== ui/guide-view.js ====
 // The "what is this and how do I use it" page, written for someone opening the site for
 // the first time with no idea what it does. Lives inside the app rather than in a README
@@ -4895,183 +5421,6 @@ function renderGuide(container, onOpenTab) {
   `;
 
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
-}
-
-// ==== posters/slichos.js ====
-// The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
-//
-// The times on it are the shul's own minyan slots and are not on the zmanim board, so
-// unlike the שבת שובה poster there is no cell to read them out of. They are the table
-// below. What is worked out here is the part that was wrong every few years when this was
-// a Word file: which days each line actually covers.
-//
-// Two lines carry a note that the first מנין is five minutes earlier on the days there is
-// קריאת התורה, because the davening runs longer. On the hand-made posters that note was
-// typed as "יום ב' וה'" or "יום ב'" and left alone the next year, and the days it names
-// change with the day ר"ה falls on. So it is computed.
-//
-// The marks are the boards' marks, not the old poster's. The Word posters used * for
-// בעזרת נשים, ** for למטה and *** for אולם השמחות; the app writes plain for the main בית
-// מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
-// is written in the app's system, so somebody holding the poster and the chart is reading
-// one set of marks.
-
-/** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
-const DOW_SUNDAY = 1;
-const DOW_MONDAY = 2;
-const DOW_THURSDAY = 5;
-const DOW_SHABBOS = 7;
-
-/** The days the Torah is read at shacharis, which is why those mornings start earlier.
- *  Named in the order the note says them. */
-const KRIAS_HATORAH = [
-  { dow: DOW_MONDAY, he: "יום ב'", both: "יום ב'" },
-  { dow: DOW_THURSDAY, he: "יום ה'", both: "וה'" },
-];
-
-/** ר"ה of a Hebrew year, as an Excel serial. roshHashana() takes the year with the 3761
- *  taken off it, which is how the workbook's own defined name is written. */
-const roshHashanaSerial = (hebrewYearNum) => roshHashana(hebrewYearNum - 3761);
-
-/** The first morning of סליחות.
- *
- *  They begin on a Sunday (the מוצ"ש before it is the first night), and if the Sunday
- *  before ר"ה would leave fewer than four days they begin the Sunday before that. Which
- *  is why the run is four days in some years and nine in others. */
-function slichosStart(hebrewYearNum) {
-  const erev = roshHashanaSerial(hebrewYearNum) - 1; // 29 אלול
-  let start = erev - (excelWeekday(erev) - DOW_SUNDAY); // the Sunday on or before it
-  if (erev - start + 1 < 4) start -= 7;
-  return start;
-}
-
-/** צום גדליה: 3 תשרי, pushed to the 4th when the 3rd is Shabbos. Returned as a day of
- *  תשרי rather than a serial, since that is how the days around it are counted here. */
-function tzomGedaliaDay(rh) {
-  return excelWeekday(rh + 2) === DOW_SHABBOS ? 4 : 3;
-}
-
-/** The mornings each of the two multi-day lines covers, as Excel weekdays.
- *
- *  סליחות is every סליחות morning after that first Sunday, up to but not including ערב ר"ה,
- *  which has a line of its own. עשי"ת is 3 to 8 תשרי, less Shabbos and less צום גדליה,
- *  which also have their own lines, and less ערב יו"כ on the 9th.
- *
- *  Both skip Shabbos, which has no weekday shacharis to print. */
-function posterDays(hebrewYearNum) {
-  const rh = roshHashanaSerial(hebrewYearNum);
-  const erev = rh - 1;
-  const start = slichosStart(hebrewYearNum);
-
-  const slichos = [];
-  for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
-
-  const tzom = tzomGedaliaDay(rh);
-  const aseres = [];
-  for (let n = 3; n <= 8; n++) {
-    const d = rh + n - 1;
-    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    aseres.push(excelWeekday(d));
-  }
-  return { slichos, aseres };
-}
-
-/** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
- *  and what time the first מנין is on them.
- *
- *  Nothing at all if neither falls in the range, which does happen: the four-day סליחות of
- *  a year ר"ה is on Thursday runs Sunday to Wednesday and never reaches a Thursday, and the
- *  עשי"ת of a year ר"ה is on Shabbos runs Tuesday to Friday and never reaches a Monday. */
-function kriasHatorahNote(days, time) {
-  if (!time) return '';
-  const hit = KRIAS_HATORAH.filter((d) => days.includes(d.dow));
-  if (!hit.length) return '';
-  // "יום ב' וה'" when both, and each on its own reads as itself.
-  const named = hit.length === 2 ? `${hit[0].both} ${hit[1].both}` : hit[0].he;
-  return `(${named} ${time})`;
-}
-
-/** The poster, line by line, in the order it is hung.
- *
- *  `times` is written the way a chart cell is: a plain time is the main בית מדרש, <u> is
- *  למטה, a trailing * is בעזרת נשים and ** is באולם השמחות. `earlier` is the five-minutes-
- *  earlier first מנין on a קריאת התורה morning, and `days` says which range decides which
- *  of those mornings the line actually has.
- *
- *  Here rather than in settings, the same as the שבת שובה wording: these are the shul's
- *  fixed מנין slots and they have not moved in the posters we have. The year's worth of
- *  it that does change is computed above. */
-const SLICHOS_ROWS = [
-  { label: 'דרשה מאת הרב שליט"א', times: '12:30' },
-  { label: 'סליחות מוצ"ש', times: '12:55' },
-  { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
-  { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
-  { label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
-  { label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
-  { label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
-  { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
-];
-
-const SLICHOS_TEXT = { title: 'סליחות' };
-
-/** One line's times, split into the pieces the poster draws.
- *
- *  Reads the same notation a chart cell uses, so a row above can be written the way the
- *  board writes it: <u> for למטה, a trailing * for בעזרת נשים and ** for באולם השמחות.
- *  The marks come off the text and become flags, so the view decides how to draw them and
- *  the foot can count which ones are actually on the sheet. */
-function parseTimes(str) {
-  return String(str ?? '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const underlined = /^<u>.*<\/u>\**$/.test(part);
-      const bare = part.replace(/<\/?u>/g, '');
-      const stars = (bare.match(/\*+$/) || [''])[0];
-      return { text: bare.slice(0, bare.length - stars.length), underlined, mark: stars };
-    });
-}
-
-/** The finished poster for one Hebrew year.
- *
- *  The year is the one whose ר"ה this sheet is for, which is the year written on it. The
- *  סליחות at the top of it are the last days of the year before. */
-function buildSlichosPoster(hebrewYearNum) {
-  if (!hebrewYearNum) return null;
-  const days = posterDays(hebrewYearNum);
-  const rows = SLICHOS_ROWS.map((row) => ({
-    label: row.label,
-    times: parseTimes(row.times),
-    note: row.days ? kriasHatorahNote(days[row.days], row.earlier) : '',
-  }));
-  const all = rows.flatMap((r) => r.times);
-
-  // Only the marks that are actually on this poster get explained, same as שבת שובה. The
-  // two star notes share a line and sit in the order the printed chart's footer has them.
-  //
-  // Each line carries the direction it has to be set in, because they do not agree. The
-  // underline line is an English sentence with Hebrew in it and is left to right; the star
-  // line is Hebrew and is right to left, and setting it the other way puts the star on the
-  // far side of the phrase instead of against the word it belongs to. Same split as the
-  // week card's legend in week-view.js, and the same as the printed chart's own footer.
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-  return {
-    hebrewYear: hebrewYearNum,
-    rows,
-    days,
-    // The days this sheet actually covers, as Excel serials: the first סליחות morning
-    // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
-    // years, since סליחות are the end of one and ערב יו"כ the start of the next.
-    span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-  };
 }
 
 // ==== posters/roshhashana.js ====
@@ -5359,281 +5708,6 @@ function buildTzomGedaliaPoster(year, settings) {
       { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
       { head: TZG_TEXT.maariv, lines: [maariv] },
     ],
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-  };
-}
-
-// ==== posters/yomkippur.js ====
-// The יום כיפור poster: ערב יו"כ, the day itself, and the schedule that starts after it.
-//
-// Three parts. The top two are the seder, worked out from the calendar the same way the
-// ראש השנה sheet is. The box at the foot is the ordinary weekday schedule for the days
-// between יו"כ and סוכות, and its late מנחה and early מעריב move with how early the sun is
-// setting by then, so they are worked out too.
-//
-// As on the ראש השנה sheet, a heading gathers the night that opens the day: the שקיעה under
-// יום כיפור is ערב יו"כ's, and the מעריב at the foot of that block is יו"כ's own, which is
-// מוצאי יו"כ.
-//
-// Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
-// תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
-// other way and is not self-consistent with it. See the commit for the line by line.
-
-
-
-
-
-/** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
- *  of times: after מעריב, or at half past ten. */
-const YK_AMP = `${NBSP}&${NBSP}`;
-
-const YK_MIN = 1 / 1440;
-const at = (h, m) => (h * 60 + m) / 1440;
-/** Up to the next 5 minutes, and to the nearest 5. */
-const ykUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
-const ykNear5 = (t) => Math.round(t * 288) / 288;
-
-/** The Hebrew letter for a weekday, as the sheet names the morning after יו"כ. Shabbos
- *  cannot happen there (10 תשרי is never a Friday), but it is covered anyway. */
-const YK_DAY_LETTERS = ['', "א'", "ב'", "ג'", "ד'", "ה'", "ו'", 'שבת'];
-
-/** The wording, and the times the shul sets by hand rather than by the sun. */
-const YK_TEXT = {
-  title: 'יום כיפור',
-  erevHeading: 'ערב יום כיפור',
-  dayHeading: 'יום כיפור',
-  erevShacharis: { label: 'שחרית', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
-  erevMincha: { label: 'מנחה', times: '1:30, 2:00, 2:30, 3:00, 3:30, 4:00' },
-  candles: 'הדלקת נרות',
-  shkia: 'שקיעה',
-  kolNidrei: 'כל נדרי',
-  drasha: 'דברי התעוררות מאת הרב שליט"א',
-  drashaBeforeNeila: 'דברי התעוררות מאת הרב שליט"א קודם נעילה',
-  maariv: 'מעריב',
-  shacharis: { label: 'שחרית', times: '7:30' },
-  hamelech: { label: 'המלך', times: '8:30' },
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
-  yizkor: { label: 'יזכור בערך', times: '11:55' },
-  mincha: 'מנחה',
-  neila: 'נעילה',
-  // A third מעריב for anyone who has not davened yet, on every year's sheet. The label says
-  // where it is in words and the time is underlined as well, which is how the old sheets
-  // marked it: the underline is this system's way of saying the same thing.
-  maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
-  // The gap goes after the name, and what follows is two ways of taking it rather than one
-  // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
-  kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
-  nextMorning: 'שחרית יום',
-  afterHeading: 'Starting after יום כיפור',
-  after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
-  // The same three names again, without the colon, for the sheet that gives the schedule a
-  // page of its own and sets them as headings.
-  afterBig: { shacharis: 'שחרית', mincha: 'מנחה', maariv: 'מעריב' },
-};
-
-/** The everyday שחרית as the boards print it, read out of settings so the poster and the
- *  charts cannot drift.
- *
- *  The stored value is rich text: a wrapper span, a line break between the two halves, and
- *  the times separated by spaces rather than commas. All three are flattened to the comma
- *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
-function weekdayShacharis(settings) {
-  const html = String(settings.weekdayShacharis || '')
-    .replace(/<span[^>]*>|<\/span>/g, '')
-    .replace(/<br\s*\/?>/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .join(', ');
-  return parseTimes(html);
-}
-
-/** The same list five minutes earlier, which is what the morning after יו"כ runs on. */
-function fiveEarlier(times) {
-  return times.map((t) => {
-    const [h, m] = t.text.split(':').map(Number);
-    const shifted = at(h === 12 ? 0 : h, m) - 5 * YK_MIN;
-    return { ...t, text: formatTime(shifted) };
-  });
-}
-
-/** The days between יו"כ and סוכות: 11 תשרי through ערב סוכות on the 14th.
- *
- *  The late מנחה and the early מעריב have to work on every one of them, so they are set by
- *  the earliest שקיעה in the run. Only Sunday through Thursday count: Friday and Shabbos
- *  keep their own schedule and are not what this box is for. */
-function afterYomKippurDays(rh, settings) {
-  const days = [];
-  for (let n = 11; n <= 14; n++) {
-    const serial = rh + n - 1;
-    const dow = excelWeekday(serial);
-    if (dow < 1 || dow > 5) continue; // Sunday to Thursday
-    days.push({ serial, shkia: Z.sunsetElev(dateFromSerial(serial), settings) });
-  }
-  return days;
-}
-
-/** The מנחה list for the box.
- *
- *  Four fixed ones, then every 20 minutes from 4:40 for as long as a מנין still lands 15
- *  minutes or more before שקיעה. Then one last one squeezed in between 15 and 20 minutes
- *  before שקיעה if there is room for it, which there is only when the 20 minute run stopped
- *  well short: it has to be at least 15 minutes after the one in front of it. That last one
- *  is the 6:15 on the תשפ"ו sheet, 16 minutes before a 6:31 שקיעה. */
-function afterMincha(earliestShkia) {
-  const times = [at(13, 15), at(13, 35), at(13, 50), at(16, 15)];
-  for (let t = at(16, 40); t <= earliestShkia - 15 * YK_MIN + 1e-9; t += 20 * YK_MIN) times.push(t);
-  const last = times[times.length - 1];
-  const tail = ykNear5(earliestShkia - 17 * YK_MIN); // the middle of the 15 to 20 window
-  if (tail > last + 15 * YK_MIN - 1e-9
-      && tail <= earliestShkia - 15 * YK_MIN + 1e-9
-      && tail >= earliestShkia - 20 * YK_MIN - 1e-9) times.push(tail);
-  return times;
-}
-
-/** The first מעריב of the box: 7:30 if that is a full 50 minutes after שקיעה, and otherwise
- *  pushed on in fives until it is, but never past 7:45, which is 15 minutes in front of the
- *  8:00 behind it. */
-function afterEarlyMaariv(earliestShkia) {
-  let t = at(19, 30);
-  while (t < earliestShkia + 50 * YK_MIN - 1e-9 && t < at(19, 45)) t += 5 * YK_MIN;
-  return t;
-}
-
-/** The rest of the מעריב list, which does not move. 8:30 is added to the everyday run, and
- *  the marks follow the boards: everything is למטה except 8:45 and 10:30, which are the main
- *  בית מדרש (see calculations-view for where that comes from). */
-const AFTER_MAARIV_REST = [
-  [20, 0, true], [20, 30, true], [20, 45, false], [21, 0, true], [21, 30, true],
-  [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],
-  // Midnight, written as the 24th hour so it stays in order after 11:30 rather than
-  // sorting to the front of the day. formatTime prints it as 12:00.
-  [24, 0, true],
-];
-
-/** The everyday schedule that runs from after יו"כ until סוכות.
- *
- *  Shared, because it is both the box at the foot of the יום כיפור sheet and a sheet of its
- *  own. The everyday שחרית comes out of settings, so the posters and the boards cannot
- *  drift. */
-function buildAfterYomKippur(year, settings) {
-  const rh = roshHashana(year - 3761);
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-  const runDays = afterYomKippurDays(rh, settings);
-  const earliest = runDays.length
-    ? Math.min(...runDays.map((d) => d.shkia))
-    : Z.sunsetElev(dateFromSerial(rh + 9), settings);
-  return {
-    shacharis: weekdayShacharis(settings),
-    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
-    mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
-    maariv: [tm(afterEarlyMaariv(earliest), true),
-      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
-    earliestShkia: formatTime(earliest),
-  };
-}
-
-/** The same schedule as a sheet in its own right, set large with a heading per תפילה. */
-function buildAfterYomKippurPoster(year, settings) {
-  if (!year) return null;
-  const rh = roshHashana(year - 3761);
-  const after = buildAfterYomKippur(year, settings);
-  const all = [...after.shacharis, ...after.mincha, ...after.maariv];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-  return {
-    hebrewYear: year,
-    // From the morning after יו"כ through ערב סוכות, which is what it covers.
-    span: { from: rh + 10, to: rh + 13 },
-    after,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-  };
-}
-
-function buildYomKippurPoster(year, settings) {
-  if (!year) return null;
-  const rh = roshHashana(year - 3761);
-  const erev = dateFromSerial(rh + 8);   // 9 תשרי
-  const yk = dateFromSerial(rh + 9);     // 10 תשרי
-  const erevShkia = Z.sunsetElev(erev, settings);
-  const ykShkia = Z.sunsetElev(yk, settings);
-
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark });
-  const line = (label, times, opts = {}) => ({ label, times, ...opts });
-
-  // כל נדרי is the candle lighting taken up to the next 5, and if that leaves less than
-  // four minutes to light in, on to the 5 after it. Both sheets turn on this: תשפ"ו lights
-  // at 6:21 and davens at 6:25, exactly four; תשפ"ד lights at 6:33, where 6:35 would leave
-  // two, so it goes to 6:40.
-  const candles = erevShkia - settings.candleLightingMinutes * YK_MIN;
-  let kolNidrei = ykUp5(candles);
-  if (kolNidrei - candles < 4 * YK_MIN - 1e-9) kolNidrei = ykUp5(kolNidrei + YK_MIN);
-
-  const nightMaariv = erevShkia + 72 * YK_MIN;
-  const motzei60 = ykShkia + 60 * YK_MIN;
-  const neila = ykNear5(motzei60 - 110 * YK_MIN);   // 1:50 before the 60 minute מעריב
-
-  const dayLines = [
-    line(YK_TEXT.candles, [tm(candles)]),
-    line(YK_TEXT.shkia, [tm(erevShkia)]),
-    line(YK_TEXT.kolNidrei, [tm(kolNidrei)]),
-    line(YK_TEXT.drasha, [tm(ykNear5(nightMaariv - 30 * YK_MIN))]),
-    line(YK_TEXT.maariv, [tm(nightMaariv)]),
-    line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
-      { extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
-    line(YK_TEXT.krias.name,
-      [tm(Z.sofZmanShmaMGA72(yk, settings)), tm(Z.sofZmanShmaGRA(yk, settings))],
-      { sub: YK_TEXT.krias.basis }),
-    line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)]),
-    line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)]),   // 1:50 before נעילה
-    line(YK_TEXT.drashaBeforeNeila, []),
-    line(YK_TEXT.neila, [tm(neila)]),
-    // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
-    // time מעריב.
-    line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
-    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
-    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
-      { sep: YK_AMP }),
-  ];
-
-  // The morning after, which the calendar names and which runs five minutes early.
-  const dayAfter = rh + 10;
-  const nextMorning = {
-    label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
-    times: fiveEarlier(weekdayShacharis(settings)),
-  };
-
-  // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
-  const after = buildAfterYomKippur(year, settings);
-
-  const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
-    ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-
-  return {
-    hebrewYear: year,
-    span: { from: rh + 8, to: rh + 9 },
-    // Both are lists of מנינים rather than one זמן given two ways, so they are set with
-    // commas; see the renderer.
-    erevLines: [
-      line(YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), { list: true }),
-      line(YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), { list: true }),
-    ],
-    dayLines,
-    nextMorning,
-    after,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
@@ -6481,12 +6555,12 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
     ${built.items.map((it) => {
       const turned = sideways && it.orientations;
       return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
-        <p class="poster-all-name no-print">${esc(it.label)}${turned ? ' (turned on its side)' : ''}</p>
+        <p class="poster-all-name no-print">${escAttr(it.label)}${turned ? ' (turned on its side)' : ''}</p>
         ${it.render(it.poster, settings, { landscape: turned })}
       </div>`;
     }).join('')}
     ${built.notBuilt.length
-      ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${esc(built.notBuilt.join(', '))}</p>`
+      ? `<p class="hint no-print">Not in this run, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : ''}
     <p class="hint no-print">${sideways
       ? 'The two sheets that can be set either way up are on their side here, because one print run can only be one page size. They come out whole on the same paper as the rest; turn the sheet to read them.'
@@ -6534,16 +6608,13 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
   return { poster: pick.poster, conflict: built };
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 /** One time as the boards write it: plain is the main בית מדרש, underlined is למטה, a
  *  trailing * is בעזרת נשים and ** is באולם השמחות. The same marks as the chart, so
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
-  const body = t.underlined ? `<u>${esc(t.text)}</u>` : esc(t.text);
-  return `${body}${esc(t.mark || '')}`;
+  const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
+  return `${body}${escAttr(t.mark || '')}`;
 }
 
 /** The page every poster is drawn on: the letterhead, the rabbi's line under it, whatever
@@ -6556,9 +6627,9 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="assets/logo-text.png"
-         alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
-    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>`;
-  const rabbiBlock = `<div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>`;
+         alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
+    <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
+  const rabbiBlock = `<div class="poster-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${escAttr(l)}</div>`).join('')}</div>`;
   // Two headers. The single sheets stack theirs: wordmark, rule, then the rabbi's line under
   // it against the right margin, which is how the Word posters are built.
   //
@@ -6576,31 +6647,31 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
            <div class="header-year" aria-hidden="true"></div>
            <div class="header-center">
              <img class="header-logo" src="assets/logo-text.png"
-                  alt="${esc(settings.shulName)}"${hebrewLang(settings.shulName)}>
-             <div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${esc(settings.headerSubtitle)}</div>
+                  alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
+             <div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>
            </div>
-           <div class="header-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${esc(l)}</div>`).join('')}</div>
+           <div class="header-rabbi">${rabbi.map((l) => `<div${hebrewLang(l)}>${escAttr(l)}</div>`).join('')}</div>
          </div>
        </div>`
     : `${wordmark}
     <img class="poster-rule" src="assets/poster-rule.png" alt="" width="1897" height="85">
     ${rabbiBlock}`;
-  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${esc(fontStackFor(POSTER_FONT))}">
+  return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${escAttr(fontStackFor(POSTER_FONT))}">
     ${head}
     ${body}
     ${legend.length
       ? `<div class="poster-legend">${legend
-          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
+          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${escAttr(l.text)}</div>`).join('')}</div>`
       : ''}
   </div>`;
 }
 
 function renderShuvaPoster(poster, settings) {
   const body = `
-    <h2 class="poster-title" lang="he">${esc(SHUVA_TEXT.title)}</h2>
-    ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${esc(l)}</p>`).join('')}
-    ${poster.drasha ? `<p class="poster-at" lang="he">${esc(SHUVA_TEXT.at)} <bdi>${esc(poster.drasha)}</bdi></p>` : ''}
-    <p class="poster-mincha" lang="he"><span class="poster-row-label">${esc(SHUVA_TEXT.minchaLabel)}</span>
+    <h2 class="poster-title" lang="he">${escAttr(SHUVA_TEXT.title)}</h2>
+    ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${escAttr(l)}</p>`).join('')}
+    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${escAttr(poster.drasha)}</bdi></p>` : ''}
+    <p class="poster-mincha" lang="he"><span class="poster-row-label">${escAttr(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
 }
@@ -6626,7 +6697,7 @@ function slichosBody(poster) {
     // with Hebrew now inside the run, the first strong character is the note's and auto would
     // turn the whole list around. Measured after the change, not assumed.
     const parts = r.times.map(timeHtml);
-    const note = r.note ? `<bdi class="poster-row-note">${esc(r.note)}</bdi>` : '';
+    const note = r.note ? `<bdi class="poster-row-note">${escAttr(r.note)}</bdi>` : '';
     // On the left of the first time, which is the side it has always been on: it says that
     // מנין runs five minutes earlier on the days it names, so it belongs against that time
     // and not against the row's last one.
@@ -6640,11 +6711,11 @@ function slichosBody(poster) {
     const inner = note ? `${note} ${parts.join(', ')}` : parts.join(', ');
     return `
     <p class="poster-row" lang="he">
-      <span class="poster-row-label">${esc(r.label)}</span>
+      <span class="poster-row-label">${escAttr(r.label)}</span>
       <bdi class="poster-row-times" dir="ltr">${inner}</bdi>
     </p>`;
   }).join('');
-  return `<h2 class="poster-title" lang="he">${esc(SLICHOS_TEXT.title)}</h2>
+  return `<h2 class="poster-title" lang="he">${escAttr(SLICHOS_TEXT.title)}</h2>
     <div class="poster-rows">${rows}</div>`;
 }
 
@@ -6667,14 +6738,14 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
   const t = times.length
     ? `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>` : '';
   const e = extra
-    ? `<span class="poster-row-label poster-row-second">${esc(extra.label)}</span>`
+    ? `<span class="poster-row-label poster-row-second">${escAttr(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
     : '';
   // `sub` names the reckonings a זמן is given on, as ס"ז ק"ש is given on מ"א and גר"א. It
   // wears the label class as well, so it is held off the name in front of it and off the
   // times after it by the same gap every other row uses.
-  const b = sub ? `<span class="poster-row-label">${esc(sub)}</span>` : '';
-  return `<p class="poster-row" lang="he"><span class="poster-row-label">${esc(label)}</span>${b}${t}${e}</p>`;
+  const b = sub ? `<span class="poster-row-label">${escAttr(sub)}</span>` : '';
+  return `<p class="poster-row" lang="he"><span class="poster-row-label">${escAttr(label)}</span>${b}${t}${e}</p>`;
 }
 
 /** The ראש השנה schedule itself, title and all, without the page around it. Split out so the
@@ -6682,13 +6753,13 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
 function rhBody(poster, { year = true } = {}) {
   const typed = (str) => parseTimes(str);
   return `
-    <h2 class="poster-title" lang="he">${esc(RH_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(RH_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
       ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
       ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
       ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
       ${poster.blocks.map((b) => `
-        <h3 class="poster-day" lang="he">${esc(b.heading)}</h3>
+        <h3 class="poster-day" lang="he">${escAttr(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
     </div>`;
 }
@@ -6714,12 +6785,12 @@ function ykAfterBox(poster) {
   // work themselves out again around the break, where a comma written into the markup would
   // be left stranded at the end of the first line.
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
-    + `<span class="poster-row-label">${esc(label)}</span>`
+    + `<span class="poster-row-label">${escAttr(label)}</span>`
     + `<bdi class="poster-row-times">`
     + times.map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')
     + `</bdi></p>`;
   return `<div class="poster-box">
-        <h3 class="poster-box-head" dir="ltr">${esc(YK_TEXT.afterHeading)}</h3>
+        <h3 class="poster-box-head" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h3>
         ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
         ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
         ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
@@ -6770,11 +6841,11 @@ function ykBody(poster, { box = true, year = true } = {}) {
   const rows = (lines) => lines.map((ln) =>
     rhRow(ln.label, ln.times, ln.extra, ln.sub, ln.sep || (ln.list ? ', ' : SLASH))).join('');
   return `
-    <h2 class="poster-title" lang="he">${esc(YK_TEXT.title)}${year ? ' ' + esc(hebrewYear(poster.hebrewYear)) : ''}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(YK_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
-      <h3 class="poster-day" lang="he">${esc(YK_TEXT.erevHeading)}</h3>
+      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.erevHeading)}</h3>
       ${rows(poster.erevLines)}
-      <h3 class="poster-day" lang="he">${esc(YK_TEXT.dayHeading)}</h3>
+      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.dayHeading)}</h3>
       ${rows(poster.dayLines)}
       <hr class="poster-divider">
       ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
@@ -6823,12 +6894,12 @@ function renderAfterYomKippurPoster(poster, settings) {
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (title, times) => `
     <div class="poster-set">
-      <h3 class="poster-set-head" lang="he">${esc(title)}</h3>
+      <h3 class="poster-set-head" lang="he">${escAttr(title)}</h3>
       ${half(times).map(timeLine).join('')}
     </div>`;
   const a = poster.after;
   const body = `
-    <h2 class="poster-title poster-title-ltr" dir="ltr">${esc(YK_TEXT.afterHeading)}</h2>
+    <h2 class="poster-title poster-title-ltr" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h2>
     <div class="poster-sets">
       ${section(YK_TEXT.afterBig.shacharis, a.shacharis)}
       ${section(YK_TEXT.afterBig.mincha, a.mincha)}
@@ -6847,15 +6918,15 @@ function tzomGedaliaBody(poster) {
   const timeLine = (times) =>
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
-    ? `<div class="poster-set"><p class="poster-set-note" lang="he">${esc(s.note.label)}
-        <bdi>${esc(s.note.text)}</bdi></p></div>`
+    ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
+        <bdi>${escAttr(s.note.text)}</bdi></p></div>`
     : `
     <div class="poster-set">
-      <h3 class="poster-set-head" lang="he">${esc(s.head)}</h3>
+      <h3 class="poster-set-head" lang="he">${escAttr(s.head)}</h3>
       ${s.lines.map(timeLine).join('')}
     </div>`);
   return `
-    <h2 class="poster-title" lang="he">${esc(TZG_TEXT.title)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(TZG_TEXT.title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
 }
 
@@ -7004,16 +7075,16 @@ function renderPosters(container, state, routeChanged, tables) {
         <select id="poster-pick">
           ${(() => {
             const opts = (items) => items.map((p) =>
-              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
+              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('');
             return groups.map((g) => (g.name
-              ? `<optgroup label="${esc(g.name)}">${opts(g.items)}</optgroup>`
+              ? `<optgroup label="${escAttr(g.name)}">${opts(g.items)}</optgroup>`
               : opts(g.items))).join('');
           })()}
         </select>
       </label>
       <label>Year
         <select id="poster-source">
-          ${sources.map((s) => `<option value="${esc(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+          ${sources.map((s) => `<option value="${escAttr(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${escAttr(s.label)}</option>`).join('')}
         </select>
       </label>
       ${poster.orientations ? `<label>Page
@@ -7026,19 +7097,19 @@ function renderPosters(container, state, routeChanged, tables) {
     </div>
     ${built ? (() => { const w = poster.when(built); return `
       <div class="poster-when no-print">
-        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${esc(poster.covers(source.year))}</div>
-        <div class="poster-when-he" lang="he" dir="rtl">${esc(w.he)}</div>
-        <div class="poster-when-en">${esc(w.en)}</div>
-      </div>`; })() : source ? `<p class="hint no-print">${esc(poster.covers(source.year))}</p>` : ''}
+        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${escAttr(poster.covers(source.year))}</div>
+        <div class="poster-when-he" lang="he" dir="rtl">${escAttr(w.he)}</div>
+        <div class="poster-when-en">${escAttr(w.en)}</div>
+      </div>`; })() : source ? `<p class="hint no-print">${escAttr(poster.covers(source.year))}</p>` : ''}
     ${result.conflict
       ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
            <select id="poster-conflict">
-             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${esc(chartLabel(b.sheet))}</option>`).join('')}
+             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${escAttr(chartLabel(b.sheet))}</option>`).join('')}
            </select></p>`
       : ''}
     ${built
       ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-      : `<p class="hint no-print">${esc(result.missing || '')}</p>`}`;
+      : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
 
   const again = () => redrawInPlace(container, state);
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
@@ -7482,7 +7553,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
           <td data-label="Folder">
             <select class="folder-select" title="Move this sheet to a folder">
               <option value="${NO_FOLDER}" ${!s.folder ? 'selected' : ''}>No folder</option>
-              ${folders.map((f) => `<option value="${esc(f)}" ${s.folder === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+              ${folders.map((f) => `<option value="${escAttr(f)}" ${s.folder === f ? 'selected' : ''}>${escAttr(f)}</option>`).join('')}
               <option value="${NEW_FOLDER}">New folder…</option>
             </select>
           </td>
@@ -7524,7 +7595,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
         .map(
           (f) => `
         <details class="panel" open>
-          <summary>📁 ${esc(f)} <span class="hint">(${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'})</span></summary>
+          <summary>📁 ${escAttr(f)} <span class="hint">(${inFolder(f).length} sheet${inFolder(f).length === 1 ? '' : 's'})</span></summary>
           <div class="panel-body">${tableHtml(inFolder(f))}</div>
         </details>`
         )
@@ -7631,10 +7702,6 @@ function created(iso) {
   const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   return `${date}, ${time}`;
-}
-
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ==== ui/image-crop.js ====
@@ -7811,15 +7878,15 @@ function renderRules(container, state, onChange, editingRuleId = null) {
     <p class="hint">Reusable, recurring overrides. They apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text. Pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
-    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${escText(editing.name)}` : source ? `Duplicate of ${escText(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
         <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -7831,7 +7898,7 @@ function renderRules(container, state, onChange, editingRuleId = null) {
         <legend>What to do to the cell</legend>
         <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
         <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? escText(prefill.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
@@ -7854,10 +7921,10 @@ function renderRules(container, state, onChange, editingRuleId = null) {
       <div class="rule-row" data-id="${r.id}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
-          <strong>${esc(r.name)}</strong>
+          <strong>${escText(r.name)}</strong>
           <div class="hint">columns ${columnsOf(r)
-            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
-            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
+            .map((c) => `<code><bdi>${escText(prettyColumn(c))}</bdi></code>`)
+            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
         </div>
         <div class="rule-actions">
           <button class="rule-edit" title="Edit this rule">Edit</button>
@@ -7939,7 +8006,7 @@ function columnChecklist(sheetLabel, seasonKey, columns, editing) {
       ${columns
         .map(
           (c) =>
-            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
+            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${escText(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
         )
         .join('')}
     </div>
@@ -7968,9 +8035,6 @@ function conditionSummary(c) {
   if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
   return parts.join(' or ') || '(no condition, never matches)';
 }
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 // ==== ui/settings-view.js ====
 function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
@@ -7990,11 +8054,11 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
         <div class="panel-body">
         <p class="hint">The wordmark (assets/logo-text.png, pulled from the workbook) prints at the top of every page as-is. Replace that file to change it. The photo next to it can be replaced and cropped below without touching any files. Everything else here is plain editable text.</p>
         <div id="header-photo-cropper"></div>
-        <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${esc(s.shulName)}"></label>
-        <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${esc(s.headerSubtitle)}"></label>
-        <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${esc(s.headerRabbiLine)}</textarea></label>
-        <label>Footer note<textarea name="footerNote" rows="2">${esc(s.footerNote)}</textarea></label>
-        <label>Footer address<input name="footerAddress" value="${esc(s.footerAddress)}"></label>
+        <label>Shul name (used in the Saved Sheets list)<input name="shulName" value="${escAttr(s.shulName)}"></label>
+        <label>Header subtitle (under the logo)<input name="headerSubtitle" value="${escAttr(s.headerSubtitle)}"></label>
+        <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${escAttr(s.headerRabbiLine)}</textarea></label>
+        <label>Footer note<textarea name="footerNote" rows="2">${escAttr(s.footerNote)}</textarea></label>
+        <label>Footer address<input name="footerAddress" value="${escAttr(s.footerAddress)}"></label>
       </div>
       </details>
       <details class="panel">
@@ -8008,17 +8072,17 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
         <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
         <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
         <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
-        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${esc(s.weekdayFooterNote)}</textarea></label>
+        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
       <details class="panel">
         <summary>Location</summary>
         <div class="panel-body">
-        <label>Location name<input name="locationName" value="${esc(s.locationName)}"></label>
+        <label>Location name<input name="locationName" value="${escAttr(s.locationName)}"></label>
         <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
         <label>Longitude<input name="longitude" type="number" step="any" value="${s.longitude}"></label>
         <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${s.elevation}"></label>
-        <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${esc(tz.label)}</option>`).join('')}</select></label>
+        <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${escAttr(tz.label)}</option>`).join('')}</select></label>
       </div>
       </details>
       <details class="panel">
@@ -8217,10 +8281,6 @@ function showToast(message) {
     el.classList.remove('toast-in');
     setTimeout(() => el.remove(), 300);
   }, 2000);
-}
-
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ==== ui/week-view.js ====

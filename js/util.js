@@ -92,3 +92,27 @@ export function splitLinesInHalf(items, delim = SLASH) {
   const line2 = items.slice(cut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
 }
+
+/** HTML escaping, in the two shapes this codebase actually uses.
+ *
+ *  They were seven private copies of `esc`, three of one shape and four of the other, and
+ *  under ES modules that is fine: each file has its own scope. The offline copy flattens
+ *  every module into one script, where seven `function esc` are a legal redeclaration and
+ *  the last one written wins for all of them. Which one that is depends on nothing but
+ *  import order, and import order changes when any module gains an import. So they live
+ *  here, one of each, named for what they are.
+ *
+ *  escAttr also escapes the double quote, and is what anything going into an attribute
+ *  needs: a value carrying a " ends the attribute early otherwise.
+ *
+ *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
+ *  built with it and then compared against what the browser reports for that cell, to decide
+ *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
+ *  browser reports a quote as a quote, so escaping it here would make every cell holding one
+ *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
+export function escAttr(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+export function escText(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}

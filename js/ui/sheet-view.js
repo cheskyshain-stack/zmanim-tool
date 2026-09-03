@@ -4,7 +4,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang } from '../util.js';
+import { hebrewLang, escText } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -290,7 +290,7 @@ function buildPagePicker(container) {
   if (!picker) return;
   const pages = [...container.querySelectorAll('#pages > .page')];
   picker.innerHTML = pages
-    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${esc(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
+    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${escText(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
     .join('');
   picker.querySelectorAll('input').forEach((cb) => {
     cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
@@ -484,10 +484,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           // heading between them, so the wall chart looks exactly as it always has.
           const special = state.settings.weekdayShacharisSpecial;
           const html =
-            (state.settings.weekdayShacharis || esc('(set שחרית schedule in Settings)')) +
+            (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
             (special ? `
 
-<u>${esc(SPECIAL_SHACHARIS_HEADING)}</u>
+<u>${escText(SPECIAL_SHACHARIS_HEADING)}</u>
 ${special}` : '');
           return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
         }
@@ -530,10 +530,10 @@ ${special}` : '');
       <div class="header-row">
         <img class="header-icon" src="${state.settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="/assets/logo-text.png" alt="${esc(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
-          ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${esc(state.settings.headerSubtitle)}</div>` : ''}
+          <img class="header-logo" src="/assets/logo-text.png" alt="${escText(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
+          ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}
         </div>
-        <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(esc(state.settings.headerRabbiLine))}</div>
+        <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(escText(state.settings.headerRabbiLine))}</div>
       </div>
     </div>
     <table dir="${dir}" class="${isWeekday ? 'weekday-table' : ''}">
@@ -544,8 +544,8 @@ ${special}` : '');
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
-        ${footerNote ? nl2br(esc(footerNote)) + '<br>' : ''}
-        <span class="footer-address">${esc(state.settings.footerAddress)}</span>
+        ${footerNote ? nl2br(escText(footerNote)) + '<br>' : ''}
+        <span class="footer-address">${escText(state.settings.footerAddress)}</span>
       </div>
       <span class="footer-line"></span>
     </div>
@@ -623,10 +623,7 @@ function nl2br(str) {
   // gap in a cell is the separator's width and nothing else. The character is a
   // non-breaking space rather than the plain one it looks like in the source, so it is
   // matched as whitespace rather than written out.
-  const trimmed = esc(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
+  const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
-}
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

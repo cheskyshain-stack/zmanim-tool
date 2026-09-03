@@ -9,7 +9,7 @@
 // real files, written by build-offline.py out of this page, which is what a static host
 // needs in place of a rewrite rule. See the routing block near the bottom of this file.
 import { loadPublished } from './publish.js';
-import { hebrewLang } from './util.js';
+import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
@@ -178,7 +178,7 @@ const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
  *  rather than inside it, which is what used to make the footer a different shape on the two
  *  pages. It matters again the moment a second line comes back. */
 const footHtml = (s) => `<div class="luach-footer">
-      <p class="luach-foot">${esc(s.footerAddress)}</p>
+      <p class="luach-foot">${escAttr(s.footerAddress)}</p>
     </div>`;
 
 const DONATE = {
@@ -324,16 +324,16 @@ function nextUpHtml([minyan, candles]) {
     if (!item) return '';
     const when = howFar(item);
     return `<div class="luach-next-box ${tone}">
-      <p class="luach-next-head">${esc(kind)}</p>
+      <p class="luach-next-head">${escAttr(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
         <div class="luach-next-main">
-          <bdi class="luach-next-what"${hebrewLang(item.name)}>${esc(item.name)}</bdi>
-          ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${esc(item.place)}</bdi>` : ''}
-          <span class="luach-next-time">${esc(clock(item.mins))}<small>${esc(meridiem(item.mins))}</small></span>
+          <bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
+          ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}
+          <span class="luach-next-time">${escAttr(clock(item.mins))}<small>${escAttr(meridiem(item.mins))}</small></span>
         </div>
       </div>
-      ${when ? `<p class="luach-next-when">${ICON_WAIT}${esc(when)}</p>` : ''}
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}${escAttr(when)}</p>` : ''}
     </div>`;
   };
   return `<div class="luach-next" aria-live="polite">
@@ -363,7 +363,7 @@ function nextUpHtml([minyan, candles]) {
 function backBar(where) {
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="/">&larr; Menu</a>
-    <h1 class="luach-bar-title">${esc(PAGE_NAMES[where] || '')}</h1>
+    <h1 class="luach-bar-title">${escAttr(PAGE_NAMES[where] || '')}</h1>
     ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
 }
@@ -383,20 +383,20 @@ function homeHtml(published) {
            a setting, the same as the thanks line on the donation page: this repository is
            this shul's, and a second place to type the name is a second place for it to end
            up written differently. -->
-      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"${hebrewLang(s.shulName)}><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${esc(s.headerSubtitle)}</p>` : ''}
+      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${escAttr(s.shulName)}"${hebrewLang(s.shulName)}><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
+      ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${escAttr(s.headerSubtitle)}</p>` : ''}
     </header>
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
       <a class="luach-item" href="/week/">
-        ${ICON_CLOCK}<span class="luach-item-title">${esc(PAGE_NAMES.week)}</span>${CHEVRON}
+        ${ICON_CLOCK}<span class="luach-item-title">${escAttr(PAGE_NAMES.week)}</span>${CHEVRON}
       </a>
       <a class="luach-item" href="/chart/">
-        ${ICON_CALENDAR}<span class="luach-item-title">${esc(PAGE_NAMES.chart)}</span>${CHEVRON}
+        ${ICON_CALENDAR}<span class="luach-item-title">${escAttr(PAGE_NAMES.chart)}</span>${CHEVRON}
       </a>
       <a class="luach-item" href="/donate/">
-        ${ICON_HEART}<span class="luach-item-title">${esc(DONATE.name)}</span>${CHEVRON}
+        ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
     ${rule()}
@@ -620,20 +620,20 @@ function renderChartPage(published) {
 function donateAccountHtml(acc) {
   const funds = acc.funds || [];
   const chip = (f) =>
-    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${esc(f.label)}</span></li>`;
+    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${escAttr(f.label)}</span></li>`;
   /* Every fund on one line, and the line scrolls sideways where it does not fit. No fold
      and no More: the list is a glance at what is behind the link, and a glance should not
      need a press. What is cut off at the edge is the cue that there is more of it, which is
      how a row of anything scrollable says so. */
   const chips = funds.length
-    ? `<ul class="luach-chips" tabindex="0" role="list" aria-label="${esc(acc.title)} funds">${funds.map(chip).join('')}</ul>`
+    ? `<ul class="luach-chips" tabindex="0" role="list" aria-label="${escAttr(acc.title)} funds">${funds.map(chip).join('')}</ul>`
     : '';
   return `<div class="luach-give-account">
-    <h4 class="luach-account-title">${esc(acc.title)}</h4>
-    ${acc.blurb ? `<p class="luach-account-blurb">${esc(acc.blurb)}</p>` : ''}
+    <h4 class="luach-account-title">${escAttr(acc.title)}</h4>
+    ${acc.blurb ? `<p class="luach-account-blurb">${escAttr(acc.blurb)}</p>` : ''}
     ${chips}
-    <a class="luach-give-go" href="${esc(acc.href)}" target="_blank" rel="noopener noreferrer">
-      ${esc(acc.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
+    <a class="luach-give-go" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
+      ${escAttr(acc.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
     </a>
     <div class="luach-give-frame" hidden></div>
   </div>`;
@@ -652,13 +652,13 @@ function donateWayHtml(way) {
   const copy = way.copy
     ? (way.copy.value || way.copy.label
         ? `<p class="luach-copy">
-            ${way.copy.label ? `<span class="luach-copy-label">${esc(way.copy.label)}:</span>` : ''}
-            <span class="luach-copy-value">${esc(way.copy.value)}</span>
-            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${esc(way.copy.value)}">Copy</button>` : ''}
+            ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}:</span>` : ''}
+            <span class="luach-copy-value">${escAttr(way.copy.value)}</span>
+            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}">Copy</button>` : ''}
           </p>`
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
-  const how = way.how ? `<p class="luach-give-how">${esc(way.how)}</p>` : '';
+  const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
@@ -673,8 +673,8 @@ function donateWayHtml(way) {
     <summary class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
       <div class="luach-give-body">
-        <h3 class="luach-give-title">${esc(way.title)}</h3>
-        <p class="luach-give-blurb">${esc(way.blurb)}</p>
+        <h3 class="luach-give-title">${escAttr(way.title)}</h3>
+        <p class="luach-give-blurb">${escAttr(way.blurb)}</p>
       </div>
       ${giveIcon('chev', 'luach-give-chev')}
     </summary>
@@ -727,18 +727,18 @@ function wireDonateCopy(root) {
 function donateFrameHtml(href, label) {
   let host = '';
   try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
-  const out = `href="${esc(href)}" target="_blank" rel="noopener noreferrer"`;
+  const out = `href="${escAttr(href)}" target="_blank" rel="noopener noreferrer"`;
   // The waiting state sits over the frame rather than in place of it, so the frame is
   // loading underneath the whole time and there is nothing to swap in when it arrives: the
   // cover is simply taken away. It is opaque because a form paints itself in pieces, and
   // half a form showing through would look broken rather than unfinished.
   return `<div class="luach-frame-bar">
-      <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${esc(host)}</span>
+      <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${escAttr(host)}</span>
       <a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>
       <button type="button" class="luach-frame-shut" aria-label="Close the donation form">&times;</button>
     </div>
     <div class="luach-frame-wrap">
-      <iframe class="luach-frame" title="${esc(label)}" src="${esc(href)}" allow="payment"></iframe>
+      <iframe class="luach-frame" title="${escAttr(label)}" src="${escAttr(href)}" allow="payment"></iframe>
       <div class="luach-frame-load" role="status">
         <span class="luach-frame-spin" aria-hidden="true"></span>
         <span>Loading the secure form&hellip;</span>
@@ -822,12 +822,12 @@ function renderDonatePage(published) {
              already carries this page's h1 and names it "Donate". Two h1s on one page is
              one too many, and the shul's name is the site's mark rather than the title of
              what is on the page. The alt text still says whose site it is. -->
-        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${esc(s.shulName)}"${hebrewLang(s.shulName)}>
-        ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${esc(s.headerSubtitle)}</p>` : ''}
+        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${escAttr(s.shulName)}"${hebrewLang(s.shulName)}>
+        ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${escAttr(s.headerSubtitle)}</p>` : ''}
       </header>
       <header class="luach-give-head-block">
-        <h2 class="luach-give-heading">${esc(DONATE.heading)}</h2>
-        <p class="luach-give-thanks">${esc(DONATE.thanks)}</p>
+        <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
+        <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
       ${DONATE.ways.map(donateWayHtml).join('')}
       <p class="luach-give-legal">${DONATE.legal}</p>
@@ -935,9 +935,6 @@ function wireNav(published) {
   window.addEventListener('popstate', () => route(published));
 }
 
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 (async () => {
   const published = await loadPublished();

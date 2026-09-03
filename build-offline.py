@@ -408,24 +408,45 @@ def check_name_collisions(bundled_keys, texts):
     was built from carries on working. That is exactly how it went unnoticed for six
     days, so it is checked here rather than asserted in a comment.
 
-    Only a repeated `function` is allowed, which is a legal redeclaration - several
-    modules have their own private `esc` helper and always have. Anything involving a
-    const, let, var or class stops the build.
+    A repeated `function` is allowed only where the two are the same function, which is a
+    legal redeclaration and harmless - several modules have their own private `esc` helper
+    and always have. Two *different* functions of one name also parse, and that is worse
+    than a SyntaxError rather than better: the one written second wins and every call to
+    the other silently gets it, with nothing to see. That is what happened to
+    weekdayShacharis, which posters/yomkippur.js and upcoming.js both had, and it went
+    unnoticed because whichever one lost was only reached in the offline copy. So the
+    bodies are compared, not just the names. Anything involving a const, let, var or class
+    stops the build whatever its body says.
     """
     seen = {}
     problems = []
+
+    def body_of(text, start):
+        """The whole declaration, from `function` to its closing brace in column 0.
+
+        Every top-level function in this codebase is written that way, so the first "\n}"
+        after the start is the end of it. A miss would only make two identical functions
+        look different, which is a build that stops and asks rather than one that lies."""
+        end = text.find("\n}", start)
+        return text[start:end] if end != -1 else text[start:]
+
     for key in bundled_keys:
         for m in TOP_LEVEL_DECL_RE.finditer(texts[key]):
             # Column 0 only: an indented match is inside some other function.
             if m.start() and texts[key][m.start() - 1] != "\n":
                 continue
             kind, name = m.group(1), m.group(2)
+            body = body_of(texts[key], m.start()) if kind == "function" else None
             if name in seen:
-                prev_kind, prev_key = seen[name]
+                prev_kind, prev_key, prev_body = seen[name]
                 if not (kind == "function" and prev_kind == "function"):
                     problems.append(f"  {name}: {prev_kind} in {prev_key}, {kind} in {key}")
+                elif body != prev_body:
+                    problems.append(
+                        f"  {name}: a different function of that name in {prev_key} and in {key}"
+                    )
             else:
-                seen[name] = (kind, key)
+                seen[name] = (kind, key, body)
     if problems:
         raise SystemExit(
             "offline build: the same top-level name is declared in two modules, which the\n"

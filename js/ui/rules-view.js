@@ -1,6 +1,7 @@
 import { newId } from '../storage.js';
 import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
+import { escText } from '../util.js';
 
 /** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
  *  Null (the default) shows just the list - most visits here are to glance at the
@@ -21,15 +22,15 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
     <p class="hint">Reusable, recurring overrides. They apply automatically every time a sheet is generated (unlike per-cell overrides on a generated sheet, which are one-off). Match on the special-Shabbos name (e.g. שובה / הגדול), the parsha name, or "always", and replace one or more cells' text. Pick any column from either chart, so a single rule can cover both שבת קיץ and שבת חורף at once.</p>
     <div id="rules-list"></div>
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
-    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${esc(editing.name)}` : source ? `Duplicate of ${esc(source.name)}` : 'Add a rule'}</h3>
+    <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${escText(editing.name)}` : source ? `Duplicate of ${escText(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? esc(editing.name) : source ? esc(source.name + ' (copy)') : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
         <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? esc((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? esc((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? esc((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -41,7 +42,7 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
         <legend>What to do to the cell</legend>
         <label><input type="radio" name="mode" value="append" ${!prefill || prefill.mode !== 'replace' ? 'checked' : ''}> Add this text onto the computed value (e.g. add the word "דרשה" without losing the times)</label>
         <label><input type="radio" name="mode" value="replace" ${prefill?.mode === 'replace' ? 'checked' : ''}> Replace the cell's computed value entirely with this text</label>
-        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? esc(prefill.value) : ''}</textarea></label>
+        <label>Text<textarea name="value" rows="2" placeholder="דרשה" required>${prefill ? escText(prefill.value) : ''}</textarea></label>
       </fieldset>
       <div class="actions">
         <button type="submit" class="btn-primary">${editing ? 'Save changes' : 'Add rule'}</button>
@@ -64,10 +65,10 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
       <div class="rule-row" data-id="${r.id}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
-          <strong>${esc(r.name)}</strong>
+          <strong>${escText(r.name)}</strong>
           <div class="hint">columns ${columnsOf(r)
-            .map((c) => `<code><bdi>${esc(prettyColumn(c))}</bdi></code>`)
-            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${esc(r.value)}"</div>
+            .map((c) => `<code><bdi>${escText(prettyColumn(c))}</bdi></code>`)
+            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
         </div>
         <div class="rule-actions">
           <button class="rule-edit" title="Edit this rule">Edit</button>
@@ -149,7 +150,7 @@ function columnChecklist(sheetLabel, seasonKey, columns, editing) {
       ${columns
         .map(
           (c) =>
-            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${esc(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
+            `<label class="col-check"><input type="checkbox" name="columnKeys" value="${seasonKey}:${c.key}" ${checkedKeys.includes(`${seasonKey}:${c.key}`) ? 'checked' : ''}> ${escText(c.header.replace(/\n/g, ' '))} <span class="hint">(${c.key})</span></label>`
         )
         .join('')}
     </div>
@@ -177,7 +178,4 @@ function conditionSummary(c) {
   if (c.dateISO) parts.push('date: ' + c.dateISO.join(', '));
   if (c.hebrewDate) parts.push('Hebrew date: ' + c.hebrewDate.join(', '));
   return parts.join(' or ') || '(no condition, never matches)';
-}
-function esc(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

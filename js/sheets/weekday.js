@@ -31,7 +31,8 @@
 // per-cell override and rendered instead of anything computed here (see overrides.js).
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { excelWeekday, hebrewDateExtended, dateFromHebrew } from '../hebrew-calendar.js';
+import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
+import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { formatTime, underlineTime } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 
@@ -232,7 +233,56 @@ function maarivTimes(week, settings) {
   return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
 }
 
+/** One time as the poster hands it over, in the marks this chart prints. Same three: plain
+ *  is the main בית מדרש, underlined is למטה, a trailing * is בעזר״נ. */
+function fromPoster(t) {
+  return `${t.underlined ? underlineTime(t.text) : t.text}${t.mark || ''}`;
+}
+
+/** The days between יו"כ and סוכות do not run on the standing weekday schedule, and this is
+ *  the row that schedules them.
+ *
+ *  They are the shul's own run: מנחה every twenty minutes through the afternoon because
+ *  people are off, and it is already worked out, in buildAfterYomKippur, for the sheet that
+ *  gets hung on the wall for exactly these days. Left to the rules above the row came out
+ *  thinner than the week either side of it: no 4:15, because that is a BMG זמן and BMG is
+ *  between זמנים here, and only 6:35 in the evening.
+ *
+ *  So this asks that schedule rather than restating it. One set of times, and the board and
+ *  the poster on the wall beside it cannot disagree.
+ *
+ *  Which row it is comes from the days themselves: the row whose Sunday to Thursday window
+ *  holds the last day of the run, which is the last weekday before סוכות.
+ *
+ *  The last day rather than any day, because in some years the run is split across two rows
+ *  and only one of them is the week before סוכות. תש"צ is one: יו"כ is a Wednesday, so the
+ *  run is the Thursday after it and then the Sunday, and the Thursday falls in the עשרת ימי
+ *  תשובה row whose other four days are nothing of the kind. Asking for any day would have
+ *  put this schedule on both, and the file already takes the view that a row gets one answer
+ *  (see isBmgWeek). The Sunday is the one that runs up to סוכות, so it is the one that
+ *  decides, and the עשרת ימי תשובה row keeps the standing schedule its other days want.
+ *
+ *  The neighbouring years are checked too, the same way isBmgDay does it, because the AM year
+ *  rolls over in the middle of all this. */
+function afterYomKippurRow(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const { year } = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    const run = afterYomKippurDays(roshHashana(y - 3761), settings);
+    const last = run.length ? run[run.length - 1].serial : null;
+    if (last !== null && days.includes(last)) return buildAfterYomKippur(y, settings);
+  }
+  return null;
+}
+
 export function buildWeekdayRow(week, settings) {
+  const after = afterYomKippurRow(week, settings);
+  if (after) {
+    return {
+      B: splitLinesInHalf(after.maariv.map(fromPoster)),
+      C: splitLinesInHalf(after.mincha.map(fromPoster)),
+    };
+  }
   return {
     B: splitLinesInHalf(maarivTimes(week, settings)),
     C: splitLinesInHalf(minchaTimes(week, settings)),
