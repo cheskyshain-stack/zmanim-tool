@@ -17,6 +17,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { SLASH, NBSP } from '../util.js';
 
 /** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
@@ -255,6 +256,40 @@ export function buildYomKippurPoster(year, settings) {
   // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
   const after = buildAfterYomKippur(year, settings);
 
+  /* The מנינים of ערב יו"כ and יו"כ, for the congregation's "what is on next". Gathered off
+     the same numbers the lines above are made of, so the card and the sheet cannot disagree.
+     See posters/minyanim.js for why it is done this way round.
+
+     Left out on purpose: הדלקת נרות and שקיעה, which are זמנים; ס"ז ק"ש and יזכור, the same;
+     the two דברי התעוררות, which are announcements with no time of their own to daven at;
+     and קידוש לבנה, which is not a מנין and whose "אחר מעריב" is not a time at all.
+
+     The morning after is left out too, though the sheet prints it. It is the everyday שחרית
+     five minutes early, and that day's מנחה and מעריב are on the Weekday chart and nowhere
+     else: claiming the day here would take those away and leave the card with a morning and
+     nothing after it. The chart already carries the whole of that stretch (see
+     afterYomKippurRow in sheets/weekday.js), so the day is left to it. */
+  const erevOn = rh + 8;
+  const dayOn = rh + 9;
+  const M = minyanList();
+  for (const t of parseTimes(YK_TEXT.erevShacharis.times)) M.typed(erevOn, YK_TEXT.erevShacharis.label, t, MORNING);
+  for (const t of parseTimes(YK_TEXT.erevMincha.times)) M.typed(erevOn, YK_TEXT.erevMincha.label, t, AFTERNOON);
+  // The night that opens יו"כ, which is ערב יו"כ's evening.
+  M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
+  M.at(erevOn, YK_TEXT.maariv, nightMaariv);
+  // The day itself, and its מוצאי.
+  for (const t of parseTimes(YK_TEXT.shacharis.times)) M.typed(dayOn, YK_TEXT.shacharis.label, t, MORNING);
+  M.at(dayOn, YK_TEXT.mincha, neila - 110 * YK_MIN);
+  M.at(dayOn, YK_TEXT.neila, neila);
+  M.at(dayOn, YK_TEXT.maariv, motzei60);
+  M.at(dayOn, YK_TEXT.maariv, ykShkia + 72 * YK_MIN, { underlined: true });
+  // The third מעריב keeps its time and loses its underline on the way over: its label already
+  // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
+  // the name and once beside it.
+  for (const t of parseTimes(YK_TEXT.maarivGimmel.times)) {
+    M.typed(dayOn, YK_TEXT.maarivGimmel.label, { text: t.text }, AFTERNOON);
+  }
+
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
   const stars = [];
@@ -273,6 +308,9 @@ export function buildYomKippurPoster(year, settings) {
     dayLines,
     nextMorning,
     after,
+    // ערב יו"כ's and יו"כ's מנינים, for the congregation's "what is on next". Nothing on the
+    // printed sheet reads this.
+    minyanim: M.out,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

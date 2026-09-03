@@ -1572,6 +1572,77 @@ const KAYITZ_COLUMNS = [
   { key: 'L', header: 'מנחה\nערב שבת' },
 ];
 
+// ==== posters/minyanim.js ====
+// Which times on a poster are מנינים, and when they actually are.
+//
+// A poster prints a 12-hour clock with no meridiem, the same as the boards and for the same
+// reason: a sheet is a whole day laid out in order, so a 7:30 among the מנחה times cannot be
+// read as the morning. "What is on next" on the congregation's home page has no such column
+// to read from, and it needs a real instant, so a poster hands its מנינים over already
+// resolved: which day, how many minutes after midnight, and where.
+//
+// The list is built inside each poster's own builder, out of the same numbers the printed
+// lines are made of, and never worked out again here. That is the rule upcoming.js already
+// follows with the charts, for the same reason: the time on somebody's phone and the time on
+// the sheet on the wall have to be one thing, not two things that agree most years.
+//
+// Not every line is a מנין. שקיעה, הדלקת נרות, ס"ז ק"ש, יזכור, תקיעת שופר, חצות and the
+// דרשות are זמנים and announcements, and a card offering "next minyan: שקיעה" would be
+// wrong in a way nobody would think to report. Which lines count is decided in each builder,
+// beside the line itself, rather than by matching on names here.
+
+/** Which half of the day a typed time belongs to. Said out loud at every call, because it
+ *  is the one thing the printed text does not carry. */
+const MORNING = false;
+const AFTERNOON = true;
+
+/** A day fraction as minutes after midnight, which is the frame upcoming.js works in.
+ *  Rounded exactly the way formatTime rounds, so the minute a phone counts down to and the
+ *  minute the sheet prints can never be different ones. */
+const fracMins = (t) => Math.round((((t % 1) + 1) % 1) * 1440);
+
+/** "7:30" as minutes after midnight. The meridiem is not in the text and cannot be worked
+ *  out from it, so the caller says which half of the day the line is in. */
+function clockMins(text, afternoon) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text).trim());
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour < 1 || hour > 12 || minute > 59) return null;
+  return ((hour % 12) + (afternoon ? 12 : 0)) * 60 + minute;
+}
+
+/** Where a time davens, off the marks the sheets already use: underlined is למטה, one star
+ *  is בעזרת נשים, two is the hall. The same three the charts are read with, spelled the same
+ *  way, so the card reads alike whichever it came from.
+ *
+ *  POSTER_PLACES rather than PLACES: upcoming.js has a list of its own under that name, and
+ *  the offline build flattens every module into one scope where two of a name is fatal. */
+const POSTER_PLACES = { u: 'למטה', '*': 'בעזר״נ', '**': 'באולם השמחות' };
+const placeOf = (t) => POSTER_PLACES[t?.mark || (t?.underlined ? 'u' : '')] || '';
+
+/** A poster's מנינים as it builds them: one call a time, and the list at the end.
+ *
+ *  A collector rather than an array the builders push shapes into, so the shape is written
+ *  once and a builder cannot leave a field off. Anything without a readable time is dropped
+ *  rather than added as a gap. */
+function minyanList() {
+  const out = [];
+  return {
+    out,
+    /** A computed time: the day it is on, what it is called, the day fraction it was worked
+     *  out as, and the printed time object it went into, which is where the room comes from. */
+    at(serial, name, fraction, time) {
+      out.push({ serial, name, mins: fracMins(fraction), place: placeOf(time) });
+    },
+    /** A time typed into one of the poster's own text tables, which carries no meridiem. */
+    typed(serial, name, time, afternoon) {
+      const mins = clockMins(time?.text, afternoon);
+      if (mins != null) out.push({ serial, name, mins, place: placeOf(time) });
+    },
+  };
+}
+
 // ==== posters/slichos.js ====
 // The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
 //
@@ -1764,6 +1835,7 @@ function buildSlichosPoster(hebrewYearNum) {
 // Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
 // תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
 // other way and is not self-consistent with it. See the commit for the line by line.
+
 
 
 
@@ -2005,6 +2077,40 @@ function buildYomKippurPoster(year, settings) {
   // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
   const after = buildAfterYomKippur(year, settings);
 
+  /* The מנינים of ערב יו"כ and יו"כ, for the congregation's "what is on next". Gathered off
+     the same numbers the lines above are made of, so the card and the sheet cannot disagree.
+     See posters/minyanim.js for why it is done this way round.
+
+     Left out on purpose: הדלקת נרות and שקיעה, which are זמנים; ס"ז ק"ש and יזכור, the same;
+     the two דברי התעוררות, which are announcements with no time of their own to daven at;
+     and קידוש לבנה, which is not a מנין and whose "אחר מעריב" is not a time at all.
+
+     The morning after is left out too, though the sheet prints it. It is the everyday שחרית
+     five minutes early, and that day's מנחה and מעריב are on the Weekday chart and nowhere
+     else: claiming the day here would take those away and leave the card with a morning and
+     nothing after it. The chart already carries the whole of that stretch (see
+     afterYomKippurRow in sheets/weekday.js), so the day is left to it. */
+  const erevOn = rh + 8;
+  const dayOn = rh + 9;
+  const M = minyanList();
+  for (const t of parseTimes(YK_TEXT.erevShacharis.times)) M.typed(erevOn, YK_TEXT.erevShacharis.label, t, MORNING);
+  for (const t of parseTimes(YK_TEXT.erevMincha.times)) M.typed(erevOn, YK_TEXT.erevMincha.label, t, AFTERNOON);
+  // The night that opens יו"כ, which is ערב יו"כ's evening.
+  M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
+  M.at(erevOn, YK_TEXT.maariv, nightMaariv);
+  // The day itself, and its מוצאי.
+  for (const t of parseTimes(YK_TEXT.shacharis.times)) M.typed(dayOn, YK_TEXT.shacharis.label, t, MORNING);
+  M.at(dayOn, YK_TEXT.mincha, neila - 110 * YK_MIN);
+  M.at(dayOn, YK_TEXT.neila, neila);
+  M.at(dayOn, YK_TEXT.maariv, motzei60);
+  M.at(dayOn, YK_TEXT.maariv, ykShkia + 72 * YK_MIN, { underlined: true });
+  // The third מעריב keeps its time and loses its underline on the way over: its label already
+  // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
+  // the name and once beside it.
+  for (const t of parseTimes(YK_TEXT.maarivGimmel.times)) {
+    M.typed(dayOn, YK_TEXT.maarivGimmel.label, { text: t.text }, AFTERNOON);
+  }
+
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
   const stars = [];
@@ -2023,6 +2129,9 @@ function buildYomKippurPoster(year, settings) {
     dayLines,
     nextMorning,
     after,
+    // ערב יו"כ's and יו"כ's מנינים, for the congregation's "what is on next". Nothing on the
+    // printed sheet reads this.
+    minyanim: M.out,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
@@ -2498,6 +2607,421 @@ function mergeRow(computedRow, sheet, weekSerial) {
   return { row, overriddenKeys };
 }
 
+// ==== posters/roshhashana.js ====
+// The ראש השנה poster: the two days' seder, worked out from the calendar.
+//
+// The most calculated of the posters. Almost every time on it moves with the year, and the
+// shape of the sheet moves too: when the first day is Shabbos there is no שופר, so those
+// lines come off and a ט' שעות line and a דרשה קודם מוסף go on instead.
+//
+// A day's heading gathers the night that opens it. Under "יום א'" the שקיעה and מעריב are
+// ערב ר"ה's, under "יום ב'" they are the first day's, and the מעריב at the very bottom is
+// the second day's, which is מוצאי יו"ט. That is how the sheets the shul hangs are laid
+// out, and reading them any other way made the numbers look a day out.
+//
+// Verified against two of those sheets, תשפ"ד (first day Shabbos) and תשפ"ו (neither day),
+// which between them cover both shapes. See the test notes in the commit.
+
+
+
+
+
+
+const RH_MIN = 1 / 1440;
+const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
+
+/** ר"ה of a Hebrew year as an Excel serial, the same call the סליחות poster makes. */
+const rhSerial = (year) => roshHashana(year - 3761);
+
+/** To the nearest 5 minutes. The דרשה is announced to a round time rather than to the
+ *  minute the arithmetic lands on. */
+const toNearest5 = (t) => Math.round(t * 288) / 288;
+/** Down to the last 5 minutes, which is how the afternoon מנחה is set. */
+const downTo5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
+
+/** Nine seasonal hours into the day, on each of the two reckonings the boards use: the
+ *  גר"א day runs sunrise to sunset, the מ"א day עלות 72 to צאת 72. Only printed on a first
+ *  day that is Shabbos, where it stands in for the שופר times. */
+function nineHours(date, settings) {
+  const gra = Z.sunriseElev(date, settings);
+  const graEnd = Z.sunsetElev(date, settings);
+  const mga = Z.alos72(date, settings);
+  const mgaEnd = Z.tzais72(date, settings);
+  return {
+    gra: gra + 9 * (graEnd - gra) / 12,
+    mga: mga + 9 * (mgaEnd - mga) / 12,
+  };
+}
+
+/** The lines that are wording rather than arithmetic, and the times the shul sets by hand.
+ *
+ *  Here rather than in settings, the same as the other two posters: these are fixed מנין
+ *  slots and announcements. Everything that moves with the year is computed below. */
+const RH_TEXT = {
+  title: 'ראש השנה',
+  slichos: { label: 'סליחות ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  chatzos: 'חצות',
+  // The three lines above the days, gathered under a heading of their own. The sheet of its
+  // own does not need one, since those lines are the first thing under the title; the sheet
+  // that holds the whole yomim noraim does, because there every block carries a name.
+  erevHeading: 'ערב ראש השנה',
+  erevMincha: { label: 'מנחה ערב ראש השנה', times: '<u>1:35</u>, 1:50, 2:15, 3:00' },
+  shabbos: 'שבת',
+  // Joined to the day with a dot rather than wrapped in brackets: the heading is underlined,
+  // and the underline running under a bracket reads as though it is cutting through it.
+  daySep: ' · ',
+  day: ["יום א'", "יום ב'"],
+  candles: 'הדלקת נרות',
+  shkia: 'שקיעה',
+  mincha: 'מנחה',
+  maariv: 'מעריב',
+  drasha: 'דרשה מאת הרב שליט"א',
+  drashaBeforeShofar: 'דרשה מאת הרב שליט"א קודם תקיעת',
+  drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
+  shacharis: { label: 'שחרית', times: '7:30' },
+  hamelech: { label: 'המלך', times: '8:30' },
+  // Split into the name of the זמן and the two reckonings it is given on, so the row can
+  // put the same gap between them that it puts between any name and its time. The two
+  // reckonings are joined with the charts' own SLASH, a slash with a non breaking space
+  // each side, so that breathes as well.
+  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
+  nineHours: { name: "ט' שעות", basis: `מ"א${SLASH}גר"א` },
+  shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
+  shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
+};
+
+/** The finished poster for one Hebrew year. */
+function buildRoshHashanaPoster(year, settings) {
+  if (!year) return null;
+  const rh = rhSerial(year);
+  const erev = dateFromSerial(rh - 1);
+  const days = [dateFromSerial(rh), dateFromSerial(rh + 1)];
+  const shabbosDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_SHABBOS);
+
+  const line = (label, times, opts = {}) => ({ label, times, ...opts });
+  const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
+  const at = (t) => [tm(t)];
+  const pair = (a, b) => [tm(a), tm(b)];
+
+  // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
+  // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
+  // is pushed off and so is this.
+  const tashlichDay = shabbosDay === 0 ? 1 : 0;
+  const TASHLICH_EARLIER = 50;
+
+  /* The מנינים of these three days, for the congregation's "what is on next". Gathered here
+     as the sheet is built, off the same numbers, so the card and the sheet cannot disagree.
+     See posters/minyanim.js for why it is done this way round and which lines are left out.
+
+     The three lines above the days are ערב ר"ה's own: its שחרית, which is the סליחות מנין,
+     and its מנחה. חצות is a זמן and is not one. */
+  const M = minyanList();
+  for (const t of parseTimes(RH_TEXT.slichos.times)) M.typed(rh - 1, RH_TEXT.slichos.label, t, MORNING);
+  for (const t of parseTimes(RH_TEXT.erevMincha.times)) M.typed(rh - 1, RH_TEXT.erevMincha.label, t, AFTERNOON);
+
+  const blocks = days.map((day, i) => {
+    const night = i === 0 ? erev : days[0];
+    const shkia = Z.sunsetElev(night, settings);
+    const isShabbos = i === shabbosDay;
+    const krias = { gra: Z.sofZmanShmaGRA(day, settings), mga: Z.sofZmanShmaMGA72(day, settings) };
+    const nine = nineHours(day, settings);
+    const dayShkia = Z.sunsetElev(day, settings);
+
+    const lines = [];
+    // The night that opens the day. הדלקת נרות only on the first, since the second day's
+    // candles are lit from an existing flame and the sheets have never printed a time.
+    if (i === 0) lines.push(line(RH_TEXT.candles, at(shkia - settings.candleLightingMinutes * RH_MIN)));
+    if (i === 0) lines.push(line(RH_TEXT.mincha, at(shkia - 15 * RH_MIN)));
+    lines.push(line(RH_TEXT.shkia, at(shkia)));
+    if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN))));
+    lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
+    // These two are on the evening that opens the day, which is the day before it: under
+    // "יום א'" that is ערב ר"ה, under "יום ב'" the first day. Getting that wrong is the one
+    // way this could be a whole day out, so it is taken from the same `night` the שקיעה
+    // above is worked out from rather than from the block's own index.
+    const nightOn = rh + i - 1;
+    if (i === 0) M.at(nightOn, RH_TEXT.mincha, shkia - 15 * RH_MIN);
+    M.at(nightOn, RH_TEXT.maariv, shkia + 60 * RH_MIN);
+
+    // The morning.
+    // המלך rides on the שחרית line as a second label and time, not as one run of text, so
+    // it gets the same gap between word and time that every other row has.
+    lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
+      { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
+    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { sub: RH_TEXT.krias.basis }));
+
+    // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
+    if (isShabbos) {
+      lines.push(line(RH_TEXT.drashaBeforeMusaf, []));
+      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { sub: RH_TEXT.nineHours.basis }));
+    } else {
+      lines.push(line(RH_TEXT.drashaBeforeShofar, []));
+      lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }]));
+      lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }]));
+    }
+
+    // The afternoon מנחה, an hour before that day's own שקיעה taken down to the last 5, on
+    // both days, with the earlier תשליך one in front of it on the day that has one.
+    const mainMincha = downTo5(dayShkia - 60 * RH_MIN);
+    lines.push(line(RH_TEXT.mincha, i === tashlichDay
+      ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
+      : at(mainMincha)));
+
+    // The morning and the afternoon, on the day itself. שחרית is typed rather than computed,
+    // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
+    // its own. ס"ז ק"ש, ט' שעות, the שופר times and the דרשות are זמנים and announcements.
+    const dayOn = rh + i;
+    for (const t of parseTimes(RH_TEXT.shacharis.times)) M.typed(dayOn, RH_TEXT.shacharis.label, t, MORNING);
+    if (i === tashlichDay) M.at(dayOn, RH_TEXT.mincha, mainMincha - TASHLICH_EARLIER * RH_MIN, { underlined: true });
+    M.at(dayOn, RH_TEXT.mincha, mainMincha);
+
+    // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
+    // which is the same way round the boards print a two time מעריב (see calculations-view).
+    if (i === 1) {
+      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)]));
+      M.at(dayOn, RH_TEXT.maariv, dayShkia + 60 * RH_MIN);
+      M.at(dayOn, RH_TEXT.maariv, dayShkia + 72 * RH_MIN, { underlined: true });
+    }
+
+    return {
+      heading: RH_TEXT.day[i] + (isShabbos ? RH_TEXT.daySep + RH_TEXT.shabbos : ''),
+      isShabbos,
+      lines,
+    };
+  });
+
+  // Only the marks the sheet actually carries get explained, and each line carries the
+  // direction it has to be set in. Same as the other two posters.
+  const marks = [
+    ...parseTimes(RH_TEXT.slichos.times),
+    ...parseTimes(RH_TEXT.erevMincha.times),
+    ...blocks.flatMap((b) => b.lines.flatMap((l) => l.times)),
+  ];
+  const stars = [];
+  if (marks.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (marks.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+
+  return {
+    hebrewYear: year,
+    legend: [
+      marks.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+    span: { from: rh - 1, to: rh + 1 },
+    // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
+    // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
+    // minute later than חצות really is, and no printed זמן should say that.
+    chatzos: formatTime(floorToMinute(Z.solarNoon(erev, settings))),
+    blocks,
+    // The three days' מנינים, for the congregation's "what is on next". Nothing on the
+    // printed sheet reads this.
+    minyanim: M.out,
+  };
+}
+
+// ==== posters/tzomgedalia.js ====
+// The צום גדליה poster: a fast day, so one page holding שחרית, מנחה, שקיעה and מעריב.
+//
+// Laid out like the sheet that runs the days after יו"כ: a heading per תפילה with its
+// times under it, rather than the label-and-time rows the ראש השנה and יום כיפור sheets
+// use. That is how the shul hangs this one.
+//
+// Everything on the afternoon of the sheet hangs off שקיעה. The last מנין is 45 minutes in
+// front of it, the one before that 45 minutes in front of the last, and the one before that
+// 45 minutes again. Only the two roundings differ, and they are set out in tzomGedaliaMincha.
+//
+// The morning is not calculated at all, and it is not the ר"ח בה"ב ותענ"צ schedule out of
+// Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
+// its own list. It sits in TZG_TEXT with the other slots that are set by hand.
+
+
+
+
+
+const TZG_MIN = 1 / 1440;
+/** To the nearest 5 minutes, and up to the next quarter hour. */
+const tzgNear5 = (t) => Math.round(t * 288) / 288;
+const tzgUp15 = (t) => Math.ceil(t * 96 - 1e-9) / 96;
+
+/** How far apart the three afternoon מנינים are, and how far the last one is in front of
+ *  שקיעה. One number, because it is the same 45 minutes throughout. */
+const TZG_GAP = 45;
+
+/** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
+const TZG_TEXT = {
+  title: 'צום גדליה',
+  shacharis: 'שחרית',
+  mincha: 'מנחה',
+  shkia: 'שקיעה',
+  maariv: 'מעריב',
+  // The morning, which does not move with the year. The fast day run starts earlier than
+  // the everyday one and is its own list rather than the ר"ח בה"ב ותענ"צ schedule out of
+  // Settings: this is what the sheet the shul hangs prints. Written in the marks this
+  // project uses throughout, which is where the old sheet's three levels of asterisk land:
+  // its ** (בית מדרש למטה) is the underline here, and its *** (באולם השמחות) is **.
+  morning: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00',
+  // The two early ones, which do not move with the year either. Same pair as the everyday
+  // board: the 1:35 is למטה and the 1:50 is the main בית מדרש.
+  earlyMincha: '<u>1:35</u>, 1:50',
+};
+
+/** The day the fast falls on, as an Excel serial.
+ *
+ *  3 תשרי, unless that is Shabbos, when the fast is put off to the Sunday. ר"ה can only
+ *  open on a Monday, Tuesday, Thursday or Shabbos, so the one case that defers is a Thursday
+ *  ר"ה, which puts 3 תשרי on Shabbos. */
+function tzomGedaliaSerial(rh) {
+  const third = rh + 2;
+  return excelWeekday(third) === 7 ? third + 1 : third;
+}
+
+/** The three afternoon מנינים, worked back from שקיעה.
+ *
+ *  The last is 45 minutes before שקיעה, to the nearest 5. The one in front of it is 45
+ *  minutes earlier again, put up to the next quarter hour, which is what keeps the middle of
+ *  the afternoon on a round time. The first is a plain 45 minutes before that and needs no
+ *  rounding of its own, since it is already on a quarter hour.
+ *
+ *  The two roundings go opposite ways, which is not a slip. They are the pair that
+ *  reproduces the תשפ"ו sheet: a 6:49 שקיעה gives 6:04, then 6:05, 5:30 and 4:45, which is
+ *  what that sheet prints. Rounding both down instead gives 6:00, 5:15 and 4:30, a quarter
+ *  hour early. Confirmed with the user against that sheet before this was written. */
+function tzomGedaliaMincha(shkia) {
+  const last = tzgNear5(shkia - TZG_GAP * TZG_MIN);
+  const middle = tzgUp15(last - TZG_GAP * TZG_MIN);
+  return [middle - TZG_GAP * TZG_MIN, middle, last];
+}
+
+/** The finished poster for one Hebrew year. */
+function buildTzomGedaliaPoster(year, settings) {
+  if (!year) return null;
+  const serial = tzomGedaliaSerial(roshHashana(year - 3761));
+  const shkia = Z.sunsetElev(dateFromSerial(serial), settings);
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+
+  const shacharis = parseTimes(TZG_TEXT.morning);
+  const mincha = [
+    ...parseTimes(TZG_TEXT.earlyMincha),
+    // The two that open the run are למטה and the one against שקיעה is the main בית מדרש,
+    // the same way round as the afternoon on the everyday board.
+    ...tzomGedaliaMincha(shkia).map((t, i) => tm(t, i < 2)),
+  ];
+  // 35 and 50 minutes after שקיעה. The later one is the underlined one, which is how the
+  // boards print a two time מעריב.
+  const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
+
+  /* The fast day's מנינים, for the congregation's "what is on next", off the very lists the
+     sheet prints rather than worked out again. שקיעה is not one of them: it stands between
+     מנחה and מעריב on the sheet as a זמן, which is why it carries no heading there either.
+
+     The מנחה run is read out of the list it was just built into rather than re-derived from
+     tzomGedaliaMincha, so the two typed early מנינים in front of it are included and in
+     order. Its times are all afternoon and its שחרית all morning, which on a fast day needs
+     no thought: nothing here runs past מעריב. */
+  const M = minyanList();
+  for (const t of shacharis) M.typed(serial, TZG_TEXT.shacharis, t, MORNING);
+  for (const t of mincha) M.typed(serial, TZG_TEXT.mincha, t, AFTERNOON);
+  for (const t of maariv) M.typed(serial, TZG_TEXT.maariv, t, AFTERNOON);
+
+  const all = [...shacharis, ...mincha, ...maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+
+  return {
+    hebrewYear: year,
+    span: { from: serial, to: serial },
+    sets: [
+      { head: TZG_TEXT.shacharis, lines: [shacharis] },
+      { head: TZG_TEXT.mincha, lines: [mincha] },
+      // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
+      // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
+      // name and the time together.
+      { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
+      { head: TZG_TEXT.maariv, lines: [maariv] },
+    ],
+    // The day's מנינים, for the congregation's "what is on next". Nothing on the printed
+    // sheet reads this.
+    minyanim: M.out,
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
+// ==== posters/day.js ====
+// The days the sheets on the wall speak for, and what is davening on them.
+//
+// Six days a year the schedule is not on either chart: ערב ר"ה, the two days of ר"ה, צום
+// גדליה, ערב יו"כ and יו"כ. On those days the shul hangs a sheet, and the charts carry the
+// ordinary weekday row for the week they fall in. "What is on next" on the congregation's
+// home page was reading that row and offering it: on יום כיפור it said מנחה 1:15 where the
+// sheet on the wall says 4:15, and on the second day of ר"ה it said 1:35 where the sheet says
+// 5:15. Wrong on the days it matters most, and wrong confidently, which is worse.
+//
+// So the poster is asked first. Each of the three builders gathers its own מנינים as it works
+// the sheet out, off the same numbers the printed lines are made of (see posters/minyanim.js),
+// and this file is only the question "which of them is on this day".
+//
+// Six days and no more. A day is taken over here only where the sheet is the whole of it:
+// שחרית, מנחה and מעריב all on the one sheet. The morning after יו"כ is not one of them,
+// though its sheet prints a שחרית: that day's מנחה and מעריב are on the Weekday chart and
+// nowhere else, and the chart already carries the whole of that stretch. Nor is שבת שובה,
+// whose מנחה the poster reads off the chart to begin with. Half a day taken over would be a
+// card with a morning on it and nothing after.
+
+
+
+
+/** How far either side of ר"ה a sheet can reach: ערב ר"ה is the day before, and יו"כ's
+ *  מוצאי is 9 days after. Every day outside that answers in one calendar call and builds
+ *  nothing, which matters because this is asked of eight days in a row every time the home
+ *  page draws its card. */
+const BEFORE = 1;
+const AFTER = 9;
+
+/** The three sheets for one year, built once.
+ *
+ *  nextMinyan walks up to eight days looking for the next one, and inside the yomim noraim
+ *  most of those days are covered here, so without this the same three sheets would be built
+ *  eight times over on a phone. Keyed on the settings object as well as the year: Settings
+ *  moves candle lighting and the horizon, and a stale sheet would be worse than a slow one. */
+let built = null;
+function sheetsFor(year, settings) {
+  if (built && built.year === year && built.settings === settings) return built.list;
+  const list = [];
+  for (const build of [buildRoshHashanaPoster, buildYomKippurPoster, buildTzomGedaliaPoster]) {
+    let poster = null;
+    // A sheet that will not build must not take the home page's card down with it. The card
+    // then falls back to the charts, which is where it was before any of this.
+    try { poster = build(year, settings); } catch { poster = null; }
+    if (poster?.minyanim) list.push(...poster.minyanim);
+  }
+  built = { year, settings, list };
+  return list;
+}
+
+/** Every מנין on one day that comes off a sheet rather than off a chart, earliest first.
+ *
+ *  Empty on every other day of the year, which is the signal to the caller that the charts
+ *  are the answer.
+ *
+ *  Two years are tried because ערב ר"ה is the day before the year turns over: its own Hebrew
+ *  year is the old one, and the sheet it is on belongs to the new. */
+function specialMinyanim(serial, settings) {
+  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  for (const year of [here, here + 1]) {
+    const rh = roshHashana(year - 3761);
+    if (serial < rh - BEFORE || serial > rh + AFTER) continue;
+    const found = sheetsFor(year, settings).filter((m) => m.serial === serial);
+    if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
+  }
+  return [];
+}
+
 // ==== rules.js ====
 // Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
 // HaGadol have a different Mincha time because of the drasha"). Applied to every
@@ -2663,6 +3187,7 @@ function rowFor(week, sheet, state, settings) {
 
 
 
+
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
  *  Not every column is a מנין. ס"ז קר"ש and הדלקת נרות are זמנים and are left out here;
@@ -2810,6 +3335,14 @@ function entryForDay(serial, state) {
  *  A day is served by whichever chart covers it: Sunday through Thursday by the Weekday
  *  chart, Friday and Shabbos by the שבת chart for that week. */
 function minyanimForDay(serial, state, settings) {
+  /* The sheets on the wall first, on the six days a year they are the whole schedule: ערב
+     ר"ה, both days of ר"ה, צום גדליה, ערב יו"כ and יו"כ. Neither chart carries those days,
+     and both carry the ordinary weekday row for the week they fall in, so this used to offer
+     it: on יום כיפור the card said מנחה 1:15 where the sheet says 4:15. See posters/day.js
+     for which days are taken over and why the list stops at six. */
+  const special = specialMinyanim(serial, settings);
+  if (special.length) return special;
+
   const dow = excelWeekday(serial);
   const found = entryForDay(serial, state);
   if (!found) return [];
@@ -5465,303 +5998,6 @@ function renderGuide(container, onOpenTab) {
   `;
 
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
-}
-
-// ==== posters/roshhashana.js ====
-// The ראש השנה poster: the two days' seder, worked out from the calendar.
-//
-// The most calculated of the posters. Almost every time on it moves with the year, and the
-// shape of the sheet moves too: when the first day is Shabbos there is no שופר, so those
-// lines come off and a ט' שעות line and a דרשה קודם מוסף go on instead.
-//
-// A day's heading gathers the night that opens it. Under "יום א'" the שקיעה and מעריב are
-// ערב ר"ה's, under "יום ב'" they are the first day's, and the מעריב at the very bottom is
-// the second day's, which is מוצאי יו"ט. That is how the sheets the shul hangs are laid
-// out, and reading them any other way made the numbers look a day out.
-//
-// Verified against two of those sheets, תשפ"ד (first day Shabbos) and תשפ"ו (neither day),
-// which between them cover both shapes. See the test notes in the commit.
-
-
-
-
-
-const RH_MIN = 1 / 1440;
-const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
-
-/** ר"ה of a Hebrew year as an Excel serial, the same call the סליחות poster makes. */
-const rhSerial = (year) => roshHashana(year - 3761);
-
-/** To the nearest 5 minutes. The דרשה is announced to a round time rather than to the
- *  minute the arithmetic lands on. */
-const toNearest5 = (t) => Math.round(t * 288) / 288;
-/** Down to the last 5 minutes, which is how the afternoon מנחה is set. */
-const downTo5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
-
-/** Nine seasonal hours into the day, on each of the two reckonings the boards use: the
- *  גר"א day runs sunrise to sunset, the מ"א day עלות 72 to צאת 72. Only printed on a first
- *  day that is Shabbos, where it stands in for the שופר times. */
-function nineHours(date, settings) {
-  const gra = Z.sunriseElev(date, settings);
-  const graEnd = Z.sunsetElev(date, settings);
-  const mga = Z.alos72(date, settings);
-  const mgaEnd = Z.tzais72(date, settings);
-  return {
-    gra: gra + 9 * (graEnd - gra) / 12,
-    mga: mga + 9 * (mgaEnd - mga) / 12,
-  };
-}
-
-/** The lines that are wording rather than arithmetic, and the times the shul sets by hand.
- *
- *  Here rather than in settings, the same as the other two posters: these are fixed מנין
- *  slots and announcements. Everything that moves with the year is computed below. */
-const RH_TEXT = {
-  title: 'ראש השנה',
-  slichos: { label: 'סליחות ערב ר"ה', times: '6:30, <u>7:10</u>' },
-  chatzos: 'חצות',
-  // The three lines above the days, gathered under a heading of their own. The sheet of its
-  // own does not need one, since those lines are the first thing under the title; the sheet
-  // that holds the whole yomim noraim does, because there every block carries a name.
-  erevHeading: 'ערב ראש השנה',
-  erevMincha: { label: 'מנחה ערב ראש השנה', times: '<u>1:35</u>, 1:50, 2:15, 3:00' },
-  shabbos: 'שבת',
-  // Joined to the day with a dot rather than wrapped in brackets: the heading is underlined,
-  // and the underline running under a bracket reads as though it is cutting through it.
-  daySep: ' · ',
-  day: ["יום א'", "יום ב'"],
-  candles: 'הדלקת נרות',
-  shkia: 'שקיעה',
-  mincha: 'מנחה',
-  maariv: 'מעריב',
-  drasha: 'דרשה מאת הרב שליט"א',
-  drashaBeforeShofar: 'דרשה מאת הרב שליט"א קודם תקיעת',
-  drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
-  shacharis: { label: 'שחרית', times: '7:30' },
-  hamelech: { label: 'המלך', times: '8:30' },
-  // Split into the name of the זמן and the two reckonings it is given on, so the row can
-  // put the same gap between them that it puts between any name and its time. The two
-  // reckonings are joined with the charts' own SLASH, a slash with a non breaking space
-  // each side, so that breathes as well.
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
-  nineHours: { name: "ט' שעות", basis: `מ"א${SLASH}גר"א` },
-  shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
-  shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
-};
-
-/** The finished poster for one Hebrew year. */
-function buildRoshHashanaPoster(year, settings) {
-  if (!year) return null;
-  const rh = rhSerial(year);
-  const erev = dateFromSerial(rh - 1);
-  const days = [dateFromSerial(rh), dateFromSerial(rh + 1)];
-  const shabbosDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_SHABBOS);
-
-  const line = (label, times, opts = {}) => ({ label, times, ...opts });
-  const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
-  const at = (t) => [tm(t)];
-  const pair = (a, b) => [tm(a), tm(b)];
-
-  // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
-  // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
-  // is pushed off and so is this.
-  const tashlichDay = shabbosDay === 0 ? 1 : 0;
-  const TASHLICH_EARLIER = 50;
-
-  const blocks = days.map((day, i) => {
-    const night = i === 0 ? erev : days[0];
-    const shkia = Z.sunsetElev(night, settings);
-    const isShabbos = i === shabbosDay;
-    const krias = { gra: Z.sofZmanShmaGRA(day, settings), mga: Z.sofZmanShmaMGA72(day, settings) };
-    const nine = nineHours(day, settings);
-    const dayShkia = Z.sunsetElev(day, settings);
-
-    const lines = [];
-    // The night that opens the day. הדלקת נרות only on the first, since the second day's
-    // candles are lit from an existing flame and the sheets have never printed a time.
-    if (i === 0) lines.push(line(RH_TEXT.candles, at(shkia - settings.candleLightingMinutes * RH_MIN)));
-    if (i === 0) lines.push(line(RH_TEXT.mincha, at(shkia - 15 * RH_MIN)));
-    lines.push(line(RH_TEXT.shkia, at(shkia)));
-    if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN))));
-    lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
-
-    // The morning.
-    // המלך rides on the שחרית line as a second label and time, not as one run of text, so
-    // it gets the same gap between word and time that every other row has.
-    lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
-      { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { sub: RH_TEXT.krias.basis }));
-
-    // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
-    if (isShabbos) {
-      lines.push(line(RH_TEXT.drashaBeforeMusaf, []));
-      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { sub: RH_TEXT.nineHours.basis }));
-    } else {
-      lines.push(line(RH_TEXT.drashaBeforeShofar, []));
-      lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }]));
-      lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }]));
-    }
-
-    // The afternoon מנחה, an hour before that day's own שקיעה taken down to the last 5, on
-    // both days, with the earlier תשליך one in front of it on the day that has one.
-    const mainMincha = downTo5(dayShkia - 60 * RH_MIN);
-    lines.push(line(RH_TEXT.mincha, i === tashlichDay
-      ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
-      : at(mainMincha)));
-
-    // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
-    // which is the same way round the boards print a two time מעריב (see calculations-view).
-    if (i === 1) {
-      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)]));
-    }
-
-    return {
-      heading: RH_TEXT.day[i] + (isShabbos ? RH_TEXT.daySep + RH_TEXT.shabbos : ''),
-      isShabbos,
-      lines,
-    };
-  });
-
-  // Only the marks the sheet actually carries get explained, and each line carries the
-  // direction it has to be set in. Same as the other two posters.
-  const marks = [
-    ...parseTimes(RH_TEXT.slichos.times),
-    ...parseTimes(RH_TEXT.erevMincha.times),
-    ...blocks.flatMap((b) => b.lines.flatMap((l) => l.times)),
-  ];
-  const stars = [];
-  if (marks.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (marks.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-
-  return {
-    hebrewYear: year,
-    legend: [
-      marks.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-    span: { from: rh - 1, to: rh + 1 },
-    // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
-    // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
-    // minute later than חצות really is, and no printed זמן should say that.
-    chatzos: formatTime(floorToMinute(Z.solarNoon(erev, settings))),
-    blocks,
-  };
-}
-
-// ==== posters/tzomgedalia.js ====
-// The צום גדליה poster: a fast day, so one page holding שחרית, מנחה, שקיעה and מעריב.
-//
-// Laid out like the sheet that runs the days after יו"כ: a heading per תפילה with its
-// times under it, rather than the label-and-time rows the ראש השנה and יום כיפור sheets
-// use. That is how the shul hangs this one.
-//
-// Everything on the afternoon of the sheet hangs off שקיעה. The last מנין is 45 minutes in
-// front of it, the one before that 45 minutes in front of the last, and the one before that
-// 45 minutes again. Only the two roundings differ, and they are set out in tzomGedaliaMincha.
-//
-// The morning is not calculated at all, and it is not the ר"ח בה"ב ותענ"צ schedule out of
-// Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
-// its own list. It sits in TZG_TEXT with the other slots that are set by hand.
-
-
-
-
-const TZG_MIN = 1 / 1440;
-/** To the nearest 5 minutes, and up to the next quarter hour. */
-const tzgNear5 = (t) => Math.round(t * 288) / 288;
-const tzgUp15 = (t) => Math.ceil(t * 96 - 1e-9) / 96;
-
-/** How far apart the three afternoon מנינים are, and how far the last one is in front of
- *  שקיעה. One number, because it is the same 45 minutes throughout. */
-const TZG_GAP = 45;
-
-/** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
-const TZG_TEXT = {
-  title: 'צום גדליה',
-  shacharis: 'שחרית',
-  mincha: 'מנחה',
-  shkia: 'שקיעה',
-  maariv: 'מעריב',
-  // The morning, which does not move with the year. The fast day run starts earlier than
-  // the everyday one and is its own list rather than the ר"ח בה"ב ותענ"צ schedule out of
-  // Settings: this is what the sheet the shul hangs prints. Written in the marks this
-  // project uses throughout, which is where the old sheet's three levels of asterisk land:
-  // its ** (בית מדרש למטה) is the underline here, and its *** (באולם השמחות) is **.
-  morning: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00',
-  // The two early ones, which do not move with the year either. Same pair as the everyday
-  // board: the 1:35 is למטה and the 1:50 is the main בית מדרש.
-  earlyMincha: '<u>1:35</u>, 1:50',
-};
-
-/** The day the fast falls on, as an Excel serial.
- *
- *  3 תשרי, unless that is Shabbos, when the fast is put off to the Sunday. ר"ה can only
- *  open on a Monday, Tuesday, Thursday or Shabbos, so the one case that defers is a Thursday
- *  ר"ה, which puts 3 תשרי on Shabbos. */
-function tzomGedaliaSerial(rh) {
-  const third = rh + 2;
-  return excelWeekday(third) === 7 ? third + 1 : third;
-}
-
-/** The three afternoon מנינים, worked back from שקיעה.
- *
- *  The last is 45 minutes before שקיעה, to the nearest 5. The one in front of it is 45
- *  minutes earlier again, put up to the next quarter hour, which is what keeps the middle of
- *  the afternoon on a round time. The first is a plain 45 minutes before that and needs no
- *  rounding of its own, since it is already on a quarter hour.
- *
- *  The two roundings go opposite ways, which is not a slip. They are the pair that
- *  reproduces the תשפ"ו sheet: a 6:49 שקיעה gives 6:04, then 6:05, 5:30 and 4:45, which is
- *  what that sheet prints. Rounding both down instead gives 6:00, 5:15 and 4:30, a quarter
- *  hour early. Confirmed with the user against that sheet before this was written. */
-function tzomGedaliaMincha(shkia) {
-  const last = tzgNear5(shkia - TZG_GAP * TZG_MIN);
-  const middle = tzgUp15(last - TZG_GAP * TZG_MIN);
-  return [middle - TZG_GAP * TZG_MIN, middle, last];
-}
-
-/** The finished poster for one Hebrew year. */
-function buildTzomGedaliaPoster(year, settings) {
-  if (!year) return null;
-  const serial = tzomGedaliaSerial(roshHashana(year - 3761));
-  const shkia = Z.sunsetElev(dateFromSerial(serial), settings);
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-
-  const shacharis = parseTimes(TZG_TEXT.morning);
-  const mincha = [
-    ...parseTimes(TZG_TEXT.earlyMincha),
-    // The two that open the run are למטה and the one against שקיעה is the main בית מדרש,
-    // the same way round as the afternoon on the everyday board.
-    ...tzomGedaliaMincha(shkia).map((t, i) => tm(t, i < 2)),
-  ];
-  // 35 and 50 minutes after שקיעה. The later one is the underlined one, which is how the
-  // boards print a two time מעריב.
-  const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
-
-  const all = [...shacharis, ...mincha, ...maariv];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-
-  return {
-    hebrewYear: year,
-    span: { from: serial, to: serial },
-    sets: [
-      { head: TZG_TEXT.shacharis, lines: [shacharis] },
-      { head: TZG_TEXT.mincha, lines: [mincha] },
-      // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
-      // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
-      // name and the time together.
-      { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
-      { head: TZG_TEXT.maariv, lines: [maariv] },
-    ],
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
-  };
 }
 
 // ==== posters/pair.js ====

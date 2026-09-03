@@ -25,6 +25,7 @@ import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
 import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
+import { specialMinyanim } from './posters/day.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -173,6 +174,14 @@ function entryForDay(serial, state) {
  *  A day is served by whichever chart covers it: Sunday through Thursday by the Weekday
  *  chart, Friday and Shabbos by the שבת chart for that week. */
 export function minyanimForDay(serial, state, settings) {
+  /* The sheets on the wall first, on the six days a year they are the whole schedule: ערב
+     ר"ה, both days of ר"ה, צום גדליה, ערב יו"כ and יו"כ. Neither chart carries those days,
+     and both carry the ordinary weekday row for the week they fall in, so this used to offer
+     it: on יום כיפור the card said מנחה 1:15 where the sheet says 4:15. See posters/day.js
+     for which days are taken over and why the list stops at six. */
+  const special = specialMinyanim(serial, settings);
+  if (special.length) return special;
+
   const dow = excelWeekday(serial);
   const found = entryForDay(serial, state);
   if (!found) return [];

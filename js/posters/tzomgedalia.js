@@ -16,6 +16,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 
 const TZG_MIN = 1 / 1440;
 /** To the nearest 5 minutes, and up to the next quarter hour. */
@@ -89,6 +90,19 @@ export function buildTzomGedaliaPoster(year, settings) {
   // boards print a two time מעריב.
   const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
 
+  /* The fast day's מנינים, for the congregation's "what is on next", off the very lists the
+     sheet prints rather than worked out again. שקיעה is not one of them: it stands between
+     מנחה and מעריב on the sheet as a זמן, which is why it carries no heading there either.
+
+     The מנחה run is read out of the list it was just built into rather than re-derived from
+     tzomGedaliaMincha, so the two typed early מנינים in front of it are included and in
+     order. Its times are all afternoon and its שחרית all morning, which on a fast day needs
+     no thought: nothing here runs past מעריב. */
+  const M = minyanList();
+  for (const t of shacharis) M.typed(serial, TZG_TEXT.shacharis, t, MORNING);
+  for (const t of mincha) M.typed(serial, TZG_TEXT.mincha, t, AFTERNOON);
+  for (const t of maariv) M.typed(serial, TZG_TEXT.maariv, t, AFTERNOON);
+
   const all = [...shacharis, ...mincha, ...maariv];
   const stars = [];
   if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
@@ -106,6 +120,9 @@ export function buildTzomGedaliaPoster(year, settings) {
       { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
       { head: TZG_TEXT.maariv, lines: [maariv] },
     ],
+    // The day's מנינים, for the congregation's "what is on next". Nothing on the printed
+    // sheet reads this.
+    minyanim: M.out,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

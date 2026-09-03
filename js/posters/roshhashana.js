@@ -16,6 +16,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { SLASH } from '../util.js';
 
 const RH_MIN = 1 / 1440;
@@ -100,6 +101,16 @@ export function buildRoshHashanaPoster(year, settings) {
   const tashlichDay = shabbosDay === 0 ? 1 : 0;
   const TASHLICH_EARLIER = 50;
 
+  /* The מנינים of these three days, for the congregation's "what is on next". Gathered here
+     as the sheet is built, off the same numbers, so the card and the sheet cannot disagree.
+     See posters/minyanim.js for why it is done this way round and which lines are left out.
+
+     The three lines above the days are ערב ר"ה's own: its שחרית, which is the סליחות מנין,
+     and its מנחה. חצות is a זמן and is not one. */
+  const M = minyanList();
+  for (const t of parseTimes(RH_TEXT.slichos.times)) M.typed(rh - 1, RH_TEXT.slichos.label, t, MORNING);
+  for (const t of parseTimes(RH_TEXT.erevMincha.times)) M.typed(rh - 1, RH_TEXT.erevMincha.label, t, AFTERNOON);
+
   const blocks = days.map((day, i) => {
     const night = i === 0 ? erev : days[0];
     const shkia = Z.sunsetElev(night, settings);
@@ -116,6 +127,13 @@ export function buildRoshHashanaPoster(year, settings) {
     lines.push(line(RH_TEXT.shkia, at(shkia)));
     if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN))));
     lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
+    // These two are on the evening that opens the day, which is the day before it: under
+    // "יום א'" that is ערב ר"ה, under "יום ב'" the first day. Getting that wrong is the one
+    // way this could be a whole day out, so it is taken from the same `night` the שקיעה
+    // above is worked out from rather than from the block's own index.
+    const nightOn = rh + i - 1;
+    if (i === 0) M.at(nightOn, RH_TEXT.mincha, shkia - 15 * RH_MIN);
+    M.at(nightOn, RH_TEXT.maariv, shkia + 60 * RH_MIN);
 
     // The morning.
     // המלך rides on the שחרית line as a second label and time, not as one run of text, so
@@ -141,10 +159,20 @@ export function buildRoshHashanaPoster(year, settings) {
       ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
       : at(mainMincha)));
 
+    // The morning and the afternoon, on the day itself. שחרית is typed rather than computed,
+    // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
+    // its own. ס"ז ק"ש, ט' שעות, the שופר times and the דרשות are זמנים and announcements.
+    const dayOn = rh + i;
+    for (const t of parseTimes(RH_TEXT.shacharis.times)) M.typed(dayOn, RH_TEXT.shacharis.label, t, MORNING);
+    if (i === tashlichDay) M.at(dayOn, RH_TEXT.mincha, mainMincha - TASHLICH_EARLIER * RH_MIN, { underlined: true });
+    M.at(dayOn, RH_TEXT.mincha, mainMincha);
+
     // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
     // which is the same way round the boards print a two time מעריב (see calculations-view).
     if (i === 1) {
       lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)]));
+      M.at(dayOn, RH_TEXT.maariv, dayShkia + 60 * RH_MIN);
+      M.at(dayOn, RH_TEXT.maariv, dayShkia + 72 * RH_MIN, { underlined: true });
     }
 
     return {
@@ -178,5 +206,8 @@ export function buildRoshHashanaPoster(year, settings) {
     // minute later than חצות really is, and no printed זמן should say that.
     chatzos: formatTime(floorToMinute(Z.solarNoon(erev, settings))),
     blocks,
+    // The three days' מנינים, for the congregation's "what is on next". Nothing on the
+    // printed sheet reads this.
+    minyanim: M.out,
   };
 }
