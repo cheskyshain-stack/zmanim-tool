@@ -246,3 +246,40 @@
   .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
   .poster-all-item.is-sideways .poster.is-landscape { page: poster; }
 }
+
+/* --- The same thing again, for the boxes that are portrait ---------------------------
+   Everything above this point about iOS Safari is true of these too, and they never got the
+   treatment. A week card, the two-card sheet and a poster are each exactly 8.5in by 11in
+   with a @page asking for letter portrait and no margin. A desktop obliges. An iPhone
+   ignores the size descriptor, prints on whatever the person picked, and adds margins that
+   cannot be zeroed, so an 8.5in box does not fit the printable area it actually gets: it
+   hangs off the sheet and the sides are cut. Reported from a phone as the week card coming
+   out enormous with the ends missing.
+
+   The same shape of answer as the charts', with the numbers turned round for a portrait
+   box: the smaller of the two ratios, so it cannot fit the width and then overrun the
+   height. The floor is the same 0.72, and for the same reason. It is the scale that fits an
+   8.5in by 11in page on letter in the worse of the two orientations: portrait wants about
+   0.94 once margins are taken, landscape wants 8.5/11 = 0.773, so 0.72 clears both with
+   room. Where 100vw really is the print box the middle term wins and the fit is exact;
+   where it is the phone's layout viewport instead, which is what happened to the charts,
+   the floor catches it and the sheet prints whole at 72% rather than at a third.
+
+   The gate is 8.49in rather than the charts' 10.99in because these boxes are 8.5in wide. A
+   desktop printing letter portrait has a box of exactly 8.5in, does not match, and keeps
+   its untouched full-size page.
+
+   !important because the rules above pin all three to zoom: 1 to keep the screen's
+   fit-to-window off paper, and that pin has to be beaten here without being removed there.
+
+   Not the run of every poster. That does not print correctly on any platform yet and is a
+   thing of its own; scaling it would only make it differently wrong. */
+@media print and (max-width: 8.49in) {
+  .week-pair, .week-cards .week-card, .poster {
+    zoom: clamp(0.72, min(calc(100vw / 8.5in), calc(100vh / 11in)), 1) !important;
+  }
+  /* A pair scales as one sheet. Its two columns are .week-card as well, and left to the
+     rule above they would be scaled a second time inside an already scaled box. */
+  .week-pair .week-card { zoom: 1 !important; }
+  .poster-all .poster { zoom: 1 !important; }
+}
