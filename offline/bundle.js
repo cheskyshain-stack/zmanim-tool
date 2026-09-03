@@ -7541,7 +7541,7 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
    order the days actually run. A poster this table has no entry for is left out rather than
    guessed at. */
 const ONEPAGE_TEXT = {
-  title: 'זמני הימים הנוראים',
+  title: 'ימים נוראים',
   // "ראש השנה - יום א'". Both halves are Hebrew, so a plain hyphen between them needs no
   // isolate: nothing here runs the other way.
   sep: ' - ',
