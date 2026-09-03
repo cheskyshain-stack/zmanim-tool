@@ -5951,6 +5951,24 @@ function shuvaSheetsFor(sheets, hebrewYearNum) {
   });
 }
 
+/** The date שבת שובה falls on, as an Excel serial: the first Shabbos after ר"ה opens, which
+ *  is the same ten days the search above looks through.
+ *
+ *  The poster itself does not use this. It reads its date off the chart week it was built
+ *  from, because the times come from that week's cell and the two must agree. This is for
+ *  ordering the posters by date, which has to be answerable before anything is built and for
+ *  a year that may have no chart saved at all.
+ *
+ *  ר"ה can only open on a Monday, Tuesday, Thursday or Shabbos. A Thursday ר"ה puts שבת שובה
+ *  on 3 תשרי, in front of צום גדליה rather than after it, which is the whole reason the order
+ *  is worked out per year instead of written down once. */
+function shabbosShuvaSerial(hebrewYearNum) {
+  const rh = roshHashana(hebrewYearNum - 3761);
+  // Days from ר"ה to the next Shabbos. Zero would mean ר"ה is itself Shabbos, and the Shabbos
+  // of the ten days is then the one a week later, so an exact hit takes the full seven.
+  return rh + ((7 - excelWeekday(rh)) % 7 || 7);
+}
+
 /** The poster's content for a sheet, or null when that sheet has no שבת שובה in it.
  *
  *  Returns the דרשה's time and the מנחה times as they stand on the board, each knowing
@@ -6106,95 +6124,23 @@ function yearLabel(y) {
  *  its own build() so this table is the only place that knows what a given poster needs. */
 const POSTERS = [
   {
-    key: 'shuva',
-    label: 'שבת שובה דרשה',
-    covers: (y) => `שבת שובה ${hebrewYear(y)}`,
-    // The one Shabbos it is about, read off the week the chart handed back.
-    when: (built) => when(excelSerial(new Date(built.week.date))),
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => buildFromCharts(state, settings, y),
-      }));
-    },
-    render: renderShuvaPoster,
-  },
-  {
-    key: 'roshhashana',
-    label: 'ראש השנה',
-    covers: (y) => `${RH_TEXT.title} ${hebrewYear(y)}`,
-    // ערב ר"ה through the second day, which is every date on the sheet.
+    key: 'slichos',
+    label: 'סליחות',
+    covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}`,
+    // First סליחות morning through ערב יו"כ, the last line on the sheet.
     when: (built) => when(built.span.from, built.span.to),
-    sources: (state, settings) => {
+    starts: (y) => buildSlichosPoster(y)?.span.from ?? null,
+    sources: (state) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
         id: String(y),
         year: y,
         label: yearLabel(y),
         preferred: y === preferred,
-        build: () => ({ poster: buildRoshHashanaPoster(y, settings) }),
+        build: () => ({ poster: buildSlichosPoster(y) }),
       }));
     },
-    render: renderRoshHashanaPoster,
-  },
-  {
-    key: 'tzomgedalia',
-    label: 'צום גדליה',
-    covers: (y) => `${TZG_TEXT.title} ${hebrewYear(y)}`,
-    // One day, so the two ends of the span are the same date.
-    when: (built) => when(built.span.from, built.span.to),
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildTzomGedaliaPoster(y, settings) }),
-      }));
-    },
-    render: renderTzomGedaliaPoster,
-  },
-  {
-    key: 'yomkippur',
-    label: 'יום כיפור',
-    covers: (y) => `${YK_TEXT.title} ${hebrewYear(y)}`,
-    when: (built) => when(built.span.from, built.span.to),
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildYomKippurPoster(y, settings) }),
-      }));
-    },
-    render: renderYomKippurPoster,
-  },
-  {
-    key: 'pair',
-    label: 'ראש השנה ויום כיפור על דף אחד',
-    covers: (y) => `${RH_TEXT.title} ${YK_TEXT.title} ${hebrewYear(y)}`,
-    when: (built) => when(built.span.from, built.span.to),
-    // The one sheet that can be set either way up, so the tab shows an orientation picker
-    // for it and hands the choice to the renderer.
-    orientations: true,
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildPairPoster(y, settings) }),
-      }));
-    },
-    render: renderPairPoster,
+    render: renderSlichosPoster,
   },
   {
     key: 'slichostzom',
@@ -6202,6 +6148,7 @@ const POSTERS = [
     covers: (y) => `${SLICHOS_TEXT.title} ${TZG_TEXT.title} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     orientations: true,
+    starts: (y, settings) => buildSlichosTzomPoster(y, settings)?.span.from ?? null,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -6215,10 +6162,110 @@ const POSTERS = [
     render: renderSlichosTzomPoster,
   },
   {
+    key: 'roshhashana',
+    label: 'ראש השנה',
+    covers: (y) => `${RH_TEXT.title} ${hebrewYear(y)}`,
+    // ערב ר"ה through the second day, which is every date on the sheet.
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildRoshHashanaPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildRoshHashanaPoster(y, settings) }),
+      }));
+    },
+    render: renderRoshHashanaPoster,
+  },
+  {
+    key: 'pair',
+    label: 'ראש השנה ויום כיפור על דף אחד',
+    covers: (y) => `${RH_TEXT.title} ${YK_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    // The one sheet that can be set either way up, so the tab shows an orientation picker
+    // for it and hands the choice to the renderer.
+    orientations: true,
+    starts: (y, settings) => buildPairPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildPairPoster(y, settings) }),
+      }));
+    },
+    render: renderPairPoster,
+  },
+  {
+    key: 'tzomgedalia',
+    label: 'צום גדליה',
+    covers: (y) => `${TZG_TEXT.title} ${hebrewYear(y)}`,
+    // One day, so the two ends of the span are the same date.
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildTzomGedaliaPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildTzomGedaliaPoster(y, settings) }),
+      }));
+    },
+    render: renderTzomGedaliaPoster,
+  },
+  {
+    key: 'shuva',
+    label: 'שבת שובה דרשה',
+    covers: (y) => `שבת שובה ${hebrewYear(y)}`,
+    // The one Shabbos it is about, read off the week the chart handed back.
+    when: (built) => when(excelSerial(new Date(built.week.date))),
+    // From the calendar rather than from that week, because the order has to hold for a year
+    // with no chart saved, where this poster cannot be built at all. Measured against the
+    // charts that are saved: the same date either way.
+    starts: (y) => shabbosShuvaSerial(y),
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => buildFromCharts(state, settings, y),
+      }));
+    },
+    render: renderShuvaPoster,
+  },
+  {
+    key: 'yomkippur',
+    label: 'יום כיפור',
+    covers: (y) => `${YK_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildYomKippurPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildYomKippurPoster(y, settings) }),
+      }));
+    },
+    render: renderYomKippurPoster,
+  },
+  {
     key: 'afteryk',
     label: 'Starting after יום כיפור',
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildAfterYomKippurPoster(y, settings)?.span.from ?? null,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -6231,30 +6278,14 @@ const POSTERS = [
     },
     render: renderAfterYomKippurPoster,
   },
-  {
-    key: 'slichos',
-    label: 'סליחות',
-    covers: (y) => `סליחות through ערב יו"כ ${hebrewYear(y)}`,
-    // First סליחות morning through ערב יו"כ, the last line on the sheet.
-    when: (built) => when(built.span.from, built.span.to),
-    sources: (state) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildSlichosPoster(y) }),
-      }));
-    },
-    render: renderSlichosPoster,
-  },
-  // Last in the list, because it is a way of looking at the others rather than a poster.
+  // Last in the list whatever the dates say, because it is a way of looking at the others
+  // rather than a poster with a date of its own.
   {
     key: 'all',
     label: 'All of them, one after another',
     covers: (y) => `Every poster for ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
+    last: true,
     // The Page picker works here too, and a landscape sheet in a run is turned on its side
     // rather than left out. Chrome puts one page size on a whole PDF, so a run genuinely
     // cannot mix the two: set landscape and printed straight, those 11in sheets went onto
@@ -6276,6 +6307,36 @@ const POSTERS = [
   },
 ];
 
+/** The posters in the order the days actually come, which is the order the picker lists them
+ *  and the order the run prints them.
+ *
+ *  Worked out per year rather than written down once, because two of them change places. ר"ה
+ *  can open on a Monday, Tuesday, Thursday or Shabbos; on a Thursday, 3 תשרי is Shabbos, so
+ *  שבת שובה is that day and צום גדליה is put off to the Sunday behind it. Every other year the
+ *  fast comes first.
+ *
+ *  Each date is asked of the poster itself, so the order cannot drift from what the sheets
+ *  say. Two of them start on the same day as the sheet they are half of, and a stable sort
+ *  leaves those in the order the table above is written: the single sheet, then the pair.
+ *
+ *  A poster that cannot say when it starts keeps its place in the table rather than being
+ *  dropped or thrown to the end. */
+function postersByDate(year, settings) {
+  const at = new Map();
+  POSTERS.forEach((p, i) => {
+    let from = null;
+    try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
+    at.set(p, { from, i, last: Boolean(p.last) });
+  });
+  return [...POSTERS].sort((a, b) => {
+    const x = at.get(a);
+    const y2 = at.get(b);
+    if (x.last !== y2.last) return x.last ? 1 : -1;
+    if (x.from != null && y2.from != null && x.from !== y2.from) return x.from - y2.from;
+    return x.i - y2.i;
+  });
+}
+
 /** Every poster for one year, in the order the picker lists them.
  *
  *  Each is built by its own entry's own source, so this knows nothing about what any of them
@@ -6289,8 +6350,8 @@ const POSTERS = [
 function buildEveryPoster(state, settings, year) {
   const items = [];
   const missing = [];
-  for (const p of POSTERS) {
-    if (p.key === 'all') continue;
+  for (const p of postersByDate(year, settings)) {
+    if (p.last) continue;
     const source = p.sources(state, settings).find((s) => s.year === year);
     let result = null;
     try {
@@ -6821,7 +6882,12 @@ function redrawInPlace(container, state) {
 function renderPosters(container, state, routeChanged) {
   if (routeChanged !== undefined) onRoute = routeChanged;
   const settings = resolveSettings(state.settings);
-  const poster = POSTERS.find((p) => p.key === chosen) || POSTERS[0];
+  // Ordered by date, so the picker and the run both read down the season. Which year's dates
+  // is settled here rather than below, because the order has to be known before the poster is
+  // picked out of it. Every poster's sources are the same list of years and a source id is
+  // that year, so this is the Year picker's answer without having to build anything first.
+  const ordered = postersByDate(Number(chosenSourceId) || posterYears(state).preferred, settings);
+  const poster = ordered.find((p) => p.key === chosen) || ordered[0];
   const sources = poster.sources(state, settings);
   // Opens on the yomim noraim coming up, not on the first year in the list. In אלול the
   // calendar still says last year, and that is the year somebody would print by mistake.
@@ -6837,7 +6903,7 @@ function renderPosters(container, state, routeChanged) {
     <div class="poster-bar no-print">
       <label>Poster
         <select id="poster-pick">
-          ${POSTERS.map((p) => `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+          ${ordered.map((p) => `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
         </select>
       </label>
       <label>Year

@@ -16,7 +16,7 @@
 import { rowFor } from '../sheets/rows.js';
 import { erevPlain, erevTimes } from '../erev-text.js';
 import { SHUVA_NAMES } from '../sheets/common.js';
-import { roshHashana } from '../hebrew-calendar.js';
+import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial } from '../zmanim/solar.js';
 
 /** The lines that are the poster rather than the times: what it is, and who is speaking.
@@ -64,6 +64,24 @@ export function shuvaSheetsFor(sheets, hebrewYearNum) {
     const serial = excelSerial(new Date(week.date));
     return serial > rh && serial < rh + 10;
   });
+}
+
+/** The date שבת שובה falls on, as an Excel serial: the first Shabbos after ר"ה opens, which
+ *  is the same ten days the search above looks through.
+ *
+ *  The poster itself does not use this. It reads its date off the chart week it was built
+ *  from, because the times come from that week's cell and the two must agree. This is for
+ *  ordering the posters by date, which has to be answerable before anything is built and for
+ *  a year that may have no chart saved at all.
+ *
+ *  ר"ה can only open on a Monday, Tuesday, Thursday or Shabbos. A Thursday ר"ה puts שבת שובה
+ *  on 3 תשרי, in front of צום גדליה rather than after it, which is the whole reason the order
+ *  is worked out per year instead of written down once. */
+export function shabbosShuvaSerial(hebrewYearNum) {
+  const rh = roshHashana(hebrewYearNum - 3761);
+  // Days from ר"ה to the next Shabbos. Zero would mean ר"ה is itself Shabbos, and the Shabbos
+  // of the ten days is then the one a week later, so an exact hit takes the full seven.
+  return rh + ((7 - excelWeekday(rh)) % 7 || 7);
 }
 
 /** The poster's content for a sheet, or null when that sheet has no שבת שובה in it.
