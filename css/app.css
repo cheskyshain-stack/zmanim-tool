@@ -2768,12 +2768,23 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    push the page wider and Chrome would tile the print. Out of flow it cannot, and the
    wrapper stays exactly a portrait sheet.
 
-   Rotated about its own centre, and the centres are made to coincide, so an 11in by 8.5in
-   sheet lands centred on the 8.5in by 11in page with nothing hanging off an edge.
-
    A quarter turn anticlockwise, which puts the head of the sheet against the left edge of
    the page. That is the way round a landscape page normally sits in a portrait document:
-   the paper is turned clockwise to read it. */
+   the paper is turned clockwise to read it.
+
+   Turned about its top left corner and then dropped a page's height, rather than about its
+   own centre. The two put the sheet in the same place, and only this one prints.
+
+   A transform is painted, not laid out: the box Chrome paginates by is where the sheet sits
+   before it is turned. Centred, that box starts halfway down the wrapper and is 11in long,
+   so it ran 288px past the foot of the page it belongs to. A box crossing a page boundary is
+   fragmented, a transformed box cannot be, and what came out was the sheet drawn twice over
+   itself with its frame in pieces. From the corner the same sheet lays out 11in wide and
+   8.5in tall at the top of the wrapper, which is inside the page in the direction that
+   matters; the width it overhangs by is horizontal and pagination does not care.
+
+   The order reads right to left: turn first, which swings the sheet up to sit above the
+   page, then translate down its own length to bring it back. */
 .poster-all-item.is-sideways {
   width: 8.5in; height: 11in;
   position: relative; overflow: hidden;
@@ -2781,9 +2792,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   box-shadow: 0 1px 3px rgba(0,0,0,0.18);
 }
 .poster-all-item.is-sideways .poster {
-  position: absolute; top: 50%; left: 50%;
+  position: absolute; top: 0; left: 0;
   margin: 0; box-shadow: none;
-  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: 0 0;
+  transform: translateY(11in) rotate(-90deg);
 }
 
 /* The one poster whose title is an English sentence. */

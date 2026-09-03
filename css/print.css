@@ -234,7 +234,15 @@
   /* A turned sheet is on a portrait page like the rest of the run, so it must not claim the
      landscape one: left to `page: posterland` it would ask for a second page size in a
      document that can only have one, and Chrome would put the whole run on landscape paper.
-     The wrapper keeps the shadow off paper too. */
-  .poster-all-item.is-sideways { box-shadow: none; }
+     The wrapper keeps the shadow off paper too.
+
+     zoom: 1 for the same reason .poster carries it, and it has to be said here as well as
+     there. Fit to screen scales a turned sheet by this wrapper rather than by the sheet
+     inside it, because rotation leaves the sheet's own box 11in wide whatever it looks like
+     (see fitPoster). So the rule that pins .poster to 1 never reached the thing actually
+     carrying the zoom: on a phone the plain sheets came out full size and the turned ones
+     printed at the 0.42 the screen had them at, a small sheet adrift on a letter page.
+     A desktop never showed it, having no zoom to reset. */
+  .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
   .poster-all-item.is-sideways .poster.is-landscape { page: poster; }
 }
