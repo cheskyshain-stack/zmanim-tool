@@ -124,78 +124,65 @@ function nameAndBasis(header) {
   };
 }
 
-/* Which part of the week each column belongs to, and in what order it is read.
+/* The chart's columns in the order the day runs, and where the two zmanim out of the הדלקת
+ * נרות cell go among them.
  *
  * Written out per season rather than taken from the columns table, because the table's own
  * order is the chart's, left to right across a page, and this sheet is read down a day. It is
  * keyed by season because a letter means different things on the two charts: קיץ's ערב שבת
  * מנחה is column L and חורף's is column I, which is the same trap upcoming.js names.
  *
- * H is not here: it is the one cell holding two zmanim, and it is split by hand below so that
- * שקיעה can sit where it belongs in the day rather than where the column order puts it. */
+ * One block, headed שבת, rather than the ערב שבת / שבת / מוצאי שבת it was first written as.
+ * The names in it are the chart's own column headings and they already say which מנין each
+ * one is, so the day headings were saying a second time what the row said, and the whole
+ * Shabbos reads as one list the way the board has always had it. זמני חול keeps its own
+ * heading, being a different set of days.
+ *
+ * `candles` and `shkia` are where the two halves of column H are dropped in, so שקיעה lands
+ * between מנחה מעריב and מעריב the way it does on the ראש השנה sheet rather than above them
+ * where the column order would put it. */
 const SHEET_PLAN = {
-  kayitz: {
-    erev: ['L', 'K', 'J', 'I'],
-    day: ['E', 'D', 'C'],
-    motzei: ['B'],
-    // the מנין that runs into שקיעה, printed after the candles and before שקיעה itself
-    minchaMaariv: 'G',
-    maariv: 'F',
-  },
-  choref: {
-    erev: ['I'],
-    day: ['E', 'D', 'C'],
-    motzei: ['B'],
-    minchaMaariv: 'G',
-    maariv: 'F',
-  },
+  kayitz: { order: ['L', 'K', 'J', 'I', 'candles', 'G', 'shkia', 'F', 'E', 'D', 'C', 'B'] },
+  choref: { order: ['I', 'candles', 'G', 'shkia', 'F', 'E', 'D', 'C', 'B'] },
 };
 
 const SHEET_TEXT = {
-  erev: 'ערב שבת',
-  day: 'שבת',
-  motzei: 'מוצאי שבת',
+  shabbos: 'שבת',
   chol: 'זמני חול',
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
 };
 
-/** The week's four blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings) {
+/** The week's blocks, out of the chart's own cells. */
+function sheetSections(showing, index, state, settings, withChol) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
   if (sheet && SHEET_PLAN[sheet.season]) {
-    const plan = SHEET_PLAN[sheet.season];
     const built = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
     const { row, columns } = built;
     const byKey = new Map(columns.map((c) => [c.key, c]));
-    const rowFor1 = (key) => {
+    // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
+    // candleLightingCell writes it. Split rather than parsed: the second line is the word and
+    // the time together, so the word comes off and the time is what is left.
+    const [candles, shkiaLine] = String(row.H ?? '').split('\n');
+    const one = (key) => {
+      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles);
+      if (key === 'shkia') {
+        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim());
+      }
       const col = byKey.get(key);
       if (!col) return '';
       const { label, sub } = nameAndBasis(col.header);
       return sheetRow(label, row[key], sub);
     };
-    // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
-    // candleLightingCell writes it. Split rather than parsed: the second line is the word and
-    // the time together, so the word comes off and the time is what is left.
-    const [candles, shkiaLine] = String(row.H ?? '').split('\n');
-    const shkia = String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim();
-    out.push([SHEET_TEXT.erev, [
-      ...plan.erev.map(rowFor1),
-      sheetRow(SHEET_TEXT.candles, candles),
-      rowFor1(plan.minchaMaariv),
-      sheetRow(SHEET_TEXT.shkia, shkia),
-      rowFor1(plan.maariv),
-    ]]);
-    out.push([SHEET_TEXT.day, plan.day.map(rowFor1)]);
-    out.push([SHEET_TEXT.motzei, plan.motzei.map(rowFor1)]);
+    out.push([SHEET_TEXT.shabbos, SHEET_PLAN[sheet.season].order.map(one)]);
   }
 
   // The weekday side of the week, the same three the חול card carries. Built from the
   // formulas and then overridden, exactly like the Shabbos row above.
-  const weekday = weekdayChartFor(sheet, showing, state);
-  const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
+  const weekday = withChol && weekdayChartFor(sheet, showing, state);
+  const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     out.push([SHEET_TEXT.chol, [
@@ -223,8 +210,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-export function weekSheetHtml(showing, index, state, settings, title) {
-  const sections = sheetSections(showing, index, state, settings);
+export function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);

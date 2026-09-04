@@ -10019,78 +10019,65 @@ function nameAndBasis(header) {
   };
 }
 
-/* Which part of the week each column belongs to, and in what order it is read.
+/* The chart's columns in the order the day runs, and where the two zmanim out of the הדלקת
+ * נרות cell go among them.
  *
  * Written out per season rather than taken from the columns table, because the table's own
  * order is the chart's, left to right across a page, and this sheet is read down a day. It is
  * keyed by season because a letter means different things on the two charts: קיץ's ערב שבת
  * מנחה is column L and חורף's is column I, which is the same trap upcoming.js names.
  *
- * H is not here: it is the one cell holding two zmanim, and it is split by hand below so that
- * שקיעה can sit where it belongs in the day rather than where the column order puts it. */
+ * One block, headed שבת, rather than the ערב שבת / שבת / מוצאי שבת it was first written as.
+ * The names in it are the chart's own column headings and they already say which מנין each
+ * one is, so the day headings were saying a second time what the row said, and the whole
+ * Shabbos reads as one list the way the board has always had it. זמני חול keeps its own
+ * heading, being a different set of days.
+ *
+ * `candles` and `shkia` are where the two halves of column H are dropped in, so שקיעה lands
+ * between מנחה מעריב and מעריב the way it does on the ראש השנה sheet rather than above them
+ * where the column order would put it. */
 const SHEET_PLAN = {
-  kayitz: {
-    erev: ['L', 'K', 'J', 'I'],
-    day: ['E', 'D', 'C'],
-    motzei: ['B'],
-    // the מנין that runs into שקיעה, printed after the candles and before שקיעה itself
-    minchaMaariv: 'G',
-    maariv: 'F',
-  },
-  choref: {
-    erev: ['I'],
-    day: ['E', 'D', 'C'],
-    motzei: ['B'],
-    minchaMaariv: 'G',
-    maariv: 'F',
-  },
+  kayitz: { order: ['L', 'K', 'J', 'I', 'candles', 'G', 'shkia', 'F', 'E', 'D', 'C', 'B'] },
+  choref: { order: ['I', 'candles', 'G', 'shkia', 'F', 'E', 'D', 'C', 'B'] },
 };
 
 const SHEET_TEXT = {
-  erev: 'ערב שבת',
-  day: 'שבת',
-  motzei: 'מוצאי שבת',
+  shabbos: 'שבת',
   chol: 'זמני חול',
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
 };
 
-/** The week's four blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings) {
+/** The week's blocks, out of the chart's own cells. */
+function sheetSections(showing, index, state, settings, withChol) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
   if (sheet && SHEET_PLAN[sheet.season]) {
-    const plan = SHEET_PLAN[sheet.season];
     const built = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
     const { row, columns } = built;
     const byKey = new Map(columns.map((c) => [c.key, c]));
-    const rowFor1 = (key) => {
+    // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
+    // candleLightingCell writes it. Split rather than parsed: the second line is the word and
+    // the time together, so the word comes off and the time is what is left.
+    const [candles, shkiaLine] = String(row.H ?? '').split('\n');
+    const one = (key) => {
+      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles);
+      if (key === 'shkia') {
+        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim());
+      }
       const col = byKey.get(key);
       if (!col) return '';
       const { label, sub } = nameAndBasis(col.header);
       return sheetRow(label, row[key], sub);
     };
-    // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
-    // candleLightingCell writes it. Split rather than parsed: the second line is the word and
-    // the time together, so the word comes off and the time is what is left.
-    const [candles, shkiaLine] = String(row.H ?? '').split('\n');
-    const shkia = String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim();
-    out.push([SHEET_TEXT.erev, [
-      ...plan.erev.map(rowFor1),
-      sheetRow(SHEET_TEXT.candles, candles),
-      rowFor1(plan.minchaMaariv),
-      sheetRow(SHEET_TEXT.shkia, shkia),
-      rowFor1(plan.maariv),
-    ]]);
-    out.push([SHEET_TEXT.day, plan.day.map(rowFor1)]);
-    out.push([SHEET_TEXT.motzei, plan.motzei.map(rowFor1)]);
+    out.push([SHEET_TEXT.shabbos, SHEET_PLAN[sheet.season].order.map(one)]);
   }
 
   // The weekday side of the week, the same three the חול card carries. Built from the
   // formulas and then overridden, exactly like the Shabbos row above.
-  const weekday = weekdayChartFor(sheet, showing, state);
-  const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
+  const weekday = withChol && weekdayChartFor(sheet, showing, state);
+  const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     out.push([SHEET_TEXT.chol, [
@@ -10118,8 +10105,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-function weekSheetHtml(showing, index, state, settings, title) {
-  const sections = sheetSections(showing, index, state, settings);
+function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);
@@ -10375,13 +10362,19 @@ function rememberCardOrder(value, showing, state, settings) {
  *  and the sheet should still be a sheet afterwards. */
 let pairView = false;
 
-/** Which of the two layouts is on: the two charts, or the week on one sheet.
+/** Which of the three layouts is on: the two charts, the week on one sheet, or that sheet
+ *  without the weekday half.
+ *
+ *  Three points on one axis rather than two questions stacked, which is the same call the
+ *  Posters bar's Sheets switch makes: how much of the week goes on how much paper. A second
+ *  switch asking "with חול or without" would have had a dead position, since two charts is
+ *  already both halves and there is no version of it with one.
  *
  *  Beside pairView rather than in localStorage or the app state, and for the same reason: it
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
- *  congregation's page still shows anybody who does not go looking for the other one. */
-let sheetView = false;
+ *  congregation's page still shows anybody who does not go looking for the others. */
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -11506,12 +11499,14 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
   const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
-  // The same week on one sheet. Built either way, since the switch offering it has to know
-  // whether there is one, and a week with nothing to build comes back empty.
+  // The same week on one sheet, in whichever of the two forms is asked for. Built whatever
+  // the switch says, since the switch offering it has to know whether there is one: a week
+  // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
+  // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings));
-  const sheetAvailable = Boolean(sheetHtml);
-  const onOneSheet = sheetView && sheetAvailable;
+    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+  const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
+  const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
   // rather than width. See setPrintPage for why the document's one page size is set from
   // the view rather than from a named page in the stylesheet.
@@ -11564,8 +11559,12 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
               // both halves of the week to say, and the one-sheet version says them.
               sheetAvailable
                 ? switchHtml('week-layout', 'Layout', [
-                  { value: 'charts', label: 'Two charts', on: !sheetView },
-                  { value: 'sheet', label: 'One sheet', on: sheetView },
+                  { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
+                  { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
+                  // The side beside it says sheet, so this reads as one sheet without חול
+                  // without having to say it, which it has no room to: three sides of a
+                  // switch get 86px of text each on a phone.
+                  { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
             }
@@ -11579,7 +11578,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
               // Neither of them either while the week is on one sheet, which is the same
               // rule again: one sheet is one page, so how many go on a sheet and which
               // comes first are questions it does not raise.
-              cardCount > 1 && !sheetView
+              cardCount > 1 && !onOneSheet
                 ? `${switchHtml('week-pages', 'Pages per sheet', [
                     { value: 'one', label: 'One', on: !pairView },
                     { value: 'two', label: 'Two', on: pairView },
@@ -11763,7 +11762,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
           ?.focus({ preventScroll: true });
       });
   };
-  onSwitch('week-layout', (value) => { sheetView = value === 'sheet'; });
+  onSwitch('week-layout', (value) => { weekLayout = value; });
   onSwitch('week-pages', (value) => { pairView = value === 'two'; });
   onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
 
@@ -11796,8 +11795,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       // The layout the screen is on, week after week. A run that came out as two charts
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
-      const asSheet = sheetView && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings));
+      const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
+        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);

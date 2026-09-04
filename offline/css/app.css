@@ -2678,9 +2678,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    one that failed to finish. A browser that does not know :has() leaves it at the top, which
    is what it did before. */
 .poster.is-weeksheet .onepage-col:has(.onepage-sec:only-child) { justify-content: center; }
-/* The building in the top left corner, which the yomim noraim sheet leaves empty. Sized
-   against the header the wall charts use, which is the header this sheet carries. */
-.poster.is-weeksheet .header-icon { justify-self: start; }
+/* The name, dead centre on the sheet, with the building in the left corner and the rabbi's
+   line in the right one.
+
+   Pinned rather than left to the header's own three column grid, which is the same fix the
+   two-card sheet needed and for the same reason: the two side cells of that grid are equal
+   but their contents are not, and the rabbi's two lines are wider than the building, so the
+   name sat left of centre. Taken out of the flow, the name is centred in the whole row and
+   neither side can push it. */
+.poster.is-weeksheet .header-row { display: block; position: relative; text-align: center; }
+.poster.is-weeksheet .header-center { display: inline-block; }
+.poster.is-weeksheet .header-icon { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+.poster.is-weeksheet .header-rabbi { position: absolute; right: 0; top: 50%; transform: translateY(-50%); text-align: right; }
 
 .calc-section { margin: 2rem 0 0.2rem; font-size: 1.15rem; }
 .calc-section:first-of-type { margin-top: 1.4rem; }

@@ -151,13 +151,19 @@ function rememberCardOrder(value, showing, state, settings) {
  *  and the sheet should still be a sheet afterwards. */
 let pairView = false;
 
-/** Which of the two layouts is on: the two charts, or the week on one sheet.
+/** Which of the three layouts is on: the two charts, the week on one sheet, or that sheet
+ *  without the weekday half.
+ *
+ *  Three points on one axis rather than two questions stacked, which is the same call the
+ *  Posters bar's Sheets switch makes: how much of the week goes on how much paper. A second
+ *  switch asking "with חול or without" would have had a dead position, since two charts is
+ *  already both halves and there is no version of it with one.
  *
  *  Beside pairView rather than in localStorage or the app state, and for the same reason: it
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
- *  congregation's page still shows anybody who does not go looking for the other one. */
-let sheetView = false;
+ *  congregation's page still shows anybody who does not go looking for the others. */
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -1282,12 +1288,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
   const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
-  // The same week on one sheet. Built either way, since the switch offering it has to know
-  // whether there is one, and a week with nothing to build comes back empty.
+  // The same week on one sheet, in whichever of the two forms is asked for. Built whatever
+  // the switch says, since the switch offering it has to know whether there is one: a week
+  // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
+  // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings));
-  const sheetAvailable = Boolean(sheetHtml);
-  const onOneSheet = sheetView && sheetAvailable;
+    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+  const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
+  const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
   // rather than width. See setPrintPage for why the document's one page size is set from
   // the view rather than from a named page in the stylesheet.
@@ -1340,8 +1348,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
               // both halves of the week to say, and the one-sheet version says them.
               sheetAvailable
                 ? switchHtml('week-layout', 'Layout', [
-                  { value: 'charts', label: 'Two charts', on: !sheetView },
-                  { value: 'sheet', label: 'One sheet', on: sheetView },
+                  { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
+                  { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
+                  // The side beside it says sheet, so this reads as one sheet without חול
+                  // without having to say it, which it has no room to: three sides of a
+                  // switch get 86px of text each on a phone.
+                  { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
             }
@@ -1355,7 +1367,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
               // Neither of them either while the week is on one sheet, which is the same
               // rule again: one sheet is one page, so how many go on a sheet and which
               // comes first are questions it does not raise.
-              cardCount > 1 && !sheetView
+              cardCount > 1 && !onOneSheet
                 ? `${switchHtml('week-pages', 'Pages per sheet', [
                     { value: 'one', label: 'One', on: !pairView },
                     { value: 'two', label: 'Two', on: pairView },
@@ -1539,7 +1551,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           ?.focus({ preventScroll: true });
       });
   };
-  onSwitch('week-layout', (value) => { sheetView = value === 'sheet'; });
+  onSwitch('week-layout', (value) => { weekLayout = value; });
   onSwitch('week-pages', (value) => { pairView = value === 'two'; });
   onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
 
@@ -1572,8 +1584,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       // The layout the screen is on, week after week. A run that came out as two charts
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
-      const asSheet = sheetView && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings));
+      const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
+        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);
