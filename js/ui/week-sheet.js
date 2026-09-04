@@ -243,11 +243,15 @@ export function weekSheetHtml(showing, index, state, settings, title, { withChol
   </div>`;
 }
 
-/** Room left at the foot before a size counts as fitting, in the sheet's own pixels. The same
- *  tenth of an inch the yomim noraim sheet leaves itself, and for the same reason: every
- *  device lays a line of type out a little differently, and fitted to the last pixel here some
- *  of them come out a line over there. */
-const WS_ROOM = 11;
+/** Room left over before a size counts as fitting, in the sheet's own pixels.
+ *
+ *  A tenth of an inch at each end, which is why it is twice the yomim noraim sheet's own
+ *  number: that sheet packs its columns from the top and this one centres what is left, so the
+ *  margin is split between the head and the foot and half of it would be half an answer.
+ *
+ *  The reason for having one at all is the same. Every device lays a line of type out a little
+ *  differently, and a sheet fitted to the last pixel here comes out a line over there. */
+const WS_ROOM = 22;
 const WS_MIN = 1;
 const WS_MAX = 3.2;
 
@@ -293,6 +297,9 @@ export function fitWeekSheet(container) {
     // The room is measured at every size, not once at the start. --op-scale sets the title
     // above the columns as well as the rows in them, so growing the type takes room away at
     // the same time as it uses more: measured once at scale 1 the answer came out 12px over.
+    // Fitted with the rows at their own height. What is left over is given to them
+    // afterwards, so it cannot be counted twice.
+    sheet.style.setProperty('--ws-gap', '0px');
     const fits = (scale) => {
       sheet.style.setProperty('--op-scale', scale.toFixed(2));
       const z = zoom();
@@ -310,6 +317,25 @@ export function fitWeekSheet(container) {
       best = s;
     }
     sheet.style.setProperty('--op-scale', best.toFixed(2));
+
+    /* Then the room that is left goes to the rows, so the sheet is spaced out rather than set
+     * solid with the remainder banked at the foot.
+     *
+     * The type can only be grown in steps, and it stops at the last step that fits, so there
+     * is always something left: measured across the season, between 11 and 73px of an eleven
+     * inch page. Spread through the rows it disappears; left where it was it read as a sheet
+     * that had stopped early.
+     *
+     * Capped at nine tenths of a row's own height, which is what a week with little on it
+     * needs: a Yom Tov week is three rows and its share of the leftover would be an inch and
+     * a half a row, a table with holes in it rather than a spaced one. Whatever the cap
+     * leaves over is taken up by the column centring itself. */
+    const z = zoom();
+    const room = cols.getBoundingClientRect().height / z;
+    const used = (last.getBoundingClientRect().bottom - first.getBoundingClientRect().top) / z;
+    const spare = Math.max(0, room - WS_ROOM - used);
+    const rowHeight = used / rows.length;
+    sheet.style.setProperty('--ws-gap', `${Math.min(spare / rows.length, rowHeight * 0.9).toFixed(2)}px`);
     col.style.justifyContent = '';
   }
 }

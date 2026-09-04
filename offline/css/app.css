@@ -2661,23 +2661,26 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    sheet's fifty-nine, so it does not need a second column, and at the size fifteen rows have
    to be set to fill a page a half-width column is too narrow for the names: measured, מנחה
    ערב שבת and ס"ז קר"ש גר"א / מ"א both broke over two lines in it. */
-.poster.is-weeksheet .onepage-cols { display: block; }
+/* Nothing to do to make the one column full width: the base .onepage-cols is already a flex
+   row of stretched columns at flex: 1 1 0, so one child fills it on both axes. It was set to
+   display: block here for a while, which took the height away with the flexing and left the
+   centring below with nothing to centre in: a Yom Tov week's three rows sat high on the sheet
+   rather than in the middle of it. */
 .poster.is-weeksheet .onepage-col {
-  width: 100%;
-  /* Still the two-column flex behaviour, which is what spreads the four blocks down the
-     sheet: the type is grown until it nearly fills (fitWeekSheet) and this takes up what is
-     left, so the last block ends against the foot rather than short of it. */
-  display: flex; flex-direction: column; justify-content: space-between;
+  /* Centred, with what is left over spread through the rows themselves rather than banked at
+     one end: see --ws-gap below. Centring is what is left to do once the rows have taken all
+     the room they should, which is only the sparse weeks. */
+  justify-content: center;
 }
+/* The room left after the type has been grown as far as it will go, given to the rows.
+   Added to their own padding rather than as a margin between them, because each row carries a
+   hairline along its foot: spaced with margins the hairlines would have come away from the
+   rows and floated in the gaps. fitWeekSheet works out how much, and caps it, so three rows on
+   a Yom Tov week do not end up an inch and a half apart. */
+.poster.is-weeksheet .onepage-row { padding-block: calc(0.014in + var(--ws-gap, 0px) / 2); }
 /* No rule down the middle, there being no middle. */
 .poster.is-weeksheet .onepage-col + .onepage-col { border: 0; }
-/* A week whose Shabbos is Yom Tov has no שבת row on any chart, so its sheet is the one
-   זמני חול block and nothing else: three rows, which cannot fill a page at any size a person
-   would want to read. Spreading has nothing to spread against there, and the block sat at the
-   top with half a sheet of nothing under it. Centred it reads as a short sheet rather than as
-   one that failed to finish. A browser that does not know :has() leaves it at the top, which
-   is what it did before. */
-.poster.is-weeksheet .onepage-col:has(.onepage-sec:only-child) { justify-content: center; }
+
 /* The name, dead centre on the sheet, with the building in the left corner and the rabbi's
    line in the right one.
 
