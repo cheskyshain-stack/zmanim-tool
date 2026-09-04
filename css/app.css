@@ -1142,8 +1142,18 @@ body.is-luach .week-cards { align-items: center; }
    on a full sheet: the room goes from 212px to 460px, and the longest of the three runs,
    מעריב at 422px, fits on one line where it did not before. */
 .week-card.is-weekday-card .week-lines-inner { max-width: none; }
-.week-card.is-weekday-card .week-line { display: block; }
-.week-card.is-weekday-card .week-label { display: block; margin-bottom: 0.03in; }
+.week-card.is-weekday-card .week-line { display: block; text-align: center; }
+/* The name set at the size of its own times, not the 13pt it takes on the שבת card. There
+   it labels a column and the times are what is being read; here it heads a block of its
+   own and reading down the sheet is reading the three names, so it cannot be the smaller
+   of the two. Bold with them for the same reason: at one size and two weights the name
+   still gave way to the row underneath it. */
+.week-card.is-weekday-card .week-label { display: block; margin-bottom: 0.03in; font-size: 14pt; font-weight: 700; }
+/* Both centred on the row rather than the name to one edge and the times to the other.
+   Stacked they are one block of two lines, and a name pinned right above times pinned left
+   read as two things that had been left where the two-column layout put them. */
+.week-card.is-weekday-card .week-label,
+.week-card.is-weekday-card .week-time { text-align: center; }
 /* text-wrap: balance so a run that does turn comes out in even lines rather than one full
    line and a remainder: six times that need two lines read 3 and 3, not 4 and 2. A browser
    that does not know the property wraps greedily instead, which is the same lines in a
@@ -1160,9 +1170,7 @@ body.is-luach .week-cards { align-items: center; }
    the non-breaking space in front of the slash holds, and the only place the run can turn
    is after a separator, which is where hideSeparatorsAtLineEnd expects it. */
 .week-card.is-weekday-card .time-mark { display: inline; width: auto; }
-/* Hidden rather than removed, so the line the browser settled on does not move under it:
-   see hideSeparatorsAtLineEnd in ui/week-view.js. */
-.week-sep.is-line-end { visibility: hidden; }
+
 
 /* minmax(0, 1fr) on the sides rather than 1fr: a plain 1fr is a minimum of its content,
    so the rabbi's line widened its own column and pushed the name off the centre line. */

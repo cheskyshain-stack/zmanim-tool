@@ -9988,44 +9988,67 @@ function hangTimeMarkers(root) {
  *  for the row ends "7:20 /" and carries on underneath. With SLASH, which the charts use
  *  and which is non-breaking on both sides, the whole run is one unbreakable word and it
  *  runs off the side of the card instead of wrapping at all. */
+const ACROSS_SEP = '\u00A0/ ';
 function runTimesAcross(root) {
   root.querySelectorAll('br').forEach((br) => {
     const sep = document.createElement('span');
     sep.className = 'week-sep';
-    sep.textContent = '\u00A0/ ';
+    sep.textContent = ACROSS_SEP;
     br.replaceWith(sep);
   });
 }
 
-/** Takes the paint off any separator that a wrap has left sitting at the end of a line.
+/** Turns every separator a wrap has left at the end of a line into the line break itself.
  *
- *  A run that turns ends "7:20 /" and picks up underneath, which reads as though a time
- *  had been left out. The slash is hidden rather than removed: it still occupies the width
- *  it did, so nothing re-wraps and the line the browser chose stays the line that prints.
- *  Taking it out of the flow instead would let the next time up onto the line, which would
- *  strand a different slash, and so on around the loop.
+ *  A run that turns ends "7:20 /" and picks up underneath, which reads as though a time had
+ *  been left out. The separator has to go, and it cannot simply be painted out: the times
+ *  are centred, so a slash left standing invisibly at the end of a line pushes everything
+ *  on that line left by half its width, which is about a quarter of an inch on paper.
+ *
+ *  Nor can it be taken out of the flow, because it *is* the flow: the only place the run
+ *  can turn is the space after a separator, so removing one takes the break opportunity
+ *  with it and welds the two lines into one. So it is replaced by a hard break, which is
+ *  the same break in the same place, minus the slash. Nothing can move up onto the line
+ *  above afterwards: the break above it is no longer a suggestion.
+ *
+ *  The line the browser chose is therefore the line that prints, and every line comes out
+ *  a slash narrower than it measured, never wider.
  *
  *  Run after the fitting, not with the rest of the decoration: which separator lands at a
- *  line end depends on how wide the row is and how big the type ended up, and both of
- *  those are settled by fitLinesToPage and fitPairColumns. */
-function hideSeparatorsAtLineEnd(card) {
+ *  line end depends on how wide the row is and how big the type ended up, and both of those
+ *  are settled by fitLinesToPage and fitPairColumns. Which is also why it starts by undoing
+ *  itself: the pair sheet re-fits the very cards the single sheet already broke, at a size
+ *  of its own, and it has to measure them as they were written rather than as they were
+ *  last laid out. */
+function breakAtLineEnds(card) {
   card.querySelectorAll('.week-time').forEach((cell) => {
+    cell.querySelectorAll('br.week-sep-break').forEach((br) => {
+      const sep = document.createElement('span');
+      sep.className = 'week-sep';
+      sep.textContent = ACROSS_SEP;
+      br.replaceWith(sep);
+    });
     const seps = [...cell.querySelectorAll('.week-sep')];
     if (!seps.length) return;
-    seps.forEach((sep) => sep.classList.remove('is-line-end'));
     // Every box the cell's content paints, separators included, so "the far end of this
     // line" is measured from what is really on the line rather than from the row's width:
     // a balanced wrap ends its lines well short of that.
     const range = document.createRange();
     range.selectNodeContents(cell);
     const rects = [...range.getClientRects()];
+    const ends = [];
     for (const sep of seps) {
       const box = sep.getBoundingClientRect();
       // Overlapping vertically rather than sharing a top: a separator and the digits
       // beside it sit in boxes of different heights.
       const sameLine = rects.filter((r) => r.top < box.bottom - 1 && r.bottom > box.top + 1);
       const end = Math.max(...sameLine.map((r) => r.right), 0);
-      if (box.right >= end - 0.5) sep.classList.add('is-line-end');
+      if (box.right >= end - 0.5) ends.push(sep);
+    }
+    for (const sep of ends) {
+      const br = document.createElement('br');
+      br.className = 'week-sep-break';
+      sep.replaceWith(br);
     }
   });
 }
@@ -10272,7 +10295,7 @@ function fitLinesToPage(container) {
     else heightAt(fits);
   });
   // The scale is settled, so where each line turns is settled with it.
-  container.querySelectorAll('.week-card').forEach((card) => hideSeparatorsAtLineEnd(card));
+  container.querySelectorAll('.week-card').forEach((card) => breakAtLineEnds(card));
 }
 
 /** Sizes the times in each column of the pair sheet.
@@ -10304,7 +10327,7 @@ function fitPairColumns(sheet) {
       else tooBig = mid;
     }
     card.style.setProperty('--fit-scale', fits.toFixed(3));
-    hideSeparatorsAtLineEnd(card);
+    breakAtLineEnds(card);
   });
 }
 
