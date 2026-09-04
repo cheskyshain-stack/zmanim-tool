@@ -7853,8 +7853,21 @@ function fitOnePage(container) {
   }
 }
 
-let chosen = POSTERS[0].key;
-let chosenSourceId = null;
+// Which sheet is on screen, when they are being shown one at a time. Null until something
+// has been picked, which is how a fresh load and a change of occasion both land on the first
+// sheet of the list without this having to know what that is.
+let chosen = null;
+// Whether the whole set is on screen rather than one sheet of it. The run used to be an entry
+// in the picker; it is a switch of its own now, because "all of them" is a different question
+// from "which one" and the answers to it (one page or all pages, two on a page, which way up)
+// are not questions about a poster at all.
+let showAll = false;
+// Which yom tov. One so far, and the picker has one answer, but the posters have been grouped
+// by it from the start and the next set drawn will land in the next group.
+let chosenGroup = null;
+// The year, stepped by the two buttons. Null means the yomim noraim coming up, which is what
+// a fresh load should open on: see posterYears.
+let chosenYear = null;
 // Told to app.js whenever a picker moves, so the choice can go in the address. Held here
 // rather than passed through every redraw, since redrawInPlace calls back in on its own.
 let onRoute = null;
@@ -7871,17 +7884,30 @@ let posterTables = null;
  *  the right answer on a fresh load; carrying a year in the address would mean a link that
  *  goes stale. */
 function posterRoute() {
-  const poster = POSTERS.find((p) => p.key === chosen);
-  return poster?.orientations ? [chosen, chosenOrientation] : [chosen];
+  // The whole set keeps the key the run entry has always had, so a link written before it
+  // became a switch still lands on it.
+  const key = showAll ? POSTERS.find((p) => p.last)?.key : chosen;
+  if (!key) return [];
+  const poster = POSTERS.find((p) => p.key === key);
+  return poster?.orientations ? [key, chosenOrientation] : [key];
 }
 
 /** The other way: set the pickers from the address. Anything unrecognised is left alone,
  *  so an old or hand-typed link falls back to the defaults rather than to nothing. */
 function setPosterRoute(parts = []) {
   const [key, orient] = parts;
-  if (POSTERS.some((p) => p.key === key)) chosen = key;
+  const poster = POSTERS.find((p) => p.key === key);
+  if (poster) {
+    showAll = Boolean(poster.last);
+    // The occasion goes with the sheet, so a link to one of another yom tov's brings its own
+    // heading up with it rather than landing on a list the sheet is not in.
+    if (!poster.last) {
+      chosen = key;
+      chosenGroup = poster.group || POSTER_GROUP_DEFAULT;
+    }
+  }
   if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
-  chosenSourceId = null;
+  chosenYear = null;
   conflictPick = 0;
 }
 // Which way up the one sheet that can go either way is set. Only the pair poster reads it,
@@ -7972,19 +7998,37 @@ function renderPosters(container, state, routeChanged, tables) {
   // is settled here rather than below, because the order has to be known before the poster is
   // picked out of it. Every poster's sources are the same list of years and a source id is
   // that year, so this is the Year picker's answer without having to build anything first.
-  const orderYear = Number(chosenSourceId) || posterYears(state).preferred;
-  const groups = posterGroups(orderYear, settings);
-  const ordered = groups.flatMap((g) => g.items);
-  const poster = ordered.find((p) => p.key === chosen) || ordered[0];
-  // Only the entry that offers both ways of being given everything reads the switch, so
-  // picking another poster does not take its own controls off the bar.
-  const onePage = Boolean(poster.onepage && chosenOnePage);
-  const sources = poster.sources(state, settings);
-  // Opens on the yomim noraim coming up, not on the first year in the list. In אלול the
-  // calendar still says last year, and that is the year somebody would print by mistake.
-  const source = sources.find((s) => s.id === chosenSourceId)
+  /* The year, stepped rather than picked out of a list. It opens on the yomim noraim coming
+     up, not on the calendar's own year: in אלול the calendar still says last year, and that
+     is the year somebody would print by mistake. The list is still what says how far the
+     steps reach, since a year with a chart saved for its שבת שובה is in it whether or not it
+     is one of the ten either side. */
+  const { years, preferred } = posterYears(state);
+  const year = years.includes(chosenYear) ? chosenYear : preferred;
+  const at = years.indexOf(year);
+
+  /* Which occasion, and then which sheet of it. Only the yomim noraim so far, so the picker
+     has one answer; it is there because the posters are already grouped by yom tov and the
+     next set to be drawn will land in it (see POSTER_GROUP_DEFAULT).
+     The nameless group is dropped: it holds the run, which is now the other side of the
+     "one at a time or all of them" switch rather than an entry in the list. */
+  const groups = posterGroups(year, settings).filter((g) => g.name);
+  const group = groups.find((g) => g.name === chosenGroup) || groups[0];
+  const items = group ? group.items : [];
+  const runPoster = POSTERS.find((p) => p.last);
+  const one = items.find((p) => p.key === chosen) || items[0] || null;
+  const poster = showAll ? runPoster : one;
+
+  // Which of the further switches this sheet actually reads. Two on a page and the page's
+  // own way up belong to the run; the run's way up only means something when there is a
+  // sheet in it that can be turned, which is what Two on a page decides.
+  const onePage = Boolean(poster?.onepage && chosenOnePage);
+  const canTurn = Boolean(poster?.orientations) && !onePage && (!poster?.last || chosenCombined);
+
+  const sources = poster ? poster.sources(state, settings) : [];
+  const source = sources.find((s) => s.year === year)
     || sources.find((s) => s.preferred) || sources[0] || null;
-  const result = source ? source.build() : { missing: 'No year to build from.' };
+  const result = poster && source ? source.build() : { missing: 'No year to build from.' };
   const built = result.poster || null;
 
   container.className = 'is-sheet-view';
@@ -7992,42 +8036,53 @@ function renderPosters(container, state, routeChanged, tables) {
     <h2 class="no-print">Posters</h2>
     <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. What changes with the year is worked out rather than typed, so a poster is right the year it is printed and every year after.</p>
     <div class="poster-bar no-print">
-      <label>Poster
+      <div class="poster-year">
+        <span class="poster-year-label" id="poster-year-label">Year</span>
+        <div class="poster-year-step" role="group" aria-labelledby="poster-year-label">
+          <button type="button" id="poster-year-back" aria-label="The year before"
+            ${at <= 0 ? 'disabled' : ''}>&minus;</button>
+          <!-- data-year is the number behind the label, which is written as תשפ״ז and a
+               Gregorian date. aria-live, so a screen reader is told the year changed rather
+               than the page silently becoming a different one. -->
+          <span class="poster-year-now" data-year="${year}" aria-live="polite">${escAttr(yearLabel(year))}</span>
+          <button type="button" id="poster-year-next" aria-label="The year after"
+            ${at >= years.length - 1 ? 'disabled' : ''}>+</button>
+        </div>
+      </div>
+      <label>Special schedules
+        <select id="poster-group">
+          ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="poster-bar-switch">${switchHtml('poster-how', 'Show', [
+        { value: 'one', label: 'One at a time', on: !showAll },
+        { value: 'all', label: 'All of them', on: showAll },
+      ])}</div>
+      ${!showAll ? `<label>Sheet
         <select id="poster-pick">
-          ${(() => {
-            const opts = (items) => items.map((p) =>
-              `<option value="${p.key}" ${p.key === poster.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('');
-            return groups.map((g) => (g.name
-              ? `<optgroup label="${escAttr(g.name)}">${opts(g.items)}</optgroup>`
-              : opts(g.items))).join('');
-          })()}
+          ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
-      </label>
-      <label>Year
-        <select id="poster-source">
-          ${sources.map((s) => `<option value="${escAttr(s.id)}" ${source && s.id === source.id ? 'selected' : ''}>${escAttr(s.label)}</option>`).join('')}
-        </select>
-      </label>
-      ${poster.onepage ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'All of them as', [
-        { value: 'sheets', label: 'Separate sheets', on: !onePage },
+      </label>` : ''}
+      ${showAll ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'All of them as', [
+        { value: 'sheets', label: 'All pages', on: !onePage },
         { value: 'one', label: 'One page', on: onePage },
       ])}</div>` : ''}
-      ${poster.orientations && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Page', [
-        { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
-        { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
-      ])}</div>` : ''}
-      ${poster.last && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'Two on a page', [
+      ${showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'Two on a page', [
         { value: 'yes', label: 'Include', on: chosenCombined },
         { value: 'no', label: 'Leave out', on: !chosenCombined },
+      ])}</div>` : ''}
+      ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Page', [
+        { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
+        { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
       ])}</div>` : ''}
       ${built ? printButtonHtml() : ''}
     </div>
     ${built ? (() => { const w = poster.when(built); return `
       <div class="poster-when no-print">
-        <div class="poster-when-what"${hebrewLang(poster.covers(source.year))}>${escAttr(poster.covers(source.year))}</div>
+        <div class="poster-when-what"${hebrewLang(poster.covers(year))}>${escAttr(poster.covers(year))}</div>
         <div class="poster-when-he" lang="he" dir="rtl">${escAttr(w.he)}</div>
         <div class="poster-when-en">${escAttr(w.en)}</div>
-      </div>`; })() : source ? `<p class="hint no-print">${escAttr(poster.covers(source.year))}</p>` : ''}
+      </div>`; })() : poster ? `<p class="hint no-print">${escAttr(poster.covers(year))}</p>` : ''}
     ${result.conflict
       ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
            <select id="poster-conflict">
@@ -8039,15 +8094,36 @@ function renderPosters(container, state, routeChanged, tables) {
       : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
 
   const again = () => redrawInPlace(container, state);
-  container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
-    chosen = e.target.value;
+  // A year either side, and no further: the buttons at the ends are disabled rather than
+  // wrapping round, so holding one down cannot walk off the list.
+  const step = (by) => {
+    const to = years[at + by];
+    if (to == null) return;
+    chosenYear = to;
+    conflictPick = 0;
+    again();
+  };
+  container.querySelector('#poster-year-back')?.addEventListener('click', () => step(-1));
+  container.querySelector('#poster-year-next')?.addEventListener('click', () => step(1));
+  container.querySelector('#poster-group')?.addEventListener('change', (e) => {
+    chosenGroup = e.target.value;
+    // The sheet chosen belongs to the occasion that was showing, so it is let go of here
+    // rather than left pointing into a list it is not in any more.
+    chosen = null;
     conflictPick = 0;
     onRoute?.();
     again();
   });
-  container.querySelector('#poster-source')?.addEventListener('change', (e) => {
-    chosenSourceId = e.target.value;
+  wireSwitch(container, 'poster-how', (value) => {
+    showAll = value === 'all';
     conflictPick = 0;
+    onRoute?.();
+    again();
+  });
+  container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
+    chosen = e.target.value;
+    conflictPick = 0;
+    onRoute?.();
     again();
   });
   wireSwitch(container, 'poster-orient', (value) => {

@@ -3212,6 +3212,42 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-weight: 700; font-style: normal; color: var(--muted);
 }
 .poster-bar select option { font-weight: 500; color: var(--ink); }
+/* The year, stepped rather than picked out of a list. A poster is almost always this year's
+   or next, and a dropdown of ten made you open a menu and read it to move one. The two
+   buttons sit either side of the year they are moving, so which way each goes needs no
+   label, and the year between them is the answer rather than a thing to be chosen. */
+.poster-year {
+  display: grid; gap: 0.35rem; justify-items: start;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted); letter-spacing: 0.02em;
+}
+.poster-year-step {
+  display: flex; align-items: stretch;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); overflow: hidden;
+}
+.poster-year-step button {
+  /* The Print button's own block padding, so this box is the height of everything else on
+     the row and the bar lines up along its bottom edge. */
+  padding: 0.55rem 0.9rem; border: 0; border-radius: 0;
+  background: transparent; color: var(--ink);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 700; line-height: 1.4;
+  cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease;
+}
+.poster-year-step button:hover:not(:disabled) { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.poster-year-step button:focus-visible {
+  outline: 2px solid var(--ui-accent); outline-offset: -2px;
+}
+/* At the ends of the list. Still there, so the box does not change width when the year
+   reaches one, and plainly not pressable. */
+.poster-year-step button:disabled { color: var(--muted); opacity: 0.45; cursor: default; }
+.poster-year-now {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 11.5rem; padding: 0.55rem 0.4rem;
+  border-inline: 1px solid var(--border);
+  color: var(--ink); font-size: var(--fs-md); font-weight: 600; line-height: 1.4;
+  text-align: center; white-space: nowrap;
+}
+
 /* The one control on this bar that is not a picker: which of the two ways of being given all
    of them is on the screen. A switch rather than a third dropdown, because it is a question
    with two answers and both of them fit: see ui/switch.js.
@@ -3255,4 +3291,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      "Separate sheets" broke over two lines inside a pill the other side did not fill. */
   .poster-bar-switch { justify-items: stretch; }
   .poster-bar-switch .week-switch { width: 100%; }
+  /* The year takes the row like the pickers do, the two buttons at its ends and the year
+     itself filling what is left. */
+  .poster-year { justify-items: stretch; }
+  .poster-year-step { width: 100%; }
+  .poster-year-now { flex: 1; min-width: 0; }
 }
