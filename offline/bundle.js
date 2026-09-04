@@ -7084,8 +7084,8 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
       ? `<p class="hint no-print">Left out, one occasion a sheet: ${escAttr(built.leftOut.join(', '))}</p>`
       : ''}
     ${(built.leftOut || []).length ? '' : `<p class="hint no-print">${sideways
-      ? 'The two sheets that can be set either way up are on their side here, because one print run can only be one page size. They come out whole on the same paper as the rest; turn the sheet to read them.'
-      : 'Set Page to Landscape to have the two sheets that can be set either way up come out that way, turned on their side so they still fit the run.'}</p>`}
+      ? 'The two sheets that carry two schedules are on their side here, because one print run can only be one size of paper. They come out whole on the same paper as the rest; turn the sheet to read them.'
+      : 'Set Paper to Landscape to have the two sheets that carry two schedules come out that way, turned on their side so they still fit the run.'}</p>`}
   </div>`;
 }
 
@@ -8081,9 +8081,9 @@ function renderPosters(container, state, routeChanged, tables) {
   const one = items.find((p) => p.key === chosen) || items[0] || null;
   const poster = showAll ? runPoster : one;
 
-  // Which of the further switches this sheet actually reads. Two on a page and the page's
-  // own way up belong to the run; the run's way up only means something when there is a
-  // sheet in it that can be turned, which is what Two on a page decides.
+  // Which of the further switches this sheet actually reads. The two-in-one sheets and the
+  // paper's own way up belong to the run; the way up only means something when there is a
+  // sheet in the run that can be turned, which is what including them decides.
   const onePage = Boolean(poster?.onepage && chosenOnePage);
   const canTurn = Boolean(poster?.orientations) && !onePage && (!poster?.last || chosenCombined);
 
@@ -8111,29 +8111,29 @@ function renderPosters(container, state, routeChanged, tables) {
             ${at >= years.length - 1 ? 'disabled' : ''}>+</button>
         </div>
       </div>
-      <label>Special schedules
+      <label>Yom tov
         <select id="poster-group">
           ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
         </select>
       </label>
-      <div class="poster-bar-switch">${switchHtml('poster-how', 'Show', [
+      <div class="poster-bar-switch">${switchHtml('poster-how', 'Sheets', [
         { value: 'one', label: 'One at a time', on: !showAll },
         { value: 'all', label: 'All of them', on: showAll },
       ])}</div>
-      ${!showAll ? `<label>Sheet
+      ${!showAll ? `<label>Which sheet
         <select id="poster-pick">
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
-      ${showAll ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'All of them as', [
-        { value: 'sheets', label: 'All pages', on: !onePage },
-        { value: 'one', label: 'One page', on: onePage },
+      ${showAll ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'Lay them out', [
+        { value: 'sheets', label: 'A sheet each', on: !onePage },
+        { value: 'one', label: 'All on one sheet', on: onePage },
       ])}</div>` : ''}
-      ${showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'Two on a page', [
+      ${showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
         { value: 'yes', label: 'Include', on: chosenCombined },
         { value: 'no', label: 'Leave out', on: !chosenCombined },
       ])}</div>` : ''}
-      ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Page', [
+      ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Paper', [
         { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
         { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
       ])}</div>` : ''}
