@@ -18,9 +18,10 @@ import { mergeRow } from '../overrides.js';
 import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, DAY_NAMES, hebrewLang } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
+import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
@@ -149,6 +150,14 @@ function rememberCardOrder(value, showing, state, settings) {
  *  outlive a single render, though, since paging to another week re-renders from scratch
  *  and the sheet should still be a sheet afterwards. */
 let pairView = false;
+
+/** Which of the two layouts is on: the two charts, or the week on one sheet.
+ *
+ *  Beside pairView rather than in localStorage or the app state, and for the same reason: it
+ *  is how you are looking at this week now, not something about the shul. Opening the page
+ *  fresh shows the charts, which is what every device has shown until now and what the
+ *  congregation's page still shows anybody who does not go looking for the other one. */
+let sheetView = false;
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -604,12 +613,11 @@ function hangTimeMarkers(root) {
  *  for the row ends "7:20 /" and carries on underneath. With SLASH, which the charts use
  *  and which is non-breaking on both sides, the whole run is one unbreakable word and it
  *  runs off the side of the card instead of wrapping at all. */
-const ACROSS_SEP = '\u00A0/ ';
 function runTimesAcross(root) {
   root.querySelectorAll('br').forEach((br) => {
     const sep = document.createElement('span');
     sep.className = 'week-sep';
-    sep.textContent = ACROSS_SEP;
+    sep.textContent = SOFT_SLASH;
     br.replaceWith(sep);
   });
 }
@@ -636,12 +644,12 @@ function runTimesAcross(root) {
  *  itself: the pair sheet re-fits the very cards the single sheet already broke, at a size
  *  of its own, and it has to measure them as they were written rather than as they were
  *  last laid out. */
-function breakAtLineEnds(card) {
-  card.querySelectorAll('.week-time').forEach((cell) => {
+function breakAtLineEnds(root, selector = '.week-time') {
+  root.querySelectorAll(selector).forEach((cell) => {
     cell.querySelectorAll('br.week-sep-break').forEach((br) => {
       const sep = document.createElement('span');
       sep.className = 'week-sep';
-      sep.textContent = ACROSS_SEP;
+      sep.textContent = SOFT_SLASH;
       br.replaceWith(sep);
     });
     const seps = [...cell.querySelectorAll('.week-sep')];
@@ -1041,17 +1049,21 @@ let fitPagesHandler = null;
  *  a third size: enough to see the shape of the page and to check it before printing it,
  *  not enough to read the times off. That is the honest cost of looking at a landscape
  *  sheet on a portrait phone, and Back to two pages is right there. */
-function fitSheetToWindow(container) {
+function fitSheetToWindow(container, selector = '.week-pair', after = null) {
   const wrap = container.querySelector('.week-cards');
-  const sheet = wrap?.querySelector('.week-pair');
+  const sheet = wrap?.querySelector(selector);
   if (!sheet) return;
   const apply = () => {
     if (!document.body.contains(sheet)) return;
     sheet.style.removeProperty('zoom');
     const available = wrap.clientWidth;
     const sheetWidth = sheet.getBoundingClientRect().width;
-    if (!available || !sheetWidth || sheetWidth <= available) return;
-    sheet.style.zoom = (available / sheetWidth).toFixed(4);
+    if (available && sheetWidth && sheetWidth > available) {
+      sheet.style.zoom = (available / sheetWidth).toFixed(4);
+    }
+    // Anything that has to be measured with the zoom already on, which is how the one-sheet
+    // view sets its type.
+    after?.();
   };
   apply();
   if (fitPagesHandler) window.removeEventListener('resize', fitPagesHandler);
@@ -1120,6 +1132,22 @@ function decorateCards(root) {
   });
 }
 
+/** What this week is called, on the card and on the one-sheet version alike.
+ *
+ *  A week whose Shabbos is Yom Tov is named for its Yom Tov rather than a parsha, no parsha
+ *  being read that Shabbos. "פרשת סוכות" would be wrong and "סוכות" on its own reads as though
+ *  these were the times for Yom Tov, which they are not: they are the ordinary weekdays around
+ *  it. Named off the label rather than off the missing Shabbos sheet, so the cards, the sheet
+ *  and the chart all say the same thing by the same rule.
+ *
+ *  Its own function rather than a line inside the card builder, since the sheet needs the same
+ *  answer and two places working it out is two places to get it wrong. */
+function weekTitle(showing, index) {
+  const { week } = index.get(showing);
+  const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
+  return isYomTovWeekLabel(week.parsha) ? weekOfLabel(week.parsha, false) : 'פרשת ' + parsha;
+}
+
 /** Both cards for one week, as markup, ready to be dropped into a .week-cards container.
  *
  *  Split out of renderWeek so a week other than the one on screen can be built too: that
@@ -1177,13 +1205,7 @@ function weekCardsHtml(showing, index, state, settings) {
     weekdayLines = parts.join('');
   }
 
-  const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
-  // A week whose Shabbos is Yom Tov is named for its Yom Tov rather than a parsha, no
-  // parsha being read that Shabbos. "פרשת סוכות" would be wrong and "סוכות" on its own
-  // reads as though these were the times for Yom Tov, which they are not: they are the
-  // ordinary weekdays around it. Named off the label rather than off the missing Shabbos
-  // sheet, so the card and the chart say the same thing by the same rule.
-  const cardTitle = isYomTovWeekLabel(week.parsha) ? weekOfLabel(week.parsha, false) : 'פרשת ' + parsha;
+  const cardTitle = weekTitle(showing, index, state, settings);
 
   const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '';
   const weekdayCard = weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '';
@@ -1260,6 +1282,12 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
   const cardCount = (cardsHtml.match(/class="week-card/g) || []).length;
+  // The same week on one sheet. Built either way, since the switch offering it has to know
+  // whether there is one, and a week with nothing to build comes back empty.
+  const sheetHtml = weekSheetHtml(showing, index, state, settings,
+    weekTitle(showing, index, state, settings));
+  const sheetAvailable = Boolean(sheetHtml);
+  const onOneSheet = sheetView && sheetAvailable;
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
   // rather than width. See setPrintPage for why the document's one page size is set from
   // the view rather than from a named page in the stylesheet.
@@ -1303,25 +1331,42 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
             // an empty one.
             sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy text</button>' : ''
           }</div>
-          ${
-            // Both switches, or neither. Each of them is a question about two pages, and a
-            // week that has only one (a Shabbos that is Yom Tov comes through on its
-            // Weekday chart alone) has nothing to lay out beside anything and nothing to
-            // put first. "Which page first" used to show anyway and answered a question
-            // that week did not raise.
-            cardCount > 1
-              ? `<div class="week-switches">
-                  ${switchHtml('week-pages', 'Pages per sheet', [
+          <div class="week-switches">
+            ${
+              // The two layouts. "Two charts" is the שבת chart and the חול chart, each its
+              // own page, which is the week as the boards have always had it; "One sheet"
+              // is the whole week in one list, set the way the yomim noraim sheet is set.
+              // Offered wherever there is a sheet to build: a week with one card still has
+              // both halves of the week to say, and the one-sheet version says them.
+              sheetAvailable
+                ? switchHtml('week-layout', 'Layout', [
+                  { value: 'charts', label: 'Two charts', on: !sheetView },
+                  { value: 'sheet', label: 'One sheet', on: sheetView },
+                ])
+                : ''
+            }
+            ${
+              // Both of these, or neither. Each is a question about two pages, and a week
+              // that has only one (a Shabbos that is Yom Tov comes through on its Weekday
+              // chart alone) has nothing to lay out beside anything and nothing to put
+              // first. "Which page first" used to show anyway and answered a question that
+              // week did not raise.
+              //
+              // Neither of them either while the week is on one sheet, which is the same
+              // rule again: one sheet is one page, so how many go on a sheet and which
+              // comes first are questions it does not raise.
+              cardCount > 1 && !sheetView
+                ? `${switchHtml('week-pages', 'Pages per sheet', [
                     { value: 'one', label: 'One', on: !pairView },
                     { value: 'two', label: 'Two', on: pairView },
                   ])}
                   ${switchHtml('week-order', 'Which page first', [
                     { value: 'shabbos', label: '<bdi lang="he">שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
                     { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
-                  ])}
-                </div>`
-              : ''
-          }
+                  ])}`
+                : ''
+            }
+          </div>
           <div class="week-nav-row week-nav-print">
             <button type="button" id="week-print-rest">Print every week to the end of the season</button>
           </div>
@@ -1342,7 +1387,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           : ''
       }
     </div>
-    <div class="week-cards">${cardsHtml}</div>
+    <div class="week-cards">${onOneSheet ? sheetHtml : cardsHtml}</div>
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -1355,12 +1400,28 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   decorateCards(container);
   fitLinesToPage(container);
 
+  const wrap = container.querySelector('.week-cards');
+  // The week on one sheet is not made of cards, so none of the above touched it. It has one
+  // step of its own: the type is grown until a week's worth of rows fills a page, which is a
+  // different problem from the cards' and is solved where it lives. Everything below this
+  // wires the screen up and applies to all three views, so this branches rather than returns.
+  //
   // Either the two pages as they are, or the pair of them rebuilt as one landscape sheet.
   // The sheet is a real thing on the screen from here on, not something assembled for the
   // length of a print run, so what goes to the printer is whatever is being looked at.
-  const wrap = container.querySelector('.week-cards');
-  const onSheet = pairView && cardCount > 1 && buildPairSheet(wrap);
-  if (onSheet) {
+  const onSheet = !onOneSheet && pairView && cardCount > 1 && buildPairSheet(wrap);
+  if (onOneSheet) {
+    // Scaled to the window first, then the type fitted inside that: see fitWeekSheet for why
+    // round that way. The type is fitted again on every resize for the same reason, since a
+    // window that changes changes the zoom and with it what fits.
+    fitSheetToWindow(container, '.poster.is-weeksheet', () => {
+      fitWeekSheet(container);
+      // Where a run turned, the separator at the end of the line becomes the break. After
+      // the type is settled, since which separator lands at a line end depends on it, and it
+      // only ever takes width away, so a fit made a moment ago still holds.
+      breakAtLineEnds(container, '.onepage-times');
+    });
+  } else if (onSheet) {
     // The columns are a different shape from the cards they came out of, so the times are
     // sized again for them. Before the sheet is scaled to the window, not after: a scale
     // on the sheet changes what the columns measure, and with it left on the same sheet
@@ -1478,6 +1539,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           ?.focus({ preventScroll: true });
       });
   };
+  onSwitch('week-layout', (value) => { sheetView = value === 'sheet'; });
   onSwitch('week-pages', (value) => { pairView = value === 'two'; });
   onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
 
@@ -1507,6 +1569,17 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       const host = document.createElement('div');
       host.className = 'week-cards';
       wrap.appendChild(host);
+      // The layout the screen is on, week after week. A run that came out as two charts
+      // while the screen showed one sheet would be the one place the two could disagree,
+      // and it is the place nobody would check: the run is looked at in the print dialog.
+      const asSheet = sheetView && weekSheetHtml(serial, index, state, settings,
+        weekTitle(serial, index, state, settings));
+      if (asSheet) {
+        host.innerHTML = asSheet;
+        fitWeekSheet(host);
+        breakAtLineEnds(host, '.onepage-times');
+        continue;
+      }
       host.innerHTML = weekCardsHtml(serial, index, state, settings);
       decorateCards(host);
       fitLinesToPage(host);

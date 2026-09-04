@@ -5,6 +5,19 @@
 // narrow - only the sheet's own explicit \n line breaks should ever create a new line.
 export const NBSP = ' ';
 export const SLASH = `${NBSP}/${NBSP}`;
+/** The same separator, but able to turn at the end of a line.
+ *
+ *  SLASH is non-breaking on both sides, which is right in a chart cell: a run of times there
+ *  is broken where the formula says, not where the column runs out. On a sheet that sets a run
+ *  across the page it is wrong twice over. The whole run becomes one unbreakable word, so it
+ *  runs off the side rather than wrapping; and where it does have to wrap there is nowhere to
+ *  do it, so the type cannot be grown to fill the page without spilling.
+ *
+ *  A non-breaking space, a slash, then an ordinary space. The slash is welded to the time in
+ *  front of it and the only place the line can turn is after it, which is the one arrangement
+ *  of the three that cannot strand a slash at the start of a line. A slash left at the end of
+ *  one is turned into the break itself: see breakAtLineEnds in ui/week-view.js. */
+export const SOFT_SLASH = `${NBSP}/ `;
 
 /* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
    order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
