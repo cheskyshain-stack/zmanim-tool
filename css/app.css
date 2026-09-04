@@ -3135,6 +3135,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The times, flush against the left edge of the column. A long run is set as two lines
    rather than wrapped (see onePageLines), and the two are flush with each other so they read
    as one list. */
+/* The key at the foot, under a rule of its own, so the columns are closed at the bottom the
+   way the title closes them at the top. The same 1.5pt gold as the title's, and the spacing
+   is that rule's turned over: 0.1in of air between the columns and the rule, 0.05in between
+   the rule and the words.
+   width: 100% because .poster centres its children and the key is only as wide as its own
+   two lines; the title is full width already, and the two rules have to be the same length
+   or they read as two different marks rather than a pair.
+   margin-top for the air above it, which also replaces the auto that pins the key to the
+   foot: the columns take the free space themselves (flex: 1), so that auto was resolving to
+   nothing anyway. */
+.poster.is-onepage .poster-legend {
+  width: 100%;
+  margin-top: 0.1in;
+  padding-top: 0.05in;
+  border-top: 1.5pt solid var(--op-rule);
+}
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
 /* The slash between one time and the next, on a run long enough to be cut in two. From CSS
