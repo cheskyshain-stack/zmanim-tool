@@ -6981,14 +6981,33 @@ function postersByDate(year, settings) {
   });
 }
 
-/** Which heading a poster sits under in the picker.
+/** The occasions the picker offers, in the order of the year.
  *
- *  Every sheet so far belongs to the yomim noraim, so that is the default and no entry above
- *  has to say it. A poster for another yom tov carries `group: 'סוכות'` (or חנוכה, פורים, פסח,
- *  שבועות) and that is the whole of adding a category: the heading appears, the posters under
- *  it sort by date like everything else, and the headings themselves come out in the order of
- *  the year because that is the order their first sheet falls in. */
-const POSTER_GROUP_DEFAULT = 'ימים נוראים';
+ *  Written out rather than gathered from the sheets that exist, because the picker is meant
+ *  to show the whole year from the start: an occasion with nothing behind it yet still has a
+ *  place in the list, and says so when it is chosen, rather than turning up the week its
+ *  sheets are finished. That way the list is the shul's year and not a report on what has
+ *  been built.
+ *
+ *  Adding sheets to one of them is the whole of filling it in: a poster carries
+ *  `group: 'סוכות'`, its name here already has the place, and the posters under it sort by
+ *  date like everything else. A poster whose group is not in this table still shows, after
+ *  these, so a name typed one way in a poster and another way here cannot lose the sheet. */
+const POSTER_OCCASIONS = [
+  'ראש השנה יום כיפור',
+  'סוכות',
+  'חנוכה',
+  'עשרה בטבת',
+  'פורים',
+  'פסח',
+  'שבועות',
+  'שבעה עשר בתמוז',
+  'תשעה באב',
+];
+
+/** Which heading a poster sits under when it does not name one. Every sheet so far belongs
+ *  to the first occasion, so that is the default and no entry above has to say it. */
+const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
 
 /** The posters cut into those headings, both in date order.
  *
@@ -8080,20 +8099,28 @@ function renderPosters(container, state, routeChanged, tables) {
   const year = years.includes(chosenYear) ? chosenYear : preferred;
   const at = years.indexOf(year);
 
-  /* Which occasion, and then which sheet of it. Only the yomim noraim so far, so the picker
-     has one answer; it is there because the posters are already grouped by yom tov and the
-     next set to be drawn will land in it (see POSTER_GROUP_DEFAULT).
+  /* Which occasion, and then which sheet of it. The whole year is offered whether or not its
+     sheets exist yet, so the list reads as the shul's year rather than as a report on what
+     has been drawn (see POSTER_OCCASIONS). Only the first of them has sheets so far.
      The nameless group is dropped: it holds the run, which is now the other side of the
      "one at a time or all of them" switch rather than an entry in the list. */
-  const groups = posterGroups(year, settings).filter((g) => g.name);
+  const drawn = new Map(posterGroups(year, settings).filter((g) => g.name).map((g) => [g.name, g.items]));
+  const groups = [
+    ...POSTER_OCCASIONS.map((name) => ({ name, items: drawn.get(name) || [] })),
+    ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name)).map(([name, items]) => ({ name, items })),
+  ];
   const group = groups.find((g) => g.name === chosenGroup) || groups[0];
   const items = group ? group.items : [];
+  // An occasion nobody has given times for yet. Everything past the picker is left off: a
+  // Sheets switch over nothing, or a Print button that would hand over a blank page, is a
+  // control that lies about what is there.
+  const empty = items.length === 0;
   const runPoster = POSTERS.find((p) => p.last);
   const one = items.find((p) => p.key === chosen) || items[0] || null;
   // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
   const showAll = chosenSheets !== 'one';
   const onePage = chosenSheets === 'all';
-  const poster = showAll ? runPoster : one;
+  const poster = empty ? null : showAll ? runPoster : one;
 
   // Which of the further switches this sheet actually reads. The two-in-one sheets and the
   // paper's own way up belong to the run; the way up only means something when there is a
@@ -8129,20 +8156,20 @@ function renderPosters(container, state, routeChanged, tables) {
           ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
         </select>
       </label>
-      <div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
+      ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
         { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
         { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
         // The one beside it says sheet, so this reads as all on one sheet without having to
         // say it, which it has no room to: three sides of a switch get 86px of text each on
         // a phone and "All on one sheet" is 105px of it.
         { value: 'all', label: 'All on one', on: chosenSheets === 'all' },
-      ])}</div>
-      ${!showAll ? `<label>Which sheet
+      ])}</div>`}
+      ${!empty && !showAll ? `<label>Which sheet
         <select id="poster-pick">
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
-      ${showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
+      ${!empty && showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
         { value: 'no', label: 'Leave out', on: !chosenCombined },
         { value: 'yes', label: 'Include', on: chosenCombined },
       ])}</div>` : ''}
@@ -8164,9 +8191,11 @@ function renderPosters(container, state, routeChanged, tables) {
              ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${escAttr(chartLabel(b.sheet))}</option>`).join('')}
            </select></p>`
       : ''}
-    ${built
-      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-      : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
+    ${empty
+      ? `<p class="hint no-print">Nothing is drawn for <bdi${hebrewLang(group.name)}>${escAttr(group.name)}</bdi> yet. It is in the list so the whole year is in one place; the sheets follow once the shul's times for it are in, and then this fills in on its own the way <bdi${hebrewLang(POSTER_GROUP_DEFAULT)}>${escAttr(POSTER_GROUP_DEFAULT)}</bdi> does.</p>`
+      : built
+        ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
+        : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
 
   const again = () => redrawInPlace(container, state);
   // A year either side, and no further: the buttons at the ends are disabled rather than
