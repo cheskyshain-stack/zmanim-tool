@@ -6602,7 +6602,11 @@ function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
  *  reordered against what is around it.
  *
  *  `name` is the radio group's name and the stem of every id, so two switches on one page
- *  cannot capture each other's presses. */
+ *  cannot capture each other's presses.
+ *
+ *  Two sides or three. Three is for a question whose answers are one axis rather than a
+ *  yes and a no: the Posters bar asks for one sheet, a sheet each, or all on one, which is
+ *  three points on how much goes on how much paper and not two questions stacked. */
 function switchHtml(name, question, sides) {
   const side = ({ value, label, on }) => `
     <input type="radio" name="${name}" id="${name}-${value}" value="${value}"
@@ -6611,8 +6615,10 @@ function switchHtml(name, question, sides) {
   // The question and the switch are siblings rather than the switch being wrapped in a row
   // of its own, so that switches stacked in a panel can share one grid and line their
   // tracks up with each other. aria-labelledby does not care how they are nested.
+  // is-three when there are three answers rather than two, which is all the thumb needs to
+  // know: it is a third of the track instead of a half, and it has one more place to stop.
   return `<span class="week-switch-label" id="${name}-label">${question}</span>
-    <div class="week-switch" role="radiogroup" aria-labelledby="${name}-label">
+    <div class="week-switch${sides.length > 2 ? ' is-three' : ''}" role="radiogroup" aria-labelledby="${name}-label">
       ${sides.map(side).join('')}
       <span class="week-switch-thumb" aria-hidden="true"></span>
     </div>`;
@@ -6936,10 +6942,10 @@ const POSTERS = [
         preferred: y === preferred,
         // The one-page sheet takes one occasion a sheet: it lays the schedules out itself,
         // so a sheet carrying two of them would put those two on it twice.
-        build: () => buildEveryPoster(state, settings, y, { combined: chosenOnePage ? false : chosenCombined }),
+        build: () => buildEveryPoster(state, settings, y, { combined: chosenSheets === 'all' ? false : chosenCombined }),
       }));
     },
-    render: (built, settings, opts) => (chosenOnePage
+    render: (built, settings, opts) => (chosenSheets === 'all'
       ? renderOnePagePoster(built, settings)
       : renderAllPosters(built, settings, opts)),
   },
@@ -7857,11 +7863,13 @@ function fitOnePage(container) {
 // has been picked, which is how a fresh load and a change of occasion both land on the first
 // sheet of the list without this having to know what that is.
 let chosen = null;
-// Whether the whole set is on screen rather than one sheet of it. The run used to be an entry
-// in the picker; it is a switch of its own now, because "all of them" is a different question
-// from "which one" and the answers to it (one page or all pages, two on a page, which way up)
-// are not questions about a poster at all.
-let showAll = false;
+/* How much is on screen and on how much paper: 'one' is a single sheet, 'each' is every sheet
+   one to a page, 'all' is every one of them on a single sheet.
+   One control rather than two, because there were only ever three answers. It was a pair of
+   switches, which is four boxes, and the fourth was dead: a single sheet has no layout to
+   choose and the second switch went away whenever the first said one. Three points on one
+   axis is what it always was. */
+let chosenSheets = 'one';
 // Which yom tov. One so far, and the picker has one answer, but the posters have been grouped
 // by it from the start and the next set drawn will land in the next group.
 let chosenGroup = null;
@@ -7886,7 +7894,7 @@ let posterTables = null;
 function posterRoute() {
   // The whole set keeps the key the run entry has always had, so a link written before it
   // became a switch still lands on it.
-  const key = showAll ? POSTERS.find((p) => p.last)?.key : chosen;
+  const key = chosenSheets === 'one' ? chosen : POSTERS.find((p) => p.last)?.key;
   if (!key) return [];
   const poster = POSTERS.find((p) => p.key === key);
   return poster?.orientations ? [key, chosenOrientation] : [key];
@@ -7900,14 +7908,16 @@ function setPosterRoute(parts = []) {
   recallBar();
   const [key, orient] = parts;
   const poster = POSTERS.find((p) => p.key === key);
-  if (poster) {
-    showAll = Boolean(poster.last);
+  if (poster?.last) {
+    // A link to the whole set says only that, not which of the two ways of laying it out, so
+    // whichever was left standing is kept.
+    if (chosenSheets === 'one') chosenSheets = 'each';
+  } else if (poster) {
+    chosenSheets = 'one';
+    chosen = key;
     // The occasion goes with the sheet, so a link to one of another yom tov's brings its own
     // heading up with it rather than landing on a list the sheet is not in.
-    if (!poster.last) {
-      chosen = key;
-      chosenGroup = poster.group || POSTER_GROUP_DEFAULT;
-    }
+    chosenGroup = poster.group || POSTER_GROUP_DEFAULT;
   }
   if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
   // The year is not in the address and is not cleared by a change of one: it is the year
@@ -7953,9 +7963,11 @@ function recallBar() {
     if (Number.isFinite(saved.year)) chosenYear = saved.year;
     if (typeof saved.group === 'string') chosenGroup = saved.group;
     if (typeof saved.sheet === 'string') chosen = saved.sheet;
-    if (typeof saved.all === 'boolean') showAll = saved.all;
+    if (['one', 'each', 'all'].includes(saved.sheets)) chosenSheets = saved.sheets;
+    // What the two switches this replaced were remembered as, carried forward so somebody
+    // who left the tab on the run comes back to it rather than to a single sheet.
+    else if (typeof saved.all === 'boolean') chosenSheets = saved.all ? (saved.onePage ? 'all' : 'each') : 'one';
     if (typeof saved.combined === 'boolean') chosenCombined = saved.combined;
-    if (typeof saved.onePage === 'boolean') chosenOnePage = saved.onePage;
     if (saved.orientation === 'portrait' || saved.orientation === 'landscape') {
       chosenOrientation = saved.orientation;
     }
@@ -7967,21 +7979,20 @@ function recallBar() {
 function rememberBar() {
   try {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
-      year: chosenYear, group: chosenGroup, sheet: chosen, all: showAll,
-      combined: chosenCombined, onePage: chosenOnePage, orientation: chosenOrientation,
+      year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
+      combined: chosenCombined, orientation: chosenOrientation,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
   }
 }
-// Whether the run carries the two-on-a-page sheets. Only the run reads it, and it is
-// remembered across a redraw the same way. Not in the address: the orientation is there
-// because it decides what paper comes out, and this only decides how many sheets.
-let chosenCombined = true;
-// Whether "All of them" is the run of sheets or the whole season on one. Held like the two
-// above, and off the address for the same reason: it is a way of looking at what is already
-// chosen rather than a different thing to look at.
-let chosenOnePage = false;
+/* Whether the run carries the two-in-one sheets. Left out by default, and the first of the
+   two sides: one occasion a sheet is the run somebody wants nearly every time, and including
+   them puts two of the schedules on the run twice over, once on their own sheet and once
+   doubled up. Only the run reads it, and it is remembered across a redraw the same way. Not
+   in the address: the orientation is there because it decides what paper comes out, and this
+   only decides how many sheets. */
+let chosenCombined = false;
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -8079,12 +8090,14 @@ function renderPosters(container, state, routeChanged, tables) {
   const items = group ? group.items : [];
   const runPoster = POSTERS.find((p) => p.last);
   const one = items.find((p) => p.key === chosen) || items[0] || null;
+  // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
+  const showAll = chosenSheets !== 'one';
+  const onePage = chosenSheets === 'all';
   const poster = showAll ? runPoster : one;
 
   // Which of the further switches this sheet actually reads. The two-in-one sheets and the
   // paper's own way up belong to the run; the way up only means something when there is a
   // sheet in the run that can be turned, which is what including them decides.
-  const onePage = Boolean(poster?.onepage && chosenOnePage);
   const canTurn = Boolean(poster?.orientations) && !onePage && (!poster?.last || chosenCombined);
 
   const sources = poster ? poster.sources(state, settings) : [];
@@ -8116,22 +8129,22 @@ function renderPosters(container, state, routeChanged, tables) {
           ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
         </select>
       </label>
-      <div class="poster-bar-switch">${switchHtml('poster-how', 'Sheets', [
-        { value: 'one', label: 'One at a time', on: !showAll },
-        { value: 'all', label: 'All of them', on: showAll },
+      <div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
+        { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
+        { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
+        // The one beside it says sheet, so this reads as all on one sheet without having to
+        // say it, which it has no room to: three sides of a switch get 86px of text each on
+        // a phone and "All on one sheet" is 105px of it.
+        { value: 'all', label: 'All on one', on: chosenSheets === 'all' },
       ])}</div>
       ${!showAll ? `<label>Which sheet
         <select id="poster-pick">
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
-      ${showAll ? `<div class="poster-bar-switch">${switchHtml('poster-onepage', 'Lay them out', [
-        { value: 'sheets', label: 'A sheet each', on: !onePage },
-        { value: 'one', label: 'All on one sheet', on: onePage },
-      ])}</div>` : ''}
       ${showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
-        { value: 'yes', label: 'Include', on: chosenCombined },
         { value: 'no', label: 'Leave out', on: !chosenCombined },
+        { value: 'yes', label: 'Include', on: chosenCombined },
       ])}</div>` : ''}
       ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Paper', [
         { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
@@ -8178,8 +8191,8 @@ function renderPosters(container, state, routeChanged, tables) {
     onRoute?.();
     again();
   });
-  wireSwitch(container, 'poster-how', (value) => {
-    showAll = value === 'all';
+  wireSwitch(container, 'poster-sheets', (value) => {
+    chosenSheets = value;
     conflictPick = 0;
     rememberBar();
     onRoute?.();
@@ -8200,11 +8213,6 @@ function renderPosters(container, state, routeChanged, tables) {
   });
   wireSwitch(container, 'poster-combined', (value) => {
     chosenCombined = value === 'yes';
-    rememberBar();
-    again();
-  });
-  wireSwitch(container, 'poster-onepage', (value) => {
-    chosenOnePage = value === 'one';
     rememberBar();
     again();
   });

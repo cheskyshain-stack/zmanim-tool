@@ -952,8 +952,16 @@ td.ruled .cell { background: var(--ruled); }
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 /* input:last-of-type is the second of the two radios, whatever the switch is called. Named
-   that way rather than by id so one rule serves both switches in the panel. */
-.week-switch:has(.week-switch-radio:last-of-type:checked) .week-switch-thumb { transform: translateX(100%); }
+   that way rather than by id so one rule serves both switches in the panel.
+   :not(.is-three) because on a three-way the last radio is the third, and this would slide
+   the thumb to the middle for it. The three-way has its own two rules below. */
+.week-switch:not(.is-three):has(.week-switch-radio:last-of-type:checked) .week-switch-thumb { transform: translateX(100%); }
+/* Three answers: a third of the track, and one more place for it to stop. Counted by
+   nth-of-type rather than by id, the same way the two-way rule is, so it serves any
+   three-way switch. */
+.week-switch.is-three .week-switch-thumb { width: calc(33.3333% - 2px); }
+.week-switch.is-three:has(.week-switch-radio:nth-of-type(2):checked) .week-switch-thumb { transform: translateX(100%); }
+.week-switch.is-three:has(.week-switch-radio:nth-of-type(3):checked) .week-switch-thumb { transform: translateX(200%); }
 /* :has() is what moves the thumb, and where it is missing the thumb would sit under the
    left-hand side for ever, saying the opposite of the truth half the time. So where it is
    missing there is no thumb at all and the chosen side is filled in directly. */
@@ -3281,6 +3289,15 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    than everything else on the row. The bar wraps to a second line sooner for it, which is
    what a bar of controls should do. */
 .poster-bar-switch .week-switch-side { min-width: 8rem; white-space: nowrap; }
+/* Three sides cannot each have the 8rem two get: that is 384px of track on a phone with
+   346px of bar. 6.5rem instead, which is 3 x 104 plus the track's own 6px = 318px and fits
+   with room to spare. Taking the floor off altogether was the first try and left the sides
+   at the width of their own words, which on a desktop is a pill with the labels pressed
+   against each other and against the thumb.
+   On a phone the switch is the full width of the bar and the three share 113px each, over
+   the floor, which leaves 86px of text once the padding is off. The longest of the three
+   labels is "A sheet each" at 84px, which is why the third one cannot say "sheet" too. */
+.poster-bar-switch .week-switch.is-three .week-switch-side { min-width: 6.5rem; }
 
 /* The same switch in Settings, where a question with two answers was a dropdown too.
    .form-grid label is written for the form's own fields and would reach the switch's two

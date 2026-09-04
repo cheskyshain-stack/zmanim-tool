@@ -28,7 +28,11 @@
  *  reordered against what is around it.
  *
  *  `name` is the radio group's name and the stem of every id, so two switches on one page
- *  cannot capture each other's presses. */
+ *  cannot capture each other's presses.
+ *
+ *  Two sides or three. Three is for a question whose answers are one axis rather than a
+ *  yes and a no: the Posters bar asks for one sheet, a sheet each, or all on one, which is
+ *  three points on how much goes on how much paper and not two questions stacked. */
 export function switchHtml(name, question, sides) {
   const side = ({ value, label, on }) => `
     <input type="radio" name="${name}" id="${name}-${value}" value="${value}"
@@ -37,8 +41,10 @@ export function switchHtml(name, question, sides) {
   // The question and the switch are siblings rather than the switch being wrapped in a row
   // of its own, so that switches stacked in a panel can share one grid and line their
   // tracks up with each other. aria-labelledby does not care how they are nested.
+  // is-three when there are three answers rather than two, which is all the thumb needs to
+  // know: it is a third of the track instead of a half, and it has one more place to stop.
   return `<span class="week-switch-label" id="${name}-label">${question}</span>
-    <div class="week-switch" role="radiogroup" aria-labelledby="${name}-label">
+    <div class="week-switch${sides.length > 2 ? ' is-three' : ''}" role="radiogroup" aria-labelledby="${name}-label">
       ${sides.map(side).join('')}
       <span class="week-switch-thumb" aria-hidden="true"></span>
     </div>`;
