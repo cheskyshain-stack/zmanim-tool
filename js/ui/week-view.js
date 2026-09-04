@@ -590,6 +590,62 @@ function hangTimeMarkers(root) {
   }
 }
 
+/** Turns a stacked column of times into one run that reads across the row.
+ *
+ *  The weekday card puts the name of the minyan on a line of its own and the times on the
+ *  line under it, left to right. Everything above still builds the column first, one time
+ *  to a line, because that is where the reflowing, the trimming and the marks all live and
+ *  none of them cares which direction the result is read in. This is the last step and it
+ *  only swaps the breaks for separators.
+ *
+ *  The separator is a non-breaking space, a slash, then an ordinary space. That is the one
+ *  arrangement of the three that breaks in a sensible place: the slash is welded to the
+ *  time in front of it and the only place the line can turn is after it, so a run too wide
+ *  for the row ends "7:20 /" and carries on underneath. With SLASH, which the charts use
+ *  and which is non-breaking on both sides, the whole run is one unbreakable word and it
+ *  runs off the side of the card instead of wrapping at all. */
+function runTimesAcross(root) {
+  root.querySelectorAll('br').forEach((br) => {
+    const sep = document.createElement('span');
+    sep.className = 'week-sep';
+    sep.textContent = '\u00A0/ ';
+    br.replaceWith(sep);
+  });
+}
+
+/** Takes the paint off any separator that a wrap has left sitting at the end of a line.
+ *
+ *  A run that turns ends "7:20 /" and picks up underneath, which reads as though a time
+ *  had been left out. The slash is hidden rather than removed: it still occupies the width
+ *  it did, so nothing re-wraps and the line the browser chose stays the line that prints.
+ *  Taking it out of the flow instead would let the next time up onto the line, which would
+ *  strand a different slash, and so on around the loop.
+ *
+ *  Run after the fitting, not with the rest of the decoration: which separator lands at a
+ *  line end depends on how wide the row is and how big the type ended up, and both of
+ *  those are settled by fitLinesToPage and fitPairColumns. */
+function hideSeparatorsAtLineEnd(card) {
+  card.querySelectorAll('.week-time').forEach((cell) => {
+    const seps = [...cell.querySelectorAll('.week-sep')];
+    if (!seps.length) return;
+    seps.forEach((sep) => sep.classList.remove('is-line-end'));
+    // Every box the cell's content paints, separators included, so "the far end of this
+    // line" is measured from what is really on the line rather than from the row's width:
+    // a balanced wrap ends its lines well short of that.
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    const rects = [...range.getClientRects()];
+    for (const sep of seps) {
+      const box = sep.getBoundingClientRect();
+      // Overlapping vertically rather than sharing a top: a separator and the digits
+      // beside it sit in boxes of different heights.
+      const sameLine = rects.filter((r) => r.top < box.bottom - 1 && r.bottom > box.top + 1);
+      const end = Math.max(...sameLine.map((r) => r.right), 0);
+      if (box.right >= end - 0.5) sep.classList.add('is-line-end');
+    }
+  });
+}
+
 /** The text node immediately before `node` in reading order, without crossing a line
  *  break or leaving `root`. Returns null at either boundary. */
 function previousTextNode(from, root) {
@@ -767,6 +823,14 @@ function cardHtml(title, linesHtml, settings, kind = '') {
  *  print stylesheet and measure against that, which was fragile and got the answer wrong
  *  twice. */
 const MAX_GROW = 1.6; // past this the times are billboard-sized rather than well set
+// The weekday card is allowed further, because it is a different shape of page. It holds
+// three names and their times, and once the times run across the row instead of down it
+// the whole list is four inches of an eleven inch sheet: at 1.6 it stopped halfway and
+// left the bottom half of the paper blank, which is the very thing MAX_GROW was raised
+// from 1.0 to prevent. It is not billboard type at 2.3 either, because the growth is
+// spent on a list of three rather than on eleven.
+const MAX_GROW_ACROSS = 2.6;
+const growCapFor = (card) => (card.classList.contains('is-weekday-card') ? MAX_GROW_ACROSS : MAX_GROW);
 
 function fitLinesToPage(container) {
   container.querySelectorAll('.week-card').forEach((card) => {
@@ -790,18 +854,41 @@ function fitLinesToPage(container) {
     // measure by the same factor cancels that: the type grows, the block stays put.
     //
     // A constant width and bigger type can push a line into wrapping, which makes the
-    // block taller than the growth assumed, so the result is measured and eased back
-    // until it really fits rather than trusted first time.
-    let grow = Math.min(byHeight, MAX_GROW);
-    for (let i = 0; i < 8 && grow > 1.02; i++) {
-      card.style.setProperty('--fit-scale', grow.toFixed(3));
-      card.style.setProperty('--fit-width', grow.toFixed(3));
-      if (inner.scrollHeight * grow <= room) return;
-      grow -= 0.05;
+    // block taller than the growth assumed, so the result is measured rather than trusted
+    // first time.
+    //
+    // Searched for by halving, the way fitPairColumns does it, rather than eased down in
+    // steps of a twentieth. The steps were enough while the ratio never asked for much:
+    // eight of them cover four tenths, and a card that wanted three times its size was
+    // still over the edge when they ran out, at which point this gave up and printed at
+    // 1.0, smaller than the too-big answer it had already measured. Halving cannot run
+    // out: taller type in a fixed measure is always taller on the paper, so there is one
+    // crossing point and nine tries land within a thousandth of it.
+    const clear = () => {
+      card.style.removeProperty('--fit-scale');
+      card.style.removeProperty('--fit-width');
+    };
+    const heightAt = (scale) => {
+      card.style.setProperty('--fit-scale', scale.toFixed(3));
+      card.style.setProperty('--fit-width', scale.toFixed(3));
+      // scrollHeight is in the block's own space, which zoom then scales onto the paper.
+      return inner.scrollHeight * scale;
+    };
+    const cap = Math.min(byHeight, growCapFor(card));
+    if (cap <= 1.02) return;
+    if (heightAt(cap) <= room) return;
+    let fits = 1;
+    let tooBig = cap;
+    for (let i = 0; i < 9; i++) {
+      const mid = (fits + tooBig) / 2;
+      if (heightAt(mid) <= room) fits = mid;
+      else tooBig = mid;
     }
-    card.style.removeProperty('--fit-scale');
-    card.style.removeProperty('--fit-width');
+    if (fits <= 1.02) clear();
+    else heightAt(fits);
   });
+  // The scale is settled, so where each line turns is settled with it.
+  container.querySelectorAll('.week-card').forEach((card) => hideSeparatorsAtLineEnd(card));
 }
 
 /** Sizes the times in each column of the pair sheet.
@@ -824,7 +911,7 @@ function fitPairColumns(sheet) {
     const room = box.clientHeight;
     if (!room) return;
     let fits = 0.5;
-    let tooBig = MAX_GROW;
+    let tooBig = growCapFor(card);
     for (let i = 0; i < 9; i++) {
       const mid = (fits + tooBig) / 2;
       card.style.setProperty('--fit-scale', mid.toFixed(3));
@@ -833,6 +920,7 @@ function fitPairColumns(sheet) {
       else tooBig = mid;
     }
     card.style.setProperty('--fit-scale', fits.toFixed(3));
+    hideSeparatorsAtLineEnd(card);
   });
 }
 
@@ -984,16 +1072,26 @@ function decorateCards(root) {
     // It was three. Two makes the pairs plain and, with sizesFor putting the short line
     // first, leaves any odd time at the top of the block rather than trailing off the
     // bottom: seven comes out 1, 2, 2, 2.
-    const perLine = card.classList.contains('is-weekday-card') ? 1 : 2;
+    const acrossCard = card.classList.contains('is-weekday-card');
+    const perLine = acrossCard ? 1 : 2;
     card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     const cells = [...card.querySelectorAll('.week-time')];
     cells.forEach((el) => trimSpaceAtLineStart(el));
     // One colon axis for the whole card rather than one per row, except where a single long
     // hour would be the only thing on it: see cardShouldStandFlush.
-    if (cells.some((el) => hasTwoDigitHourAtLineStart(el)) && !cardShouldStandFlush(cells)) {
+    //
+    // Not on the weekday card at all: its times are about to be run across the row rather
+    // than stacked in a column, and there is no column for a colon to line up in. Left on,
+    // the padding that squares up 7:00 under 10:00 came out as a gap in front of one time
+    // in the middle of a line and nowhere else.
+    if (!acrossCard && cells.some((el) => hasTwoDigitHourAtLineStart(el)) && !cardShouldStandFlush(cells)) {
       cells.forEach((el) => alignColons(el));
     }
     cells.forEach((el) => hangTimeMarkers(el));
+    // Last, so the marks are already in their spans: the separator carries no time and
+    // the pass that finds them would not look at it either way, but a step that rewrites
+    // the line is easier to reason about at the end than in the middle.
+    if (acrossCard) cells.forEach((el) => runTimesAcross(el));
     // After the marks exist, so the key can be built from what is really on the card.
     fillLegend(card);
   });

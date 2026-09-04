@@ -1129,6 +1129,41 @@ body.is-luach .week-cards { align-items: center; }
    wall chart. Here they are separate labelled rows, so the size difference says nothing. */
 .week-card .big { font-size: inherit; }
 
+/* The weekday card reads the other way round: the name of the minyan on a line of its own
+   and its times across the row underneath, rather than a name on the right with a column
+   of times facing it. Three minyanim against a whole sheet is what makes that possible.
+   The שבת card has eleven rows and no room to give any of them two lines, so it keeps the
+   two columns.
+
+   The block goes full width here, where the שבת card holds it to 3.6in. That measure is
+   there to stop a name and a time drifting to opposite edges of the page with a hand's
+   width of nothing between them, which is a two-column problem: stacked, the times want
+   the whole row so that a run of six fits on one line instead of turning early. Measured
+   on a full sheet: the room goes from 212px to 460px, and the longest of the three runs,
+   מעריב at 422px, fits on one line where it did not before. */
+.week-card.is-weekday-card .week-lines-inner { max-width: none; }
+.week-card.is-weekday-card .week-line { display: block; }
+.week-card.is-weekday-card .week-label { display: block; margin-bottom: 0.03in; }
+/* text-wrap: balance so a run that does turn comes out in even lines rather than one full
+   line and a remainder: six times that need two lines read 3 and 3, not 4 and 2. A browser
+   that does not know the property wraps greedily instead, which is the same lines in a
+   worse order and never a line off the card. */
+.week-card.is-weekday-card .week-time { text-wrap: balance; }
+/* The stars are hung in a box of no width so they cannot push a time out of its column.
+   There is no column here and nothing under a time to line it up with, so a hung star
+   would simply be printed over the separator that follows it.
+
+   Plain inline, not an inline-block of its own width. An inline-block is an atomic box and
+   Chrome will turn a line after one whatever is written next to it, non-breaking space
+   included: on the two-to-a-sheet view שחרית came out "7:00 / 7:20*" and then a line
+   beginning "/ 7:35", the separator having been carried over on its own. As inline text
+   the non-breaking space in front of the slash holds, and the only place the run can turn
+   is after a separator, which is where hideSeparatorsAtLineEnd expects it. */
+.week-card.is-weekday-card .time-mark { display: inline; width: auto; }
+/* Hidden rather than removed, so the line the browser settled on does not move under it:
+   see hideSeparatorsAtLineEnd in ui/week-view.js. */
+.week-sep.is-line-end { visibility: hidden; }
+
 /* minmax(0, 1fr) on the sides rather than 1fr: a plain 1fr is a minimum of its content,
    so the rabbi's line widened its own column and pushed the name off the centre line. */
 .week-card .header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
