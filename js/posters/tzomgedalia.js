@@ -111,14 +111,15 @@ export function buildTzomGedaliaPoster(year, settings) {
   return {
     hebrewYear: year,
     span: { from: serial, to: serial },
+    // `calc` names the rule behind each block, for the Calculations page.
     sets: [
-      { head: TZG_TEXT.shacharis, lines: [shacharis] },
-      { head: TZG_TEXT.mincha, lines: [mincha] },
+      { calc: 'shacharis', head: TZG_TEXT.shacharis, lines: [shacharis] },
+      { calc: 'mincha', head: TZG_TEXT.mincha, lines: [mincha] },
       // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
       // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
       // name and the time together.
-      { note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
-      { head: TZG_TEXT.maariv, lines: [maariv] },
+      { calc: 'shkia', note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
+      { calc: 'maariv', head: TZG_TEXT.maariv, lines: [maariv] },
     ],
     // The day's מנינים, for the congregation's "what is on next". Nothing on the printed
     // sheet reads this.

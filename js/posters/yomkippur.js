@@ -278,32 +278,36 @@ export function buildYomKippurPoster(year, settings) {
   const motzei60 = ykShkia + 60 * YK_MIN;
   const neila = ykNear5(motzei60 - 110 * YK_MIN);   // 1:50 before the 60 minute מעריב
 
+  // `calc` names the rule behind the line, for the Calculations page: מעריב is on this
+  // sheet three times over with a different rule each time, and שחרית twice, so the page
+  // keys its prose on this rather than on the label.
   const dayLines = [
-    line(YK_TEXT.candles, [tm(candles)]),
-    line(YK_TEXT.shkia, [tm(erevShkia)]),
-    line(YK_TEXT.kolNidrei, [tm(kolNidrei)]),
-    line(YK_TEXT.drasha, [tm(ykNear5(nightMaariv - 30 * YK_MIN))]),
-    line(YK_TEXT.maariv, [tm(nightMaariv)]),
+    line(YK_TEXT.candles, [tm(candles)], { calc: 'candles' }),
+    line(YK_TEXT.shkia, [tm(erevShkia)], { calc: 'erevShkia' }),
+    line(YK_TEXT.kolNidrei, [tm(kolNidrei)], { calc: 'kolNidrei' }),
+    line(YK_TEXT.drasha, [tm(ykNear5(nightMaariv - 30 * YK_MIN))], { calc: 'nightDrasha' }),
+    line(YK_TEXT.maariv, [tm(nightMaariv)], { calc: 'nightMaariv' }),
     line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
-      { extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
+      { calc: 'shacharis', extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
     line(YK_TEXT.krias.name,
       [tm(Z.sofZmanShmaMGA72(yk, settings)), tm(Z.sofZmanShmaGRA(yk, settings))],
-      { sub: YK_TEXT.krias.basis }),
-    line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)]),
-    line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)]),   // 1:50 before נעילה
-    line(YK_TEXT.drashaBeforeNeila, []),
-    line(YK_TEXT.neila, [tm(neila)]),
+      { calc: 'krias', sub: YK_TEXT.krias.basis }),
+    line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)], { calc: 'yizkor' }),
+    line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)], { calc: 'dayMincha' }),   // 1:50 before נעילה
+    line(YK_TEXT.drashaBeforeNeila, [], { calc: 'drashaBeforeNeila' }),
+    line(YK_TEXT.neila, [tm(neila)], { calc: 'neila' }),
     // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
     // time מעריב.
-    line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)]),
-    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times)),
+    line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)], { calc: 'motzeiMaariv' }),
+    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times), { calc: 'maarivGimmel' }),
     line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
-      { sep: YK_AMP }),
+      { calc: 'kiddushLevana', sep: YK_AMP }),
   ];
 
   // The morning after, which the calendar names and which runs five minutes early.
   const dayAfter = rh + 10;
   const nextMorning = {
+    calc: 'nextMorning',
     label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
     times: fiveEarlier(everydayShacharis(settings)),
   };
@@ -371,8 +375,8 @@ export function buildYomKippurPoster(year, settings) {
     // Both are lists of מנינים rather than one זמן given two ways, so they are set with
     // commas; see the renderer.
     erevLines: [
-      line(YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), { list: true }),
-      line(YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), { list: true }),
+      line(YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), { calc: 'erevShacharis', list: true }),
+      line(YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), { calc: 'erevMincha', list: true }),
     ],
     dayLines,
     nextMorning,

@@ -90,6 +90,10 @@ export function buildRoshHashanaPoster(year, settings) {
   const days = [dateFromSerial(rh), dateFromSerial(rh + 1)];
   const shabbosDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_SHABBOS);
 
+  // `calc` names the rule behind the line, for the Calculations page. A label cannot do
+  // it: מנחה, שקיעה and מעריב each appear more than once on this sheet with a different
+  // rule each time, and the page keys its prose on this instead so it cannot describe the
+  // wrong one, or quietly miss a line that was added.
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
   const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
   const at = (t) => [tm(t)];
@@ -122,11 +126,11 @@ export function buildRoshHashanaPoster(year, settings) {
     const lines = [];
     // The night that opens the day. הדלקת נרות only on the first, since the second day's
     // candles are lit from an existing flame and the sheets have never printed a time.
-    if (i === 0) lines.push(line(RH_TEXT.candles, at(shkia - settings.candleLightingMinutes * RH_MIN)));
-    if (i === 0) lines.push(line(RH_TEXT.mincha, at(shkia - 15 * RH_MIN)));
-    lines.push(line(RH_TEXT.shkia, at(shkia)));
-    if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN))));
-    lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN)));
+    if (i === 0) lines.push(line(RH_TEXT.candles, at(shkia - settings.candleLightingMinutes * RH_MIN), { calc: 'candles' }));
+    if (i === 0) lines.push(line(RH_TEXT.mincha, at(shkia - 15 * RH_MIN), { calc: 'nightMincha' }));
+    lines.push(line(RH_TEXT.shkia, at(shkia), { calc: 'nightShkia' }));
+    if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN)), { calc: 'nightDrasha' }));
+    lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN), { calc: 'nightMaariv' }));
     // These two are on the evening that opens the day, which is the day before it: under
     // "יום א'" that is ערב ר"ה, under "יום ב'" the first day. Getting that wrong is the one
     // way this could be a whole day out, so it is taken from the same `night` the שקיעה
@@ -139,17 +143,18 @@ export function buildRoshHashanaPoster(year, settings) {
     // המלך rides on the שחרית line as a second label and time, not as one run of text, so
     // it gets the same gap between word and time that every other row has.
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
-      { extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { sub: RH_TEXT.krias.basis }));
+      { calc: 'shacharis',
+        extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
+    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { calc: 'krias', sub: RH_TEXT.krias.basis }));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
     if (isShabbos) {
-      lines.push(line(RH_TEXT.drashaBeforeMusaf, []));
-      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { sub: RH_TEXT.nineHours.basis }));
+      lines.push(line(RH_TEXT.drashaBeforeMusaf, [], { calc: 'drashaBeforeMusaf' }));
+      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { calc: 'nineHours', sub: RH_TEXT.nineHours.basis }));
     } else {
-      lines.push(line(RH_TEXT.drashaBeforeShofar, []));
-      lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }]));
-      lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }]));
+      lines.push(line(RH_TEXT.drashaBeforeShofar, [], { calc: 'drashaBeforeShofar' }));
+      lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }], { calc: 'shofar' }));
+      lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }], { calc: 'shofarWomen' }));
     }
 
     // The afternoon מנחה, an hour before that day's own שקיעה taken down to the last 5, on
@@ -157,7 +162,7 @@ export function buildRoshHashanaPoster(year, settings) {
     const mainMincha = downTo5(dayShkia - 60 * RH_MIN);
     lines.push(line(RH_TEXT.mincha, i === tashlichDay
       ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
-      : at(mainMincha)));
+      : at(mainMincha), { calc: 'dayMincha' }));
 
     // The morning and the afternoon, on the day itself. שחרית is typed rather than computed,
     // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
@@ -170,7 +175,7 @@ export function buildRoshHashanaPoster(year, settings) {
     // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
     // which is the same way round the boards print a two time מעריב (see calculations-view).
     if (i === 1) {
-      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)]));
+      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)], { calc: 'motzeiMaariv' }));
       M.at(dayOn, RH_TEXT.maariv, dayShkia + 60 * RH_MIN);
       M.at(dayOn, RH_TEXT.maariv, dayShkia + 72 * RH_MIN, { underlined: true });
     }

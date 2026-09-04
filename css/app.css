@@ -2649,6 +2649,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* One card per column, with the plain rule, what it came out to that week, and the exact
    formula folded under it. */
 .calc-not-rules { border-left: 3px solid var(--ui-accent); padding-left: 0.8rem; margin: 1rem 0 1.2rem; }
+/* The two halves of the page, the charts and the posters. A heading rather than two
+   panels, because each half is already a stack of panels and nesting them would give every
+   sheet two triangles to open. The first one is pulled up against the lede above it; the
+   second wants air, since what is above it is the last chart's own panel. */
+.calc-section { margin: 2rem 0 0.2rem; font-size: 1.15rem; }
+.calc-section:first-of-type { margin-top: 1.4rem; }
 .calc-chart { margin-bottom: 0.6rem; }
 .calc-cols { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.9rem; }
 .calc-col { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem; background: var(--surface); }

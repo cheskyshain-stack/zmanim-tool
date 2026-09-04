@@ -42,7 +42,7 @@ const POSTER_FONT = 'Times New Roman';
  *  moment יו"כ is past: in אלול 5786 the calendar still says 5786, but the סליחות a week
  *  away are for ר"ה 5787. This asks the question the poster asks, which yomim noraim are
  *  still ahead, and rolls over the day after יו"כ. */
-function nextYomimNoraim(today = new Date()) {
+export function nextYomimNoraim(today = new Date()) {
   const serial = excelSerial(today);
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
