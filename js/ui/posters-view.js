@@ -1263,6 +1263,9 @@ export function posterRoute() {
 /** The other way: set the pickers from the address. Anything unrecognised is left alone,
  *  so an old or hand-typed link falls back to the defaults rather than to nothing. */
 export function setPosterRoute(parts = []) {
+  // What was remembered first, then the address over the top of it: a link says which sheet
+  // and which way up, and everything it does not say is left as it was left.
+  recallBar();
   const [key, orient] = parts;
   const poster = POSTERS.find((p) => p.key === key);
   if (poster) {
@@ -1275,12 +1278,70 @@ export function setPosterRoute(parts = []) {
     }
   }
   if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
-  chosenYear = null;
+  // The year is not in the address and is not cleared by a change of one: it is the year
+  // being worked in rather than part of what a link points at. See recallBar.
   conflictPick = 0;
+  rememberBar();
 }
 // Which way up the one sheet that can go either way is set. Only the pair poster reads it,
 // and it is remembered across a redraw so changing the year does not put it back.
 let chosenOrientation = 'portrait';
+
+/* --- Keeping the bar's answers across a refresh ----------------------------------------
+   Everything the bar asks is remembered, so coming back to the tab opens on the sheet you
+   were last looking at, in the year, for the occasion, laid out the way you left it.
+
+   In localStorage rather than in the address, and the two carry different things on purpose.
+   The address is what a link is made of, so it holds what somebody would mean by "this
+   poster": which sheet, and which way up. The year is not in it and must not be, or a link
+   sent to somebody, or bookmarked, opens on a year that has gone by. But "the year I was
+   working in" is exactly the kind of thing a refresh should not lose, so it is kept here,
+   against this browser rather than against the link.
+
+   A remembered year expires by itself. The picker offers two years back and seven forward,
+   so one left behind for long enough simply stops being on the list and the render falls
+   back to the yomim noraim coming up, the same as it does for a sheet that is not in the
+   occasion showing. Nothing here has to check how old anything is.
+
+   Wrapped, because localStorage is not always readable: it throws outright in a page inside
+   another site where third party storage is blocked, and in a private window in some
+   browsers. Which sheet came up last is a convenience; losing the tab over it is not a trade
+   worth making, so it falls back to the defaults and carries on. */
+const POSTER_BAR_KEY = 'zmanim-poster-bar-v1';
+let recalled = false;
+function recallBar() {
+  if (recalled) return;
+  recalled = true;
+  try {
+    const saved = JSON.parse(localStorage.getItem(POSTER_BAR_KEY) || 'null');
+    if (!saved || typeof saved !== 'object') return;
+    // Read one at a time and only where the value is the right shape. Everything read here
+    // is checked again by the render, which falls back to the first sheet of the occasion
+    // and to the year coming up, so a stale or hand edited value costs nothing.
+    if (Number.isFinite(saved.year)) chosenYear = saved.year;
+    if (typeof saved.group === 'string') chosenGroup = saved.group;
+    if (typeof saved.sheet === 'string') chosen = saved.sheet;
+    if (typeof saved.all === 'boolean') showAll = saved.all;
+    if (typeof saved.combined === 'boolean') chosenCombined = saved.combined;
+    if (typeof saved.onePage === 'boolean') chosenOnePage = saved.onePage;
+    if (saved.orientation === 'portrait' || saved.orientation === 'landscape') {
+      chosenOrientation = saved.orientation;
+    }
+  } catch {
+    // Nothing to do: the bar opens on its defaults, which is where it opened before any of
+    // this was remembered at all.
+  }
+}
+function rememberBar() {
+  try {
+    localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
+      year: chosenYear, group: chosenGroup, sheet: chosen, all: showAll,
+      combined: chosenCombined, onePage: chosenOnePage, orientation: chosenOrientation,
+    }));
+  } catch {
+    // The choice still holds for this page, it just will not be there next time.
+  }
+}
 // Whether the run carries the two-on-a-page sheets. Only the run reads it, and it is
 // remembered across a redraw the same way. Not in the address: the orientation is there
 // because it decides what paper comes out, and this only decides how many sheets.
@@ -1359,6 +1420,7 @@ function redrawInPlace(container, state) {
 }
 
 export function renderPosters(container, state, routeChanged, tables) {
+  recallBar();
   if (routeChanged !== undefined) onRoute = routeChanged;
   if (tables) posterTables = tables;
   const settings = resolveSettings(state.settings);
@@ -1469,6 +1531,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (to == null) return;
     chosenYear = to;
     conflictPick = 0;
+    rememberBar();
     again();
   };
   container.querySelector('#poster-year-back')?.addEventListener('click', () => step(-1));
@@ -1479,32 +1542,38 @@ export function renderPosters(container, state, routeChanged, tables) {
     // rather than left pointing into a list it is not in any more.
     chosen = null;
     conflictPick = 0;
+    rememberBar();
     onRoute?.();
     again();
   });
   wireSwitch(container, 'poster-how', (value) => {
     showAll = value === 'all';
     conflictPick = 0;
+    rememberBar();
     onRoute?.();
     again();
   });
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
     conflictPick = 0;
+    rememberBar();
     onRoute?.();
     again();
   });
   wireSwitch(container, 'poster-orient', (value) => {
     chosenOrientation = value;
+    rememberBar();
     onRoute?.();
     again();
   });
   wireSwitch(container, 'poster-combined', (value) => {
     chosenCombined = value === 'yes';
+    rememberBar();
     again();
   });
   wireSwitch(container, 'poster-onepage', (value) => {
     chosenOnePage = value === 'one';
+    rememberBar();
     again();
   });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
