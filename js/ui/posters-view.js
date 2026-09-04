@@ -1581,13 +1581,11 @@ export function renderPosters(container, state, routeChanged, tables) {
     again();
   });
   if (built) {
-    /* Which way up the paper goes, asked of the sheet that was actually drawn rather than
-       of the picker, because the two do not always agree: the run holds a landscape sheet
-       and still prints on portrait paper, turned on its side (see .is-sideways). One page
-       size a document, so a run is portrait even where a sheet in it is not. */
-    const landscape = !container.querySelector('.poster-all')
-      && Boolean(container.querySelector('.poster.is-landscape'));
-    setPrintPage(landscape ? 'letter landscape' : 'letter portrait');
+    /* Every sheet on this tab prints on portrait paper, the landscape ones included: they
+       go on it turned a quarter turn, which is what the run has always done with them and
+       what a single one does now as well. See the .poster.is-landscape rule in print.css
+       for why it is not left to the paper to be landscape. */
+    setPrintPage('letter portrait');
     wirePrintButton(container);
     // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
     // would not change where a line breaks, but measuring the unscaled sheet is one less

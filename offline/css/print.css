@@ -213,18 +213,36 @@
     margin: 0; padding: 0;
     overflow: hidden;
   }
-  /* Same again for the landscape sheet, the other way round. One class more specific than
-     the rule above, so it wins wherever it applies and the portrait rule is left alone.
-     Which means it has to carry the same two exclusions, or it stops being more specific
-     and the sheet goes back to being pinned portrait: adding the .luach-sheet one above
-     and not here turned this sheet into two pages, half of it on each. :has() and :not()
-     take the specificity of their most specific argument, and `.luach-sheet +
-     .luach-sheet` is two classes, so leaving it off cost this rule the cascade by a
-     margin rather than by a hair. */
-  body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)),
-  body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) .app-shell,
+  /* The sheet that is set landscape goes on portrait paper too, turned a quarter turn.
+     It used to ask for landscape paper, which is the obvious thing and which the page has
+     no way to insist on. A print dialog keeps a Layout against each destination, so a
+     printer somebody once set to Portrait hands every document portrait paper whatever the
+     page asks for, and an 11in sheet on an 8.5in page is scaled to fit the width and sits
+     in a corner. Measured: 94% of the width and 54% of the height of the page, reported
+     from a desktop as "the wrong size".
+     Detecting that and turning the sheet only then is what a media query is for and it does
+     not work here. Chrome answers (orientation: portrait) as portrait on an 11in by 8.5in
+     page while it lays a PDF out, and answers the width as 8.5in on that same page: probed
+     one threshold at a time, a marker fired at max-width: 8.5in and not at 8.49in. Both
+     tests are wrong in the direction that turns a sheet already the right way round. The
+     width rules at the foot of this file survive that because matching them is harmless,
+     their clamp resolving to 1 on the right paper; a rotation has no such middle.
+     So it is not detected. The sheet is always turned, and the paper is always portrait,
+     which is the one thing about a print dialog that has never had to be guessed at: it is
+     what the run of every poster has done from the start. Full size, read by turning the
+     sheet, and no setting on any destination can make it the wrong size.
+     Rotated about its own top left corner and then dropped 11in, so its pre-transform box
+     stays inside the page: the same transform as .poster-all-item.is-sideways in app.css.
+     The 11in by 8.5in pin this rule used to carry is gone with it, so the portrait pin
+     above now covers this sheet as well, which is the box the turned sheet fills. */
   body:has(.poster.is-landscape):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) main {
-    width: 11in; height: 8.5in;
+    position: relative;
+  }
+  .poster.is-landscape {
+    position: absolute; top: 0; left: 0;
+    margin: 0;
+    transform-origin: 0 0;
+    transform: translateY(11in) rotate(-90deg);
   }
   /* The run of every poster is the one case where there is more than one sheet on the tab,
      so the boxes above it cannot be pinned to one sheet: doing that clipped everything after
@@ -305,4 +323,9 @@
      rule above they would be scaled a second time inside an already scaled box. */
   .week-pair .week-card { zoom: 1 !important; }
   .poster-all .poster { zoom: 1 !important; }
+  /* A turned sheet is left alone for the same reason the run's are. Rotation leaves the
+     sheet's own box 11in wide whatever it looks like on the page, and the 11in this rule
+     drops it by is a fixed distance that a zoom does not scale with it, so scaling the
+     sheet would slide it off its own paper rather than fit it. */
+  .poster.is-landscape { zoom: 1 !important; }
 }
