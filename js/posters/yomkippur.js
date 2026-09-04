@@ -101,6 +101,10 @@ function fiveEarlier(times) {
   });
 }
 
+/** A day fraction snapped to the minute formatTime will print it as, so a comparison here
+ *  and the times a reader sees cannot disagree by a rounding. */
+const toPrintedMinute = (t) => Math.round(t * 1440) / 1440;
+
 /** The days between יו"כ and סוכות: 11 תשרי through ערב סוכות on the 14th.
  *
  *  The late מנחה and the early מעריב have to work on every one of them, so they are set by
@@ -112,7 +116,13 @@ export function afterYomKippurDays(rh, settings) {
     const serial = rh + n - 1;
     const dow = excelWeekday(serial);
     if (dow < 1 || dow > 5) continue; // Sunday to Thursday
-    days.push({ serial, shkia: Z.sunsetElev(dateFromSerial(serial), settings) });
+    days.push({
+      serial,
+      shkia: Z.sunsetElev(dateFromSerial(serial), settings),
+      // The later of מנחה גדולה and half an hour after חצות, which is the one the charts
+      // already test their early מנחה against (sheets/common.js, sheets/weekday.js).
+      minchaGedola: Z.minchaGedolaLechumra(dateFromSerial(serial), settings),
+    });
   }
   return days;
 }
@@ -123,9 +133,35 @@ export function afterYomKippurDays(rh, settings) {
  *  minutes or more before שקיעה. Then one last one squeezed in between 15 and 20 minutes
  *  before שקיעה if there is room for it, which there is only when the 20 minute run stopped
  *  well short: it has to be at least 15 minutes after the one in front of it. That last one
- *  is the 6:15 on the תשפ"ו sheet, 16 minutes before a 6:31 שקיעה. */
-export function afterMincha(earliestShkia) {
-  const times = [at(13, 15), at(13, 35), at(13, 50), at(16, 15)];
+ *  is the 6:15 on the תשפ"ו sheet, 16 minutes before a 6:31 שקיעה.
+ *
+ *  The 1:15 is not really fixed, and this is the one מנחה on any of these sheets that was
+ *  landing before מנחה גדולה. These days are always on daylight saving time, when חצות is
+ *  an hour later than it is for most of the year, and מנחה גדולה sits between about 1:11 and
+ *  1:23 depending where in September or October יו"כ falls. Measured across תשפ"ד to תשצ"ה:
+ *  early in eight years of twelve, by as much as eight minutes, and in תשפ"ז by five on
+ *  every one of the four days. The weekday chart never had this because its own 12:45 and
+ *  1:15 run on standard time only, which is the same guard by another name; here there was
+ *  none, so the same rule the ערב שבת מנחה menu already follows is applied instead: where
+ *  the clock time would be too early, מנחה גדולה is printed in its place.
+ *
+ *  The binding day is the latest מנחה גדולה of the run, since one printed list has to hold
+ *  for all four days, the same way the earliest שקיעה binds the evening ones.
+ *
+ *  And if that move leaves it less than 15 minutes in front of the 1:35, it is not printed
+ *  at all. Two מנינים a few minutes apart is not a choice anybody uses, and the weekday
+ *  chart drops a zman on the same ground when a move walks it up against its neighbour.
+ *
+ *  Both the move and that 15 minutes are measured on the minute the sheet prints, not on the
+ *  raw zman. מנחה גדולה is a fraction of a second as well as a minute: in תשפ"ז it falls at
+ *  1:20 and 24 seconds, which prints as 1:20 and is a clean 15 minutes in front of the 1:35,
+ *  while the unrounded number is 14 minutes 36 and was dropping the מנין the shul asked to
+ *  keep. Rounded to the same minute formatTime would show, the arithmetic on the paper and
+ *  the arithmetic here are one thing. */
+export function afterMincha(earliestShkia, latestMinchaGedola = 0) {
+  const first = toPrintedMinute(Math.max(at(13, 15), latestMinchaGedola));
+  const times = [at(13, 35), at(13, 50), at(16, 15)];
+  if (at(13, 35) - first >= 15 * YK_MIN - 1e-9) times.unshift(first);
   for (let t = at(16, 40); t <= earliestShkia - 15 * YK_MIN + 1e-9; t += 20 * YK_MIN) times.push(t);
   const last = times[times.length - 1];
   const tail = ykNear5(earliestShkia - 17 * YK_MIN); // the middle of the 15 to 20 window
@@ -167,10 +203,29 @@ export function buildAfterYomKippur(year, settings) {
   const earliest = runDays.length
     ? Math.min(...runDays.map((d) => d.shkia))
     : Z.sunsetElev(dateFromSerial(rh + 9), settings);
+  /* The latest מנחה גדולה of every day this list is offered on, so the opening מנין holds on
+     all of them: see afterMincha.
+
+     The morning after יו"כ is counted whether or not it is one of the run's own Sunday to
+     Thursday days. The sheet completes that day from this box and so does the card, which
+     is deliberate and is written down where it happens; but the box's times are set by the
+     Sunday to Thursday days alone, so in a year where the morning after is a Friday the
+     opening מנין was being offered on a day nobody had checked it against. Measured: תשפ"ו
+     and תת"ה are both such years, and in both the list opened one minute before חצות plus
+     half an hour on that Friday. Adding the day here can only push the opening מנין later,
+     never earlier, so it cannot take a מנין off a day that had one.
+
+     Which days bind the *evening* times is a separate question and is left alone: those are
+     set by the earliest שקיעה of the run and moving that would shift times all down the
+     list. */
+  const minchaGedolaDays = [...new Set([...runDays.map((d) => d.serial), rh + 10])];
+  const latestMinchaGedola = Math.max(
+    ...minchaGedolaDays.map((serial) => Z.minchaGedolaLechumra(dateFromSerial(serial), settings))
+  );
   return {
     shacharis: everydayShacharis(settings),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
-    mincha: afterMincha(earliest).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
+    mincha: afterMincha(earliest, latestMinchaGedola).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
     maariv: [tm(afterEarlyMaariv(earliest), true),
       ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
     earliestShkia: formatTime(earliest),
