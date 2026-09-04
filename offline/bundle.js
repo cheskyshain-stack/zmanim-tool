@@ -1725,6 +1725,25 @@ function buildRoshHashanaPoster(year, settings) {
   const tashlichDay = shabbosDay === 0 ? 1 : 0;
   const TASHLICH_EARLIER = 50;
 
+  /* The afternoon מנחה is one time across both days, not one worked out per day.
+   *
+   * It is an hour before שקיעה taken down to the last 5, and the second day's שקיעה is a
+   * minute or two earlier than the first's, which is enough to cross a 5 and print two
+   * different times: תשפ"ז came out 6:10 on the first day and 6:05 on the second. Two days
+   * of one יום טוב with their מנחה five minutes apart is not something a shul davens or a
+   * sheet should say, so the two are worked out and the later of them is printed on both.
+   *
+   * The later rather than the earlier, which is what was asked for and is also the safe
+   * direction: the two never differ by more than the one 5 minute step the rounding can
+   * put between them, so the day that moves ends up at most five minutes nearer its own
+   * שקיעה, still the better part of an hour in front of it.
+   *
+   * The תשליך מנין follows it. That one is defined as 50 minutes before the main מנחה
+   * rather than as a time of its own, so it moves with it and the gap it exists for is
+   * unchanged. */
+  const dayShkias = days.map((day) => Z.sunsetElev(day, settings));
+  const mainMincha = Math.max(...dayShkias.map((shkia) => downTo5(shkia - 60 * RH_MIN)));
+
   /* The מנינים of these three days, for the congregation's "what is on next". Gathered here
      as the sheet is built, off the same numbers, so the card and the sheet cannot disagree.
      See posters/minyanim.js for why it is done this way round and which lines are left out.
@@ -1741,7 +1760,7 @@ function buildRoshHashanaPoster(year, settings) {
     const isShabbos = i === shabbosDay;
     const krias = { gra: Z.sofZmanShmaGRA(day, settings), mga: Z.sofZmanShmaMGA72(day, settings) };
     const nine = nineHours(day, settings);
-    const dayShkia = Z.sunsetElev(day, settings);
+    const dayShkia = dayShkias[i]; // that day's own שקיעה, which מוצאי יום טוב is worked from
 
     const lines = [];
     // The night that opens the day. הדלקת נרות only on the first, since the second day's
@@ -1777,9 +1796,8 @@ function buildRoshHashanaPoster(year, settings) {
       lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }], { calc: 'shofarWomen' }));
     }
 
-    // The afternoon מנחה, an hour before that day's own שקיעה taken down to the last 5, on
-    // both days, with the earlier תשליך one in front of it on the day that has one.
-    const mainMincha = downTo5(dayShkia - 60 * RH_MIN);
+    // The afternoon מנחה, the same on both days (see mainMincha above), with the earlier
+    // תשליך one in front of it on the day that has one.
     lines.push(line(RH_TEXT.mincha, i === tashlichDay
       ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
       : at(mainMincha), { calc: 'dayMincha' }));
@@ -7175,8 +7193,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: a fixed 3:05, and only on a day that is not Shabbos.',
       },
       dayMincha: {
-        plain: 'The afternoon מנחה, an hour before that day\'s own שקיעה. One of the two days carries an earlier מנין in front of it as well, so there is daylight after מנחה for תשליך.',
-        exact: 'That day\'s שקיעה less 60 minutes, taken down to the last 5. The תשליך day gets a second time 50 minutes in front of that, underlined for למטה, and it is the first day unless the first day is Shabbos, when תשליך is put off and so is the earlier מנין.',
+        plain: 'The afternoon מנחה, an hour before שקיעה, and the same time on both days. One of the two carries an earlier מנין in front of it as well, so there is daylight after מנחה for תשליך.',
+        exact: 'Each day\'s own שקיעה less 60 minutes taken down to the last 5, and then the later of the two printed on both days. The second day\'s שקיעה is a minute or two earlier than the first\'s, which is enough to cross a 5 and give two times: the two days would otherwise have davened five minutes apart in nine of the next twenty-seven years. The day that moves ends up at most five minutes nearer its own שקיעה, which is the whole of the difference the rounding can make. The תשליך day gets a second time 50 minutes in front of it, underlined for למטה, and moves with it; that is the first day unless the first day is Shabbos, when תשליך is put off and so is the earlier מנין.',
       },
       motzeiMaariv: {
         plain: 'מוצאי יום טוב, at the foot of the second day. Two times, 60 and 72 minutes after שקיעה, the 72 underlined for למטה.',

@@ -328,8 +328,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: a fixed 3:05, and only on a day that is not Shabbos.',
       },
       dayMincha: {
-        plain: 'The afternoon מנחה, an hour before that day\'s own שקיעה. One of the two days carries an earlier מנין in front of it as well, so there is daylight after מנחה for תשליך.',
-        exact: 'That day\'s שקיעה less 60 minutes, taken down to the last 5. The תשליך day gets a second time 50 minutes in front of that, underlined for למטה, and it is the first day unless the first day is Shabbos, when תשליך is put off and so is the earlier מנין.',
+        plain: 'The afternoon מנחה, an hour before שקיעה, and the same time on both days. One of the two carries an earlier מנין in front of it as well, so there is daylight after מנחה for תשליך.',
+        exact: 'Each day\'s own שקיעה less 60 minutes taken down to the last 5, and then the later of the two printed on both days. The second day\'s שקיעה is a minute or two earlier than the first\'s, which is enough to cross a 5 and give two times: the two days would otherwise have davened five minutes apart in nine of the next twenty-seven years. The day that moves ends up at most five minutes nearer its own שקיעה, which is the whole of the difference the rounding can make. The תשליך day gets a second time 50 minutes in front of it, underlined for למטה, and moves with it; that is the first day unless the first day is Shabbos, when תשליך is put off and so is the earlier מנין.',
       },
       motzeiMaariv: {
         plain: 'מוצאי יום טוב, at the foot of the second day. Two times, 60 and 72 minutes after שקיעה, the 72 underlined for למטה.',
