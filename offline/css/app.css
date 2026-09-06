@@ -3363,18 +3363,45 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
    inline-flex rather than a block, because on the full sheets a row is a line of text and the
    pair has to sit in it beside the label like any other run of times. */
-.zman-pairs { display: inline-flex; align-items: flex-end; gap: 0.14in; }
-.zman-pair { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; }
+/* Inline-block, not a flex row, and that is what puts the label on the times' line. A block
+   takes its baseline from its first line box when it is a flex item and from its last when it
+   is inline: the pair is a name over a time, so the first line is the small name and the last
+   is the time. Set as a flex row, the run handed the name's baseline to the row and the label
+   went up beside the names; inline, the times' baseline is the run's and the label sits with
+   them, which is how the row is read.
+   The gap is a margin between the pairs rather than flex's, and each pair sits on the shared
+   baseline of the line it is in, so the two times line up on their own baseline rather than on
+   the bottoms of their boxes. */
+.zman-pairs { display: inline-block; line-height: 1; }
+.zman-pair + .zman-pair { margin-inline-start: 0.14in; }
+/* An inline-block rather than a flex column, and that is what puts the label on the right
+   line. A row is read as "ס"ז ק"ש 9:08 9:44" with the two names sitting over the two times,
+   so the label belongs on the times' line and not on the names'. An inline-flex takes its
+   baseline from its first item, which is the name, and the label went up there with it; an
+   inline-block takes its baseline from its last line box, which is the time.
+
+   Set solid. A stacked pair is two lines where every row around it is one, so it is the row on
+   the sheet that can least afford leading it is not using: measured on the one-page sheet, the
+   name's own line box carried 1.5px of air and the time's 0.8px on top of a row that was
+   already the tallest thing in the column. */
+.zman-pair { display: inline-block; text-align: center; line-height: 1; }
 /* Smaller and lighter than the time under it: it names the time rather than being one, the
    same relation the chart's own two-line heading has to its column. In em, so it follows
-   whatever size the sheet has been fitted to. */
-.zman-pair-name { font-size: 0.68em; font-weight: 400; }
-/* The label centred against the pair rather than sitting on the first line's baseline, which
-   is the small name and would have left the label riding high. A row without a pair keeps the
-   baseline it always had. */
-.poster-row:has(.zman-pair) .poster-row-label,
-.poster-row:has(.zman-pair) .zman-pairs { vertical-align: middle; }
-.onepage-row:has(.zman-pair) { align-items: center; }
+   whatever size the sheet has been fitted to. Set solid as well, so the whole of the space it
+   costs the row is the height of the letters themselves. */
+.zman-pair-name { display: block; font-size: 0.62em; font-weight: 400; line-height: 1; }
+.zman-pair-time { display: block; }
+/* Nothing here for the label any more: both sheets align on the baseline, which is the pair's
+   own last line, which is the time. It was centred against the whole pair for a while, and
+   that put it between the two lines with air above the names that nothing was using. */
+/* No text strut behind the pair. The pair is an inline-flex in a block that has a line-height
+   of its own, and its baseline is its first line's, which is the small name: everything under
+   that name's baseline, which is the whole of the time under it, counted as descender and the
+   line box grew to fit. Measured on the one-page sheet, a row 36.6px deep against 27.9px of
+   pair, where the rows around it are 22.7px. With the strut gone the line box is the pair and
+   nothing else. The full sheets never had this: there the pair sits in a line of text beside
+   its label, and vertical-align: middle above already takes it off the baseline. */
+.onepage-times:has(.zman-pairs) { line-height: 0; }
 .onepage-times u { text-underline-offset: 0.12em; }
 .onepage-note { white-space: nowrap; }
 
