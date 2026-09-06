@@ -21,6 +21,7 @@ import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
+import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -275,6 +276,44 @@ const POSTERS = [
     },
     render: renderAfterYomKippurPoster,
   },
+  {
+    key: 'sukkos',
+    label: 'סוכות',
+    group: 'סוכות',
+    covers: (y) => `${SK_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildSukkosPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildSukkosPoster(y, settings) }),
+      }));
+    },
+    render: renderSukkosPoster,
+  },
+  {
+    key: 'sukkosshuava',
+    label: 'שמחת בית השואבה',
+    group: 'סוכות',
+    covers: (y) => `${SK_SHUAVA.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y) => buildSukkosShuavaPoster(y)?.span.from ?? null,
+    sources: (state) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildSukkosShuavaPoster(y) }),
+      }));
+    },
+    render: renderSukkosShuavaPoster,
+  },
   // Last in the list whatever the dates say, because it is a way of looking at the others
   // rather than a poster with a date of its own.
   {
@@ -486,9 +525,10 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  The two-on-a-page sheets are left out. They exist to save a wall a second sheet of paper,
  *  and on a screen they are two schedules to read at once where one would do.
  *
- *  Only two years are looked at. A sheet's dates all sit within a fortnight of ר"ה, and
+ *  Only two years are looked at. Every sheet's dates sit within a month of ר"ה, and
  *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything
- *  still ahead and the year before it covers the one sheet that runs past יו"כ.
+ *  still ahead and the year before it covers the sheets that run past יו"כ, which from סוכות
+ *  onwards is most of them.
  *
  *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at
  *  all. That is the right way round here rather than a shortcut: the chart is what the board
@@ -499,13 +539,14 @@ export function currentPosters(state, settings, { on = excelSerial(new Date()), 
   const out = [];
   for (const year of [next - 1, next]) {
     // Nowhere near, so do not build a thing. This is asked on the congregation's menu, which
-    // is the page every visitor lands on, and building six sheets to find out that none of
-    // them is up cost 120ms on a slow phone. Every date on every sheet sits inside a
-    // fortnight either side of ר"ה, and the widest window is the סליחות sheet's, which opens
-    // eleven days before it, so a month and a half back and three weeks on is far wider than
-    // any of them can reach. The dates come from the calendar, which costs nothing.
+    // is the page every visitor lands on, and building every sheet to find out that none of
+    // them is up cost 120ms on a slow phone. The widest window either way is the סליחות
+    // sheet's, which opens eleven days before ר"ה, and the סוכות sheet's, whose last line is
+    // שבת בראשית on 24 תשרי in a year where שמחת תורה is a Friday. A month and a half back and
+    // five weeks on is wider than either can reach. The dates come from the calendar, which
+    // costs nothing.
     const rh = roshHashana(year - 3761);
-    if (on < rh - 45 || on > rh + 20) continue;
+    if (on < rh - 45 || on > rh + 35) continue;
     for (const p of postersByDate(year, settings)) {
       if (p.last || p.combined) continue;
       const source = p.sources(state, settings).find((s) => s.year === year);
@@ -600,11 +641,11 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
-    + `${onepage ? ' is-onepage' : ''}`;
+    + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -763,7 +804,7 @@ function renderRoshHashanaPoster(poster, settings) {
  *  schedules. Same three lines either way. */
 function ykAfterBox(poster) {
   // One span per time, and the commas between them come from CSS rather than from here.
-  // That is what lets balanceBoxRows below cut a run in two by moving spans: the separators
+  // That is what lets balanceRuns below cut a run in two by moving spans: the separators
   // work themselves out again around the break, where a comma written into the markup would
   // be left stranded at the end of the first line.
   const boxRow = (label, times) => `<p class="poster-row poster-box-row" lang="he">`
@@ -794,15 +835,30 @@ function ykAfterBox(poster) {
  *
  *  Reading the run first and moving afterwards, because the box is sized to its widest line:
  *  cutting one row narrows the box under the row being measured next. */
-function balanceBoxRows(container) {
-  // Whether the run got a second line, asked of layout rather than of paint. offsetTop is
-  // measured before any transform; getClientRects is measured after, and in the run of every
-  // poster a landscape sheet is turned a quarter turn, which stands the line up on its end
-  // and gives every time on it a different top. That read as eleven wrapped lines and cut a
-  // row that was sitting comfortably on one.
+function balanceRuns(container) {
+  /* Any earlier cut is put back before anything is measured, so this can be run twice over the
+     same sheet and balance the whole run rather than the half of it that was left behind. The
+     סוכות sheet needs that: its runs are measured once at the size they are written at and
+     again after fitSukkos has grown the type, which is what decides whether one wraps at all. */
+  for (const more of container.querySelectorAll('.poster-run-more')) {
+    const run = more.previousElementSibling;
+    if (run) while (more.firstChild) run.appendChild(more.firstChild);
+    more.remove();
+  }
+  /* Whether the run got a second line, asked of layout rather than of paint. offsetTop is
+     measured before any transform; getClientRects is measured after, and in the run of every
+     poster a landscape sheet is turned a quarter turn, which stands the line up on its end
+     and gives every time on it a different top. That read as eleven wrapped lines and cut a
+     row that was sitting comfortably on one.
+     It is the top of each time that is asked, and that only answers honestly where the break
+     falls between two of them rather than inside one. A separator drawn as the next time's own
+     ::before puts that time's box on the line above with its comma, and only its digits move
+     down, so a run whose last time alone wrapped reads as fitting. Every separator on this
+     sheet carries a zero width space that belongs to the time in front of it, which is what
+     keeps the break between the two: see .poster-run and the box in app.css. */
   const wrapped = (times) => times.length > 1 && times[times.length - 1].offsetTop > times[0].offsetTop;
   const cuts = [];
-  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times')) {
+  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run')) {
     const times = [...run.querySelectorAll(':scope > .poster-t')];
     if (!wrapped(times)) continue;
     const cut = Math.floor(times.length / 2);
@@ -810,7 +866,8 @@ function balanceBoxRows(container) {
   }
   for (const { run, rest } of cuts) {
     const more = document.createElement('bdi');
-    more.className = 'poster-row-times poster-box-more';
+    more.className = `${run.className} poster-run-more`;
+    more.dir = run.dir || 'ltr';
     for (const t of rest) more.appendChild(t);
     run.after(more);
   }
@@ -858,6 +915,114 @@ function renderPairPoster(poster, settings, { landscape = false } = {}) {
   return posterShell(settings, body, poster.legend || [], {
     dense: true, pair: true, landscape, chartHead: true,
   });
+}
+
+/** The סוכות sheet: six blocks at most, in two columns with a rule between them, and the
+ *  חול המועד box at the foot of whichever column has less in it.
+ *
+ *  Two columns because a year with a שבת חול המועד and a שבת בראשית runs to forty three rows,
+ *  which is three times what the ראש השנה sheet holds and will not go down one page in a
+ *  column. It is also how the sheets the shul hangs are laid out, so this reads like them.
+ *
+ *  Which blocks go in which column is the builder's answer, not a measurement: the sheet has
+ *  a natural break in it, between the last day of חול המועד and שמיני עצרת, and splitting it
+ *  anywhere else would put half of a יום טוב at the foot of one column and half at the head of
+ *  the other. See `split` in posters/sukkos.js.
+ *
+ *  The box is written into the first column and fitSukkos moves it to whichever column it
+ *  leaves shorter, once the browser has said how tall everything is. Which column that is is a
+ *  question about the page rather than about the days. */
+/** One row of the סוכות sheet.
+ *
+ *  Its own rather than the ראש השנה sheet's rhRow, for one reason: a run of times here is spans
+ *  with the slash between them drawn by CSS, not text with a slash written into it. That is
+ *  what lets balanceRuns cut a run of five in half when it will not sit on one line, and the
+ *  separators sort themselves out around the break. Written as text, a run that wrapped left a
+ *  slash hanging at the end of the first line with nothing after it.
+ *
+ *  It matters here and nowhere else because this is the sheet that sets its own type as large
+ *  as the page will take. Held to one line, "1:15 / 1:35 / 1:50 / 2:15 / 3:00" is the widest
+ *  thing on the sheet and it alone held the type down: measured, 1.12 with the run unbreakable
+ *  against 1.28 with it free to be cut, on a sheet that had a fifth of its height going spare.
+ *
+ *  Everything else a row can be is the same as the other sheets': a זמן given on both
+ *  reckonings is the shared pair of little columns, a row with an explicit separator (the
+ *  שמחת תורה מנחה, "מיד אחר מוסף & 5:55") keeps its own text, and `extra` is the second label
+ *  and time that sits on the same line. */
+function sukkosRow(ln) {
+  const times = !ln.times.length
+    ? ''
+    : isReckoned(ln.times)
+      ? reckoningPairs(ln.times)
+      : ln.sep
+        ? `<bdi class="poster-row-times" dir="ltr">${ln.times.map(timeHtml).join(ln.sep)}</bdi>`
+        : `<bdi class="poster-row-times poster-run" dir="ltr">${ln.times
+          .map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')}</bdi>`;
+  const extra = ln.extra
+    ? `<span class="poster-row-label poster-row-second">${escAttr(ln.extra.label)}</span>`
+      + `<bdi class="poster-row-times" dir="ltr">${ln.extra.times.map(timeHtml).join(SLASH)}</bdi>`
+    : '';
+  return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}" lang="he">`
+    + `<span class="poster-row-label">${escAttr(ln.label)}</span>${times}${extra}</p>`;
+}
+
+function sukkosBox(poster) {
+  const boxRow = (label, times, note = '') => `<p class="poster-row poster-box-row" lang="he">`
+    + `<span class="poster-row-label">${escAttr(label)}</span>`
+    + `<bdi class="poster-row-times" dir="ltr">`
+    // The note is written in front of the times, the same as on the סליחות sheet and for the
+    // same reason: the row is right to left and its times read left to right, so a note
+    // written after them lands at the far left of the row where it looks like part of the
+    // next line. Its own bdi, because it is Hebrew with a time inside it.
+    + (note ? `<bdi class="poster-row-note">${escAttr(note)}</bdi> ` : '')
+    + times.map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')
+    + `</bdi></p>`;
+  return `<div class="poster-box">
+        <h3 class="poster-box-head" lang="he">${escAttr(SK_TEXT.cholHamoed)}</h3>
+        ${boxRow(`${SK_TEXT.shacharis} ${SK_TEXT.shacharisChm}`, poster.box.shacharis)}
+        ${boxRow(`${SK_TEXT.shacharis} ${SK_TEXT.shacharisHoshana}`, poster.box.hoshana,
+    `(${SK_TEXT.netz} ${poster.box.hoshanaNetz})`)}
+        ${boxRow(SK_TEXT.mincha, poster.box.mincha)}
+        ${boxRow(SK_TEXT.maariv, poster.box.maariv)}
+      </div>`;
+}
+
+function renderSukkosPoster(poster, settings) {
+  const columns = [poster.blocks.slice(0, poster.split), poster.blocks.slice(poster.split)];
+  const col = (blocks, box) => `<div class="poster-pair-col">
+      <div class="poster-rows is-dense">
+        ${blocks.map((b) => `
+          <h3 class="poster-day" lang="he">${escAttr(b.heading)}</h3>
+          ${b.lines.map(sukkosRow).join('')}`).join('')}
+        ${box ? sukkosBox(poster) : ''}
+      </div>
+    </div>`;
+  const body = `
+    <h2 class="poster-title" lang="he">${escAttr(SK_TEXT.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="poster-pair">
+      ${col(columns[0], true)}
+      ${col(columns[1], false)}
+    </div>`;
+  return posterShell(settings, body, poster.legend || [], {
+    dense: true, pair: true, chartHead: true, sukkos: true,
+  });
+}
+
+/** The שמחת בית השואבה sheet: four lines and a rule, at the size a sheet is read from across
+ *  a room. Nothing on it is worked out, so nothing here measures anything. */
+function renderSukkosShuavaPoster(poster, settings) {
+  const t = poster.text;
+  const body = `
+    <div class="poster-shuava">
+      <h2 class="poster-shuava-head" lang="he">${escAttr(t.title)}</h2>
+      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
+      <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
+      <hr class="poster-shuava-rule">
+      <h2 class="poster-shuava-head" lang="he">${escAttr(t.mishna)}</h2>
+      <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
+      <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
+    </div>`;
+  return posterShell(settings, body, poster.legend || []);
 }
 
 /** The everyday schedule from after יו"כ to סוכות, given a sheet of its own.
@@ -982,7 +1147,7 @@ const ONEPAGE_PER_LINE = 4;
  *  Three and three came out with one line visibly longer than the other. So every cut is
  *  tried and the one that leaves the wider line narrowest wins.
  *
- *  Measured after the sheet is on the page, the same as balanceBoxRows, because the answer is
+ *  Measured after the sheet is on the page, the same as balanceRuns, because the answer is
  *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the
  *  whole sheet with zoom, and a rect read under that is in screen pixels.
  *
@@ -1263,6 +1428,84 @@ function fitOnePage(container) {
   }
 }
 
+/** Sets the type on the סוכות sheet to the largest that still fits its two columns.
+ *
+ *  Same problem and same answer as fitOnePage above: the year decides how much there is, so
+ *  the size is measured rather than written down. A year with a שבת חול המועד and a שבת
+ *  בראשית has forty three rows and six headings where a year opening on Shabbos has thirty one
+ *  and four, and one size for both means the shorter year prints smaller than it needs to.
+ *
+ *  Where the blocks go is not measured, unlike the one-page sheet: the sheet has a real break
+ *  in it, between the last day of חול המועד and שמיני עצרת, and it is the builder that knows
+ *  where. Only the size is decided here.
+ *
+ *  The ink is measured, not the box. A column is a flex child stretched to the full height of
+ *  the pair whatever is in it, so its own height always reports full and says nothing: what
+ *  counts is the top of its first block to the bottom of its last. That was measured wrong
+ *  once here, and every year came back "760 of 760" and settled on the smallest type there is.
+ *
+ *  Rects, divided back by the zoom. A rect is in screen pixels and the box it has to fit is in
+ *  the sheet's own, and on a phone the whole sheet is shrunk with zoom to fit the screen, so
+ *  the two are not the same pixel. And it runs after that zoom rather than before it, because
+ *  under the zoom every row rounds to whole device pixels and a column holds a line or two
+ *  fewer. See fitOnePage, which got that second half wrong once for real. */
+const SK_MIN_SCALE = 0.6;
+const SK_MAX_SCALE = 1.4;
+function fitSukkos(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-sukkos')) {
+    const pair = sheet.querySelector('.poster-pair');
+    const cols = pair ? [...pair.querySelectorAll(':scope > .poster-pair-col > .poster-rows')] : [];
+    if (cols.length !== 2) continue;
+    const zoom = Number(getComputedStyle(sheet).zoom) || 1;
+    const ink = (col) => {
+      const kids = [...col.children];
+      if (!kids.length) return 0;
+      const top = kids[0].getBoundingClientRect().top;
+      const bottom = kids[kids.length - 1].getBoundingClientRect().bottom;
+      return (bottom - top) / zoom;
+    };
+    const set = (v) => sheet.style.setProperty('--sk-scale', v);
+    /* The חול המועד box goes to the foot of whichever column it leaves shorter, which is a
+       question about the year: with a שבת בראשית the first column is the one with room and
+       without one it is the second. Tried both ways round and measured rather than worked out
+       from the number of rows, because the box is not rows: it is four runs of times that wrap
+       to as many lines as the year's runs are long. */
+    const box = sheet.querySelector('.poster-box');
+    const layout = () => {
+      if (!box) return Math.max(...cols.map(ink));
+      let worst = Infinity;
+      let at = 0;
+      for (let i = 0; i < cols.length; i++) {
+        cols[i].appendChild(box);
+        const m = Math.max(...cols.map(ink));
+        if (m < worst) { worst = m; at = i; }
+      }
+      cols[at].appendChild(box);
+      return worst;
+    };
+    /* Across as well as down. A label is set nowrap on this sheet, so "מנחה ערב שבת" cannot be
+       broken in the middle of itself, and neither can the run of times beside it. What that
+       buys in legibility it has to pay for here: a row too wide for its column would run off
+       the side of the sheet rather than wrapping, so a size that does that is not a size that
+       fits. Same question scrollWidth answers for the one-page sheet's third column. */
+    const wide = () => cols.some((c) => c.scrollWidth > c.clientWidth + 1);
+    const fits = () => layout() <= pair.clientHeight - OP_ROOM && !wide();
+    let best = SK_MIN_SCALE;
+    for (const step of [0.05, 0.01]) {
+      for (let v = best; v <= SK_MAX_SCALE + 1e-9; v = Math.round((v + step) * 100) / 100) {
+        set(v);
+        if (!fits()) break;
+        best = v;
+      }
+    }
+    set(best);
+    // The box's runs wrap at the size just chosen, not at the size the sheet was written at,
+    // so which of them needs cutting in two is only answerable now.
+    balanceRuns(sheet);
+    layout();
+  }
+}
+
 // Which sheet is on screen, when they are being shown one at a time. Null until something
 // has been picked, which is how a fresh load and a change of occasion both land on the first
 // sheet of the list without this having to know what that is.
@@ -1436,8 +1679,9 @@ export function fitPoster(container) {
     }
     // The one-page sheet's type is set against the zoom just chosen, so the two are decided
     // together and a resize cannot leave one of them behind. See fitOnePage for why it has
-    // to be this way round.
+    // to be this way round. The סוכות sheet's type is set here for the same reason.
     fitOnePage(container);
+    fitSukkos(container);
   };
   decide();
   // Rotating a phone changes what fits. One listener, replaced each render so it always
@@ -1644,7 +1888,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
     // would not change where a line breaks, but measuring the unscaled sheet is one less
     // thing to have to be sure of.
-    balanceBoxRows(container);
+    balanceRuns(container);
     // Before the type is fitted, and it can be: every time on a line scales by the same
     // factor, so where the run should be cut does not change when the size does. The heights
     // it settles are what the fit then measures.
