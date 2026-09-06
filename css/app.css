@@ -711,7 +711,22 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .page { font-weight: 700; }
 
 .page-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.1in; }
-.header-row { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 0.15in; }
+/* The name on the middle of the sheet, and not on the middle of what is left over.
+   Three columns with the two ends given the same width, so the name is centred on the row
+   whatever is in the corners. Laid out as flex it was centred by luck: the middle box took
+   the space between the two ends, so it only landed on the sheet's middle while the ends
+   happened to be the same width, and they were, near enough, at 141px of building against
+   145px of the rabbi's line. Setting the building to the height of the name took it to 102px
+   and the name went 21px off centre, which is where this was measured.
+   minmax(0, 1fr) rather than 1fr on the ends: a plain 1fr is at least as wide as its content,
+   so the rabbi's line would widen its own column and push the name off again, which is the
+   same fix the week card's copy of this header already carries. */
+.header-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; width: 100%; gap: 0.15in;
+}
+.header-row > .header-icon { justify-self: start; }
+.header-row > .header-rabbi { justify-self: end; }
 /* The building and the name are set to one height, which is what makes the two read as one
    line of letterhead rather than as a photo with a name beside it. It was 0.85in against the
    name's 0.62in, which put the loudest thing on the page in the corner: the photo is a solid
