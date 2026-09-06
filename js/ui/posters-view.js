@@ -1847,7 +1847,18 @@ function redrawInPlace(container, state) {
   const y = window.scrollY;
   const focused = document.activeElement?.id || '';
   renderPosters(container, state);
-  if (focused) container.querySelector(`#${focused}`)?.focus({ preventScroll: true });
+  const same = focused ? container.querySelector(`#${focused}`) : null;
+  /* A button that has just disabled itself under the finger cannot take the focus back, and
+     without the second half of this it goes to the body, which puts a keyboard back at the
+     top of the page. The year stepper is where it happens: Today disables itself every time
+     it is pressed, and each of the two steps does at its end of the list. So the focus goes
+     to whatever is still pressable in the same box and the next key is still working the
+     year. Measured before this: pressing + up to the last year left document.activeElement
+     as BODY. */
+  const to = same && !same.disabled
+    ? same
+    : same?.closest('.poster-year-step')?.querySelector('button:not(:disabled)');
+  to?.focus({ preventScroll: true });
   window.scrollTo(0, y);
 }
 
@@ -1933,6 +1944,15 @@ export function renderPosters(container, state, routeChanged, tables) {
           <span class="poster-year-now" data-year="${year}" aria-live="polite">${escAttr(yearLabel(year))}</span>
           <button type="button" id="poster-year-next" aria-label="The year after"
             ${at >= years.length - 1 ? 'disabled' : ''}>+</button>
+          <!-- Back to the year a fresh load opens on, after stepping off it to look at
+               another one. Called Today because that is what the same button is called on
+               This week and on the wall chart, and because the year it lands on is the one
+               that is current for printing rather than the calendar's own: in אלול it is
+               next year's sheets that are wanted. Disabled where it is already there, the
+               way the two steppers are at the ends of the list, so it keeps its place in
+               the box rather than the bar changing shape as the year moves. -->
+          <button type="button" id="poster-year-today" class="poster-year-reset"
+            aria-label="The year coming up" ${year === preferred ? 'disabled' : ''}>Today</button>
         </div>
       </div>
       <label>Yom tov
@@ -1994,6 +2014,15 @@ export function renderPosters(container, state, routeChanged, tables) {
   };
   container.querySelector('#poster-year-back')?.addEventListener('click', () => step(-1));
   container.querySelector('#poster-year-next')?.addEventListener('click', () => step(1));
+  // Null rather than the year itself: null is what a fresh load holds and it means the year
+  // coming up, so this leaves the bar in the state it opens in rather than in a state that
+  // happens to name the same year today and the wrong one after ראש השנה.
+  container.querySelector('#poster-year-today')?.addEventListener('click', () => {
+    chosenYear = null;
+    conflictPick = 0;
+    rememberBar();
+    again();
+  });
   container.querySelector('#poster-group')?.addEventListener('change', (e) => {
     chosenGroup = e.target.value;
     // The sheet chosen belongs to the occasion that was showing, so it is let go of here
