@@ -17,6 +17,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { SLASH, NBSP } from '../util.js';
 
@@ -49,7 +50,7 @@ export const YK_TEXT = {
   maariv: 'מעריב',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
+  krias: { name: 'ס"ז ק"ש' },
   yizkor: { label: 'יזכור בערך', times: '11:55' },
   mincha: 'מנחה',
   neila: 'נעילה',
@@ -289,9 +290,11 @@ export function buildYomKippurPoster(year, settings) {
     line(YK_TEXT.maariv, [tm(nightMaariv)], { calc: 'nightMaariv' }),
     line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
       { calc: 'shacharis', extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
+    // Earliest first, each time under the name of its own reckoning: see reckonings.js.
     line(YK_TEXT.krias.name,
-      [tm(Z.sofZmanShmaMGA72(yk, settings)), tm(Z.sofZmanShmaGRA(yk, settings))],
-      { calc: 'krias', sub: YK_TEXT.krias.basis }),
+      twoReckonings(Z.sofZmanShmaMGA72(yk, settings), Z.sofZmanShmaGRA(yk, settings))
+        .map((r) => ({ ...tm(r.at), name: r.name })),
+      { calc: 'krias' }),
     line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)], { calc: 'yizkor' }),
     line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)], { calc: 'dayMincha' }),   // 1:50 before נעילה
     line(YK_TEXT.drashaBeforeNeila, [], { calc: 'drashaBeforeNeila' }),

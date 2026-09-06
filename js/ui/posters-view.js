@@ -577,6 +577,24 @@ function timeHtml(t) {
   return `${body}${escAttr(t.mark || '')}`;
 }
 
+/** A זמן given both ways, set as two little columns: the name of each reckoning over its own
+ *  time. Shared by both sheets, so the two are one design and not a likeness of one.
+ *
+ *  This shape rather than a name beside the label and a list of times, because that could
+ *  only be read the right way round by luck. The names are Hebrew and set right to left, the
+ *  times are digits and set left to right, so the leftmost name and the leftmost time belonged
+ *  to different reckonings: measured on the sheet, גר"א sat over the מ"א's 9:08. Under each
+ *  other there is nothing to pair up wrongly. See posters/reckonings.js, which also puts the
+ *  earlier of the two on the left. */
+function reckoningPairs(times) {
+  return `<bdi class="zman-pairs" dir="ltr">${times.map((t) =>
+    `<span class="zman-pair"><span class="zman-pair-name" lang="he">${escAttr(t.name)}</span>`
+    + `<span class="zman-pair-time">${timeHtml(t)}</span></span>`).join('')}</bdi>`;
+}
+
+/** Whether a row's times are one זמן given two ways rather than a list of מנינים. */
+const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
+
 /** The page every poster is drawn on: the letterhead, the rabbi's line under it, whatever
  *  the poster itself puts in the middle, and the key to the marks at the foot.
  *
@@ -696,8 +714,11 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
   //
   // SLASH is the charts' own separator, a slash with a non breaking space each side. A bare
   // slash sets the two times hard against it and they read as one number.
-  const t = times.length
-    ? `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>` : '';
+  const t = !times.length
+    ? ''
+    : isReckoned(times)
+      ? reckoningPairs(times)
+      : `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>`;
   const e = extra
     ? `<span class="poster-row-label poster-row-second">${escAttr(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
@@ -1090,9 +1111,11 @@ function onePageRows(r) {
   const body = long
     ? r.times.map((t) => `<span class="onepage-t">${timeHtml(t)}</span>`).join('')
     : r.times.map(timeHtml).join(sep);
-  const times = r.times.length || note
-    ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
-    : '';
+  const times = isReckoned(r.times)
+    ? `<div class="onepage-times">${reckoningPairs(r.times)}</div>`
+    : r.times.length || note
+      ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
+      : '';
   return `<div class="onepage-row">${label}${times}</div>`
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }

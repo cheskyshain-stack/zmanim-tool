@@ -1146,6 +1146,46 @@ function minyanList() {
   };
 }
 
+// ==== posters/reckonings.js ====
+// A זמן given on the two reckonings the boards use, and which order the two go in.
+//
+// ס"ז ק"ש and ט' שעות are each one זמן answered twice, on the גר"א's day and on the מגן
+// אברהם's. The sheets used to print the pair as two times with the two names beside the
+// label, "ס"ז ק"ש מ"א / גר"א   9:08 / 9:44", and that reads backwards. Measured on screen:
+// the names are Hebrew and set right to left, so the leftmost word is גר"א; the times are
+// digits and set left to right, so the leftmost time is the מ"א's. Anybody pairing them
+// across the line reads each time under the wrong name.
+//
+// The wall chart never had this, and the reason is worth writing down because it is the
+// whole of the bug. Its heading is stored "גר״א / מ״א", which displays with מ״א on the left,
+// against times stored מ״א first: measured, מ״א paints at x=455 over 8:50 at x=459 and גר״א
+// at 495 over 9:26 at 494. The posters wrote the same pair in the opposite order and so came
+// out crossed.
+//
+// So the pair is not a label and a list any more. Each time carries the name of its own
+// reckoning and is set under it, which cannot be read the wrong way round whichever
+// direction anything else on the sheet runs in.
+//
+// And they are ordered by the clock rather than by which reckoning it is, so the earlier of
+// the two is always on the left. Written the other way the two rows disagreed with each
+// other: on ס"ז ק"ש the מ"א is the earlier and on ט' שעות it is the later, so a reader
+// meeting both on one sheet had to work out for each row which side was which.
+
+/** The two reckonings, spelled the way the boards spell them. */
+const RECKONING_MGA = 'מ"א';
+const RECKONING_GRA = 'גר"א';
+
+/** One זמן given both ways, earliest first, each answer knowing which reckoning it is.
+ *
+ *  Sorted on the day fractions rather than on the printed text, so it is the real order of
+ *  the two and not a comparison of two strings that carry no meridiem. */
+function twoReckonings(mga, gra) {
+  return [
+    { at: mga, name: RECKONING_MGA },
+    { at: gra, name: RECKONING_GRA },
+  ].sort((a, b) => a.at - b.at);
+}
+
 // ==== posters/slichos.js ====
 // The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
 //
@@ -1392,139 +1432,6 @@ function buildSlichosPoster(hebrewYearNum) {
   };
 }
 
-// ==== util.js ====
-// Small Excel-semantics helpers shared by the sheet column ports.
-
-// Non-breaking space: used in every "/"-joined time list so the browser can never wrap
-// mid-pair (e.g. "7:30 / 8:15" splitting into "7:30 /" + "8:15") when a column is
-// narrow - only the sheet's own explicit \n line breaks should ever create a new line.
-const NBSP = ' ';
-const SLASH = `${NBSP}/${NBSP}`;
-/** The same separator, but able to turn at the end of a line.
- *
- *  SLASH is non-breaking on both sides, which is right in a chart cell: a run of times there
- *  is broken where the formula says, not where the column runs out. On a sheet that sets a run
- *  across the page it is wrong twice over. The whole run becomes one unbreakable word, so it
- *  runs off the side rather than wrapping; and where it does have to wrap there is nowhere to
- *  do it, so the type cannot be grown to fill the page without spilling.
- *
- *  A non-breaking space, a slash, then an ordinary space. The slash is welded to the time in
- *  front of it and the only place the line can turn is after it, which is the one arrangement
- *  of the three that cannot strand a slash at the start of a line. A slash left at the end of
- *  one is turned into the break itself: see breakAtLineEnds in ui/week-view.js. */
-const SOFT_SLASH = `${NBSP}/ `;
-
-/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
-   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
-   <bdi> does, in characters rather than markup: these strings are escaped on their way into
-   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
-   where a tag would be wrong and these are simply invisible.
-
-   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
-   every number after the Hebrew word joins its run and the whole line reverses: measured on
-   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
-   order on a board people read a time off. */
-const ISO_START = '\u2066';
-const ISO_END = '\u2069';
-const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
-
-/* The days of the week as the boards name them, Sunday first so it indexes straight off
-   excelWeekday less one. Here rather than in either of the two files that want it, which
-   had a copy each: the offline build flattens every module into one scope and two consts
-   of the same name in it is a hard error, which is how the pair was found. */
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
-
-/* ' lang="he"' for a string that is Hebrew, and nothing for one that is not, to be dropped
-   straight into a template: `<p class="x"${hebrewLang(value)}>`.
- *
- * The documents declare themselves English (the congregation's) or Hebrew (the admin app),
- * and neither is true of every line inside them. Without this a screen reader says שחרית
- * in an English voice, letter by letter or as nonsense, which on the week's list is most of
- * the words on the page.
- *
- * It is asked of the string rather than written into the markup by hand because most of
- * these words are settings somebody types. The subtitle is Hebrew at this shul and could be
- * English at another, and a cell holds "פלג 6:48" one week and "6:48" the next. Marking the
- * element in the template would be a guess about the contents that is right today.
- *
- * A Latin letter anywhere means no, and that is the point of the rule rather than a
- * shortcut: the footer and the legend line read "All underlined מנינים will be...", one
- * Hebrew word in an English sentence, and calling that whole line Hebrew would be the
- * mistake this is meant to fix, only louder. Those keep no marking at all, which leaves one
- * word said in the wrong voice instead of a sentence. Marking the word itself means wrapping
- * runs mid-string, and those two strings are rich text that carries the underline markup the
- * boards are printed with, so it is not worth the risk to that for one word.
- *
- * Digits and punctuation are neither way and are ignored: a time beside a Hebrew word does
- * not stop the word being Hebrew. */
-const HEBREW_LETTER = /[֐-׿]/;
-const LATIN_LETTER = /[A-Za-z]/;
-function hebrewLang(text) {
-  // Several of these strings arrive as HTML rather than as words: a cell carries the <br>
-  // its line breaks became, and the boards' rich text carries the underline markup. Asked
-  // of the markup, every one of them has Latin letters in it (the "br", the "u") and none
-  // of them would ever be called Hebrew. The tags and any entities come out first, so what
-  // is judged is what is actually read out.
-  const plain = String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ' ');
-  return HEBREW_LETTER.test(plain) && !LATIN_LETTER.test(plain) ? ' lang="he"' : '';
-}
-
-function textjoin(delim, ignoreEmpty, parts) {
-  const flat = [];
-  for (const p of parts) {
-    if (Array.isArray(p)) flat.push(...p);
-    else flat.push(p);
-  }
-  const filtered = ignoreEmpty ? flat.filter((x) => x !== '' && x != null) : flat;
-  return filtered.join(delim);
-}
-function addDays(date, n) {
-  return new Date(date.getTime() + n * 86400000);
-}
-
-/** Flattens arrays (e.g. HSTACK-style pairs) and drops empty/blank entries. */
-function flattenNonEmpty(parts) {
-  const flat = [];
-  for (const p of parts) {
-    if (Array.isArray(p)) flat.push(...p);
-    else flat.push(p);
-  }
-  return flat.filter((x) => x !== '' && x != null);
-}
-
-/** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
-function splitLinesInHalf(items, delim = SLASH) {
-  const cut = Math.floor(items.length / 2);
-  const line1 = items.slice(0, cut).join(delim);
-  const line2 = items.slice(cut).join(delim);
-  return [line1, line2].filter(Boolean).join('\n');
-}
-
-/** HTML escaping, in the two shapes this codebase actually uses.
- *
- *  They were seven private copies of `esc`, three of one shape and four of the other, and
- *  under ES modules that is fine: each file has its own scope. The offline copy flattens
- *  every module into one script, where seven `function esc` are a legal redeclaration and
- *  the last one written wins for all of them. Which one that is depends on nothing but
- *  import order, and import order changes when any module gains an import. So they live
- *  here, one of each, named for what they are.
- *
- *  escAttr also escapes the double quote, and is what anything going into an attribute
- *  needs: a value carrying a " ends the attribute early otherwise.
- *
- *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
- *  built with it and then compared against what the browser reports for that cell, to decide
- *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
- *  browser reports a quote as a quote, so escaping it here would make every cell holding one
- *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
-function escAttr(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-function escText(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 // ==== zmanim/zmanim.js ====
 // Named zman functions, ported 1:1 from the workbook's defined names.
 // Every function returns a fractional day (0-1) representing local time-of-day,
@@ -1705,12 +1612,10 @@ const RH_TEXT = {
   drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  // Split into the name of the זמן and the two reckonings it is given on, so the row can
-  // put the same gap between them that it puts between any name and its time. The two
-  // reckonings are joined with the charts' own SLASH, a slash with a non breaking space
-  // each side, so that breathes as well.
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
-  nineHours: { name: "ט' שעות", basis: `מ"א${SLASH}גר"א` },
+  // Only the name of the זמן. Which reckonings it is given on is carried by the times
+  // themselves now, each under its own name: see posters/reckonings.js for why.
+  krias: { name: 'ס"ז ק"ש' },
+  nineHours: { name: "ט' שעות" },
   shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
   shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
 };
@@ -1730,7 +1635,9 @@ function buildRoshHashanaPoster(year, settings) {
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
   const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
   const at = (t) => [tm(t)];
-  const pair = (a, b) => [tm(a), tm(b)];
+  /** One זמן given both ways: earliest first, each time carrying the name of its own
+   *  reckoning so the sheet can set the two under each other. See posters/reckonings.js. */
+  const bothWays = (mga, gra) => twoReckonings(mga, gra).map((r) => ({ ...tm(r.at), name: r.name }));
 
   // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
   // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
@@ -1797,12 +1704,12 @@ function buildRoshHashanaPoster(year, settings) {
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
       { calc: 'shacharis',
         extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { calc: 'krias', sub: RH_TEXT.krias.basis }));
+    lines.push(line(RH_TEXT.krias.name, bothWays(krias.mga, krias.gra), { calc: 'krias' }));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
     if (isShabbos) {
       lines.push(line(RH_TEXT.drashaBeforeMusaf, [], { calc: 'drashaBeforeMusaf' }));
-      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { calc: 'nineHours', sub: RH_TEXT.nineHours.basis }));
+      lines.push(line(RH_TEXT.nineHours.name, bothWays(nine.mga, nine.gra), { calc: 'nineHours' }));
     } else {
       lines.push(line(RH_TEXT.drashaBeforeShofar, [], { calc: 'drashaBeforeShofar' }));
       lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }], { calc: 'shofar' }));
@@ -2001,6 +1908,139 @@ function buildTzomGedaliaPoster(year, settings) {
   };
 }
 
+// ==== util.js ====
+// Small Excel-semantics helpers shared by the sheet column ports.
+
+// Non-breaking space: used in every "/"-joined time list so the browser can never wrap
+// mid-pair (e.g. "7:30 / 8:15" splitting into "7:30 /" + "8:15") when a column is
+// narrow - only the sheet's own explicit \n line breaks should ever create a new line.
+const NBSP = ' ';
+const SLASH = `${NBSP}/${NBSP}`;
+/** The same separator, but able to turn at the end of a line.
+ *
+ *  SLASH is non-breaking on both sides, which is right in a chart cell: a run of times there
+ *  is broken where the formula says, not where the column runs out. On a sheet that sets a run
+ *  across the page it is wrong twice over. The whole run becomes one unbreakable word, so it
+ *  runs off the side rather than wrapping; and where it does have to wrap there is nowhere to
+ *  do it, so the type cannot be grown to fill the page without spilling.
+ *
+ *  A non-breaking space, a slash, then an ordinary space. The slash is welded to the time in
+ *  front of it and the only place the line can turn is after it, which is the one arrangement
+ *  of the three that cannot strand a slash at the start of a line. A slash left at the end of
+ *  one is turned into the break itself: see breakAtLineEnds in ui/week-view.js. */
+const SOFT_SLASH = `${NBSP}/ `;
+
+/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
+   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
+   <bdi> does, in characters rather than markup: these strings are escaped on their way into
+   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
+   where a tag would be wrong and these are simply invisible.
+
+   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
+   every number after the Hebrew word joins its run and the whole line reverses: measured on
+   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
+   order on a board people read a time off. */
+const ISO_START = '\u2066';
+const ISO_END = '\u2069';
+const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
+
+/* The days of the week as the boards name them, Sunday first so it indexes straight off
+   excelWeekday less one. Here rather than in either of the two files that want it, which
+   had a copy each: the offline build flattens every module into one scope and two consts
+   of the same name in it is a hard error, which is how the pair was found. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+
+/* ' lang="he"' for a string that is Hebrew, and nothing for one that is not, to be dropped
+   straight into a template: `<p class="x"${hebrewLang(value)}>`.
+ *
+ * The documents declare themselves English (the congregation's) or Hebrew (the admin app),
+ * and neither is true of every line inside them. Without this a screen reader says שחרית
+ * in an English voice, letter by letter or as nonsense, which on the week's list is most of
+ * the words on the page.
+ *
+ * It is asked of the string rather than written into the markup by hand because most of
+ * these words are settings somebody types. The subtitle is Hebrew at this shul and could be
+ * English at another, and a cell holds "פלג 6:48" one week and "6:48" the next. Marking the
+ * element in the template would be a guess about the contents that is right today.
+ *
+ * A Latin letter anywhere means no, and that is the point of the rule rather than a
+ * shortcut: the footer and the legend line read "All underlined מנינים will be...", one
+ * Hebrew word in an English sentence, and calling that whole line Hebrew would be the
+ * mistake this is meant to fix, only louder. Those keep no marking at all, which leaves one
+ * word said in the wrong voice instead of a sentence. Marking the word itself means wrapping
+ * runs mid-string, and those two strings are rich text that carries the underline markup the
+ * boards are printed with, so it is not worth the risk to that for one word.
+ *
+ * Digits and punctuation are neither way and are ignored: a time beside a Hebrew word does
+ * not stop the word being Hebrew. */
+const HEBREW_LETTER = /[֐-׿]/;
+const LATIN_LETTER = /[A-Za-z]/;
+function hebrewLang(text) {
+  // Several of these strings arrive as HTML rather than as words: a cell carries the <br>
+  // its line breaks became, and the boards' rich text carries the underline markup. Asked
+  // of the markup, every one of them has Latin letters in it (the "br", the "u") and none
+  // of them would ever be called Hebrew. The tags and any entities come out first, so what
+  // is judged is what is actually read out.
+  const plain = String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ' ');
+  return HEBREW_LETTER.test(plain) && !LATIN_LETTER.test(plain) ? ' lang="he"' : '';
+}
+
+function textjoin(delim, ignoreEmpty, parts) {
+  const flat = [];
+  for (const p of parts) {
+    if (Array.isArray(p)) flat.push(...p);
+    else flat.push(p);
+  }
+  const filtered = ignoreEmpty ? flat.filter((x) => x !== '' && x != null) : flat;
+  return filtered.join(delim);
+}
+function addDays(date, n) {
+  return new Date(date.getTime() + n * 86400000);
+}
+
+/** Flattens arrays (e.g. HSTACK-style pairs) and drops empty/blank entries. */
+function flattenNonEmpty(parts) {
+  const flat = [];
+  for (const p of parts) {
+    if (Array.isArray(p)) flat.push(...p);
+    else flat.push(p);
+  }
+  return flat.filter((x) => x !== '' && x != null);
+}
+
+/** Splits a list of time options across two printed lines, first line getting the
+ *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
+function splitLinesInHalf(items, delim = SLASH) {
+  const cut = Math.floor(items.length / 2);
+  const line1 = items.slice(0, cut).join(delim);
+  const line2 = items.slice(cut).join(delim);
+  return [line1, line2].filter(Boolean).join('\n');
+}
+
+/** HTML escaping, in the two shapes this codebase actually uses.
+ *
+ *  They were seven private copies of `esc`, three of one shape and four of the other, and
+ *  under ES modules that is fine: each file has its own scope. The offline copy flattens
+ *  every module into one script, where seven `function esc` are a legal redeclaration and
+ *  the last one written wins for all of them. Which one that is depends on nothing but
+ *  import order, and import order changes when any module gains an import. So they live
+ *  here, one of each, named for what they are.
+ *
+ *  escAttr also escapes the double quote, and is what anything going into an attribute
+ *  needs: a value carrying a " ends the attribute early otherwise.
+ *
+ *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
+ *  built with it and then compared against what the browser reports for that cell, to decide
+ *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
+ *  browser reports a quote as a quote, so escaping it here would make every cell holding one
+ *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
+function escAttr(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escText(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ==== posters/yomkippur.js ====
 // The יום כיפור poster: ערב יו"כ, the day itself, and the schedule that starts after it.
 //
@@ -2016,6 +2056,7 @@ function buildTzomGedaliaPoster(year, settings) {
 // Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
 // תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
 // other way and is not self-consistent with it. See the commit for the line by line.
+
 
 
 
@@ -2051,7 +2092,7 @@ const YK_TEXT = {
   maariv: 'מעריב',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
+  krias: { name: 'ס"ז ק"ש' },
   yizkor: { label: 'יזכור בערך', times: '11:55' },
   mincha: 'מנחה',
   neila: 'נעילה',
@@ -2291,9 +2332,11 @@ function buildYomKippurPoster(year, settings) {
     line(YK_TEXT.maariv, [tm(nightMaariv)], { calc: 'nightMaariv' }),
     line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
       { calc: 'shacharis', extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
+    // Earliest first, each time under the name of its own reckoning: see reckonings.js.
     line(YK_TEXT.krias.name,
-      [tm(Z.sofZmanShmaMGA72(yk, settings)), tm(Z.sofZmanShmaGRA(yk, settings))],
-      { calc: 'krias', sub: YK_TEXT.krias.basis }),
+      twoReckonings(Z.sofZmanShmaMGA72(yk, settings), Z.sofZmanShmaGRA(yk, settings))
+        .map((r) => ({ ...tm(r.at), name: r.name })),
+      { calc: 'krias' }),
     line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)], { calc: 'yizkor' }),
     line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)], { calc: 'dayMincha' }),   // 1:50 before נעילה
     line(YK_TEXT.drashaBeforeNeila, [], { calc: 'drashaBeforeNeila' }),
@@ -5304,6 +5347,24 @@ function timeHtml(t) {
   return `${body}${escAttr(t.mark || '')}`;
 }
 
+/** A זמן given both ways, set as two little columns: the name of each reckoning over its own
+ *  time. Shared by both sheets, so the two are one design and not a likeness of one.
+ *
+ *  This shape rather than a name beside the label and a list of times, because that could
+ *  only be read the right way round by luck. The names are Hebrew and set right to left, the
+ *  times are digits and set left to right, so the leftmost name and the leftmost time belonged
+ *  to different reckonings: measured on the sheet, גר"א sat over the מ"א's 9:08. Under each
+ *  other there is nothing to pair up wrongly. See posters/reckonings.js, which also puts the
+ *  earlier of the two on the left. */
+function reckoningPairs(times) {
+  return `<bdi class="zman-pairs" dir="ltr">${times.map((t) =>
+    `<span class="zman-pair"><span class="zman-pair-name" lang="he">${escAttr(t.name)}</span>`
+    + `<span class="zman-pair-time">${timeHtml(t)}</span></span>`).join('')}</bdi>`;
+}
+
+/** Whether a row's times are one זמן given two ways rather than a list of מנינים. */
+const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
+
 /** The page every poster is drawn on: the letterhead, the rabbi's line under it, whatever
  *  the poster itself puts in the middle, and the key to the marks at the foot.
  *
@@ -5423,8 +5484,11 @@ function rhRow(label, times, extra, sub, sep = SLASH) {
   //
   // SLASH is the charts' own separator, a slash with a non breaking space each side. A bare
   // slash sets the two times hard against it and they read as one number.
-  const t = times.length
-    ? `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>` : '';
+  const t = !times.length
+    ? ''
+    : isReckoned(times)
+      ? reckoningPairs(times)
+      : `<bdi class="poster-row-times">${times.map(timeHtml).join(sep)}</bdi>`;
   const e = extra
     ? `<span class="poster-row-label poster-row-second">${escAttr(extra.label)}</span>`
       + `<bdi class="poster-row-times">${extra.times.map(timeHtml).join(SLASH)}</bdi>`
@@ -5817,9 +5881,11 @@ function onePageRows(r) {
   const body = long
     ? r.times.map((t) => `<span class="onepage-t">${timeHtml(t)}</span>`).join('')
     : r.times.map(timeHtml).join(sep);
-  const times = r.times.length || note
-    ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
-    : '';
+  const times = isReckoned(r.times)
+    ? `<div class="onepage-times">${reckoningPairs(r.times)}</div>`
+    : r.times.length || note
+      ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
+      : '';
   return `<div class="onepage-row">${label}${times}</div>`
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }
@@ -7182,16 +7248,16 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: 7:30 and 8:30. המלך rides on the שחרית line as a second name and time rather than as one run of text, so it takes the same gap between word and time that every other row has.',
       },
       krias: {
-        plain: 'סוף זמן קריאת שמע, given both ways: the מגן אברהם\'s first, then the גר"א\'s.',
-        exact: 'The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה, each a quarter of the way through its own day. Printed מ"א then גר"א, joined by the charts\' own slash.',
+        plain: 'סוף זמן קריאת שמע, given both ways, with each answer set under the name of the reckoning it belongs to and the earlier of the two on the left.',
+        exact: 'The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה, each a quarter of the way through its own day. The two are ordered by the clock rather than by which reckoning it is, and each name is set over its own time: a name beside the label could only be paired with a time by luck, the names being Hebrew and set right to left while the times are digits and set left to right. On this זמן the מ"א is the earlier of the two, so it is the one on the left.',
       },
       drashaBeforeMusaf: {
         plain: 'On a first day that is Shabbos there is no שופר, so the דרשה moves to before מוסף. An announcement with no time on it.',
         exact: 'Printed instead of the דרשה קודם תקיעת שופר whenever this day is Shabbos.',
       },
       nineHours: {
-        plain: 'ט\' שעות, given both ways like the קריאת שמע above it. Printed only on a day that is Shabbos, standing in for the שופר lines.',
-        exact: 'Nine seasonal hours from the start of the day, counted forward. The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה: each day divided by twelve and nine of those taken. Printed מ"א then גר"א, which on this זמן is the later one first, unlike the קריאת שמע line above it.',
+        plain: 'ט\' שעות, set the same way as the קריאת שמע above it: each answer under its own name, earlier on the left. Printed only on a day that is Shabbos, standing in for the שופר lines.',
+        exact: 'Nine seasonal hours from the start of the day, counted forward. The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה: each day divided by twelve and nine of those taken. On this זמן the מ"א is the later of the two, the opposite way round from the קריאת שמע line above it, which is why the pair is ordered by the clock and not by the reckoning: the earlier answer is on the left on both rows, and here that is the גר"א.',
       },
       drashaBeforeShofar: {
         plain: 'The דרשה before תקיעת שופר, on a day that is not Shabbos. An announcement with no time on it.',
@@ -7266,8 +7332,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: 7:30 and 8:30, the same pair the ראש השנה sheet prints.',
       },
       krias: {
-        plain: 'סוף זמן קריאת שמע on יום כיפור, given the מגן אברהם\'s way and then the גר"א\'s.',
-        exact: 'Worked exactly as on the ראש השנה sheet: a quarter of the way through the day, the מ"א on עלות 72 to צאת 72 and the גר"א on נץ to שקיעה, on 10 תשרי.',
+        plain: 'סוף זמן קריאת שמע on יום כיפור, given both ways, each answer under its own name and the earlier on the left.',
+        exact: 'Worked and set exactly as on the ראש השנה sheet: a quarter of the way through the day, the מ"א on עלות 72 to צאת 72 and the גר"א on נץ to שקיעה, on 10 תשרי.',
       },
       yizkor: {
         plain: 'יזכור, given as an approximate time because it follows the davening.',

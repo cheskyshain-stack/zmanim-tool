@@ -304,16 +304,16 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: 7:30 and 8:30. המלך rides on the שחרית line as a second name and time rather than as one run of text, so it takes the same gap between word and time that every other row has.',
       },
       krias: {
-        plain: 'סוף זמן קריאת שמע, given both ways: the מגן אברהם\'s first, then the גר"א\'s.',
-        exact: 'The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה, each a quarter of the way through its own day. Printed מ"א then גר"א, joined by the charts\' own slash.',
+        plain: 'סוף זמן קריאת שמע, given both ways, with each answer set under the name of the reckoning it belongs to and the earlier of the two on the left.',
+        exact: 'The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה, each a quarter of the way through its own day. The two are ordered by the clock rather than by which reckoning it is, and each name is set over its own time: a name beside the label could only be paired with a time by luck, the names being Hebrew and set right to left while the times are digits and set left to right. On this זמן the מ"א is the earlier of the two, so it is the one on the left.',
       },
       drashaBeforeMusaf: {
         plain: 'On a first day that is Shabbos there is no שופר, so the דרשה moves to before מוסף. An announcement with no time on it.',
         exact: 'Printed instead of the דרשה קודם תקיעת שופר whenever this day is Shabbos.',
       },
       nineHours: {
-        plain: 'ט\' שעות, given both ways like the קריאת שמע above it. Printed only on a day that is Shabbos, standing in for the שופר lines.',
-        exact: 'Nine seasonal hours from the start of the day, counted forward. The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה: each day divided by twelve and nine of those taken. Printed מ"א then גר"א, which on this זמן is the later one first, unlike the קריאת שמע line above it.',
+        plain: 'ט\' שעות, set the same way as the קריאת שמע above it: each answer under its own name, earlier on the left. Printed only on a day that is Shabbos, standing in for the שופר lines.',
+        exact: 'Nine seasonal hours from the start of the day, counted forward. The מ"א on a day running from עלות 72 minutes to צאת 72 minutes, the גר"א on a day running נץ to שקיעה: each day divided by twelve and nine of those taken. On this זמן the מ"א is the later of the two, the opposite way round from the קריאת שמע line above it, which is why the pair is ordered by the clock and not by the reckoning: the earlier answer is on the left on both rows, and here that is the גר"א.',
       },
       drashaBeforeShofar: {
         plain: 'The דרשה before תקיעת שופר, on a day that is not Shabbos. An announcement with no time on it.',
@@ -388,8 +388,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated: 7:30 and 8:30, the same pair the ראש השנה sheet prints.',
       },
       krias: {
-        plain: 'סוף זמן קריאת שמע on יום כיפור, given the מגן אברהם\'s way and then the גר"א\'s.',
-        exact: 'Worked exactly as on the ראש השנה sheet: a quarter of the way through the day, the מ"א on עלות 72 to צאת 72 and the גר"א on נץ to שקיעה, on 10 תשרי.',
+        plain: 'סוף זמן קריאת שמע on יום כיפור, given both ways, each answer under its own name and the earlier on the left.',
+        exact: 'Worked and set exactly as on the ראש השנה sheet: a quarter of the way through the day, the מ"א on עלות 72 to צאת 72 and the גר"א on נץ to שקיעה, on 10 תשרי.',
       },
       yizkor: {
         plain: 'יזכור, given as an approximate time because it follows the davening.',

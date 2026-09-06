@@ -3259,6 +3259,26 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    Non-breaking spaces either side, the same as the SLASH the short runs are joined with, so
    a line can never break between a time and its own slash. */
 .onepage-t + .onepage-t::before { content: "\00a0/\00a0"; }
+
+/* One זמן given both ways: the name of each reckoning over its own time. On every sheet that
+   prints such a pair, which is ס"ז ק"ש on ראש השנה and on יום כיפור and ט' שעות on a ראש השנה
+   that is Shabbos. See reckoningPairs in ui/posters-view.js for why they are stacked and
+   posters/reckonings.js for why the earlier one is on the left.
+
+   inline-flex rather than a block, because on the full sheets a row is a line of text and the
+   pair has to sit in it beside the label like any other run of times. */
+.zman-pairs { display: inline-flex; align-items: flex-end; gap: 0.14in; }
+.zman-pair { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; }
+/* Smaller and lighter than the time under it: it names the time rather than being one, the
+   same relation the chart's own two-line heading has to its column. In em, so it follows
+   whatever size the sheet has been fitted to. */
+.zman-pair-name { font-size: 0.68em; font-weight: 400; }
+/* The label centred against the pair rather than sitting on the first line's baseline, which
+   is the small name and would have left the label riding high. A row without a pair keeps the
+   baseline it always had. */
+.poster-row:has(.zman-pair) .poster-row-label,
+.poster-row:has(.zman-pair) .zman-pairs { vertical-align: middle; }
+.onepage-row:has(.zman-pair) { align-items: center; }
 .onepage-times u { text-underline-offset: 0.12em; }
 .onepage-note { white-space: nowrap; }
 

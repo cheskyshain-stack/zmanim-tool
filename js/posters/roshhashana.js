@@ -17,7 +17,7 @@ import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
-import { SLASH } from '../util.js';
+import { twoReckonings } from './reckonings.js';
 
 const RH_MIN = 1 / 1440;
 const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -72,12 +72,10 @@ export const RH_TEXT = {
   drashaBeforeMusaf: 'דרשה מאת הרב שליט"א קודם מוסף',
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
-  // Split into the name of the זמן and the two reckonings it is given on, so the row can
-  // put the same gap between them that it puts between any name and its time. The two
-  // reckonings are joined with the charts' own SLASH, a slash with a non breaking space
-  // each side, so that breathes as well.
-  krias: { name: 'ס"ז ק"ש', basis: `מ"א${SLASH}גר"א` },
-  nineHours: { name: "ט' שעות", basis: `מ"א${SLASH}גר"א` },
+  // Only the name of the זמן. Which reckonings it is given on is carried by the times
+  // themselves now, each under its own name: see posters/reckonings.js for why.
+  krias: { name: 'ס"ז ק"ש' },
+  nineHours: { name: "ט' שעות" },
   shofar: { label: 'תקיעת שופר בערך', times: '11:40' },
   shofarWomen: { label: 'תקיעת שופר לנשים בערך', times: '3:05' },
 };
@@ -97,7 +95,9 @@ export function buildRoshHashanaPoster(year, settings) {
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
   const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
   const at = (t) => [tm(t)];
-  const pair = (a, b) => [tm(a), tm(b)];
+  /** One זמן given both ways: earliest first, each time carrying the name of its own
+   *  reckoning so the sheet can set the two under each other. See posters/reckonings.js. */
+  const bothWays = (mga, gra) => twoReckonings(mga, gra).map((r) => ({ ...tm(r.at), name: r.name }));
 
   // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
   // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
@@ -164,12 +164,12 @@ export function buildRoshHashanaPoster(year, settings) {
     lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
       { calc: 'shacharis',
         extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias.name, pair(krias.mga, krias.gra), { calc: 'krias', sub: RH_TEXT.krias.basis }));
+    lines.push(line(RH_TEXT.krias.name, bothWays(krias.mga, krias.gra), { calc: 'krias' }));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
     if (isShabbos) {
       lines.push(line(RH_TEXT.drashaBeforeMusaf, [], { calc: 'drashaBeforeMusaf' }));
-      lines.push(line(RH_TEXT.nineHours.name, pair(nine.mga, nine.gra), { calc: 'nineHours', sub: RH_TEXT.nineHours.basis }));
+      lines.push(line(RH_TEXT.nineHours.name, bothWays(nine.mga, nine.gra), { calc: 'nineHours' }));
     } else {
       lines.push(line(RH_TEXT.drashaBeforeShofar, [], { calc: 'drashaBeforeShofar' }));
       lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }], { calc: 'shofar' }));
