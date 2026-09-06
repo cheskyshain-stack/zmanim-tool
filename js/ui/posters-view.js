@@ -1427,6 +1427,85 @@ function renderOnePagePoster(built, settings) {
 const OP_MIN = 0.7;
 const OP_MAX = 1.25;
 const OP_STEP = 0.01;
+/** Hands a sheet's blocks out between two columns so the taller of them is as short as it can
+ *  be, and answers with how tall that is.
+ *
+ *  Shared by the two sheets that have two columns to fill, the one-page sheet and the סוכות
+ *  sheet, because the question is the same one and the answer was not: each had its own, each
+ *  cut only between whole blocks, and a year whose blocks did not divide evenly came out with
+ *  one column full and the other two thirds of the way down. Measured on the סוכות sheet, 570px
+ *  of one column against 787px of the other.
+ *
+ *  So the cut can fall inside a block. What is carried over does not repeat the block's name:
+ *  the shul asked for it not to be written twice, and a column opening on the rest of the block
+ *  above it reads as the continuation it is. The cut never falls straight after a heading,
+ *  which would leave the heading stranded at the foot of the first column with nothing under
+ *  it.
+ *
+ *  Everything is measured with every block in the first column, because a block's height does
+ *  not depend on which column it is in: the two are the same width. So one pass of measuring
+ *  answers every cut. offsetTop and offsetHeight, which are layout and are in the sheet's own
+ *  pixels: a phone shrinks the whole sheet with zoom, and a rect read under that is in screen
+ *  pixels and could not be compared with the box it has to fit.
+ *
+ *  `groups` is one entry per block: the element it lives in, its heading, and its rows. */
+function splitColumns(cols, groups) {
+  // Everything back where it started, its rows first and then the box that carried them, so a
+  // block that was cut last time is one block again before anything is measured.
+  for (const g of groups) {
+    for (const r of g.rows) if (r.parentElement !== g.box) g.box.appendChild(r);
+    if (g.carried) { g.carried.remove(); g.carried = null; }
+    if (g.box.parentElement !== cols[0]) cols[0].appendChild(g.box);
+  }
+  // The blocks and their rows as one list, in the order they are read.
+  const items = [];
+  for (const g of groups) {
+    if (g.head) items.push({ el: g.head, group: g, head: true });
+    for (const r of g.rows) items.push({ el: r, group: g, head: false });
+  }
+  if (items.length < 2) return 0;
+  const top = items.map((it) => it.el.offsetTop);
+  const tail = items[items.length - 1].el;
+  const end = tail.offsetTop + tail.offsetHeight;
+  let at = items.length;
+  let worst = end - top[0];
+  for (let k = 1; k < items.length; k++) {
+    // Never straight after a heading: that would strand it at the foot of the first column
+    // with nothing under it.
+    if (items[k - 1].head) continue;
+    const m = Math.max(top[k] - top[0], end - top[k]);
+    if (m < worst) { worst = m; at = k; }
+  }
+  if (at >= items.length) return worst;
+
+  const cut = items[at];
+  const rest = groups.slice(groups.indexOf(cut.group) + (cut.head ? 0 : 1));
+  if (!cut.head) {
+    /* The block the cut falls inside keeps its box and the rows above the cut; the rows below
+       it go into a box of their own at the head of the second column. A shallow clone, so the
+       continuation is the same kind of box with the same classes and none of the old children.
+       No heading on it: the shul asked for the name not to be written a second time, and a
+       column that opens on the rest of the block above it reads as the continuation it is. */
+    const g = cut.group;
+    const cont = g.box.cloneNode(false);
+    g.carried = cont;
+    for (const r of g.rows.slice(g.rows.indexOf(cut.el))) cont.appendChild(r);
+    cols[1].appendChild(cont);
+  }
+  for (const g of rest) cols[1].appendChild(g.box);
+  /* Measured rather than the estimate handed back, because it is what the caller fits against.
+     The estimate is the two columns' heights read off one column, which is close and is not
+     the same thing: a block at the head of a column loses the space above it, and a carried
+     heading is counted at its own height rather than at what it takes with its margins. Both
+     columns are packed to the top, so this is the real ink. */
+  return Math.max(...[...cols].map((c) => {
+    const kids = [...c.children];
+    if (!kids.length) return 0;
+    const bottom = kids[kids.length - 1];
+    return bottom.offsetTop + bottom.offsetHeight - kids[0].offsetTop;
+  }));
+}
+
 /** Room left at the foot before a size counts as fitting, in the sheet's own pixels.
  *
  *  A tenth of an inch on eleven, which is the price of not having to be right to the pixel
@@ -1443,33 +1522,24 @@ function fitOnePage(container) {
     const secs = [...cols.querySelectorAll('.onepage-sec')];
     if (secs.length < 2) continue;
     const set = (v) => sheet.style.setProperty('--op-scale', v);
-    /* Hand the blocks out between the two columns so the taller of them is as short as it
-       can be, and answer with how tall that is.
-       offsetHeight, which is layout and is in the sheet's own pixels: a phone shrinks the
-       whole sheet with zoom to fit its screen, and a rect read under that is in screen
-       pixels, so it could not be compared with the box it has to fit.
-       Every split is tried rather than the halfway point taken, because the blocks are not
-       the same size: יום כיפור is fourteen rows and שבת שובה is two, and cutting the list in
-       the middle leaves one column inches longer than the other. */
-    const layout = () => {
-      const tall = secs.map((s) => s.offsetHeight
-        + parseFloat(getComputedStyle(s).marginBottom || 0));
-      const total = tall.reduce((a, x) => a + x, 0);
-      let at = 1;
-      let worst = Infinity;
-      let run = 0;
-      for (let i = 1; i < secs.length; i++) {
-        run += tall[i - 1];
-        const m = Math.max(run, total - run);
-        if (m < worst) { worst = m; at = i; }
-      }
-      secs.forEach((s, i) => {
-        const want = i < at ? col[0] : col[1];
-        if (s.parentElement !== want) want.appendChild(s);
-      });
-      return worst;
-    };
+    /* One entry per block: the box it lives in, its heading, and its rows. splitColumns hands
+       them out between the two columns and may cut one block in two to do it.
+       Kept on the sheet rather than gathered afresh every call, because this runs again when a
+       phone is turned and by then the sheet may already be cut: read off the page a second
+       time, the half of a block carried into the second column would be read as a block of its
+       own, and putting it back would have nowhere to put it back to. */
+    const groups = sheet.posterGroups || (sheet.posterGroups = secs.map((box) => ({
+      box,
+      head: box.querySelector(':scope > .onepage-sec-head'),
+      rows: [...box.querySelectorAll(':scope > .onepage-row')],
+      carried: null,
+    })));
+    const layout = () => splitColumns(col, groups);
     const fits = () => layout() <= cols.clientHeight - OP_ROOM;
+    // Cleared before the search, not after it: this runs again when a phone is turned, and a
+    // gap left over from the last pass would be part of what the type is fitted against.
+    sheet.style.setProperty('--op-gap-1', '0px');
+    sheet.style.setProperty('--op-gap-2', '0px');
     let best = OP_MIN;
     for (const step of [0.05, OP_STEP]) {
       for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
@@ -1480,6 +1550,24 @@ function fitOnePage(container) {
     }
     set(best);
     layout();
+    /* Whatever is left after the last step of type goes to the rows. The type can only be
+       grown in steps and it stops at the last one that fits, and it stops for good at the
+       ceiling, which an occasion with little on it reaches with room still to spare: measured
+       on סוכות, 1.25 with a sixth of the column unused and the whole of it banked into the
+       three gaps between four blocks.
+       Per row, and the smaller of the two columns' shares, so neither can overflow. The taller
+       column then fills exactly and the other keeps a little slack, which its own space-between
+       spreads between its blocks the way it always did. Capped at nine tenths of a row, so an
+       occasion with very little on it does not come out a table with holes in it. */
+    const gaps = [...col].map((c) => {
+      const rows = c.querySelectorAll('.onepage-row');
+      const inner = [...c.querySelectorAll('.onepage-sec')];
+      if (!rows.length || !inner.length) return 0;
+      const ink = inner[inner.length - 1].offsetTop + inner[inner.length - 1].offsetHeight - inner[0].offsetTop;
+      const spare = cols.clientHeight - OP_ROOM - ink;
+      return Math.min(Math.max(0, spare) / rows.length, rows[0].offsetHeight * 0.9);
+    });
+    gaps.forEach((g, i) => sheet.style.setProperty(`--op-gap-${i + 1}`, `${g}px`));
   }
 }
 
@@ -1510,28 +1598,14 @@ function fitSukkos(container) {
     const blocks = pair ? [...pair.querySelectorAll('.poster-block')] : [];
     if (cols.length !== 2 || blocks.length < 2) continue;
     const set = (v) => sheet.style.setProperty('--sk-scale', v);
-    /* Hand the blocks out, and answer with how tall the taller column comes to.
-       Measured with all of them in the first column, because a block's height does not depend
-       on which column it is in: the two are the same width. So one pass of measuring answers
-       every split. */
-    const layout = () => {
-      for (const b of blocks) if (b.parentElement !== cols[0]) cols[0].appendChild(b);
-      const tall = blocks.map((b) => b.offsetHeight);
-      const total = tall.reduce((a, x) => a + x, 0);
-      let at = blocks.length;
-      let worst = total;
-      let run = 0;
-      for (let i = 1; i < blocks.length; i++) {
-        run += tall[i - 1];
-        const m = Math.max(run, total - run);
-        if (m < worst) { worst = m; at = i; }
-      }
-      blocks.forEach((b, i) => {
-        const want = i < at ? cols[0] : cols[1];
-        if (b.parentElement !== want) want.appendChild(b);
-      });
-      return worst;
-    };
+    // Kept on the sheet rather than gathered afresh every call: see fitOnePage for why.
+    const groups = sheet.posterGroups || (sheet.posterGroups = blocks.map((box) => ({
+      box,
+      head: box.querySelector(':scope > .poster-day'),
+      rows: [...box.querySelectorAll(':scope > .poster-row')],
+      carried: null,
+    })));
+    const layout = () => splitColumns(cols, groups);
     /* Across as well as down. A label is set nowrap on this sheet, so "מנחה ערב שבת" cannot be
        broken in the middle of itself. What that buys in legibility it has to pay for here: a
        label too wide for its column would run off the side of the sheet rather than wrapping,

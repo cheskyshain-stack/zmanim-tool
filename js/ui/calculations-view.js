@@ -516,8 +516,12 @@ const POSTER_SHEETS = [
         exact: 'Four fixed times, and a first one that is 1:15 where that is at or after מנחה גדולה לחומרא (itself the later of מנחה גדולה and half an hour after חצות), 1:20 where it is not, and nothing at all in a year where even 1:20 would be early. The sheets the shul hangs already moved it by hand: תשפ"ד prints 1:16, 1:17 and 1:18 on its three afternoons, and the round 1:20 is what the shul asked for in place of three different minutes in three different years. Both are measured on the printed minute, since מנחה גדולה carries seconds. The first two מנינים are למטה.',
       },
       candles: {
-        plain: 'הדלקת נרות before a יום טוב, the usual number of minutes before שקיעה, with the מנחה that goes with it three minutes later.',
-        exact: (settings) => `שקיעה of the night that opens the day, less the ${settings.candleLightingMinutes} minutes set in Settings. The מנחה beside it is that time plus 3 minutes.`,
+        plain: 'הדלקת נרות before a יום טוב, the usual number of minutes before שקיעה.',
+        exact: (settings) => `שקיעה of the night that opens the day, less the ${settings.candleLightingMinutes} minutes set in Settings.`,
+      },
+      candlesMincha: {
+        plain: 'The מנחה that goes with הדלקת נרות, three minutes after it, on a line of its own under it.',
+        exact: 'הדלקת נרות plus 3 minutes.',
       },
       nightShkia: {
         plain: 'שקיעה of the night that opens this day. A זמן, not a מנין.',
@@ -581,7 +585,7 @@ const POSTER_SHEETS = [
       },
       shabbosCandles: {
         plain: 'הדלקת נרות before a Shabbos on this sheet, worked exactly as the board works it.',
-        exact: (settings) => `Sunset at the shul\'s horizon on the Friday, taken down to the whole minute, less the ${settings.candleLightingMinutes} minutes set in Settings. The same formula as column H of the שבת חורף chart. On שבת חול המועד the מנחה three minutes later is printed beside it; on שבת בראשית it is not, because that Friday is שמחת תורה and its own block has already given the afternoon.`,
+        exact: (settings) => `Sunset at the shul\'s horizon on the Friday, taken down to the whole minute, less the ${settings.candleLightingMinutes} minutes set in Settings. The same formula as column H of the שבת חורף chart. On שבת חול המועד the מנחה three minutes later is printed under it; on שבת בראשית it is not, because that Friday is שמחת תורה and its own block has already given the afternoon.`,
       },
       shabbosShkia: {
         plain: 'שקיעה on the Friday, the one printed on the board beside הדלקת נרות.',
@@ -616,7 +620,7 @@ const POSTER_SHEETS = [
         exact: 'Not calculated.',
       },
       mishna: {
-        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00.',
+        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with.',
         exact: 'Not calculated.',
       },
       mishnaMaariv: {

@@ -275,12 +275,8 @@ function sukkosShabbosLines(shabbosSerial, settings, bothWays, { erevMincha = nu
   const out = [];
   if (erevMincha) {
     out.push({ label: SK_TEXT.erevMinchaShabbos, times: erevMincha, calc: 'erevMincha' });
-    out.push({
-      label: SK_TEXT.candles,
-      times: [tm(candles)],
-      calc: 'shabbosCandles',
-      extra: { label: SK_TEXT.mincha, times: [tm(candles + 3 * SK_MIN)] },
-    });
+    out.push({ label: SK_TEXT.candles, times: [tm(candles)], calc: 'shabbosCandles' });
+    out.push({ label: SK_TEXT.mincha, times: [tm(candles + 3 * SK_MIN)], calc: 'candlesMincha' });
   } else {
     out.push({ label: SK_TEXT.candles, times: [tm(candles)], calc: 'shabbosCandles' });
   }
@@ -359,9 +355,11 @@ export function buildSukkosPoster(year, settings) {
       // Shabbos days: the afternoon is ערב יום טוב first, and the Shabbos is said in the
       // heading above.
       line(SK_TEXT.erevMincha, list(sukkosErevMincha(on, settings)), { calc: 'erevMincha' }),
-      // הדלקת נרות and the מנין three minutes behind it, the pair the sheet sets on one line.
-      line(SK_TEXT.candles, [tm(candles)],
-        { calc: 'candles', extra: { label: SK_TEXT.mincha, times: [tm(candles + 3 * SK_MIN)] } }),
+      // הדלקת נרות, and the מנין three minutes behind it on a line of its own. The two were
+      // one row for a while, the way the sheets it was ported from set them; the shul asked
+      // for two, which is also how the one-page sheet has always set them.
+      line(SK_TEXT.candles, [tm(candles)], { calc: 'candles' }),
+      line(SK_TEXT.mincha, [tm(candles + 3 * SK_MIN)], { calc: 'candlesMincha' }),
       line(SK_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
     ];
     if (opts.drasha !== false) {
@@ -523,7 +521,10 @@ export function buildSukkosPoster(year, settings) {
   blocks.push({
     heading: SK_TEXT.hoshana,
     lines: [
-      line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt)], { calc: 'mishna', wrap: true }),
+      // Starred, because it is in the עזרת נשים and that is what a star means on these sheets.
+      // The words say so as well: that is the wording the shul's own sheet uses and it is left
+      // alone, so this row says where twice over, once in words and once in the key's mark.
+      line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt, false, '*')], { calc: 'mishna', wrap: true }),
       line(SK_SHUAVA.mishnaMaariv, [], { calc: 'mishnaMaariv', wrap: true }),
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.

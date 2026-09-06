@@ -3204,10 +3204,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: 26pt; font-weight: 700; text-decoration: underline;
   text-underline-offset: 0.06em; text-decoration-skip-ink: none; margin: 0 0 0.14in; line-height: 1.3;
 }
-.poster-shuava-line {
-  font-size: 24pt; font-weight: 700; margin: 0 0 0.14in; line-height: 1.3;
-  text-decoration: underline; text-underline-offset: 0.06em; text-decoration-skip-ink: none;
-}
+/* Not underlined, unlike the two headings above them. The sheet this was ported from
+   underlines every line on it, and copying that put an underline on a time: on these boards an
+   underline under a time means the מנין davens בבית מדרש למטה, and this one is at the Rav's
+   house. A heading is underlined here the way .poster-title and .poster-day are on every other
+   sheet, and nothing else is. */
+.poster-shuava-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.14in; line-height: 1.3; }
 .poster-shuava-rule { border: 0; border-top: 1px solid #000; width: 3.4in; margin: 0.6in auto; }
 .poster-mincha u { text-underline-offset: 0.12em; }
 /* Only the marks this poster actually carries get explained, so it never defines a star it
@@ -3293,7 +3295,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .onepage-col {
   flex: 1 1 0; min-width: 0;
-  display: flex; flex-direction: column; justify-content: space-between;
+  /* Packed to the top, not spread. What is left over goes into the rows themselves now (see
+     --op-gap on .onepage-row), so there is next to nothing left to spread, and spread is what
+     made the leftover hard to measure in the first place: with space-between a column's first
+     block and its last are pinned to its two ends whatever is in them, so it always measured
+     exactly full and never had anything spare. */
+  display: flex; flex-direction: column; justify-content: flex-start;
 }
 /* The rule between them. On the second column's start edge, which in a right-to-left sheet
    is the edge facing the first one. */
@@ -3318,10 +3325,21 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    it comes back to 95%, which is the whole of what these two numbers are for. */
 .onepage-row {
   display: flex; justify-content: space-between; align-items: baseline;
-  gap: 0.1in; padding: 0.014in 0.06in;
+  /* The room left after the type has been grown as far as it will go, given to the rows.
+     fitOnePage works out how much and caps it. Added to their own padding rather than as a
+     margin, and spread through every row rather than banked between the blocks: an occasion
+     with little on it, סוכות against the yomim noraim, reached the ceiling on its type with
+     room to spare and put the whole of it into three gaps between four headings. */
+  gap: 0.1in; padding: calc(0.014in + var(--op-gap, 0px) / 2) 0.06in;
   border-bottom: 0.5pt solid var(--op-hair);
   font-size: calc(9.5pt * var(--op-scale)); line-height: 1.2;
 }
+/* A column at a time, because the two rarely have the same amount left over: one is what the
+   type was fitted against and fills, and the other is whatever was left after the blocks were
+   handed out. One number for both meant the tighter column decided it and the looser one kept
+   its slack, which is the holes this was meant to close. */
+.onepage-col:nth-child(1) .onepage-row { --op-gap: var(--op-gap-1, 0px); }
+.onepage-col:nth-child(2) .onepage-row { --op-gap: var(--op-gap-2, 0px); }
 .onepage-sec > .onepage-row:last-child { border-bottom: 0; }
 .onepage-label { text-align: right; }
 /* The reckonings a זמן is given on (מ"א / גר"א), held off the name in front of it. */
