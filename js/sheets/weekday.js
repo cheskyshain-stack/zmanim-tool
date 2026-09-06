@@ -33,6 +33,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
+import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { formatTime, underlineTime } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 
@@ -275,8 +276,38 @@ function afterYomKippurRow(week, settings) {
   return null;
 }
 
+/** The same again for the week after סוכות, which is the week of בראשית in an ordinary year.
+ *
+ *  Those days are the other end of the same yom tov stretch: people are off, the shul runs the
+ *  fuller schedule, and the סוכות sheet already carries it as its own block, "זמני תפילה אחר
+ *  סוכות", worked on the rules the shul gave for the days after יום כיפור. Left to the rules
+ *  above, the row came out thinner than that block: measured on תשפ"ז, 1:35 / 1:50 / 6:10
+ *  against the block's 1:15 / 1:35 / 1:50 / 4:15 / 4:40 / 5:00 / 5:20 / 5:40 / 6:00, and an
+ *  evening missing the 8:30 and the 9:00. The board and the sheet hung beside it were saying
+ *  two different things about one week, and the shul asked for the sheet's answer.
+ *
+ *  The row is found by the first day of the run rather than the last, which is where this
+ *  differs from the יו"כ one above. That run ends at ערב סוכות and its last day is what pins
+ *  it; this one opens the morning after שמחת תורה and runs on into the next week, so its first
+ *  day is what says which row it belongs to. In an ordinary year that is the week of בראשית.
+ *  In a year where שמחת תורה is the Friday and בראשית the day after, the weekdays of the
+ *  בראשית row are still יום טוב and the run opens on the Sunday after it: תשפ"ה is such a
+ *  year, and there this schedule lands on the נח row, which is the week it is actually for. */
+function afterSukkosRow(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const { year } = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    const rh = roshHashana(y - 3761);
+    const run = sukkosAfterDays(rh, settings);
+    if (run.length && days.includes(run[0])) return buildSukkosAfter(rh, settings);
+  }
+  return null;
+}
+
 export function buildWeekdayRow(week, settings) {
-  const after = afterYomKippurRow(week, settings);
+  // Both give the same three lists in the same shape, and no week can be in both runs: one
+  // ends at ערב סוכות and the other starts after שמחת תורה.
+  const after = afterYomKippurRow(week, settings) || afterSukkosRow(week, settings);
   if (after) {
     return {
       B: splitLinesInHalf(after.maariv.map(fromPoster)),

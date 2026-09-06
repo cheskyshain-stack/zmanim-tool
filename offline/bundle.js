@@ -3612,6 +3612,7 @@ const KAYITZ_COLUMNS = [
 
 
 
+
 /** Times are handled in whole minutes after midnight rather than Excel day-fractions,
  *  because every zman on this chart sits on a 5-minute grid and the moves below are
  *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
@@ -3851,8 +3852,38 @@ function afterYomKippurRow(week, settings) {
   return null;
 }
 
+/** The same again for the week after סוכות, which is the week of בראשית in an ordinary year.
+ *
+ *  Those days are the other end of the same yom tov stretch: people are off, the shul runs the
+ *  fuller schedule, and the סוכות sheet already carries it as its own block, "זמני תפילה אחר
+ *  סוכות", worked on the rules the shul gave for the days after יום כיפור. Left to the rules
+ *  above, the row came out thinner than that block: measured on תשפ"ז, 1:35 / 1:50 / 6:10
+ *  against the block's 1:15 / 1:35 / 1:50 / 4:15 / 4:40 / 5:00 / 5:20 / 5:40 / 6:00, and an
+ *  evening missing the 8:30 and the 9:00. The board and the sheet hung beside it were saying
+ *  two different things about one week, and the shul asked for the sheet's answer.
+ *
+ *  The row is found by the first day of the run rather than the last, which is where this
+ *  differs from the יו"כ one above. That run ends at ערב סוכות and its last day is what pins
+ *  it; this one opens the morning after שמחת תורה and runs on into the next week, so its first
+ *  day is what says which row it belongs to. In an ordinary year that is the week of בראשית.
+ *  In a year where שמחת תורה is the Friday and בראשית the day after, the weekdays of the
+ *  בראשית row are still יום טוב and the run opens on the Sunday after it: תשפ"ה is such a
+ *  year, and there this schedule lands on the נח row, which is the week it is actually for. */
+function afterSukkosRow(week, settings) {
+  const days = sundayThroughThursday(week.serial);
+  const { year } = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  for (const y of [year - 1, year, year + 1]) {
+    const rh = roshHashana(y - 3761);
+    const run = sukkosAfterDays(rh, settings);
+    if (run.length && days.includes(run[0])) return buildSukkosAfter(rh, settings);
+  }
+  return null;
+}
+
 function buildWeekdayRow(week, settings) {
-  const after = afterYomKippurRow(week, settings);
+  // Both give the same three lists in the same shape, and no week can be in both runs: one
+  // ends at ערב סוכות and the other starts after שמחת תורה.
+  const after = afterYomKippurRow(week, settings) || afterSukkosRow(week, settings);
   if (after) {
     return {
       B: splitLinesInHalf(after.maariv.map(fromPoster)),
@@ -8416,15 +8447,15 @@ const CHOREF_RULES = {
 const WEEKDAY_RULES = {
   B: {
     plain:
-      'The weekday מעריב times, one row for the whole week. The regular list is 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, and 11:30 and 12:00 while BMG is out of session. Every one of them has to be at least 50 minutes after שקיעה on all five days, so as the days lengthen each is pushed later in 5 minute steps until it clears. A time pushed up to within a quarter of an hour of the next one stops being printed. All of them are למטה except 10:30, which is the main בית מדרש, and the 8:45.',
+      'The weekday מעריב times, one row for the whole week. The regular list is 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, and 11:30 and 12:00 while BMG is out of session. Every one of them has to be at least 50 minutes after שקיעה on all five days, so as the days lengthen each is pushed later in 5 minute steps until it clears. A time pushed up to within a quarter of an hour of the next one stops being printed. All of them are למטה except 10:30, which is the main בית מדרש, and the 8:45. Two weeks are the exception: the days between יום כיפור and סוכות, and the days after סוכות, which take the schedules off the יום כיפור and סוכות sheets instead.',
     exact:
-      'Sunday through Thursday of the week ending on this Shabbos. The binding שקיעה is the latest of the five, rounded up; a time must be at or after that plus 50 minutes. Each time steps forward by 5 minutes until it does. Then, walking from the last time backwards, a time that moved and now sits within 14 minutes of the next one still being kept is dropped. The 8:45 is exempt from that, being its own מנין rather than a duplicate; it is in the main בית מדרש up to 8:45, למטה from 8:50 to 9:15, and בעזרת נשים from 9:20.',
+      'Sunday through Thursday of the week ending on this Shabbos. The binding שקיעה is the latest of the five, rounded up; a time must be at or after that plus 50 minutes. Each time steps forward by 5 minutes until it does. Then, walking from the last time backwards, a time that moved and now sits within 14 minutes of the next one still being kept is dropped. The 8:45 is exempt from that, being its own מנין rather than a duplicate; it is in the main בית מדרש up to 8:45, למטה from 8:50 to 9:15, and בעזרת נשים from 9:20. On the two yom tov weeks all of that is set aside: the week whose Sunday to Thursday run holds the last day between יום כיפור and סוכות takes the box off the יום כיפור sheet, and the week whose run holds the first day after שמחת תורה takes the block off the סוכות sheet, so the board and the sheet hung beside it cannot disagree.',
   },
   C: {
     plain:
-      'The weekday מנחה times. The regular list is 12:45 and 1:15 on standard time only, then an early afternoon one, then 1:50, then 4:15 while BMG is in session, then 6:35, 7:30 and 8:00. The evening ones have to be at least 15 minutes before שקיעה on all five days, so they are pulled earlier in 5 minute steps as the days shorten, and one that lands within a quarter of an hour of the one before it stops being printed. Everything is למטה except 1:50, the main בית מדרש. The days between יום כיפור and סוכות are the exception: that week the column carries the schedule off the יום כיפור sheet instead, whose own opening מנחה is held to מנחה גדולה.',
+      'The weekday מנחה times. The regular list is 12:45 and 1:15 on standard time only, then an early afternoon one, then 1:50, then 4:15 while BMG is in session, then 6:35, 7:30 and 8:00. The evening ones have to be at least 15 minutes before שקיעה on all five days, so they are pulled earlier in 5 minute steps as the days shorten, and one that lands within a quarter of an hour of the one before it stops being printed. Everything is למטה except 1:50, the main בית מדרש. Two weeks are the exception: the days between יום כיפור and סוכות, where the column carries the schedule off the יום כיפור sheet, and the days after סוכות, where it carries the "זמני תפילה אחר סוכות" block off the סוכות sheet. Both of those open on a מנחה held to מנחה גדולה.',
     exact:
-      'Sunday through Thursday of the week ending on this Shabbos. 12:45 and 1:15 only when none of the five days is on DST. The early afternoon time is 1:35, or 1:40 if מנחה גדולה לחומרא is after 1:35 on any of the five days. 4:15 only in a BMG week. The binding שקיעה is the earliest of the five, rounded down; an evening time must be at or before that less 15 minutes, and steps back by 5 minutes until it is. A time that moved and sits within 14 minutes of the one before it is dropped. On the week whose Sunday-to-Thursday run holds the last day between יום כיפור and סוכות, all of the above is set aside and the schedule from the יום כיפור sheet is printed. Its list opens at 1:15, or at מנחה גדולה לחומרא where that is later, taken from the latest of the run\'s own days; and if that leaves under 15 minutes to the 1:35 behind it, the opening מנין is not printed at all.',
+      'Sunday through Thursday of the week ending on this Shabbos. 12:45 and 1:15 only when none of the five days is on DST. The early afternoon time is 1:35, or 1:40 if מנחה גדולה לחומרא is after 1:35 on any of the five days. 4:15 only in a BMG week. The binding שקיעה is the earliest of the five, rounded down; an evening time must be at or before that less 15 minutes, and steps back by 5 minutes until it is. A time that moved and sits within 14 minutes of the one before it is dropped. On the week whose Sunday-to-Thursday run holds the last day between יום כיפור and סוכות, all of the above is set aside and the schedule from the יום כיפור sheet is printed. Its list opens at 1:15, or at מנחה גדולה לחומרא where that is later, taken from the latest of the run\'s own days; and if that leaves under 15 minutes to the 1:35 behind it, the opening מנין is not printed at all. The same on the week whose run holds the first day after שמחת תורה, which takes the block off the סוכות sheet: in an ordinary year that is the week of בראשית, and in a year where שמחת תורה is the Friday it is the week of נח, the בראשית week\'s own days still being יום טוב.',
   },
   E: {
     plain:
