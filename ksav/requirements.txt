@@ -1,0 +1,31 @@
+# Ksav runtime dependencies.
+#
+# Every entry is MIT, BSD, Apache-2.0 or LGPL. Nothing here is GPL, AGPL, or
+# carries a revenue capped model licence, because the application may be
+# distributed later and unwinding a licence mistake at that point is expensive.
+# See docs/licensing.md before adding anything.
+
+# --- Phase 0: shell, settings, hardware, model vault ---
+PySide6==6.11.2          # LGPL-3.0. Dynamically linked, no fee. Not PyQt, which is GPL.
+psutil==7.2.2            # BSD-3-Clause. CPU, cores and memory.
+
+# --- Phase 1: transcription ---
+# faster-whisper==1.2.0  # MIT. CTranslate2 backed Whisper.
+# ctranslate2==4.6.0     # MIT. The inference engine underneath it.
+# av==15.0.0             # BSD-3-Clause. Audio decoding without shelling out.
+# python-docx==1.2.0     # MIT. DOCX export.
+# pyahocorasick==2.2.0   # BSD-3-Clause. Matches a very large dictionary in one pass.
+
+# --- Phase 2: OCR ---
+# pytesseract==0.3.13    # Apache-2.0. Thin wrapper. Tesseract itself is vendored.
+# opencv-python-headless==4.13.0.88   # Apache-2.0. Deskew, denoise, threshold.
+# pypdfium2==5.0.1       # BSD-3-Clause and Apache-2.0. Deliberately not PyMuPDF, which is AGPL.
+# pillow==12.0.0         # MIT-CMU.
+# reportlab==4.4.4       # BSD-3-Clause. PDF export.
+
+# --- Phase 3: dictation ---
+# sounddevice==0.5.3     # MIT. Microphone capture.
+# onnxruntime==1.24.0    # MIT. Runs Silero VAD without pulling in PyTorch.
+
+# --- Phase 4: diarization ---
+# sherpa-onnx==1.12.15   # Apache-2.0. Speaker segmentation with no account and no token.

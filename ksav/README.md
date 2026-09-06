@@ -1,0 +1,77 @@
+# Ksav
+
+Offline transcription, dictation and OCR for Windows, built for Yeshivish and
+Torah speech and print.
+
+After installation and a one time model download, everything runs on your own
+computer. Recordings, images, documents and text never leave it. You can
+disconnect the network completely and keep working.
+
+## Where the project is
+
+Phase 0 of four is complete: the application shell, settings, hardware
+detection, the Model Vault, the engine interfaces, the packaging path, and the
+test that enforces the privacy promise.
+
+| Phase | What it brings | State |
+| --- | --- | --- |
+| 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer | Done |
+| 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Next |
+| 2 | OCR for images and PDFs, side by side review | Planned |
+| 3 | Live dictation and the global Windows shortcut | Planned |
+| 4 | Diarization, advanced OCR, large Torah vocabulary, auto model selection | Planned |
+
+`docs/architecture.md` explains the design. `docs/licensing.md` covers the
+dependency obligations, including two that are easy to get wrong.
+
+## Running it during development
+
+```
+pip install -r requirements-dev.txt
+python -m app.main
+```
+
+Tests, including the headless interface tests, run with no display attached:
+
+```
+QT_QPA_PLATFORM=offscreen python -m pytest tests -q
+```
+
+## Building the Windows installer
+
+```
+pyinstaller packaging/ksav.spec --noconfirm
+iscc packaging\installer.iss
+```
+
+The result is a per user installer that needs no administrator rights. Models
+are not bundled: they are downloaded once from the Model Vault, or imported from
+a folder for a machine that has never been online.
+
+## Privacy
+
+This is the point of the project, so it is enforced rather than promised.
+
+* `app/platform/net.py` is the only module in Ksav that may open a socket, and
+  it refuses to transfer anything unless a caller has explicitly opened the gate.
+  The Model Vault is the only caller.
+* `tests/test_no_network.py` scans every source file and fails the build if
+  anything else imports a networking library, then runs a full transcription
+  with sockets replaced by something that raises.
+* Inference libraries are pinned offline at process start, so none of them can
+  quietly fetch a missing file.
+* No account, no licence check, no telemetry, no update ping.
+
+## Where your files live
+
+Everything Ksav writes is under one folder, so it can be backed up, moved or
+deleted in one go:
+
+```
+%LOCALAPPDATA%\Ksav\
+    settings.json      your settings
+    lexicon.sqlite     the Yeshivish dictionary
+    models\            downloaded speech and OCR models
+    jobs\              in progress transcription jobs, so a crash resumes
+    logs\              local only, never transmitted
+```
