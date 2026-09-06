@@ -669,21 +669,26 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   // wordmark in the middle and the rabbi's line beside it rather than under it. It is
   // shorter, and on those sheets every tenth of an inch of header is a tenth the two columns
   // do not get.
+  /* The building, and the one kind of sheet that carries it: the whole season on one page,
+     the sheet with the ruled rows and the gold headings, which is the one that reads as a
+     printed page of a booklet rather than as a poster. The framed sheets keep their letterhead
+     as the Word posters have it, name over the corners and nothing in them: that is the שבת
+     שובה sheet and the rest of the single ones, which stack their header, and the סוכות sheet
+     and the two-in-one sheets, which use the chart's header but not its corner.
+     Out of Settings, so a shul that has cropped its own photo in has it here as well, and
+     alt="" because the name beside it already says what it is. */
+  const icon = onepage
+    ? `<img class="header-icon" src="${escAttr(settings.headerIconImage || '/assets/logo-building-icon.png')}" alt="">`
+    : '';
   const head = chartHead
     /* The wall chart's header, copied: the same markup and the same classes, so the two are
-       one thing rather than a likeness of one that drifts. The building goes where a chart
-       puts it, in the corner that held the year until the year came off and which is still
-       what balances the rabbi's line at the other end. Out of Settings, so a shul that has
-       cropped its own photo in has it here as well, and alt="" because the name beside it
-       already says what it is. No rule under the row, because a chart does not have one.
-
-       Only on this header. The single sheets stack theirs, name over rule over the rabbi's
-       line, which is how the Word posters they were drawn from are built, and the shul asked
-       for the picture on the sheets that carry the chart's header and nowhere else. */
+       one thing rather than a likeness of one that drifts. The corner held the year until the
+       year came off; it is where a chart puts the building, and it is still what balances the
+       rabbi's line at the other end whether or not there is anything in it. No rule under the
+       row, because a chart does not have one. */
     ? `<div class="page-header" dir="ltr">
          <div class="header-row">
-           <div class="header-year"><img class="header-icon"
-                src="${escAttr(settings.headerIconImage || '/assets/logo-building-icon.png')}" alt=""></div>
+           <div class="header-year"${icon ? '' : ' aria-hidden="true"'}>${icon}</div>
            <div class="header-center">
              <img class="header-logo" src="/assets/logo-text.png"
                   alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
