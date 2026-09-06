@@ -9,6 +9,7 @@ LGPL. No GPL, no AGPL, and no model weights with a revenue cap.
 | --- | --- | --- |
 | PySide6 (Qt 6) | LGPL-3.0 | Dynamically linked, no fee. **Not PyQt**, which is GPL |
 | faster-whisper, CTranslate2 | MIT | |
+| PyAV | BSD-3-Clause | Bundles LGPL FFmpeg. Replaces vendoring an ffmpeg binary |
 | Whisper model weights | MIT | |
 | ivrit.ai Hebrew models | Apache-2.0 | |
 | Silero VAD | MIT | |
@@ -16,7 +17,6 @@ LGPL. No GPL, no AGPL, and no model weights with a revenue cap.
 | Tesseract 5 and tessdata | Apache-2.0 | heb, yid, eng, osd |
 | OpenCV | Apache-2.0 | |
 | pypdfium2 | BSD-3-Clause, Apache-2.0 | **Not PyMuPDF**, which is AGPL |
-| pyahocorasick | BSD-3-Clause | |
 | python-docx | MIT | |
 | ReportLab | BSD-3-Clause | |
 | psutil | BSD-3-Clause | |

@@ -26,7 +26,10 @@ from ..platform import media
 from ..platform.hardware import Hardware, Recommendation
 from ..platform.models import BY_ID, ModelManager
 from . import coming_soon
+from .dictionary_view import DictionaryView
 from .home import HomeView
+from .transcribe_view import TranscribeView
+from .transcript_view import TranscriptView
 from .model_vault import ModelVaultView
 from .palette import for_theme, stylesheet
 from .settings_view import SettingsView
@@ -53,12 +56,18 @@ class Shell(QWidget):
         recommendation: Recommendation,
         manager: ModelManager,
         parent: QWidget | None = None,
+        lexicon=None,
+        queue=None,
+        service=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("Root")
         self._settings = settings
         self._hardware = hardware
         self._manager = manager
+        self._lexicon = lexicon
+        self._queue = queue
+        self._service = service
 
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -89,19 +98,41 @@ class Shell(QWidget):
         self.settings_view.navigate.connect(self.show_section)
         self.settings_view.settings_changed.connect(self._evaluate_readiness)
 
+        # Phase 1 screens are real when the services behind them exist; the
+        # honest placeholder stands in when the shell is built without them,
+        # which is how the interface tests run without a queue.
+        if self._queue is not None:
+            self.transcribe = TranscribeView(self._queue, settings)
+            self.transcribe.open_transcript.connect(self.open_transcript)
+        else:
+            self.transcribe = coming_soon.transcribe_view()
+
+        if self._lexicon is not None:
+            self.dictionary = DictionaryView(self._lexicon)
+            self.dictionary.changed.connect(self._on_dictionary_changed)
+        else:
+            self.dictionary = coming_soon.dictionary_view()
+
+        self.transcript = TranscriptView(settings, self._categories())
+
         self._screens = {
             "home": self.home,
-            "transcribe": coming_soon.transcribe_view(),
+            "transcribe": self.transcribe,
             "dictation": coming_soon.dictation_view(),
             "ocr": coming_soon.ocr_view(),
-            "dictionary": coming_soon.dictionary_view(),
+            "dictionary": self.dictionary,
             "vault": self.vault,
             "settings": self.settings_view,
+            "transcript": self.transcript,
         }
         for widget in self._screens.values():
             self.stack.addWidget(widget)
 
-        self.show_section(settings.ui.last_section if settings.ui.last_section in self._screens else "home")
+        start = settings.ui.last_section
+        # Never reopen straight into a transcript that is no longer loaded.
+        if start not in self._screens or start == "transcript":
+            start = "home"
+        self.show_section(start)
         self._evaluate_readiness()
 
     # -- construction ----------------------------------------------------
@@ -160,7 +191,37 @@ class Shell(QWidget):
         button = self._nav_buttons.get(key)
         if button:
             button.setChecked(True)
+        elif key == "transcript":
+            # Reached from the queue rather than the rail. Keep Transcribe lit,
+            # because that is where Back leads.
+            self._nav_buttons["transcribe"].setChecked(True)
         self._settings.ui.last_section = key
+
+    def _categories(self) -> dict[str, str]:
+        """Entry id to category, which is how Mode C decides per term."""
+        if self._lexicon is None:
+            return {}
+        return {e.id: e.category for e in self._lexicon.all()}
+
+    def _on_dictionary_changed(self) -> None:
+        # The matcher index is built from the dictionary, so an edit invalidates
+        # it. Rebuilding is a few milliseconds, so this is not worth being clever
+        # about.
+        if self._service is not None:
+            self._service.invalidate_index()
+        self.transcript._categories = self._categories()
+
+    def open_transcript(self, path: str) -> None:
+        """Show a finished transcript. Reached from the queue's Open button."""
+        if self._service is None:
+            return
+        try:
+            corrected = self._service.store.load(path)
+        except (OSError, ValueError, KeyError) as exc:
+            log.warning("could not open transcript %s: %s", path, exc)
+            return
+        self.transcript.load(corrected, self._categories())
+        self.show_section("transcript")
 
     def _on_models_changed(self) -> None:
         self.settings_view.refresh_models()

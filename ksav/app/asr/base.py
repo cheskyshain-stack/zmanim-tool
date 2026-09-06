@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from ..core.models import Transcript
+from ..core.models import Segment, Transcript
 
 
 @dataclass
@@ -51,6 +51,13 @@ class TranscribeOptions:
     # Start offset in seconds, used when resuming an interrupted job.
     start_at: float = 0.0
     temperature: float = 0.0
+    # Seconds of silence that begin a new paragraph.
+    paragraph_pause: float = 1.6
+    # "accuracy", "balanced" or "speed". Engines map it to their own knobs.
+    quality: str = "balanced"
+
+    def quality_key(self) -> str:
+        return self.quality if self.quality in ("accuracy", "balanced", "speed") else "balanced"
 
 
 @dataclass
@@ -71,6 +78,9 @@ class ProgressEvent:
 
 ProgressFn = Callable[[ProgressEvent], None]
 CancelFn = Callable[[], bool]
+# Called as each segment is recognised, before the whole file is finished.
+# This is what makes partial saves, resume, and live text possible.
+SegmentFn = Callable[["Segment"], None]
 
 
 class EngineUnavailable(RuntimeError):
@@ -99,6 +109,7 @@ class AsrEngine(abc.ABC):
         options: TranscribeOptions,
         on_progress: ProgressFn | None = None,
         should_cancel: CancelFn | None = None,
+        on_segment: SegmentFn | None = None,
     ) -> Transcript:
         """Transcribe a whole file.
 

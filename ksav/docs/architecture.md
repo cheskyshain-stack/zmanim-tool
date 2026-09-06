@@ -66,10 +66,26 @@ photograph. The lexicon entry format handles that directly:
 * **Provenance on every change,** so nothing happens that cannot be seen and
   reversed.
 
-Matching uses an Aho-Corasick automaton over token n-grams, which finds every one
-of a hundred thousand terms in a single linear pass rather than running a hundred
-thousand regexes. A Yeshivish tuned phonetic key sits on top of that to catch
-misrecognitions nobody has entered yet, always as a suggestion.
+Matching uses a token n-gram index. The original design note said Aho-Corasick,
+and that was changed during Phase 1 for a reason worth recording rather than
+quietly substituting.
+
+Aho-Corasick earns its complexity when patterns are character sequences of
+unbounded length. Here the patterns are runs of whole words and no Torah term is
+longer than a handful of them, so indexing each term by its normalised token run
+and looking up at most six slices per position gives the same linear cost in the
+length of the transcript, builds in a fraction of the time, uses less memory,
+needs no compiled dependency, and can be read by anyone. Matching is on tokens
+throughout, so word boundaries are structural rather than a regex that has to be
+got right. Measured: a 3,000 term dictionary indexes in well under a second and
+matches a long transcript in single digit milliseconds.
+
+A Yeshivish tuned phonetic key sits on top to catch spelling variants nobody has
+entered yet, always as a suggestion. It covers the axes that actually vary in
+transliteration: ch and kh, tz and ts, the sav against the tav, and vowels. It is
+deliberately not for acoustic confusions like the model writing "camera" for
+Gemara, because nothing phonetic connects a gimel to a kof; those belong in the
+dictionary as explicit heard as variants.
 
 ## Swapping an engine
 

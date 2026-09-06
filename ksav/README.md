@@ -9,17 +9,49 @@ disconnect the network completely and keep working.
 
 ## Where the project is
 
-Phase 0 of four is complete: the application shell, settings, hardware
-detection, the Model Vault, the engine interfaces, the packaging path, and the
-test that enforces the privacy promise.
+Phases 0 and 1 of four are complete. Ksav transcribes recordings offline,
+corrects Yeshivish and Torah terminology against a dictionary that also primes
+the recogniser, renders the result in four output modes, and exports to TXT,
+DOCX, SRT and VTT.
 
 | Phase | What it brings | State |
 | --- | --- | --- |
 | 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer, USB bundle and portable mode | Done |
-| 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Next |
-| 2 | OCR for images and PDFs, side by side review | Planned |
+| 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Done |
+| 2 | OCR for images and PDFs, side by side review | Next |
 | 3 | Live dictation and the global Windows shortcut | Planned |
 | 4 | Diarization, advanced OCR, large Torah vocabulary, auto model selection | Planned |
+
+### What works now
+
+Drop in an MP3, WAV, M4A, MP4, AAC or FLAC and Ksav transcribes it on this
+computer. The queue shows real progress and a finish time, survives being
+closed, and resumes an interrupted job. The transcript opens in an editor where
+clicking a paragraph jumps the recording to it.
+
+The dictionary does two jobs. Before the model decides on a word, a ranked
+selection of Torah terms goes into its hotwords and prompt. Afterwards, the full
+vocabulary corrects the result, with word boundaries and context respected:
+
+```
+"The camera asks a kashya"          ->  camera becomes Gemara
+"I took a photo with the camera"    ->  left alone
+"He picked up the camera and left"  ->  offered as a suggestion, not applied
+```
+
+Four output modes render from one stored transcript, so switching is instant and
+the original is never lost:
+
+```
+Yeshivish English   The Gemara asks a kashya on Rav Huna.
+Hebrew script       The גמרא asks a קשיא on רב הונא.
+Automatic mixed     decided per term, masechtos in Hebrew by default
+Original            The camera asks a kasha on Rav Huna.
+```
+
+Every correction is listed with the reason it fired and can be reversed one at a
+time. Export goes to TXT, DOCX, SRT and VTT, with Hebrew marked as complex
+script so Word renders it in the right font.
 
 `docs/architecture.md` explains the design. `docs/licensing.md` covers the
 dependency obligations, including two that are easy to get wrong.

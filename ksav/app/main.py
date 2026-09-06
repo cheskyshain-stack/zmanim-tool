@@ -31,7 +31,38 @@ def build_application():
     return app
 
 
-def build_window(settings, hardware, recommendation, manager):
+def build_services(settings):
+    """The dictionary, the recognition engines, and the background queue.
+
+    Engines register here rather than at import, so that nothing heavy is
+    pulled in until the application actually starts.
+    """
+    from app.asr import registry as asr_registry
+    from app.asr.demo_engine import register_into as register_demo
+    from app.asr.faster_whisper_engine import register_into as register_whisper
+    from app.language.lexicon import Lexicon
+    from app.services.job_queue import JobQueue
+    from app.services.transcription import TranscriptionService
+
+    register_whisper(asr_registry)
+    register_demo(asr_registry)
+
+    lexicon = Lexicon(paths.lexicon_db())
+    seed = paths.bundle_root() / "app" / "language" / "data" / "seed_lexicon.jsonl"
+    if seed.is_file():
+        added = lexicon.seed_from(seed)
+        if added:
+            klogging.get("ksav").info("seeded %d dictionary terms", added)
+
+    service = TranscriptionService(settings, lexicon)
+    queue = JobQueue(service.make_runner())
+    queue.restore()
+    queue.start()
+    return lexicon, queue, service
+
+
+def build_window(settings, hardware, recommendation, manager,
+                 lexicon=None, queue=None, service=None):
     from PySide6.QtWidgets import QMainWindow
 
     from app.ui.shell import Shell
@@ -41,7 +72,8 @@ def build_window(settings, hardware, recommendation, manager):
     window.resize(settings.ui.window_width, settings.ui.window_height)
     window.setMinimumSize(940, 620)
 
-    shell = Shell(settings, hardware, recommendation, manager)
+    shell = Shell(settings, hardware, recommendation, manager,
+                  lexicon=lexicon, queue=queue, service=service)
     window.setCentralWidget(shell)
     shell.apply_theme()
 
@@ -49,6 +81,9 @@ def build_window(settings, hardware, recommendation, manager):
 
     def on_close(event):
         shell.persist()
+        if queue is not None:
+            # Journalled work resumes next launch; this just stops the worker.
+            queue.stop()
         original_close(event)
 
     window.closeEvent = on_close
@@ -70,11 +105,19 @@ def main() -> int:
     log.info("recommended: %s on %s", recommendation.asr_model, recommendation.device)
 
     manager = ModelManager()
+    lexicon, queue, service = build_services(settings)
 
     app = build_application()
-    window, _shell = build_window(settings, hardware, recommendation, manager)
+    window, _shell = build_window(
+        settings, hardware, recommendation, manager,
+        lexicon=lexicon, queue=queue, service=service,
+    )
     window.show()
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        queue.stop()
+        lexicon.close()
 
 
 if __name__ == "__main__":

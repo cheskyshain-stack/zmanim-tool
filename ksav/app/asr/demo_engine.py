@@ -21,6 +21,7 @@ from .base import (
     EngineCapabilities,
     ProgressEvent,
     ProgressFn,
+    SegmentFn,
     TranscribeOptions,
 )
 
@@ -56,6 +57,7 @@ class DemoAsrEngine(AsrEngine):
         options: TranscribeOptions,
         on_progress: ProgressFn | None = None,
         should_cancel: CancelFn | None = None,
+        on_segment: SegmentFn | None = None,
     ) -> Transcript:
         segments: list[Segment] = []
         clock = 0.0
@@ -76,6 +78,8 @@ class DemoAsrEngine(AsrEngine):
                     paragraph_break=index == 2,
                 )
             )
+            if on_segment:
+                on_segment(segments[-1])
             clock += duration + 0.35
             if on_progress:
                 on_progress(ProgressEvent(clock, total, index + 1, f"segment {index + 1}"))
