@@ -2692,16 +2692,15 @@ function sukkosErevMincha(serial, settings) {
 const skRoundPrinted = (t) => Math.round(t * 1440) / 1440;
 
 /** The afternoon מנחה of a יום טוב: 2:00, 5:30 למטה, and the last one half an hour before that
- *  day's own שקיעה. A day that is Shabbos opens with an early one as well, held to מנחה גדולה
- *  the same way as the ערב יום טוב list, which is what the תשפ"ד sheet prints on both of its
- *  Shabbos days. */
+ *  day's own שקיעה.
+ *
+ *  2:00 whatever day of the week it is. A day that is Shabbos opened with an early מנין as
+ *  well for a while, held to מנחה גדולה the way the ערב יום טוב list is, which is what the
+ *  תשפ"ד sheet prints on both of its Shabbos days. The shul asked for the afternoon to start
+ *  at 2:00 on those days too. */
 function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false } = {}) {
   const last = skRoundPrinted(skShkia(serial, settings) - 30 * SK_MIN);
   const out = [];
-  if (excelWeekday(serial) === SK_SHABBOS) {
-    const early = openingMincha(skMinchaGedola(serial, settings), skAt(14, 0));
-    if (early !== null) out.push({ t: early });
-  }
   out.push({ t: skAt(14, 0) });
   if (five) out.push({ t: skAt(17, 30), u: true });
   else {
@@ -2727,21 +2726,42 @@ function sukkosChmDays(rh) {
  *  1:15, 1:35 and 1:50 to open, the 1:15 moved to 1:20 or dropped like every other on this
  *  sheet, worked off the latest מנחה גדולה of the days the one printed list has to hold for.
  *  Then from 5:00 every twenty minutes, and last a מנין a quarter of an hour before the
- *  earliest שקיעה of those days, so it clears on all of them. A twenty minute step that lands
- *  within a quarter of an hour of that last one is not printed: two מנינים a few minutes apart
- *  is not a choice anybody uses, which is the same ground the weekday chart drops a zman on.
+ *  earliest שקיעה of those days, so it clears on all of them, taken down to a round five. A
+ *  twenty minute step that lands within a quarter of an hour of that last one is not printed:
+ *  two מנינים a few minutes apart is not a choice anybody uses, which is the same ground the
+ *  weekday chart drops a zman on. Where dropping it leaves more than twenty minutes with
+ *  nothing in them, one goes back in fifteen to twenty minutes before the last.
  *
  *  Everything from 5:00 is למטה, and so are the 1:15 and the 1:35. */
 function sukkosChmMincha(days, settings) {
   const earliest = Math.min(...days.map((s) => skShkia(s, settings)));
-  const last = skRoundPrinted(earliest - 15 * SK_MIN);
+  // Down to the last five. It is announced as a round time like the rest of the run, and down
+  // rather than up because a quarter of an hour before the earliest שקיעה is the latest it may
+  // be: rounding up would push it past that on every one of the days it has to hold for.
+  const last = skDown5(earliest - 15 * SK_MIN);
   const out = [];
   const first = openingMincha(Math.max(...days.map((s) => skMinchaGedola(s, settings))), skAt(13, 35));
   if (first !== null) out.push({ t: first, u: true });
   out.push({ t: skAt(13, 35), u: true }, { t: skAt(13, 50) });
+  const run = [];
   for (let t = skAt(17, 0); t <= last + 1e-9; t += 20 * SK_MIN) {
-    if (last - t >= 15 * SK_MIN - 1e-9) out.push({ t, u: true });
+    if (last - t >= 15 * SK_MIN - 1e-9) run.push(t);
   }
+  /* One more between the run and the last, where the twenty minute step leaves a hole. The
+     step is dropped when it falls within a quarter of an hour of the last מנין, and dropping it
+     can leave better than half an hour with nothing in it: measured on תשפ״ח, 5:20 and then
+     5:50. So where the gap runs past twenty minutes a מנין goes in twenty minutes before the
+     last, or fifteen where twenty would crowd the one in front of it, and nothing at all where
+     neither leaves room. It lands on a round five by itself, the last being on one.
+     It changes nothing in the years the shul's own sheets already read well: תשפ״ד's
+     5:40 / 6:00 / 6:15 and תשפ״ו's 5:40 / 6:05 come out exactly as they are printed. */
+  const before = run.length ? run[run.length - 1] : skAt(13, 50);
+  if (last - before > 20 * SK_MIN + 1e-9) {
+    const fill = [20, 15].map((m) => last - m * SK_MIN)
+      .find((t) => t - before >= 15 * SK_MIN - 1e-9);
+    if (fill !== undefined) run.push(fill);
+  }
+  for (const t of run) out.push({ t, u: true });
   out.push({ t: last, u: true });
   return out;
 }
@@ -8598,8 +8618,8 @@ const POSTER_SHEETS = [
         exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, counted from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is. The old sheets read a minute earlier on both: they were typed by hand and this is the same calculation the board makes.',
       },
       dayMincha: {
-        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. A day that is Shabbos opens with an early one as well.',
-        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. On a Shabbos the list opens with 1:15, or 1:20 where 1:15 would fall before מנחה גדולה, which is the same rule the ערב יום טוב list follows. The תשפ"ד sheet prints an early מנין on both of its Shabbos days.',
+        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. The 2:00 opens it whatever day of the week it is.',
+        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. A day that is Shabbos opened with an early מנין in front of the 2:00 as well for a while, held to מנחה גדולה the way the ערב יום טוב list is, which is what the תשפ"ד sheet prints on both of its Shabbos days. The shul asked for those days to start at 2:00 like every other.',
       },
       shiur: {
         plain: 'The שיעור on the second night, at least twenty minutes before the first מעריב, announced to a round time.',
@@ -8686,8 +8706,8 @@ const POSTER_SHEETS = [
         exact: 'Sunrise at the shul\'s horizon on 21 תשרי, less 36 minutes, למטה. The two after it, 7:30 and 8:20 in the hall, are fixed.',
       },
       chmMincha: {
-        plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, so it clears on all of them.',
-        exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
+        plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, announced on a round five so it clears on all of them.',
+        exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5: down rather than up, because a quarter of an hour before the earliest שקיעה is the latest that מנין may be. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them a מנין goes back in 20 minutes before the last, or 15 where 20 would crowd the one in front. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       chmMaariv: {
         plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',

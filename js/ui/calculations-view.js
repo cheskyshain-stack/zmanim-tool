@@ -544,8 +544,8 @@ const POSTER_SHEETS = [
         exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, counted from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is. The old sheets read a minute earlier on both: they were typed by hand and this is the same calculation the board makes.',
       },
       dayMincha: {
-        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. A day that is Shabbos opens with an early one as well.',
-        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. On a Shabbos the list opens with 1:15, or 1:20 where 1:15 would fall before מנחה גדולה, which is the same rule the ערב יום טוב list follows. The תשפ"ד sheet prints an early מנין on both of its Shabbos days.',
+        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. The 2:00 opens it whatever day of the week it is.',
+        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. A day that is Shabbos opened with an early מנין in front of the 2:00 as well for a while, held to מנחה גדולה the way the ערב יום טוב list is, which is what the תשפ"ד sheet prints on both of its Shabbos days. The shul asked for those days to start at 2:00 like every other.',
       },
       shiur: {
         plain: 'The שיעור on the second night, at least twenty minutes before the first מעריב, announced to a round time.',
@@ -632,8 +632,8 @@ const POSTER_SHEETS = [
         exact: 'Sunrise at the shul\'s horizon on 21 תשרי, less 36 minutes, למטה. The two after it, 7:30 and 8:20 in the hall, are fixed.',
       },
       chmMincha: {
-        plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, so it clears on all of them.',
-        exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
+        plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, announced on a round five so it clears on all of them.',
+        exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5: down rather than up, because a quarter of an hour before the earliest שקיעה is the latest that מנין may be. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them a מנין goes back in 20 minutes before the last, or 15 where 20 would crowd the one in front. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       chmMaariv: {
         plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
