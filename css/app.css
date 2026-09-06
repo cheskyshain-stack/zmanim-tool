@@ -712,9 +712,19 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 
 .page-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.1in; }
 .header-row { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 0.15in; }
-.header-icon { height: calc(0.85in * var(--sheet-header-scale)); width: auto; flex-shrink: 0; }
-.header-center { display: flex; flex-direction: column; align-items: center; flex: 1; }
+/* The building and the name are set to one height, which is what makes the two read as one
+   line of letterhead rather than as a photo with a name beside it. It was 0.85in against the
+   name's 0.62in, which put the loudest thing on the page in the corner: the photo is a solid
+   rectangle of image, ink to every edge (measured: no white margin inside it at all), so at
+   the same height it already carries more weight than the letterforms do, and 37% taller than
+   them it overhung the name top and bottom.
+   Nothing is squeezed by the change. The row is as tall as the name and the subtitle under it,
+   0.79in on a chart, which is taller than either of these, so the header keeps its height and
+   every sheet fitted to it keeps its type. */
+.header-icon,
 .header-logo { height: calc(0.62in * var(--sheet-header-scale)); width: auto; }
+.header-icon { flex-shrink: 0; }
+.header-center { display: flex; flex-direction: column; align-items: center; flex: 1; }
 .header-subtitle { font-size: calc(var(--sheet-font-size) + 1.5pt); margin-top: 1pt; }
 .header-rabbi { font-size: var(--sheet-font-size); text-align: right; white-space: pre-line; flex-shrink: 0; line-height: 1.3; }
 
