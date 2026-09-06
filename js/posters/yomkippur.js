@@ -19,6 +19,7 @@ import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
 import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
+import { openingMincha } from './early-mincha.js';
 import { SLASH, NBSP } from '../util.js';
 
 /** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
@@ -77,12 +78,15 @@ export const YK_TEXT = {
  *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
 /** The everyday שחרית out of Settings, as times.
  *
+ *  Exported because the סוכות sheet needs it too: ערב סוכות's own morning is an ordinary one
+ *  and is on the box this sheet carries rather than on that one.
+ *
  *  Named for what it is rather than "weekday", because upcoming.js has a weekdayShacharis of
  *  its own that answers a different question (one day's schedule, with the ר"ח/בה"ב/תענית
  *  variant picked). Two functions of one name are fine across modules and fatal in the offline
  *  copy, which flattens every module into one scope: whichever is written second wins, and
  *  every call to the other one silently gets it. That is exactly what had happened here. */
-function everydayShacharis(settings) {
+export function everydayShacharis(settings) {
   const html = String(settings.weekdayShacharis || '')
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
@@ -101,10 +105,6 @@ function fiveEarlier(times) {
     return { ...t, text: formatTime(shifted) };
   });
 }
-
-/** A day fraction snapped to the minute formatTime will print it as, so a comparison here
- *  and the times a reader sees cannot disagree by a rounding. */
-const toPrintedMinute = (t) => Math.round(t * 1440) / 1440;
 
 /** The days between יו"כ and סוכות: 11 תשרי through ערב סוכות on the 14th.
  *
@@ -136,33 +136,15 @@ export function afterYomKippurDays(rh, settings) {
  *  well short: it has to be at least 15 minutes after the one in front of it. That last one
  *  is the 6:15 on the תשפ"ו sheet, 16 minutes before a 6:31 שקיעה.
  *
- *  The 1:15 is not really fixed, and this is the one מנחה on any of these sheets that was
- *  landing before מנחה גדולה. These days are always on daylight saving time, when חצות is
- *  an hour later than it is for most of the year, and מנחה גדולה sits between about 1:11 and
- *  1:23 depending where in September or October יו"כ falls. Measured across תשפ"ד to תשצ"ה:
- *  early in eight years of twelve, by as much as eight minutes, and in תשפ"ז by five on
- *  every one of the four days. The weekday chart never had this because its own 12:45 and
- *  1:15 run on standard time only, which is the same guard by another name; here there was
- *  none, so the same rule the ערב שבת מנחה menu already follows is applied instead: where
- *  the clock time would be too early, מנחה גדולה is printed in its place.
- *
- *  The binding day is the latest מנחה גדולה of the run, since one printed list has to hold
- *  for all four days, the same way the earliest שקיעה binds the evening ones.
- *
- *  And if that move leaves it less than 15 minutes in front of the 1:35, it is not printed
- *  at all. Two מנינים a few minutes apart is not a choice anybody uses, and the weekday
- *  chart drops a zman on the same ground when a move walks it up against its neighbour.
- *
- *  Both the move and that 15 minutes are measured on the minute the sheet prints, not on the
- *  raw zman. מנחה גדולה is a fraction of a second as well as a minute: in תשפ"ז it falls at
- *  1:20 and 24 seconds, which prints as 1:20 and is a clean 15 minutes in front of the 1:35,
- *  while the unrounded number is 14 minutes 36 and was dropping the מנין the shul asked to
- *  keep. Rounded to the same minute formatTime would show, the arithmetic on the paper and
- *  the arithmetic here are one thing. */
+ *  The 1:15 is not really fixed: on daylight saving time it can land before מנחה גדולה, and
+ *  where it does it moves to 1:20, or comes off the sheet where even that is too early. That
+ *  is openingMincha in posters/early-mincha.js, which the סוכות sheet asks the same question
+ *  of. The binding day is the latest מנחה גדולה of the run, since one printed list has to hold
+ *  for all four days, the same way the earliest שקיעה binds the evening ones. */
 export function afterMincha(earliestShkia, latestMinchaGedola = 0) {
-  const first = toPrintedMinute(Math.max(at(13, 15), latestMinchaGedola));
+  const first = openingMincha(latestMinchaGedola, at(13, 35));
   const times = [at(13, 35), at(13, 50), at(16, 15)];
-  if (at(13, 35) - first >= 15 * YK_MIN - 1e-9) times.unshift(first);
+  if (first !== null) times.unshift(first);
   for (let t = at(16, 40); t <= earliestShkia - 15 * YK_MIN + 1e-9; t += 20 * YK_MIN) times.push(t);
   const last = times[times.length - 1];
   const tail = ykNear5(earliestShkia - 17 * YK_MIN); // the middle of the 15 to 20 window

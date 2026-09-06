@@ -3129,26 +3129,19 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
    --pair-lead is tighter here than on any other pair: those sheets have room going spare and
    spend it on leading, and this one does not. */
-.poster.is-sukkos { --sk-scale: 1; --pair-lead: 1.15; }
+.poster.is-sukkos { --sk-scale: 1; --pair-lead: 1.5; }
 .poster.is-sukkos .poster-title { font-size: 24pt; margin-bottom: 0.1in; }
 .poster.is-sukkos .poster-rows.is-dense .poster-row { font-size: calc(12pt * var(--sk-scale)); }
 .poster.is-sukkos .poster-rows.is-dense .poster-day {
-  font-size: calc(15pt * var(--sk-scale)); margin: calc(0.09in * var(--sk-scale)) 0 0.02in;
+  font-size: calc(15pt * var(--sk-scale)); margin: 0 0 0.02in;
 }
-/* The box takes the scale too, and keeps the step down from the rows around it. Its own !important
-   is what the rule it overrides already carries, so this one needs the same weight. */
-.poster.is-sukkos .poster-box-row { font-size: calc(10pt * var(--sk-scale)) !important; }
-.poster.is-sukkos .poster-box-head { font-size: calc(11.5pt * var(--sk-scale)); }
-.poster.is-sukkos .poster-box { padding: 0.1in 0.14in 0.12in; }
-/* The comma in the box is hung off the time in front of it here, with a zero width space
-   behind it, rather than drawn in front of the time after it. Same reason as the slash in a
-   run above: written the other way the break falls inside the following time's own box, that
-   time still starts on the line above, and balanceRuns reads a run whose last time wrapped as
-   one that fitted. Measured on this sheet, the מנחה run printed six times and a trailing comma
-   with a seventh hanging under them. Only this sheet: the יום כיפור box is not set large enough
-   for a run to wrap by one. */
-.poster.is-sukkos .poster-box-row .poster-t + .poster-t::before { content: none; }
-.poster.is-sukkos .poster-box-row .poster-t:not(:last-child)::after { content: ",\200B"; padding-inline-end: 0.25em; }
+/* The air above a block is the block's own padding rather than the heading's margin. Two
+   reasons, and both are about fitSukkos rather than about the look: a margin on the first
+   thing inside a section escapes the section, so the block's height would not have counted
+   it, and it is the block that has to lose that space when it lands at the head of the second
+   column, which :first-child says and a heading's margin cannot. */
+.poster.is-sukkos .poster-block { padding-top: calc(0.14in * var(--sk-scale)); }
+.poster.is-sukkos .poster-rows > .poster-block:first-child { padding-top: 0; }
 /* Packed to the top rather than spread. The columns are full and there is nothing to spread;
    left on space-between, the shorter of the two opened its gaps to match the longer one and
    the two columns' rows no longer lined up with each other. */

@@ -502,23 +502,18 @@ const POSTER_SHEETS = [
   {
     key: 'sukkos',
     name: 'סוכות',
-    note: 'The longest sheet, and the one whose shape moves most: a year with a שבת חול המועד and a שבת בראשית carries six blocks where a year opening on Shabbos carries four. A day\'s heading gathers the night that opens it, the same way the ראש השנה sheet does, so the שקיעה and מעריב under יום א\' are ערב סוכות\'s. Two of the blocks are Shabbosos and are worked off the שבת חורף chart\'s own columns rather than off rules of their own.',
+    note: 'The longest sheet, and the one whose shape moves most: a year with a שבת חול המועד and a שבת בראשית carries seven blocks where a year opening on Shabbos carries five. A day\'s heading gathers the night that opens it, the same way the ראש השנה sheet does, so the שקיעה and מעריב under יום א\' are ערב סוכות\'s. Two of the blocks are Shabbosos and are worked off the שבת חורף chart\'s own columns rather than off rules of their own. חול המועד and the שבת among those days come in the order the days actually run, which changes with the year.',
     build: (year, settings) => buildSukkosPoster(year, settings),
-    rows: (built) => [
-      ...built.blocks.flatMap((block) => block.lines.map((l) => ({
-        key: l.calc,
-        name: `${block.heading} · ${l.label}`,
-        value: posterTimes(l.times) + (l.extra ? '   ' + l.extra.label + ' ' + posterTimes(l.extra.times) : ''),
-      }))),
-      { key: 'boxShacharis', name: 'חול המועד · שחרית', value: posterTimes(built.box.shacharis) },
-      { key: 'boxHoshana', name: 'חול המועד · שחרית הושענא רבה', value: `${posterTimes(built.box.hoshana)}   (נץ ${built.box.hoshanaNetz})` },
-      { key: 'boxMincha', name: 'חול המועד · מנחה', value: posterTimes(built.box.mincha) },
-      { key: 'boxMaariv', name: 'חול המועד · מעריב', value: posterTimes(built.box.maariv) },
-    ],
+    rows: (built) => built.blocks.flatMap((block) => block.lines.map((l) => ({
+      key: l.calc,
+      name: `${block.heading} · ${l.label}`,
+      value: (l.note ? l.note + ' ' : '') + posterTimes(l.times)
+        + (l.extra ? '   ' + l.extra.label + ' ' + posterTimes(l.extra.times) : ''),
+    }))),
     rules: {
       erevMincha: {
-        plain: 'The afternoon before a יום טוב: 1:15, 1:35, 1:50, 2:15 and 3:00, except that the 1:15 is never before מנחה גדולה.',
-        exact: 'Four fixed times, and a first one at the later of 1:15 and מנחה גדולה לחומרא, which is itself the later of מנחה גדולה and half an hour after חצות. Where that move leaves under 15 minutes to the 1:35 the מנין is not printed at all. The sheets the shul hangs already did this by hand: תשפ"ד prints 1:16, 1:17 and 1:18 on its three afternoons. The first two are למטה.',
+        plain: 'The afternoon before a יום טוב: 1:15, 1:35, 1:50, 2:15 and 3:00, except that the 1:15 moves to 1:20 on a day where it would fall before מנחה גדולה.',
+        exact: 'Four fixed times, and a first one that is 1:15 where that is at or after מנחה גדולה לחומרא (itself the later of מנחה גדולה and half an hour after חצות), 1:20 where it is not, and nothing at all in a year where even 1:20 would be early. The sheets the shul hangs already moved it by hand: תשפ"ד prints 1:16, 1:17 and 1:18 on its three afternoons, and the round 1:20 is what the shul asked for in place of three different minutes in three different years. Both are measured on the printed minute, since מנחה גדולה carries seconds. The first two מנינים are למטה.',
       },
       candles: {
         plain: 'הדלקת נרות before a יום טוב, the usual number of minutes before שקיעה, with the מנחה that goes with it three minutes later.',
@@ -546,7 +541,7 @@ const POSTER_SHEETS = [
       },
       dayMincha: {
         plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. A day that is Shabbos opens with an early one as well.',
-        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. On a Shabbos the list opens with the later of 1:15 and מנחה גדולה לחומרא, dropped where that leaves under 15 minutes to the 2:00, which is what the תשפ"ד sheet prints on both of its Shabbos days.',
+        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. On a Shabbos the list opens with 1:15, or 1:20 where 1:15 would fall before מנחה גדולה, which is the same rule the ערב יום טוב list follows. The תשפ"ד sheet prints an early מנין on both of its Shabbos days.',
       },
       shiur: {
         plain: 'The שיעור on the second night, at least twenty minutes before the first מעריב, announced to a round time.',
@@ -608,19 +603,19 @@ const POSTER_SHEETS = [
         plain: 'מוצאי שבת, straight off the board: 60 and 72 minutes after שקיעה.',
         exact: 'Column B of the שבת חורף chart, both put up to the whole minute, the later one למטה.',
       },
-      boxShacharis: {
+      chmShacharis: {
         plain: 'The חול המועד mornings: three fixed מנינים, 7:00 למטה, 8:00 and 8:40 למטה.',
         exact: 'Not calculated. These days do not run on the everyday שחרית out of Settings; the sheet has its own three.',
       },
-      boxHoshana: {
-        plain: 'הושענא רבה starts earlier, and the first מנין is when שחרית starts: thirty six minutes before נץ. The נץ itself is printed beside it so the sheet says what the time was worked from.',
+      hoshanaShacharis: {
+        plain: 'הושענא רבה starts earlier than the rest of חול המועד, so it is given last, under them: the first מנין is when שחרית starts, thirty six minutes before נץ. The נץ itself is printed beside it so the sheet says what the time was worked from.',
         exact: 'Sunrise at the shul\'s horizon on 21 תשרי, less 36 minutes, למטה. The two after it, 7:30 and 8:20 in the hall, are fixed.',
       },
-      boxMincha: {
+      chmMincha: {
         plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, so it clears on all of them.',
-        exact: 'The 1:15 is held to מנחה גדולה the same way every early מנחה on this sheet is, and dropped where that leaves under 15 minutes to the 1:35. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
+        exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
-      boxMaariv: {
+      chmMaariv: {
         plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
         exact: 'The latest שקיעה of the same days plus 50 minutes, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
       },

@@ -20,6 +20,8 @@ import { buildChorefRow } from '../sheets/choref.js';
 import { parseTimes } from './slichos.js';
 import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
+import { everydayShacharis } from './yomkippur.js';
+import { openingMincha } from './early-mincha.js';
 
 const SK_MIN = 1 / 1440;
 const SK_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -111,21 +113,22 @@ export const SK_SHUAVA = {
 
 /** The early מנחה every one of these afternoons opens with.
  *
- *  1:15, 1:35, 1:50, 2:15 and 3:00, with the 1:15 held to מנחה גדולה the way the schedule
- *  after יום כיפור is: where the clock time would be before it, מנחה גדולה is printed in its
- *  place, and where that move leaves under 15 minutes to the 1:35 the מנין is not printed at
- *  all. Measured on the shul's own תשפ"ד sheet, which prints 1:16, 1:17 and 1:18 on its three
- *  afternoons rather than 1:15, so this is what those sheets were already doing by hand.
+ *  1:15, 1:35, 1:50, 2:15 and 3:00, with the 1:15 moved to 1:20 on a day where it would fall
+ *  before מנחה גדולה, and left off altogether where even that would. That is openingMincha in
+ *  early-mincha.js, the same rule and the same code the schedule after יום כיפור runs on.
+ *
+ *  The shul's own תשפ"ד sheet prints 1:16, 1:17 and 1:18 on its three afternoons rather than
+ *  1:15, so the guard is what those sheets were already doing by hand; the round 1:20 is what
+ *  the shul asked for in place of three different minutes in three different years.
  *
  *  Both of the first two are למטה, the rest the main בית מדרש. */
 export function sukkosErevMincha(serial, settings) {
-  const first = skRoundPrinted(Math.max(skAt(13, 15), skMinchaGedola(serial, settings)));
+  const first = openingMincha(skMinchaGedola(serial, settings), skAt(13, 35));
   const rest = [
     { t: skAt(13, 35), u: true }, { t: skAt(13, 50) },
     { t: skAt(14, 15) }, { t: skAt(15, 0) },
   ];
-  const keep = skAt(13, 35) - first >= 15 * SK_MIN - 1e-9;
-  return (keep ? [{ t: first, u: true }, ...rest] : rest);
+  return first === null ? rest : [{ t: first, u: true }, ...rest];
 }
 
 /** A day fraction snapped to the minute it prints as, so a comparison here and the sheet
@@ -140,8 +143,8 @@ function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false } =
   const last = skRoundPrinted(skShkia(serial, settings) - 30 * SK_MIN);
   const out = [];
   if (excelWeekday(serial) === SK_SHABBOS) {
-    const early = skRoundPrinted(Math.max(skAt(13, 15), skMinchaGedola(serial, settings)));
-    if (skAt(14, 0) - early >= 15 * SK_MIN - 1e-9) out.push({ t: early });
+    const early = openingMincha(skMinchaGedola(serial, settings), skAt(14, 0));
+    if (early !== null) out.push({ t: early });
   }
   out.push({ t: skAt(14, 0) });
   if (five) out.push({ t: skAt(17, 30), u: true });
@@ -165,7 +168,8 @@ export function sukkosChmDays(rh) {
 
 /** The חול המועד מנחה run.
  *
- *  1:15, 1:35 and 1:50 to open, the 1:15 held to מנחה גדולה like every other on this sheet.
+ *  1:15, 1:35 and 1:50 to open, the 1:15 moved to 1:20 or dropped like every other on this
+ *  sheet, worked off the latest מנחה גדולה of the days the one printed list has to hold for.
  *  Then from 5:00 every twenty minutes, and last a מנין a quarter of an hour before the
  *  earliest שקיעה of those days, so it clears on all of them. A twenty minute step that lands
  *  within a quarter of an hour of that last one is not printed: two מנינים a few minutes apart
@@ -176,8 +180,8 @@ export function sukkosChmMincha(days, settings) {
   const earliest = Math.min(...days.map((s) => skShkia(s, settings)));
   const last = skRoundPrinted(earliest - 15 * SK_MIN);
   const out = [];
-  const first = skRoundPrinted(Math.max(skAt(13, 15), Math.max(...days.map((s) => skMinchaGedola(s, settings)))));
-  if (skAt(13, 35) - first >= 15 * SK_MIN - 1e-9) out.push({ t: first, u: true });
+  const first = openingMincha(Math.max(...days.map((s) => skMinchaGedola(s, settings))), skAt(13, 35));
+  if (first !== null) out.push({ t: first, u: true });
   out.push({ t: skAt(13, 35), u: true }, { t: skAt(13, 50) });
   for (let t = skAt(17, 0); t <= last + 1e-9; t += 20 * SK_MIN) {
     if (last - t >= 15 * SK_MIN - 1e-9) out.push({ t, u: true });
@@ -393,6 +397,15 @@ export function buildSukkosPoster(year, settings) {
   // made because יום ב' runs straight into Shabbos, so that afternoon belongs to both days.
   const day2Friday = eiruvDay1;
 
+  /* ערב סוכות's own morning, which is not on this sheet and is on the card all the same.
+     The sheet opens at that afternoon's מנחה, because the morning is an ordinary one and the
+     box on the יום כיפור sheet has already said so: its שחרית runs from after יו"כ to סוכות.
+     "What is on next" hands a whole day over to a sheet or to the charts and not half of each,
+     so a day the sheet speaks for has to be the whole day. Left out, ערב סוכות came back with
+     an afternoon and no morning at all. Taken from Settings, the same call the after יו"כ box
+     makes, so the card and that box cannot say different things. */
+  M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(settings), MORNING);
+
   // יום א'
   blocks.push({
     heading: heading(SK_TEXT.day1, SK_DAY1, { eiruv: eiruvDay1 }),
@@ -441,22 +454,64 @@ export function buildSukkosPoster(year, settings) {
     }
   }
 
-  /* שבת חול המועד, in the years that have one: 17 to 21 תשרי with a Shabbos among them, which
-     is every year whose first day is not itself Shabbos. It opens with the ערב שבת מנחה,
-     because that Friday is חול המועד and the box below leaves Fridays out, so this block is
-     the only place that afternoon is given. */
+  /* חול המועד, and the שבת among those days in the years that have one, in the order the days
+     actually run.
+     Which comes first moves with the year and the shul asked for it to: in תשפ"ה the Shabbos
+     is 17 תשרי and the ordinary weekdays start on the 18th, and in תשפ"ו the first weekday is
+     the 17th and the Shabbos is the 19th. Each block is placed by the first day it speaks
+     for, so neither has to know about the other. */
+  const chmDays = sukkosChmDays(rh);
   const shabbosChm = SK_CHM.map((n) => day(n)).find((s) => excelWeekday(s) === SK_SHABBOS) || null;
+  const middle = [];
+  /* חול המועד: the everyday mornings, the מנחה run and the מעריב run, and then הושענא רבה's
+     own morning, which starts earlier than the rest and is given last. A block like the days
+     rather than a ruled box at the foot of a column, which is where it was and which put the
+     one part of the sheet that is a week rather than a day into a frame of its own. */
+  const hoshana = day(SK_HOSHANA);
+  const hoshanaTimes = [tm(skRoundPrinted(skNetz(hoshana, settings) - 36 * SK_MIN), true),
+    ...parseTimes(SK_TEXT.hoshanaRest)];
+  middle.push({
+    at: Math.min(...chmDays),
+    heading: SK_TEXT.cholHamoed,
+    lines: [
+      line(SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), { calc: 'chmShacharis' }),
+      line(SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), { calc: 'chmMincha' }),
+      line(SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), { calc: 'chmMaariv' }),
+      // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
+      // beside it so the sheet says what it was worked from.
+      line(`${SK_TEXT.shacharis} ${SK_TEXT.shacharisHoshana}`, hoshanaTimes,
+        { calc: 'hoshanaShacharis', note: `(${SK_TEXT.netz} ${formatTime(skNetz(hoshana, settings))})` }),
+    ],
+  });
   if (shabbosChm) {
-    // Unless that Friday is יום ב', in which case the block above has already given the
-    // afternoon and candles are lit off a flame that has been burning since יום א'. תשפ"ה is
-    // that year, and its sheet opens this block at הדלקת נרות for exactly that reason.
+    // It opens with the ערב שבת מנחה, because that Friday is חול המועד and the חול המועד block
+    // leaves Fridays out, so this is the only place that afternoon is given. Unless that
+    // Friday is יום ב', in which case the block above has already given the afternoon and
+    // candles are lit off a flame that has been burning since יום א'. תשפ"ה is that year, and
+    // its sheet opens this block at הדלקת נרות for exactly that reason.
     const erev = shabbosChm - 1 > day(SK_DAY2) ? list(sukkosErevMincha(shabbosChm - 1, settings)) : null;
-    blocks.push({
+    middle.push({
+      at: shabbosChm,
       heading: SK_TEXT.shabbosChm,
       lines: sukkosShabbosLines(shabbosChm, settings, bothWays, { erevMincha: erev }),
     });
     addShabbosMinyanim(M, shabbosChm, settings, erev);
   }
+  /* The mornings run on every day of חול המועד that is not Shabbos, the Friday included: the
+     sheet's שחרית line covers all of them and only Shabbos has a morning of its own. The
+     afternoon and the evening are the weekdays' alone, since the Friday's belong to the
+     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning either way. */
+  for (const n of SK_CHM) {
+    const on = day(n);
+    if (excelWeekday(on) === SK_SHABBOS) continue;
+    if (n === SK_HOSHANA) M.list(on, SK_TEXT.shacharis, hoshanaTimes, MORNING);
+    else M.list(on, SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), MORNING);
+  }
+  for (const s of chmDays) {
+    M.list(s, SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), AFTERNOON);
+    M.list(s, SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), AFTERNOON);
+  }
+  blocks.push(...middle.sort((a, b) => a.at - b.at).map(({ at, ...b }) => b));
   // Where the first column of the sheet ends. Everything above it is יום א' and what follows
   // it up to the last day of חול המועד; everything below is שמיני עצרת onwards.
   const split = blocks.length;
@@ -537,28 +592,9 @@ export function buildSukkosPoster(year, settings) {
     addShabbosMinyanim(M, bereishis, settings, null);
   }
 
-  // The חול המועד box.
-  const chmDays = sukkosChmDays(rh);
-  const hoshana = day(SK_HOSHANA);
-  const box = {
-    shacharis: parseTimes(SK_TEXT.chmShacharis),
-    // הושענא רבה starts earlier, and the first מנין is when שחרית starts: thirty six minutes
-    // before נץ, which is printed beside it so the sheet says what it was worked from.
-    hoshana: [tm(skRoundPrinted(skNetz(hoshana, settings) - 36 * SK_MIN), true), ...parseTimes(SK_TEXT.hoshanaRest)],
-    hoshanaNetz: formatTime(skNetz(hoshana, settings)),
-    mincha: list(sukkosChmMincha(chmDays, settings)),
-    maariv: list(sukkosChmMaariv(chmDays, settings)),
-  };
-  for (const s of chmDays) {
-    M.list(s, SK_TEXT.shacharis, box.shacharis, MORNING);
-    M.list(s, SK_TEXT.mincha, box.mincha, AFTERNOON);
-    M.list(s, SK_TEXT.maariv, box.maariv, AFTERNOON);
-  }
-
   // Every printed time on the sheet, the second half of a two-part row included: which marks
   // the key at the foot explains is a question about what is actually on the paper.
-  const all = [...blocks.flatMap((b) => b.lines.flatMap((l) => [...l.times, ...(l.extra?.times || [])])),
-    ...box.shacharis, ...box.hoshana, ...box.mincha, ...box.maariv];
+  const all = blocks.flatMap((b) => b.lines.flatMap((l) => [...l.times, ...(l.extra?.times || [])]));
   const stars = [];
   if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
   if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
@@ -571,7 +607,6 @@ export function buildSukkosPoster(year, settings) {
     blocks,
     // How many of those blocks belong in the first of the sheet's two columns.
     split,
-    box,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster
        hands back. Nothing asks for these yet: posters/day.js hands a whole day over to a sheet
        only from ערב ר"ה to the morning after יו"כ, and סוכות is outside that window, so "what
