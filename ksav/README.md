@@ -15,7 +15,7 @@ test that enforces the privacy promise.
 
 | Phase | What it brings | State |
 | --- | --- | --- |
-| 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer | Done |
+| 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer, USB bundle and portable mode | Done |
 | 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Next |
 | 2 | OCR for images and PDFs, side by side review | Planned |
 | 3 | Live dictation and the global Windows shortcut | Planned |
@@ -36,6 +36,24 @@ Tests, including the headless interface tests, run with no display attached:
 ```
 QT_QPA_PLATFORM=offscreen python -m pytest tests -q
 ```
+
+## Putting it on a USB stick
+
+The computer you use Ksav on never needs an internet connection. On a computer
+that does have one:
+
+```
+pyinstaller packaging/ksav.spec --noconfirm
+python packaging\make-usb-bundle.py --models whisper-medium --out D:\
+```
+
+That writes a `KsavUSB` folder holding the program, the installer and the models.
+Copy it to a stick. On the offline computer, either open `KsavUSB\Ksav` and
+double click `Ksav` to run it straight off the stick, or run the installer and
+let Ksav find the models on the stick by itself.
+
+Ksav is a normal Windows program, not a web page. No browser is involved at any
+point, online or offline. `docs/usb.md` has the detail.
 
 ## Building the Windows installer
 
@@ -67,6 +85,8 @@ This is the point of the project, so it is enforced rather than promised.
 Everything Ksav writes is under one folder, so it can be backed up, moved or
 deleted in one go:
 
+When Ksav is installed normally:
+
 ```
 %LOCALAPPDATA%\Ksav\
     settings.json      your settings
@@ -75,3 +95,6 @@ deleted in one go:
     jobs\              in progress transcription jobs, so a crash resumes
     logs\              local only, never transmitted
 ```
+
+When it is running portable from a USB stick, the same folders sit in `KsavData`
+beside the program instead, and nothing is written to the host computer.

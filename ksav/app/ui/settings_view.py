@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..core import paths
 from ..core.models import MODE_LABELS, OutputMode
 from ..core.settings import Settings, save as save_settings
 from ..platform.hardware import Hardware, Recommendation
@@ -293,6 +294,23 @@ class SettingsView(QWidget):
     def _build_files_card(self) -> None:
         card = Card("Files")
         e = self._settings.export
+
+        location = QLabel(paths.describe_location())
+        location.setObjectName("Mono")
+        location.setWordWrap(True)
+        card.add_row("Settings, dictionary and models", location)
+        if paths.is_portable():
+            card.add(caption(
+                "Ksav is running in portable mode from this drive. Its settings, "
+                "dictionary and models travel with it and nothing is written to the "
+                "computer you plug it into."
+            ))
+        elif paths.portable_requested_but_unavailable():
+            card.add(caption(
+                "This copy of Ksav is marked portable, but the drive it is on will not "
+                "accept a write, so it is using this computer's folders instead. "
+                "A write protected stick is the usual cause."
+            ))
 
         row = QHBoxLayout()
         row.setSpacing(8)

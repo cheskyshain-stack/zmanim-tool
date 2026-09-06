@@ -151,3 +151,19 @@ def test_offline_environment_pins_are_set(monkeypatch):
     assert os.environ["HF_HUB_OFFLINE"] == "1"
     assert os.environ["TRANSFORMERS_OFFLINE"] == "1"
     assert os.environ["HF_HUB_DISABLE_TELEMETRY"] == "1"
+
+
+def test_nothing_opens_a_browser():
+    """Ksav is a native window, not a web page, online or offline.
+
+    A stray openUrl would send the user into a browser, which is exactly what
+    they asked to avoid, and on an offline machine it would fail confusingly.
+    """
+    browser_calls = ("webbrowser", "QDesktopServices", "openUrl", "QWebEngineView")
+    offenders = []
+    for path in APP.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        hits = [call for call in browser_calls if call in text]
+        if hits:
+            offenders.append(f"{path.relative_to(ROOT)} mentions {', '.join(hits)}")
+    assert not offenders, "Ksav must never open a browser:\n  " + "\n  ".join(offenders)

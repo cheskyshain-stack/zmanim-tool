@@ -29,7 +29,7 @@ def configure(level: int = logging.INFO) -> None:
     root.setLevel(level)
 
     handler = logging.handlers.RotatingFileHandler(
-        paths.LOGS_DIR / "ksav.log",
+        paths.logs_dir() / "ksav.log",
         maxBytes=2_000_000,
         backupCount=3,
         encoding="utf-8",

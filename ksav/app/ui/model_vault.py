@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from ..core.logging import get
 from ..platform.hardware import Hardware
+from ..platform import media
 from ..platform.models import CATALOGUE, ModelManager, ModelSpec
 from .widgets import Card, Divider, button, caption
 
@@ -76,6 +78,8 @@ class ModelRow(QFrame):
         self._manager = manager
         self._hardware = hardware
         self._thread: _DownloadThread | None = None
+        # Where this model could be installed from without any network at all.
+        self._found_at: Path | None = None
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(18, 15, 18, 15)
@@ -117,7 +121,7 @@ class ModelRow(QFrame):
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
         buttons.addStretch(1)
-        self.import_button = button("Import from folder", self._import)
+        self.import_button = button("Choose a folder", self._import)
         self.action_button = button("Download", self._toggle, primary=True)
         self.remove_button = button("Remove", self._remove)
         self.remove_button.setObjectName("Danger")
@@ -146,6 +150,10 @@ class ModelRow(QFrame):
     def refresh(self) -> None:
         state = self._manager.state(self._spec)
         busy = self._thread is not None and self._thread.isRunning()
+        self._found_at = None
+        if not state.installed and not busy:
+            found = self._manager.discover(self._spec)
+            self._found_at = found[0] if found else None
 
         if busy:
             self.status.setText("Downloading")
@@ -156,6 +164,14 @@ class ModelRow(QFrame):
             self.action_button.setText("Installed")
             self.action_button.setEnabled(False)
             self.action_button.setObjectName("")
+        elif self._found_at is not None:
+            # Already on a stick or beside the program. No network needed, so
+            # copying it across is the obvious action rather than downloading.
+            self.status.setText(f"Ready to install from {media.describe(self._found_at)}")
+            self.status.setToolTip(media.describe_full(self._found_at))
+            self.action_button.setText("Install from USB")
+            self.action_button.setEnabled(True)
+            self.action_button.setObjectName("Primary")
         else:
             partial = state.bytes_on_disk > 0
             self.status.setText("Partly downloaded" if partial else "Not installed")
@@ -165,7 +181,9 @@ class ModelRow(QFrame):
 
         self.remove_button.setVisible(state.installed or state.bytes_on_disk > 0)
         self.remove_button.setEnabled(not busy)
-        self.import_button.setVisible(not state.installed and not busy)
+        self.import_button.setVisible(
+            not state.installed and not busy and self._found_at is None
+        )
         for widget in (self.action_button, self.remove_button):
             widget.style().unpolish(widget)
             widget.style().polish(widget)
@@ -176,6 +194,10 @@ class ModelRow(QFrame):
         if self._thread and self._thread.isRunning():
             self._thread.cancel()
             self.bar_label.setText("Cancelling...")
+            return
+
+        if self._found_at is not None:
+            self._install_from(self._found_at)
             return
 
         answer = QMessageBox.question(
@@ -225,12 +247,24 @@ class ModelRow(QFrame):
         folder = QFileDialog.getExistingDirectory(
             self, f"Choose the folder holding {self._spec.name}"
         )
-        if not folder:
-            return
+        if folder:
+            self._install_from(Path(folder))
+
+    def _install_from(self, folder: Path) -> None:
+        """Copy a model in from a stick or a folder. Never touches the network."""
+        self.bar.setVisible(True)
+        self.bar.setRange(0, 0)          # copying, with no useful percentage
+        self.bar_label.setVisible(True)
+        self.bar_label.setText(f"Copying from {media.describe(folder)}...")
+        QApplication.processEvents()
         try:
-            self._manager.import_from_folder(self._spec, Path(folder))
+            self._manager.import_from_folder(self._spec, folder)
         except Exception as exc:
-            QMessageBox.warning(self, "Could not import that folder", str(exc))
+            QMessageBox.warning(self, "Could not use that folder", str(exc))
+        finally:
+            self.bar.setRange(0, 100)
+            self.bar.setVisible(False)
+            self.bar_label.setVisible(False)
         self.refresh()
         self.changed.emit()
 
@@ -264,8 +298,9 @@ class ModelVaultView(QWidget):
         title = QLabel("Model Vault")
         title.setObjectName("PageTitle")
         blurb = QLabel(
-            "Models are downloaded once and then stay on this computer. This screen is "
-            "the only place in Ksav that uses the internet, and only when you press a button."
+            "Models are installed once and then stay on this computer, either copied "
+            "from a USB stick or downloaded. This screen is the only place in Ksav that "
+            "can use the internet, and only when you press Download."
         )
         blurb.setObjectName("PageBlurb")
         blurb.setWordWrap(True)
@@ -274,6 +309,20 @@ class ModelVaultView(QWidget):
 
         self.summary = caption("")
         outer.addWidget(self.summary)
+
+        self.usb_banner = QFrame()
+        self.usb_banner.setObjectName("Card")
+        banner_layout = QHBoxLayout(self.usb_banner)
+        banner_layout.setContentsMargins(16, 12, 16, 12)
+        banner_layout.setSpacing(12)
+        self.usb_text = QLabel("")
+        self.usb_text.setWordWrap(True)
+        banner_layout.addWidget(self.usb_text, 1)
+        self.usb_button = button("Install them all", self._install_everything, primary=True)
+        banner_layout.addWidget(self.usb_button, 0, Qt.AlignRight)
+        self.usb_banner.setVisible(False)
+        outer.addWidget(self.usb_banner)
+
         outer.addWidget(Divider())
 
         scroll = QScrollArea()
@@ -299,9 +348,34 @@ class ModelVaultView(QWidget):
         self.refresh()
         self.changed.emit()
 
+    def _install_everything(self) -> None:
+        for model_id, folder in self._manager.discover_all().items():
+            spec = next((s for s in CATALOGUE if s.id == model_id), None)
+            if spec is None:
+                continue
+            try:
+                self._manager.import_from_folder(spec, folder)
+            except Exception as exc:
+                QMessageBox.warning(self, "Could not use that folder", str(exc))
+                break
+        self._on_changed()
+
     def refresh(self) -> None:
         for row in self._rows:
             row.refresh()
+
+        waiting = self._manager.discover_all()
+        self.usb_banner.setVisible(bool(waiting))
+        if waiting:
+            where = media.describe(next(iter(waiting.values())))
+            count = len(waiting)
+            first = next(iter(waiting.values()))
+            self.usb_text.setText(
+                f"{count} model{'s' if count != 1 else ''} ready to install from "
+                f"{where}. No internet is needed."
+            )
+            self.usb_text.setToolTip(media.describe_full(first))
+
         installed = self._manager.installed_ids()
         used = self._manager.total_bytes_on_disk() / (1024 ** 3)
         if installed:
@@ -309,7 +383,13 @@ class ModelVaultView(QWidget):
                 f"{len(installed)} model{'s' if len(installed) != 1 else ''} installed, "
                 f"using {used:.1f} GB. You can work with the network unplugged."
             )
+            self.summary.setVisible(True)
+        elif waiting:
+            # The banner below already says what to do. Repeating "no models
+            # installed" here just contradicts it.
+            self.summary.setVisible(False)
         else:
             self.summary.setText(
                 "No models installed yet. Transcription needs one of these before it can run."
             )
+            self.summary.setVisible(True)

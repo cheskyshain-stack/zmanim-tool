@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 
 from ..core import paths
 from ..core.logging import get
-from . import net
+from . import media, net
 
 log = get(__name__)
 
@@ -60,7 +60,7 @@ class ModelSpec:
         return f"{self.size_bytes / (1024 ** 2):.0f} MB"
 
     def directory(self) -> Path:
-        return paths.MODELS_DIR / self.id
+        return paths.models_dir() / self.id
 
 
 def _ct2_whisper(repo: str, revision: str = "main") -> tuple[ModelFile, ...]:
@@ -177,7 +177,9 @@ class ModelManager:
     MANIFEST = "ksav-model.json"
 
     def __init__(self, root: Path | None = None) -> None:
-        self.root = Path(root) if root else paths.MODELS_DIR
+        # Resolved through the function, not the module constant, so a portable
+        # install running from a USB stick keeps its models on the stick.
+        self.root = Path(root) if root else paths.models_dir()
 
     def directory(self, spec: ModelSpec) -> Path:
         return self.root / spec.id
@@ -290,6 +292,96 @@ class ModelManager:
         self._write_manifest(spec)
         return directory
 
+    # -- USB and offline installation -----------------------------------
+
+    def looks_like(self, spec: ModelSpec, folder: Path) -> bool:
+        """True when this folder holds every required file for the model."""
+        folder = Path(folder)
+        if not folder.is_dir():
+            return False
+        return all(
+            (folder / f.name).is_file()
+            for f in spec.files
+            if not f.optional
+        )
+
+    def discover(self, spec: ModelSpec) -> list[Path]:
+        """Folders this model could be installed from right now.
+
+        Checks beside the program and on every removable drive, so a user who
+        copied a folder to a USB stick never has to say where they put it.
+        Each candidate root is tried both as the model folder itself and as a
+        folder containing one named after the model.
+        """
+        found: list[Path] = []
+        for root in media.candidate_model_roots():
+            for candidate in (root / spec.id, root):
+                if self.looks_like(spec, candidate) and candidate not in found:
+                    found.append(candidate)
+        return found
+
+    def discover_all(self) -> dict[str, Path]:
+        """Every model that could be installed from attached media, by id."""
+        out: dict[str, Path] = {}
+        for spec in CATALOGUE:
+            if self.state(spec).installed:
+                continue
+            places = self.discover(spec)
+            if places:
+                out[spec.id] = places[0]
+        return out
+
+    def download_to(
+        self,
+        spec: ModelSpec,
+        folder: Path,
+        *,
+        on_progress: Callable[[str, float, int, int], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> Path:
+        """Fetch a model into an arbitrary folder rather than the install location.
+
+        This is what the USB bundle builder uses, so there is one download
+        implementation rather than two that can drift apart.
+        """
+        folder = Path(folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        total_files = len([f for f in spec.files if not f.optional])
+        done = 0
+
+        with net.gate(f"build offline bundle for {spec.id}"):
+            net.allow_downloads_env()
+            for model_file in spec.files:
+                target = folder / model_file.name
+                if target.is_file() and target.stat().st_size > 0:
+                    done += 0 if model_file.optional else 1
+                    continue
+
+                def progress(p: net.Progress, name=model_file.name, index=done) -> None:
+                    if on_progress:
+                        on_progress(name, p.fraction or 0.0, index, total_files)
+
+                try:
+                    net.download(
+                        model_file.url,
+                        target,
+                        sha256=model_file.sha256,
+                        expected_size=model_file.size,
+                        on_progress=progress,
+                        should_cancel=should_cancel,
+                    )
+                except Exception as exc:
+                    if model_file.optional:
+                        log.info("optional file %s not available: %s", model_file.name, exc)
+                        continue
+                    raise
+                if not model_file.optional:
+                    done += 1
+
+        self._write_manifest_to(spec, folder)
+        net.enforce_offline_env()
+        return folder
+
     def remove(self, spec: ModelSpec) -> None:
         import shutil
 
@@ -303,6 +395,9 @@ class ModelManager:
         return sum(p.stat().st_size for p in self.root.rglob("*") if p.is_file())
 
     def _write_manifest(self, spec: ModelSpec) -> None:
+        self._write_manifest_to(spec, self.directory(spec))
+
+    def _write_manifest_to(self, spec: ModelSpec, folder: Path) -> None:
         payload = {
             "id": spec.id,
             "name": spec.name,
@@ -311,6 +406,6 @@ class ModelManager:
             "licence": spec.licence,
             "files": [f.name for f in spec.files],
         }
-        self.manifest_path(spec).write_text(
+        (Path(folder) / self.MANIFEST).write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )

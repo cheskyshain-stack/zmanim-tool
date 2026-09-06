@@ -221,7 +221,7 @@ def normalize(settings: Settings) -> Settings:
 
 
 def load(path=None) -> Settings:
-    path = path or paths.SETTINGS_FILE
+    path = path or paths.settings_file()
     try:
         with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
@@ -234,7 +234,7 @@ def load(path=None) -> Settings:
 
 def save(settings: Settings, path=None) -> None:
     """Write atomically. A half written settings file is worse than none."""
-    path = path or paths.SETTINGS_FILE
+    path = path or paths.settings_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(_as_dict(settings), indent=2, ensure_ascii=False)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")

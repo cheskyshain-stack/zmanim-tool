@@ -135,7 +135,7 @@ def test_the_three_home_actions_navigate(qt_app, tmp_path, machine):
 def test_settings_writes_through_to_disk(qt_app, tmp_path, machine, monkeypatch):
     from app.core import paths
 
-    monkeypatch.setattr(paths, "SETTINGS_FILE", tmp_path / "settings.json")
+    monkeypatch.setattr(paths, "settings_file", lambda: tmp_path / "settings.json")
     shell, _, settings = build(qt_app, tmp_path, machine)
 
     view = shell.settings_view

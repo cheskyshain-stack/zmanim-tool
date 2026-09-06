@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from ..core.logging import get
 from ..core.settings import Settings, save as save_settings
+from ..platform import media
 from ..platform.hardware import Hardware, Recommendation
 from ..platform.models import BY_ID, ModelManager
 from . import coming_soon
@@ -202,6 +203,25 @@ class Shell(QWidget):
             )
             return
 
+        # Before telling anyone to go online, check whether a model is already
+        # sitting on a USB stick or beside the program.
+        waiting = self._manager.discover_all()
+        if waiting:
+            where = media.describe(next(iter(waiting.values())))
+            count = len(waiting)
+            self.pill.set_state(
+                StatusPill.WARN,
+                "OFFLINE · Model ready to install",
+                f"{count} model{'s' if count != 1 else ''} found on {where}.",
+            )
+            self.home.set_readiness(
+                False,
+                f"{count} model{'s' if count != 1 else ''} ready to install from {where}. "
+                "This takes a minute and needs no internet connection.",
+                "Open the Model Vault and press Install them all.",
+            )
+            return
+
         self.pill.set_state(
             StatusPill.DANGER,
             "OFFLINE · Model needed",
@@ -209,8 +229,8 @@ class Shell(QWidget):
         )
         self.home.set_readiness(
             False,
-            "No speech model is installed yet. Ksav needs to download one once, "
-            "and after that it never uses the internet again.",
+            "No speech model is installed yet. Ksav needs one, either downloaded once "
+            "or copied across from a USB stick. After that it never uses the internet again.",
             f"The Model Vault recommends a model that suits {self._hardware.summary()}.",
         )
 
