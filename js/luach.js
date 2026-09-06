@@ -15,7 +15,7 @@ import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upc
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
-import { currentPosters, fitPoster } from './ui/posters-view.js';
+import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
 
 const main = document.getElementById('main');
@@ -593,12 +593,16 @@ function renderWeekPage(published) {
 /** The sheets the shul has up right now, or an empty list.
  *
  *  Asked in two places, the menu and the page itself, so it is one call here rather than the
- *  same three lines twice. A sheet is current from five days before the first date on it
- *  through the end of the last, which is currentPosters' own rule. */
+ *  same three lines twice. A sheet is current from three days before the first date on it
+ *  through the end of the last, which is currentOnePageSheets' own rule.
+ *
+ *  One sheet an occasion, the whole yom tov on a page, rather than the run of separate
+ *  posters this used to list: that run is what goes on a wall, and a phone has room for the
+ *  one page that holds the same schedule. */
 function schedulesNow(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   try {
-    return currentPosters(state, resolveSettings(published.settings));
+    return currentOnePageSheets(state, resolveSettings(published.settings));
   } catch (err) {
     // A sheet that will not build must not take the whole site down with it. The menu then
     // has one fewer thing on it, which is the same as there being nothing up.
@@ -626,8 +630,8 @@ function schedulesNow(published) {
 function renderSchedulesPage(published) {
   stopNextUp();
   const sheets = schedulesNow(published);
-  // Every sheet that can be up here is portrait: currentPosters leaves out the one that
-  // can be turned. See setPrintPage for why the page size comes from the view.
+  // Every sheet here is portrait: a one-page sheet is 8.5in by 11in whatever occasion it
+  // holds. See setPrintPage for why the page size comes from the view.
   setPrintPage('letter portrait');
   main.className = '';
   main.innerHTML = backBar('schedules') + `<div class="luach-sheets">
@@ -639,13 +643,14 @@ function renderSchedulesPage(published) {
           <p class="luach-sheet-when no-print">${escAttr(sh.when.en)}</p>
           <div class="luach-sheet-page">${sh.html}</div>
         </section>`).join('')
+        + `<p class="luach-sheet-caveat no-print">Times are subject to change.</p>`
       : `<p class="luach-sheet-none">Nothing extra is up at the moment. The week's times are on
           <a href="/week/">${escAttr(PAGE_NAMES.week)}</a> and the season's board on
           <a href="/chart/">${escAttr(PAGE_NAMES.chart)}</a>.</p>`}
   </div>`;
   openTheDoor();
   if (sheets.length) {
-    fitPoster(main.querySelector('.luach-sheets'));
+    layoutPosters(main.querySelector('.luach-sheets'));
     wirePrintButton(main, 'sheet-print');
   }
 }

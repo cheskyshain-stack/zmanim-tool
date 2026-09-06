@@ -268,34 +268,37 @@ export function sukkosChmMaariv(days, settings) {
    So the three lists come out of afterSchedule in posters/yomkippur.js, exactly as the after
    יו"כ ones do, and all this decides is which days they have to hold for. */
 const SK_AFTER_FIRST = 24;  // the morning after שמחת תורה
-const SK_AFTER_LAST = 30;   // the last day of תשרי
+const SK_THURSDAY = 5;      // excelWeekday: 1 = Sunday .. 7 = Shabbos
 
-/** The days the after סוכות schedule is set by: the week from the morning after שמחת תורה,
- *  Sunday through Thursday.
+/** The days the after סוכות schedule is set by: from the first weekday after שמחת תורה to the
+ *  Thursday of that same week.
  *
  *  Sunday to Thursday for the same reason the after יו"כ run counts only those: Friday and
- *  Shabbos keep schedules of their own and are not what this block is for.
+ *  Shabbos keep schedules of their own and are not what this block is for. So in a year where
+ *  שמחת תורה is the Friday, 24 תשרי is Shabbos and the run opens on the Sunday after it.
  *
- *  A week rather than everything up to the next sheet, because these days are getting shorter
- *  fast: שקיעה falls about a minute and a half a day through late October, so a list set by a
- *  month of them would print a last מנחה that is half an hour early on the first of them. A
- *  week is what the shul hangs this for, the same stretch the after יו"כ block covers.
+ *  One week, and it is the week the wall chart gives this schedule to: the row is found by
+ *  this run's first day (afterSukkosRow in sheets/weekday.js), and stopping at that week's own
+ *  Thursday is what keeps the block and the row speaking for exactly the same days. Counting
+ *  on to the end of תשרי pulled in the Sunday of the week after, whose row on the chart says
+ *  something else, and it left the sheet claiming a day the board did not give it.
+ *
+ *  A week rather than everything up to the next sheet for a second reason as well: these days
+ *  are getting shorter fast. שקיעה falls about a minute and a half a day through late October,
+ *  so a list set by a month of them would print a last מנחה half an hour early on the first of
+ *  them.
  *
  *  And it stops where the clocks do. The end of daylight saving takes שקיעה back an hour, and
  *  a year late enough for that to land inside this week would otherwise set the whole evening
  *  by a day on the other clock: a last מנחה before the 5:00 in front of it. Asked of the
  *  timezone rather than of the date, so it is the one rule the charts already run on. */
 export function sukkosAfterDays(rh, settings) {
+  let first = skSerial(rh, SK_AFTER_FIRST);
+  while (excelWeekday(first) > SK_THURSDAY) first += 1;
   const days = [];
-  let clock = null;
-  for (let n = SK_AFTER_FIRST; n <= SK_AFTER_LAST; n++) {
-    const serial = skSerial(rh, n);
-    const date = dateFromSerial(serial);
-    const dst = Z.dstLocal(date, settings);
-    if (clock === null) clock = dst;
-    if (dst !== clock) break;
-    const dow = excelWeekday(serial);
-    if (dow < 1 || dow > 5) continue; // Sunday to Thursday
+  const clock = Z.dstLocal(dateFromSerial(first), settings);
+  for (let serial = first; excelWeekday(serial) <= SK_THURSDAY; serial += 1) {
+    if (Z.dstLocal(dateFromSerial(serial), settings) !== clock) break;
     days.push(serial);
   }
   return days;
@@ -708,6 +711,7 @@ export function buildSukkosPoster(year, settings) {
      with times of its own, and these are a week of ordinary days that the wall chart already
      carries in full: adding them here would put the same week in twice, once off the chart
      and once off a poster, with nothing to keep the two the same. */
+  const afterDays = sukkosAfterDays(rh, settings);
   {
     const after = buildSukkosAfter(rh, settings);
     blocks.push({
@@ -729,9 +733,18 @@ export function buildSukkosPoster(year, settings) {
 
   return {
     hebrewYear: year,
-    // From the afternoon of ערב סוכות to the last day the sheet gives, which is שמחת תורה
-    // most years and the שבת בראשית after it in a year that has one.
-    span: { from: day(SK_EREV), to: bereishis || day(SK_SIMCHAS) },
+    /* From the afternoon of ערב סוכות to the last day the sheet speaks for.
+       That used to be שמחת תורה, or the שבת בראשית after it in a year that has one, and it is
+       the last day of the week after it now: the sheet carries the schedule that starts the
+       morning after שמחת תורה, and while that block still has days ahead of it the sheet has
+       something to say. Which is what decides how long it stays up on the congregation's own
+       page as well as what the date line under the picker reads. The last day counted rather
+       than the last day of the week: the Friday and the Shabbos after it run on schedules of
+       their own and this sheet does not give them. */
+    span: {
+      from: day(SK_EREV),
+      to: Math.max(bereishis || day(SK_SIMCHAS), afterDays[afterDays.length - 1] ?? 0),
+    },
     blocks,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster
        hands back. Nothing asks for these yet: posters/day.js hands a whole day over to a sheet

@@ -1692,6 +1692,16 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-sheet-page > .poster { flex: 0 0 auto; }
 .luach-sheet-print { display: flex; justify-content: center; margin-bottom: 1.1rem; }
 .luach-sheet-none { max-width: 30rem; margin: 1.5rem auto; text-align: center; color: var(--luach-ink); line-height: 1.6; }
+/* The one line on this page that is not the sheet: a note that the times can move. Small and
+   grey, under the sheet rather than over it, because it is a caveat and not a heading, and
+   no-print in the markup, so paper gets the shul's own sheet with nothing added to it. */
+.luach-sheet-caveat {
+  margin: 0.9rem auto 0; text-align: center;
+  font-size: var(--fs-xs);
+  /* A shade darker than --muted, which at this size is 4.48:1 on the site's paper and just
+     under the 4.5 small text wants. Measured both. */
+  color: #646b78;
+}
 
 /* --- What is on next -----------------------------------------------------------------
    One bordered box above the menu with the next מנין in it, and on an Erev Shabbos a

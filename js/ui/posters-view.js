@@ -527,54 +527,60 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
   </div>`;
 }
 
-/** The sheets that are current on one day, in date order, drawn and ready to show.
+/** The same question asked of the whole occasion rather than of one sheet: the yom tov on a
+ *  single page, which is what the congregation is given.
  *
- *  This is what the congregation's own site puts behind Special Schedules. Current means the
- *  window the shul wants a sheet seen in: from `lead` days before the first date on it,
- *  through the end of the last. A sheet is up on the wall before the days it covers and
- *  comes down when they are over, and this is the same thing on a phone.
+ *  One sheet an occasion, laid out the way the admin's "All on one" lays it out and drawn by
+ *  the same code, so what a visitor reads is the sheet the shul prints and not a second
+ *  telling of it. The shul asked for this in place of the run of separate posters that used to
+ *  be listed here: the separate ones are what goes on a wall, where there is room for eight
+ *  sheets of paper; a phone has room for one page and the one page holds the same schedule.
  *
- *  The two-on-a-page sheets are left out. They exist to save a wall a second sheet of paper,
- *  and on a screen they are two schedules to read at once where one would do.
+ *  Up from three days before the first date on the sheet, and down after the last: the shul's
+ *  own rule, and the same shape as the wall, where a sheet goes up a few days early and comes
+ *  down when the days it covers are over. Three where the separate sheets used five, which is
+ *  what the shul asked for.
+ *
+ *  The two-on-a-page sheets are left out, as they are on the printed one-page sheet: both
+ *  halves of each are already on it under their own names, and a sheet holding them twice is
+ *  the same schedule said twice.
  *
  *  Only two years are looked at. Every sheet's dates sit within a month of ר"ה, and
- *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything
- *  still ahead and the year before it covers the sheets that run past יו"כ, which from סוכות
- *  onwards is most of them.
+ *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything still
+ *  ahead and the year before it covers the sheets that run past יו"כ, which from סוכות onwards
+ *  is most of them. A year nowhere near today is not built at all: this is asked on the page
+ *  every visitor lands on, and building a season to find out that none of it is up cost 120ms
+ *  on a slow phone. The dates come from the calendar, which costs nothing.
  *
- *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at
- *  all. That is the right way round here rather than a shortcut: the chart is what the board
- *  says, hand edits and all, and the congregation should be reading the same times as the
- *  sheet on the wall. */
-export function currentPosters(state, settings, { on = excelSerial(new Date()), lead = 5 } = {}) {
+ *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at all.
+ *  That is the right way round here rather than a shortcut: the chart is what the board says,
+ *  hand edits and all, and the congregation should be reading the same times as the sheet on
+ *  the wall. */
+export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = 3 } = {}) {
   const next = nextYomimNoraim();
   const out = [];
   for (const year of [next - 1, next]) {
-    // Nowhere near, so do not build a thing. This is asked on the congregation's menu, which
-    // is the page every visitor lands on, and building every sheet to find out that none of
-    // them is up cost 120ms on a slow phone. The widest window either way is the סליחות
-    // sheet's, which opens eleven days before ר"ה, and the סוכות sheet's, whose last line is
-    // שבת בראשית on 24 תשרי in a year where שמחת תורה is a Friday. A month and a half back and
-    // five weeks on is wider than either can reach. The dates come from the calendar, which
-    // costs nothing.
     const rh = roshHashana(year - 3761);
     if (on < rh - 45 || on > rh + 35) continue;
-    for (const p of postersByDate(year, settings)) {
-      if (p.last || p.combined) continue;
-      const source = p.sources(state, settings).find((s) => s.year === year);
-      if (!source) continue;
+    for (const name of POSTER_OCCASIONS) {
       let built = null;
-      try { built = source.build()?.poster || null; } catch { built = null; }
+      try {
+        built = buildEveryPoster(state, settings, year, { combined: false, group: name })?.poster || null;
+      } catch {
+        built = null;
+      }
       if (!built?.span) continue;
+      // The span of a one-page sheet is the whole occasion's: the first date on any of the
+      // sheets it holds through the last date on any of them. See buildEveryPoster.
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
       out.push({
-        key: p.key,
+        key: `onepage-${year}-${name}`,
         year,
-        label: p.label,
+        label: name,
         span: built.span,
-        when: p.when(built),
-        html: p.render(built, settings),
+        when: when(from, to),
+        html: renderOnePagePoster(built, settings),
       });
     }
   }
@@ -1830,6 +1836,23 @@ let fitHandler = null;
  *
  *  Exported because the congregation's Special Schedules page draws the same sheets and has
  *  the same problem, and a second copy of this would be a second thing to keep right. */
+/** Everything a sheet needs once it is in the document, in the order it needs it.
+ *
+ *  One call rather than three, because the three have to happen in this order and a caller
+ *  that knew about only some of them is exactly the bug this replaced: the congregation's own
+ *  page called the fit alone, so the runs of times on a one-page sheet were never cut in two
+ *  and every long row hung off the side of its column. Measured on a 414px phone: 199px of a
+ *  334px column, on the same sheet that came out clean in the admin.
+ *
+ *  The two cuts come before the fit and can: every time on a line scales by the same factor,
+ *  so where a run should be cut does not change when the type does, and the heights they
+ *  settle are what the fit then measures. */
+export function layoutPosters(container) {
+  balanceRuns(container);
+  balanceOnePageTimes(container);
+  fitPoster(container);
+}
+
 export function fitPoster(container) {
   // All of them at once is a run of sheets rather than one, and they are not all the same
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
@@ -2100,16 +2123,8 @@ export function renderPosters(container, state, routeChanged, tables) {
        for why it is not left to the paper to be landscape. */
     setPrintPage('letter portrait');
     wirePrintButton(container);
-    // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
-    // would not change where a line breaks, but measuring the unscaled sheet is one less
-    // thing to have to be sure of.
-    balanceRuns(container);
-    // Before the type is fitted, and it can be: every time on a line scales by the same
-    // factor, so where the run should be cut does not change when the size does. The heights
-    // it settles are what the fit then measures.
-    balanceOnePageTimes(container);
-    // fitPoster sets the one-page sheet's type as well as the sheets' zoom, since the first
-    // depends on the second.
-    fitPoster(container);
+    // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
+    // is what the congregation's page calls as well so the two cannot come to differ.
+    layoutPosters(container);
   }
 }

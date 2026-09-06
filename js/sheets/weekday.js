@@ -288,8 +288,8 @@ function afterYomKippurRow(week, settings) {
  *
  *  The row is found by the first day of the run rather than the last, which is where this
  *  differs from the יו"כ one above. That run ends at ערב סוכות and its last day is what pins
- *  it; this one opens the morning after שמחת תורה and runs on into the next week, so its first
- *  day is what says which row it belongs to. In an ordinary year that is the week of בראשית.
+ *  it; this one opens the morning after שמחת תורה, and its first day is what says which row it
+ *  belongs to. In an ordinary year that is the week of בראשית.
  *  In a year where שמחת תורה is the Friday and בראשית the day after, the weekdays of the
  *  בראשית row are still יום טוב and the run opens on the Sunday after it: תשפ"ה is such a
  *  year, and there this schedule lands on the נח row, which is the week it is actually for. */

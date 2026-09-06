@@ -2873,34 +2873,37 @@ function sukkosChmMaariv(days, settings) {
    So the three lists come out of afterSchedule in posters/yomkippur.js, exactly as the after
    יו"כ ones do, and all this decides is which days they have to hold for. */
 const SK_AFTER_FIRST = 24;  // the morning after שמחת תורה
-const SK_AFTER_LAST = 30;   // the last day of תשרי
+const SK_THURSDAY = 5;      // excelWeekday: 1 = Sunday .. 7 = Shabbos
 
-/** The days the after סוכות schedule is set by: the week from the morning after שמחת תורה,
- *  Sunday through Thursday.
+/** The days the after סוכות schedule is set by: from the first weekday after שמחת תורה to the
+ *  Thursday of that same week.
  *
  *  Sunday to Thursday for the same reason the after יו"כ run counts only those: Friday and
- *  Shabbos keep schedules of their own and are not what this block is for.
+ *  Shabbos keep schedules of their own and are not what this block is for. So in a year where
+ *  שמחת תורה is the Friday, 24 תשרי is Shabbos and the run opens on the Sunday after it.
  *
- *  A week rather than everything up to the next sheet, because these days are getting shorter
- *  fast: שקיעה falls about a minute and a half a day through late October, so a list set by a
- *  month of them would print a last מנחה that is half an hour early on the first of them. A
- *  week is what the shul hangs this for, the same stretch the after יו"כ block covers.
+ *  One week, and it is the week the wall chart gives this schedule to: the row is found by
+ *  this run's first day (afterSukkosRow in sheets/weekday.js), and stopping at that week's own
+ *  Thursday is what keeps the block and the row speaking for exactly the same days. Counting
+ *  on to the end of תשרי pulled in the Sunday of the week after, whose row on the chart says
+ *  something else, and it left the sheet claiming a day the board did not give it.
+ *
+ *  A week rather than everything up to the next sheet for a second reason as well: these days
+ *  are getting shorter fast. שקיעה falls about a minute and a half a day through late October,
+ *  so a list set by a month of them would print a last מנחה half an hour early on the first of
+ *  them.
  *
  *  And it stops where the clocks do. The end of daylight saving takes שקיעה back an hour, and
  *  a year late enough for that to land inside this week would otherwise set the whole evening
  *  by a day on the other clock: a last מנחה before the 5:00 in front of it. Asked of the
  *  timezone rather than of the date, so it is the one rule the charts already run on. */
 function sukkosAfterDays(rh, settings) {
+  let first = skSerial(rh, SK_AFTER_FIRST);
+  while (excelWeekday(first) > SK_THURSDAY) first += 1;
   const days = [];
-  let clock = null;
-  for (let n = SK_AFTER_FIRST; n <= SK_AFTER_LAST; n++) {
-    const serial = skSerial(rh, n);
-    const date = dateFromSerial(serial);
-    const dst = Z.dstLocal(date, settings);
-    if (clock === null) clock = dst;
-    if (dst !== clock) break;
-    const dow = excelWeekday(serial);
-    if (dow < 1 || dow > 5) continue; // Sunday to Thursday
+  const clock = Z.dstLocal(dateFromSerial(first), settings);
+  for (let serial = first; excelWeekday(serial) <= SK_THURSDAY; serial += 1) {
+    if (Z.dstLocal(dateFromSerial(serial), settings) !== clock) break;
     days.push(serial);
   }
   return days;
@@ -3313,6 +3316,7 @@ function buildSukkosPoster(year, settings) {
      with times of its own, and these are a week of ordinary days that the wall chart already
      carries in full: adding them here would put the same week in twice, once off the chart
      and once off a poster, with nothing to keep the two the same. */
+  const afterDays = sukkosAfterDays(rh, settings);
   {
     const after = buildSukkosAfter(rh, settings);
     blocks.push({
@@ -3334,9 +3338,18 @@ function buildSukkosPoster(year, settings) {
 
   return {
     hebrewYear: year,
-    // From the afternoon of ערב סוכות to the last day the sheet gives, which is שמחת תורה
-    // most years and the שבת בראשית after it in a year that has one.
-    span: { from: day(SK_EREV), to: bereishis || day(SK_SIMCHAS) },
+    /* From the afternoon of ערב סוכות to the last day the sheet speaks for.
+       That used to be שמחת תורה, or the שבת בראשית after it in a year that has one, and it is
+       the last day of the week after it now: the sheet carries the schedule that starts the
+       morning after שמחת תורה, and while that block still has days ahead of it the sheet has
+       something to say. Which is what decides how long it stays up on the congregation's own
+       page as well as what the date line under the picker reads. The last day counted rather
+       than the last day of the week: the Friday and the Shabbos after it run on schedules of
+       their own and this sheet does not give them. */
+    span: {
+      from: day(SK_EREV),
+      to: Math.max(bereishis || day(SK_SIMCHAS), afterDays[afterDays.length - 1] ?? 0),
+    },
     blocks,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster
        hands back. Nothing asks for these yet: posters/day.js hands a whole day over to a sheet
@@ -3868,8 +3881,8 @@ function afterYomKippurRow(week, settings) {
  *
  *  The row is found by the first day of the run rather than the last, which is where this
  *  differs from the יו"כ one above. That run ends at ערב סוכות and its last day is what pins
- *  it; this one opens the morning after שמחת תורה and runs on into the next week, so its first
- *  day is what says which row it belongs to. In an ordinary year that is the week of בראשית.
+ *  it; this one opens the morning after שמחת תורה, and its first day is what says which row it
+ *  belongs to. In an ordinary year that is the week of בראשית.
  *  In a year where שמחת תורה is the Friday and בראשית the day after, the weekdays of the
  *  בראשית row are still יום טוב and the run opens on the Sunday after it: תשפ"ה is such a
  *  year, and there this schedule lands on the נח row, which is the week it is actually for. */
@@ -4583,7 +4596,7 @@ function posterFromCell(week, cell) {
     week,
     // The one Shabbos it is about, said the way every other poster says its dates, so
     // anything asking "is this sheet current" can ask all of them the same question. This
-    // one was the exception and so it never answered: see currentPosters in posters-view.
+    // one was the exception and so it never answered: see currentOnePageSheets in posters-view.
     span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
     mincha,
@@ -6194,54 +6207,60 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
   </div>`;
 }
 
-/** The sheets that are current on one day, in date order, drawn and ready to show.
+/** The same question asked of the whole occasion rather than of one sheet: the yom tov on a
+ *  single page, which is what the congregation is given.
  *
- *  This is what the congregation's own site puts behind Special Schedules. Current means the
- *  window the shul wants a sheet seen in: from `lead` days before the first date on it,
- *  through the end of the last. A sheet is up on the wall before the days it covers and
- *  comes down when they are over, and this is the same thing on a phone.
+ *  One sheet an occasion, laid out the way the admin's "All on one" lays it out and drawn by
+ *  the same code, so what a visitor reads is the sheet the shul prints and not a second
+ *  telling of it. The shul asked for this in place of the run of separate posters that used to
+ *  be listed here: the separate ones are what goes on a wall, where there is room for eight
+ *  sheets of paper; a phone has room for one page and the one page holds the same schedule.
  *
- *  The two-on-a-page sheets are left out. They exist to save a wall a second sheet of paper,
- *  and on a screen they are two schedules to read at once where one would do.
+ *  Up from three days before the first date on the sheet, and down after the last: the shul's
+ *  own rule, and the same shape as the wall, where a sheet goes up a few days early and comes
+ *  down when the days it covers are over. Three where the separate sheets used five, which is
+ *  what the shul asked for.
+ *
+ *  The two-on-a-page sheets are left out, as they are on the printed one-page sheet: both
+ *  halves of each are already on it under their own names, and a sheet holding them twice is
+ *  the same schedule said twice.
  *
  *  Only two years are looked at. Every sheet's dates sit within a month of ר"ה, and
- *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything
- *  still ahead and the year before it covers the sheets that run past יו"כ, which from סוכות
- *  onwards is most of them.
+ *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything still
+ *  ahead and the year before it covers the sheets that run past יו"כ, which from סוכות onwards
+ *  is most of them. A year nowhere near today is not built at all: this is asked on the page
+ *  every visitor lands on, and building a season to find out that none of it is up cost 120ms
+ *  on a slow phone. The dates come from the calendar, which costs nothing.
  *
- *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at
- *  all. That is the right way round here rather than a shortcut: the chart is what the board
- *  says, hand edits and all, and the congregation should be reading the same times as the
- *  sheet on the wall. */
-function currentPosters(state, settings, { on = excelSerial(new Date()), lead = 5 } = {}) {
+ *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at all.
+ *  That is the right way round here rather than a shortcut: the chart is what the board says,
+ *  hand edits and all, and the congregation should be reading the same times as the sheet on
+ *  the wall. */
+function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = 3 } = {}) {
   const next = nextYomimNoraim();
   const out = [];
   for (const year of [next - 1, next]) {
-    // Nowhere near, so do not build a thing. This is asked on the congregation's menu, which
-    // is the page every visitor lands on, and building every sheet to find out that none of
-    // them is up cost 120ms on a slow phone. The widest window either way is the סליחות
-    // sheet's, which opens eleven days before ר"ה, and the סוכות sheet's, whose last line is
-    // שבת בראשית on 24 תשרי in a year where שמחת תורה is a Friday. A month and a half back and
-    // five weeks on is wider than either can reach. The dates come from the calendar, which
-    // costs nothing.
     const rh = roshHashana(year - 3761);
     if (on < rh - 45 || on > rh + 35) continue;
-    for (const p of postersByDate(year, settings)) {
-      if (p.last || p.combined) continue;
-      const source = p.sources(state, settings).find((s) => s.year === year);
-      if (!source) continue;
+    for (const name of POSTER_OCCASIONS) {
       let built = null;
-      try { built = source.build()?.poster || null; } catch { built = null; }
+      try {
+        built = buildEveryPoster(state, settings, year, { combined: false, group: name })?.poster || null;
+      } catch {
+        built = null;
+      }
       if (!built?.span) continue;
+      // The span of a one-page sheet is the whole occasion's: the first date on any of the
+      // sheets it holds through the last date on any of them. See buildEveryPoster.
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
       out.push({
-        key: p.key,
+        key: `onepage-${year}-${name}`,
         year,
-        label: p.label,
+        label: name,
         span: built.span,
-        when: p.when(built),
-        html: p.render(built, settings),
+        when: when(from, to),
+        html: renderOnePagePoster(built, settings),
       });
     }
   }
@@ -7497,6 +7516,23 @@ let fitHandler = null;
  *
  *  Exported because the congregation's Special Schedules page draws the same sheets and has
  *  the same problem, and a second copy of this would be a second thing to keep right. */
+/** Everything a sheet needs once it is in the document, in the order it needs it.
+ *
+ *  One call rather than three, because the three have to happen in this order and a caller
+ *  that knew about only some of them is exactly the bug this replaced: the congregation's own
+ *  page called the fit alone, so the runs of times on a one-page sheet were never cut in two
+ *  and every long row hung off the side of its column. Measured on a 414px phone: 199px of a
+ *  334px column, on the same sheet that came out clean in the admin.
+ *
+ *  The two cuts come before the fit and can: every time on a line scales by the same factor,
+ *  so where a run should be cut does not change when the type does, and the heights they
+ *  settle are what the fit then measures. */
+function layoutPosters(container) {
+  balanceRuns(container);
+  balanceOnePageTimes(container);
+  fitPoster(container);
+}
+
 function fitPoster(container) {
   // All of them at once is a run of sheets rather than one, and they are not all the same
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
@@ -7767,17 +7803,9 @@ function renderPosters(container, state, routeChanged, tables) {
        for why it is not left to the paper to be landscape. */
     setPrintPage('letter portrait');
     wirePrintButton(container);
-    // Before fitPoster, so the cut is measured at the sheet's real size. zoom is uniform and
-    // would not change where a line breaks, but measuring the unscaled sheet is one less
-    // thing to have to be sure of.
-    balanceRuns(container);
-    // Before the type is fitted, and it can be: every time on a line scales by the same
-    // factor, so where the run should be cut does not change when the size does. The heights
-    // it settles are what the fit then measures.
-    balanceOnePageTimes(container);
-    // fitPoster sets the one-page sheet's type as well as the sheets' zoom, since the first
-    // depends on the second.
-    fitPoster(container);
+    // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
+    // is what the congregation's page calls as well so the two cannot come to differ.
+    layoutPosters(container);
   }
 }
 
@@ -8948,7 +8976,7 @@ const POSTER_SHEETS = [
       },
       afterMincha: {
         plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40 for as long as a מנין still lands a quarter of an hour before שקיעה, and one more squeezed in behind it where there is room.',
-        exact: 'The same rule as the schedule after יום כיפור, which is where it is worked, asked of this week\'s own days: 24 to 30 תשרי, less Friday and Shabbos, which keep schedules of their own, and stopping where the clocks go back. The 1:15 moves to 1:20, or comes off, against the latest מנחה גדולה of those days, and the end of the run is set by their earliest שקיעה. A week rather than everything up to the next sheet because these days lose about a minute and a half of daylight each: a list set by a month of them would print a last מנחה half an hour early on the first of them. Everything is למטה except the 1:50.',
+        exact: 'The same rule as the schedule after יום כיפור, which is where it is worked, asked of this week\'s own days: from the first weekday after שמחת תורה to the Thursday of that same week, Friday and Shabbos keeping schedules of their own, and stopping where the clocks go back. The 1:15 moves to 1:20, or comes off, against the latest מנחה גדולה of those days, and the end of the run is set by their earliest שקיעה. One week, which is the week the wall chart gives this schedule to, and short enough to hold: these days lose about a minute and a half of daylight each, so a list set by a month of them would print a last מנחה half an hour early on the first of them. Everything is למטה except the 1:50.',
       },
       afterMaariv: {
         plain: 'The evening of that week: a first מנין at 7:30, or later where 7:30 would fall inside fifty minutes of שקיעה, then the top and the bottom of every hour to 12:00 with the 8:45 among them.',
