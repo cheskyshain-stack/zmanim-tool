@@ -6565,33 +6565,39 @@ function renderPairPoster(poster, settings, { landscape = false } = {}) {
 const keepUpAttr = (ln) => (ln.keepUp ? ' data-keep-up="1"' : '');
 
 function sukkosRow(ln) {
+  /* The note in brackets, which on this sheet is the נץ the הושענא רבה מנין is worked from.
+     Its own isolate, because it is Hebrew with a time inside it.
+
+     Inside the run and in front of the first time, which is the מנין it is about: that מנין is
+     thirty six minutes before it and the two are one answer. Written between the label and the
+     times it was at the other end of the line. The row is right to left and the times inside it
+     read left to right, so the note ended up against the run's right hand edge, which is its
+     *last* time: measured, the נץ sat beside the 8:20 with the 6:18 it belongs to at the far
+     left of the line. Inside the run it is beside the 6:18 whichever way the line is read,
+     which is where the shul's own sheet has it and where the סליחות sheet puts its
+     "(יום ה' 6:20)".
+
+     Joined to the first time by a non-breaking space, so the נץ and the מנין it is the נץ for
+     can never be split across two lines. See onePageRows for where that showed. */
+  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
   const times = !ln.times.length
-    ? ''
+    ? note
     : isReckoned(ln.times)
-      ? reckoningPairs(ln.times)
+      ? note + reckoningPairs(ln.times)
       : ln.sep
-        ? `<bdi class="poster-row-times" dir="ltr">${ln.times.map(timeHtml).join(ln.sep)}</bdi>`
-        : `<bdi class="poster-row-times poster-run" dir="ltr">${ln.times
+        ? `<bdi class="poster-row-times" dir="ltr">${note}${ln.times.map(timeHtml).join(ln.sep)}</bdi>`
+        : `<bdi class="poster-row-times poster-run" dir="ltr">${note}${ln.times
           .map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')}</bdi>`;
   const extra = ln.extra
     ? `<span class="poster-row-label poster-row-second">${escAttr(ln.extra.label)}</span>`
       + `<bdi class="poster-row-times" dir="ltr">${ln.extra.times.map(timeHtml).join(SLASH)}</bdi>`
     : '';
-  // The note in brackets, which on this sheet is the נץ the הושענא רבה מנין is worked from.
-  // Its own isolate, because it is Hebrew with a time inside it, and written in front of the
-  // times rather than after them: the row is right to left and the times inside it read left
-  // to right, so a note written last lands at the far left of the line where it reads as part
-  // of the row underneath. In front, it sits against the first time, which is the one it is
-  // about. Same placement and the same reason as the סליחות sheet's.
-  // Joined to the times by a non-breaking space, so the נץ and the מנין it is the נץ for can
-  // never be split across two lines. See onePageRows for where that showed.
-  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
   // A label that is not Hebrew is isolated from the row around it. One is: the address the
   // שמחת בית השואבה line carries. A row is set right to left, so "798 vine ave." left to itself
   // came out with the full stop at the front of the line.
   const name = ln.ltrLabel ? `<bdi dir="ltr">${escAttr(ln.label)}</bdi>` : escAttr(ln.label);
   return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}"${keepUpAttr(ln)} lang="he">`
-    + `<span class="poster-row-label">${name}</span>${note}${times}${extra}</p>`;
+    + `<span class="poster-row-label">${name}</span>${times}${extra}</p>`;
 }
 
 /** The סוכות sheet: seven blocks at most, in two columns with a rule between them.
