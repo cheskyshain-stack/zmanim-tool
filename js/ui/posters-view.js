@@ -1613,6 +1613,10 @@ function fitSukkos(container) {
        the one-page sheet's third column. */
     const wide = () => cols.some((c) => c.scrollWidth > c.clientWidth + 1);
     const fits = () => layout() <= pair.clientHeight - OP_ROOM && !wide();
+    // Cleared before the search: this runs again when a phone is turned, and a gap left over
+    // from the last pass would be part of what the type is fitted against.
+    sheet.style.setProperty('--sk-gap-1', '0px');
+    sheet.style.setProperty('--sk-gap-2', '0px');
     let best = SK_MIN_SCALE;
     for (const step of [0.05, 0.01]) {
       for (let v = best; v <= SK_MAX_SCALE + 1e-9; v = Math.round((v + step) * 100) / 100) {
@@ -1627,6 +1631,19 @@ function fitSukkos(container) {
     // layout, since cutting a run changes how tall its block is.
     balanceRuns(sheet);
     layout();
+    /* And what is left in each column goes to that column's rows, so the two end level. The
+       cut has to fall between two rows and a row is a whole line of type, so the closest the
+       columns can come to each other on their own is half a row: measured on תשפ״ח, 676px
+       against 746px, which is an inch of nothing at the foot of one of them. */
+    cols.forEach((c, i) => {
+      const rows = c.querySelectorAll('.poster-row');
+      const kids = [...c.children];
+      if (!rows.length || !kids.length) return;
+      const ink = kids[kids.length - 1].offsetTop + kids[kids.length - 1].offsetHeight - kids[0].offsetTop;
+      const spare = pair.clientHeight - OP_ROOM - ink;
+      const gap = Math.min(Math.max(0, spare) / rows.length, rows[0].offsetHeight * 0.9);
+      sheet.style.setProperty(`--sk-gap-${i + 1}`, `${gap}px`);
+    });
   }
 }
 

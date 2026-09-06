@@ -3146,6 +3146,15 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    left on space-between, the shorter of the two opened its gaps to match the longer one and
    the two columns' rows no longer lined up with each other. */
 .poster.is-sukkos .poster-rows { justify-content: flex-start; }
+/* What is left over in a column goes to its own rows, a column at a time.
+   The cut between the two columns has to fall between two rows, and a row here is a whole
+   line of type: the closest the two columns can come to each other is half a row, and on a
+   sheet of twenty rows to the column that is a visible inch of nothing at the foot of one of
+   them. Measured on תשפ״ח, 676px against 746px. Spread through the shorter column's rows it
+   comes to about three pixels a row and the two columns end level.
+   fitSukkos works out how much and caps it, the same as the one-page sheet's --op-gap. */
+.poster.is-sukkos .poster-pair-col:nth-child(1) .poster-row { padding-block: calc(var(--sk-gap-1, 0px) / 2); }
+.poster.is-sukkos .poster-pair-col:nth-child(2) .poster-row { padding-block: calc(var(--sk-gap-2, 0px) / 2); }
 /* The room the two columns have, held to what is actually left on the page. A flex item's
    min-height is auto, so a column too tall for the page pushes the box it sits in taller
    than the page instead of overflowing it, and the box then reports its own content back as
