@@ -3030,6 +3030,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    what balances the rabbi's line at the other end and keeps the wordmark on the sheet's
    middle. */
 .poster.is-chart-head .header-year { font-size: 16pt; font-weight: 700; text-align: left; }
+/* The building sits in that corner now, and line-height: 0 is what keeps it from making the
+   header taller than it was. An image is an inline box: it sits on the text baseline and the
+   strut behind it leaves room for a descender under it, which is 6px here, and 6px of header
+   is 6px the two columns underneath do not get. Measured: the row is 61px, the height of the
+   name and its subtitle, with the picture in it and without. */
+.poster.is-chart-head .header-year { line-height: 0; }
 /* The landscape sheet is 11in wide, the same as a chart, so it takes the chart's own two
    numbers and its header is a copy of one to the pixel. */
 .poster.is-pair.is-landscape .page-header {

@@ -670,13 +670,20 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   // shorter, and on those sheets every tenth of an inch of header is a tenth the two columns
   // do not get.
   const head = chartHead
-    // The wall chart's header, copied: the same markup and the same classes, so the two are
-    // one thing rather than a likeness of one that drifts. Where a chart puts the building,
-    // this leaves the corner empty: it held the year for a while and the year came off. No
-    // rule under it either, because a chart does not have one.
+    /* The wall chart's header, copied: the same markup and the same classes, so the two are
+       one thing rather than a likeness of one that drifts. The building goes where a chart
+       puts it, in the corner that held the year until the year came off and which is still
+       what balances the rabbi's line at the other end. Out of Settings, so a shul that has
+       cropped its own photo in has it here as well, and alt="" because the name beside it
+       already says what it is. No rule under the row, because a chart does not have one.
+
+       Only on this header. The single sheets stack theirs, name over rule over the rabbi's
+       line, which is how the Word posters they were drawn from are built, and the shul asked
+       for the picture on the sheets that carry the chart's header and nowhere else. */
     ? `<div class="page-header" dir="ltr">
          <div class="header-row">
-           <div class="header-year" aria-hidden="true"></div>
+           <div class="header-year"><img class="header-icon"
+                src="${escAttr(settings.headerIconImage || '/assets/logo-building-icon.png')}" alt=""></div>
            <div class="header-center">
              <img class="header-logo" src="/assets/logo-text.png"
                   alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
@@ -1653,7 +1660,13 @@ function fitSukkos(container) {
       const kids = [...c.children];
       if (!rows.length || !kids.length) return;
       const ink = kids[kids.length - 1].offsetTop + kids[kids.length - 1].offsetHeight - kids[0].offsetTop;
-      const spare = pair.clientHeight - OP_ROOM - ink;
+      /* A pixel of the spare is left unspent, because the gap is laid on as padding split
+         between the two sides of every row and the browser rounds each of those to its own
+         device pixels. Spending all of it, the sum of the rows came out a pixel or two past
+         the room it was fitted to: measured at 1440px, 750px of ink where the target was 749.
+         Nothing overflows at that, the clearance being 11px, but it eats into the margin that
+         is there for devices this cannot measure, and a pixel of gap is invisible. */
+      const spare = pair.clientHeight - OP_ROOM - ink - 1;
       const gap = Math.min(Math.max(0, spare) / rows.length, rows[0].offsetHeight * 0.9);
       sheet.style.setProperty(`--sk-gap-${i + 1}`, `${gap}px`);
     });
