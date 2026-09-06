@@ -20,7 +20,7 @@ import { buildChorefRow } from '../sheets/choref.js';
 import { parseTimes } from './slichos.js';
 import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
-import { everydayShacharis } from './yomkippur.js';
+import { everydayShacharis, afterSchedule } from './yomkippur.js';
 import { openingMincha } from './early-mincha.js';
 
 const SK_MIN = 1 / 1440;
@@ -84,6 +84,9 @@ export const SK_TEXT = {
   shacharisChm: 'חול המועד',
   hoshana: 'הושענא רבה',
   netz: 'נץ',
+  // The everyday schedule the shul goes back to, the last block on the sheet. Named to match
+  // the one that starts after יום כיפור, which it is worked exactly like.
+  afterTitle: 'זמני תפילה אחר סוכות',
   // The two morning runs, which do not move with the year. The everyday one is not used on
   // חול המועד: those mornings have their own three, which is what the sheet prints.
   chmShacharis: '<u>7:00</u>, 8:00, <u>8:40</u>',
@@ -249,6 +252,58 @@ export function sukkosChmMaariv(days, settings) {
   }
   grid.sort((a, b) => a.t - b.t);
   return [{ t: first, u: true }, ...grid.filter((g) => g.t - first >= 15 * SK_MIN - 1e-9)];
+}
+
+/* --- The schedule that starts after סוכות ---------------------------------------------
+   The last block on the sheet, and the only one that is not about a day of יום טוב: the
+   everyday schedule the shul goes back to once שמחת תורה is over. It is on the תשפ"ד sheet
+   under this name and the shul asked for it back, worked on the same rules as the schedule
+   that starts after יום כיפור rather than on the numbers that sheet happens to print.
+
+   So the three lists come out of afterSchedule in posters/yomkippur.js, exactly as the after
+   יו"כ ones do, and all this decides is which days they have to hold for. */
+const SK_AFTER_FIRST = 24;  // the morning after שמחת תורה
+const SK_AFTER_LAST = 30;   // the last day of תשרי
+
+/** The days the after סוכות schedule is set by: the week from the morning after שמחת תורה,
+ *  Sunday through Thursday.
+ *
+ *  Sunday to Thursday for the same reason the after יו"כ run counts only those: Friday and
+ *  Shabbos keep schedules of their own and are not what this block is for.
+ *
+ *  A week rather than everything up to the next sheet, because these days are getting shorter
+ *  fast: שקיעה falls about a minute and a half a day through late October, so a list set by a
+ *  month of them would print a last מנחה that is half an hour early on the first of them. A
+ *  week is what the shul hangs this for, the same stretch the after יו"כ block covers.
+ *
+ *  And it stops where the clocks do. The end of daylight saving takes שקיעה back an hour, and
+ *  a year late enough for that to land inside this week would otherwise set the whole evening
+ *  by a day on the other clock: a last מנחה before the 5:00 in front of it. Asked of the
+ *  timezone rather than of the date, so it is the one rule the charts already run on. */
+export function sukkosAfterDays(rh, settings) {
+  const days = [];
+  let clock = null;
+  for (let n = SK_AFTER_FIRST; n <= SK_AFTER_LAST; n++) {
+    const serial = skSerial(rh, n);
+    const date = dateFromSerial(serial);
+    const dst = Z.dstLocal(date, settings);
+    if (clock === null) clock = dst;
+    if (dst !== clock) break;
+    const dow = excelWeekday(serial);
+    if (dow < 1 || dow > 5) continue; // Sunday to Thursday
+    days.push(serial);
+  }
+  return days;
+}
+
+/** The after סוכות schedule: the same three lists as after יו"כ, bound by that week's own days. */
+export function buildSukkosAfter(rh, settings) {
+  const days = sukkosAfterDays(rh, settings);
+  return afterSchedule(
+    Math.min(...days.map((s) => skShkia(s, settings))),
+    Math.max(...days.map((s) => skMinchaGedola(s, settings))),
+    settings
+  );
 }
 
 /** A chart cell read back as the poster's own times.
@@ -553,7 +608,9 @@ export function buildSukkosPoster(year, settings) {
       // The words say so as well: that is the wording the shul's own sheet uses and it is left
       // alone, so this row says where twice over, once in words and once in the key's mark.
       line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt, false, '*')], { calc: 'mishna', wrap: true }),
-      line(SK_SHUAVA.mishnaMaariv, [], { calc: 'mishnaMaariv', wrap: true }),
+      // It has no time of its own and names the שיעור above it, so the column break may not
+      // come between the two: on its own at the head of a column it is a line about nothing.
+      line(SK_SHUAVA.mishnaMaariv, [], { calc: 'mishnaMaariv', wrap: true, keepUp: true }),
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.
       line(SK_TEXT.shacharis, hoshanaTimes,
@@ -635,6 +692,27 @@ export function buildSukkosPoster(year, settings) {
       lines: sukkosShabbosLines(bereishis, settings, bothWays),
     });
     addShabbosMinyanim(M, bereishis, settings, null);
+  }
+
+  /* The everyday schedule that starts the morning after שמחת תורה, which is where the sheet
+     ends. On the תשפ"ד sheet it is the last block of the left hand column, under the same
+     name; the times are worked here rather than copied off it, on the rules the shul gave for
+     the schedule that starts after יום כיפור. See buildSukkosAfter.
+
+     Its מנינים are not gathered into M. Every other block on this sheet is a day of יום טוב
+     with times of its own, and these are a week of ordinary days that the wall chart already
+     carries in full: adding them here would put the same week in twice, once off the chart
+     and once off a poster, with nothing to keep the two the same. */
+  {
+    const after = buildSukkosAfter(rh, settings);
+    blocks.push({
+      heading: SK_TEXT.afterTitle,
+      lines: [
+        line(SK_TEXT.shacharis, after.shacharis, { calc: 'afterShacharis' }),
+        line(SK_TEXT.mincha, after.mincha, { calc: 'afterMincha' }),
+        line(SK_TEXT.maariv, after.maariv, { calc: 'afterMaariv' }),
+      ],
+    });
   }
 
   // Every printed time on the sheet, the second half of a two-part row included: which marks

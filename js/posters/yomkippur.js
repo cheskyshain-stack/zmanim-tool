@@ -63,7 +63,10 @@ export const YK_TEXT = {
   // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
   kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
   nextMorning: 'שחרית יום',
-  afterHeading: 'Starting after יום כיפור',
+  // The one heading on these sheets that used to be English, because that was the wording the
+  // shul hung. It is Hebrew now and reads the same way round as the block after סוכות, which
+  // runs on the same rules and is named to match.
+  afterHeading: 'זמני תפילה אחר יום כיפור',
   after: { shacharis: 'שחרית:', mincha: 'מנחה:', maariv: 'מעריב:' },
   // The same three names again, without the colon, for the sheet that gives the schedule a
   // page of its own and sets them as headings.
@@ -174,6 +177,27 @@ const AFTER_MAARIV_REST = [
   [24, 0, true],
 ];
 
+/** The three lists themselves, given the two zmanim that bind them: the earliest שקיעה of the
+ *  days one printed schedule has to hold for, which sets the end of the afternoon and the head
+ *  of the evening, and their latest מנחה גדולה, which decides the מנין the afternoon opens with.
+ *
+ *  Here rather than inside buildAfterYomKippur because two schedules run on it: this one and
+ *  the one that starts after סוכות, which the shul asked to be worked the same way. One rule in
+ *  one place is the only way the two can be relied on to stay the same, which is the same
+ *  ground the opening מנין itself is shared on (posters/early-mincha.js). What differs between
+ *  them is only which days are counted, and each sheet answers that for itself. */
+export function afterSchedule(earliestShkia, latestMinchaGedola, settings) {
+  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+  return {
+    shacharis: everydayShacharis(settings),
+    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
+    mincha: afterMincha(earliestShkia, latestMinchaGedola)
+      .map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
+    maariv: [tm(afterEarlyMaariv(earliestShkia), true),
+      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
+  };
+}
+
 /** The everyday schedule that runs from after יו"כ until סוכות.
  *
  *  Shared, because it is both the box at the foot of the יום כיפור sheet and a sheet of its
@@ -181,7 +205,6 @@ const AFTER_MAARIV_REST = [
  *  drift. */
 export function buildAfterYomKippur(year, settings) {
   const rh = roshHashana(year - 3761);
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
   const runDays = afterYomKippurDays(rh, settings);
   const earliest = runDays.length
     ? Math.min(...runDays.map((d) => d.shkia))
@@ -206,11 +229,7 @@ export function buildAfterYomKippur(year, settings) {
     ...minchaGedolaDays.map((serial) => Z.minchaGedolaLechumra(dateFromSerial(serial), settings))
   );
   return {
-    shacharis: everydayShacharis(settings),
-    // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
-    mincha: afterMincha(earliest, latestMinchaGedola).map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
-    maariv: [tm(afterEarlyMaariv(earliest), true),
-      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
+    ...afterSchedule(earliest, latestMinchaGedola, settings),
     earliestShkia: formatTime(earliest),
   };
 }

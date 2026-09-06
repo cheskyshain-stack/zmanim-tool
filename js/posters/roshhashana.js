@@ -51,13 +51,18 @@ function nineHours(date, settings) {
  *  slots and announcements. Everything that moves with the year is computed below. */
 export const RH_TEXT = {
   title: 'ראש השנה',
-  slichos: { label: 'סליחות ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  /* Two labels each, and which one is used depends on whether anything above the line has
+     already said which day it is. The sheet of its own has no heading over these three, so
+     the label carries the day; the sheet that holds the whole yomim noraim puts them under
+     ערב ראש השנה, and there the day in the label is the same word twice on two lines
+     running. `short` is the one for a block that is already named. */
+  slichos: { label: 'סליחות ערב ר"ה', short: 'סליחות', times: '6:30, <u>7:10</u>' },
   chatzos: 'חצות',
   // The three lines above the days, gathered under a heading of their own. The sheet of its
   // own does not need one, since those lines are the first thing under the title; the sheet
   // that holds the whole yomim noraim does, because there every block carries a name.
   erevHeading: 'ערב ראש השנה',
-  erevMincha: { label: 'מנחה ערב ראש השנה', times: '<u>1:35</u>, 1:50, 2:15, 3:00' },
+  erevMincha: { label: 'מנחה ערב ראש השנה', short: 'מנחה', times: '<u>1:35</u>, 1:50, 2:15, 3:00' },
   shabbos: 'שבת',
   // Joined to the day with a dot rather than wrapped in brackets: the heading is underlined,
   // and the underline running under a bracket reads as though it is cutting through it.

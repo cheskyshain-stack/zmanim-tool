@@ -825,7 +825,7 @@ function ykAfterBox(poster) {
     + times.map((t) => `<span class="poster-t">${timeHtml(t)}</span>`).join('')
     + `</bdi></p>`;
   return `<div class="poster-box">
-        <h3 class="poster-box-head" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h3>
+        <h3 class="poster-box-head" lang="he">${escAttr(YK_TEXT.afterHeading)}</h3>
         ${boxRow(YK_TEXT.after.shacharis, poster.after.shacharis)}
         ${boxRow(YK_TEXT.after.mincha, poster.after.mincha)}
         ${boxRow(YK_TEXT.after.maariv, poster.after.maariv)}
@@ -947,6 +947,15 @@ function renderPairPoster(poster, settings, { landscape = false } = {}) {
  *  שמחת תורה מנחה, "מיד אחר מוסף & 5:55") keeps its own text, `extra` is the second label and
  *  time that sits on the same line, and `note` is the bracket that says what a time was worked
  *  from. */
+/** Says the row belongs to the one above it and the column break may not come between them.
+ *
+ *  One line has it: the מעריב after the משנה תורה on הושענא רבה, which has no time of its own
+ *  and names the שיעור above it. Cut from it, it opens a column as "מעריב אחר משנה תורה" with
+ *  no משנה תורה anywhere near, which reads as a line about nothing. The same trouble the נץ and
+ *  its מנין have inside one line, at the size of a block: see splitColumns, which is the one
+ *  place that reads this. */
+const keepUpAttr = (ln) => (ln.keepUp ? ' data-keep-up="1"' : '');
+
 function sukkosRow(ln) {
   const times = !ln.times.length
     ? ''
@@ -973,7 +982,7 @@ function sukkosRow(ln) {
   // שמחת בית השואבה line carries. A row is set right to left, so "798 vine ave." left to itself
   // came out with the full stop at the front of the line.
   const name = ln.ltrLabel ? `<bdi dir="ltr">${escAttr(ln.label)}</bdi>` : escAttr(ln.label);
-  return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}" lang="he">`
+  return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}"${keepUpAttr(ln)} lang="he">`
     + `<span class="poster-row-label">${name}</span>${note}${times}${extra}</p>`;
 }
 
@@ -1046,7 +1055,7 @@ function renderAfterYomKippurPoster(poster, settings) {
     </div>`;
   const a = poster.after;
   const body = `
-    <h2 class="poster-title poster-title-ltr" dir="ltr">${escAttr(YK_TEXT.afterHeading)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(YK_TEXT.afterHeading)}</h2>
     <div class="poster-sets">
       ${section(YK_TEXT.afterBig.shacharis, a.shacharis)}
       ${section(YK_TEXT.afterBig.mincha, a.mincha)}
@@ -1115,9 +1124,6 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
    guessed at. */
 const ONEPAGE_TEXT = {
   title: 'ימים נוראים',
-  // "ראש השנה - יום א'". Both halves are Hebrew, so a plain hyphen between them needs no
-  // isolate: nothing here runs the other way.
-  sep: ' - ',
 };
 
 /** How many times go on one line before the run is cut in two.
@@ -1237,8 +1243,7 @@ function balanceOnePageTimes(container) {
 /** A block: a name and its rows. Rows are the poster's own line shape, `{ label, times }`
  *  with the same optional `sub`, `extra`, `note` and `sep` the sheets already use, so a row
  *  can be handed straight over from a poster without being rebuilt. */
-const oneSection = (title, rows, opts = {}) => ({ title, rows, ...opts });
-const oneHead = (a, b) => `${a}${ONEPAGE_TEXT.sep}${b}`;
+const oneSection = (title, rows) => ({ title, rows });
 const onePlain = (text) => [{ text, underlined: false, mark: '' }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
@@ -1247,12 +1252,14 @@ const onePlain = (text) => [{ text, underlined: false, mark: '' }];
 const ONEPAGE_SECTIONS = {
   slichos: (p) => [oneSection(SLICHOS_TEXT.title, p.rows)],
   roshhashana: (p) => [
-    oneSection(oneHead(RH_TEXT.title, RH_TEXT.erevHeading), [
-      { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
+    // The day in the label as well as in the heading is the same word twice on two lines
+    // running, so under a block that is already named these are סליחות and מנחה.
+    oneSection(RH_TEXT.erevHeading, [
+      { label: RH_TEXT.slichos.short, times: parseTimes(RH_TEXT.slichos.times) },
       { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
-      { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
+      { label: RH_TEXT.erevMincha.short, times: parseTimes(RH_TEXT.erevMincha.times) },
     ]),
-    ...p.blocks.map((b) => oneSection(oneHead(RH_TEXT.title, b.heading), b.lines)),
+    ...p.blocks.map((b) => oneSection(b.heading, b.lines)),
   ],
   tzomgedalia: (p) => [oneSection(TZG_TEXT.title, p.sets.map((s) => (s.note
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
@@ -1260,24 +1267,25 @@ const ONEPAGE_SECTIONS = {
     // is a row like the rest.
     ? { label: s.note.label, times: onePlain(s.note.text) }
     : { label: s.head, times: s.lines.flat() })))],
-  shuva: (p) => [oneSection(SHUVA_TEXT.title, [
-    // The two lines of the announcement read as one label with the time beside it. Given a
-    // page of its own this is three lines of 24pt down the middle of the sheet; in a column
-    // an inch and a half wide it is a row.
-    { label: SHUVA_TEXT.lines.join(' '), times: p.drasha ? onePlain(p.drasha) : [] },
+  shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
+    // The announcement itself is not on this sheet. Given a page of its own it is three lines
+    // of 24pt down the middle of the sheet; as a row it was a sentence lying across a
+    // timetable, and it says nothing the heading over it and the word דרשה do not.
+    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha) : [] },
     { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
   ])],
   yomkippur: (p) => [
-    oneSection(oneHead(YK_TEXT.title, YK_TEXT.erevHeading), p.erevLines),
+    oneSection(YK_TEXT.erevHeading, p.erevLines),
     oneSection(YK_TEXT.dayHeading, p.dayLines),
     // The morning after names its own day ("שחרית יום ג'"), so the block is named for it and
     // the row inside says only which תפילה it is.
     oneSection(p.nextMorning.label, [{ label: YK_TEXT.shacharis.label, times: p.nextMorning.times }]),
   ],
-  /* The סוכות sheet's own blocks, each a section, with no name in front of the heading. The
-     ראש השנה and יום כיפור sections carry theirs because that sheet holds two yom tovim and
-     "יום א'" alone would not say which; this one is a single occasion from end to end and the
-     title at the top of the sheet has already said which. */
+  /* Every block on this sheet is its own name, on both occasions. They used to carry the yom
+     tov in front of them, "ראש השנה - יום א'", because one sheet holds two of them and "יום א'"
+     alone does not say which; but the blocks run in date order and each yom tov opens with its
+     own ערב, so the day above says which as well as the label did, and the shul asked for the
+     names on their own. */
   sukkos: (p) => p.blocks.map((b) => oneSection(b.heading, b.lines)),
   /* No entry for the שמחת בית השואבה sheet, and that is deliberate rather than a gap: both
      halves of it are on the סוכות sheet's own blocks now, the evening under יום ב' and the
@@ -1286,10 +1294,7 @@ const ONEPAGE_SECTIONS = {
     { label: YK_TEXT.afterBig.shacharis, times: p.after.shacharis },
     { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
     { label: YK_TEXT.afterBig.maariv, times: p.after.maariv },
-  // The only heading on the sheet that is not Hebrew, because it is the wording the shul
-  // already hangs. Said out loud rather than left to dir="auto", which would take its cue
-  // from the Hebrew half and turn the line round.
-  ], { ltrHead: true })],
+  ])],
 };
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
@@ -1336,7 +1341,7 @@ function onePageRows(r) {
     : r.times.length || note
       ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
       : '';
-  return `<div class="onepage-row">${label}${times}</div>`
+  return `<div class="onepage-row"${keepUpAttr(r)}>${label}${times}</div>`
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }
 
@@ -1376,7 +1381,7 @@ function renderOnePagePoster(built, settings) {
     <div class="onepage-cols">
       <div class="onepage-col">
         ${sections.map((s) => `<section class="onepage-sec">
-          <h3 class="onepage-sec-head"${s.ltrHead ? ' dir="ltr"' : hebrewLang(s.title)}>${escAttr(s.title)}</h3>
+          <h3 class="onepage-sec-head"${hebrewLang(s.title)}>${escAttr(s.title)}</h3>
           ${s.rows.map(onePageRows).join('')}
         </section>`).join('')}
       </div>
@@ -1473,6 +1478,8 @@ function splitColumns(cols, groups) {
     // Never straight after a heading: that would strand it at the foot of the first column
     // with nothing under it.
     if (items[k - 1].head) continue;
+    // And never between a row and the one it belongs to: see keepUpAttr.
+    if (items[k].el.dataset?.keepUp) continue;
     const m = Math.max(top[k] - top[0], end - top[k]);
     if (m < worst) { worst = m; at = k; }
   }

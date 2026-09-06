@@ -29,6 +29,13 @@ export const SHUVA_TEXT = {
   lines: ['בעזהשי"ת הרב שליט"א', 'ידרוש בהלכה ובאגדה'],
   at: 'בשעה',
   minchaLabel: 'מנחה',
+  /* What the block is called on the sheet that holds the whole yomim noraim, where it is one
+     block among nine rather than a sheet. The announcement itself is not on that sheet: given
+     a page of its own it is the three lines the shul hangs, and squeezed into a column an inch
+     and a half wide it is a sentence lying across a timetable. The heading says which Shabbos
+     and the row says דרשה, which is what the time beside it is. */
+  heading: 'שבת שובה',
+  drashaLabel: 'דרשה',
 };
 
 /** Which of the sheet's weeks is שבת שובה, or nothing if this sheet does not cover it.

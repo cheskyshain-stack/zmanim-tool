@@ -635,6 +635,18 @@ const POSTER_SHEETS = [
         plain: '1:15, 1:35 and 1:50 to open, then every twenty minutes from 5:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, announced on a round five so it clears on all of them.',
         exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5: down rather than up, because a quarter of an hour before the earliest שקיעה is the latest that מנין may be. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them a מנין goes back in 20 minutes before the last, or 15 where 20 would crowd the one in front. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
+      afterShacharis: {
+        plain: 'The everyday morning the shul goes back to once שמחת תורה is over, straight out of Settings.',
+        exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, so a change in Settings reaches all three at once.',
+      },
+      afterMincha: {
+        plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40 for as long as a מנין still lands a quarter of an hour before שקיעה, and one more squeezed in behind it where there is room.',
+        exact: 'The same rule as the schedule after יום כיפור, which is where it is worked, asked of this week\'s own days: 24 to 30 תשרי, less Friday and Shabbos, which keep schedules of their own, and stopping where the clocks go back. The 1:15 moves to 1:20, or comes off, against the latest מנחה גדולה of those days, and the end of the run is set by their earliest שקיעה. A week rather than everything up to the next sheet because these days lose about a minute and a half of daylight each: a list set by a month of them would print a last מנחה half an hour early on the first of them. Everything is למטה except the 1:50.',
+      },
+      afterMaariv: {
+        plain: 'The evening of that week: a first מנין at 7:30, or later where 7:30 would fall inside fifty minutes of שקיעה, then the top and the bottom of every hour to 12:00 with the 8:45 among them.',
+        exact: 'The same rule as the schedule after יום כיפור. The first is 7:30 pushed on in fives until it is a full fifty minutes after the earliest שקיעה of the week, and never past 7:45, which is a quarter of an hour in front of the 8:00. The rest do not move. Everything is למטה except the 8:45 and the 10:30.',
+      },
       chmMaariv: {
         plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
         exact: 'The latest שקיעה of the same days plus 50 minutes, taken up to the next 5, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',

@@ -2931,9 +2931,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   transform: translateY(11in) rotate(-90deg);
 }
 
-/* The one poster whose title is an English sentence. */
-.poster-title-ltr { text-align: center; }
-
 /* --- Two schedules on one sheet ------------------------------------------------------
    Two of these: ראש השנה with יום כיפור, and סליחות with צום גדליה.
 
