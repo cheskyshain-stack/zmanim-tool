@@ -966,9 +966,15 @@ function sukkosRow(ln) {
   // to right, so a note written last lands at the far left of the line where it reads as part
   // of the row underneath. In front, it sits against the first time, which is the one it is
   // about. Same placement and the same reason as the סליחות sheet's.
-  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi> ` : '';
+  // Joined to the times by a non-breaking space, so the נץ and the מנין it is the נץ for can
+  // never be split across two lines. See onePageRows for where that showed.
+  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
+  // A label that is not Hebrew is isolated from the row around it. One is: the address the
+  // שמחת בית השואבה line carries. A row is set right to left, so "798 vine ave." left to itself
+  // came out with the full stop at the front of the line.
+  const name = ln.ltrLabel ? `<bdi dir="ltr">${escAttr(ln.label)}</bdi>` : escAttr(ln.label);
   return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}" lang="he">`
-    + `<span class="poster-row-label">${escAttr(ln.label)}</span>${note}${times}${extra}</p>`;
+    + `<span class="poster-row-label">${name}</span>${note}${times}${extra}</p>`;
 }
 
 /** The סוכות sheet: seven blocks at most, in two columns with a rule between them.
@@ -1133,7 +1139,7 @@ const ONEPAGE_TEXT = {
  *  point of type. */
 const ONEPAGE_PER_LINE = 4;
 
-/** Cuts every long run of times on the sheet into two lines of about the same width.
+/** Cuts every long run of times on the sheet into lines of about the same width.
  *
  *  Where the cut goes is a question about width, not about how many times there are. Six
  *  times split three and three is even only if all six are the same width, and they are not:
@@ -1153,6 +1159,40 @@ const ONEPAGE_PER_LINE = 4;
  *  moved to the second line and the slashes work themselves out around the break. A slash
  *  written into the markup would be left stranded at the end of the first line. Same trick,
  *  and the same reason, as the box on the יום כיפור sheet. */
+/** Where to cut a run of the given widths into `lines` lines so the widest line is as narrow
+ *  as it can be, as a list of indices to break at.
+ *
+ *  Every split is tried rather than the run divided evenly, because the times are not the same
+ *  width: one carrying ** is wider than a bare one and an underlined 10:30 is wider than 7:00.
+ *  Small enough to do exhaustively (a dozen times over three lines), and memoised on where the
+ *  line starts and how many are left so it stays that way if a run ever gets longer.
+ *
+ *  `lead` is the width of anything already on the first line before the times, which on this
+ *  sheet is the note in brackets some rows carry. */
+function evenCuts(wide, lead, lines) {
+  const memo = new Map();
+  const go = (from, left) => {
+    if (left === 1) {
+      return { worst: wide.slice(from).reduce((a, x) => a + x, from === 0 ? lead : 0), cuts: [] };
+    }
+    const key = `${from}:${left}`;
+    if (memo.has(key)) return memo.get(key);
+    let best = null;
+    let head = from === 0 ? lead : 0;
+    for (let i = from; i <= wide.length - left; i++) {
+      head += wide[i];
+      const rest = go(i + 1, left - 1);
+      const worst = Math.max(head, rest.worst);
+      // Strictly narrower to win, so a tie leaves the cut where it already is, which is the
+      // earlier one: fewer on the top line, the way round the shul asked for on the box.
+      if (!best || worst < best.worst) best = { worst, cuts: [i + 1, ...rest.cuts] };
+    }
+    memo.set(key, best);
+    return best;
+  };
+  return go(0, lines).cuts;
+}
+
 function balanceOnePageTimes(container) {
   for (const run of container.querySelectorAll('.onepage-line')) {
     const times = [...run.querySelectorAll(':scope > .onepage-t')];
@@ -1170,22 +1210,27 @@ function balanceOnePageTimes(container) {
        space between them is about 3px and is not worth a second measurement. */
     const note = run.querySelector(':scope > .onepage-note');
     const lead = note ? note.offsetWidth : 0;
-    const total = lead + wide.reduce((a, x) => a + x, 0);
-    let at = 1;
-    let worst = Infinity;
-    let head = lead;
-    for (let i = 1; i < times.length; i++) {
-      head += wide[i - 1];
-      const m = Math.max(head, total - head);
-      // Strictly narrower to win, so a tie leaves the cut where it already is, which is the
-      // earlier one: fewer on the top line, the way round the shul asked for on the box.
-      if (m < worst) { worst = m; at = i; }
-    }
-    const more = document.createElement('bdi');
-    more.className = 'onepage-line';
-    more.dir = 'ltr';
-    for (const t of times.slice(at)) more.appendChild(t);
-    run.after(more);
+    /* How many lines, from how many times there are rather than from how wide the column is.
+       The column's width is the one thing that does not change when the type is fitted: the
+       sheet grows its type and the columns stay where they are, so a count taken off the room
+       would be right at the size the sheet was written at and wrong at the size it prints at,
+       and the fit cannot be asked first because how tall a run is is what it is fitting. Four
+       to a line, which is the same number this sheet already calls long.
+       It is the חול המועד מעריב that made this more than one cut: eleven and twelve times cut
+       in half is six to a line, which ran to the column rule and past it. */
+    const lines = Math.ceil(times.length / ONEPAGE_PER_LINE);
+    const cuts = evenCuts(wide, lead, lines);
+    // The times before the first cut stay where they are; each cut after that is a line of its
+    // own, put after the one before it so the run reads down the rows in order.
+    let last = run;
+    cuts.forEach((from, k) => {
+      const more = document.createElement('bdi');
+      more.className = 'onepage-line';
+      more.dir = 'ltr';
+      for (const t of times.slice(from, k + 1 < cuts.length ? cuts[k + 1] : times.length)) more.appendChild(t);
+      last.after(more);
+      last = more;
+    });
   }
 }
 
@@ -1234,12 +1279,9 @@ const ONEPAGE_SECTIONS = {
      "יום א'" alone would not say which; this one is a single occasion from end to end and the
      title at the top of the sheet has already said which. */
   sukkos: (p) => p.blocks.map((b) => oneSection(b.heading, b.lines)),
-  sukkosshuava: (p) => [oneSection(p.text.title, [
-    { label: p.text.when, times: onePlain(p.text.at) },
-    { label: p.text.where, times: [], ltrLabel: true },
-    { label: p.text.mishna, times: onePlain(p.text.mishnaAt) },
-    { label: p.text.mishnaMaariv, times: [] },
-  ])],
+  /* No entry for the שמחת בית השואבה sheet, and that is deliberate rather than a gap: both
+     halves of it are on the סוכות sheet's own blocks now, the evening under יום ב' and the
+     משנה תורה under הושענא רבה, so a section here would put them on this sheet twice. */
   afteryk: (p) => [oneSection(YK_TEXT.afterHeading, [
     { label: YK_TEXT.afterBig.shacharis, times: p.after.shacharis },
     { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
@@ -1275,7 +1317,11 @@ function onePageRows(r) {
      and two answers are never cut. */
   const long = r.times.length > ONEPAGE_PER_LINE;
   const sep = r.sep || SLASH;
-  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi> ` : '';
+  /* The note and the time it is about are one unbreakable pair, joined by a non-breaking
+     space. They are two boxes with a space between them, and a column an inch and a half wide
+     broke at that space: the הושענא רבה row came out with "(נץ 6:54)" alone on one line and the
+     6:18 it is the נץ for on the next, which reads as a line about nothing. */
+  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi>\u00A0` : '';
   // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
   // strong characters, so a note's Hebrew would otherwise turn the whole run around.
   //

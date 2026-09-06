@@ -607,8 +607,24 @@ const POSTER_SHEETS = [
         plain: 'The חול המועד mornings: three fixed מנינים, 7:00 למטה, 8:00 and 8:40 למטה.',
         exact: 'Not calculated. These days do not run on the everyday שחרית out of Settings; the sheet has its own three.',
       },
+      shuava: {
+        plain: 'The שמחת בית השואבה at the Rav\'s house, on the night of the second day. Announced rather than worked out: 10:00.',
+        exact: 'Not calculated. It is on this sheet under יום ב\', which is the night it is on, and has a sheet of its own as well.',
+      },
+      shuavaWhere: {
+        plain: 'Where the שמחת בית השואבה is, on the line under it.',
+        exact: 'Not calculated.',
+      },
+      mishna: {
+        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00.',
+        exact: 'Not calculated.',
+      },
+      mishnaMaariv: {
+        plain: 'The מעריב that follows the משנה תורה, which has no clock time of its own: it starts when the שיעור finishes.',
+        exact: 'Not calculated, and not on the card on the congregation\'s home page either, there being no time to count down to.',
+      },
       hoshanaShacharis: {
-        plain: 'הושענא רבה starts earlier than the rest of חול המועד, so it is given last, under them: the first מנין is when שחרית starts, thirty six minutes before נץ. The נץ itself is printed beside it so the sheet says what the time was worked from.',
+        plain: 'הושענא רבה does not run on the חול המועד schedule, so it has a block of its own between חול המועד and שמיני עצרת: the first מנין is when שחרית starts, thirty six minutes before נץ. The נץ itself is printed beside it so the sheet says what the time was worked from.',
         exact: 'Sunrise at the shul\'s horizon on 21 תשרי, less 36 minutes, למטה. The two after it, 7:30 and 8:20 in the hall, are fixed.',
       },
       chmMincha: {

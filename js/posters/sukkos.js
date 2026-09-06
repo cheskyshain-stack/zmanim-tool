@@ -79,7 +79,7 @@ export const SK_TEXT = {
   afterMusaf: 'מיד אחר מוסף',
   shacharis: 'שחרית',
   shacharisChm: 'חול המועד',
-  shacharisHoshana: 'הושענא רבה',
+  hoshana: 'הושענא רבה',
   netz: 'נץ',
   // The two morning runs, which do not move with the year. The everyday one is not used on
   // חול המועד: those mornings have their own three, which is what the sheet prints.
@@ -103,7 +103,7 @@ export const SK_TEXT = {
  *  ported from say 9:45 and the shul has since moved it to 10:00. */
 export const SK_SHUAVA = {
   title: 'שמחת בית השואבה בבית הרב שליט"א',
-  when: "ליל ב' סוכות בשעה",
+  when: "ליל ב' סוכות",
   at: '10:00',
   where: '798 vine ave.',
   mishna: 'משנה תורה בעזרת נשים',
@@ -431,6 +431,12 @@ export function buildSukkosPoster(year, settings) {
         line(SK_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
         line(SK_TEXT.shiur, [tm(skDown5(m1 - 20 * SK_MIN))], { calc: 'shiur', wrap: true }),
         line(SK_TEXT.maariv, [tm(m1), tm(m2, true)], { calc: 'twoMaariv' }),
+        /* The שמחת בית השואבה, which is ליל ב' סוכות and so belongs to this night, after the
+           מעריב it follows. It has a sheet of its own as well, hung where people will see it;
+           here it is two rows in the day it happens on rather than a block with a heading,
+           which is where somebody reading the schedule would look for it. */
+        line(SK_SHUAVA.title, [txt(SK_SHUAVA.at)], { calc: 'shuava', wrap: true }),
+        line(SK_SHUAVA.where, [], { calc: 'shuavaWhere', wrap: true, ltrLabel: true }),
         ...morningLines(SK_DAY2),
         line(SK_TEXT.mincha, list(sukkosDayMincha(day(SK_DAY2), settings)), { calc: 'dayMincha' }),
         // מוצאי יום טוב, sixty and seventy two minutes after the second day's own שקיעה, the
@@ -477,10 +483,6 @@ export function buildSukkosPoster(year, settings) {
       line(SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), { calc: 'chmShacharis' }),
       line(SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), { calc: 'chmMincha' }),
       line(SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), { calc: 'chmMaariv' }),
-      // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
-      // beside it so the sheet says what it was worked from.
-      line(`${SK_TEXT.shacharis} ${SK_TEXT.shacharisHoshana}`, hoshanaTimes,
-        { calc: 'hoshanaShacharis', note: `(${SK_TEXT.netz} ${formatTime(skNetz(hoshana, settings))})` }),
     ],
   });
   if (shabbosChm) {
@@ -512,9 +514,23 @@ export function buildSukkosPoster(year, settings) {
     M.list(s, SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), AFTERNOON);
   }
   blocks.push(...middle.sort((a, b) => a.at - b.at).map(({ at, ...b }) => b));
-  // Where the first column of the sheet ends. Everything above it is יום א' and what follows
-  // it up to the last day of חול המועד; everything below is שמיני עצרת onwards.
-  const split = blocks.length;
+
+  /* הושענא רבה, which is the last day of חול המועד and does not run on its schedule: the
+     משנה תורה is finished that night and the morning starts earlier than the rest of the week.
+     So it is a block of its own between חול המועד and שמיני עצרת, in the order the days come.
+     Its night first and its morning after, the same way round every other block on this sheet
+     gathers a day. */
+  blocks.push({
+    heading: SK_TEXT.hoshana,
+    lines: [
+      line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt)], { calc: 'mishna', wrap: true }),
+      line(SK_SHUAVA.mishnaMaariv, [], { calc: 'mishnaMaariv', wrap: true }),
+      // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
+      // beside it so the sheet says what it was worked from.
+      line(SK_TEXT.shacharis, hoshanaTimes,
+        { calc: 'hoshanaShacharis', note: `(${SK_TEXT.netz} ${formatTime(skNetz(hoshana, settings))})` }),
+    ],
+  });
 
   // שמיני עצרת
   {
@@ -605,8 +621,6 @@ export function buildSukkosPoster(year, settings) {
     // most years and the שבת בראשית after it in a year that has one.
     span: { from: day(SK_EREV), to: bereishis || day(SK_SIMCHAS) },
     blocks,
-    // How many of those blocks belong in the first of the sheet's two columns.
-    split,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster
        hands back. Nothing asks for these yet: posters/day.js hands a whole day over to a sheet
        only from ערב ר"ה to the morning after יו"כ, and סוכות is outside that window, so "what
