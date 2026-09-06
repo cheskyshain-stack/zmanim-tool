@@ -83,8 +83,32 @@ function alreadyCovered(rules, rule) {
   return rules.some((r) => r.id === rule.id || (r.condition?.specialParsha || []).some((p) => wanted.includes(p)));
 }
 
+/** The 8:40 off the end of a שחרית list, with whatever separator is in front of it and any
+ *  underline around it, and nothing else on the line touched.
+ *
+ *  A regex on the stored HTML, because that is what the field holds and because the shul's own
+ *  board does not write it the way the shipped default does: the default separates its times
+ *  with commas and the saved schedule separates them with spaces. A LEGACY_ list, which is how
+ *  a changed default normally reaches an install that never edited it (see settings.js), would
+ *  have matched neither, and matching it onto the new default would have retyped the shul's
+ *  separators along with it. Any closing tags after the time are kept, so a list wrapped in a
+ *  span comes back wrapped. A schedule with no 8:40 at the end comes back unchanged. */
+const DROP_TRAILING_840 = /(?:[,\s]|&nbsp;|<br\s*\/?>)*(?:<u>\s*8:40\s*<\/u>|8:40)((?:\s*<\/[a-z]+>)*)\s*$/i;
+
 function applySeeds(state) {
   const seeded = state.seeded || {};
+  /* The ר"ח / בה"ב / תענית mornings do not run an 8:40: they start earlier than an ordinary
+     day and the list ends at 8:20. Off the shipped default in settings.js, and off a schedule
+     already saved in a browser, here.
+     Once, and recorded, the same as every other seed on this list. A shul that wants an 8:40
+     back should be able to type it back and keep it, and the flag is what makes that stick. */
+  if (!seeded.specialNo840) {
+    const saved = state.settings?.weekdayShacharisSpecial;
+    if (typeof saved === 'string') {
+      state.settings.weekdayShacharisSpecial = saved.replace(DROP_TRAILING_840, '$1');
+    }
+    seeded.specialNo840 = true;
+  }
   if (!seeded.drashos) {
     for (const rule of DRASHA_RULES) {
       if (!alreadyCovered(state.rules, rule)) state.rules.push({ ...rule });

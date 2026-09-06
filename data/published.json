@@ -11,7 +11,7 @@
     "weekdayDefaultMincha": "",
     "weekdayDefaultMaariv": "",
     "weekdayShacharis": "<span class=\"big\">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>",
-    "weekdayShacharisSpecial": "6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>",
+    "weekdayShacharisSpecial": "6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20*",
     "weekdayFooterNote": "All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*",
     "locationName": "Lakewood",
     "latitude": 40.068,

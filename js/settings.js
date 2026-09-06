@@ -23,7 +23,7 @@ export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00, 7:20*, <u>7:35
  *  week card can show it only on weeks that actually have one of those days and name
  *  which it is (see ui/week-view.js). The printed chart still shows both together,
  *  since it covers a whole season at once. */
-export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>';
+export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*';
 
 /** The heading printed above the second schedule on the wall chart. */
 export const SPECIAL_SHACHARIS_HEADING = 'ר"ח בה"ב ותענ"צ';
