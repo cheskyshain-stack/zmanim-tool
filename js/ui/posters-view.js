@@ -1897,10 +1897,19 @@ export function renderPosters(container, state, routeChanged, tables) {
   const onePage = chosenSheets === 'all';
   const poster = empty ? null : showAll ? runPoster : one;
 
-  // Which of the further switches this sheet actually reads. The two-in-one sheets and the
-  // paper's own way up belong to the run; the way up only means something when there is a
-  // sheet in the run that can be turned, which is what including them decides.
-  const canTurn = Boolean(poster?.orientations) && !onePage && (!poster?.last || chosenCombined);
+  /* Which of the further switches this sheet actually reads, and whether the occasion showing
+     has anything for them to decide. Both belong to the run rather than to a single sheet.
+     A switch over nothing is a control that lies about what is there: סוכות has no sheet that
+     carries two schedules and none that can be turned, so it was being offered the choice of
+     leaving out sheets it does not have and of paper it cannot use. Asked of the occasion's own
+     sheets rather than written down, so an occasion drawn later gets the right answer by
+     carrying the right flags. */
+  const hasCombined = items.some((p) => p.combined);
+  const canTurn = !onePage && (showAll
+    // In a run, the way up only means something when a sheet that can be turned is in it, which
+    // is what the two-in-one switch decides for the ones that are both.
+    ? items.some((p) => p.orientations && (chosenCombined || !p.combined))
+    : Boolean(poster?.orientations));
 
   const sources = poster ? poster.sources(state, settings) : [];
   const source = sources.find((s) => s.year === year)
@@ -1944,7 +1953,7 @@ export function renderPosters(container, state, routeChanged, tables) {
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
-      ${!empty && showAll && !onePage ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
+      ${!empty && showAll && !onePage && hasCombined ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
         { value: 'no', label: 'Leave out', on: !chosenCombined },
         { value: 'yes', label: 'Include', on: chosenCombined },
       ])}</div>` : ''}
