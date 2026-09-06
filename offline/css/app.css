@@ -3206,15 +3206,17 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      and the sheet read as two ragged edges facing each other. */
   text-align: center;
 }
+/* Nothing on this sheet is underlined, headings included, and that is the shul's own answer
+   rather than a house style. The sheet it was ported from underlines every line on it, and
+   copying that put an underline on a time: on these boards an underline under a time means the
+   מנין davens בבית מדרש למטה, and neither of these is, one being at the Rav's house and the
+   other in the עזרת נשים. The headings went the same way when the underline was still reading
+   as that mark rather than as a heading's rule. It is a sheet of four lines with two names on
+   it, and the size tells them apart; the other posters keep their underlined titles, where a
+   page of times underneath makes a rule under the name read as a rule and nothing else. */
 .poster-shuava-head {
-  font-size: 26pt; font-weight: 700; text-decoration: underline;
-  text-underline-offset: 0.06em; text-decoration-skip-ink: none; margin: 0 0 0.14in; line-height: 1.3;
+  font-size: 26pt; font-weight: 700; margin: 0 0 0.14in; line-height: 1.3;
 }
-/* Not underlined, unlike the two headings above them. The sheet this was ported from
-   underlines every line on it, and copying that put an underline on a time: on these boards an
-   underline under a time means the מנין davens בבית מדרש למטה, and this one is at the Rav's
-   house. A heading is underlined here the way .poster-title and .poster-day are on every other
-   sheet, and nothing else is. */
 .poster-shuava-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.14in; line-height: 1.3; }
 .poster-shuava-rule { border: 0; border-top: 1px solid #000; width: 3.4in; margin: 0.6in auto; }
 .poster-mincha u { text-underline-offset: 0.12em; }
