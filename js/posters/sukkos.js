@@ -67,6 +67,11 @@ export const SK_TEXT = {
   // afternoon. Both are on the old sheets in brackets after the day.
   shabbos: 'שבת',
   eiruv: 'עירוב תבשילין',
+  // Joined to the day with a dot rather than wrapped in brackets, which is how the ראש השנה
+  // sheet has always set its Shabbos and the same reason (see RH_TEXT.daySep): the heading is
+  // underlined, and the underline running under a bracket reads as though it is cutting
+  // through it. Two notes on one day are two dots, "יום א' · שבת · עירוב תבשילין".
+  daySep: ' · ',
   erevMincha: 'מנחה עיו"ט',
   erevMinchaShabbos: 'מנחה ערב שבת',
   candles: 'הדלקת נרות',
@@ -466,7 +471,7 @@ export function buildSukkosPoster(year, settings) {
     const notes = [];
     if (isShabbos(n)) notes.push(SK_TEXT.shabbos);
     if (eiruv) notes.push(SK_TEXT.eiruv);
-    return notes.length ? `${name} (${notes.join(' · ')})` : name;
+    return [name, ...notes].join(SK_TEXT.daySep);
   };
 
   /* An עירוב תבשילין is made when a יום טוב runs into Shabbos, which is to say when the day
