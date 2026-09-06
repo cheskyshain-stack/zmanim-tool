@@ -636,8 +636,8 @@ const POSTER_SHEETS = [
         exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       chmMaariv: {
-        plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
-        exact: 'The latest שקיעה of the same days plus 50 minutes, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
+        plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
+        exact: 'The latest שקיעה of the same days plus 50 minutes, taken up to the next 5, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
       },
     },
   },

@@ -2586,6 +2586,9 @@ const skAt = (h, m) => (h * 60 + m) * SK_MIN;
  *  the nearest keeps the gap the shul asked for: a דרשה half an hour before מעריב taken to
  *  the nearest five could land 28 minutes before it. */
 const skDown5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
+/** Up to the next 5 minutes, for the one time that is announced as the head of a run rather
+ *  than as a זמן of its own. */
+const skUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
 
 /* Which day of תשרי each part of the sheet is. 1 תשרי is ראש השנה, so day n is rh + n - 1. */
 const SK_EREV = 14;      // ערב סוכות, the afternoon the sheet opens on
@@ -2746,7 +2749,7 @@ function sukkosChmMincha(days, settings) {
 /** The חול המועד מעריב run.
  *
  *  The first is fifty minutes after the latest שקיעה of those days, so it clears on all of
- *  them. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its
+ *  them, taken up to the next five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its
  *  place: it is its own מנין on the boards and not one more step of the run. A time within a
  *  quarter of an hour of the first is not printed, which in a year where שקיעה is late takes
  *  the 7:30 off.
@@ -2755,7 +2758,12 @@ function sukkosChmMincha(days, settings) {
  *  round as the weekday chart. */
 function sukkosChmMaariv(days, settings) {
   const latest = Math.max(...days.map((s) => skShkia(s, settings)));
-  const first = skRoundPrinted(latest + 50 * SK_MIN);
+  // Up to the next five. It is the head of a run of round times and is announced as one, so
+  // 7:03 is not a time anybody is called to daven at; and up rather than down, since fifty
+  // minutes after the latest שקיעה is the earliest it may be. It reproduces two of the three
+  // sheets exactly, תשפ"ד's 7:30 and תשפ"ה's 7:00, where the raw number gives 7:28 and 6:59;
+  // תשפ"ו's sheet prints its 7:16 unrounded.
+  const first = skUp5(latest + 50 * SK_MIN);
   // Evening hours, written as 19 through 24 rather than 7 through 12. On a 12 hour clock the
   // two are the same digits and the arithmetic is not: 7:30 in the morning is a smaller day
   // fraction than a שקיעה, so a grid built on the morning hours came out entirely before the
@@ -8673,8 +8681,8 @@ const POSTER_SHEETS = [
         exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes; a twenty minute step landing within a quarter of an hour of it is not printed. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       chmMaariv: {
-        plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
-        exact: 'The latest שקיעה of the same days plus 50 minutes, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
+        plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
+        exact: 'The latest שקיעה of the same days plus 50 minutes, taken up to the next 5, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
       },
     },
   },
