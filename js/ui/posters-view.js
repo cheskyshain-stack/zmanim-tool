@@ -913,9 +913,11 @@ function ykBody(poster, { box = true, year = true } = {}) {
   return `
     <h2 class="poster-title" lang="he">${escAttr(YK_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
-      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.erevHeading)}</h3>
+      <h3 class="poster-day" lang="he">${escAttr(poster.erevHeading)}</h3>
       ${rows(poster.erevLines)}
-      <h3 class="poster-day" lang="he">${escAttr(YK_TEXT.dayHeading)}</h3>
+      <!-- The day's heading says "· שבת" in a year where 10 תשרי is one. Off the poster
+           rather than off YK_TEXT, which cannot know the year. -->
+      <h3 class="poster-day" lang="he">${escAttr(poster.dayHeading)}</h3>
       ${rows(poster.dayLines)}
       <hr class="poster-divider">
       ${rhRow(poster.nextMorning.label, poster.nextMorning.times, undefined, undefined, ', ')}
@@ -1304,8 +1306,8 @@ const ONEPAGE_SECTIONS = {
     { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
   ])],
   yomkippur: (p) => [
-    oneSection(YK_TEXT.erevHeading, p.erevLines),
-    oneSection(YK_TEXT.dayHeading, p.dayLines),
+    oneSection(p.erevHeading, p.erevLines),
+    oneSection(p.dayHeading, p.dayLines),
     // The morning after names its own day ("שחרית יום ג'"), so the block is named for it and
     // the row inside says only which תפילה it is.
     oneSection(p.nextMorning.label, [{ label: YK_TEXT.shacharis.label, times: p.nextMorning.times }]),

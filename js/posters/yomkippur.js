@@ -32,6 +32,8 @@ const at = (h, m) => (h * 60 + m) / 1440;
 const ykUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
 const ykNear5 = (t) => Math.round(t * 288) / 288;
 
+const YK_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
+
 /** The Hebrew letter for a weekday, as the sheet names the morning after יו"כ. Shabbos
  *  cannot happen there (10 תשרי is never a Friday), but it is covered anyway. */
 const YK_DAY_LETTERS = ['', "א'", "ב'", "ג'", "ד'", "ה'", "ו'", 'שבת'];
@@ -41,6 +43,14 @@ export const YK_TEXT = {
   title: 'יום כיפור',
   erevHeading: 'ערב יום כיפור',
   dayHeading: 'יום כיפור',
+  /* What the day's heading adds in a year where 10 תשרי is Shabbos, which is every year
+     ר"ה falls on a Thursday. Joined with a dot rather than wrapped in brackets, and both
+     the word and the separator are the ראש השנה sheet's (see RH_TEXT.daySep): the heading
+     is underlined, and the underline running under a bracket reads as though it is cutting
+     through it. The two sheets sit side by side on one page, so they say it the same way.
+     ערב יו"כ takes nothing: in such a year it is the Friday. */
+  shabbos: 'שבת',
+  daySep: ' · ',
   // Called סליחות rather than שחרית for the same reason צום גדליה's morning is: סליחות are
   // said that morning, and that is what the מנינים under the heading are for.
   erevShacharis: { label: 'סליחות', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
@@ -402,6 +412,13 @@ export function buildYomKippurPoster(year, settings) {
   return {
     hebrewYear: year,
     span: { from: rh + 8, to: rh + 9 },
+    /* The two headings, carried on the poster rather than read off YK_TEXT by whoever is
+       drawing it, because one of them moves with the year and three sheets print it: this
+       one, the ראש השנה ויום כיפור pair, and the all-on-one. Worked once here and they
+       cannot disagree. */
+    erevHeading: YK_TEXT.erevHeading,
+    dayHeading: YK_TEXT.dayHeading
+      + (excelWeekday(dayOn) === YK_SHABBOS ? YK_TEXT.daySep + YK_TEXT.shabbos : ''),
     // Both are lists of מנינים rather than one זמן given two ways, so they are set with
     // commas; see the renderer.
     erevLines: [
