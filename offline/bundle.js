@@ -7040,12 +7040,17 @@ function onePageRows(r) {
   const body = long
     ? r.times.map((t) => `<span class="onepage-t">${timeHtml(t)}</span>`).join('')
     : r.times.map(timeHtml).join(sep);
-  const times = isReckoned(r.times)
+  /* A row whose times are one זמן given two ways is two lines tall: the reckoning's name sits
+     over each time. Marked so the sheet can set its name against the middle of that pair
+     rather than against the times' own line, which is where a baseline puts it. See
+     .onepage-row.is-pairs in app.css. */
+  const pairs = isReckoned(r.times);
+  const times = pairs
     ? `<div class="onepage-times">${reckoningPairs(r.times)}</div>`
     : r.times.length || note
       ? `<div class="onepage-times"><bdi class="onepage-line" dir="ltr">${note}${body}</bdi></div>`
       : '';
-  return `<div class="onepage-row"${keepUpAttr(r)}>${label}${times}</div>`
+  return `<div class="onepage-row${pairs ? ' is-pairs' : ''}"${keepUpAttr(r)}>${label}${times}</div>`
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }
 

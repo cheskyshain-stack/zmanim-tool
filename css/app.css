@@ -3387,6 +3387,15 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    type was fitted against and fills, and the other is whatever was left after the blocks were
    handed out. One number for both meant the tighter column decided it and the looser one kept
    its slack, which is the holes this was meant to close. */
+/* The one row on this sheet that is two lines tall: ס"ז ק"ש, whose times each carry the name
+   of the reckoning they are on above them. Its name is set against the middle of that pair
+   rather than against the times' own line.
+   Every other row is aligned on the baseline, which is what puts a name and the time beside it
+   on one line, and on this row that baseline is the times' one: an inline block hands out the
+   baseline of its last line, and the last line here is the times, so the name came out under
+   the reckonings' names and level with the digits. Centred it reads as one row rather than as
+   a name that belongs to the lower half of it. */
+.onepage-row.is-pairs { align-items: center; }
 .onepage-col:nth-child(1) .onepage-row { --op-gap: var(--op-gap-1, 0px); }
 .onepage-col:nth-child(2) .onepage-row { --op-gap: var(--op-gap-2, 0px); }
 .onepage-sec > .onepage-row:last-child { border-bottom: 0; }
