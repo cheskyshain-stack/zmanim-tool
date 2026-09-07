@@ -2154,7 +2154,9 @@ const YK_TEXT = {
   title: 'יום כיפור',
   erevHeading: 'ערב יום כיפור',
   dayHeading: 'יום כיפור',
-  erevShacharis: { label: 'שחרית', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+  // Called סליחות rather than שחרית for the same reason צום גדליה's morning is: סליחות are
+  // said that morning, and that is what the מנינים under the heading are for.
+  erevShacharis: { label: 'סליחות', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
   erevMincha: { label: 'מנחה', times: '1:30, 2:00, 2:30, 3:00, 3:30, 4:00' },
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
@@ -2754,12 +2756,28 @@ const SK_FRIDAY = 6;
 /** A clock time as a day fraction. */
 const skAt = (h, m) => (h * 60 + m) * SK_MIN;
 /** Down to the last 5 minutes. Announced times are round, and rounding down rather than to
- *  the nearest keeps the gap the shul asked for: a דרשה half an hour before מעריב taken to
- *  the nearest five could land 28 minutes before it. */
+ *  the nearest keeps a gap at or over the one asked for rather than either side of it. */
 const skDown5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
 /** Up to the next 5 minutes, for the one time that is announced as the head of a run rather
  *  than as a זמן of its own. */
 const skUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
+
+/** How long before מעריב the דרשה is announced, in minutes.
+ *
+ *  The announced time is a round five and מעריב is not, so the gap cannot be one number: it is
+ *  whatever the rounding leaves. Asked for as 27 to 32 minutes, and the widest a round five can
+ *  hold inside that is five minutes, so this is the near end of it and the gap comes out
+ *  between 28 and 32. It was 30 before, which rounded down is 30 to 34, and the sheet in front
+ *  of the shul had a 34 on it.
+ *
+ *  Read as "the latest round five that is still at least this long before מעריב", which is what
+ *  skDown5 of מעריב less this number is.
+ *
+ *  Off the מעריב the sheet prints rather than the fraction behind it. מעריב is שקיעה plus fifty
+ *  minutes and lands on a fraction of a minute; the printed time rounds and the דרשה was being
+ *  taken off the unrounded one, so a year where מעריב rounded up read a minute wider than it
+ *  was worked out to be. Seven of thirty one years came out at 33. */
+const SK_DRASHA_BEFORE = 28;
 
 /* Which day of תשרי each part of the sheet is. 1 תשרי is ראש השנה, so day n is rh + n - 1. */
 const SK_EREV = 14;      // ערב סוכות, the afternoon the sheet opens on
@@ -3157,8 +3175,8 @@ function buildSukkosPoster(year, settings) {
   const isShabbos = (n) => excelWeekday(day(n)) === SK_SHABBOS;
 
   /** The evening that opens a day: candles, the מנחה three minutes after them, שקיעה, the
-   *  דרשה half an hour before מעריב taken down to a round five, and מעריב fifty minutes after
-   *  שקיעה. The same five lines open יום א' and שמיני עצרת. */
+   *  דרשה before מעריב (see SK_DRASHA_BEFORE), and מעריב fifty minutes after שקיעה. The same
+   *  five lines open יום א' and שמיני עצרת. */
   const eveningLines = (nightDay, opts = {}) => {
     const shkia = shkiaOf(nightDay);
     const candles = shkia - settings.candleLightingMinutes * SK_MIN;
@@ -3178,7 +3196,8 @@ function buildSukkosPoster(year, settings) {
       line(SK_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
     ];
     if (opts.drasha !== false) {
-      out.push(line(SK_TEXT.drasha, [tm(skDown5(maariv - 30 * SK_MIN))], { calc: 'drasha', wrap: true }));
+      out.push(line(SK_TEXT.drasha,
+        [tm(skDown5(roundToMinute(maariv) - SK_DRASHA_BEFORE * SK_MIN))], { calc: 'drasha', wrap: true }));
     }
     out.push(line(SK_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv' }));
     M.list(on, SK_TEXT.erevMincha, list(sukkosErevMincha(on, settings)), AFTERNOON);
@@ -3540,7 +3559,11 @@ const TZG_GAP = 45;
 /** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
 const TZG_TEXT = {
   title: 'צום גדליה',
-  shacharis: 'שחרית',
+  /* The morning is called by what is said at it. סליחות are said on a fast, and the shul
+     opens earlier for them, so the block that heading sits over is the סליחות מנינים rather
+     than an ordinary שחרית that happens to be early. The same word the ערב יו"כ block uses
+     and the same word the סליחות sheet uses for every other morning of the season. */
+  shacharis: 'סליחות',
   mincha: 'מנחה',
   shkia: 'שקיעה',
   maariv: 'מעריב',
@@ -11881,7 +11904,9 @@ const SHEET_TEXT = {
  *  still runs on those times and they are what should be read first. */
 function weekSpecialShacharis(showing, state, settings) {
   const days = specialDaysInWeek(showing, settings);
-  const name = (d) => `שחרית ${d.name}`;
+  // The same rule the card keeps: a fast morning is called by what is said at it, off the
+  // constant its own sheet is headed with. See dayLabel in week-view.js.
+  const name = (d) => `${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`;
   const out = [];
   /* The יומים נוראים season first, which decides the morning outright rather than adding a day
      to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,
@@ -13354,8 +13379,13 @@ function weekCardsHtml(showing, index, state, settings) {
       // The day names go on their own line, in their own direction. Run together with
       // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
       // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
+      /* The word in front of the day's name is what is davened at it: a fast morning is
+         called סליחות, off the same constant its own sheet is headed with, so the card and
+         the sheet on the wall cannot end up calling one morning two things. ר"ח and בה"ב
+         have no סליחות and stay שחרית. */
       const dayLabel = (d) =>
-        `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
+        `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
+        + `<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
       /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
          list and read as one line naming both, which is what this has always done, and צום
          גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.

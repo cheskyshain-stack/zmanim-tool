@@ -217,7 +217,9 @@ const SHEET_TEXT = {
  *  still runs on those times and they are what should be read first. */
 function weekSpecialShacharis(showing, state, settings) {
   const days = specialDaysInWeek(showing, settings);
-  const name = (d) => `שחרית ${d.name}`;
+  // The same rule the card keeps: a fast morning is called by what is said at it, off the
+  // constant its own sheet is headed with. See dayLabel in week-view.js.
+  const name = (d) => `${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`;
   const out = [];
   /* The יומים נוראים season first, which decides the morning outright rather than adding a day
      to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,

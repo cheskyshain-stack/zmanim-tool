@@ -1209,8 +1209,13 @@ function weekCardsHtml(showing, index, state, settings) {
       // The day names go on their own line, in their own direction. Run together with
       // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
       // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
+      /* The word in front of the day's name is what is davened at it: a fast morning is
+         called סליחות, off the same constant its own sheet is headed with, so the card and
+         the sheet on the wall cannot end up calling one morning two things. ר"ח and בה"ב
+         have no סליחות and stay שחרית. */
       const dayLabel = (d) =>
-        `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
+        `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
+        + `<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
       /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
          list and read as one line naming both, which is what this has always done, and צום
          גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.

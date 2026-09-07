@@ -14,7 +14,7 @@
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, floorToMinute, UL_START } from '../format.js';
+import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js';
 import { SLASH } from '../util.js';
 import { buildChorefRow } from '../sheets/choref.js';
 import { parseTimes } from './slichos.js';
@@ -30,12 +30,28 @@ const SK_FRIDAY = 6;
 /** A clock time as a day fraction. */
 const skAt = (h, m) => (h * 60 + m) * SK_MIN;
 /** Down to the last 5 minutes. Announced times are round, and rounding down rather than to
- *  the nearest keeps the gap the shul asked for: a דרשה half an hour before מעריב taken to
- *  the nearest five could land 28 minutes before it. */
+ *  the nearest keeps a gap at or over the one asked for rather than either side of it. */
 const skDown5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
 /** Up to the next 5 minutes, for the one time that is announced as the head of a run rather
  *  than as a זמן of its own. */
 const skUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
+
+/** How long before מעריב the דרשה is announced, in minutes.
+ *
+ *  The announced time is a round five and מעריב is not, so the gap cannot be one number: it is
+ *  whatever the rounding leaves. Asked for as 27 to 32 minutes, and the widest a round five can
+ *  hold inside that is five minutes, so this is the near end of it and the gap comes out
+ *  between 28 and 32. It was 30 before, which rounded down is 30 to 34, and the sheet in front
+ *  of the shul had a 34 on it.
+ *
+ *  Read as "the latest round five that is still at least this long before מעריב", which is what
+ *  skDown5 of מעריב less this number is.
+ *
+ *  Off the מעריב the sheet prints rather than the fraction behind it. מעריב is שקיעה plus fifty
+ *  minutes and lands on a fraction of a minute; the printed time rounds and the דרשה was being
+ *  taken off the unrounded one, so a year where מעריב rounded up read a minute wider than it
+ *  was worked out to be. Seven of thirty one years came out at 33. */
+const SK_DRASHA_BEFORE = 28;
 
 /* Which day of תשרי each part of the sheet is. 1 תשרי is ראש השנה, so day n is rh + n - 1. */
 const SK_EREV = 14;      // ערב סוכות, the afternoon the sheet opens on
@@ -433,8 +449,8 @@ export function buildSukkosPoster(year, settings) {
   const isShabbos = (n) => excelWeekday(day(n)) === SK_SHABBOS;
 
   /** The evening that opens a day: candles, the מנחה three minutes after them, שקיעה, the
-   *  דרשה half an hour before מעריב taken down to a round five, and מעריב fifty minutes after
-   *  שקיעה. The same five lines open יום א' and שמיני עצרת. */
+   *  דרשה before מעריב (see SK_DRASHA_BEFORE), and מעריב fifty minutes after שקיעה. The same
+   *  five lines open יום א' and שמיני עצרת. */
   const eveningLines = (nightDay, opts = {}) => {
     const shkia = shkiaOf(nightDay);
     const candles = shkia - settings.candleLightingMinutes * SK_MIN;
@@ -454,7 +470,8 @@ export function buildSukkosPoster(year, settings) {
       line(SK_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
     ];
     if (opts.drasha !== false) {
-      out.push(line(SK_TEXT.drasha, [tm(skDown5(maariv - 30 * SK_MIN))], { calc: 'drasha', wrap: true }));
+      out.push(line(SK_TEXT.drasha,
+        [tm(skDown5(roundToMinute(maariv) - SK_DRASHA_BEFORE * SK_MIN))], { calc: 'drasha', wrap: true }));
     }
     out.push(line(SK_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv' }));
     M.list(on, SK_TEXT.erevMincha, list(sukkosErevMincha(on, settings)), AFTERNOON);

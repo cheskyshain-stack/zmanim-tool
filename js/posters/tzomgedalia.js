@@ -30,7 +30,11 @@ const TZG_GAP = 45;
 /** The wording, and the two מנחה slots the shul sets by hand rather than by the sun. */
 export const TZG_TEXT = {
   title: 'צום גדליה',
-  shacharis: 'שחרית',
+  /* The morning is called by what is said at it. סליחות are said on a fast, and the shul
+     opens earlier for them, so the block that heading sits over is the סליחות מנינים rather
+     than an ordinary שחרית that happens to be early. The same word the ערב יו"כ block uses
+     and the same word the סליחות sheet uses for every other morning of the season. */
+  shacharis: 'סליחות',
   mincha: 'מנחה',
   shkia: 'שקיעה',
   maariv: 'מעריב',

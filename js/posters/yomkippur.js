@@ -41,7 +41,9 @@ export const YK_TEXT = {
   title: 'יום כיפור',
   erevHeading: 'ערב יום כיפור',
   dayHeading: 'יום כיפור',
-  erevShacharis: { label: 'שחרית', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+  // Called סליחות rather than שחרית for the same reason צום גדליה's morning is: סליחות are
+  // said that morning, and that is what the מנינים under the heading are for.
+  erevShacharis: { label: 'סליחות', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
   erevMincha: { label: 'מנחה', times: '1:30, 2:00, 2:30, 3:00, 3:30, 4:00' },
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
