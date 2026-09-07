@@ -11545,8 +11545,8 @@ function showToast(message) {
 //   puts it.
 //
 //   A run of times that the chart broke over two lines to fit its column comes out on one
-//   line here. A cell carrying a word does not: a דרשה or a ט באב note keeps the cell's own
-//   breaks, since those lines are not simply more times.
+//   line here. A line carrying a word does not: a פלג, a דרשה or a ט באב note keeps the
+//   cell's own break, since those lines are not simply more times.
 
 
 
@@ -11563,12 +11563,11 @@ const esc = (s) => String(s ?? '')
 /** A cell as the sheet sets it: the underline sentinels become real underlines, and the
  *  cell's own lines are either run together or kept.
  *
- *  Run together when the cell is nothing but times and separators, which is the case the
- *  chart only broke to fit a column an inch wide; kept when it carries a word, because a
- *  דרשה, a ט באב note or a שקיעה is a line of its own and not one more time. The same test
- *  capTimesPerLine uses on the week cards, so the two agree about what a line is. */
+ *  Run together when both sides of a break are nothing but times, which is the case the chart
+ *  only broke to fit a column an inch wide; kept when either side carries a word, because a
+ *  פלג, a דרשה or a ט באב note is a line of its own and not one more time. */
 function sheetCellHtml(value) {
-  const text = String(value ?? '').trim();
+  const text = cellSource(value);
   if (!text) return '';
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   // The separator is a span rather than plain text so a slash left at the end of a line can
@@ -11576,33 +11575,56 @@ function sheetCellHtml(value) {
   // card. It has to be able to turn at all, which the charts' own SLASH cannot: see
   // SOFT_SLASH, and fitWeekSheet for what an unbreakable run costs on this sheet.
   const sep = `<span class="week-sep">${esc(SOFT_SLASH)}</span>`;
-  const joined = lines.some(isNoteLine)
-    ? lines.map(esc).join('<br>')
-    : lines.map(esc).join(sep);
+  const joined = lines.map((line, i) => (
+    i && !ownLine(line) && !ownLine(lines[i - 1]) ? sep + esc(line) : (i ? '<br>' : '') + esc(line)
+  )).join('');
   return joined.split(esc(UL_START)).join('<u>').split(esc(UL_END)).join('</u>');
 }
 
-/** A line of a cell that is something other than more times, and so has to keep the break the
- *  chart gave it.
+/** A line of a cell that is something other than more times, and so keeps a line to itself.
  *
- *  There are two kinds of word in these cells and they want opposite things. A פלג line names
- *  the זמן the מנין above it is set against, and the two belong together: on the chart they are
- *  stacked because the column is an inch wide, and given the width they read as one line,
- *  "7:35 / פלג 7:50". A דרשה or a ט באב line is a different announcement on a line of its own,
- *  and running it into the times either side of it would read as a time nobody davens. */
-function isNoteLine(line) {
+ *  Any line carrying a word. A דרשה or a ט באב line is an announcement and running it into the
+ *  times either side of it would read as a time nobody davens. A פלג line was run in with the
+ *  מנין above it for a while, on the grounds that it names the זמן that מנין is set against and
+ *  the two are one thing; asked for on its own line instead, which is what the chart's own cell
+ *  does and what leaves the times down the sheet reading as one column of times.
+ *
+ *  Decided a break at a time rather than for the whole cell, so a run of times that the chart
+ *  cut only to fit its column still comes back together when the word is somewhere else in the
+ *  cell. */
+function ownLine(line) {
   const bare = String(line).split(UL_START).join('').split(UL_END).join('').trim();
-  return /\p{L}/u.test(bare) && !bare.startsWith('פלג');
+  return /\p{L}/u.test(bare);
 }
 
-/** The rich text out of Settings as one of these cells: the underlines kept, every other tag
- *  dropped. Without this the שחרית row lost the underline the card and the board both give it,
- *  since the field stores real <u> elements where a computed cell carries the sentinels. */
-function fromSettingsHtml(html) {
-  return String(html ?? '')
+/** A cell's value as plain text with the underline sentinels in it, whatever it arrived as.
+ *
+ *  A computed cell is already that. A hand edit and the rich text fields out of Settings are
+ *  HTML, because both are typed into a contenteditable, and dropping their tags wholesale put
+ *  a literal `<u> 4:45</u><div>` on the sheet where a שבת שובה cell had been edited. So the
+ *  underlines become sentinels, every break element becomes a break, and what is left of the
+ *  markup goes.
+ *
+ *  Then the whitespace inside an underline is turned out of it. UNDERLINE_TIME writes a space
+ *  in front of the time, which is right on the board (the rule runs a little ahead of the
+ *  digits in a narrow column) and wrong here: measured on this sheet, an underlined time
+ *  started 7.2px right of a plain one in the row above it, so a column of times came out
+ *  ragged and every rule hung out to the left of what it underlines. A newline that ends up
+ *  inside one is put outside instead, which keeps the break and keeps the tags balanced. */
+function cellSource(value) {
+  const text = String(value ?? '')
     .replace(/<\s*u\s*>/gi, UL_START)
     .replace(/<\s*\/\s*u\s*>/gi, UL_END)
-    .replace(/<[^>]+>/g, '');
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/?\s*(?:div|p)(?:\s[^>]*)?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, '&');
+  return text
+    .replace(new RegExp(`${UL_START}\\s*`, 'g'), (m) => (m.includes('\n') ? '\n' : '') + UL_START)
+    .replace(new RegExp(`\\s*${UL_END}`, 'g'), (m) => UL_END + (m.includes('\n') ? '\n' : ''))
+    .trim();
 }
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
@@ -11706,7 +11728,7 @@ function sheetSections(showing, index, state, settings, withChol) {
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     out.push([SHEET_TEXT.chol, [
-      sheetRow('שחרית', fromSettingsHtml(state.settings.weekdayShacharis)),
+      sheetRow('שחרית', state.settings.weekdayShacharis),
       sheetRow('מנחה', wdRow.C),
       sheetRow('מעריב', wdRow.B),
     ]]);
@@ -11775,6 +11797,23 @@ const WS_ROOM = 22;
 const WS_MIN = 1;
 const WS_MAX = 3.2;
 
+/** The least air a row gets between it and the next one, as a share of its own line.
+ *
+ *  Reserved before the type is fitted rather than handed out afterwards, which is the whole
+ *  point of it. Handed out afterwards it is whatever the last step of the fit happened to leave
+ *  over, and a week that filled its page left nothing: measured, the sheet came out at --ws-gap
+ *  0.18px, which is a set of rows sitting on each other's hairlines. Reserved first, the type
+ *  takes a step down instead and the sheet is spaced.
+ *
+ *  The two numbers below are .onepage-row's own type, which is what --op-scale multiplies, and
+ *  they have to agree with the two in app.css. Read out of the row rather than written here for
+ *  a while: getComputedStyle gives the size the row is set to at the scale being tried, so the
+ *  reserved gap changed under the fit and the loop could not settle. */
+const WS_PT = 9.5 * (96 / 72);
+const WS_LINE = 1.2;
+const WS_LEAD = 0.34;
+const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
+
 /** Sets the type to the largest that still fits the sheet.
  *
  *  A week is far less to fit than a whole yomim noraim, which is the whole difficulty here
@@ -11817,15 +11856,40 @@ function fitWeekSheet(container) {
     // The room is measured at every size, not once at the start. --op-scale sets the title
     // above the columns as well as the rows in them, so growing the type takes room away at
     // the same time as it uses more: measured once at scale 1 the answer came out 12px over.
-    // Fitted with the rows at their own height. What is left over is given to them
+    /* A row whose times are too long for the sheet, which the column's own width cannot say.
+     *
+     * A run this sheet cannot break, `8:45&nbsp;/&nbsp;9:00`, is one word to the type: it does
+     * not widen the column, it eats the row's side padding and then hangs over it. Measured on
+     * the סוכות week, whose מעריב carries eleven times, that row began 5.8px left of every other
+     * row, which is exactly the padding, and neither the column nor the row scrolled to say so.
+     * Overflow to the start side of an RTL box is not what scrollWidth reports.
+     *
+     * Nor does anything inside the row: the times are a flex item, so they are given their own
+     * narrowest width and the row is what overflows. So it is the row that is measured, and the
+     * question asked of it is whether the times still begin inside its padding. */
+    const times = [...col.querySelectorAll('.onepage-times')];
+    const spills = () => {
+      // The padding, less the pixel of rounding a flex layout is allowed. Times the zoom
+      // because the rects are in the screen's pixels: if the padding read back is already
+      // zoomed the guard only gets smaller, which is the safe way round.
+      const guard = (parseFloat(getComputedStyle(rows[0]).paddingLeft) || 0) * zoom() - 1;
+      return times.some((t) => {
+        const row = t.closest('.onepage-row').getBoundingClientRect();
+        return t.getBoundingClientRect().left - row.left < guard;
+      });
+    };
+
+    // Fitted with the rows already carrying their reserved lead, so the type is chosen against
+    // a spaced sheet rather than a solid one. Anything over and above the lead is given to them
     // afterwards, so it cannot be counted twice.
-    sheet.style.setProperty('--ws-gap', '0px');
     const fits = (scale) => {
+      sheet.style.setProperty('--ws-gap', `${leadFor(scale).toFixed(2)}px`);
       sheet.style.setProperty('--op-scale', scale.toFixed(2));
       const z = zoom();
       const box = cols.getBoundingClientRect();
       const tall = (last.getBoundingClientRect().bottom - first.getBoundingClientRect().top) / z;
-      return tall <= box.height / z - WS_ROOM && cols.scrollWidth <= cols.clientWidth + 1;
+      return tall <= box.height / z - WS_ROOM && cols.scrollWidth <= cols.clientWidth + 1
+        && !spills();
     };
     let best = WS_MIN;
     for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
@@ -11836,7 +11900,9 @@ function fitWeekSheet(container) {
       if (!fits(s)) break;
       best = s;
     }
+    const lead = leadFor(best);
     sheet.style.setProperty('--op-scale', best.toFixed(2));
+    sheet.style.setProperty('--ws-gap', `${lead.toFixed(2)}px`);
 
     /* Then the room that is left goes to the rows, so the sheet is spaced out rather than set
      * solid with the remainder banked at the foot.
@@ -11855,7 +11921,8 @@ function fitWeekSheet(container) {
     const used = (last.getBoundingClientRect().bottom - first.getBoundingClientRect().top) / z;
     const spare = Math.max(0, room - WS_ROOM - used);
     const rowHeight = used / rows.length;
-    sheet.style.setProperty('--ws-gap', `${Math.min(spare / rows.length, rowHeight * 0.9).toFixed(2)}px`);
+    sheet.style.setProperty('--ws-gap',
+      `${(lead + Math.min(spare / rows.length, rowHeight * 0.9)).toFixed(2)}px`);
     col.style.justifyContent = '';
   }
 }
