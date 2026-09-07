@@ -11,7 +11,7 @@ import {
   type Unit,
 } from '../lib/print'
 import type { Settings } from '../lib/storage'
-import type { DecodedImage } from '../lib/image'
+import { formatMegapixels, type DecodedImage } from '../lib/image'
 import { Button, Card, Label, Note, NumberField, Segmented, Stat } from './primitives'
 
 const GRADE_TONE: Record<Grade, 'good' | 'warn' | 'bad' | 'plain'> = {
@@ -186,7 +186,7 @@ export function SizeStep({
           <Stat label="Print ratio" value={ratioLabel(target.pxWidth, target.pxHeight)} />
           <Stat
             label="Final pixels"
-            value={`${target.pxWidth.toLocaleString()} x ${target.pxHeight.toLocaleString()} (${target.megapixels.toFixed(1)} MP)`}
+            value={`${target.pxWidth.toLocaleString()} x ${target.pxHeight.toLocaleString()} (${formatMegapixels(target.pxWidth * target.pxHeight)})`}
             wide
           />
           <Stat

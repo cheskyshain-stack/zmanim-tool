@@ -48,6 +48,7 @@ export function CompareViewer({
   const [message, setMessage] = useState('')
   const [view, setView] = useState(512)
   const jobRef = useRef(0)
+  const activeId = useRef<number | null>(null)
 
   useEffect(() => {
     const element = container.current
@@ -79,6 +80,10 @@ export function CompareViewer({
 
   const run = useCallback(async () => {
     const token = ++jobRef.current
+    // Dragging the zoom or moving the inspection point fires a new preview. Tell the
+    // worker to drop the old one, or a few quick taps queue up minutes of GPU work
+    // whose results are all going to be thrown away.
+    if (activeId.current !== null) worker.cancel(activeId.current)
     setStatus('working')
     setMessage('Rendering this patch at print resolution')
     try {
@@ -107,7 +112,7 @@ export function CompareViewer({
         }
       }
 
-      const { result } = worker.preview({
+      const { id, result } = worker.preview({
         type: 'preview',
         baseUrl,
         pixels: region.data.buffer as ArrayBuffer,
@@ -121,7 +126,9 @@ export function CompareViewer({
         outHeight: view,
         tuning,
       })
+      activeId.current = id
       const done = await result
+      activeId.current = null
       if (token !== jobRef.current) return
 
       const after = afterCanvas.current
@@ -138,7 +145,9 @@ export function CompareViewer({
       }
       setStatus('idle')
     } catch (error) {
+      // A cancel is this component superseding its own request, not a failure.
       if (token !== jobRef.current) return
+      activeId.current = null
       setStatus('error')
       setMessage(error instanceof Error ? error.message : String(error))
     }
@@ -174,19 +183,17 @@ export function CompareViewer({
           className="absolute inset-0 h-full w-full"
           style={{ imageRendering: 'pixelated' }}
         />
-        <div
-          className="absolute inset-y-0 left-0 overflow-hidden"
-          style={{ width: `${split}%` }}
-        >
-          <canvas
-            ref={afterCanvas}
-            className="absolute inset-y-0 left-0 h-full"
-            style={{
-              width: container.current?.clientWidth ?? '100%',
-              imageRendering: 'pixelated',
-            }}
-          />
-        </div>
+        {/* Clipped rather than wrapped in a narrowing box. A nested box would make the
+            canvas inherit the clip width and squash the image; clip-path keeps both
+            canvases exactly the same size, so the two halves always line up. */}
+        <canvas
+          ref={afterCanvas}
+          className="absolute inset-0 h-full w-full"
+          style={{
+            clipPath: `inset(0 ${100 - split}% 0 0)`,
+            imageRendering: 'pixelated',
+          }}
+        />
         <div
           className="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow"
           style={{ left: `${split}%` }}

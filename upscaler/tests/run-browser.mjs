@@ -59,12 +59,11 @@ const checks = [
   {
     name: 'borders',
     describe: (r) =>
-      `${r.size.join('x')} border ${r.topLeft.join(',')} / ${r.leftEdge.join(',')}, ` +
-      `content ${r.firstContent.join(',')}`,
+      `${r.size.join('x')} border ${r.topLeft.join(',')} on all four sides, ` +
+      `content starts ${r.firstContent.join(',')}`,
     pass: (r) =>
-      r.topLeft.join() === '12,34,56' &&
-      r.leftEdge.join() === '12,34,56' &&
-      r.bottomRight.join() === '12,34,56' &&
+      ['topLeft', 'aboveContent', 'leftEdge', 'rightEdge', 'belowContent', 'bottomRight']
+        .every((key) => r[key].join() === '12,34,56') &&
       r.firstContent.join() !== '12,34,56',
   },
   {

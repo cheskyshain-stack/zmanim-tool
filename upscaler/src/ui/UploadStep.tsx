@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react'
-import { ACCEPT_ATTRIBUTE, decodeImage, formatBytes, type DecodedImage } from '../lib/image'
+import {
+  ACCEPT_ATTRIBUTE,
+  decodeImage,
+  formatBytes,
+  formatMegapixels,
+  type DecodedImage,
+} from '../lib/image'
 import { ratioLabel } from '../lib/aspect'
 import { Button, Card, Note, Stat } from './primitives'
 
@@ -86,7 +92,7 @@ export function UploadStep({
             />
             <Stat
               label="Megapixels"
-              value={`${((source.width * source.height) / 1e6).toFixed(1)} MP`}
+              value={formatMegapixels(source.width * source.height)}
             />
             <Stat label="File size" value={formatBytes(source.bytes)} />
           </div>

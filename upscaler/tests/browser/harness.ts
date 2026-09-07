@@ -352,9 +352,11 @@ async function testBorders() {
   const w = 64
   const h = 64
   const image = await loadPhoto('/tests/tmp/photo.jpg', w, h)
+  // Borders on all four sides, and more than 256 rows above and below so the chunked
+  // border writer has to loop rather than emit one block.
   const targetWidth = 400
-  const targetHeight = 200
-  const content = { x: 100, y: 0, width: 200, height: 200 }
+  const targetHeight = 800
+  const content = { x: 100, y: 300, width: 200, height: 200 }
   const result = await runRender(
     makeRequest({
       pixels: image.data.slice().buffer,
@@ -377,10 +379,12 @@ async function testBorders() {
   return {
     size: [out.width, out.height],
     topLeft: at(0, 0),
-    leftEdge: at(99, 100),
-    firstContent: at(100, 100),
-    rightEdge: at(300, 100),
-    bottomRight: at(399, 199),
+    aboveContent: at(200, 299),
+    leftEdge: at(99, 400),
+    firstContent: at(100, 400),
+    rightEdge: at(300, 400),
+    belowContent: at(200, 500),
+    bottomRight: at(399, 799),
   }
 }
 

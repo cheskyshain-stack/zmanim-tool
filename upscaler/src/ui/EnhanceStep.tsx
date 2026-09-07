@@ -1,7 +1,7 @@
 import { SHARPEN_LABEL, type SharpenLevel } from '../lib/enhance'
 import { MODES, type ModeId } from '../lib/models'
 import { FORCED_FACTORS, describePasses, type UpscalePlan } from '../lib/plan'
-import { formatDuration } from '../lib/image'
+import { formatDuration, formatMegapixels } from '../lib/image'
 import type { Settings } from '../lib/storage'
 import type { ExportFormat } from '../worker/protocol'
 import { Button, Card, Label, Note, Segmented, Stat, Toggle } from './primitives'
@@ -180,7 +180,7 @@ export function EnhanceStep({
           />
           <Stat
             label="Pixels the AI generates"
-            value={`${(plan.aiPixels / 1e6).toFixed(0)} MP`}
+            value={formatMegapixels(plan.aiPixels)}
           />
           <Stat
             label="Estimated time"

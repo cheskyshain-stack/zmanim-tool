@@ -181,6 +181,14 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
+/** Megapixels, with enough decimals that a small image does not read as "0.0 MP". */
+export function formatMegapixels(pixels: number): string {
+  const mp = pixels / 1e6
+  if (mp >= 10) return `${mp.toFixed(0)} MP`
+  if (mp >= 1) return `${mp.toFixed(1)} MP`
+  return `${mp.toFixed(2)} MP`
+}
+
 export function formatDuration(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return 'unknown'
   if (seconds < 60) return `${Math.max(1, Math.round(seconds))} sec`

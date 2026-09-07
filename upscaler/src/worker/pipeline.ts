@@ -218,11 +218,21 @@ export async function runRender(
     borderRow[x * CHANNELS + 2] = borderB
   }
 
+  // Chunked, not allocated whole. "Fit whole image" on a tall print can put thousands
+  // of border rows above the image, and 28,800 pixels wide by 5,000 rows is 432 MB in
+  // one go, which would defeat the entire point of streaming the rest.
+  const BORDER_CHUNK = 256
   const writeBorderRows = (count: number) => {
     if (count <= 0) return
-    const block = new Uint8Array(targetRowBytes * count)
-    for (let i = 0; i < count; i++) block.set(borderRow, i * targetRowBytes)
-    encoder.writeRows(block, count)
+    const rows = Math.min(count, BORDER_CHUNK)
+    const block = new Uint8Array(targetRowBytes * rows)
+    for (let i = 0; i < rows; i++) block.set(borderRow, i * targetRowBytes)
+    let remaining = count
+    while (remaining > 0) {
+      const take = Math.min(rows, remaining)
+      encoder.writeRows(block, take)
+      remaining -= take
+    }
   }
 
   writeBorderRows(contentY)

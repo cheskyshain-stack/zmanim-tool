@@ -56,6 +56,11 @@ Both sides are rendered through the real pipeline, not mocked up.
 **Download** as PNG, TIFF or JPEG, at the exact pixel count, with the DPI and sRGB
 written into the file.
 
+Progress is reported by stage: preparing, loading model, upscaling, resizing, enhancing,
+exporting, with a live percentage and a time remaining that switches from the up front
+estimate to the rate the job is really achieving. There is no "uploading" stage because
+nothing is uploaded.
+
 ---
 
 ## Quick start
@@ -312,12 +317,37 @@ Two things dominate:
   format printers RIP somewhere between 150 and 200 DPI. If a job is quoted at hours,
   this is the setting to change.
 
-Measured throughput in this repository's test environment, which is **software rendered
-WebGL (SwiftShader) with no GPU at all**, is in the table below. Treat it as a floor: it
-is the number a machine gets when it has no graphics hardware whatsoever, and any real
-phone GPU is far above it.
+### Measured numbers
 
-<!-- MEASURED -->
+These come from `npm run test:browser` in this repository's environment, which has
+**no GPU at all**: TensorFlow.js falls back to WebGL rendered in software by SwiftShader,
+which is a CPU rasteriser. Treat them as a floor rather than a forecast.
+
+Network throughput, in output pixels per second:
+
+| Model | 2x | 4x |
+|:--|--:|--:|
+| esrgan-slim | 0.02 MP/s | 0.06 MP/s |
+| esrgan-medium | 0.01 MP/s | 0.03 MP/s |
+
+Everything after the network, on the same machine's CPU, at 8 megapixels:
+
+| Step | Rate | Output |
+|:--|--:|--:|
+| PNG, adaptive filters, deflate 6 | 3.6 MP/s | 3.6 MB |
+| PNG, up filter, deflate 4 | 13.3 MP/s | 1.5 MB |
+| TIFF, deflate 6, predictor | 6.2 MP/s | 0.8 MB |
+| JPEG, quality 95, 4:4:4 | 5.6 MP/s | 16.3 MB |
+
+Two things are worth reading off that. The encoders are not the bottleneck even on a
+CPU, and lossless TIFF came out **four times smaller than PNG** on this content, which
+is why it is worth trying if a PNG will not save on a phone.
+
+I am not going to put a phone number in this table that I have not measured. A GPU is
+a completely different machine for this workload, and rather than guess by how much,
+the app times your actual device on your actual settings and quotes the job from that.
+Both numbers above are measured the same way the app measures them, by the same code:
+`npm run test:browser` for the network, `npm run bench:encoders` for the rest.
 
 ---
 
@@ -413,6 +443,7 @@ npm run test:logic      # print maths, crops, planning, resampler, sharpener (un
 npm run test:browser    # models, tiling, band seams, borders, throughput, large exports
 npm run test:app        # drives the built app in a 375 px browser
 npm run test:encoders   # PNG, TIFF and JPEG against Pillow (needs python + pillow)
+npm run bench:encoders  # times the three encoders, where the README numbers come from
 ```
 
 `test:logic` is pure functions and runs instantly, so it is the one to run while working.

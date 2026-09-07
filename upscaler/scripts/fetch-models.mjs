@@ -8,7 +8,7 @@
 //
 // public/models is generated, not checked in. Run "npm run models" (build and dev both
 // run it for you) after a fresh npm install.
-import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { cp, mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,8 +35,12 @@ async function dirSize(dir) {
 }
 
 async function main() {
-  await rm(out, { recursive: true, force: true })
-  await mkdir(out, { recursive: true })
+  // Stage into a temporary directory and swap it in at the end, rather than emptying
+  // public/models first. A dev server or a test run reading those files while this
+  // script is halfway through would otherwise get a 404 for a model that exists.
+  const staging = `${out}.staging`
+  await rm(staging, { recursive: true, force: true })
+  await mkdir(staging, { recursive: true })
 
   for (const family of FAMILIES) {
     const src = join(root, 'node_modules', family.pkg, 'models')
@@ -48,7 +52,7 @@ async function main() {
     }
     for (const scale of family.scales) {
       const from = join(src, `x${scale}`)
-      const to = join(out, family.id, `x${scale}`)
+      const to = join(staging, family.id, `x${scale}`)
       if (!existsSync(join(from, 'model.json'))) {
         console.error(`\nMissing ${from}/model.json\n`)
         process.exit(1)
@@ -58,7 +62,9 @@ async function main() {
     }
   }
 
-  const mb = (await dirSize(out)) / 1024 / 1024
+  const mb = (await dirSize(staging)) / 1024 / 1024
+  await rm(out, { recursive: true, force: true })
+  await rename(staging, out)
   console.log(`models: wrote public/models (${mb.toFixed(1)} MB)`)
 }
 

@@ -91,6 +91,10 @@ export interface BenchmarkRequest {
   id: number
   baseUrl: string
   passes: PassSpec[]
+  /** Measured too, because the encoder is a real share of a 300 megapixel job. */
+  format: ExportFormat
+  jpegQuality: number
+  sharpen: SharpenLevel
 }
 
 export interface CancelRequest {
@@ -138,6 +142,12 @@ export interface BenchmarkDoneMessage {
   backend: string
   /** Output pixels per second the device sustains on this model chain. */
   pixelsPerSecond: number
+  /**
+   * Output pixels per second for everything after the network: the Lanczos resize, the
+   * sharpen and the encoder. On a very large export that is minutes, not seconds, so
+   * quoting the network time alone would read as a broken estimate.
+   */
+  outputPixelsPerSecond: number
 }
 
 export interface ErrorMessage {

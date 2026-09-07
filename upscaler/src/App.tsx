@@ -71,6 +71,7 @@ export default function App() {
   const [customCrop, setCustomCrop] = useState<Rect | null>(null)
   const [job, setJob] = useState<JobState>(IDLE_JOB)
   const [rate, setRate] = useState<number | null>(null)
+  const [outputRate, setOutputRate] = useState<number | null>(null)
   const [benchmarking, setBenchmarking] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [now, setNow] = useState(0)
@@ -161,12 +162,15 @@ export default function App() {
   )
 
   const estimateSeconds = useMemo(() => {
-    if (rate === null || rate <= 0) return null
-    // The AI passes dominate, but the encoder, the resize and the sharpen are not free.
-    // Measured against real runs, everything after the network costs roughly a fifth
-    // again on top, and quoting the network time alone reads as a broken estimate.
-    return (plan.aiPixels / rate) * 1.2 + target.megapixels * 0.05
-  }, [plan, rate, target])
+    if (outputRate === null || outputRate <= 0) return null
+    // Two measured rates, not one guess: the network's, and the rate the resize, the
+    // sharpen and the encoder together manage on this device. On a 311 megapixel export
+    // the second is minutes rather than seconds, so leaving it out would read as a
+    // broken estimate the moment the bar slowed down at the end.
+    const network = rate && rate > 0 ? plan.aiPixels / rate : 0
+    const output = (target.pxWidth * target.pxHeight) / outputRate
+    return network + output
+  }, [plan, rate, outputRate, target])
 
   // --- previews ------------------------------------------------------------
   useEffect(() => {
@@ -187,18 +191,35 @@ export default function App() {
   }, [step, job.error])
 
   // --- benchmark -----------------------------------------------------------
-  const benchmarkKey = plan.passes.map((p) => `${p.family}x${p.scale}`).join('-')
+  const benchmarkKey = [
+    ...plan.passes.map((p) => `${p.family}x${p.scale}`),
+    settings.format,
+    settings.sharpen,
+    settings.jpegQuality,
+  ].join('-')
   useEffect(() => {
-    if (step !== 'enhance' || plan.passes.length === 0) return
+    if (step !== 'enhance') return
     let cancelled = false
     setBenchmarking(true)
     getWorker()
-      .benchmark({ type: 'benchmark', baseUrl, passes: plan.passes })
+      .benchmark({
+        type: 'benchmark',
+        baseUrl,
+        passes: plan.passes,
+        format: settings.format,
+        jpegQuality: settings.jpegQuality,
+        sharpen: settings.sharpen,
+      })
       .result.then((message) => {
-        if (!cancelled) setRate(message.pixelsPerSecond)
+        if (cancelled) return
+        setRate(message.pixelsPerSecond)
+        setOutputRate(message.outputPixelsPerSecond)
       })
       .catch(() => {
-        if (!cancelled) setRate(null)
+        if (!cancelled) {
+          setRate(null)
+          setOutputRate(null)
+        }
       })
       .finally(() => {
         if (!cancelled) setBenchmarking(false)
@@ -206,9 +227,10 @@ export default function App() {
     return () => {
       cancelled = true
     }
-    // benchmarkKey stands in for the pass list: only a change of model or scale changes
-    // the speed, and the array itself is a new object on every render.
-  }, [step, benchmarkKey, baseUrl, getWorker, plan.passes.length])
+    // benchmarkKey stands in for the pass list and the export settings: those are what
+    // change the speed, and the arrays themselves are new objects on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, benchmarkKey, baseUrl, getWorker])
 
   // --- running the job -----------------------------------------------------
   const start = useCallback(

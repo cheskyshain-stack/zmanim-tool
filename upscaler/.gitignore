@@ -11,3 +11,4 @@ public/models/
 # Scratch space for the browser tests.
 tests/tmp/
 tsconfig.tsbuildinfo
+public/models.staging/

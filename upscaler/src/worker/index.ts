@@ -2,12 +2,23 @@
 // responsive: a 300 megapixel export runs for a long time and must never be the reason
 // a scroll stutters or a Cancel button stops responding.
 
-import { CHANNELS, resampleImage } from '../lib/lanczos'
+import {
+  CHANNELS,
+  buildTaps,
+  resampleImage,
+  resampleX,
+  resampleYBand,
+} from '../lib/lanczos'
 import { deblockInPlace, denoiseInPlace, sharpenInPlace } from '../lib/enhance'
+import type { SharpenLevel } from '../lib/enhance'
+import { PngEncoder } from '../lib/encode/png'
+import { TiffEncoder } from '../lib/encode/tiff'
+import { JpegEncoder } from '../lib/encode/jpeg'
 import { Cancelled, benchmark, currentBackend, initBackend, loadModel, upscaleBuffer } from './engine'
 import { rgbaToFloatRgb, runRender } from './pipeline'
 import type {
   BenchmarkRequest,
+  ExportFormat,
   PreviewRequest,
   RenderRequest,
   WorkerRequest,
@@ -167,5 +178,53 @@ async function handleBenchmark(request: BenchmarkRequest): Promise<void> {
     id: request.id,
     backend: currentBackend(),
     pixelsPerSecond,
+    outputPixelsPerSecond: benchmarkOutput(
+      request.format,
+      request.jpegQuality,
+      request.sharpen,
+    ),
   })
+}
+
+/**
+ * Times the tail of the pipeline on a real band: resize, sharpen, encode. Runs the same
+ * code the export runs, on the same format and settings, so the number is the device's
+ * own rather than a constant that was true on somebody else's laptop.
+ */
+function benchmarkOutput(
+  format: ExportFormat,
+  quality: number,
+  sharpen: SharpenLevel,
+): number {
+  const width = 512
+  const rows = 256
+  // A slightly larger source than output, which is the shape of the real final step.
+  const sourceWidth = 584
+  const sourceRows = 292
+  const slab = new Float32Array(sourceWidth * sourceRows * CHANNELS)
+  for (let i = 0; i < slab.length; i++) slab[i] = (i * 13) % 256
+
+  const started = performance.now()
+  const xTaps = buildTaps(sourceWidth, width)
+  const yTaps = buildTaps(sourceRows, rows)
+  const wide = resampleX(slab, sourceWidth, sourceRows, xTaps)
+  const band = resampleYBand(wide, width, 0, sourceRows, yTaps, 0, rows)
+  sharpenInPlace(band, width, rows, sharpen)
+
+  const bytes = new Uint8Array(width * rows * CHANNELS)
+  for (let i = 0; i < bytes.length; i++) {
+    const v = band[i]
+    bytes[i] = v <= 0 ? 0 : v >= 255 ? 255 : (v + 0.5) | 0
+  }
+  const encoder =
+    format === 'tiff'
+      ? new TiffEncoder(width, rows, { dpi: 300 })
+      : format === 'jpeg'
+        ? new JpegEncoder(width, rows, { dpi: 300, quality })
+        : new PngEncoder(width, rows, { dpi: 300 })
+  encoder.writeRows(bytes, rows)
+  encoder.finish()
+
+  const elapsed = (performance.now() - started) / 1000
+  return (width * rows) / Math.max(elapsed, 1e-6)
 }
