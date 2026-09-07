@@ -18,7 +18,7 @@ import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js
 import { SLASH } from '../util.js';
 import { buildChorefRow } from '../sheets/choref.js';
 import { parseTimes } from './slichos.js';
-import { twoReckonings } from './reckonings.js';
+import { twoReckonings, nineHours } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { everydayShacharis, afterSchedule } from './yomkippur.js';
 import { openingMincha } from './early-mincha.js';
@@ -52,6 +52,12 @@ const skUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
  *  taken off the unrounded one, so a year where מעריב rounded up read a minute wider than it
  *  was worked out to be. Seven of thirty one years came out at 33. */
 const SK_DRASHA_BEFORE = 28;
+
+/** How long before שקיעה שמחת תורה's last מנחה is, in minutes. The shul asked for twenty; the
+ *  sheets this was ported from print twenty two. Not rounded to a five: it is the one מנין of
+ *  the day that is set off the sun rather than announced, the same as every other last מנחה on
+ *  the sheet that is worked from that day's own שקיעה. */
+const SK_SIMCHAS_BEFORE = 20;
 
 /* Which day of תשרי each part of the sheet is. 1 תשרי is ראש השנה, so day n is rh + n - 1. */
 const SK_EREV = 14;      // ערב סוכות, the afternoon the sheet opens on
@@ -98,6 +104,9 @@ export const SK_TEXT = {
   maarivSheini: "מעריב ב'",
   shiur: 'שיעור בעניני החג מאחד מבני חבורה',
   krias: 'ס"ז ק"ש',
+  // Printed on every Shabbos this sheet carries, the same זמן and the same pair of reckonings
+  // the ראש השנה sheet prints on a first day that is Shabbos.
+  nineHours: "ט' שעות",
   yizkor: 'יזכור בערך',
   mechiras: 'מכירת עליות שמחת תורה קודם מעריב',
   afterMusaf: 'מיד אחר מוסף',
@@ -115,10 +124,12 @@ export const SK_TEXT = {
   // The יום טוב morning, the same pair on every day of the sheet.
   yomTovShacharis: '<u>7:30</u>, 8:15',
   simchasShacharis: '8:15',
-  // יזכור, which is announced rather than worked out, and moves half an hour later when
-  // שמיני עצרת is Shabbos: the davening runs longer.
+  /* יזכור, which is announced rather than worked out. One per שחרית: the למטה מנין's and the
+     main בית מדרש's. Both move later when שמיני עצרת is Shabbos, the davening running longer:
+     the למטה one by half an hour and the main one by the same. */
   yizkorEarly: '9:10',
   yizkorLate: '10:25',
+  yizkorShabbosEarly: '9:40',
   yizkorShabbos: '10:55',
 };
 
@@ -148,12 +159,16 @@ export const SK_SHUAVA = {
  *  1:15, so the guard is what those sheets were already doing by hand; the round 1:20 is what
  *  the shul asked for in place of three different minutes in three different years.
  *
- *  Both of the first two are למטה, the rest the main בית מדרש. */
-export function sukkosErevMincha(serial, settings) {
+ *  Both of the first two are למטה, the rest the main בית מדרש.
+ *
+ *  Except on ערב שמיני עצרת, where the shul asked for the whole afternoon to be למטה: the main
+ *  בית מדרש is being set up for the night, so there is nowhere upstairs to daven. That is
+ *  `allDown`, and only the שמיני עצרת block passes it. */
+export function sukkosErevMincha(serial, settings, { allDown = false } = {}) {
   const first = openingMincha(skMinchaGedola(serial, settings), skAt(13, 35));
   const rest = [
-    { t: skAt(13, 35), u: true }, { t: skAt(13, 50) },
-    { t: skAt(14, 15) }, { t: skAt(15, 0) },
+    { t: skAt(13, 35), u: true }, { t: skAt(13, 50), u: allDown },
+    { t: skAt(14, 15), u: allDown }, { t: skAt(15, 0), u: allDown },
   ];
   return first === null ? rest : [{ t: first, u: true }, ...rest];
 }
@@ -165,13 +180,26 @@ const skRoundPrinted = (t) => Math.round(t * 1440) / 1440;
 /** The afternoon מנחה of a יום טוב: 2:00, 5:30 למטה, and the last one half an hour before that
  *  day's own שקיעה.
  *
- *  2:00 whatever day of the week it is. A day that is Shabbos opened with an early מנין as
- *  well for a while, held to מנחה גדולה the way the ערב יום טוב list is, which is what the
- *  תשפ"ד sheet prints on both of its Shabbos days. The shul asked for the afternoon to start
- *  at 2:00 on those days too. */
-function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false } = {}) {
+ *  2:00 whatever day of the week it is, and on a day that falls on Shabbos an earlier מנין in
+ *  front of it as well: `early`. That is 1:15, moved to 1:20 or dropped altogether where מנחה
+ *  גדולה is later, the same openingMincha every other afternoon on this sheet opens with, and
+ *  it is what the תשפ"ד sheet prints on both of its Shabbos days. The shul asked for the 2:00
+ *  alone for a while and has asked for the early מנין back.
+ *
+ *  In the main בית מדרש, not למטה, which is how it was printed before and how the wall chart
+ *  sets a Shabbos afternoon's first מנין.
+ *
+ *  Only the days that are Shabbos take it. A weekday יום טוב afternoon still opens at 2:00,
+ *  and in practice that is יום ב', which can never be Shabbos: 16 תשרי falls on a Sunday,
+ *  Tuesday, Wednesday or Friday. The two that can are יום א' and שמיני עצרת, and they are
+ *  Shabbos in the same years as each other, 15 and 22 תשרי being a week apart. */
+function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false, early = false } = {}) {
   const last = skRoundPrinted(skShkia(serial, settings) - 30 * SK_MIN);
   const out = [];
+  if (early) {
+    const first = openingMincha(skMinchaGedola(serial, settings), skAt(14, 0));
+    if (first !== null) out.push({ t: first });
+  }
   out.push({ t: skAt(14, 0) });
   if (five) out.push({ t: skAt(17, 30), u: true });
   else {
@@ -326,7 +354,12 @@ export function buildSukkosAfter(rh, settings) {
   return afterSchedule(
     Math.min(...days.map((s) => skShkia(s, settings))),
     Math.max(...days.map((s) => skMinchaGedola(s, settings))),
-    settings
+    settings,
+    // The last מנין a quarter of an hour before שקיעה, which is how the חול המועד run above it
+    // on this same sheet ends and what the shul asked for here. The schedule that starts after
+    // יו"כ is left as it was: it was not part of the ask, and its own sheet prints what it
+    // prints today.
+    { lastFifteen: true }
   );
 }
 
@@ -372,8 +405,12 @@ function chartTimes(cell) {
  *
  *  שבת חול המועד opens with the ערב שבת מנחה menu, because that Friday is חול המועד and the
  *  חול המועד box leaves Fridays out. שבת בראשית does not: its Friday is שמחת תורה and that
- *  block has already given the afternoon. */
-function sukkosShabbosLines(shabbosSerial, settings, bothWays, { erevMincha = null } = {}) {
+ *  block has already given the afternoon.
+ *
+ *  ט' שעות is the poster's as well, under the ס"ז ק"ש the chart's row does give: every Shabbos
+ *  on this sheet carries it, and in a year where the Shabbosos are these two rather than
+ *  יום א' and שמיני עצרת, these are the two. */
+function sukkosShabbosLines(shabbosSerial, settings, bothWays, nineWays, { erevMincha = null } = {}) {
   const friday = shabbosSerial - 1;
   const row = buildChorefRow({ serial: shabbosSerial, specialParsha: '' }, settings);
   const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
@@ -396,6 +433,7 @@ function sukkosShabbosLines(shabbosSerial, settings, bothWays, { erevMincha = nu
   });
   out.push({ label: SK_TEXT.shacharis, times: chartTimes(row.E), calc: 'shabbosShacharis' });
   out.push({ label: SK_TEXT.krias, times: bothWays(shabbosSerial), calc: 'krias' });
+  out.push({ label: SK_TEXT.nineHours, times: nineWays(shabbosSerial), calc: 'nineHours' });
   out.push({ label: SK_TEXT.mincha, times: chartTimes(row.C), calc: 'shabbosMincha' });
   out.push({ label: SK_TEXT.maariv, times: chartTimes(row.B), calc: 'shabbosMotzei' });
   return out;
@@ -444,6 +482,14 @@ export function buildSukkosPoster(year, settings) {
     Z.sofZmanShmaMGA72(dateFromSerial(serial), settings),
     Z.sofZmanShmaGRA(dateFromSerial(serial), settings)
   ).map((r) => ({ ...tm(r.at), name: r.name }));
+  /* ט' שעות the same way, which is the point of it being the same helper: one זמן answered on
+     both reckonings, each answer under its own name and the earlier of the two on the left.
+     See posters/reckonings.js, where writing the pair the other way round crossed the names
+     over the times for real. */
+  const nineWays = (serial) => {
+    const nine = nineHours(dateFromSerial(serial), settings);
+    return twoReckonings(nine.mga, nine.gra).map((r) => ({ ...tm(r.at), name: r.name }));
+  };
 
   const M = minyanList();
   const isShabbos = (n) => excelWeekday(day(n)) === SK_SHABBOS;
@@ -456,12 +502,13 @@ export function buildSukkosPoster(year, settings) {
     const candles = shkia - settings.candleLightingMinutes * SK_MIN;
     const maariv = shkia + 50 * SK_MIN;
     const on = day(nightDay);
+    const erevMincha = sukkosErevMincha(on, settings, { allDown: opts.allDown === true });
     const out = [
       // מנחה עיו"ט whichever day of the week it is. A year where יום א' or שמיני עצרת falls on
       // Shabbos still says עיו"ט here, which is what the תשפ"ד sheet prints on both of its
       // Shabbos days: the afternoon is ערב יום טוב first, and the Shabbos is said in the
       // heading above.
-      line(SK_TEXT.erevMincha, list(sukkosErevMincha(on, settings)), { calc: 'erevMincha' }),
+      line(SK_TEXT.erevMincha, list(erevMincha), { calc: 'erevMincha' }),
       // הדלקת נרות, and the מנין three minutes behind it on a line of its own. The two were
       // one row for a while, the way the sheets it was ported from set them; the shul asked
       // for two, which is also how the one-page sheet has always set them.
@@ -474,16 +521,23 @@ export function buildSukkosPoster(year, settings) {
         [tm(skDown5(roundToMinute(maariv) - SK_DRASHA_BEFORE * SK_MIN))], { calc: 'drasha', wrap: true }));
     }
     out.push(line(SK_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv' }));
-    M.list(on, SK_TEXT.erevMincha, list(sukkosErevMincha(on, settings)), AFTERNOON);
+    M.list(on, SK_TEXT.erevMincha, list(erevMincha), AFTERNOON);
     M.at(on, SK_TEXT.mincha, candles + 3 * SK_MIN);
     M.at(on, SK_TEXT.maariv, maariv);
     return out;
   };
 
-  /** The morning of a יום טוב: the fixed pair, then ס"ז ק"ש both ways. */
+  /** ט' שעות, on a day of this sheet that falls on Shabbos, and nothing on one that does not.
+   *  A list rather than a line so it can be spread into a block's lines either way. */
+  const nineLine = (n) => (isShabbos(n)
+    ? [line(SK_TEXT.nineHours, nineWays(day(n)), { calc: 'nineHours' })] : []);
+
+  /** The morning of a יום טוב: the fixed pair, then ס"ז ק"ש both ways, and ט' שעות on a
+   *  Shabbos. */
   const morningLines = (n) => [
     line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
     line(SK_TEXT.krias, bothWays(day(n)), { calc: 'krias' }),
+    ...nineLine(n),
   ];
 
   const blocks = [];
@@ -512,17 +566,18 @@ export function buildSukkosPoster(year, settings) {
      makes, so the card and that box cannot say different things. */
   M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(settings), MORNING);
 
-  // יום א'
+  // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
+  const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });
   blocks.push({
     heading: heading(SK_TEXT.day1, SK_DAY1, { eiruv: eiruvDay1 }),
     lines: [
       ...eveningLines(SK_EREV),
       ...morningLines(SK_DAY1),
-      line(SK_TEXT.mincha, list(sukkosDayMincha(day(SK_DAY1), settings)), { calc: 'dayMincha' }),
+      line(SK_TEXT.mincha, list(day1Mincha), { calc: 'dayMincha' }),
     ],
   });
   M.list(day(SK_DAY1), SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), MORNING);
-  M.list(day(SK_DAY1), SK_TEXT.mincha, list(sukkosDayMincha(day(SK_DAY1), settings)), AFTERNOON);
+  M.list(day(SK_DAY1), SK_TEXT.mincha, list(day1Mincha), AFTERNOON);
 
   // יום ב'. Its night is the first day's: the שיעור, then the two מעריב, fifty and seventy two
   // minutes after שקיעה. The שיעור is twenty minutes before the first of them, on a round five.
@@ -539,10 +594,12 @@ export function buildSukkosPoster(year, settings) {
         line(SK_TEXT.maariv, [tm(m1), tm(m2, true)], { calc: 'twoMaariv' }),
         /* The שמחת בית השואבה, which is ליל ב' סוכות and so belongs to this night, after the
            מעריב it follows. It has a sheet of its own as well, hung where people will see it;
-           here it is two rows in the day it happens on rather than a block with a heading,
-           which is where somebody reading the schedule would look for it. */
+           here it is one row in the day it happens on rather than a block with a heading,
+           which is where somebody reading the schedule would look for it.
+           The name and the hour only. The street address was a second row under it and the
+           shul asked for it off: the sheet of its own carries the address, and this is the
+           schedule, where the line is there to say the evening is on and when. */
         line(SK_SHUAVA.title, [txt(SK_SHUAVA.at)], { calc: 'shuava', wrap: true }),
-        line(SK_SHUAVA.where, [], { calc: 'shuavaWhere', wrap: true, ltrLabel: true }),
         ...morningLines(SK_DAY2),
         line(SK_TEXT.mincha, list(sukkosDayMincha(day(SK_DAY2), settings)), { calc: 'dayMincha' }),
         // מוצאי יום טוב, sixty and seventy two minutes after the second day's own שקיעה, the
@@ -601,7 +658,7 @@ export function buildSukkosPoster(year, settings) {
     middle.push({
       at: shabbosChm,
       heading: SK_TEXT.shabbosChm,
-      lines: sukkosShabbosLines(shabbosChm, settings, bothWays, { erevMincha: erev }),
+      lines: sukkosShabbosLines(shabbosChm, settings, bothWays, nineWays, { erevMincha: erev }),
     });
     addShabbosMinyanim(M, shabbosChm, settings, erev);
   }
@@ -646,30 +703,35 @@ export function buildSukkosPoster(year, settings) {
   // שמיני עצרת
   {
     const n = SK_SHMINI;
-    const yizkor = isShabbos(n)
-      // On Shabbos the davening runs longer and there is one יזכור, half an hour later than
-      // the second of the two an ordinary year prints.
-      ? [line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
-        line(SK_TEXT.yizkor, [txt(SK_TEXT.yizkorShabbos)], { calc: 'yizkor' })]
-      // Otherwise each שחרית carries its own, which is how the sheet sets them.
-      : [line(SK_TEXT.shacharis, [txt('7:30', true)],
-        { calc: 'shacharis', extra: { label: SK_TEXT.yizkor, times: [txt(SK_TEXT.yizkorEarly)] } }),
+    /* Each שחרית carries its own יזכור, which is how the sheet sets them: the 7:30 is the
+       למטה מנין and the 8:15 the main בית מדרש, and each one davens יזכור when it gets there.
+       On Shabbos both run later, the davening being longer: 9:40 and 10:55 against 9:10 and
+       10:25. The Shabbos year used to print one יזכור for the two of them and the למטה מנין
+       had no time on the sheet at all. */
+    const yizkor = [
+      line(SK_TEXT.shacharis, [txt('7:30', true)],
+        { calc: 'shacharis',
+          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly)] } }),
       line(SK_TEXT.shacharis, [txt('8:15')],
-        { calc: 'shacharis', extra: { label: SK_TEXT.yizkor, times: [txt(SK_TEXT.yizkorLate)] } })];
+        { calc: 'shacharis',
+          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate)] } }),
+    ];
+    const shminiMincha = sukkosDayMincha(day(n), settings,
+      { five: false, fiveIfRoom: true, early: isShabbos(n) });
     blocks.push({
       heading: heading(SK_TEXT.shmini, n, { eiruv: eiruvShmini }),
       lines: [
-        // the evening of הושענא רבה, which is the one that opens שמיני עצרת
-        ...eveningLines(SK_SHMINI - 1),
+        /* the evening of הושענא רבה, which is the one that opens שמיני עצרת. Its whole מנחה
+           run is למטה: see sukkosErevMincha. */
+        ...eveningLines(SK_SHMINI - 1, { allDown: true }),
         ...yizkor,
         line(SK_TEXT.krias, bothWays(day(n)), { calc: 'krias' }),
-        line(SK_TEXT.mincha, list(sukkosDayMincha(day(n), settings, { five: false, fiveIfRoom: true })),
-          { calc: 'shminiMincha' }),
+        ...nineLine(n),
+        line(SK_TEXT.mincha, list(shminiMincha), { calc: 'shminiMincha' }),
       ],
     });
     M.list(day(n), SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), MORNING);
-    M.list(day(n), SK_TEXT.mincha,
-      list(sukkosDayMincha(day(n), settings, { five: false, fiveIfRoom: true })), AFTERNOON);
+    M.list(day(n), SK_TEXT.mincha, list(shminiMincha), AFTERNOON);
   }
 
   // שמחת תורה. Its night is שמיני עצרת's, and its מעריב is sixty minutes after that שקיעה
@@ -691,8 +753,9 @@ export function buildSukkosPoster(year, settings) {
         line(SK_TEXT.maariv, [tm(nightShkia + 60 * SK_MIN)], { calc: 'simchasMaariv' }),
         line(SK_TEXT.shacharis, parseTimes(SK_TEXT.simchasShacharis), { calc: 'simchasShacharis' }),
         line(SK_TEXT.krias, bothWays(day(SK_SIMCHAS)), { calc: 'krias' }),
-        // Straight after מוסף, and then one twenty two minutes before שקיעה.
-        line(SK_TEXT.mincha, [txt(SK_TEXT.afterMusaf), tm(dayShkia - 22 * SK_MIN)],
+        // Straight after מוסף, and then one twenty minutes before שקיעה. It was twenty two,
+        // which is what the sheets it was ported from print; the shul asked for twenty.
+        line(SK_TEXT.mincha, [txt(SK_TEXT.afterMusaf), tm(dayShkia - SK_SIMCHAS_BEFORE * SK_MIN)],
           { calc: 'simchasMincha', sep: ' & ' }),
         bereishis ? null
           : line(SK_TEXT.maariv, [tm(dayShkia + 60 * SK_MIN), tm(dayShkia + 72 * SK_MIN, true)],
@@ -701,7 +764,7 @@ export function buildSukkosPoster(year, settings) {
     });
     M.at(on, SK_TEXT.maariv, nightShkia + 60 * SK_MIN);
     M.list(day(SK_SIMCHAS), SK_TEXT.shacharis, parseTimes(SK_TEXT.simchasShacharis), MORNING);
-    M.at(day(SK_SIMCHAS), SK_TEXT.mincha, dayShkia - 22 * SK_MIN);
+    M.at(day(SK_SIMCHAS), SK_TEXT.mincha, dayShkia - SK_SIMCHAS_BEFORE * SK_MIN);
     if (!bereishis) {
       M.at(day(SK_SIMCHAS), SK_TEXT.maariv, dayShkia + 60 * SK_MIN);
       M.at(day(SK_SIMCHAS), SK_TEXT.maariv, dayShkia + 72 * SK_MIN, { underlined: true });
@@ -714,7 +777,7 @@ export function buildSukkosPoster(year, settings) {
   if (bereishis) {
     blocks.push({
       heading: SK_TEXT.shabbosBereishis,
-      lines: sukkosShabbosLines(bereishis, settings, bothWays),
+      lines: sukkosShabbosLines(bereishis, settings, bothWays, nineWays),
     });
     addShabbosMinyanim(M, bereishis, settings, null);
   }

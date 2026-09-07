@@ -513,7 +513,7 @@ const POSTER_SHEETS = [
     rules: {
       erevMincha: {
         plain: 'The afternoon before a יום טוב: 1:15, 1:35, 1:50, 2:15 and 3:00, except that the 1:15 moves to 1:20 on a day where it would fall before מנחה גדולה.',
-        exact: 'Four fixed times, and a first one that is 1:15 where that is at or after מנחה גדולה לחומרא (itself the later of מנחה גדולה and half an hour after חצות), 1:20 where it is not, and nothing at all in a year where even 1:20 would be early. The sheets the shul hangs already moved it by hand: תשפ"ד prints 1:16, 1:17 and 1:18 on its three afternoons, and the round 1:20 is what the shul asked for in place of three different minutes in three different years. Both are measured on the printed minute, since מנחה גדולה carries seconds. The first two מנינים are למטה.',
+        exact: 'Four fixed times, and a first one that is 1:15 where that is at or after מנחה גדולה לחומרא (itself the later of מנחה גדולה and half an hour after חצות), 1:20 where it is not, and nothing at all in a year where even 1:20 would be early. The sheets the shul hangs already moved it by hand: תשפ"ד prints 1:16, 1:17 and 1:18 on its three afternoons, and the round 1:20 is what the shul asked for in place of three different minutes in three different years. Both are measured on the printed minute, since מנחה גדולה carries seconds. The first two מנינים are למטה, except on ערב שמיני עצרת, where the whole run is: the main בית מדרש is being set up for the night and there is nowhere upstairs to daven.',
       },
       candles: {
         plain: 'הדלקת נרות before a יום טוב, the usual number of minutes before שקיעה.',
@@ -543,9 +543,13 @@ const POSTER_SHEETS = [
         plain: 'ס"ז קריאת שמע, given on both reckonings with each time under the name of its own.',
         exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, counted from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is. The old sheets read a minute earlier on both: they were typed by hand and this is the same calculation the board makes.',
       },
+      nineHours: {
+        plain: 'ט\' שעות, printed on every Shabbos this sheet carries and on no other day, set the same way as the ס"ז ק"ש above it: each answer under its own name, earlier on the left.',
+        exact: 'Nine seasonal hours into the day on each reckoning: the גר"א\'s day נץ to שקיעה, the מגן אברהם\'s 72 minutes before נץ to 72 after שקיעה. The Shabbosos are יום א\' and שמיני עצרת in a year where יום א\' falls on Shabbos, and שבת חול המועד with שבת בראשית otherwise. The same זמן and the same code the ראש השנה sheet prints on a first day that is Shabbos.',
+      },
       dayMincha: {
-        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. The 2:00 opens it whatever day of the week it is.',
-        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. A day that is Shabbos opened with an early מנין in front of the 2:00 as well for a while, held to מנחה גדולה the way the ערב יום טוב list is, which is what the תשפ"ד sheet prints on both of its Shabbos days. The shul asked for those days to start at 2:00 like every other.',
+        plain: 'The afternoon of a יום טוב: 2:00, 5:30 למטה, and a last מנין half an hour before שקיעה. On a day that falls on Shabbos an earlier מנין opens it in front of the 2:00.',
+        exact: 'Two fixed times and a last at that day\'s own שקיעה less 30 minutes. On a day that is Shabbos the list opens with 1:15, moved to 1:20 or dropped against מנחה גדולה the same way every other early מנחה on this sheet is, in the main בית מדרש. That is what the תשפ"ד sheet prints on both of its Shabbos days; the shul asked for the 2:00 alone for a while and has asked for the early מנין back. In practice the days that take it are יום א\' and שמיני עצרת, which are Shabbos in the same years as each other; יום ב\' can never be Shabbos.',
       },
       shiur: {
         plain: 'The שיעור on the second night, at least twenty minutes before the first מעריב, announced to a round time.',
@@ -560,8 +564,8 @@ const POSTER_SHEETS = [
         exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed at all in a year where the day runs into Shabbos: the Shabbos block below gives that evening instead.',
       },
       yizkor: {
-        plain: 'יזכור on שמיני עצרת, announced rather than worked out: 9:10 after the first שחרית and 10:25 after the second.',
-        exact: 'Not calculated. On a Shabbos there is one יזכור rather than two, at 10:55, because the davening runs longer.',
+        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 למטה and 10:25 after the 8:15.',
+        exact: 'Not calculated. On a Shabbos both run later, the davening being longer: 9:40 and 10:55. The Shabbos year used to print one יזכור for the two מנינים and the למטה one had no time on the sheet at all.',
       },
       shminiMincha: {
         plain: 'שמיני עצרת\'s afternoon: 2:00 and 5:00 rather than 5:30, a 5:30 as well where there is room for it, and a last מנין half an hour before שקיעה.',
@@ -580,8 +584,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated.',
       },
       simchasMincha: {
-        plain: 'מנחה on שמחת תורה: straight after מוסף, and again twenty two minutes before שקיעה.',
-        exact: 'The first has no clock time. The second is that day\'s שקיעה less 22 minutes.',
+        plain: 'מנחה on שמחת תורה: straight after מוסף, and again twenty minutes before שקיעה.',
+        exact: 'The first has no clock time. The second is that day\'s שקיעה less 20 minutes. It was 22, which is what the sheets this was ported from print; the shul asked for twenty.',
       },
       shabbosCandles: {
         plain: 'הדלקת נרות before a Shabbos on this sheet, worked exactly as the board works it.',
@@ -615,10 +619,6 @@ const POSTER_SHEETS = [
         plain: 'The שמחת בית השואבה at the Rav\'s house, on the night of the second day. Announced rather than worked out: 10:00.',
         exact: 'Not calculated. It is on this sheet under יום ב\', which is the night it is on, and has a sheet of its own as well.',
       },
-      shuavaWhere: {
-        plain: 'Where the שמחת בית השואבה is, on the line under it.',
-        exact: 'Not calculated.',
-      },
       mishna: {
         plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with.',
         exact: 'Not calculated.',
@@ -640,8 +640,8 @@ const POSTER_SHEETS = [
         exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, so a change in Settings reaches all three at once.',
       },
       afterMincha: {
-        plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40 for as long as a מנין still lands a quarter of an hour before שקיעה, and one more squeezed in behind it where there is room.',
-        exact: 'The same rule as the schedule after יום כיפור, which is where it is worked, asked of this week\'s own days: from the first weekday after שמחת תורה to the Thursday of that same week, Friday and Shabbos keeping schedules of their own, and stopping where the clocks go back. The 1:15 moves to 1:20, or comes off, against the latest מנחה גדולה of those days, and the end of the run is set by their earliest שקיעה. One week, which is the week the wall chart gives this schedule to, and short enough to hold: these days lose about a minute and a half of daylight each, so a list set by a month of them would print a last מנחה half an hour early on the first of them. Everything is למטה except the 1:50.',
+        plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40, and last a מנין a quarter of an hour before שקיעה on a round five.',
+        exact: 'The same rule as the schedule after יום כיפור, which is where it is worked, asked of this week\'s own days: from the first weekday after שמחת תורה to the Thursday of that same week, Friday and Shabbos keeping schedules of their own, and stopping where the clocks go back. The 1:15 moves to 1:20, or comes off, against the latest מנחה גדולה of those days. The last מנין is their earliest שקיעה less 15 minutes taken down to the last 5, which the shul asked for and which is how the חול המועד run above it on the same sheet already ends: a twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them one goes back in. The schedule after יום כיפור closes its own list the other way, wherever the twenty minute run stops. One week, which is the week the wall chart gives this schedule to, and short enough to hold: these days lose about a minute and a half of daylight each, so a list set by a month of them would print a last מנחה half an hour early on the first of them. Everything is למטה except the 1:50.',
       },
       afterMaariv: {
         plain: 'The evening of that week: a first מנין at 7:30, or later where 7:30 would fall inside fifty minutes of שקיעה, then the top and the bottom of every hour to 12:00 with the 8:45 among them.',

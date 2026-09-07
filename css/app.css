@@ -3310,7 +3310,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   --op-band: #f4efe3;
   --op-rule: #b99a55;
   --op-hair: #e2dccc;
-  padding: 0.42in 0.5in 0.42in;
+  /* Half an inch all round, which the shul asked for. It was 0.42in top and bottom against
+     0.5in at the sides, so this is the top and the foot coming in by five hundredths of an
+     inch each and the sides staying where they are. That is a tenth of an inch off the room
+     the type is fitted into, which fitOnePage spends by taking the size down a step where a
+     year needs it to. */
+  padding: 0.5in;
 }
 /* The two rules that make the frame, off. They are a ::before and a ::after on .poster, so
    there is nothing to unset: the content property is what draws them. */

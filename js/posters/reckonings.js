@@ -22,6 +22,8 @@
 // other: on ס"ז ק"ש the מ"א is the earlier and on ט' שעות it is the later, so a reader
 // meeting both on one sheet had to work out for each row which side was which.
 
+import * as Z from '../zmanim/zmanim.js';
+
 /** The two reckonings, spelled the way the boards spell them. */
 export const RECKONING_MGA = 'מ"א';
 export const RECKONING_GRA = 'גר"א';
@@ -35,4 +37,22 @@ export function twoReckonings(mga, gra) {
     { at: mga, name: RECKONING_MGA },
     { at: gra, name: RECKONING_GRA },
   ].sort((a, b) => a.at - b.at);
+}
+
+/** Nine seasonal hours into the day, on each of the two reckonings: the גר"א day runs sunrise
+ *  to sunset, the מ"א day עלות 72 to צאת 72.
+ *
+ *  Here rather than in either sheet that prints it. It is on ראש השנה, where a first day that
+ *  is Shabbos prints it in place of the שופר times, and on סוכות, where every Shabbos of the
+ *  festival carries it. Two copies of a זמן is two things to keep the same, and this file is
+ *  already where a זמן answered on both reckonings lives. */
+export function nineHours(date, settings) {
+  const gra = Z.sunriseElev(date, settings);
+  const graEnd = Z.sunsetElev(date, settings);
+  const mga = Z.alos72(date, settings);
+  const mgaEnd = Z.tzais72(date, settings);
+  return {
+    gra: gra + 9 * (graEnd - gra) / 12,
+    mga: mga + 9 * (mgaEnd - mga) / 12,
+  };
 }

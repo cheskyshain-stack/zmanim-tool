@@ -145,11 +145,35 @@ export function afterYomKippurDays(rh, settings) {
  *  where it does it moves to 1:20, or comes off the sheet where even that is too early. That
  *  is openingMincha in posters/early-mincha.js, which the סוכות sheet asks the same question
  *  of. The binding day is the latest מנחה גדולה of the run, since one printed list has to hold
- *  for all four days, the same way the earliest שקיעה binds the evening ones. */
-export function afterMincha(earliestShkia, latestMinchaGedola = 0) {
+ *  for all four days, the same way the earliest שקיעה binds the evening ones.
+ *
+ *  `lastFifteen` closes the list differently, and the schedule that starts after סוכות is the
+ *  one that asks for it: a last מנין a quarter of an hour before שקיעה, on a round five, rather
+ *  than wherever the twenty minute run happens to stop. The shul asked for that end explicitly
+ *  and this is the same rule the חול המועד run above it already prints (sukkosChmMincha in
+ *  posters/sukkos.js): the run stops short of it by a quarter of an hour, and where that leaves
+ *  more than twenty minutes with nothing in them one מנין goes back in.
+ */
+export function afterMincha(earliestShkia, latestMinchaGedola = 0, { lastFifteen = false } = {}) {
   const first = openingMincha(latestMinchaGedola, at(13, 35));
   const times = [at(13, 35), at(13, 50), at(16, 15)];
   if (first !== null) times.unshift(first);
+  if (lastFifteen) {
+    // Down to the last five rather than up: a quarter of an hour before שקיעה is the latest
+    // this מנין may be, and rounding up would push it past that.
+    const end = Math.floor((earliestShkia - 15 * YK_MIN) * 288 + 1e-9) / 288;
+    for (let t = at(16, 40); t <= end + 1e-9; t += 20 * YK_MIN) {
+      if (end - t >= 15 * YK_MIN - 1e-9) times.push(t);
+    }
+    const before = times[times.length - 1];
+    if (end - before > 20 * YK_MIN + 1e-9) {
+      const fill = [20, 15].map((m) => end - m * YK_MIN)
+        .find((t) => t - before >= 15 * YK_MIN - 1e-9);
+      if (fill !== undefined) times.push(fill);
+    }
+    times.push(end);
+    return times;
+  }
   for (let t = at(16, 40); t <= earliestShkia - 15 * YK_MIN + 1e-9; t += 20 * YK_MIN) times.push(t);
   const last = times[times.length - 1];
   const tail = ykNear5(earliestShkia - 17 * YK_MIN); // the middle of the 15 to 20 window
@@ -188,12 +212,12 @@ const AFTER_MAARIV_REST = [
  *  one place is the only way the two can be relied on to stay the same, which is the same
  *  ground the opening מנין itself is shared on (posters/early-mincha.js). What differs between
  *  them is only which days are counted, and each sheet answers that for itself. */
-export function afterSchedule(earliestShkia, latestMinchaGedola, settings) {
+export function afterSchedule(earliestShkia, latestMinchaGedola, settings, { lastFifteen = false } = {}) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
   return {
     shacharis: everydayShacharis(settings),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
-    mincha: afterMincha(earliestShkia, latestMinchaGedola)
+    mincha: afterMincha(earliestShkia, latestMinchaGedola, { lastFifteen })
       .map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
     maariv: [tm(afterEarlyMaariv(earliestShkia), true),
       ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],

@@ -1512,7 +1512,7 @@ const OP_STEP = 0.01;
  *  pixels and could not be compared with the box it has to fit.
  *
  *  `groups` is one entry per block: the element it lives in, its heading, and its rows. */
-function splitColumns(cols, groups) {
+function splitColumns(cols, groups, atDayOnly = false) {
   // Everything back where it started, its rows first and then the box that carried them, so a
   // block that was cut last time is one block again before anything is measured.
   for (const g of groups) {
@@ -1538,6 +1538,10 @@ function splitColumns(cols, groups) {
     if (items[k - 1].head) continue;
     // And never between a row and the one it belongs to: see keepUpAttr.
     if (items[k].el.dataset?.keepUp) continue;
+    // Asked to break at a day, the only cuts on offer are the headings: the second column then
+    // opens on a day rather than on the rest of one. Fewer places to cut, so the two columns
+    // come out further apart, which is the trade the switch is there to let somebody make.
+    if (atDayOnly && !items[k].head) continue;
     const m = Math.max(top[k] - top[0], end - top[k]);
     if (m < worst) { worst = m; at = k; }
   }
@@ -1599,7 +1603,7 @@ function fitOnePage(container) {
       rows: [...box.querySelectorAll(':scope > .onepage-row')],
       carried: null,
     })));
-    const layout = () => splitColumns(col, groups);
+    const layout = () => splitColumns(col, groups, chosenBreak === 'day');
     const fits = () => layout() <= cols.clientHeight - OP_ROOM;
     // Cleared before the search, not after it: this runs again when a phone is turned, and a
     // gap left over from the last pass would be part of what the type is fitted against.
@@ -1827,6 +1831,7 @@ function recallBar() {
     // who left the tab on the run comes back to it rather than to a single sheet.
     else if (typeof saved.all === 'boolean') chosenSheets = saved.all ? (saved.onePage ? 'all' : 'each') : 'one';
     if (typeof saved.combined === 'boolean') chosenCombined = saved.combined;
+    if (saved.brk === 'even' || saved.brk === 'day') chosenBreak = saved.brk;
     if (saved.orientation === 'portrait' || saved.orientation === 'landscape') {
       chosenOrientation = saved.orientation;
     }
@@ -1839,7 +1844,7 @@ function rememberBar() {
   try {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
-      combined: chosenCombined, orientation: chosenOrientation,
+      combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -1852,6 +1857,14 @@ function rememberBar() {
    in the address: the orientation is there because it decides what paper comes out, and this
    only decides how many sheets. */
 let chosenCombined = false;
+/* Where the one-page sheet's second column is allowed to start.
+   'even' cuts wherever the two columns come closest to level, which can fall inside a day: the
+   rest of that day carries over to the head of the second column with no heading on it, since
+   writing the name twice would read as two days. 'day' only ever cuts between one day and the
+   next, so a day is never split, and the columns end wherever the days happen to leave them.
+   Even by default, which is what the sheet has always done. Only the one-page sheet reads it:
+   the סוכות poster's own two columns are fitted by fitSukkos and are left as they were. */
+let chosenBreak = 'even';
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -2061,6 +2074,12 @@ export function renderPosters(container, state, routeChanged, tables) {
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
+      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
+        // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
+        // and "Start at a day" both sit inside that where a sentence would not.
+        { value: 'even', label: 'Split evenly', on: chosenBreak === 'even' },
+        { value: 'day', label: 'Start at a day', on: chosenBreak === 'day' },
+      ])}</div>` : ''}
       ${!empty && showAll && !onePage && hasCombined ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
         { value: 'no', label: 'Leave out', on: !chosenCombined },
         { value: 'yes', label: 'Include', on: chosenCombined },
@@ -2139,6 +2158,11 @@ export function renderPosters(container, state, routeChanged, tables) {
     chosenOrientation = value;
     rememberBar();
     onRoute?.();
+    again();
+  });
+  wireSwitch(container, 'poster-break', (value) => {
+    chosenBreak = value === 'day' ? 'day' : 'even';
+    rememberBar();
     again();
   });
   wireSwitch(container, 'poster-combined', (value) => {

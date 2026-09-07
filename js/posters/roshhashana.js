@@ -17,7 +17,7 @@ import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
-import { twoReckonings } from './reckonings.js';
+import { twoReckonings, nineHours } from './reckonings.js';
 
 const RH_MIN = 1 / 1440;
 const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -31,19 +31,9 @@ const toNearest5 = (t) => Math.round(t * 288) / 288;
 /** Down to the last 5 minutes, which is how the afternoon מנחה is set. */
 const downTo5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
 
-/** Nine seasonal hours into the day, on each of the two reckonings the boards use: the
- *  גר"א day runs sunrise to sunset, the מ"א day עלות 72 to צאת 72. Only printed on a first
- *  day that is Shabbos, where it stands in for the שופר times. */
-function nineHours(date, settings) {
-  const gra = Z.sunriseElev(date, settings);
-  const graEnd = Z.sunsetElev(date, settings);
-  const mga = Z.alos72(date, settings);
-  const mgaEnd = Z.tzais72(date, settings);
-  return {
-    gra: gra + 9 * (graEnd - gra) / 12,
-    mga: mga + 9 * (mgaEnd - mga) / 12,
-  };
-}
+/* ט' שעות is in posters/reckonings.js, beside the ס"ז ק"ש it is set the same way as. On this
+   sheet it is printed only on a first day that is Shabbos, where it stands in for the שופר
+   times; the סוכות sheet prints it on every Shabbos of the festival. */
 
 /** The lines that are wording rather than arithmetic, and the times the shul sets by hand.
  *
