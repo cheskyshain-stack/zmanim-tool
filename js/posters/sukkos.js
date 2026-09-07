@@ -14,7 +14,7 @@
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js';
+import { formatTime, floorToMinute, ceilToMinute, roundToMinute, UL_START } from '../format.js';
 import { SLASH } from '../util.js';
 import { buildChorefRow } from '../sheets/choref.js';
 import { parseTimes } from './slichos.js';
@@ -181,13 +181,20 @@ const skRoundPrinted = (t) => Math.round(t * 1440) / 1440;
  *  day's own שקיעה.
  *
  *  2:00 whatever day of the week it is, and on a day that falls on Shabbos an earlier מנין in
- *  front of it as well: `early`. That is 1:15, moved to 1:20 or dropped altogether where מנחה
- *  גדולה is later, the same openingMincha every other afternoon on this sheet opens with, and
- *  it is what the תשפ"ד sheet prints on both of its Shabbos days. The shul asked for the 2:00
- *  alone for a while and has asked for the early מנין back.
+ *  front of it as well: `early`. The shul asked for the 2:00 alone for a while and has asked
+ *  for the early מנין back.
  *
- *  In the main בית מדרש, not למטה, which is how it was printed before and how the wall chart
- *  sets a Shabbos afternoon's first מנין.
+ *  That one is מנחה גדולה itself, put up to the whole minute, and not a round five. Every
+ *  other early מנחה on this sheet is announced at 1:15 or 1:20 (openingMincha), and the shul
+ *  asked for this one to be the זמן: it is the מנין that is there so a Shabbos afternoon can
+ *  start as early as it is allowed to, so a rounded 1:20 would give away the four or five
+ *  minutes it exists for. Up rather than to the nearest, which is what לחומרא means here: at
+ *  1:20 and 24 seconds the מנין is 1:21, never 1:20, so the printed minute is never one the
+ *  זמן has not reached.
+ *
+ *  למטה, like the מנין the ערב יום טוב afternoons open with. It was in the main בית מדרש when
+ *  this was first put back, which is how the sheet printed it years ago; the shul says it is
+ *  downstairs.
  *
  *  Only the days that are Shabbos take it. A weekday יום טוב afternoon still opens at 2:00,
  *  and in practice that is יום ב', which can never be Shabbos: 16 תשרי falls on a Sunday,
@@ -196,10 +203,7 @@ const skRoundPrinted = (t) => Math.round(t * 1440) / 1440;
 function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false, early = false } = {}) {
   const last = skRoundPrinted(skShkia(serial, settings) - 30 * SK_MIN);
   const out = [];
-  if (early) {
-    const first = openingMincha(skMinchaGedola(serial, settings), skAt(14, 0));
-    if (first !== null) out.push({ t: first });
-  }
+  if (early) out.push({ t: ceilToMinute(skMinchaGedola(serial, settings)), u: true });
   out.push({ t: skAt(14, 0) });
   if (five) out.push({ t: skAt(17, 30), u: true });
   else {
