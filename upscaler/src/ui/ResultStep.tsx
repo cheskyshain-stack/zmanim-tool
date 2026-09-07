@@ -121,8 +121,10 @@ export function ResultStep({
       {blob.size > 400 * 1024 * 1024 && (
         <Note tone="warn">
           This file is {formatBytes(blob.size)}. Some phones struggle to save a file that
-          large from the browser. If the download stalls, try TIFF (usually smaller than
-          PNG on photographic images) or a lower DPI.
+          large from the browser. If the download stalls, drop to 150 or 200 DPI, which
+          for a banner this size is normally invisible from viewing distance and is a
+          quarter to a half of the pixels. JPEG at quality 95 is far smaller again, at
+          the cost of being lossy.
         </Note>
       )}
 

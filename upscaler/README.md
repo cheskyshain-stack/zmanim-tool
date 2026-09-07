@@ -203,7 +203,8 @@ reads back as 299.9994. That is the format, not a bug.)
 **TIFF** writes Deflate compressed strips with a horizontal differencing predictor, the
 DPI in the resolution tags, and a real 588 byte sRGB ICC profile embedded, because TIFF
 has no "this is sRGB" flag the way PNG does. This is usually what a large format print
-shop asks for.
+shop asks for. It is not smaller than PNG on photographic content, and is not meant to
+be: both are lossless, so the choice between them is about what the printer wants.
 
 **JPEG** is a baseline encoder at **4:4:4**, so chroma is kept at full resolution.
 Ordinary photo JPEG throws away three quarters of the colour detail; on a print somebody
@@ -334,9 +335,22 @@ Two things dominate:
 
 ### Measured numbers
 
-These come from `npm run test:browser` in this repository's environment, which has
+All of these come from the test suite, so they can be rechecked rather than taken on
+trust. They come from this repository's environment, which has
 **no GPU at all**: TensorFlow.js falls back to WebGL rendered in software by SwiftShader,
 which is a CPU rasteriser. Treat them as a floor rather than a forecast.
+
+Whole jobs, end to end, from `npm run test:browser`:
+
+| Job | Time |
+|:--|--:|
+| 28,800 x 10,800 PNG (311 MP), resize and encode, 48 MB budget | 121 s, 128 MB |
+| 8192 x 3072 (25 MP) with one 4x pass, PNG | 76 s, 13.9 MB |
+| the same, TIFF | 59 s, 15.9 MB |
+| the same, JPEG quality 95 | 54 s, 3.8 MB |
+
+The first row is the one that matters: that is the flagship print size, produced inside
+a memory budget a phone would get, on a machine with no GPU.
 
 Network throughput, in output pixels per second:
 
@@ -354,9 +368,12 @@ Everything after the network, on the same machine's CPU, at 8 megapixels:
 | TIFF, deflate 6, predictor | 6.2 MP/s | 0.8 MB |
 | JPEG, quality 95, 4:4:4 | 5.6 MP/s | 16.3 MB |
 
-Two things are worth reading off that. The encoders are not the bottleneck even on a
-CPU, and lossless TIFF came out **four times smaller than PNG** on this content, which
-is why it is worth trying if a PNG will not save on a phone.
+The encoders are not the bottleneck even on a CPU, which is the main thing to read off
+that table. Do not read a file size comparison off it, though: that synthetic pattern
+compresses very differently from a photograph. On the real 25 megapixel export the test
+suite runs, the same three encoders produce **13.9 MB of PNG, 15.9 MB of TIFF and 3.8 MB
+of JPEG**, so PNG and TIFF land close together with PNG slightly ahead. Choose TIFF
+because your print shop asks for it, not because it will be smaller.
 
 I am not going to put a phone number in this table that I have not measured. A GPU is
 a completely different machine for this workload, and rather than guess by how much,
@@ -540,7 +557,7 @@ upscaler/
 
 Worth knowing before you rely on it.
 
-- **Four AI passes maximum**, so 256x at the very most and in practice 64x. Beyond that
+- **Four AI passes maximum**, so 256x at the very most, from four 4x passes. Beyond that
   the planner says so plainly and lets Lanczos cover the remainder rather than quietly
   producing something soft.
 - **TIFF is capped at 4 GB** by the format's 32 bit offsets. The encoder refuses with a
@@ -548,10 +565,11 @@ Worth knowing before you rely on it.
 - **JPEG is 4:4:4 baseline**, not progressive and not 12 bit.
 - **sRGB only.** No CMYK and no custom ICC profiles; colour separation is the printer's
   job and they will want to do it themselves.
-- **Intermediates between cached passes are stored as bytes, not floats.** That is a
-  4x memory saving for a maximum difference of a few levels out of 255 in the final
-  file, which the test suite measures. It is the right trade on a phone, and it is the
-  reason a 300 megapixel job fits at all.
+- **Intermediates between cached passes are stored as bytes, not floats.** The test
+  suite measures what that costs on a two pass job with medium sharpening: a maximum
+  difference of 6 levels out of 255 on the worst pixel, and a mean of 0.23, spread
+  evenly rather than collecting anywhere. For a 4x memory saving that is the right trade
+  on a phone, and it is the reason a 300 megapixel job fits at all.
 - **Leaving the browser can suspend a long job on a phone.** The app says so on the
   progress screen. There is no way around this from a web page.
 - **A device reporting 2 GB or less streams every pass**, including the first, rather
