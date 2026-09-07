@@ -3399,6 +3399,31 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   border-bottom: 0.5pt solid var(--op-hair);
   font-size: calc(9.5pt * var(--op-scale)); line-height: 1.2;
 }
+/* A row whose times run to two or three lines gets more air around it than a one-line row.
+ *
+ * A row of one line is a name and a time with a hairline under it, and the hairline is enough
+ * to say where it ends. A row of three is a block of type, and where two or three of them come
+ * one after another, which is most of what a שחרית, a מנחה and a מעריב are on this sheet, the
+ * hairline alone leaves the reader working out which lines belong to which תפילה: the last line
+ * of מנחה and the first of מעריב sit as close together as the three lines of מנחה do.
+ *
+ * Padding rather than a margin, because the hairline is the row's own border: spaced with
+ * margins the rules would come away from the rows and float in the gaps. On both sides rather
+ * than below, which keeps the hairline in the middle of the space between two such rows instead
+ * of hard against the one under it.
+ *
+ * Not on the last row of a block: what follows it is the next block's heading, which brings its
+ * own air, or the foot of the column. Scaled with the type, like the leading inside a cut run.
+ *
+ * :has() is what makes it possible to ask "does this row hold a cut run" from CSS at all. The
+ * cut is made after the sheet is drawn (balanceOnePageTimes) and the fit runs after that, so by
+ * the time anything is measured the second line is really there. */
+.onepage-row:has(.onepage-line + .onepage-line) {
+  padding-block: calc(0.014in + 0.035in * var(--op-scale) + var(--op-gap, 0px) / 2);
+}
+.onepage-sec > .onepage-row:last-child:has(.onepage-line + .onepage-line) {
+  padding-bottom: calc(0.014in + var(--op-gap, 0px) / 2);
+}
 /* A column at a time, because the two rarely have the same amount left over: one is what the
    type was fitted against and fills, and the other is whatever was left after the blocks were
    handed out. One number for both meant the tighter column decided it and the looser one kept
