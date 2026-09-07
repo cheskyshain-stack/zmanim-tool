@@ -646,6 +646,15 @@ function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Whether two שחרית schedules say different things, whatever tags or separators they were
+ *  typed with. Used to drop a season line that only repeats the everyday one: the morning of
+ *  יום א' of סליחות is the ordinary list, its סליחות having been said the night before, and
+ *  printing it again under its own heading says nothing the line above it did not. */
+function differsFromSchedule(a, b) {
+  const bare = (v) => String(v ?? '').replace(/<[^>]*>/g, '').replace(/[\s,/]+/g, ' ').trim();
+  return bare(a) !== bare(b);
+}
+
 // ==== zmanim/solar.js ====
 // Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
@@ -1404,6 +1413,7 @@ function twoReckonings(mga, gra) {
 // is written in the app's system, so somebody holding the poster and the chart is reading
 // one set of marks.
 
+
 /** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
 const DOW_SUNDAY = 1;
 const DOW_MONDAY = 2;
@@ -1550,14 +1560,16 @@ function slichosMornings(hebrewYearNum) {
 
   // The first night and the first morning, both on the Sunday: 12:55 is after midnight, so
   // it belongs to the day the sheet calls יום א' rather than to the Shabbos behind it.
-  out.push({ serial: start, name: SLICHOS_TEXT.title, times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
-  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
+  out.push({ serial: start, name: SLICHOS_TEXT.title, night: true, from: 'סליחות מוצ"ש',
+    times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
+  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, from: "שחרית יום א' (no סליחות)",
+    times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
 
   // Every סליחות morning after it, up to but not including ערב ר"ה, which has its own sheet.
   const daily = rowNamed('סליחות');
   for (let d = start + 1; d < erev; d++) {
     if (excelWeekday(d) === DOW_SHABBOS) continue;
-    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(daily, d) });
+    out.push({ serial: d, name: SLICHOS_TEXT.title, from: daily.label, times: timesOn(daily, d) });
   }
 
   // עשי"ת: 3 to 8 תשרי, less Shabbos and less צום גדליה. The same range posterDays works out
@@ -1566,9 +1578,54 @@ function slichosMornings(hebrewYearNum) {
   for (let n = 3; n <= 8; n++) {
     const d = rh + n - 1;
     if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    out.push({ serial: d, name: SLICHOS_TEXT.title, times: timesOn(aseres, d) });
+    out.push({ serial: d, name: SLICHOS_TEXT.title, from: aseres.label, times: timesOn(aseres, d) });
   }
   return out;
+}
+
+/** The mornings of one week that the סליחות sheet, rather than the Weekday chart, decides.
+ *
+ *  A week card and the week on one sheet both print the שחרית out of Settings, which is the
+ *  ordinary morning. Through this season it is not the ordinary morning: from the first
+ *  סליחות to יום כיפור the shul opens earlier and on a different list, and that list was on the
+ *  סליחות sheet and nowhere else. So the week of ר"ה was telling the congregation 7:00 when the
+ *  shul was opening at 6:40.
+ *
+ *  One line per schedule, which is the rule the card already keeps for ר"ח and בה"ב: the days
+ *  of the week that run the same list read as one line naming them all. That splits what the
+ *  sheet writes as one line and a bracket, "6:40 ... (יום ב' וה' 6:35)", into the two lists it
+ *  means, and it has to: the card counts the times in a line to decide where to break it, and
+ *  the 6:35 inside that bracket counted as one, so the break landed inside the bracket and put
+ *  a slash in it. Two plain lines cannot be misread and cannot be mis-broken.
+ *
+ *  ערב ר"ה, צום גדליה and ערב יו"כ are not here, and neither is the first night's 12:55. The
+ *  three days have sheets of their own, whole, and the 12:55 is a night rather than a morning.
+ *  slichosMornings leaves the days out and marks the night; this drops the night.
+ *
+ *  Both years are asked, because a week in אלול belongs to the ר"ה coming and a week in תשרי to
+ *  the one just gone. */
+function slichosWeekLines(shabbosSerial, settings) {
+  const year = hebrewDateExtended(shabbosSerial, settings?.useGregorianBefore1582).year;
+  const mornings = new Map();
+  for (const y of [year, year + 1]) {
+    for (const m of slichosMornings(y)) if (!m.night) mornings.set(m.serial, m);
+  }
+  /** A list of times back as the card and the sheet write a cell: <u> for למטה, the stars
+   *  kept. Also what one schedule is told from another by, so it is the whole of the key. */
+  const asCell = (times) => times
+    .map((t) => (t.underlined ? `<u>${t.text}</u>` : t.text) + t.mark)
+    .join(', ');
+  const groups = new Map();
+  for (let offset = 6; offset >= 1; offset -= 1) {
+    const serial = shabbosSerial - offset;
+    const m = mornings.get(serial);
+    if (!m) continue;
+    const html = asCell(m.times);
+    const key = `${m.name}|${html}`;
+    if (!groups.has(key)) groups.set(key, { name: m.name, html, days: [] });
+    groups.get(key).days.push(DAY_NAMES[6 - offset]);
+  }
+  return [...groups.values()].map((g) => ({ name: g.name, day: g.days.join(', '), html: g.html }));
 }
 
 /** One line's times, split into the pieces the poster draws.
@@ -11605,6 +11662,7 @@ function showToast(message) {
 
 
 
+
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
 const SHEET_FONT = 'Times New Roman';
@@ -11788,6 +11846,14 @@ function weekSpecialShacharis(showing, state, settings) {
   const days = specialDaysInWeek(showing, settings);
   const name = (d) => `שחרית ${d.name}`;
   const out = [];
+  /* The יומים נוראים season first, which decides the morning outright rather than adding a day
+     to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,
+     and that list is on the סליחות sheet. One line per schedule, and a line that only repeats
+     the everyday שחרית dropped. */
+  for (const g of slichosWeekLines(showing, settings)) {
+    if (!differsFromSchedule(g.html, state.settings.weekdayShacharis)) continue;
+    out.push({ label: g.name, html: g.html, days: `(${g.day})` });
+  }
   for (const d of days.filter((x) => x.fast)) {
     out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
   }
@@ -12075,6 +12141,7 @@ function fitWeekSheet(container) {
 
 
 
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -12082,6 +12149,7 @@ function fitWeekSheet(container) {
  *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
+
 
 
 /** Which of a week's two cards comes first: the שבת page or the חול page.
@@ -13225,6 +13293,23 @@ function weekCardsHtml(showing, index, state, settings) {
     // labelled with which day it is rather than the chart's catch-all heading. It goes
     // directly after the everyday schedule, not before it: most of the week still runs
     // on the regular times, so those are what should be read first.
+    /* The יומים נוראים season, which decides the morning outright rather than adding a day to
+       it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
+       and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
+       through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
+       below keep, and ahead of them, being the bigger departure from the everyday times. */
+    const season = slichosWeekLines(showing, settings)
+      .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
+    if (season.length) {
+      parts.splice(1, 0, ...season.map((g) => line(
+        '',
+        htmlLines(g.html),
+        true, false,
+        `${weekEsc(g.name)}<br><span class="week-days" dir="ltr">(${weekEsc(g.day)})</span>`,
+        true
+      )));
+    }
+
     const special = specialDaysInWeek(showing, settings);
     if (special.length) {
       // The day names go on their own line, in their own direction. Run together with

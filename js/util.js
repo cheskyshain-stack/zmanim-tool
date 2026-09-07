@@ -129,3 +129,12 @@ export function escAttr(str) {
 export function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+/** Whether two שחרית schedules say different things, whatever tags or separators they were
+ *  typed with. Used to drop a season line that only repeats the everyday one: the morning of
+ *  יום א' of סליחות is the ordinary list, its סליחות having been said the night before, and
+ *  printing it again under its own heading says nothing the line above it did not. */
+export function differsFromSchedule(a, b) {
+  const bare = (v) => String(v ?? '').replace(/<[^>]*>/g, '').replace(/[\s,/]+/g, ' ').trim();
+  return bare(a) !== bare(b);
+}

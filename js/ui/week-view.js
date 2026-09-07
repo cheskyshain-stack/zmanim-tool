@@ -13,6 +13,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { TZG_TEXT } from '../posters/tzomgedalia.js';
+import { slichosWeekLines } from '../posters/slichos.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
@@ -20,7 +21,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInW
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, differsFromSchedule } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
@@ -40,6 +41,7 @@ import { chartSpreads } from './chart-view.js';
  *  it, so this walks Sunday through Friday. Yom Kippur and Tisha B'Av are skipped: those
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
+
 
 
 /** Which of a week's two cards comes first: the שבת page or the חול page.
@@ -1183,6 +1185,23 @@ function weekCardsHtml(showing, index, state, settings) {
     // labelled with which day it is rather than the chart's catch-all heading. It goes
     // directly after the everyday schedule, not before it: most of the week still runs
     // on the regular times, so those are what should be read first.
+    /* The יומים נוראים season, which decides the morning outright rather than adding a day to
+       it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
+       and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
+       through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
+       below keep, and ahead of them, being the bigger departure from the everyday times. */
+    const season = slichosWeekLines(showing, settings)
+      .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
+    if (season.length) {
+      parts.splice(1, 0, ...season.map((g) => line(
+        '',
+        htmlLines(g.html),
+        true, false,
+        `${weekEsc(g.name)}<br><span class="week-days" dir="ltr">(${weekEsc(g.day)})</span>`,
+        true
+      )));
+    }
+
     const special = specialDaysInWeek(showing, settings);
     if (special.length) {
       // The day names go on their own line, in their own direction. Run together with

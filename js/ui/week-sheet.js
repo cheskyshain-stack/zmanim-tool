@@ -32,7 +32,8 @@ import { buildWeekdayRow } from '../sheets/weekday.js';
 import { UL_START, UL_END } from '../format.js';
 import { specialDaysInWeek } from '../hebrew-calendar.js';
 import { TZG_TEXT } from '../posters/tzomgedalia.js';
-import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
+import { slichosWeekLines } from '../posters/slichos.js';
+import { hebrewLang, escAttr, SOFT_SLASH, differsFromSchedule } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
 
 /** The same face the posters are set in, for the same reason: a sheet is its own document
@@ -218,6 +219,14 @@ function weekSpecialShacharis(showing, state, settings) {
   const days = specialDaysInWeek(showing, settings);
   const name = (d) => `שחרית ${d.name}`;
   const out = [];
+  /* The יומים נוראים season first, which decides the morning outright rather than adding a day
+     to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,
+     and that list is on the סליחות sheet. One line per schedule, and a line that only repeats
+     the everyday שחרית dropped. */
+  for (const g of slichosWeekLines(showing, settings)) {
+    if (!differsFromSchedule(g.html, state.settings.weekdayShacharis)) continue;
+    out.push({ label: g.name, html: g.html, days: `(${g.day})` });
+  }
   for (const d of days.filter((x) => x.fast)) {
     out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
   }
