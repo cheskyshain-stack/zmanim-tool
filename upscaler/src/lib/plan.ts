@@ -62,7 +62,16 @@ export interface PlanInput {
   mode: Mode
   /** Cap on AI work, used to keep a phone from accepting a job it cannot finish. */
   maxAiPixels?: number
+  /**
+   * Force a total enlargement instead of working one out. Null is the normal case and
+   * is what "Maximum Print Quality" uses. A forced factor is for when you want to see
+   * what 16x looks like on this image regardless of what the print needs.
+   */
+  forceFactor?: number | null
 }
+
+/** The factors the manual control offers, all reachable from 2x, 3x and 4x passes. */
+export const FORCED_FACTORS = [2, 4, 8, 16] as const
 
 export function planUpscale(input: PlanInput): UpscalePlan {
   const { cropWidth, cropHeight, targetWidth, targetHeight, mode } = input
@@ -88,6 +97,38 @@ export function planUpscale(input: PlanInput): UpscalePlan {
       intermediateWidth: width,
       intermediateHeight: height,
       notes,
+    }
+  }
+
+  if (input.forceFactor) {
+    const wanted = input.forceFactor
+    const exact = chains(mode.preferredScales)
+      .map((passes) => ({
+        passes: passes.map((p) => ({ ...p, family: mode.family })),
+        factor: passes.reduce((n, p) => n * p.scale, 1),
+      }))
+      .filter((c) => c.factor === wanted)
+    if (exact.length > 0) {
+      const order = new Map(mode.preferredScales.map((s, i) => [s, i]))
+      exact.sort((a, b) => {
+        const prefA = a.passes.reduce((n, p) => n + (order.get(p.scale) ?? 9), 0)
+        const prefB = b.passes.reduce((n, p) => n + (order.get(p.scale) ?? 9), 0)
+        return prefA - prefB || a.passes.length - b.passes.length
+      })
+      const forced = build(exact[0].passes)
+      if (forced.factor < required) {
+        notes.push(
+          `Forced to ${wanted}x, but this print needs ${required.toFixed(2)}x. Lanczos ` +
+            'covers the difference, so the result will be softer than choosing Auto.',
+        )
+      } else if (forced.factor > required * 2) {
+        notes.push(
+          `Forced to ${wanted}x where ${required.toFixed(2)}x would do. That is more ` +
+            'work than the print needs, though the extra downscale at the end does no ' +
+            'harm to the result.',
+        )
+      }
+      return forced
     }
   }
 
@@ -141,7 +182,7 @@ export function planUpscale(input: PlanInput): UpscalePlan {
     const affordable = candidates.find((c) => build(c.passes).aiPixels <= budget)
     if (affordable && affordable !== chosen) {
       chosen = affordable
-      notes.push('Pass count reduced to stay inside this device’s memory budget.')
+      notes.push('Pass count reduced to stay inside the memory budget for this device.')
     }
   }
 

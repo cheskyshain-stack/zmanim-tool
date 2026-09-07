@@ -1,6 +1,6 @@
 import { SHARPEN_LABEL, type SharpenLevel } from '../lib/enhance'
 import { MODES, type ModeId } from '../lib/models'
-import { describePasses, type UpscalePlan } from '../lib/plan'
+import { FORCED_FACTORS, describePasses, type UpscalePlan } from '../lib/plan'
 import { formatDuration } from '../lib/image'
 import type { Settings } from '../lib/storage'
 import type { ExportFormat } from '../worker/protocol'
@@ -67,6 +67,27 @@ export function EnhanceStep({
             )
           })}
         </div>
+      </Card>
+
+      <Card>
+        <Segmented
+          label="Enlargement"
+          columns={5}
+          value={settings.forceFactor ?? 0}
+          onChange={(value) => update({ forceFactor: value === 0 ? null : value })}
+          options={[
+            { value: 0, label: 'Auto' },
+            ...FORCED_FACTORS.map((factor) => ({
+              value: factor as number,
+              label: `${factor}x`,
+            })),
+          ]}
+        />
+        <p className="mt-2 text-sm text-ink-600 dark:text-paper-300">
+          Auto reaches the enlargement your print needs and stops there, which is both
+          the fastest option and the best looking one. Force a number if you want to see
+          what a particular amount does to this image.
+        </p>
       </Card>
 
       <Card>

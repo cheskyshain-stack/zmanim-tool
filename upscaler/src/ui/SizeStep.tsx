@@ -186,9 +186,9 @@ export function SizeStep({
           <Stat label="Print ratio" value={ratioLabel(target.pxWidth, target.pxHeight)} />
           <Stat
             label="Final pixels"
-            value={`${target.pxWidth.toLocaleString()} x ${target.pxHeight.toLocaleString()}`}
+            value={`${target.pxWidth.toLocaleString()} x ${target.pxHeight.toLocaleString()} (${target.megapixels.toFixed(1)} MP)`}
+            wide
           />
-          <Stat label="That is" value={`${target.megapixels.toFixed(1)} MP`} />
           <Stat
             label="Your image today"
             value={`${assessment.effectiveDpi.toFixed(0)} DPI`}

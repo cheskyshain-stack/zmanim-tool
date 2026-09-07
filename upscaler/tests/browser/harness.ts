@@ -1,7 +1,7 @@
 // Test harness page. Playwright loads it and calls window.__run(name). Everything runs
 // in a real browser against the real WebGL backend, because the whole point is to check
 // what the models and the streaming loop actually do rather than what they should do.
-import { initBackend, loadModel, upscaleBuffer, currentBackend } from '../../src/worker/engine'
+import { benchmark, initBackend, loadModel, upscaleBuffer, currentBackend } from '../../src/worker/engine'
 import { runRender, rgbaToFloatRgb } from '../../src/worker/pipeline'
 import { resampleImage, CHANNELS } from '../../src/lib/lanczos'
 import type { RenderRequest, Tuning } from '../../src/worker/protocol'
@@ -416,9 +416,29 @@ async function testReferenceOutput() {
   return out
 }
 
+
+/**
+ * Measures what this machine actually sustains, so the README can quote a number rather
+ * than an adjective. Reported in output pixels per second, which is the unit the
+ * planner's aiPixels counts in, so the two multiply straight into a time.
+ */
+async function testThroughput() {
+  await initBackend()
+  const out: Record<string, unknown> = { backend: currentBackend() }
+  for (const family of ['esrgan-slim', 'esrgan-medium'] as const) {
+    for (const scale of [2, 4] as const) {
+      const model = await loadModel(BASE, family, scale)
+      const rate = await benchmark(model, scale, 96)
+      out[`${family}-x${scale}`] = Math.round(rate)
+    }
+  }
+  return out
+}
+
 const TESTS: Record<string, () => Promise<unknown>> = {
   superResolution: testSuperResolution,
   referenceOutput: testReferenceOutput,
+  throughput: testThroughput,
   tileInvariance: testTileInvariance,
   bandInvariance: testBandInvariance,
   borders: testBorders,

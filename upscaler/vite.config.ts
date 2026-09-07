@@ -22,7 +22,16 @@ export default defineConfig({
           'Upscale images with AI and prepare them for very large format printing.',
         theme_color: '#0b1220',
         background_color: '#0b1220',
-        display: 'standalone',
+        // This pair is load bearing, not a leftover. Android reads display_override, so
+        // Chrome installs this as a real app: no browser chrome, and the launcher uses
+        // the maskable icon. Safari does not implement display_override and falls
+        // through to "browser", so an iPhone keeps opening it in Safari with the
+        // address bar. That is what we want there: saving a large file from a
+        // standalone web app on iOS is unreliable, and downloading the print file is
+        // the entire point. Collapsing these into a plain "standalone" would take
+        // downloads away from every iPhone that installs it.
+        display_override: ['standalone'],
+        display: 'browser',
         orientation: 'portrait',
         start_url: base,
         scope: base,

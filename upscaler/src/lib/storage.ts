@@ -21,6 +21,8 @@ export interface Settings {
   fit: FitMode
   borderColor: string
   modeId: ModeId
+  /** Null lets the planner choose. A number forces that total enlargement. */
+  forceFactor: number | null
   sharpen: SharpenLevel
   denoise: boolean
   deblock: boolean
@@ -43,6 +45,7 @@ export const DEFAULTS: Settings = {
   fit: 'cover',
   borderColor: '#ffffff',
   modeId: 'artwork',
+  forceFactor: null,
   sharpen: 'light',
   denoise: false,
   deblock: false,
@@ -98,8 +101,11 @@ export function deviceProfile(settings: Settings): DeviceProfile {
     // the test suite checks byte for byte.
     pad: 20,
     bandBudget: budgetMb * 1024 * 1024,
-    // Held as bytes, so three per pixel. Keeping a 25 megapixel intermediate whole costs
-    // 75 MB and saves recomputing the first pass once per band.
-    cacheBudget: Math.floor((budgetMb * 1024 * 1024) / 3 / 2),
+    // In pixels, held as bytes, so three bytes each. The flagship job's first pass
+    // produces 8192 x 3072, which is 25 MP and 75 MB: worth holding on anything with
+    // 4 GB or more, because recomputing it once per band costs far more than it saves.
+    // A smaller device falls back to streaming that pass too, which is slower but is
+    // the difference between a slow job and a failed one.
+    cacheBudget: Math.floor((budgetMb * 1024 * 1024) / 3),
   }
 }

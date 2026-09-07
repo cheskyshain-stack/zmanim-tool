@@ -67,6 +67,17 @@ const checks = [
       r.bottomRight.join() === '12,34,56' &&
       r.firstContent.join() !== '12,34,56',
   },
+  {
+    name: 'throughput',
+    describe: (r) =>
+      `${r.backend}: ` +
+      ['esrgan-slim-x2', 'esrgan-slim-x4', 'esrgan-medium-x2', 'esrgan-medium-x4']
+        .map((k) => `${k.replace('esrgan-', '')} ${(r[k] / 1e6).toFixed(2)} MP/s`)
+        .join(', '),
+    // Not a quality gate, just a floor that catches the backend silently falling back
+    // to something unusable.
+    pass: (r) => r['esrgan-slim-x4'] > 10_000,
+  },
   ...['largePng', 'largeTiff', 'largeJpeg'].map((name) => ({
     name,
     describe: (r) =>

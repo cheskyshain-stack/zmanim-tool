@@ -205,6 +205,16 @@ Separable Lanczos 3, in float, with the kernel widened by the shrink factor when
 shrinking so the downscale does not alias, and weights normalised per output sample so
 edge pixels do not darken.
 
+### A note on OffscreenCanvas
+
+There is not one in the pipeline, on purpose. A canvas is used exactly twice, both on
+the main thread: once to apply EXIF rotation, and once to read the cropped region out of
+the decoded bitmap. From that point on the worker holds raw typed arrays and never needs
+a drawing surface again, which is better than moving a canvas into the worker: it avoids
+the canvas size ceiling entirely, avoids Safari's patchier OffscreenCanvas support, and
+makes the whole pipeline testable in plain Node. `structuredClone` transfer of the pixel
+buffer is what crosses the thread boundary, and it is zero copy.
+
 ---
 
 ## What is AI here, and what is not
@@ -347,6 +357,15 @@ Open the deployed site and use **Add to Home screen** (Chrome's menu on Android,
 Share button on an iPhone). After that first visit the app, its code and all 10.7 MB of
 model weights are in the service worker cache, and it upscales with no network at all.
 
+The manifest carries **both** `display_override: ["standalone"]` and
+`display: "browser"`, and that pair is deliberate. Android reads `display_override`, so
+Chrome installs this as a real app with no browser chrome and the maskable icon on the
+launcher. Safari does not implement `display_override` and falls through to `browser`,
+so an iPhone keeps opening it in Safari with the address bar. That is the outcome we
+want there: saving a large file from a standalone web app on iOS is unreliable, and
+downloading the print file is the entire point. Collapsing the two into a plain
+`"standalone"` would take downloads away from every iPhone that installs it.
+
 Updates are picked up on the next launch rather than applied immediately, on purpose: a
 service worker swapping code out from under a job that has been running for half an hour
 would lose the job.
@@ -389,11 +408,20 @@ resize, the sharpening and all three encoders keep working untouched.
 ## Testing
 
 ```bash
-npm run test            # browser checks, then the full app end to end
-npm run test:browser    # models, tiling, band seams, borders, large exports
+npm run test            # logic, then browser, then the full app end to end
+npm run test:logic      # print maths, crops, planning, resampler, sharpener (under a second)
+npm run test:browser    # models, tiling, band seams, borders, throughput, large exports
 npm run test:app        # drives the built app in a 375 px browser
 npm run test:encoders   # PNG, TIFF and JPEG against Pillow (needs python + pillow)
 ```
+
+`test:logic` is pure functions and runs instantly, so it is the one to run while working.
+It checks the things a wrong number would silently ruin a print with: that 36" x 96" at
+300 DPI really is 28,800 x 10,800, that a 2048 x 768 source really needs 14.06x, that the
+planner reaches that with 16x and comes back down rather than up, that Artwork mode
+really does chain four 2x passes where High Detail uses two 4x, that Lanczos weights sum
+to one so edges do not darken, and that a strong sharpen on a hard edge does not overshoot
+into a halo.
 
 The browser checks need two fixtures in `tests/tmp/`, which is gitignored:
 
@@ -452,6 +480,7 @@ upscaler/
 │   ├── state/worker-client.ts
 │   └── ui/                    one component per step, plus the compare viewer
 └── tests/
+    ├── logic.test.mts         pure maths, runs in under a second
     ├── run-browser.mjs        model, tiling, band and export checks
     ├── run-app.mjs            end to end through the built app
     ├── browser/harness.ts     what those checks actually run
@@ -479,6 +508,15 @@ Worth knowing before you rely on it.
   reason a 300 megapixel job fits at all.
 - **Leaving the browser can suspend a long job on a phone.** The app says so on the
   progress screen. There is no way around this from a web page.
+- **A device reporting 2 GB or less streams every pass**, including the first, rather
+  than holding an intermediate. That is a lot of repeated work at the tile padding, so
+  those devices are noticeably slower. It is deliberate: slow beats out of memory, and
+  the progress screen switches to the rate the job is really achieving within the first
+  couple of percent, so the estimate corrects itself.
+- **Integer pixel counts can leave a rounding-sized aspect difference.** A crop is whole
+  pixels and so is a print, so a crop cannot always be the print's exact ratio. The
+  residual is under a tenth of a percent, far below anything a printer resolves, and the
+  app never stretches beyond it.
 - **The models are trained on DIV2K**, a photographic dataset. They are strong on
   texture, stone, foliage, fabric and architecture, and weaker on large flat areas of
   synthetic colour and on text, where Ultra Sharp mode helps.

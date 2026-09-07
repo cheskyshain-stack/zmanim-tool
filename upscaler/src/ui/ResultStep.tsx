@@ -75,10 +75,8 @@ export function ResultStep({
   return (
     <div className="space-y-4">
       <Card>
-        <div className="mb-3 flex items-center gap-2">
-          <span className="rounded-full bg-good-500 px-3 py-1 text-sm font-black text-white">
-            READY FOR LARGE FORMAT PRINTING
-          </span>
+        <div className="mb-3 rounded-xl bg-good-500 px-3 py-2 text-center text-sm font-black uppercase tracking-wide text-white">
+          Ready for large format printing
         </div>
         <dl className="tabular divide-y divide-paper-200 text-sm dark:divide-ink-800">
           <Row label="Print size" value={`${trim(target.widthIn)}" x ${trim(target.heightIn)}"`} />

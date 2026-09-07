@@ -129,10 +129,13 @@ export function Stat({
   label,
   value,
   tone = 'plain',
+  wide = false,
 }: {
   label: string
   value: ReactNode
   tone?: 'plain' | 'good' | 'warn' | 'bad'
+  /** Spans both columns. For values like "28,800 x 10,800" that wrap mid-number. */
+  wide?: boolean
 }) {
   const colour = {
     plain: '',
@@ -141,7 +144,11 @@ export function Stat({
     bad: 'text-bad-500',
   }[tone]
   return (
-    <div className="rounded-xl bg-paper-100 px-3 py-2 dark:bg-ink-850">
+    <div
+      className={`rounded-xl bg-paper-100 px-3 py-2 dark:bg-ink-850 ${
+        wide ? 'col-span-2' : ''
+      }`}
+    >
       <div className="text-xs font-medium text-ink-600 dark:text-paper-300">{label}</div>
       <div className={`tabular text-base font-bold ${colour}`}>{value}</div>
     </div>

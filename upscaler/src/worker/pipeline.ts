@@ -81,6 +81,13 @@ export async function runRender(
   }
 
   hooks.onPhase('preparing', 0, 'Reading image')
+  const expected = request.cropWidth * request.cropHeight * 4
+  if (request.pixels.byteLength !== expected) {
+    throw new Error(
+      `Pixel buffer is ${request.pixels.byteLength} bytes for a ` +
+        `${request.cropWidth} x ${request.cropHeight} crop, which needs ${expected}.`,
+    )
+  }
   let current = rgbaToFloatRgb(
     new Uint8ClampedArray(request.pixels),
     request.cropWidth,

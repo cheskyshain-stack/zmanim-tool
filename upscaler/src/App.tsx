@@ -155,8 +155,9 @@ export default function App() {
         targetWidth: content.width,
         targetHeight: content.height,
         mode,
+        forceFactor: settings.forceFactor,
       }),
-    [crop, content, mode],
+    [crop, content, mode, settings.forceFactor],
   )
 
   const estimateSeconds = useMemo(() => {
@@ -255,6 +256,7 @@ export default function App() {
         targetWidth: activeContent.width,
         targetHeight: activeContent.height,
         mode: activeMode,
+        forceFactor: effective.forceFactor,
       })
 
       let pixels: ImageData
@@ -280,8 +282,11 @@ export default function App() {
           type: 'render',
           baseUrl,
           pixels: pixels.data.buffer as ArrayBuffer,
-          cropWidth: activeCrop.width,
-          cropHeight: activeCrop.height,
+          // From the ImageData, not the rect: the rect can be fractional, and a crop
+          // size that disagreed with the buffer by one pixel would shear the whole
+          // image rather than fail.
+          cropWidth: pixels.width,
+          cropHeight: pixels.height,
           targetWidth: activeTarget.pxWidth,
           targetHeight: activeTarget.pxHeight,
           content: activeContent,
@@ -345,6 +350,7 @@ export default function App() {
       modeId: 'artwork',
       sharpen: 'light',
       format: 'png',
+      forceFactor: null,
     }
     update(override)
     start(override)
