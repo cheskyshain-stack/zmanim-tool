@@ -3439,6 +3439,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
+/* Air between the lines of a run that has been cut in two or three, and only there.
+ *
+ * The row's leading is 1.2, which is right for a row of one line and reads as squashed on a
+ * run of three: the מנחה after סוכות is nine times over three lines and they very nearly
+ * touch. Raising the row's line-height would fix that and charge every one-line row on the
+ * sheet for it, which is most of them, and the sheet is fitted so tightly that the whole cost
+ * would come out of the type: at 1.3 leading it once fell from 98% to 85%.
+ *
+ * A margin between one cut line and the next costs nothing anywhere else. It only ever
+ * matches inside balanceOnePageTimes' own output, each cut being an .onepage-line of its own:
+ * a row of one line has one, and the week sheet, which shares this markup, breaks its cells
+ * with <br> inside a single line and so never matches at all.
+ *
+ * Scaled with the type, so the space and the letters stay in proportion at every size the
+ * sheet can be fitted to. */
+.onepage-line + .onepage-line { margin-top: calc(0.04in * var(--op-scale)); }
 /* The slash between one time and the next, on a run long enough to be cut in two. From CSS
    rather than from the markup so balanceOnePageTimes can move a span to the second line and
    have the separators work themselves out around the break: the first span on a line has no
