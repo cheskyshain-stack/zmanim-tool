@@ -11893,6 +11893,7 @@ function fitWeekSheet(container) {
 
 
 
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -11916,7 +11917,16 @@ function specialDaysInWeek(shabbosSerial, settings) {
       byName.get(name).push(day);
     }
   }
-  return [...byName.entries()].map(([name, days]) => ({ name, day: days.join(', ') }));
+  /* צום גדליה is marked, because it does not run the schedule the others do: the shul's own
+     sheet for that day starts at 6:20 where the ר"ח / בה"ב / תענית list out of Settings starts
+     at 6:40, and the card and the sheet on the wall should not be saying two things. Matched
+     on the name, which is how the two days above are left out, and both of the names the
+     calendar can give it. */
+  return [...byName.entries()].map(([name, days]) => ({
+    name,
+    day: days.join(', '),
+    fast: /צום גדליה|Gedaly/.test(name),
+  }));
 }
 
 /** Which of a week's two cards comes first: the שבת page or the חול page.
@@ -13061,14 +13071,25 @@ function weekCardsHtml(showing, index, state, settings) {
     // directly after the everyday schedule, not before it: most of the week still runs
     // on the regular times, so those are what should be read first.
     const special = specialDaysInWeek(showing, settings);
-    if (special.length && state.settings.weekdayShacharisSpecial) {
+    if (special.length) {
       // The day names go on their own line, in their own direction. Run together with
       // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
       // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
-      const labelHtml = special
-        .map((d) => `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`)
-        .join('<br>');
-      parts.splice(1, 0, line('', htmlLines(state.settings.weekdayShacharisSpecial), true, false, labelHtml, true));
+      const dayLabel = (d) =>
+        `${weekEsc('שחרית ' + d.name)}<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
+      /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
+         list and read as one line naming both, which is what this has always done, and צום
+         גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
+         The fast first, since it is the one that is not the general rule. */
+      const groups = [];
+      for (const d of special.filter((x) => x.fast)) {
+        groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
+      }
+      const rest = special.filter((x) => !x.fast);
+      if (rest.length && state.settings.weekdayShacharisSpecial) {
+        groups.push({ label: rest.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
+      }
+      parts.splice(1, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }
     weekdayLines = parts.join('');
   }
