@@ -1151,6 +1151,15 @@ function renderSlichosTzomPoster(poster, settings, { landscape = false } = {}) {
    guessed at. */
 const ONEPAGE_TEXT = {
   title: 'ימים נוראים',
+  /* The last line of the key, under the marks. Not a mark and not about this sheet's own
+     arithmetic: every printed time on it is a whole minute where the זמן behind it carries
+     seconds, and the shul asks that people take two minutes off rather than read the printed
+     minute as exact.
+     Written left to right and given no lang: it is an English sentence with one Hebrew word
+     in it, the same shape as the underline line above it, and calling the whole line Hebrew
+     would have a screen reader say the English in a Hebrew voice. See hebrewLang in util.js,
+     which makes the same judgement about the same kind of line. */
+  rounded: 'All zmanim are rounded off. Please be מחמיר two minutes.',
 };
 
 /** How many times go on one line before the run is cut in two.
@@ -1432,6 +1441,10 @@ function renderOnePagePoster(built, settings) {
     !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
     // Two identical lines: keep the first.
     && lines.findIndex((o) => o.text === l.text) === i);
+  /* And the rounding note, last, under the marks. Added here rather than to each poster's own
+     legend because it is about this sheet: it says every time on the page is a whole minute
+     and asks for two minutes in hand, and the sheets of their own do not carry it. */
+  legend.push({ dir: 'ltr', text: ONEPAGE_TEXT.rounded });
   /* Both columns are written out, and every block starts in the first one. Which of them
      each block ends up in is settled by fitOnePage, after the browser has said how tall
      each is: the split is a measurement, not a number written down here, so a year that
