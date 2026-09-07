@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/* Manual theme switch as well as the system one. The `dark` class goes on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-ink-950: #070c16;
+  --color-ink-900: #0b1220;
+  --color-ink-850: #111a2b;
+  --color-ink-800: #16213a;
+  --color-ink-700: #23324f;
+  --color-ink-600: #33456a;
+
+  --color-paper-50: #ffffff;
+  --color-paper-100: #f6f7fb;
+  --color-paper-200: #eceef5;
+  --color-paper-300: #dbdfeb;
+
+  --color-brand-400: #7fb5ff;
+  --color-brand-500: #4f93f5;
+  --color-brand-600: #2f74dd;
+  --color-brand-700: #1f57ad;
+
+  --color-good-500: #35b87a;
+  --color-warn-500: #e8a33d;
+  --color-bad-500: #e2564d;
+}
+
+:root {
+  color-scheme: light dark;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper-100);
+  color: var(--color-ink-900);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    sans-serif;
+  /* Stops iOS inflating text in one column and not another, which breaks the layout. */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+.dark body {
+  background: var(--color-ink-950);
+  color: var(--color-paper-100);
+}
+
+/* Numbers that sit in columns should line up, and a pixel count should never reflow as
+   its digits change while a job runs. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Every control the thumb has to hit is at least this tall. */
+.touch {
+  min-height: 3rem;
+}
+
+input[type='range'] {
+  accent-color: var(--color-brand-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.checkerboard {
+  background-image:
+    linear-gradient(45deg, rgba(128, 128, 128, 0.18) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(128, 128, 128, 0.18) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(128, 128, 128, 0.18) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(128, 128, 128, 0.18) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0px;
+}

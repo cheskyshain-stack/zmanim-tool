@@ -1,0 +1,13 @@
+node_modules
+dist
+dev-dist
+.DS_Store
+*.local
+
+# Weights, copied out of node_modules by scripts/fetch-models.mjs. Regenerate with
+# "npm run models"; npm run dev and npm run build both do it for you.
+public/models/
+
+# Scratch space for the browser tests.
+tests/tmp/
+tsconfig.tsbuildinfo
