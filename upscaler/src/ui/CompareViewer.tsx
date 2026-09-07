@@ -66,6 +66,10 @@ export function CompareViewer({
   }, [])
 
   const window_ = useMemo(() => {
+    // The window is square where the crop allows it, but a short crop clamps the height
+    // and leaves a wide window. The panel below follows that shape rather than squeezing
+    // it back into a square, because a comparison viewer that distorts the image is
+    // worse than useless.
     const wanted = view / (zoom * printScale)
     const width = Math.max(8, Math.min(Math.round(wanted), Math.round(crop.width)))
     const height = Math.max(8, Math.min(Math.round(wanted), Math.round(crop.height)))
@@ -77,6 +81,10 @@ export function CompareViewer({
     )
     return { x, y, width, height }
   }, [view, zoom, printScale, crop, centre])
+
+  // Output size follows the window's shape, so nothing is stretched on either side.
+  const outWidth = view
+  const outHeight = Math.max(1, Math.round((view * window_.height) / window_.width))
 
   const run = useCallback(async () => {
     const token = ++jobRef.current
@@ -98,8 +106,8 @@ export function CompareViewer({
       // Before: the same pixels enlarged the ordinary way.
       const before = beforeCanvas.current
       if (before) {
-        before.width = view
-        before.height = view
+        before.width = outWidth
+        before.height = outHeight
         const ctx = before.getContext('2d')
         if (ctx) {
           const temp = document.createElement('canvas')
@@ -108,7 +116,7 @@ export function CompareViewer({
           temp.getContext('2d')?.putImageData(region, 0, 0)
           ctx.imageSmoothingEnabled = true
           ctx.imageSmoothingQuality = 'high'
-          ctx.drawImage(temp, 0, 0, view, view)
+          ctx.drawImage(temp, 0, 0, outWidth, outHeight)
         }
       }
 
@@ -122,8 +130,8 @@ export function CompareViewer({
         sharpen,
         denoise: denoise ? 1 : 0,
         deblock,
-        outWidth: view,
-        outHeight: view,
+        outWidth,
+        outHeight,
         tuning,
       })
       activeId.current = id
@@ -151,7 +159,19 @@ export function CompareViewer({
       setStatus('error')
       setMessage(error instanceof Error ? error.message : String(error))
     }
-  }, [source, window_, view, passes, sharpen, denoise, deblock, worker, tuning, baseUrl])
+  }, [
+    source,
+    window_,
+    outWidth,
+    outHeight,
+    passes,
+    sharpen,
+    denoise,
+    deblock,
+    worker,
+    tuning,
+    baseUrl,
+  ])
 
   useEffect(() => {
     void run()
@@ -163,7 +183,7 @@ export function CompareViewer({
       <div
         ref={container}
         className="checkerboard relative w-full select-none overflow-hidden rounded-xl"
-        style={{ aspectRatio: '1 / 1' }}
+        style={{ aspectRatio: `${window_.width} / ${window_.height}` }}
         onPointerDown={(event) => {
           const bounds = event.currentTarget.getBoundingClientRect()
           setSplit(

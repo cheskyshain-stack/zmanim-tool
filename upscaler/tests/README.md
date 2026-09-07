@@ -28,8 +28,17 @@ and published output, which is what makes the `referenceOutput` check meaningful
 | `superResolution` | Shrink a photo by 4 and put it back. Does the network recover meaningfully more edge energy than a good Lanczos resize, without overshooting past the original? |
 | `tileInvariance` | Does tiling change the answer? It must not, at all. |
 | `bandInvariance` | Does the number of output bands change the file? It must not, at all, or exports get faint horizontal lines. Also measures what the byte cached intermediate costs in precision, and checks that cost is spread evenly rather than piling up at band boundaries. |
-| `borders` | Does "fit whole image" put exactly the requested colour in exactly the right places? |
-| `largePng`, `largeTiff`, `largeJpeg` | Does a genuinely large streamed export complete and produce a real file in each format? |
+| `borders` | Does "fit whole image" put exactly the requested colour in exactly the right places, on all four sides, including more border rows than the writer emits in one block? |
+| `throughput` | What does this machine actually sustain, per model and scale? Where the README's numbers come from. |
+| `flagshipExport` | Does a real 28,800 x 10,800 file come out, inside a phone sized memory budget? Checks the size in the PNG header rather than trusting the request. |
+| `largePng`, `largeTiff`, `largeJpeg` | Does a genuinely large streamed export complete and produce a real file in each format, with the AI passes included? |
+
+`flagshipExport` leaves the AI passes out deliberately. 402 megapixels of inference on a
+software renderer would run for hours and would prove nothing the other checks miss:
+`bandInvariance` already shows the AI path is exact at any band count, and `largePng`
+shows the network, the streaming and the encoder working together. What is left to prove
+is the part that scales with the final print size rather than with the network, and that
+is what this one covers.
 
 Run one at a time by name:
 
@@ -41,7 +50,8 @@ node tests/run-browser.mjs tileInvariance bandInvariance
 
 These are slow here, and that is expected: the environment has no GPU, so TensorFlow.js
 falls back to software rendered WebGL through SwiftShader. `bandInvariance` renders the
-same job three times and takes several minutes. On a machine with a real GPU it is
+same job three times and takes several minutes, and the three `large*` checks each run a
+25 megapixel job through two 4x passes. On a machine with a real GPU it is
 seconds. Nothing about the test is waiting on a timeout; it is genuinely computing.
 
 ## Chromium

@@ -156,9 +156,10 @@ export default function App() {
         targetWidth: content.width,
         targetHeight: content.height,
         mode,
+        family: settings.family,
         forceFactor: settings.forceFactor,
       }),
-    [crop, content, mode, settings.forceFactor],
+    [crop, content, mode, settings.family, settings.forceFactor],
   )
 
   const estimateSeconds = useMemo(() => {
@@ -278,6 +279,7 @@ export default function App() {
         targetWidth: activeContent.width,
         targetHeight: activeContent.height,
         mode: activeMode,
+        family: effective.family,
         forceFactor: effective.forceFactor,
       })
 
@@ -372,6 +374,7 @@ export default function App() {
       modeId: 'artwork',
       sharpen: 'light',
       format: 'png',
+      family: 'esrgan-medium',
       forceFactor: null,
     }
     update(override)

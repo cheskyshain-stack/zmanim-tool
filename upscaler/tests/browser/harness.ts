@@ -311,7 +311,15 @@ async function testBandInvariance() {
   }
 }
 
-/** A genuinely large export, streamed, in all three formats. */
+/**
+ * A genuinely large export, streamed, in each format, with the network in the loop.
+ *
+ * One 4x pass rather than two. The second pass would multiply the inference by sixteen
+ * and prove nothing extra: what these three checks are for is that the band loop, the
+ * final resize and each encoder survive a 25 megapixel job together. How the network
+ * behaves is covered by referenceOutput, tileInvariance and bandInvariance, and the
+ * full print size is covered by flagshipExport.
+ */
 async function testLargeExport(format: 'png' | 'tiff' | 'jpeg') {
   await initBackend()
   const w = 512
@@ -329,10 +337,7 @@ async function testLargeExport(format: 'png' | 'tiff' | 'jpeg') {
       targetHeight,
       content: { x: 0, y: 0, width: targetWidth, height: targetHeight },
       format,
-      passes: [
-        { family: 'esrgan-slim', scale: 4 },
-        { family: 'esrgan-slim', scale: 4 },
-      ],
+      passes: [{ family: 'esrgan-slim', scale: 4 }],
       tuning: { ...TUNING, bandBudget: 24 << 20, cacheBudget: 4_500_000 },
     }),
     { onPhase: () => {}, shouldCancel: () => false },
@@ -439,6 +444,60 @@ async function testThroughput() {
   return out
 }
 
+
+/**
+ * The claim this whole app rests on: a 28,800 x 10,800 file really does come out of a
+ * phone sized memory budget.
+ *
+ * The AI passes are left out on purpose. 402 megapixels of inference on a software
+ * renderer would run for hours and would prove nothing this suite does not already
+ * cover: bandInvariance shows the AI path is exact at any band count, and largePng
+ * shows the AI, the streaming and the encoder working together. What is left to prove
+ * is the part that scales with the final size rather than with the network, which is
+ * the band loop, the Lanczos step, the sharpen and the encoder at full print size.
+ */
+async function testFlagshipExport() {
+  await initBackend()
+  const w = 2048
+  const h = 768
+  const image = await loadPhoto('/tests/tmp/photo.jpg', w, h)
+  const targetWidth = 28800
+  const targetHeight = 10800
+  const started = performance.now()
+
+  const result = await runRender(
+    makeRequest({
+      pixels: image.data.slice().buffer,
+      cropWidth: w,
+      cropHeight: h,
+      targetWidth,
+      targetHeight,
+      content: { x: 0, y: 0, width: targetWidth, height: targetHeight },
+      dpi: 300,
+      passes: [],
+      sharpen: 'light',
+      format: 'png',
+      // A phone's budget, not this machine's, so the band count is the one a phone
+      // would use.
+      tuning: { ...TUNING, bandBudget: 48 << 20, cacheBudget: 16_000_000, deflateLevel: 4, pngFilter: 'up' },
+    }),
+    { onPhase: () => {}, shouldCancel: () => false },
+  )
+
+  // Read the size straight out of the PNG header rather than trusting the request:
+  // IHDR is bytes 16 to 24, big endian.
+  const head = new DataView(await result.blob.slice(0, 33).arrayBuffer())
+  return {
+    megapixels: (targetWidth * targetHeight) / 1e6,
+    headerWidth: head.getUint32(16),
+    headerHeight: head.getUint32(20),
+    bitDepth: head.getUint8(24),
+    colourType: head.getUint8(25),
+    bytes: result.blob.size,
+    seconds: (performance.now() - started) / 1000,
+  }
+}
+
 const TESTS: Record<string, () => Promise<unknown>> = {
   superResolution: testSuperResolution,
   referenceOutput: testReferenceOutput,
@@ -446,6 +505,7 @@ const TESTS: Record<string, () => Promise<unknown>> = {
   tileInvariance: testTileInvariance,
   bandInvariance: testBandInvariance,
   borders: testBorders,
+  flagshipExport: testFlagshipExport,
   largePng: () => testLargeExport('png'),
   largeTiff: () => testLargeExport('tiff'),
   largeJpeg: () => testLargeExport('jpeg'),

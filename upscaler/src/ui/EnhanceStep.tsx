@@ -1,5 +1,5 @@
 import { SHARPEN_LABEL, type SharpenLevel } from '../lib/enhance'
-import { MODES, type ModeId } from '../lib/models'
+import { FAMILIES, MODES, type FamilyId, type ModeId } from '../lib/models'
 import { FORCED_FACTORS, describePasses, type UpscalePlan } from '../lib/plan'
 import { formatDuration, formatMegapixels } from '../lib/image'
 import type { Settings } from '../lib/storage'
@@ -67,6 +67,22 @@ export function EnhanceStep({
             )
           })}
         </div>
+      </Card>
+
+      <Card>
+        <Segmented<FamilyId>
+          label="Network"
+          value={settings.family}
+          onChange={(family) => update({ family })}
+          options={Object.values(FAMILIES).map((f) => ({
+            value: f.id,
+            label: f.label,
+            hint: f.id === 'esrgan-slim' ? 'smaller' : 'deeper',
+          }))}
+        />
+        <p className="mt-2 text-sm text-ink-600 dark:text-paper-300">
+          {FAMILIES[settings.family].note}
+        </p>
       </Card>
 
       <Card>

@@ -68,6 +68,8 @@ export interface PlanInput {
    * what 16x looks like on this image regardless of what the print needs.
    */
   forceFactor?: number | null
+  /** Overrides the mode's network. Speed against detail, chosen separately. */
+  family?: FamilyId
 }
 
 /** The factors the manual control offers, all reachable from 2x, 3x and 4x passes. */
@@ -75,6 +77,7 @@ export const FORCED_FACTORS = [2, 4, 8, 16] as const
 
 export function planUpscale(input: PlanInput): UpscalePlan {
   const { cropWidth, cropHeight, targetWidth, targetHeight, mode } = input
+  const family = input.family ?? mode.family
   const required = Math.max(targetWidth / cropWidth, targetHeight / cropHeight)
   const notes: string[] = []
 
@@ -104,7 +107,7 @@ export function planUpscale(input: PlanInput): UpscalePlan {
     const wanted = input.forceFactor
     const exact = chains(mode.preferredScales)
       .map((passes) => ({
-        passes: passes.map((p) => ({ ...p, family: mode.family })),
+        passes: passes.map((p) => ({ ...p, family })),
         factor: passes.reduce((n, p) => n * p.scale, 1),
       }))
       .filter((c) => c.factor === wanted)
@@ -142,7 +145,7 @@ export function planUpscale(input: PlanInput): UpscalePlan {
 
   const candidates = chains(mode.preferredScales)
     .map((passes) => ({
-      passes: passes.map((p) => ({ ...p, family: mode.family })),
+      passes: passes.map((p) => ({ ...p, family })),
       factor: passes.reduce((n, p) => n * p.scale, 1),
     }))
     .filter((c) => c.factor >= required - 1e-9)
@@ -155,7 +158,7 @@ export function planUpscale(input: PlanInput): UpscalePlan {
       const bestFactor = best.reduce((n, p) => n * p.scale, 1)
       return factor > bestFactor ? passes : best
     })
-    const plan = build(largest.map((p) => ({ ...p, family: mode.family })))
+    const plan = build(largest.map((p) => ({ ...p, family })))
     notes.push(
       `This print needs ${required.toFixed(1)}x enlargement, which is more than ` +
         `${MAX_PASSES} AI passes can reach (${plan.factor}x). The rest is done with ` +

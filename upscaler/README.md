@@ -47,7 +47,9 @@ fill, fit the whole image inside borders, or a custom crop you drag. The image i
 stretched, and nothing is ever cropped without telling you.
 
 **Upscale** with an ESRGAN family neural network, in as many passes as the enlargement
-needs. Five modes, four sharpening levels, optional noise and JPEG artifact reduction.
+needs, or force 2x, 4x, 8x or 16x if you want to see what a particular amount does. Two
+networks (Fast and Quality), five modes, four sharpening levels, optional noise and JPEG
+artifact reduction.
 
 **Inspect** the result before downloading: a split slider comparing the upscaled result
 against an ordinary resize of the same patch, at 50%, 100% and 200% of print resolution.
@@ -172,7 +174,7 @@ would cost far more than it saves. Only the last pass streams. From that pass on
 everything stays in float, because the resize and the sharpen both want the precision
 and by then only one band exists at a time.
 
-Two properties are checked by the test suite rather than asserted here:
+Three properties are checked by the test suite rather than asserted here:
 
 - **Tiling changes nothing.** Tile padding is 20 source pixels, which is the receptive
   field radius of the deeper network, counted from its layer stack. Upscaling with 48 px
@@ -180,6 +182,9 @@ Two properties are checked by the test suite rather than asserted here:
 - **Band count changes nothing.** Rendering the same job in 8 row bands and in one
   single band gives byte for byte identical files. If it did not, every export would
   have faint horizontal lines across it.
+- **A 28,800 x 10,800 file really comes out.** The `flagshipExport` check renders one
+  inside a 48 MB working budget, which is the profile a phone gets, and reads the size
+  back out of the PNG header rather than trusting the request.
 
 ### The encoders
 
@@ -255,13 +260,19 @@ viewer. It is never presented as upscaling.
 differ in which network runs, in the order of scale steps the planner is allowed to
 chain, and in the pre and post processing:
 
-| Mode | Network | Scale preference | Sharpen | Source cleanup |
-|:--|:--|:--|:--|:--|
-| Natural | medium | 2, 4, 3 | light | none |
-| High Detail | medium | 4, 2, 3 | medium | none |
-| Ultra Sharp | medium | 4, 2, 3 | strong | none |
-| Artwork / AI Generated | medium | 2, 3, 4 | light | deblock |
-| Photograph | medium | 2, 4, 3 | light | denoise + deblock |
+| Mode | Scale preference | Sharpen | Source cleanup |
+|:--|:--|:--|:--|
+| Natural | 2, 4, 3 | light | none |
+| High Detail | 4, 2, 3 | medium | none |
+| Ultra Sharp | 4, 2, 3 | strong | none |
+| Artwork / AI Generated | 2, 3, 4 | light | deblock |
+| Photograph | 2, 4, 3 | light | denoise + deblock |
+
+Which network runs is a separate choice from the mode, because it is a different question:
+the mode is about the kind of image, the network is about how much time this device has.
+**Quality** (`esrgan-medium`, ten residual dense blocks) is the default. **Fast**
+(`esrgan-slim`, two) is a third of the size and several times quicker, and is the first
+thing to try if a job is quoted at hours on an older phone.
 
 Artwork mode prefers chains of 2x because generated art is where one large jump goes
 wrong: the network invents an edge, and the next pass treats that invention as ground

@@ -77,6 +77,19 @@ const checks = [
     // to something unusable.
     pass: (r) => r['esrgan-slim-x4'] > 10_000,
   },
+  {
+    name: 'flagshipExport',
+    describe: (r) =>
+      `${r.headerWidth} x ${r.headerHeight} (${r.megapixels} MP) PNG in ` +
+      `${r.seconds.toFixed(0)}s, ${(r.bytes / 1e6).toFixed(0)} MB, ` +
+      `${r.bitDepth} bit type ${r.colourType}`,
+    pass: (r) =>
+      r.headerWidth === 28800 &&
+      r.headerHeight === 10800 &&
+      r.bitDepth === 8 &&
+      r.colourType === 2 &&
+      r.bytes > 1_000_000,
+  },
   ...['largePng', 'largeTiff', 'largeJpeg'].map((name) => ({
     name,
     describe: (r) =>
@@ -95,6 +108,11 @@ const server = await createServer({
   configFile: false,
   root: process.cwd(),
   publicDir: 'public',
+  // Scan only the harness. Left to itself vite crawls index.html, which imports the
+  // service worker registration that the PWA plugin provides, and that plugin is not
+  // loaded here (configFile: false), so the scan fails on a virtual module it cannot
+  // see. It only bites on a cold dep cache, which is exactly when you least expect it.
+  optimizeDeps: { entries: ['tests/browser/harness.html'] },
   // No hot reload and no file watching. Editing a source file while a check is running
   // would otherwise reload the page out from under it, and the failure that produces
   // ("execution context was destroyed") looks nothing like its cause.

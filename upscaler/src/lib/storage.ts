@@ -5,7 +5,7 @@
 
 import type { FitMode } from './aspect'
 import type { SharpenLevel } from './enhance'
-import type { ModeId } from './models'
+import type { FamilyId, ModeId } from './models'
 import type { Unit } from './print'
 import type { ExportFormat } from '../worker/protocol'
 
@@ -21,6 +21,8 @@ export interface Settings {
   fit: FitMode
   borderColor: string
   modeId: ModeId
+  /** Which network. Chosen separately from the mode: speed against detail. */
+  family: FamilyId
   /** Null lets the planner choose. A number forces that total enlargement. */
   forceFactor: number | null
   sharpen: SharpenLevel
@@ -45,6 +47,7 @@ export const DEFAULTS: Settings = {
   fit: 'cover',
   borderColor: '#ffffff',
   modeId: 'artwork',
+  family: 'esrgan-medium',
   forceFactor: null,
   sharpen: 'light',
   denoise: false,

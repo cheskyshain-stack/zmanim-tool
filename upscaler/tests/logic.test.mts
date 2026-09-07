@@ -123,6 +123,25 @@ test('modes differ in how they get to the same factor', () => {
   )
 })
 
+test('the network is chosen separately from the mode', () => {
+  const input = {
+    cropWidth: 2048,
+    cropHeight: 768,
+    targetWidth: 28800,
+    targetHeight: 10800,
+    mode: modeById('artwork'),
+  }
+  assert.ok(planUpscale(input).passes.every((p) => p.family === 'esrgan-medium'))
+  const fast = planUpscale({ ...input, family: 'esrgan-slim' })
+  assert.ok(fast.passes.every((p) => p.family === 'esrgan-slim'))
+  // Swapping the network must not change the plan's shape, only which weights run.
+  assert.equal(fast.factor, 16)
+  assert.deepEqual(
+    fast.passes.map((p) => p.scale),
+    [2, 2, 2, 2],
+  )
+})
+
 test('the planner takes the smallest chain that is big enough', () => {
   // 4.69x: 6 is the smallest product of 2, 3 and 4 that reaches it, not 8.
   const plan = planUpscale({
