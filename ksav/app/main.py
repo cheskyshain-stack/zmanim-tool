@@ -43,6 +43,7 @@ def build_services(settings):
     from app.language.lexicon import Lexicon
     from app.ocr import registry as ocr_registry
     from app.ocr.tesseract_engine import register_into as register_tesseract
+    from app.services.dictation import DictationService
     from app.services.job_queue import JobQueue
     from app.services.ocr import OcrService
     from app.services.transcription import TranscriptionService
@@ -71,12 +72,14 @@ def build_services(settings):
     ocr_queue.restore()
     ocr_queue.start()
 
-    return lexicon, queue, service, ocr_queue, ocr_service
+    dictation = DictationService(settings, service)
+
+    return lexicon, queue, service, ocr_queue, ocr_service, dictation
 
 
 def build_window(settings, hardware, recommendation, manager,
                  lexicon=None, queue=None, service=None,
-                 ocr_queue=None, ocr_service=None):
+                 ocr_queue=None, ocr_service=None, dictation=None):
     from PySide6.QtWidgets import QMainWindow
 
     from app.ui.shell import Shell
@@ -88,13 +91,15 @@ def build_window(settings, hardware, recommendation, manager,
 
     shell = Shell(settings, hardware, recommendation, manager,
                   lexicon=lexicon, queue=queue, service=service,
-                  ocr_queue=ocr_queue, ocr_service=ocr_service)
+                  ocr_queue=ocr_queue, ocr_service=ocr_service,
+                  dictation=dictation)
     window.setCentralWidget(shell)
     shell.apply_theme()
 
     original_close = window.closeEvent
 
     def on_close(event):
+        shell.shutdown()
         shell.persist()
         for background in (queue, ocr_queue):
             if background is not None:
@@ -121,13 +126,13 @@ def main() -> int:
     log.info("recommended: %s on %s", recommendation.asr_model, recommendation.device)
 
     manager = ModelManager()
-    lexicon, queue, service, ocr_queue, ocr_service = build_services(settings)
+    lexicon, queue, service, ocr_queue, ocr_service, dictation = build_services(settings)
 
     app = build_application()
     window, _shell = build_window(
         settings, hardware, recommendation, manager,
         lexicon=lexicon, queue=queue, service=service,
-        ocr_queue=ocr_queue, ocr_service=ocr_service,
+        ocr_queue=ocr_queue, ocr_service=ocr_service, dictation=dictation,
     )
     window.show()
     try:

@@ -26,6 +26,7 @@ from ..platform import media
 from ..platform.hardware import Hardware, Recommendation
 from ..platform.models import BY_ID, ModelManager
 from . import coming_soon
+from .dictation_view import DictationView
 from .dictionary_view import DictionaryView
 from .home import HomeView
 from .ocr_review import OcrReviewView
@@ -63,6 +64,7 @@ class Shell(QWidget):
         service=None,
         ocr_queue=None,
         ocr_service=None,
+        dictation=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("Root")
@@ -74,6 +76,8 @@ class Shell(QWidget):
         self._service = service
         self._ocr_queue = ocr_queue
         self._ocr_service = ocr_service
+        self._dictation = dictation
+        self._hotkeys = None
 
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -103,6 +107,7 @@ class Shell(QWidget):
         self.settings_view = SettingsView(settings, hardware, recommendation, manager)
         self.settings_view.navigate.connect(self.show_section)
         self.settings_view.settings_changed.connect(self._evaluate_readiness)
+        self.settings_view.hotkey_changed.connect(self.register_hotkey)
 
         # Phase 1 screens are real when the services behind them exist; the
         # honest placeholder stands in when the shell is built without them,
@@ -125,13 +130,21 @@ class Shell(QWidget):
         else:
             self.ocr = coming_soon.ocr_view()
 
+        if self._dictation is not None:
+            from ..platform.hotkey import build as build_hotkeys
+
+            self._hotkeys = build_hotkeys()
+            self.dictation = DictationView(self._dictation, settings, self._hotkeys)
+        else:
+            self.dictation = coming_soon.dictation_view()
+
         self.transcript = TranscriptView(settings, self._categories())
         self.ocr_review = OcrReviewView(settings)
 
         self._screens = {
             "home": self.home,
             "transcribe": self.transcribe,
-            "dictation": coming_soon.dictation_view(),
+            "dictation": self.dictation,
             "ocr": self.ocr,
             "dictionary": self.dictionary,
             "vault": self.vault,
@@ -141,6 +154,8 @@ class Shell(QWidget):
         }
         for widget in self._screens.values():
             self.stack.addWidget(widget)
+
+        self.register_hotkey()
 
         start = settings.ui.last_section
         # Never reopen straight into a transcript that is no longer loaded.
@@ -237,6 +252,27 @@ class Shell(QWidget):
             return
         self.transcript.load(corrected, self._categories())
         self.show_section("transcript")
+
+    def register_hotkey(self) -> tuple[bool, str]:
+        """Claim the global shortcut. Harmless and honest when it cannot be had."""
+        if self._hotkeys is None or self._dictation is None:
+            return False, ""
+        from ..platform.hotkey import HotkeyError
+
+        try:
+            ok, message = self._hotkeys.register(
+                self._settings.dictation.hotkey, self._on_hotkey
+            )
+        except HotkeyError as exc:
+            ok, message = False, str(exc)
+        if not ok:
+            log.info("global shortcut not registered: %s", message)
+        self.dictation.refresh()
+        return ok, message
+
+    def _on_hotkey(self) -> None:
+        """The shortcut fired anywhere in Windows."""
+        self.dictation.hotkey_pressed()
 
     def open_document(self, path: str) -> None:
         """Show a finished page document. Reached from the OCR queue."""
@@ -338,6 +374,13 @@ class Shell(QWidget):
         palette = for_theme(self._settings.ui.theme, dark)
         if app:
             self.window().setStyleSheet(stylesheet(palette))
+
+    def shutdown(self) -> None:
+        """Release the shortcut and stop listening, before the window closes."""
+        if self._hotkeys is not None:
+            self._hotkeys.unregister()
+        if self._dictation is not None and self._dictation.listening:
+            self._dictation.stop(wait=3.0)
 
     def persist(self) -> None:
         self._settings.ui.window_width = self.window().width()

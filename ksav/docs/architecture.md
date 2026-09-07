@@ -136,6 +136,41 @@ wheel does not carry the contrib module that has it, and on an old sefer with
 yellowed paper and bleed through from the reverse, one global threshold either
 loses the faint letters or fills the page with the ghost of the other side.
 
+## Live dictation
+
+Text appears when you pause, not word by word. Whisper is not a streaming model:
+it sees a phrase, thinks, and answers. The delay is the hangover pause plus
+recognition time, which on a GPU with the small model is well under a second
+after you stop talking. Recognising word by word would need a streaming model
+and none of the ones that exist know Hebrew, so this is a real limit rather than
+a shortcut, and the screen says so rather than looking broken.
+
+**Speech detection is an interface with two implementations.** Loudness against
+an adapting noise floor needs no model and works anywhere, which matters because
+dictation must not be gated behind a download. Silero is better in a room with
+other people in it and is used when its model is installed, through the same
+Model Vault as everything else.
+
+**The segmenter is pure.** No audio device, no threads, no clock, so the timing
+decisions that make dictation feel quick or sluggish are testable. The minimum
+phrase length is counted in frames that actually held speech rather than in
+buffer length: measuring the buffer let a tenth of a second cough through as a
+one second phrase, because the buffer carries preroll and hangover padding.
+
+**Two threading rules that were learned the hard way.** The state has to be
+listening before the first frame arrives or every frame is dropped; a real
+microphone takes a few milliseconds to deliver anything, which hid that. And
+recognition runs on a worker thread, so the callbacks emit Qt signals rather than
+touching widgets, because Qt widgets may only be touched from the thread that
+owns them. The first version did touch them and Qt said so immediately.
+
+The global shortcut uses `RegisterHotKey` from the Qt main thread, caught with a
+native event filter, so the callback arrives where it is safe to touch the
+interface. Typing into other programs uses `SendInput` with unicode events,
+falling back to the clipboard (saving and restoring what was on it). Windows will
+not let any program send input to one running as administrator; that is stated in
+the interface rather than left to be discovered.
+
 ## Offline enforcement
 
 `app/platform/net.py` is the only module permitted to open a socket, and its

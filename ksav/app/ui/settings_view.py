@@ -10,11 +10,13 @@ worth being explicit about.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
+    QKeySequenceEdit,
     QLabel,
     QScrollArea,
     QVBoxLayout,
@@ -52,6 +54,7 @@ OCR_LANGUAGE_SETS = [
 class SettingsView(QWidget):
     settings_changed = Signal()
     navigate = Signal(str)
+    hotkey_changed = Signal()
 
     def __init__(
         self,
@@ -272,15 +275,18 @@ class SettingsView(QWidget):
     def _build_dictation_card(self) -> None:
         card = Card("Dictation")
         d = self._settings.dictation
-        card.add(caption(
-            "Dictation arrives in Phase 3. These settings are stored now so the shortcut "
-            "you choose is already in place when it does."
-        ))
 
-        self.hotkey_label = QLabel(d.hotkey)
-        self.hotkey_label.setObjectName("Mono")
-        card.add_row("Global shortcut", self.hotkey_label,
-                     "Press this anywhere in Windows to dictate into whatever you are typing in.")
+        self.hotkey_edit = QKeySequenceEdit()
+        self.hotkey_edit.setKeySequence(QKeySequence(d.hotkey))
+        self.hotkey_edit.setMaximumSequenceLength(1)
+        self.hotkey_edit.setMinimumWidth(180)
+        self.hotkey_edit.editingFinished.connect(self._hotkey_changed)
+        card.add_row("Global shortcut", self.hotkey_edit,
+                     "Press this anywhere in Windows to dictate into whatever you "
+                     "are typing in. Click the box and press the keys.")
+
+        self.hotkey_status = caption("")
+        card.add(self.hotkey_status)
 
         self.hotkey_mode_box = QComboBox()
         for value, label in [("toggle", "Press once to start, once to stop"),
@@ -289,6 +295,16 @@ class SettingsView(QWidget):
         self._select(self.hotkey_mode_box, d.hotkey_mode)
         self.hotkey_mode_box.currentIndexChanged.connect(self._apply)
         card.add_row("Shortcut behaviour", self.hotkey_mode_box)
+
+        self.dictation_model_box = QComboBox()
+        for spec in asr_models():
+            mark = "" if self._manager.is_installed(spec.id) else "   (not installed)"
+            self.dictation_model_box.addItem(f"{spec.name}{mark}", spec.id)
+        self._select(self.dictation_model_box, d.model_id)
+        self.dictation_model_box.currentIndexChanged.connect(self._apply)
+        card.add_row("Dictation model", self.dictation_model_box,
+                     "A smaller model answers sooner, which matters more here "
+                     "than in a recording you are not waiting for.")
         self._column.addWidget(card)
 
     def _build_files_card(self) -> None:
@@ -355,6 +371,27 @@ class SettingsView(QWidget):
 
     # -- plumbing --------------------------------------------------------
 
+    def _hotkey_changed(self) -> None:
+        """Validate before storing, so a bad shortcut is refused where it is typed."""
+        from ..platform.hotkey import HotkeyError, normalise, parse
+
+        text = self.hotkey_edit.keySequence().toString()
+        if not text:
+            return
+        try:
+            parse(text)
+        except HotkeyError as exc:
+            self.hotkey_status.setText(str(exc))
+            self.hotkey_edit.setKeySequence(
+                QKeySequence(self._settings.dictation.hotkey)
+            )
+            return
+
+        self._settings.dictation.hotkey = normalise(text)
+        self.hotkey_status.setText(f"Set to {self._settings.dictation.hotkey}.")
+        self._apply()
+        self.hotkey_changed.emit()
+
     @staticmethod
     def _select(box: QComboBox, value) -> None:
         for i in range(box.count()):
@@ -393,6 +430,7 @@ class SettingsView(QWidget):
         ocr.use_pdf_text_layer = self.textlayer_check.isChecked()
 
         self._settings.dictation.hotkey_mode = self.hotkey_mode_box.currentData()
+        self._settings.dictation.model_id = self.dictation_model_box.currentData()
         self._settings.export.keep_processing_files = self.keep_temp_check.isChecked()
 
         save_settings(self._settings)

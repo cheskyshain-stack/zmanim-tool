@@ -9,17 +9,18 @@ disconnect the network completely and keep working.
 
 ## Where the project is
 
-Phases 0, 1 and 2 of four are complete. Ksav transcribes recordings offline,
-corrects Yeshivish and Torah terminology against a dictionary that also primes
-the recogniser, reads text from photos, scans and PDFs in Hebrew and English,
-and exports to TXT, DOCX, PDF, SRT and VTT.
+All four phases are complete. Ksav transcribes recordings offline, corrects
+Yeshivish and Torah terminology against a dictionary that also primes the
+recogniser, reads text from photos, scans and PDFs in Hebrew and English, takes
+live dictation into itself or into any other Windows program, and exports to
+TXT, DOCX, PDF, SRT and VTT.
 
 | Phase | What it brings | State |
 | --- | --- | --- |
 | 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer, USB bundle and portable mode | Done |
 | 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Done |
 | 2 | OCR for images and PDFs, side by side review | Done |
-| 3 | Live dictation and the global Windows shortcut | Next |
+| 3 | Live dictation and the global Windows shortcut | Done |
 | 4 | Diarization, advanced OCR, large Torah vocabulary, auto model selection | Planned |
 
 ### What works now
@@ -68,6 +69,18 @@ paragraph draws a box around the part of the page it came from.
 
 Rashi script, old rabbinic print and nekudos are honestly hard, and Ksav says so
 on screen before the work starts rather than after an hour of correcting.
+
+### Dictation
+
+Press Start, or the shortcut you chose, and speak. Text appears when you pause
+between phrases, with the same Torah corrections applied as a transcript gets.
+With the shortcut it types into whichever program has the cursor: Word, Outlook,
+a browser, WhatsApp Web, an ordinary text box.
+
+Two honest limits, both stated on screen rather than left to be discovered. Text
+arrives a phrase at a time, not word by word, because no streaming model knows
+Hebrew. And Windows will not let any program type into one running as
+administrator.
 
 `docs/architecture.md` explains the design. `docs/licensing.md` covers the
 dependency obligations, including two that are easy to get wrong.

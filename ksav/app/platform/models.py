@@ -214,7 +214,30 @@ OCR_CATALOGUE: tuple[ModelSpec, ...] = (
     ),
 )
 
-CATALOGUE = CATALOGUE + OCR_CATALOGUE
+# Speech detection. Tiny, and optional: dictation falls back to loudness
+# detection without it rather than refusing to run, because gating dictation
+# behind a download would be the wrong trade.
+VAD_CATALOGUE: tuple[ModelSpec, ...] = (
+    ModelSpec(
+        id="vad-silero",
+        name="Silero speech detection",
+        engine_id="silero",
+        kind="vad",
+        files=(ModelFile(
+            "silero_vad.onnx",
+            f"{HF}/deepghs/silero-vad-onnx/resolve/main/silero_vad.onnx",
+        ),),
+        size_bytes=2_300_000,
+        licence="MIT",
+        languages=(),
+        notes="Tells speech from noise far better than loudness alone, which "
+              "matters in a room with other people in it. Dictation works "
+              "without it, using loudness instead.",
+        min_ram_gb=2,
+    ),
+)
+
+CATALOGUE = CATALOGUE + OCR_CATALOGUE + VAD_CATALOGUE
 
 BY_ID = {spec.id: spec for spec in CATALOGUE}
 
@@ -225,6 +248,10 @@ def asr_models() -> list[ModelSpec]:
 
 def ocr_models() -> list[ModelSpec]:
     return [s for s in CATALOGUE if s.kind == "ocr"]
+
+
+def vad_models() -> list[ModelSpec]:
+    return [s for s in CATALOGUE if s.kind == "vad"]
 
 
 # ---------------------------------------------------------------------------

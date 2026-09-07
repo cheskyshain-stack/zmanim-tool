@@ -571,11 +571,164 @@ def test_a_file_that_is_not_a_page_is_refused(ocr_shell, qt_app, monkeypatch):
     assert not queue.jobs()
 
 
-def test_the_vault_lists_page_reading_packs_as_well_as_speech(qt_app, tmp_path, machine):
-    from app.platform.models import asr_models, ocr_models
+def test_the_vault_lists_every_kind_of_model(qt_app, tmp_path, machine):
+    """A model in the catalogue but not on this screen cannot be installed."""
+    from app.platform.models import CATALOGUE
 
     shell = Shell(Settings(), machine, recommend(machine), ModelManager(tmp_path / "m"))
     qt_app.processEvents()
-    assert len(shell.vault._rows) == len(asr_models()) + len(ocr_models())
+    assert len(shell.vault._rows) == len(CATALOGUE)
     ids = {row._spec.id for row in shell.vault._rows}
-    assert "ocr-heb" in ids and "whisper-medium" in ids
+    assert {"whisper-medium", "ocr-heb", "vad-silero"} <= ids
+    assert {row._spec.kind for row in shell.vault._rows} == {"asr", "ocr", "vad"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: dictation
+# ---------------------------------------------------------------------------
+
+
+import numpy as np      # noqa: E402
+
+from app.asr.audio import capture as audio_capture      # noqa: E402
+from app.asr.audio.vad import SAMPLE_RATE, EnergyVad    # noqa: E402
+from app.services.dictation import DictationService     # noqa: E402
+from app.services.transcription import TranscriptionService as _TS  # noqa: E402
+
+
+def _speech(seconds: float, level: float = 0.09) -> np.ndarray:
+    t = np.arange(int(SAMPLE_RATE * seconds)) / SAMPLE_RATE
+    tone = sum(np.sin(2 * np.pi * f * t) / (i + 1) for i, f in enumerate([140, 280, 420]))
+    return (tone * (0.6 + 0.4 * np.sin(2 * np.pi * 4 * t)) * level).astype(np.float32)
+
+
+def _silence(seconds: float) -> np.ndarray:
+    return np.random.default_rng(4).normal(
+        0, 0.002, int(SAMPLE_RATE * seconds)
+    ).astype(np.float32)
+
+
+@pytest.fixture
+def dictation_shell(qt_app, tmp_path, machine):
+    asr_registry.reset()
+    register_into(asr_registry)
+
+    settings = Settings()
+    settings.transcription.engine_id = "demo"
+    settings.dictation.model_id = "demo"
+    settings.dictation.inject_into_focused_app = False
+
+    lexicon = Lexicon(tmp_path / "lex.sqlite")
+    lexicon.seed_from(SEED_PATH)
+    transcription = _TS(settings, lexicon, TranscriptStore(tmp_path / "t"))
+
+    audio = np.concatenate([_silence(0.4), _speech(1.5), _silence(1.2),
+                            _speech(1.5), _silence(0.8)])
+    source = audio_capture.BufferSource(audio)
+    service = DictationService(settings, transcription, source=source, vad=EnergyVad())
+
+    shell = Shell(settings, machine, recommend(machine), ModelManager(tmp_path / "m"),
+                  dictation=service)
+    shell.resize(1240, 820)
+    qt_app.processEvents()
+
+    yield shell, service, source, settings
+
+    shell.shutdown()
+    lexicon.close()
+    asr_registry.reset()
+
+
+def test_dictated_text_reaches_the_screen(dictation_shell, qt_app):
+    shell, service, source, _settings = dictation_shell
+    shell.show_section("dictation")
+    qt_app.processEvents()
+
+    service.start()
+    for _ in range(150):
+        qt_app.processEvents()
+        time.sleep(0.02)
+        if len(shell.dictation._text) > 40:
+            break
+    service.stop()
+    qt_app.processEvents()
+
+    text = shell.dictation.editor.toPlainText()
+    assert text.strip()
+    assert "Gemara" in text, "corrections did not reach the screen"
+
+
+def test_phrases_cross_to_the_interface_thread_safely(dictation_shell, qt_app):
+    """Recognition runs on a worker; Qt widgets may only be touched from here.
+
+    The first version called the widgets straight from the worker thread and Qt
+    said so: "Cannot create children for a parent that is in a different
+    thread". On Windows that is a crash, not a warning. The callbacks now emit
+    signals, which Qt queues across the thread boundary.
+    """
+    shell, service, _source, _settings = dictation_shell
+    view = shell.dictation
+
+    # The service holds signal emitters, not bound methods that touch widgets.
+    assert service.on_phrase == view.phrase_arrived.emit
+    assert service.on_state == view.state_changed.emit
+    assert service.on_error == view.error_raised.emit
+
+
+def test_phrases_are_spaced_not_run_together(dictation_shell, qt_app):
+    shell, service, source, _settings = dictation_shell
+    shell.show_section("dictation")
+    service.start()
+    for _ in range(150):
+        qt_app.processEvents()
+        time.sleep(0.02)
+        if shell.dictation._text.count(".") >= 2:
+            break
+    service.stop()
+    qt_app.processEvents()
+
+    text = shell.dictation._text
+    assert ".The" not in text and "shver.The" not in text, "phrases ran together"
+
+
+def test_the_screen_says_what_is_missing_rather_than_looking_broken(dictation_shell, qt_app):
+    shell, _service, _source, _settings = dictation_shell
+    shell.show_section("dictation")
+    qt_app.processEvents()
+
+    view = shell.dictation
+    assert view.status.text().strip()
+    # Off Windows all three of these are unavailable, and each says so.
+    assert view.inject_note.text().strip()
+    assert view.hotkey_label.text().strip()
+
+
+def test_the_shortcut_is_released_when_the_window_closes(dictation_shell, qt_app):
+    shell, service, _source, _settings = dictation_shell
+    shell.shutdown()
+    assert not service.listening
+
+
+def test_a_bad_shortcut_is_refused_in_settings(qt_app, tmp_path, machine, monkeypatch):
+    from app.core import paths
+    from PySide6.QtGui import QKeySequence
+
+    monkeypatch.setattr(paths, "settings_file", lambda: tmp_path / "settings.json")
+    settings = Settings()
+    shell = Shell(settings, machine, recommend(machine), ModelManager(tmp_path / "m"))
+    qt_app.processEvents()
+
+    view = shell.settings_view
+    original = settings.dictation.hotkey
+
+    # A bare letter would fire every time it was typed anywhere.
+    view.hotkey_edit.setKeySequence(QKeySequence("D"))
+    view._hotkey_changed()
+    qt_app.processEvents()
+    assert settings.dictation.hotkey == original
+    assert "needs at least one" in view.hotkey_status.text()
+
+    view.hotkey_edit.setKeySequence(QKeySequence("Ctrl+Alt+K"))
+    view._hotkey_changed()
+    qt_app.processEvents()
+    assert settings.dictation.hotkey == "Ctrl+Alt+K"
