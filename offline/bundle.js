@@ -158,10 +158,276 @@ function resolveSettings(raw) {
   };
 }
 
+// ==== zmanim/solar.js ====
+// Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
+// (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
+// All "day" values are fractional days (0 = midnight, 0.5 = noon) unless noted.
+// Dates are represented as plain UTC-midnight JS Date objects (calendar day only,
+// no time-of-day) - the fractional time-of-day for an event is returned separately
+// as a number of days, exactly like an Excel serial's fractional part.
+
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30); // day 0 in Excel's serial system
+
+/** Excel-style serial date number for a UTC-midnight calendar date (no 1900 leap bug
+ *  correction - irrelevant for any date this app will ever be used for). */
+function excelSerial(date) {
+  return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
+}
+
+/** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date.
+ *  Uses Math.floor (not round): every whole-day serial in this app (shabbos/friday
+ *  Excel-style day numbers) is already an integer, so floor vs. round makes no
+ *  difference there - but the two DST-lookup call sites in this file and zmanim.js
+ *  pass a *fractional* serial (a whole day plus a UTC-time-of-day fraction, e.g. an
+ *  evening sunset's serial + eventUTC ≈ serial + 0.91). Excel's own calcDST_LOCAL/
+ *  calcTIMEZONE formulas extract the calendar day from such a value via YEAR()/DATE()
+ *  arithmetic, which truncates (floors) to the day the moment falls in - rounding
+ *  instead pushes any evening event (fraction > 0.5) into the *next* calendar day for
+ *  DST-lookup purposes. That's harmless almost all year (DST status rarely differs
+ *  between adjacent days) but silently breaks the one week each fall where that
+ *  rounded-up day crosses the real DST cutover a week early (e.g. an Oct 31 sunset
+ *  got misread as Nov 1 - already standard time - undercounting by an hour). */
+function dateFromSerial(serial) {
+  return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
+}
+
+const D2R = Math.PI / 180;
+const R2D = 180 / Math.PI;
+const sind = (deg) => Math.sin(deg * D2R);
+const cosd = (deg) => Math.cos(deg * D2R);
+const tand = (deg) => Math.tan(deg * D2R);
+const asind = (x) => Math.asin(x) * R2D;
+const acosd = (x) => Math.acos(x) * R2D;
+
+// calcJD
+function calcJD(serial) {
+  return serial + 2415018.5;
+}
+// calcJDToJCent
+function calcJDToJCent(jd) {
+  return (jd - 2451545) / 36525;
+}
+// calcGeomMeanLongSun
+function geomMeanLongSun(t) {
+  return ((280.46646 + t * (36000.76983 + 0.0003032 * t)) % 360 + 360) % 360;
+}
+// calcGeomMeanAnomalySun
+function geomMeanAnomalySun(t) {
+  return 357.52911 + t * (35999.05029 - 0.0001537 * t);
+}
+// calcEccentricityEarthOrbit
+function eccentricityEarthOrbit(t) {
+  return 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+}
+// calcSunEqOfCenter
+function sunEqOfCenter(t) {
+  const m = geomMeanAnomalySun(t);
+  return sind(m) * (1.914602 - t * (0.004817 + 0.000014 * t)) + sind(2 * m) * (0.019993 - 0.000101 * t) + sind(3 * m) * 0.000289;
+}
+// calcSunTrueLong
+function sunTrueLong(t) {
+  return geomMeanLongSun(t) + sunEqOfCenter(t);
+}
+// calcSunApparentLong
+function sunApparentLong(t) {
+  const omega = 125.04 - 1934.136 * t;
+  return sunTrueLong(t) - 0.00569 - 0.00478 * sind(omega);
+}
+// calcMeanObliquityOfEcliptic
+function meanObliquityOfEcliptic(t) {
+  const seconds = 21.448 - t * (46.815 + t * (0.00059 - t * 0.001813));
+  return 23 + (26 + seconds / 60) / 60;
+}
+// calcObliquityCorrection
+function obliquityCorrection(t) {
+  const omega = 125.04 - 1934.136 * t;
+  return meanObliquityOfEcliptic(t) + 0.00256 * cosd(omega);
+}
+// calcSunDeclination
+function sunDeclination(t) {
+  const e = obliquityCorrection(t);
+  const lambda = sunApparentLong(t);
+  return asind(sind(e) * sind(lambda));
+}
+// calcEquationOfTime (returned in fractional days, matching the workbook's /360)
+function equationOfTime(t) {
+  const epsilon = obliquityCorrection(t);
+  const long = geomMeanLongSun(t);
+  const e = eccentricityEarthOrbit(t);
+  const m = geomMeanAnomalySun(t);
+  const y = Math.pow(tand(epsilon / 2), 2);
+  const sin2long = sind(long * 2);
+  const sinm = sind(m);
+  const cos2long = cosd(2 * long);
+  const sin4long = sind(long * 4);
+  const sin2m = sind(m * 2);
+  const deg = (y * sin2long - 2 * e * sinm + 4 * e * y * sinm * cos2long - 0.5 * y * y * sin4long - 1.25 * e * e * sin2m) * R2D;
+  return deg / 360;
+}
+// calcHourAngleSunrise (degrees)
+function hourAngleSunrise(lat, solarDec, zenith) {
+  const cosH = cosd(zenith) / (cosd(lat) * cosd(solarDec)) - tand(lat) * tand(solarDec);
+  return acosd(Math.max(-1, Math.min(1, cosH)));
+}
+// calcRefraction (degrees)
+function refraction(altitude) {
+  const ta = tand(altitude);
+  let arcMin;
+  if (altitude > 85) arcMin = 0;
+  else if (altitude > 5) arcMin = 58.1 / ta - 0.07 / Math.pow(ta, 3) + 0.000086 / Math.pow(ta, 5);
+  else if (altitude > -0.575) arcMin = 1735 + altitude * (-518.2 + altitude * (103.4 + altitude * (-12.79 + altitude * 0.711)));
+  else arcMin = -20.774 / ta;
+  return arcMin / 3600;
+}
+// calcElevAdjust
+function elevAdjust(elevationMeters) {
+  return acosd(6356.9 / (6356.9 + elevationMeters / 1000));
+}
+// calcZENITH: horizonDeg is "degrees below the geometric horizon" (workbook default
+// 5/6°, i.e. solar radius + average refraction), so the zenith angle is 90 + horizonDeg
+// - NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
+// calcZENITH negates it back to +5/6 before adding 90; this function takes the
+// already-positive, human-readable value directly.)
+function zenith(horizonDeg) {
+  return 90 + horizonDeg;
+}
+
+// calcSunriseSetUTC: returns fractional day (UTC) for the given Julian day
+function sunriseSetUTC(rise, jDay, latitude, longitude, zenithDeg) {
+  const t = calcJDToJCent(jDay);
+  const eot = equationOfTime(t);
+  const solarDec = sunDeclination(t);
+  let hourAngle = hourAngleSunrise(latitude, solarDec, zenithDeg); // already in degrees (acosd)
+  if (!rise) hourAngle = -hourAngle;
+  const delta = longitude + hourAngle;
+  return 0.5 - delta / 360 - eot;
+}
+
+// calcSunriseSet: two-pass refinement, returns fractional UTC day
+function sunriseSet(rise, jDay, latitude, longitude, zenithDeg) {
+  const passOne = sunriseSetUTC(rise, jDay + (rise ? -0.25 : 0.25), latitude, longitude, zenithDeg);
+  return sunriseSetUTC(rise, jDay + passOne, latitude, longitude, zenithDeg);
+}
+
+/** US-style DST rule used throughout the workbook: 2nd Sunday in March (2am) through
+ *  1st Sunday in November (2am), local time. Returns true if `date` (UTC-midnight,
+ *  representing a local calendar day) falls within DST for that rule. */
+function usDstActive(date) {
+  const year = date.getUTCFullYear();
+  const nthSunday = (y, month, nth) => {
+    const first = new Date(Date.UTC(y, month, 1));
+    const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
+    return new Date(Date.UTC(y, month, firstSunday + (nth - 1) * 7));
+  };
+  const start = nthSunday(year, 2, 2); // March, 2nd Sunday
+  const end = nthSunday(year, 10, 1); // November, 1st Sunday
+  return date.getTime() >= start.getTime() && date.getTime() < end.getTime();
+}
+
+/** calcTIMEZONE / calcDST_LOCAL, simplified to the two DST rule types the workbook
+ *  itself implements: 'us' (2nd Sun Mar - 1st Sun Nov) and 'none'.
+ *  Returns { offsetHours, isDst } for the given calendar date and a timezone def
+ *  { utcOffset, dstOffset, rule } as found in settings.TIMEZONES. */
+function timezoneOffset(date, tz) {
+  const isDst = tz.rule === 'us' && usDstActive(date);
+  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
+}
+
+/** calcLATITUDE: clamps to +-89.8 like the workbook (avoids poles blowing up the math). */
+function clampLatitude(lat) {
+  return Math.max(-89.8, Math.min(89.8, lat));
+}
+
+/**
+ * SUNRISE/SUNSET core used by every zman in zmanim.js.
+ * @param {boolean} rise true for sunrise, false for sunset
+ * @param {Date} date UTC-midnight calendar date
+ * @param {number} horizonDeg horizon adjustment in degrees (workbook default 5/6)
+ * @param {object} settings {latitude, longitude, elevation, timezone}
+ * @param {boolean} useElevation whether to fold elevation into the horizon (SUNRISE_elev/SUNSET_elev pass true only if settings.useElevation)
+ * @returns {number} fractional day offset from `date`'s local midnight (e.g. 0.25 = 6:00am)
+ */
+function sunEvent(rise, date, horizonDeg, settings, useElevation) {
+  const lat = clampLatitude(settings.latitude);
+  const lon = settings.longitude;
+  const elevM = useElevation ? settings.elevation : 0;
+  const z = zenith(horizonDeg) + elevAdjust(elevM);
+  const serial = excelSerial(date);
+  const eventUTC = sunriseSet(rise, calcJD(serial), lat, lon, z);
+  const { offsetHours } = timezoneOffset(dateFromSerial(serial + eventUTC), settings.timezone);
+  return eventUTC + offsetHours / 24;
+}
+
+/* Where the shul is, right now, in the frame every zman here is written in: which
+   calendar day it is there and how far into it. It lives beside timezoneOffset, the
+   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
+   into the week view, so anything importing it from there dragged the week view along
+   and put nav-helpers in a cycle with it. */
+/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
+ *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
+ *  second (see untilNextChange in luach.js).
+ *
+ *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
+ *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
+ *  still on another zone should be told when מנחה is there, not have the countdown quietly
+ *  shifted by however far it has travelled.
+ *
+ *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
+ *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
+ *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
+ *  into a wall clock is a different question and the whole-day answer is wrong on the two
+ *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
+ *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
+ *  the switch at 2am each time.
+ *
+ *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
+ *  or a settings entry with no name to look up, where being an hour out for two hours a
+ *  year is better than not knowing the time at all. */
+function shulNow(now, settings) {
+  const zone = settings.timezone?.id;
+  if (zone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const at = {};
+      for (const part of parts) at[part.type] = part.value;
+      const serial = Math.round(
+        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
+      );
+      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
+      // milliseconds are added back off the instant itself, since the parts stop at seconds.
+      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
+        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
+      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
+    } catch {
+      // No Intl timezone support: fall through to the arithmetic.
+    }
+  }
+  const utcMinutes = now.getTime() / 60000;
+  // The offset is looked up for the day the moment falls on, which needs the day, which
+  // needs the offset. Standard time first, then again on the day that lands on: an hour
+  // either way can only change the answer within an hour of midnight, and the second pass
+  // is on the right side of the DST change by then.
+  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
+  for (let pass = 0; pass < 2; pass++) {
+    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+    const local = utcMinutes + offsetHours * 60;
+    const next = Math.floor(local / 1440) + 25569;
+    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+    serial = next;
+  }
+  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
+  const local = utcMinutes + offsetHours * 60;
+  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+}
+
 // ==== storage.js ====
 // localStorage persistence + JSON export/import. Everything (settings, saved sheet
 // instances with their per-cell overrides, and rules) lives in one namespaced key -
 // this is the single-browser "local app" model the user chose over a hosted backend.
+
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
@@ -330,10 +596,22 @@ const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || 
  *  header while new ones came out light. Only the exact old default is moved; a colour
  *  picked by hand is left alone, as everywhere else. */
 function normalizeSheets(sheets) {
-  for (const sheet of sheets) {
+  for (const sheet of Array.isArray(sheets) ? sheets : []) {
     if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
+    /* A week whose date will not parse gets it back off its own serial.
+     *
+     * The serial is the week's key and everything is computed from it; the date beside it is
+     * the same day written the other way, for the screens that print it. An import carrying a
+     * date this browser cannot read (a truncated file, an export edited by hand) left every
+     * screen that prints one throwing: measured, This week came up empty with "Invalid time
+     * value" and no way back except clearing the browser. Repaired rather than dropped, since
+     * the week itself is perfectly good and the serial says which day it is. */
+    for (const week of Array.isArray(sheet?.weeks) ? sheet.weeks : []) {
+      if (!Number.isFinite(week?.serial)) continue;
+      if (Number.isNaN(new Date(week.date).getTime())) week.date = dateFromSerial(week.serial).toISOString();
+    }
   }
-  return sheets;
+  return Array.isArray(sheets) ? sheets : [];
 }
 
 function defaultState() {
@@ -646,278 +924,24 @@ function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Whether two שחרית schedules say different things, whatever tags or separators they were
- *  typed with. Used to drop a season line that only repeats the everyday one: the morning of
- *  יום א' of סליחות is the ordinary list, its סליחות having been said the night before, and
- *  printing it again under its own heading says nothing the line above it did not. */
+/** Whether two שחרית schedules say different things, whatever separators they were typed with.
+ *  Used to drop a season line that only repeats the everyday one: the morning of יום א' of
+ *  סליחות is the ordinary list, its סליחות having been said the night before, and printing it
+ *  again under its own heading says nothing the line above it did not.
+ *
+ *  Commas, slashes and spaces are all the same separator here, since the same list is typed
+ *  with any of them (see cellSource in ui/week-sheet.js). The underline is not: it says the
+ *  מנין is בבית מדרש למטה, which is a different thing to say about the same time, and stripping
+ *  every tag alike made two schedules that differ only in which מנין is downstairs compare
+ *  equal, so one of them would have been dropped without a word. The stars, being plain text,
+ *  were never at risk. */
 function differsFromSchedule(a, b) {
-  const bare = (v) => String(v ?? '').replace(/<[^>]*>/g, '').replace(/[\s,/]+/g, ' ').trim();
+  const bare = (v) => String(v ?? '')
+    .replace(/<\s*\/?\s*u\s*>/gi, '_')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\s,/]+/g, ' ')
+    .trim();
   return bare(a) !== bare(b);
-}
-
-// ==== zmanim/solar.js ====
-// Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
-// (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
-// All "day" values are fractional days (0 = midnight, 0.5 = noon) unless noted.
-// Dates are represented as plain UTC-midnight JS Date objects (calendar day only,
-// no time-of-day) - the fractional time-of-day for an event is returned separately
-// as a number of days, exactly like an Excel serial's fractional part.
-
-const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30); // day 0 in Excel's serial system
-
-/** Excel-style serial date number for a UTC-midnight calendar date (no 1900 leap bug
- *  correction - irrelevant for any date this app will ever be used for). */
-function excelSerial(date) {
-  return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
-}
-
-/** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date.
- *  Uses Math.floor (not round): every whole-day serial in this app (shabbos/friday
- *  Excel-style day numbers) is already an integer, so floor vs. round makes no
- *  difference there - but the two DST-lookup call sites in this file and zmanim.js
- *  pass a *fractional* serial (a whole day plus a UTC-time-of-day fraction, e.g. an
- *  evening sunset's serial + eventUTC ≈ serial + 0.91). Excel's own calcDST_LOCAL/
- *  calcTIMEZONE formulas extract the calendar day from such a value via YEAR()/DATE()
- *  arithmetic, which truncates (floors) to the day the moment falls in - rounding
- *  instead pushes any evening event (fraction > 0.5) into the *next* calendar day for
- *  DST-lookup purposes. That's harmless almost all year (DST status rarely differs
- *  between adjacent days) but silently breaks the one week each fall where that
- *  rounded-up day crosses the real DST cutover a week early (e.g. an Oct 31 sunset
- *  got misread as Nov 1 - already standard time - undercounting by an hour). */
-function dateFromSerial(serial) {
-  return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
-}
-
-const D2R = Math.PI / 180;
-const R2D = 180 / Math.PI;
-const sind = (deg) => Math.sin(deg * D2R);
-const cosd = (deg) => Math.cos(deg * D2R);
-const tand = (deg) => Math.tan(deg * D2R);
-const asind = (x) => Math.asin(x) * R2D;
-const acosd = (x) => Math.acos(x) * R2D;
-
-// calcJD
-function calcJD(serial) {
-  return serial + 2415018.5;
-}
-// calcJDToJCent
-function calcJDToJCent(jd) {
-  return (jd - 2451545) / 36525;
-}
-// calcGeomMeanLongSun
-function geomMeanLongSun(t) {
-  return ((280.46646 + t * (36000.76983 + 0.0003032 * t)) % 360 + 360) % 360;
-}
-// calcGeomMeanAnomalySun
-function geomMeanAnomalySun(t) {
-  return 357.52911 + t * (35999.05029 - 0.0001537 * t);
-}
-// calcEccentricityEarthOrbit
-function eccentricityEarthOrbit(t) {
-  return 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
-}
-// calcSunEqOfCenter
-function sunEqOfCenter(t) {
-  const m = geomMeanAnomalySun(t);
-  return sind(m) * (1.914602 - t * (0.004817 + 0.000014 * t)) + sind(2 * m) * (0.019993 - 0.000101 * t) + sind(3 * m) * 0.000289;
-}
-// calcSunTrueLong
-function sunTrueLong(t) {
-  return geomMeanLongSun(t) + sunEqOfCenter(t);
-}
-// calcSunApparentLong
-function sunApparentLong(t) {
-  const omega = 125.04 - 1934.136 * t;
-  return sunTrueLong(t) - 0.00569 - 0.00478 * sind(omega);
-}
-// calcMeanObliquityOfEcliptic
-function meanObliquityOfEcliptic(t) {
-  const seconds = 21.448 - t * (46.815 + t * (0.00059 - t * 0.001813));
-  return 23 + (26 + seconds / 60) / 60;
-}
-// calcObliquityCorrection
-function obliquityCorrection(t) {
-  const omega = 125.04 - 1934.136 * t;
-  return meanObliquityOfEcliptic(t) + 0.00256 * cosd(omega);
-}
-// calcSunDeclination
-function sunDeclination(t) {
-  const e = obliquityCorrection(t);
-  const lambda = sunApparentLong(t);
-  return asind(sind(e) * sind(lambda));
-}
-// calcEquationOfTime (returned in fractional days, matching the workbook's /360)
-function equationOfTime(t) {
-  const epsilon = obliquityCorrection(t);
-  const long = geomMeanLongSun(t);
-  const e = eccentricityEarthOrbit(t);
-  const m = geomMeanAnomalySun(t);
-  const y = Math.pow(tand(epsilon / 2), 2);
-  const sin2long = sind(long * 2);
-  const sinm = sind(m);
-  const cos2long = cosd(2 * long);
-  const sin4long = sind(long * 4);
-  const sin2m = sind(m * 2);
-  const deg = (y * sin2long - 2 * e * sinm + 4 * e * y * sinm * cos2long - 0.5 * y * y * sin4long - 1.25 * e * e * sin2m) * R2D;
-  return deg / 360;
-}
-// calcHourAngleSunrise (degrees)
-function hourAngleSunrise(lat, solarDec, zenith) {
-  const cosH = cosd(zenith) / (cosd(lat) * cosd(solarDec)) - tand(lat) * tand(solarDec);
-  return acosd(Math.max(-1, Math.min(1, cosH)));
-}
-// calcRefraction (degrees)
-function refraction(altitude) {
-  const ta = tand(altitude);
-  let arcMin;
-  if (altitude > 85) arcMin = 0;
-  else if (altitude > 5) arcMin = 58.1 / ta - 0.07 / Math.pow(ta, 3) + 0.000086 / Math.pow(ta, 5);
-  else if (altitude > -0.575) arcMin = 1735 + altitude * (-518.2 + altitude * (103.4 + altitude * (-12.79 + altitude * 0.711)));
-  else arcMin = -20.774 / ta;
-  return arcMin / 3600;
-}
-// calcElevAdjust
-function elevAdjust(elevationMeters) {
-  return acosd(6356.9 / (6356.9 + elevationMeters / 1000));
-}
-// calcZENITH: horizonDeg is "degrees below the geometric horizon" (workbook default
-// 5/6°, i.e. solar radius + average refraction), so the zenith angle is 90 + horizonDeg
-// - NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
-// calcZENITH negates it back to +5/6 before adding 90; this function takes the
-// already-positive, human-readable value directly.)
-function zenith(horizonDeg) {
-  return 90 + horizonDeg;
-}
-
-// calcSunriseSetUTC: returns fractional day (UTC) for the given Julian day
-function sunriseSetUTC(rise, jDay, latitude, longitude, zenithDeg) {
-  const t = calcJDToJCent(jDay);
-  const eot = equationOfTime(t);
-  const solarDec = sunDeclination(t);
-  let hourAngle = hourAngleSunrise(latitude, solarDec, zenithDeg); // already in degrees (acosd)
-  if (!rise) hourAngle = -hourAngle;
-  const delta = longitude + hourAngle;
-  return 0.5 - delta / 360 - eot;
-}
-
-// calcSunriseSet: two-pass refinement, returns fractional UTC day
-function sunriseSet(rise, jDay, latitude, longitude, zenithDeg) {
-  const passOne = sunriseSetUTC(rise, jDay + (rise ? -0.25 : 0.25), latitude, longitude, zenithDeg);
-  return sunriseSetUTC(rise, jDay + passOne, latitude, longitude, zenithDeg);
-}
-
-/** US-style DST rule used throughout the workbook: 2nd Sunday in March (2am) through
- *  1st Sunday in November (2am), local time. Returns true if `date` (UTC-midnight,
- *  representing a local calendar day) falls within DST for that rule. */
-function usDstActive(date) {
-  const year = date.getUTCFullYear();
-  const nthSunday = (y, month, nth) => {
-    const first = new Date(Date.UTC(y, month, 1));
-    const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
-    return new Date(Date.UTC(y, month, firstSunday + (nth - 1) * 7));
-  };
-  const start = nthSunday(year, 2, 2); // March, 2nd Sunday
-  const end = nthSunday(year, 10, 1); // November, 1st Sunday
-  return date.getTime() >= start.getTime() && date.getTime() < end.getTime();
-}
-
-/** calcTIMEZONE / calcDST_LOCAL, simplified to the two DST rule types the workbook
- *  itself implements: 'us' (2nd Sun Mar - 1st Sun Nov) and 'none'.
- *  Returns { offsetHours, isDst } for the given calendar date and a timezone def
- *  { utcOffset, dstOffset, rule } as found in settings.TIMEZONES. */
-function timezoneOffset(date, tz) {
-  const isDst = tz.rule === 'us' && usDstActive(date);
-  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
-}
-
-/** calcLATITUDE: clamps to +-89.8 like the workbook (avoids poles blowing up the math). */
-function clampLatitude(lat) {
-  return Math.max(-89.8, Math.min(89.8, lat));
-}
-
-/**
- * SUNRISE/SUNSET core used by every zman in zmanim.js.
- * @param {boolean} rise true for sunrise, false for sunset
- * @param {Date} date UTC-midnight calendar date
- * @param {number} horizonDeg horizon adjustment in degrees (workbook default 5/6)
- * @param {object} settings {latitude, longitude, elevation, timezone}
- * @param {boolean} useElevation whether to fold elevation into the horizon (SUNRISE_elev/SUNSET_elev pass true only if settings.useElevation)
- * @returns {number} fractional day offset from `date`'s local midnight (e.g. 0.25 = 6:00am)
- */
-function sunEvent(rise, date, horizonDeg, settings, useElevation) {
-  const lat = clampLatitude(settings.latitude);
-  const lon = settings.longitude;
-  const elevM = useElevation ? settings.elevation : 0;
-  const z = zenith(horizonDeg) + elevAdjust(elevM);
-  const serial = excelSerial(date);
-  const eventUTC = sunriseSet(rise, calcJD(serial), lat, lon, z);
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial + eventUTC), settings.timezone);
-  return eventUTC + offsetHours / 24;
-}
-
-/* Where the shul is, right now, in the frame every zman here is written in: which
-   calendar day it is there and how far into it. It lives beside timezoneOffset, the
-   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
-   into the week view, so anything importing it from there dragged the week view along
-   and put nav-helpers in a cycle with it. */
-/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
- *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
- *  second (see untilNextChange in luach.js).
- *
- *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
- *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
- *  still on another zone should be told when מנחה is there, not have the countdown quietly
- *  shifted by however far it has travelled.
- *
- *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
- *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
- *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
- *  into a wall clock is a different question and the whole-day answer is wrong on the two
- *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
- *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
- *  the switch at 2am each time.
- *
- *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
- *  or a settings entry with no name to look up, where being an hour out for two hours a
- *  year is better than not knowing the time at all. */
-function shulNow(now, settings) {
-  const zone = settings.timezone?.id;
-  if (zone) {
-    try {
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-      }).formatToParts(now);
-      const at = {};
-      for (const part of parts) at[part.type] = part.value;
-      const serial = Math.round(
-        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
-      );
-      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
-      // milliseconds are added back off the instant itself, since the parts stop at seconds.
-      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
-        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
-      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
-    } catch {
-      // No Intl timezone support: fall through to the arithmetic.
-    }
-  }
-  const utcMinutes = now.getTime() / 60000;
-  // The offset is looked up for the day the moment falls on, which needs the day, which
-  // needs the offset. Standard time first, then again on the day that lands on: an hour
-  // either way can only change the answer within an hour of midnight, and the second pass
-  // is on the right side of the DST change by then.
-  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
-  for (let pass = 0; pass < 2; pass++) {
-    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-    const local = utcMinutes + offsetHours * 60;
-    const next = Math.floor(local / 1440) + 25569;
-    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
-    serial = next;
-  }
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-  const local = utcMinutes + offsetHours * 60;
-  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
 }
 
 // ==== hebrew-calendar.js ====
@@ -4451,10 +4475,19 @@ function mergeRow(computedRow, sheet, weekSerial) {
 // isn't stored on saved sheets, so it's computed at render time and works for sheets
 // generated before hebrewDate conditions existed.
 function conditionMatches(condition, week) {
+  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
+  // import need not: an older export, or a file edited by hand, and reading .always off
+  // undefined threw and took down every screen that draws a sheet.
+  if (!condition) return false;
   if (condition.always) return true;
   if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
   if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  // The date is guarded for the same reason: a week whose date will not parse would throw
+  // here rather than simply not matching. storage.js repairs those on the way in, so this
+  // is the second line rather than the first.
+  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
+    ? week.date.toISOString().slice(0, 10) : null;
+  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
   if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
   return false;
 }
@@ -11225,10 +11258,10 @@ function renderRules(container, state, onChange, editingRuleId = null) {
       <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+        <label><input type="checkbox" name="always" ${prefill?.condition?.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -11368,7 +11401,11 @@ function splitCsv(str) {
     .map((s) => s.trim())
     .filter(Boolean);
 }
-function conditionSummary(c) {
+/** A rule with no condition at all is not one the Rules form can make, but it is one an
+ *  import can carry: an older export, or a file edited by hand. Reading a field off it threw
+ *  and took the Rules panel, and Settings with it, off the screen. It says so instead. */
+function conditionSummary(condition) {
+  const c = condition || {};
   const parts = [];
   if (c.always) parts.push('always');
   if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
@@ -13297,7 +13334,9 @@ function weekCardsHtml(showing, index, state, settings) {
        it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
        and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
        through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
-       below keep, and ahead of them, being the bigger departure from the everyday times. */
+       below keep. Spliced in at the same place they are, so the day that is not the general
+       rule reads first: those splice after these and so end up above them, which puts a fast
+       ahead of the season line covering the rest of its week. */
     const season = slichosWeekLines(showing, settings)
       .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
     if (season.length) {

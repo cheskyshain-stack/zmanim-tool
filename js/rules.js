@@ -22,10 +22,19 @@
 // isn't stored on saved sheets, so it's computed at render time and works for sheets
 // generated before hebrewDate conditions existed.
 function conditionMatches(condition, week) {
+  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
+  // import need not: an older export, or a file edited by hand, and reading .always off
+  // undefined threw and took down every screen that draws a sheet.
+  if (!condition) return false;
   if (condition.always) return true;
   if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
   if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  if (condition.dateISO && condition.dateISO.includes(week.date.toISOString().slice(0, 10))) return true;
+  // The date is guarded for the same reason: a week whose date will not parse would throw
+  // here rather than simply not matching. storage.js repairs those on the way in, so this
+  // is the second line rather than the first.
+  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
+    ? week.date.toISOString().slice(0, 10) : null;
+  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
   if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
   return false;
 }

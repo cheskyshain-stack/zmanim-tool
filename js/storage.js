@@ -11,6 +11,7 @@ import {
   LEGACY_ACCENT_COLORS,
   splitCombinedShacharis,
 } from './settings.js';
+import { dateFromSerial } from './zmanim/solar.js';
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
@@ -179,10 +180,22 @@ const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || 
  *  header while new ones came out light. Only the exact old default is moved; a colour
  *  picked by hand is left alone, as everywhere else. */
 function normalizeSheets(sheets) {
-  for (const sheet of sheets) {
+  for (const sheet of Array.isArray(sheets) ? sheets : []) {
     if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
+    /* A week whose date will not parse gets it back off its own serial.
+     *
+     * The serial is the week's key and everything is computed from it; the date beside it is
+     * the same day written the other way, for the screens that print it. An import carrying a
+     * date this browser cannot read (a truncated file, an export edited by hand) left every
+     * screen that prints one throwing: measured, This week came up empty with "Invalid time
+     * value" and no way back except clearing the browser. Repaired rather than dropped, since
+     * the week itself is perfectly good and the serial says which day it is. */
+    for (const week of Array.isArray(sheet?.weeks) ? sheet.weeks : []) {
+      if (!Number.isFinite(week?.serial)) continue;
+      if (Number.isNaN(new Date(week.date).getTime())) week.date = dateFromSerial(week.serial).toISOString();
+    }
   }
-  return sheets;
+  return Array.isArray(sheets) ? sheets : [];
 }
 
 function defaultState() {

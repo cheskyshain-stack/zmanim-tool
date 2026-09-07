@@ -130,11 +130,22 @@ export function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** Whether two שחרית schedules say different things, whatever tags or separators they were
- *  typed with. Used to drop a season line that only repeats the everyday one: the morning of
- *  יום א' of סליחות is the ordinary list, its סליחות having been said the night before, and
- *  printing it again under its own heading says nothing the line above it did not. */
+/** Whether two שחרית schedules say different things, whatever separators they were typed with.
+ *  Used to drop a season line that only repeats the everyday one: the morning of יום א' of
+ *  סליחות is the ordinary list, its סליחות having been said the night before, and printing it
+ *  again under its own heading says nothing the line above it did not.
+ *
+ *  Commas, slashes and spaces are all the same separator here, since the same list is typed
+ *  with any of them (see cellSource in ui/week-sheet.js). The underline is not: it says the
+ *  מנין is בבית מדרש למטה, which is a different thing to say about the same time, and stripping
+ *  every tag alike made two schedules that differ only in which מנין is downstairs compare
+ *  equal, so one of them would have been dropped without a word. The stars, being plain text,
+ *  were never at risk. */
 export function differsFromSchedule(a, b) {
-  const bare = (v) => String(v ?? '').replace(/<[^>]*>/g, '').replace(/[\s,/]+/g, ' ').trim();
+  const bare = (v) => String(v ?? '')
+    .replace(/<\s*\/?\s*u\s*>/gi, '_')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[\s,/]+/g, ' ')
+    .trim();
   return bare(a) !== bare(b);
 }

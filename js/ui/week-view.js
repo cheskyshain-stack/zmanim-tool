@@ -1189,7 +1189,9 @@ function weekCardsHtml(showing, index, state, settings) {
        it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
        and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
        through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
-       below keep, and ahead of them, being the bigger departure from the everyday times. */
+       below keep. Spliced in at the same place they are, so the day that is not the general
+       rule reads first: those splice after these and so end up above them, which puts a fast
+       ahead of the season line covering the rest of its week. */
     const season = slichosWeekLines(showing, settings)
       .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
     if (season.length) {

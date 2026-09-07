@@ -27,10 +27,10 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
       <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
-        <label><input type="checkbox" name="always" ${prefill?.condition.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition.hebrewDate || []).join(', ')) : ''}"></label>
+        <label><input type="checkbox" name="always" ${prefill?.condition?.always ? 'checked' : ''}> Always (every week)</label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -170,7 +170,11 @@ function splitCsv(str) {
     .map((s) => s.trim())
     .filter(Boolean);
 }
-function conditionSummary(c) {
+/** A rule with no condition at all is not one the Rules form can make, but it is one an
+ *  import can carry: an older export, or a file edited by hand. Reading a field off it threw
+ *  and took the Rules panel, and Settings with it, off the screen. It says so instead. */
+function conditionSummary(condition) {
+  const c = condition || {};
   const parts = [];
   if (c.always) parts.push('always');
   if (c.specialParsha) parts.push('special Shabbos: ' + c.specialParsha.join(', '));
