@@ -200,7 +200,32 @@ function renderWeekTab(showPublish) {
   );
 }
 
+/* The screen the last paint drew, so a redraw that stays on the same screen can put the page
+ * back where it was.
+ *
+ * Every button on a tab redraws the whole tab: main.innerHTML is replaced, and for the moment
+ * the container is empty the document has no height, so the browser clamps the scroll position
+ * to 0 and it never comes back. On a desktop it does not show, the page being tall enough
+ * either way that there is nothing to clamp. On a phone it is every press: This week's
+ * Previous, Today, Next and all three Layout switches are below the fold with the sheet under
+ * them, and each one threw the page back to the top, so reading the next week meant scrolling
+ * down again first. The Posters tab has had its own answer to this for a while, redrawInPlace;
+ * this is the same answer for every tab at once.
+ *
+ * Only when the screen has not changed. Arriving at a different tab, or opening or closing a
+ * sheet, should start at the top, and does. Nor when Publishing has just been asked for, since
+ * that trip scrolls itself to the panel it came for. */
+let painted = { tab: null, sheet: null };
+
 function render() {
+  const held = painted.tab === currentTab && painted.sheet === currentSheetId && !openPublish;
+  const y = window.scrollY;
+  painted = { tab: currentTab, sheet: currentSheetId };
+  paint();
+  if (held) window.scrollTo(0, y);
+}
+
+function paint() {
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
   // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,

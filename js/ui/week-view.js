@@ -16,7 +16,8 @@ import { TZG_TEXT } from '../posters/tzomgedalia.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInWeek,
+  jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
 import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
@@ -40,32 +41,6 @@ import { chartSpreads } from './chart-view.js';
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
 
-function specialDaysInWeek(shabbosSerial, settings) {
-  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
-  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
-  const byName = new Map();
-  for (let offset = 6; offset >= 1; offset--) {
-    const serial = shabbosSerial - offset;
-    // offset 6 is the Sunday of that week, offset 1 the Friday.
-    const day = DAY_NAMES[6 - offset];
-    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
-    for (const name of names) {
-      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
-      if (!byName.has(name)) byName.set(name, []);
-      byName.get(name).push(day);
-    }
-  }
-  /* צום גדליה is marked, because it does not run the schedule the others do: the shul's own
-     sheet for that day starts at 6:20 where the ר"ח / בה"ב / תענית list out of Settings starts
-     at 6:40, and the card and the sheet on the wall should not be saying two things. Matched
-     on the name, which is how the two days above are left out, and both of the names the
-     calendar can give it. */
-  return [...byName.entries()].map(([name, days]) => ({
-    name,
-    day: days.join(', '),
-    fast: /צום גדליה|Gedaly/.test(name),
-  }));
-}
 
 /** Which of a week's two cards comes first: the שבת page or the חול page.
  *
@@ -173,7 +148,7 @@ let pairView = false;
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
  *  congregation's page still shows anybody who does not go looking for the others. */
-let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'blocks' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -1314,7 +1289,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
   // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+    weekTitle(showing, index, state, settings),
+    { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
   const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
   const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
@@ -1371,9 +1347,14 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                 ? switchHtml('week-layout', 'Layout', [
                   { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
                   { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
+                  // The same sheet with its זמני חול set as the חול card sets it, a name on a
+                  // line of its own with its times under it. Its own side of the switch rather
+                  // than the way the sheet is set, because it costs the שבת block above it
+                  // several steps of type: see sheetRow in week-sheet.js.
+                  { value: 'blocks', label: 'Blocks', on: weekLayout === 'blocks' },
                   // The side beside it says sheet, so this reads as one sheet without חול
-                  // without having to say it, which it has no room to: three sides of a
-                  // switch get 86px of text each on a phone.
+                  // without having to say it, which it has no room to: four sides of a
+                  // switch get 65px of text each on a phone.
                   { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
@@ -1606,7 +1587,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
       const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+        weekTitle(serial, index, state, settings),
+        { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);

@@ -4,6 +4,7 @@
 // (no external calendar library) so results match the source workbook exactly,
 // including its specific special-Shabbos day-of-year definitions.
 import { excelSerial } from './zmanim/solar.js';
+import { DAY_NAMES } from './util.js';
 
 /** Excel MOD: result takes the sign of the divisor (n - d*FLOOR(n/d)), unlike JS %. */
 function mod(n, d) {
@@ -308,4 +309,41 @@ export function hasTaanis(serial, settings) {
     default:
       return '';
   }
+}
+
+/** The days of one week that run a שחרית of their own: ראש חודש, בה"ב and the fasts.
+ *
+ *  Lives here rather than beside either of the two things that draw it, because both do: the
+ *  week card and the week on one sheet each add a line for these days, and two copies of the
+ *  rule would eventually disagree about which days they are.
+ *
+ *  יום כפור and תשעה באב are left out. Neither runs a schedule that can be read as "שחרית is
+ *  earlier that day": both have their own sheet entirely, and listing them beside a regular
+ *  שחרית time would be worse than saying nothing.
+ */
+export function specialDaysInWeek(shabbosSerial, settings) {
+  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
+  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
+  const byName = new Map();
+  for (let offset = 6; offset >= 1; offset--) {
+    const serial = shabbosSerial - offset;
+    // offset 6 is the Sunday of that week, offset 1 the Friday.
+    const day = DAY_NAMES[6 - offset];
+    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
+    for (const name of names) {
+      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(day);
+    }
+  }
+  /* צום גדליה is marked, because it does not run the schedule the others do: the shul's own
+     sheet for that day starts at 6:20 where the ר"ח / בה"ב / תענית list out of Settings starts
+     at 6:40, and the card and the sheet on the wall should not be saying two things. Matched
+     on the name, which is how the two days above are left out, and both of the names the
+     calendar can give it. */
+  return [...byName.entries()].map(([name, days]) => ({
+    name,
+    day: days.join(', '),
+    fast: /צום גדליה|Gedaly/.test(name),
+  }));
 }

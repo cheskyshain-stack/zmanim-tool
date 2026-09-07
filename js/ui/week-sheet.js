@@ -30,6 +30,8 @@ import { rowFor, weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { UL_START, UL_END } from '../format.js';
+import { specialDaysInWeek } from '../hebrew-calendar.js';
+import { TZG_TEXT } from '../posters/tzomgedalia.js';
 import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
 
@@ -46,10 +48,15 @@ const esc = (s) => String(s ?? '')
  *  Run together when both sides of a break are nothing but times, which is the case the chart
  *  only broke to fit a column an inch wide; kept when either side carries a word, because a
  *  פלג, a דרשה or a ט באב note is a line of its own and not one more time. */
-function sheetCellHtml(value) {
+function sheetCellHtml(value, { split = false } = {}) {
   const text = cellSource(value);
   if (!text) return '';
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  // `split` keeps every break the cell came with, which is what the זמני חול block wants: its
+  // lines are two schedules rather than one run cut to fit a column, and the chart itself sets
+  // them on two lines.
+  if (split) return lines.map(esc).join('<br>')
+    .split(esc(UL_START)).join('<u>').split(esc(UL_END)).join('</u>');
   // The separator is a span rather than plain text so a slash left at the end of a line can
   // be turned into the break itself once the type is settled, the same as on the weekday
   // card. It has to be able to turn at all, which the charts' own SLASH cannot: see
@@ -104,19 +111,50 @@ function cellSource(value) {
   return text
     .replace(new RegExp(`${UL_START}\\s*`, 'g'), (m) => (m.includes('\n') ? '\n' : '') + UL_START)
     .replace(new RegExp(`\\s*${UL_END}`, 'g'), (m) => UL_END + (m.includes('\n') ? '\n' : ''))
+    /* Whatever separates two times becomes the slash this sheet separates times with.
+     *
+     * The computed columns are written with slashes and the typed fields out of Settings with
+     * commas or with plain spaces, whichever the shul happened to type: the live שחרית is
+     * "7:00 7:20* 7:35" and the same field on another device is "7:00, 7:20*, 7:35". Left
+     * alone the שחרית row carried two spellings on one line, "7:00, 7:20*, 7:35 / 8:00".
+     *
+     * Only between two times. A space or a comma with a word on either side of it is left
+     * where it is, so a דרשה or a ט באב note is untouched, and so is "פלג 5:44". Nothing is
+     * changed in Settings or on the charts, which keep what was typed into them. */
+    .replace(
+      new RegExp(`([\\d*]${UL_END}?)(?:[ \\t]*,[ \\t]*|[ \\t]+)(?=[\\d${UL_START}])`, 'g'),
+      `$1${SOFT_SLASH}`
+    )
     .trim();
 }
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
  *
  *  The same markup the yomim noraim sheet's rows use, so the two are one design rather than
- *  two that look alike. */
-function sheetRow(label, value, sub = '') {
-  const times = sheetCellHtml(value);
+ *  two that look alike.
+ *
+ *  `stacked` is the other way of setting a row, and the whole of what the Blocks layout is: the
+ *  name on a line of its own with its times centred under it, across the whole sheet. That is
+ *  the חול card's own design and the צום גדליה sheet's, and it is what the weekday runs want,
+ *  those being the long ones. A weekday מנחה at the end of סוכות is eleven מנינים, and a name
+ *  facing its times leaves them half the sheet: on a סוכות week, where that block is all there
+ *  is on the page and the type is set large to fill it, the row wrapped and then hung over the
+ *  row's own padding. Given the width it is one line.
+ *
+ *  It is an option rather than the way this sheet is set, because it costs: the block is three
+ *  lines a row where it was one, so the שבת block above it comes down several steps of type to
+ *  make room. Measured on the שובה week, --op-scale 1.43 as rows against 1.22 as blocks. Which
+ *  of the two is worth having is a question about the week in front of you, so it is asked on
+ *  the switch rather than answered here. */
+function sheetRow(label, value, sub = '', { stacked = false, split = false } = {}) {
+  const times = sheetCellHtml(value, { split });
   if (!times) return '';
-  return `<div class="onepage-row">
+  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}">
       <span class="onepage-label"${hebrewLang(label)}>${esc(label)}${
-        sub ? ` <span class="onepage-sub"${hebrewLang(sub)}>${esc(sub)}</span>` : ''
+        // The sub is isolated, because it is not always Hebrew: the days a special שחרית runs
+        // on are "(Monday, Thursday)", and a bracketed English list inside a right to left name
+        // is reordered without it.
+        sub ? ` <span class="onepage-sub"${hebrewLang(sub)}><bdi>${esc(sub)}</bdi></span>` : ''
       }</span>
       <div class="onepage-times"><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
     </div>`;
@@ -175,8 +213,37 @@ const SHEET_TEXT = {
   shkia: 'שקיעה',
 };
 
+/** The extra שחרית lines a week's own days call for: ראש חודש, בה"ב and a fast.
+ *
+ *  The same three the חול card carries and off the same rule, specialDaysInWeek, so the card
+ *  and the sheet cannot end up naming different days. צום גדליה was missing from this sheet
+ *  altogether: it runs a list of its own, off the ימים נוראים sheet the shul hangs for that
+ *  day, which opens at 6:20 where the ר"ח / בה"ב / תענית list out of Settings opens at 6:40.
+ *
+ *  One line per schedule rather than per day, again as on the card: a week's ר"ח and בה"ב days
+ *  share a list and read as one line naming both. The fast goes first, being the one that is
+ *  not the general rule, and the lines go after the everyday שחרית, because most of the week
+ *  still runs on those times and they are what should be read first. */
+function weekSpecialShacharis(showing, state, settings) {
+  const days = specialDaysInWeek(showing, settings);
+  const name = (d) => `שחרית ${d.name}`;
+  const out = [];
+  for (const d of days.filter((x) => x.fast)) {
+    out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
+  }
+  const rest = days.filter((x) => !x.fast);
+  if (rest.length && state.settings.weekdayShacharisSpecial) {
+    out.push({
+      label: rest.map((d) => name(d)).join(' · '),
+      html: state.settings.weekdayShacharisSpecial,
+      days: `(${[...new Set(rest.map((d) => d.day))].join(', ')})`,
+    });
+  }
+  return out;
+}
+
 /** The week's blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings, withChol) {
+function sheetSections(showing, index, state, settings, withChol, blocks) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
@@ -207,10 +274,14 @@ function sheetSections(showing, index, state, settings, withChol) {
   const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
+    // Split whichever way the block is set: its lines are two schedules rather than one run
+    // cut to fit a column, so every break the chart gave a cell is kept. See sheetCellHtml.
+    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { stacked: blocks, split: true });
     out.push([SHEET_TEXT.chol, [
-      sheetRow('שחרית', state.settings.weekdayShacharis),
-      sheetRow('מנחה', wdRow.C),
-      sheetRow('מעריב', wdRow.B),
+      chol('שחרית', state.settings.weekdayShacharis),
+      ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
+      chol('מנחה', wdRow.C),
+      chol('מעריב', wdRow.B),
     ]]);
   }
   return out;
@@ -232,8 +303,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-export function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
-  const sections = sheetSections(showing, index, state, settings, withChol);
+export function weekSheetHtml(showing, index, state, settings, title, { withChol = true, blocks = false } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol, blocks);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);

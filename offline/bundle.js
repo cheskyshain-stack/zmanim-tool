@@ -513,6 +513,139 @@ function markHeaderRoom(escaped) {
   return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
 }
 
+// ==== util.js ====
+// Small Excel-semantics helpers shared by the sheet column ports.
+
+// Non-breaking space: used in every "/"-joined time list so the browser can never wrap
+// mid-pair (e.g. "7:30 / 8:15" splitting into "7:30 /" + "8:15") when a column is
+// narrow - only the sheet's own explicit \n line breaks should ever create a new line.
+const NBSP = ' ';
+const SLASH = `${NBSP}/${NBSP}`;
+/** The same separator, but able to turn at the end of a line.
+ *
+ *  SLASH is non-breaking on both sides, which is right in a chart cell: a run of times there
+ *  is broken where the formula says, not where the column runs out. On a sheet that sets a run
+ *  across the page it is wrong twice over. The whole run becomes one unbreakable word, so it
+ *  runs off the side rather than wrapping; and where it does have to wrap there is nowhere to
+ *  do it, so the type cannot be grown to fill the page without spilling.
+ *
+ *  A non-breaking space, a slash, then an ordinary space. The slash is welded to the time in
+ *  front of it and the only place the line can turn is after it, which is the one arrangement
+ *  of the three that cannot strand a slash at the start of a line. A slash left at the end of
+ *  one is turned into the break itself: see breakAtLineEnds in ui/week-view.js. */
+const SOFT_SLASH = `${NBSP}/ `;
+
+/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
+   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
+   <bdi> does, in characters rather than markup: these strings are escaped on their way into
+   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
+   where a tag would be wrong and these are simply invisible.
+
+   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
+   every number after the Hebrew word joins its run and the whole line reverses: measured on
+   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
+   order on a board people read a time off. */
+const ISO_START = '\u2066';
+const ISO_END = '\u2069';
+const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
+
+/* The days of the week as the boards name them, Sunday first so it indexes straight off
+   excelWeekday less one. Here rather than in either of the two files that want it, which
+   had a copy each: the offline build flattens every module into one scope and two consts
+   of the same name in it is a hard error, which is how the pair was found. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+
+/* ' lang="he"' for a string that is Hebrew, and nothing for one that is not, to be dropped
+   straight into a template: `<p class="x"${hebrewLang(value)}>`.
+ *
+ * The documents declare themselves English (the congregation's) or Hebrew (the admin app),
+ * and neither is true of every line inside them. Without this a screen reader says שחרית
+ * in an English voice, letter by letter or as nonsense, which on the week's list is most of
+ * the words on the page.
+ *
+ * It is asked of the string rather than written into the markup by hand because most of
+ * these words are settings somebody types. The subtitle is Hebrew at this shul and could be
+ * English at another, and a cell holds "פלג 6:48" one week and "6:48" the next. Marking the
+ * element in the template would be a guess about the contents that is right today.
+ *
+ * A Latin letter anywhere means no, and that is the point of the rule rather than a
+ * shortcut: the footer and the legend line read "All underlined מנינים will be...", one
+ * Hebrew word in an English sentence, and calling that whole line Hebrew would be the
+ * mistake this is meant to fix, only louder. Those keep no marking at all, which leaves one
+ * word said in the wrong voice instead of a sentence. Marking the word itself means wrapping
+ * runs mid-string, and those two strings are rich text that carries the underline markup the
+ * boards are printed with, so it is not worth the risk to that for one word.
+ *
+ * Digits and punctuation are neither way and are ignored: a time beside a Hebrew word does
+ * not stop the word being Hebrew. */
+const HEBREW_LETTER = /[֐-׿]/;
+const LATIN_LETTER = /[A-Za-z]/;
+function hebrewLang(text) {
+  // Several of these strings arrive as HTML rather than as words: a cell carries the <br>
+  // its line breaks became, and the boards' rich text carries the underline markup. Asked
+  // of the markup, every one of them has Latin letters in it (the "br", the "u") and none
+  // of them would ever be called Hebrew. The tags and any entities come out first, so what
+  // is judged is what is actually read out.
+  const plain = String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ' ');
+  return HEBREW_LETTER.test(plain) && !LATIN_LETTER.test(plain) ? ' lang="he"' : '';
+}
+
+function textjoin(delim, ignoreEmpty, parts) {
+  const flat = [];
+  for (const p of parts) {
+    if (Array.isArray(p)) flat.push(...p);
+    else flat.push(p);
+  }
+  const filtered = ignoreEmpty ? flat.filter((x) => x !== '' && x != null) : flat;
+  return filtered.join(delim);
+}
+function addDays(date, n) {
+  return new Date(date.getTime() + n * 86400000);
+}
+
+/** Flattens arrays (e.g. HSTACK-style pairs) and drops empty/blank entries. */
+function flattenNonEmpty(parts) {
+  const flat = [];
+  for (const p of parts) {
+    if (Array.isArray(p)) flat.push(...p);
+    else flat.push(p);
+  }
+  return flat.filter((x) => x !== '' && x != null);
+}
+
+/** Splits a list of time options across two printed lines, first line getting the
+ *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
+function splitLinesInHalf(items, delim = SLASH) {
+  const cut = Math.floor(items.length / 2);
+  const line1 = items.slice(0, cut).join(delim);
+  const line2 = items.slice(cut).join(delim);
+  return [line1, line2].filter(Boolean).join('\n');
+}
+
+/** HTML escaping, in the two shapes this codebase actually uses.
+ *
+ *  They were seven private copies of `esc`, three of one shape and four of the other, and
+ *  under ES modules that is fine: each file has its own scope. The offline copy flattens
+ *  every module into one script, where seven `function esc` are a legal redeclaration and
+ *  the last one written wins for all of them. Which one that is depends on nothing but
+ *  import order, and import order changes when any module gains an import. So they live
+ *  here, one of each, named for what they are.
+ *
+ *  escAttr also escapes the double quote, and is what anything going into an attribute
+ *  needs: a value carrying a " ends the attribute early otherwise.
+ *
+ *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
+ *  built with it and then compared against what the browser reports for that cell, to decide
+ *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
+ *  browser reports a quote as a quote, so escaping it here would make every cell holding one
+ *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
+function escAttr(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escText(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ==== zmanim/solar.js ====
 // Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
 // (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
@@ -784,6 +917,7 @@ function shulNow(now, settings) {
 // HAS_PARSHA, HAS_SPECIAL_PARSHA, HAS_YOM_TOV, HAS_ROSH_CHODESH). Fully self-contained
 // (no external calendar library) so results match the source workbook exactly,
 // including its specific special-Shabbos day-of-year definitions.
+
 
 /** Excel MOD: result takes the sign of the divisor (n - d*FLOOR(n/d)), unlike JS %. */
 function mod(n, d) {
@@ -1088,6 +1222,43 @@ function hasTaanis(serial, settings) {
     default:
       return '';
   }
+}
+
+/** The days of one week that run a שחרית of their own: ראש חודש, בה"ב and the fasts.
+ *
+ *  Lives here rather than beside either of the two things that draw it, because both do: the
+ *  week card and the week on one sheet each add a line for these days, and two copies of the
+ *  rule would eventually disagree about which days they are.
+ *
+ *  יום כפור and תשעה באב are left out. Neither runs a schedule that can be read as "שחרית is
+ *  earlier that day": both have their own sheet entirely, and listing them beside a regular
+ *  שחרית time would be worse than saying nothing.
+ */
+function specialDaysInWeek(shabbosSerial, settings) {
+  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
+  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
+  const byName = new Map();
+  for (let offset = 6; offset >= 1; offset--) {
+    const serial = shabbosSerial - offset;
+    // offset 6 is the Sunday of that week, offset 1 the Friday.
+    const day = DAY_NAMES[6 - offset];
+    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
+    for (const name of names) {
+      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push(day);
+    }
+  }
+  /* צום גדליה is marked, because it does not run the schedule the others do: the shul's own
+     sheet for that day starts at 6:20 where the ר"ח / בה"ב / תענית list out of Settings starts
+     at 6:40, and the card and the sheet on the wall should not be saying two things. Matched
+     on the name, which is how the two days above are left out, and both of the names the
+     calendar can give it. */
+  return [...byName.entries()].map(([name, days]) => ({
+    name,
+    day: days.join(', '),
+    fast: /צום גדליה|Gedaly/.test(name),
+  }));
 }
 
 // ==== posters/minyanim.js ====
@@ -1858,139 +2029,6 @@ function openingMincha(minchaGedola, next) {
   if (EM_FIRST >= gedola - 1e-9) return EM_FIRST;
   if (EM_SECOND >= gedola - 1e-9 && next - EM_SECOND >= EM_GAP - 1e-9) return EM_SECOND;
   return null;
-}
-
-// ==== util.js ====
-// Small Excel-semantics helpers shared by the sheet column ports.
-
-// Non-breaking space: used in every "/"-joined time list so the browser can never wrap
-// mid-pair (e.g. "7:30 / 8:15" splitting into "7:30 /" + "8:15") when a column is
-// narrow - only the sheet's own explicit \n line breaks should ever create a new line.
-const NBSP = ' ';
-const SLASH = `${NBSP}/${NBSP}`;
-/** The same separator, but able to turn at the end of a line.
- *
- *  SLASH is non-breaking on both sides, which is right in a chart cell: a run of times there
- *  is broken where the formula says, not where the column runs out. On a sheet that sets a run
- *  across the page it is wrong twice over. The whole run becomes one unbreakable word, so it
- *  runs off the side rather than wrapping; and where it does have to wrap there is nowhere to
- *  do it, so the type cannot be grown to fill the page without spilling.
- *
- *  A non-breaking space, a slash, then an ordinary space. The slash is welded to the time in
- *  front of it and the only place the line can turn is after it, which is the one arrangement
- *  of the three that cannot strand a slash at the start of a line. A slash left at the end of
- *  one is turned into the break itself: see breakAtLineEnds in ui/week-view.js. */
-const SOFT_SLASH = `${NBSP}/ `;
-
-/* Around a Hebrew word that has to sit in a line of times, so the times after it keep their
-   order. U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, which is what a
-   <bdi> does, in characters rather than markup: these strings are escaped on their way into
-   a cell, so a tag would arrive as text, and they are also copied, exported and read back,
-   where a tag would be wrong and these are simply invisible.
-
-   Not a nicety. The שבת שובה cell is "דרשה 5:15 / 6:14 / 6:29", and without the isolate
-   every number after the Hebrew word joins its run and the whole line reverses: measured on
-   the chart, it came out on screen as "6:29 / 6:14 / 5:15 דרשה", the times in the wrong
-   order on a board people read a time off. */
-const ISO_START = '\u2066';
-const ISO_END = '\u2069';
-const isolate = (text) => `${ISO_START}${text}${ISO_END}`;
-
-/* The days of the week as the boards name them, Sunday first so it indexes straight off
-   excelWeekday less one. Here rather than in either of the two files that want it, which
-   had a copy each: the offline build flattens every module into one scope and two consts
-   of the same name in it is a hard error, which is how the pair was found. */
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
-
-/* ' lang="he"' for a string that is Hebrew, and nothing for one that is not, to be dropped
-   straight into a template: `<p class="x"${hebrewLang(value)}>`.
- *
- * The documents declare themselves English (the congregation's) or Hebrew (the admin app),
- * and neither is true of every line inside them. Without this a screen reader says שחרית
- * in an English voice, letter by letter or as nonsense, which on the week's list is most of
- * the words on the page.
- *
- * It is asked of the string rather than written into the markup by hand because most of
- * these words are settings somebody types. The subtitle is Hebrew at this shul and could be
- * English at another, and a cell holds "פלג 6:48" one week and "6:48" the next. Marking the
- * element in the template would be a guess about the contents that is right today.
- *
- * A Latin letter anywhere means no, and that is the point of the rule rather than a
- * shortcut: the footer and the legend line read "All underlined מנינים will be...", one
- * Hebrew word in an English sentence, and calling that whole line Hebrew would be the
- * mistake this is meant to fix, only louder. Those keep no marking at all, which leaves one
- * word said in the wrong voice instead of a sentence. Marking the word itself means wrapping
- * runs mid-string, and those two strings are rich text that carries the underline markup the
- * boards are printed with, so it is not worth the risk to that for one word.
- *
- * Digits and punctuation are neither way and are ignored: a time beside a Hebrew word does
- * not stop the word being Hebrew. */
-const HEBREW_LETTER = /[֐-׿]/;
-const LATIN_LETTER = /[A-Za-z]/;
-function hebrewLang(text) {
-  // Several of these strings arrive as HTML rather than as words: a cell carries the <br>
-  // its line breaks became, and the boards' rich text carries the underline markup. Asked
-  // of the markup, every one of them has Latin letters in it (the "br", the "u") and none
-  // of them would ever be called Hebrew. The tags and any entities come out first, so what
-  // is judged is what is actually read out.
-  const plain = String(text ?? '').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ' ');
-  return HEBREW_LETTER.test(plain) && !LATIN_LETTER.test(plain) ? ' lang="he"' : '';
-}
-
-function textjoin(delim, ignoreEmpty, parts) {
-  const flat = [];
-  for (const p of parts) {
-    if (Array.isArray(p)) flat.push(...p);
-    else flat.push(p);
-  }
-  const filtered = ignoreEmpty ? flat.filter((x) => x !== '' && x != null) : flat;
-  return filtered.join(delim);
-}
-function addDays(date, n) {
-  return new Date(date.getTime() + n * 86400000);
-}
-
-/** Flattens arrays (e.g. HSTACK-style pairs) and drops empty/blank entries. */
-function flattenNonEmpty(parts) {
-  const flat = [];
-  for (const p of parts) {
-    if (Array.isArray(p)) flat.push(...p);
-    else flat.push(p);
-  }
-  return flat.filter((x) => x !== '' && x != null);
-}
-
-/** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
-function splitLinesInHalf(items, delim = SLASH) {
-  const cut = Math.floor(items.length / 2);
-  const line1 = items.slice(0, cut).join(delim);
-  const line2 = items.slice(cut).join(delim);
-  return [line1, line2].filter(Boolean).join('\n');
-}
-
-/** HTML escaping, in the two shapes this codebase actually uses.
- *
- *  They were seven private copies of `esc`, three of one shape and four of the other, and
- *  under ES modules that is fine: each file has its own scope. The offline copy flattens
- *  every module into one script, where seven `function esc` are a legal redeclaration and
- *  the last one written wins for all of them. Which one that is depends on nothing but
- *  import order, and import order changes when any module gains an import. So they live
- *  here, one of each, named for what they are.
- *
- *  escAttr also escapes the double quote, and is what anything going into an attribute
- *  needs: a value carrying a " ends the attribute early otherwise.
- *
- *  escText leaves the quote alone, and the chart cells need it left alone. A cell's HTML is
- *  built with it and then compared against what the browser reports for that cell, to decide
- *  whether somebody has actually edited it (see baselineHtmlFor in sheet-view.js). The
- *  browser reports a quote as a quote, so escaping it here would make every cell holding one
- *  look edited, and the Hebrew on these charts is full of them: שליט"א, ר"ח, מ"א, גר"א. */
-function escAttr(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-function escText(str) {
-  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ==== posters/yomkippur.js ====
@@ -5657,10 +5695,14 @@ function switchHtml(name, question, sides) {
   // The question and the switch are siblings rather than the switch being wrapped in a row
   // of its own, so that switches stacked in a panel can share one grid and line their
   // tracks up with each other. aria-labelledby does not care how they are nested.
-  // is-three when there are three answers rather than two, which is all the thumb needs to
-  // know: it is a third of the track instead of a half, and it has one more place to stop.
+  // is-three or is-four when there are more than two answers, which is all the thumb needs to
+  // know: how much of the track it covers, and how many places it has to stop. Counted rather
+  // than assumed, because it was `sides.length > 2 ? ' is-three'` while three was the most
+  // there were, and a fourth side under that rule got a thumb a third of the track wide that
+  // could not reach it.
+  const many = sides.length > 3 ? ' is-four' : sides.length > 2 ? ' is-three' : '';
   return `<span class="week-switch-label" id="${name}-label">${question}</span>
-    <div class="week-switch${sides.length > 2 ? ' is-three' : ''}" role="radiogroup" aria-labelledby="${name}-label">
+    <div class="week-switch${many}" role="radiogroup" aria-labelledby="${name}-label">
       ${sides.map(side).join('')}
       <span class="week-switch-thumb" aria-hidden="true"></span>
     </div>`;
@@ -11553,6 +11595,8 @@ function showToast(message) {
 
 
 
+
+
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
 const SHEET_FONT = 'Times New Roman';
@@ -11566,10 +11610,15 @@ const esc = (s) => String(s ?? '')
  *  Run together when both sides of a break are nothing but times, which is the case the chart
  *  only broke to fit a column an inch wide; kept when either side carries a word, because a
  *  פלג, a דרשה or a ט באב note is a line of its own and not one more time. */
-function sheetCellHtml(value) {
+function sheetCellHtml(value, { split = false } = {}) {
   const text = cellSource(value);
   if (!text) return '';
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  // `split` keeps every break the cell came with, which is what the זמני חול block wants: its
+  // lines are two schedules rather than one run cut to fit a column, and the chart itself sets
+  // them on two lines.
+  if (split) return lines.map(esc).join('<br>')
+    .split(esc(UL_START)).join('<u>').split(esc(UL_END)).join('</u>');
   // The separator is a span rather than plain text so a slash left at the end of a line can
   // be turned into the break itself once the type is settled, the same as on the weekday
   // card. It has to be able to turn at all, which the charts' own SLASH cannot: see
@@ -11624,19 +11673,50 @@ function cellSource(value) {
   return text
     .replace(new RegExp(`${UL_START}\\s*`, 'g'), (m) => (m.includes('\n') ? '\n' : '') + UL_START)
     .replace(new RegExp(`\\s*${UL_END}`, 'g'), (m) => UL_END + (m.includes('\n') ? '\n' : ''))
+    /* Whatever separates two times becomes the slash this sheet separates times with.
+     *
+     * The computed columns are written with slashes and the typed fields out of Settings with
+     * commas or with plain spaces, whichever the shul happened to type: the live שחרית is
+     * "7:00 7:20* 7:35" and the same field on another device is "7:00, 7:20*, 7:35". Left
+     * alone the שחרית row carried two spellings on one line, "7:00, 7:20*, 7:35 / 8:00".
+     *
+     * Only between two times. A space or a comma with a word on either side of it is left
+     * where it is, so a דרשה or a ט באב note is untouched, and so is "פלג 5:44". Nothing is
+     * changed in Settings or on the charts, which keep what was typed into them. */
+    .replace(
+      new RegExp(`([\\d*]${UL_END}?)(?:[ \\t]*,[ \\t]*|[ \\t]+)(?=[\\d${UL_START}])`, 'g'),
+      `$1${SOFT_SLASH}`
+    )
     .trim();
 }
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
  *
  *  The same markup the yomim noraim sheet's rows use, so the two are one design rather than
- *  two that look alike. */
-function sheetRow(label, value, sub = '') {
-  const times = sheetCellHtml(value);
+ *  two that look alike.
+ *
+ *  `stacked` is the other way of setting a row, and the whole of what the Blocks layout is: the
+ *  name on a line of its own with its times centred under it, across the whole sheet. That is
+ *  the חול card's own design and the צום גדליה sheet's, and it is what the weekday runs want,
+ *  those being the long ones. A weekday מנחה at the end of סוכות is eleven מנינים, and a name
+ *  facing its times leaves them half the sheet: on a סוכות week, where that block is all there
+ *  is on the page and the type is set large to fill it, the row wrapped and then hung over the
+ *  row's own padding. Given the width it is one line.
+ *
+ *  It is an option rather than the way this sheet is set, because it costs: the block is three
+ *  lines a row where it was one, so the שבת block above it comes down several steps of type to
+ *  make room. Measured on the שובה week, --op-scale 1.43 as rows against 1.22 as blocks. Which
+ *  of the two is worth having is a question about the week in front of you, so it is asked on
+ *  the switch rather than answered here. */
+function sheetRow(label, value, sub = '', { stacked = false, split = false } = {}) {
+  const times = sheetCellHtml(value, { split });
   if (!times) return '';
-  return `<div class="onepage-row">
+  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}">
       <span class="onepage-label"${hebrewLang(label)}>${esc(label)}${
-        sub ? ` <span class="onepage-sub"${hebrewLang(sub)}>${esc(sub)}</span>` : ''
+        // The sub is isolated, because it is not always Hebrew: the days a special שחרית runs
+        // on are "(Monday, Thursday)", and a bracketed English list inside a right to left name
+        // is reordered without it.
+        sub ? ` <span class="onepage-sub"${hebrewLang(sub)}><bdi>${esc(sub)}</bdi></span>` : ''
       }</span>
       <div class="onepage-times"><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
     </div>`;
@@ -11695,8 +11775,37 @@ const SHEET_TEXT = {
   shkia: 'שקיעה',
 };
 
+/** The extra שחרית lines a week's own days call for: ראש חודש, בה"ב and a fast.
+ *
+ *  The same three the חול card carries and off the same rule, specialDaysInWeek, so the card
+ *  and the sheet cannot end up naming different days. צום גדליה was missing from this sheet
+ *  altogether: it runs a list of its own, off the ימים נוראים sheet the shul hangs for that
+ *  day, which opens at 6:20 where the ר"ח / בה"ב / תענית list out of Settings opens at 6:40.
+ *
+ *  One line per schedule rather than per day, again as on the card: a week's ר"ח and בה"ב days
+ *  share a list and read as one line naming both. The fast goes first, being the one that is
+ *  not the general rule, and the lines go after the everyday שחרית, because most of the week
+ *  still runs on those times and they are what should be read first. */
+function weekSpecialShacharis(showing, state, settings) {
+  const days = specialDaysInWeek(showing, settings);
+  const name = (d) => `שחרית ${d.name}`;
+  const out = [];
+  for (const d of days.filter((x) => x.fast)) {
+    out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
+  }
+  const rest = days.filter((x) => !x.fast);
+  if (rest.length && state.settings.weekdayShacharisSpecial) {
+    out.push({
+      label: rest.map((d) => name(d)).join(' · '),
+      html: state.settings.weekdayShacharisSpecial,
+      days: `(${[...new Set(rest.map((d) => d.day))].join(', ')})`,
+    });
+  }
+  return out;
+}
+
 /** The week's blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings, withChol) {
+function sheetSections(showing, index, state, settings, withChol, blocks) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
@@ -11727,10 +11836,14 @@ function sheetSections(showing, index, state, settings, withChol) {
   const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
+    // Split whichever way the block is set: its lines are two schedules rather than one run
+    // cut to fit a column, so every break the chart gave a cell is kept. See sheetCellHtml.
+    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { stacked: blocks, split: true });
     out.push([SHEET_TEXT.chol, [
-      sheetRow('שחרית', state.settings.weekdayShacharis),
-      sheetRow('מנחה', wdRow.C),
-      sheetRow('מעריב', wdRow.B),
+      chol('שחרית', state.settings.weekdayShacharis),
+      ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
+      chol('מנחה', wdRow.C),
+      chol('מעריב', wdRow.B),
     ]]);
   }
   return out;
@@ -11752,8 +11865,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
-  const sections = sheetSections(showing, index, state, settings, withChol);
+function weekSheetHtml(showing, index, state, settings, title, { withChol = true, blocks = false } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol, blocks);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);
@@ -11969,32 +12082,6 @@ function fitWeekSheet(container) {
  *  have their own schedule entirely, and listing them beside a regular שחרית time would
  *  be worse than saying nothing. */
 
-function specialDaysInWeek(shabbosSerial, settings) {
-  // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
-  // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
-  const byName = new Map();
-  for (let offset = 6; offset >= 1; offset--) {
-    const serial = shabbosSerial - offset;
-    // offset 6 is the Sunday of that week, offset 1 the Friday.
-    const day = DAY_NAMES[6 - offset];
-    const names = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)].filter(Boolean);
-    for (const name of names) {
-      if (/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(name)) continue;
-      if (!byName.has(name)) byName.set(name, []);
-      byName.get(name).push(day);
-    }
-  }
-  /* צום גדליה is marked, because it does not run the schedule the others do: the shul's own
-     sheet for that day starts at 6:20 where the ר"ח / בה"ב / תענית list out of Settings starts
-     at 6:40, and the card and the sheet on the wall should not be saying two things. Matched
-     on the name, which is how the two days above are left out, and both of the names the
-     calendar can give it. */
-  return [...byName.entries()].map(([name, days]) => ({
-    name,
-    day: days.join(', '),
-    fast: /צום גדליה|Gedaly/.test(name),
-  }));
-}
 
 /** Which of a week's two cards comes first: the שבת page or the חול page.
  *
@@ -12102,7 +12189,7 @@ let pairView = false;
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
  *  congregation's page still shows anybody who does not go looking for the others. */
-let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'blocks' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -13243,7 +13330,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
   // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+    weekTitle(showing, index, state, settings),
+    { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
   const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
   const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
@@ -13300,9 +13388,14 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
                 ? switchHtml('week-layout', 'Layout', [
                   { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
                   { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
+                  // The same sheet with its זמני חול set as the חול card sets it, a name on a
+                  // line of its own with its times under it. Its own side of the switch rather
+                  // than the way the sheet is set, because it costs the שבת block above it
+                  // several steps of type: see sheetRow in week-sheet.js.
+                  { value: 'blocks', label: 'Blocks', on: weekLayout === 'blocks' },
                   // The side beside it says sheet, so this reads as one sheet without חול
-                  // without having to say it, which it has no room to: three sides of a
-                  // switch get 86px of text each on a phone.
+                  // without having to say it, which it has no room to: four sides of a
+                  // switch get 65px of text each on a phone.
                   { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
@@ -13535,7 +13628,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
       const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+        weekTitle(serial, index, state, settings),
+        { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);
@@ -13878,7 +13972,32 @@ function renderWeekTab(showPublish) {
   );
 }
 
+/* The screen the last paint drew, so a redraw that stays on the same screen can put the page
+ * back where it was.
+ *
+ * Every button on a tab redraws the whole tab: main.innerHTML is replaced, and for the moment
+ * the container is empty the document has no height, so the browser clamps the scroll position
+ * to 0 and it never comes back. On a desktop it does not show, the page being tall enough
+ * either way that there is nothing to clamp. On a phone it is every press: This week's
+ * Previous, Today, Next and all three Layout switches are below the fold with the sheet under
+ * them, and each one threw the page back to the top, so reading the next week meant scrolling
+ * down again first. The Posters tab has had its own answer to this for a while, redrawInPlace;
+ * this is the same answer for every tab at once.
+ *
+ * Only when the screen has not changed. Arriving at a different tab, or opening or closing a
+ * sheet, should start at the top, and does. Nor when Publishing has just been asked for, since
+ * that trip scrolls itself to the panel it came for. */
+let painted = { tab: null, sheet: null };
+
 function render() {
+  const held = painted.tab === currentTab && painted.sheet === currentSheetId && !openPublish;
+  const y = window.scrollY;
+  painted = { tab: currentTab, sheet: currentSheetId };
+  paint();
+  if (held) window.scrollTo(0, y);
+}
+
+function paint() {
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
   // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,

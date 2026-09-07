@@ -987,6 +987,17 @@ td.ruled .cell { background: var(--ruled); }
 .week-switch.is-three .week-switch-thumb { width: calc(33.3333% - 2px); }
 .week-switch.is-three:has(.week-switch-radio:nth-of-type(2):checked) .week-switch-thumb { transform: translateX(100%); }
 .week-switch.is-three:has(.week-switch-radio:nth-of-type(3):checked) .week-switch-thumb { transform: translateX(200%); }
+/* Four answers, which the Layout switch has: Two charts, One sheet, Blocks, Without חול.
+   A quarter of the track and three places to move to.
+
+   The sides are set tighter than on a two or three way, because four of them at the usual
+   padding did not fit a phone: measured at 375px, the track came to 380px and pushed 7px of
+   the document off the side of the screen. */
+.week-switch.is-four .week-switch-thumb { width: calc(25% - 1.5px); }
+.week-switch.is-four:has(.week-switch-radio:nth-of-type(2):checked) .week-switch-thumb { transform: translateX(100%); }
+.week-switch.is-four:has(.week-switch-radio:nth-of-type(3):checked) .week-switch-thumb { transform: translateX(200%); }
+.week-switch.is-four:has(.week-switch-radio:nth-of-type(4):checked) .week-switch-thumb { transform: translateX(300%); }
+.week-switch.is-four .week-switch-side { padding-inline: 0.4rem; min-width: 3.9rem; }
 /* :has() is what moves the thumb, and where it is missing the thumb would sit under the
    left-hand side for ever, saying the opposite of the truth half the time. So where it is
    missing there is no thumb at all and the chosen side is filled in directly. */
@@ -2713,6 +2724,24 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    rows and floated in the gaps. fitWeekSheet works out how much, and caps it, so three rows on
    a Yom Tov week do not end up an inch and a half apart. */
 .poster.is-weeksheet .onepage-row { padding-block: calc(0.014in + var(--ws-gap, 0px) / 2); }
+/* The Blocks layout: a row set as the חול card sets a תפילה and as the צום גדליה sheet does,
+   the name on a line of its own with its times centred under it, across the whole sheet.
+
+   A name facing its times leaves them half the sheet, and the weekday runs are the long ones:
+   the מנחה at the end of סוכות is eleven מנינים, and on a סוכות week, where that block is all
+   there is on the page and the type is set large to fill it, the row wrapped and then hung
+   over the row's own padding. Given the width it is one line. */
+.poster.is-weeksheet .onepage-row.is-stacked { display: block; text-align: center; }
+.poster.is-weeksheet .onepage-row.is-stacked .onepage-label {
+  display: block; text-align: center; margin-bottom: 0.035in;
+}
+/* The days the line is for, "(Wednesday)" under שחרית צום גדליה. Its own line and its own
+   direction: a bracketed list of English day names inside a right-to-left name came out as
+   "(Monday," on one line and "Thursday)" on the next. */
+.poster.is-weeksheet .onepage-row.is-stacked .onepage-sub {
+  display: block; margin-inline-start: 0; font-size: 0.82em; font-weight: 400;
+}
+.poster.is-weeksheet .onepage-row.is-stacked .onepage-times { text-align: center; }
 /* No rule down the middle, there being no middle. */
 .poster.is-weeksheet .onepage-col + .onepage-col { border: 0; }
 
