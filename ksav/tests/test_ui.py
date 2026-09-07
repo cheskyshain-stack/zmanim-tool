@@ -115,8 +115,10 @@ def test_the_vault_lists_every_model_and_none_is_squeezed_away(qt_app, tmp_path,
     shell.show_section("vault")
     qt_app.processEvents()
 
+    from app.platform.models import CATALOGUE
+
     rows = shell.vault._rows
-    assert len(rows) == 5
+    assert len(rows) == len(CATALOGUE)
     for row in rows:
         assert row.sizeHint().height() >= 120, "a row must have room for its own content"
         assert row.action_button.sizeHint().width() >= row.action_button.fontMetrics().horizontalAdvance(
@@ -362,3 +364,218 @@ def test_the_transcript_screen_is_never_the_startup_screen(qt_app, tmp_path, mac
     shell = Shell(settings, machine, recommend(machine), ModelManager(tmp_path / "m"))
     qt_app.processEvents()
     assert shell.stack.currentWidget() is shell.home
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: reading pages
+# ---------------------------------------------------------------------------
+
+
+def _ocr_available() -> bool:
+    try:
+        from app.ocr.tesseract_engine import TesseractEngine
+    except Exception:
+        return False
+    engine = TesseractEngine()
+    usable, _reason = engine.is_available()
+    return usable and "heb" in engine.languages()
+
+
+needs_ocr = pytest.mark.skipif(not _ocr_available(),
+                               reason="Tesseract with Hebrew data is not installed")
+
+
+def _hebrew_page(path: Path, columns=None) -> Path:
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+
+    columns = columns or [(80, ["בראשית ברא אלהים", "את השמים ואת הארץ"])]
+    image = Image.new("L", (1100, 600), 252)
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype("app/export/fonts/frank-ruhl-libre-400.ttf", 34)
+    for x, lines in columns:
+        y = 120
+        for line in lines:
+            draw.text((x, y), line, font=font, fill=18)
+            y += 58
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(path), np.array(image))
+    return path
+
+
+@pytest.fixture
+def ocr_shell(qt_app, tmp_path, machine):
+    from app.ocr import registry as ocr_registry
+    from app.ocr.tesseract_engine import register_into as register_tesseract
+    from app.services.ocr import DocumentStore, OcrService
+
+    ocr_registry.reset()
+    register_tesseract(ocr_registry)
+
+    settings = Settings()
+    ocr_service = OcrService(settings, DocumentStore(tmp_path / "docs"))
+    ocr_queue = JobQueue(ocr_service.make_runner(), tmp_path / "ocrjobs")
+    ocr_queue.start()
+
+    shell = Shell(settings, machine, recommend(machine), ModelManager(tmp_path / "m"),
+                  ocr_queue=ocr_queue, ocr_service=ocr_service)
+    shell.resize(1240, 820)
+    qt_app.processEvents()
+
+    yield shell, ocr_queue, ocr_service, tmp_path
+
+    ocr_queue.stop()
+    ocr_registry.reset()
+
+
+def _run_ocr(qt_app, shell, queue, tmp_path, columns=None, name="page.png"):
+    from app.ocr.base import ScriptHint
+
+    shell.show_section("ocr")
+    qt_app.processEvents()
+    shell.ocr.hint_box.setCurrentIndex(list(ScriptHint).index(ScriptHint.HEBREW_PLAIN))
+    assert shell.ocr.add_paths([_hebrew_page(tmp_path / name, columns)]) == 1
+    for _ in range(200):
+        qt_app.processEvents()
+        time.sleep(0.03)
+        if queue.jobs() and not queue.jobs()[0].is_active:
+            break
+    return queue.jobs()[0]
+
+
+@needs_ocr
+def test_a_page_dropped_in_is_read_and_opens_in_review(ocr_shell, qt_app):
+    shell, queue, _service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path)
+    assert job.status == "done", job.error
+
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+    assert shell.stack.currentWidget() is shell.ocr_review
+    assert "בראשית" in shell.ocr_review.editor.toPlainText()
+
+
+@needs_ocr
+def test_opening_a_document_does_not_wipe_its_text(ocr_shell, qt_app):
+    """The regression this catches deleted every block on load.
+
+    load() called go(), which saved the editor into the current page first. On a
+    fresh document the editor still held the previous one, so saving it in
+    rebuilt the page from nothing. OCR worked perfectly and the screen showed an
+    empty box.
+    """
+    shell, queue, service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path)
+    on_disk = service.store.load(job.result_path)
+    expected = sum(len(p.blocks) for p in on_disk.pages)
+    assert expected > 0, "nothing was recognised, so this test proves nothing"
+
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+    assert len(shell.ocr_review.page.blocks) == expected
+    assert shell.ocr_review.editor.toPlainText().strip()
+
+    # And opening a second document must not empty the first either.
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+    assert len(shell.ocr_review.page.blocks) == expected
+
+
+@needs_ocr
+def test_clicking_a_paragraph_highlights_where_it_came_from(ocr_shell, qt_app):
+    shell, queue, _service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path,
+                   columns=[(680, ["הלכות שבת סימן א"]), (90, ["מעורר השחר ואם"])])
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+
+    view = shell.ocr_review
+    cursor = view.editor.textCursor()
+    cursor.setPosition(2)
+    view.editor.setTextCursor(cursor)
+    qt_app.processEvents()
+    assert view.image._highlight is not None
+    assert view.image._highlight[2] > 0, "the highlight has no width"
+
+
+@needs_ocr
+def test_editing_the_text_is_kept_when_the_page_changes(ocr_shell, qt_app):
+    shell, queue, service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path)
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+
+    view = shell.ocr_review
+    view.editor.setPlainText("corrected by hand")
+    qt_app.processEvents()
+    view._save_edits()
+    assert "corrected by hand" in view.page.text()
+
+
+@needs_ocr
+def test_emptying_the_editor_does_not_delete_the_page(ocr_shell, qt_app):
+    """Clearing a box is never how someone means to delete their text."""
+    shell, queue, _service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path)
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+
+    view = shell.ocr_review
+    before = len(view.page.blocks)
+    view.editor.setPlainText("")
+    view._save_edits()
+    assert len(view.page.blocks) == before
+
+
+@needs_ocr
+def test_a_read_page_exports_to_every_format(ocr_shell, qt_app):
+    shell, queue, _service, tmp_path = ocr_shell
+    job = _run_ocr(qt_app, shell, queue, tmp_path)
+    shell.open_document(job.result_path)
+    qt_app.processEvents()
+
+    for extension in ("txt", "docx", "pdf"):
+        path = shell.ocr_review.export_to(tmp_path / f"out.{extension}")
+        assert path.is_file() and path.stat().st_size > 0, extension
+    assert (tmp_path / "out.txt").read_text(encoding="utf-8-sig").strip()
+
+
+def test_the_hard_scripts_warn_in_the_interface(ocr_shell, qt_app):
+    from app.ocr.base import ScriptHint
+
+    shell, _queue, _service, _tmp = ocr_shell
+    shell.show_section("ocr")
+    view = shell.ocr
+
+    view.hint_box.setCurrentIndex(list(ScriptHint).index(ScriptHint.RASHI))
+    qt_app.processEvents()
+    # isHidden rather than isVisible: the shell is never shown in these tests,
+    # so isVisible is False for every widget regardless of its own state.
+    assert not view.hint_note.isHidden()
+    assert "no good offline model" in view.hint_note.text()
+
+    view.hint_box.setCurrentIndex(list(ScriptHint).index(ScriptHint.HEBREW_PLAIN))
+    qt_app.processEvents()
+    assert view.hint_note.isHidden()
+
+
+def test_a_file_that_is_not_a_page_is_refused(ocr_shell, qt_app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    shell, queue, _service, tmp_path = ocr_shell
+    recording = tmp_path / "shiur.mp3"
+    recording.write_bytes(b"audio")
+    assert shell.ocr.add_paths([recording]) == 0
+    assert not queue.jobs()
+
+
+def test_the_vault_lists_page_reading_packs_as_well_as_speech(qt_app, tmp_path, machine):
+    from app.platform.models import asr_models, ocr_models
+
+    shell = Shell(Settings(), machine, recommend(machine), ModelManager(tmp_path / "m"))
+    qt_app.processEvents()
+    assert len(shell.vault._rows) == len(asr_models()) + len(ocr_models())
+    ids = {row._spec.id for row in shell.vault._rows}
+    assert "ocr-heb" in ids and "whisper-medium" in ids

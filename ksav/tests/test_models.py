@@ -16,7 +16,12 @@ def test_the_catalogue_is_coherent():
         assert spec.licence, f"{spec.id} has no licence recorded"
         assert spec.notes, f"{spec.id} has no explanation for the user"
         required = [f for f in spec.files if not f.optional]
-        assert any(f.name == "model.bin" for f in required), f"{spec.id} has no weights file"
+        if spec.kind == "asr":
+            assert any(f.name == "model.bin" for f in required), \
+                f"{spec.id} has no weights file"
+        elif spec.kind == "ocr":
+            assert any(f.name.endswith(".traineddata") for f in required), \
+                f"{spec.id} has no language data"
 
 
 def test_every_licence_is_one_we_can_distribute():
@@ -24,6 +29,39 @@ def test_every_licence_is_one_we_can_distribute():
     permissive = {"MIT", "Apache-2.0", "BSD-3-Clause"}
     for spec in CATALOGUE:
         assert spec.licence in permissive, f"{spec.id} carries {spec.licence}"
+
+
+def test_speech_and_page_reading_are_both_catalogued():
+    from app.platform.models import asr_models, ocr_models
+
+    assert len(asr_models()) >= 4
+    assert {s.id for s in ocr_models()} >= {"ocr-heb", "ocr-eng"}
+    assert all(s.kind == "ocr" for s in ocr_models())
+
+
+def test_installed_language_packs_are_gathered_into_one_folder(tmp_path):
+    """Tesseract wants all its language data in one directory."""
+    from app.platform.models import BY_ID, ModelManager
+
+    manager = ModelManager(tmp_path / "models")
+    for model_id in ("ocr-heb", "ocr-eng"):
+        spec = BY_ID[model_id]
+        source = tmp_path / "usb" / model_id
+        source.mkdir(parents=True)
+        for f in spec.files:
+            (source / f.name).write_bytes(b"trained")
+        manager.import_from_folder(spec, source)
+
+    tessdata = manager.tessdata_dir()
+    assert {p.name for p in tessdata.glob("*.traineddata")} == {
+        "heb.traineddata", "eng.traineddata"
+    }
+    assert manager.installed_ocr_languages() == {"heb", "eng"}
+
+    manager.remove(BY_ID["ocr-eng"])
+    assert {p.name for p in manager.tessdata_dir().glob("*.traineddata")} == {
+        "heb.traineddata"
+    }
 
 
 def test_nothing_is_installed_on_a_fresh_machine(tmp_path):

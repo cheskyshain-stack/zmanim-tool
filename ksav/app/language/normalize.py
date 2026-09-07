@@ -111,3 +111,28 @@ def title_case_like(replacement: str, original: str) -> str:
     if original[0].isupper():
         return replacement[0].upper() + replacement[1:]
     return replacement
+
+
+def split_by_script(text: str) -> list[tuple[str, bool]]:
+    """Break a mixed string into runs, each entirely Hebrew or entirely not.
+
+    Both exporters need this. Word needs it to mark Hebrew runs as complex
+    script; PDF needs it because a PDF has no layout engine and each run has to
+    be drawn with a font that actually contains its letters.
+
+    Spaces and punctuation join whichever run they follow, so a Hebrew word does
+    not get its trailing space set in the Latin font and vice versa.
+    """
+    if not text:
+        return []
+    runs: list[tuple[str, bool]] = []
+    current: list[str] = []
+    current_hebrew = is_hebrew(text[0])
+    for char in text:
+        char_hebrew = is_hebrew(char) if char.strip() else current_hebrew
+        if char_hebrew != current_hebrew:
+            runs.append(("".join(current), current_hebrew))
+            current, current_hebrew = [], char_hebrew
+        current.append(char)
+    runs.append(("".join(current), current_hebrew))
+    return [(t, h) for t, h in runs if t]

@@ -148,11 +148,83 @@ CATALOGUE: tuple[ModelSpec, ...] = (
 )
 
 
+TESSDATA = "https://github.com/tesseract-ocr/tessdata_best/raw/main"
+
+
+def _traineddata(name: str) -> tuple[ModelFile, ...]:
+    return (ModelFile(f"{name}.traineddata", f"{TESSDATA}/{name}.traineddata"),)
+
+
+# OCR language data goes through the same vault as the speech models, so it
+# downloads the same way, travels on the same USB stick, and is listed in the
+# same place. tessdata_best rather than the standard set: it is slower and
+# noticeably better on Hebrew print, which is the whole point here.
+OCR_CATALOGUE: tuple[ModelSpec, ...] = (
+    ModelSpec(
+        id="ocr-heb",
+        name="Hebrew page reading",
+        engine_id="tesseract",
+        kind="ocr",
+        files=_traineddata("heb"),
+        size_bytes=11_500_000,
+        licence="Apache-2.0",
+        languages=("he",),
+        notes="Needed for anything in Hebrew letters. Honest at roughly 92 to 96 "
+              "percent on clean modern print, and much weaker on old seforim.",
+        min_ram_gb=2,
+    ),
+    ModelSpec(
+        id="ocr-yid",
+        name="Yiddish page reading",
+        engine_id="tesseract",
+        kind="ocr",
+        files=_traineddata("yid"),
+        size_bytes=4_200_000,
+        licence="Apache-2.0",
+        languages=("yi",),
+        notes="Yiddish spelling differs enough from Hebrew that reading it as "
+              "Hebrew costs real accuracy. Worth installing for Yiddish books "
+              "and newsletters.",
+        min_ram_gb=2,
+    ),
+    ModelSpec(
+        id="ocr-eng",
+        name="English page reading",
+        engine_id="tesseract",
+        kind="ocr",
+        files=_traineddata("eng"),
+        size_bytes=12_500_000,
+        licence="Apache-2.0",
+        languages=("en",),
+        notes="Needed for English pages and for the English half of a mixed page.",
+        min_ram_gb=2,
+    ),
+    ModelSpec(
+        id="ocr-osd",
+        name="Page orientation",
+        engine_id="tesseract",
+        kind="ocr",
+        files=_traineddata("osd"),
+        size_bytes=10_500_000,
+        licence="Apache-2.0",
+        languages=(),
+        notes="Works out which way up a page is, so a photo taken sideways is "
+              "turned before it is read.",
+        min_ram_gb=2,
+    ),
+)
+
+CATALOGUE = CATALOGUE + OCR_CATALOGUE
+
 BY_ID = {spec.id: spec for spec in CATALOGUE}
 
 
 def asr_models() -> list[ModelSpec]:
     return [s for s in CATALOGUE if s.kind == "asr"]
+
+
+def ocr_models() -> list[ModelSpec]:
+    return [s for s in CATALOGUE if s.kind == "ocr"]
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +460,55 @@ class ModelManager:
         directory = self.directory(spec)
         if directory.is_dir():
             shutil.rmtree(directory)
+
+    def tessdata_dir(self) -> Path:
+        """One folder holding every installed Tesseract language file.
+
+        Tesseract wants all its language data in a single directory, but each
+        pack installs into its own folder like everything else in the vault. So
+        the installed files are gathered here. They are a few megabytes each and
+        the copy happens once, when the set changes, which is simpler and more
+        portable than a symlink farm that needs privileges on Windows.
+        """
+        target = self.root / "tessdata"
+        target.mkdir(parents=True, exist_ok=True)
+
+        wanted: dict[str, Path] = {}
+        # Start from whatever language data shipped with Ksav, so installing one
+        # extra pack does not hide the ones that were already present.
+        bundled = paths.VENDOR_DIR / "tesseract" / "tessdata"
+        if bundled.is_dir():
+            for existing in bundled.glob("*.traineddata"):
+                wanted[existing.name] = existing
+
+        for spec in ocr_models():
+            if not self.state(spec).installed:
+                continue
+            for model_file in spec.files:
+                source = self.directory(spec) / model_file.name
+                if source.is_file():
+                    wanted[model_file.name] = source
+
+        for name, source in wanted.items():
+            destination = target / name
+            if (not destination.is_file()
+                    or destination.stat().st_size != source.stat().st_size):
+                import shutil
+
+                shutil.copy2(source, destination)
+
+        for existing in target.glob("*.traineddata"):
+            if existing.name not in wanted:
+                existing.unlink(missing_ok=True)
+
+        return target
+
+    def installed_ocr_languages(self) -> set[str]:
+        return {
+            f.name.replace(".traineddata", "")
+            for spec in ocr_models() if self.state(spec).installed
+            for f in spec.files
+        }
 
     def total_bytes_on_disk(self) -> int:
         if not self.root.is_dir():

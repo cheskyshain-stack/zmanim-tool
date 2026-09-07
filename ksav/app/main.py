@@ -41,11 +41,15 @@ def build_services(settings):
     from app.asr.demo_engine import register_into as register_demo
     from app.asr.faster_whisper_engine import register_into as register_whisper
     from app.language.lexicon import Lexicon
+    from app.ocr import registry as ocr_registry
+    from app.ocr.tesseract_engine import register_into as register_tesseract
     from app.services.job_queue import JobQueue
+    from app.services.ocr import OcrService
     from app.services.transcription import TranscriptionService
 
     register_whisper(asr_registry)
     register_demo(asr_registry)
+    register_tesseract(ocr_registry)
 
     lexicon = Lexicon(paths.lexicon_db())
     seed = paths.bundle_root() / "app" / "language" / "data" / "seed_lexicon.jsonl"
@@ -55,14 +59,24 @@ def build_services(settings):
             klogging.get("ksav").info("seeded %d dictionary terms", added)
 
     service = TranscriptionService(settings, lexicon)
-    queue = JobQueue(service.make_runner())
+    # Two queues rather than one: a page being read should not sit behind a
+    # three hour shiur, and each journals into its own folder so a restart
+    # restores them independently.
+    queue = JobQueue(service.make_runner(), paths.jobs_dir() / "transcribe")
     queue.restore()
     queue.start()
-    return lexicon, queue, service
+
+    ocr_service = OcrService(settings, manager=ModelManager())
+    ocr_queue = JobQueue(ocr_service.make_runner(), paths.jobs_dir() / "ocr")
+    ocr_queue.restore()
+    ocr_queue.start()
+
+    return lexicon, queue, service, ocr_queue, ocr_service
 
 
 def build_window(settings, hardware, recommendation, manager,
-                 lexicon=None, queue=None, service=None):
+                 lexicon=None, queue=None, service=None,
+                 ocr_queue=None, ocr_service=None):
     from PySide6.QtWidgets import QMainWindow
 
     from app.ui.shell import Shell
@@ -73,7 +87,8 @@ def build_window(settings, hardware, recommendation, manager,
     window.setMinimumSize(940, 620)
 
     shell = Shell(settings, hardware, recommendation, manager,
-                  lexicon=lexicon, queue=queue, service=service)
+                  lexicon=lexicon, queue=queue, service=service,
+                  ocr_queue=ocr_queue, ocr_service=ocr_service)
     window.setCentralWidget(shell)
     shell.apply_theme()
 
@@ -81,9 +96,10 @@ def build_window(settings, hardware, recommendation, manager,
 
     def on_close(event):
         shell.persist()
-        if queue is not None:
-            # Journalled work resumes next launch; this just stops the worker.
-            queue.stop()
+        for background in (queue, ocr_queue):
+            if background is not None:
+                # Journalled work resumes next launch; this stops the worker.
+                background.stop()
         original_close(event)
 
     window.closeEvent = on_close
@@ -105,18 +121,20 @@ def main() -> int:
     log.info("recommended: %s on %s", recommendation.asr_model, recommendation.device)
 
     manager = ModelManager()
-    lexicon, queue, service = build_services(settings)
+    lexicon, queue, service, ocr_queue, ocr_service = build_services(settings)
 
     app = build_application()
     window, _shell = build_window(
         settings, hardware, recommendation, manager,
         lexicon=lexicon, queue=queue, service=service,
+        ocr_queue=ocr_queue, ocr_service=ocr_service,
     )
     window.show()
     try:
         return app.exec()
     finally:
         queue.stop()
+        ocr_queue.stop()
         lexicon.close()
 
 

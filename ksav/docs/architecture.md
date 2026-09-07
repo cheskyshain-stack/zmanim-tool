@@ -101,6 +101,41 @@ Adding an engine is a new file, one registry line, and a catalogue entry in
 concrete meaning of replacing the transcription or OCR model later without
 rewriting the program.
 
+## Reading pages
+
+Recognition and layout are separate on purpose. A page can be laid out well and
+read badly, or the reverse, and keeping them apart means the Rashi problem can be
+attacked by swapping the recogniser without touching column detection.
+
+Three things in the OCR path are worth knowing.
+
+**Skew is measured by projection profile, not by minAreaRect on the ink.**
+minAreaRect was tried first: its angle convention differs between OpenCV versions
+(5.0 returns (-90, 0] and swaps the rectangle's sides depending on orientation)
+and the dilation needed to join letters into lines smears the measurement by
+close to a degree. Rotating the page through candidate angles and maximising the
+variance of the row totals lands within 0.1 degrees, in about 20 milliseconds on
+a downscaled copy, and does not care which OpenCV is installed.
+
+**Columns are read as separate images.** Handed a two column page whole,
+Tesseract merges the columns and reads straight across them: every word is
+correct and every sentence is nonsense. Gutters are found first, by vertical
+projection, and each column is recognised on its own with its boxes offset back
+into page coordinates. Reading order then follows the page direction, so a
+Hebrew page reads its right column first and an English one its left.
+
+**Direction is decided per block by the first strong character**, which is what
+the Unicode bidi algorithm does and therefore what Word, a browser and Ksav's own
+PDF export will all do with the same text. Counting Hebrew against Latin
+characters was tried and got the common case wrong: "The Gemara asks a kashya"
+with the Torah terms in Hebrew has as many Hebrew letters as Latin ones, and is
+plainly an English sentence.
+
+Sauvola thresholding is implemented rather than imported because the OpenCV
+wheel does not carry the contrib module that has it, and on an old sefer with
+yellowed paper and bleed through from the reverse, one global threshold either
+loses the faint letters or fills the page with the ghost of the other side.
+
 ## Offline enforcement
 
 `app/platform/net.py` is the only module permitted to open a socket, and its

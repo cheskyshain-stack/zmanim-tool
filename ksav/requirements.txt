@@ -22,12 +22,18 @@ python-docx==1.2.0       # MIT. Word export, with Hebrew marked as complex scrip
 # token n-gram index written in plain Python. There is deliberately no
 # pyahocorasick dependency: see the note in app/language/matcher.py.
 
-# --- Phase 2: OCR ---
-# pytesseract==0.3.13    # Apache-2.0. Thin wrapper. Tesseract itself is vendored.
-# opencv-python-headless==4.13.0.88   # Apache-2.0. Deskew, denoise, threshold.
-# pypdfium2==5.0.1       # BSD-3-Clause and Apache-2.0. Deliberately not PyMuPDF, which is AGPL.
-# pillow==12.0.0         # MIT-CMU.
-# reportlab==4.4.4       # BSD-3-Clause. PDF export.
+# --- Phase 2: reading pages ---
+pytesseract==0.3.13      # Apache-2.0. A thin wrapper; Tesseract itself is vendored.
+opencv-python-headless==5.0.0  # Apache-2.0. Deskew, denoise, threshold, crop.
+pypdfium2==5.13.0        # BSD-3-Clause and Apache-2.0. Deliberately not PyMuPDF,
+                         # which is AGPL and would take the whole app with it.
+pillow==12.0.0           # MIT-CMU.
+reportlab==4.4.4         # BSD-3-Clause. PDF export.
+python-bidi==0.6.6       # LGPL-3.0. Reorders mixed Hebrew and English for PDF,
+                         # which has no layout engine of its own.
+
+# Frank Ruhl Libre ships in app/export/fonts under the Open Font Licence, with
+# its licence text beside it. The PDF standard fonts have no Hebrew at all.
 
 # --- Phase 3: dictation ---
 # sounddevice==0.5.3     # MIT. Microphone capture.

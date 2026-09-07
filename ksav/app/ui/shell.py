@@ -28,6 +28,8 @@ from ..platform.models import BY_ID, ModelManager
 from . import coming_soon
 from .dictionary_view import DictionaryView
 from .home import HomeView
+from .ocr_review import OcrReviewView
+from .ocr_view import OcrView
 from .transcribe_view import TranscribeView
 from .transcript_view import TranscriptView
 from .model_vault import ModelVaultView
@@ -59,6 +61,8 @@ class Shell(QWidget):
         lexicon=None,
         queue=None,
         service=None,
+        ocr_queue=None,
+        ocr_service=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("Root")
@@ -68,6 +72,8 @@ class Shell(QWidget):
         self._lexicon = lexicon
         self._queue = queue
         self._service = service
+        self._ocr_queue = ocr_queue
+        self._ocr_service = ocr_service
 
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -113,24 +119,32 @@ class Shell(QWidget):
         else:
             self.dictionary = coming_soon.dictionary_view()
 
+        if self._ocr_queue is not None:
+            self.ocr = OcrView(self._ocr_queue, settings)
+            self.ocr.open_document.connect(self.open_document)
+        else:
+            self.ocr = coming_soon.ocr_view()
+
         self.transcript = TranscriptView(settings, self._categories())
+        self.ocr_review = OcrReviewView(settings)
 
         self._screens = {
             "home": self.home,
             "transcribe": self.transcribe,
             "dictation": coming_soon.dictation_view(),
-            "ocr": coming_soon.ocr_view(),
+            "ocr": self.ocr,
             "dictionary": self.dictionary,
             "vault": self.vault,
             "settings": self.settings_view,
             "transcript": self.transcript,
+            "ocr_review": self.ocr_review,
         }
         for widget in self._screens.values():
             self.stack.addWidget(widget)
 
         start = settings.ui.last_section
         # Never reopen straight into a transcript that is no longer loaded.
-        if start not in self._screens or start == "transcript":
+        if start not in self._screens or start in ("transcript", "ocr_review"):
             start = "home"
         self.show_section(start)
         self._evaluate_readiness()
@@ -191,10 +205,11 @@ class Shell(QWidget):
         button = self._nav_buttons.get(key)
         if button:
             button.setChecked(True)
-        elif key == "transcript":
-            # Reached from the queue rather than the rail. Keep Transcribe lit,
-            # because that is where Back leads.
-            self._nav_buttons["transcribe"].setChecked(True)
+        elif key in ("transcript", "ocr_review"):
+            # Reached from a queue rather than the rail. Keep the queue that led
+            # here lit, because that is where Back goes.
+            parent = "transcribe" if key == "transcript" else "ocr"
+            self._nav_buttons[parent].setChecked(True)
         self._settings.ui.last_section = key
 
     def _categories(self) -> dict[str, str]:
@@ -213,7 +228,7 @@ class Shell(QWidget):
 
     def open_transcript(self, path: str) -> None:
         """Show a finished transcript. Reached from the queue's Open button."""
-        if self._service is None:
+        if self._service is None or not path:
             return
         try:
             corrected = self._service.store.load(path)
@@ -222,6 +237,18 @@ class Shell(QWidget):
             return
         self.transcript.load(corrected, self._categories())
         self.show_section("transcript")
+
+    def open_document(self, path: str) -> None:
+        """Show a finished page document. Reached from the OCR queue."""
+        if self._ocr_service is None or not path:
+            return
+        try:
+            document = self._ocr_service.store.load(path)
+        except (OSError, ValueError, KeyError) as exc:
+            log.warning("could not open document %s: %s", path, exc)
+            return
+        self.ocr_review.load(document)
+        self.show_section("ocr_review")
 
     def _on_models_changed(self) -> None:
         self.settings_view.refresh_models()

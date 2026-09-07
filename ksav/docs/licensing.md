@@ -19,6 +19,9 @@ LGPL. No GPL, no AGPL, and no model weights with a revenue cap.
 | pypdfium2 | BSD-3-Clause, Apache-2.0 | **Not PyMuPDF**, which is AGPL |
 | python-docx | MIT | |
 | ReportLab | BSD-3-Clause | |
+| python-bidi | LGPL-3.0 | Dynamically imported, no derivative work |
+| Frank Ruhl Libre | SIL Open Font Licence 1.1 | Embedded in exported PDFs. Licence text ships beside it |
+| Tesseract language data | Apache-2.0 | heb, yid, eng and osd, from tessdata_best |
 | psutil | BSD-3-Clause | |
 | PyInstaller | GPL with a linking exception | Bundling does not affect Ksav's own licence |
 

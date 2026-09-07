@@ -201,6 +201,17 @@ class PageText:
     engine_id: str = ""
     rotation: float = 0.0           # degrees the preprocessor corrected by
     from_text_layer: bool = False   # True when the PDF already had real text
+    columns: int = 1
+    preprocessing: str = ""         # what the cleanup steps actually did
+    # Honest warnings for this page: missing language data, a script the engine
+    # is known to be poor at, a tilt it declined to correct.
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def confidence(self) -> float:
+        """Mean confidence across the page, 0 to 1. Zero when nothing was read."""
+        scored = [b.confidence for b in self.blocks if b.text.strip()]
+        return round(sum(scored) / len(scored), 3) if scored else 0.0
 
     def text(self) -> str:
         ordered = sorted(self.blocks, key=lambda b: b.reading_order)

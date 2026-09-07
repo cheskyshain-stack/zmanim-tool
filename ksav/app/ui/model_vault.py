@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from ..core.logging import get
 from ..platform.hardware import Hardware
 from ..platform import media
-from ..platform.models import CATALOGUE, ModelManager, ModelSpec
+from ..platform.models import CATALOGUE, ModelManager, ModelSpec, asr_models, ocr_models
 from .widgets import Card, Divider, button, caption
 
 log = get(__name__)
@@ -136,6 +136,8 @@ class ModelRow(QFrame):
 
     def _fit_note(self) -> str:
         """A plain sentence about whether this machine can run it."""
+        if self._spec.kind == "ocr":
+            return "runs on any computer"
         vram = self._hardware.best_vram_gb
         if self._spec.min_vram_gb and vram >= self._spec.min_vram_gb:
             return "runs on your GPU"
@@ -333,11 +335,19 @@ class ModelVaultView(QWidget):
         layout.setContentsMargins(0, 2, 10, 0)
         layout.setSpacing(12)
 
-        for spec in CATALOGUE:
-            row = ModelRow(spec, manager, hardware)
-            row.changed.connect(self._on_changed)
-            self._rows.append(row)
-            layout.addWidget(row)
+        for heading, specs in (("Speech models", asr_models()),
+                               ("Page reading", ocr_models())):
+            if not specs:
+                continue
+            label = QLabel(heading.upper())
+            label.setObjectName("SectionLabel")
+            layout.addSpacing(4)
+            layout.addWidget(label)
+            for spec in specs:
+                row = ModelRow(spec, manager, hardware)
+                row.changed.connect(self._on_changed)
+                self._rows.append(row)
+                layout.addWidget(row)
 
         layout.addStretch(1)
         scroll.setWidget(inner)

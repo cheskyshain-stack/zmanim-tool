@@ -9,17 +9,17 @@ disconnect the network completely and keep working.
 
 ## Where the project is
 
-Phases 0 and 1 of four are complete. Ksav transcribes recordings offline,
+Phases 0, 1 and 2 of four are complete. Ksav transcribes recordings offline,
 corrects Yeshivish and Torah terminology against a dictionary that also primes
-the recogniser, renders the result in four output modes, and exports to TXT,
-DOCX, SRT and VTT.
+the recogniser, reads text from photos, scans and PDFs in Hebrew and English,
+and exports to TXT, DOCX, PDF, SRT and VTT.
 
 | Phase | What it brings | State |
 | --- | --- | --- |
 | 0 | Shell, settings, hardware probe, Model Vault, engine interfaces, installer, USB bundle and portable mode | Done |
 | 1 | Offline transcription, transcript editor, dictionary, corrections, exports | Done |
-| 2 | OCR for images and PDFs, side by side review | Next |
-| 3 | Live dictation and the global Windows shortcut | Planned |
+| 2 | OCR for images and PDFs, side by side review | Done |
+| 3 | Live dictation and the global Windows shortcut | Next |
 | 4 | Diarization, advanced OCR, large Torah vocabulary, auto model selection | Planned |
 
 ### What works now
@@ -52,6 +52,22 @@ Original            The camera asks a kasha on Rav Huna.
 Every correction is listed with the reason it fired and can be reversed one at a
 time. Export goes to TXT, DOCX, SRT and VTT, with Hebrew marked as complex
 script so Word renders it in the right font.
+
+### Reading pages
+
+Drop in a photo, a scan, a PDF or a folder of scans. Before anything is read the
+page is straightened, de-speckled, contrast lifted and thresholded, and the
+review screen says what it did. A PDF that already carries its own text is read
+directly rather than photographed and OCR'd, which is instant and perfectly
+accurate.
+
+Two column pages are read a column at a time, so a Hebrew sefer reads its right
+column first instead of straight across both. The review screen puts the
+original page on the left and editable text on the right, and clicking a
+paragraph draws a box around the part of the page it came from.
+
+Rashi script, old rabbinic print and nekudos are honestly hard, and Ksav says so
+on screen before the work starts rather than after an hour of correcting.
 
 `docs/architecture.md` explains the design. `docs/licensing.md` covers the
 dependency obligations, including two that are easy to get wrong.
