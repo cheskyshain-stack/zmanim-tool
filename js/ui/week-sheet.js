@@ -131,30 +131,15 @@ function cellSource(value) {
 /** One row: the name on the right, the times on the left, the way a timetable is read.
  *
  *  The same markup the yomim noraim sheet's rows use, so the two are one design rather than
- *  two that look alike.
- *
- *  `stacked` is the other way of setting a row, and the whole of what the Blocks layout is: the
- *  name on a line of its own with its times centred under it, across the whole sheet. That is
- *  the חול card's own design and the צום גדליה sheet's, and it is what the weekday runs want,
- *  those being the long ones. A weekday מנחה at the end of סוכות is eleven מנינים, and a name
- *  facing its times leaves them half the sheet: on a סוכות week, where that block is all there
- *  is on the page and the type is set large to fill it, the row wrapped and then hung over the
- *  row's own padding. Given the width it is one line.
- *
- *  It is an option rather than the way this sheet is set, because it costs: the block is three
- *  lines a row where it was one, so the שבת block above it comes down several steps of type to
- *  make room. Measured on the שובה week, --op-scale 1.43 as rows against 1.22 as blocks. Which
- *  of the two is worth having is a question about the week in front of you, so it is asked on
- *  the switch rather than answered here. */
-function sheetRow(label, value, sub = '', { stacked = false, split = false } = {}) {
+ *  two that look alike. Setting the זמני חול block the other way round, with the name on a line
+ *  of its own and its times centred under it the way the חול card and the צום גדליה sheet set a
+ *  תפילה, was built and taken out again: it costs the שבת block above it several steps of type,
+ *  measured at --op-scale 1.43 as rows against 1.22 as blocks, and the two halves of one sheet
+ *  stopped looking like one sheet. */
+function sheetRow(label, value, sub = '', { split = false } = {}) {
   const times = sheetCellHtml(value, { split });
   if (!times) return '';
-  /* How many times the row carries, which the sheet needs when it sets a sparse week's rows
-     across the width: one time is not a run, has nothing to spread, and justified it would be
-     dragged off the edge every other row's times start at. שקיעה and הדלקת נרות are that row.
-     Counted here rather than looked for in CSS, which cannot count words in a line. */
-  const many = (times.match(/\d+:\d\d/g) || []).length > 1;
-  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}${many ? ' has-run' : ''}">
+  return `<div class="onepage-row">
       <span class="onepage-label"${hebrewLang(label)}>${esc(label)}${
         // The sub is isolated, because it is not always Hebrew: the days a special שחרית runs
         // on are "(Monday, Thursday)", and a bracketed English list inside a right to left name
@@ -248,13 +233,16 @@ function weekSpecialShacharis(showing, state, settings) {
 }
 
 /** The week's blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings, withChol, blocks) {
+function sheetSections(showing, index, state, settings, withChol) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
   if (sheet && SHEET_PLAN[sheet.season]) {
     const built = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-    const { row, columns } = built;
+    // The season the row was built for, which past the spring clock change is קיץ even on a
+    // חורף sheet: see rowFor. The order has to follow the columns it actually got.
+    const { row, columns, season } = built;
+    const plan = SHEET_PLAN[season] || SHEET_PLAN[sheet.season];
     const byKey = new Map(columns.map((c) => [c.key, c]));
     // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
     // candleLightingCell writes it. Split rather than parsed: the second line is the word and
@@ -270,7 +258,7 @@ function sheetSections(showing, index, state, settings, withChol, blocks) {
       const { label, sub } = nameAndBasis(col.header);
       return sheetRow(label, row[key], sub);
     };
-    out.push([SHEET_TEXT.shabbos, SHEET_PLAN[sheet.season].order.map(one)]);
+    out.push([SHEET_TEXT.shabbos, plan.order.map(one)]);
   }
 
   // The weekday side of the week, the same three the חול card carries. Built from the
@@ -279,9 +267,9 @@ function sheetSections(showing, index, state, settings, withChol, blocks) {
   const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
-    // Split whichever way the block is set: its lines are two schedules rather than one run
-    // cut to fit a column, so every break the chart gave a cell is kept. See sheetCellHtml.
-    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { stacked: blocks, split: true });
+    // Split: the block's lines are two schedules rather than one run cut to fit a column, so
+    // every break the chart gave a cell is kept. See sheetCellHtml.
+    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
     out.push([SHEET_TEXT.chol, [
       chol('שחרית', state.settings.weekdayShacharis),
       ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
@@ -308,8 +296,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-export function weekSheetHtml(showing, index, state, settings, title, { withChol = true, blocks = false } = {}) {
-  const sections = sheetSections(showing, index, state, settings, withChol, blocks);
+export function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);
@@ -369,8 +357,6 @@ const WS_PT = 9.5 * (96 / 72);
 const WS_LINE = 1.2;
 const WS_LEAD = 0.34;
 const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
-
-
 
 /** Sets the type to the largest that still fits the sheet.
  *
@@ -449,31 +435,15 @@ export function fitWeekSheet(container) {
       return tall <= box.height / z - WS_ROOM && cols.scrollWidth <= cols.clientWidth + 1
         && !spills();
     };
-    const grow = () => {
-      let at = WS_MIN;
-      for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
-        if (!fits(s)) break;
-        at = s;
-      }
-      for (let s = at + 0.01; s <= Math.min(at + 0.05, WS_MAX) + 1e-9; s += 0.01) {
-        if (!fits(s)) break;
-        at = s;
-      }
-      return at;
-    };
-    let best = grow();
-    /* A week that has run the type up against its ceiling spreads its times across the sheet.
-     *
-     * The type stops at WS_MAX whatever room is left, and on a sparse week there is a lot of it:
-     * measured, every Without חול week came out at 3.20 with each row carrying a single line of
-     * times bunched hard against the left edge and a third of the sheet empty down the middle.
-     * The page was full top to bottom and the ink was not spread over it. .is-spread hands those
-     * rows the width and sets the times across it, which is what fills the middle. See app.css.
-     *
-     * Only at the ceiling. Below it the leftover is already going into the type, which is the
-     * better place for it, and a run there is long enough to fill its line on its own. So a
-     * full week, which is every week with חול on it, is not touched. */
-    sheet.classList.toggle('is-spread', best >= WS_MAX - 1e-9);
+    let best = WS_MIN;
+    for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
+      if (!fits(s)) break;
+      best = s;
+    }
+    for (let s = best + 0.01; s <= Math.min(best + 0.05, WS_MAX) + 1e-9; s += 0.01) {
+      if (!fits(s)) break;
+      best = s;
+    }
     const lead = leadFor(best);
     sheet.style.setProperty('--op-scale', best.toFixed(2));
     sheet.style.setProperty('--ws-gap', `${lead.toFixed(2)}px`);

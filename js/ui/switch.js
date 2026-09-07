@@ -43,9 +43,10 @@ export function switchHtml(name, question, sides) {
   // tracks up with each other. aria-labelledby does not care how they are nested.
   // is-three or is-four when there are more than two answers, which is all the thumb needs to
   // know: how much of the track it covers, and how many places it has to stop. Counted rather
-  // than assumed, because it was `sides.length > 2 ? ' is-three'` while three was the most
-  // there were, and a fourth side under that rule got a thumb a third of the track wide that
-  // could not reach it.
+  // than assumed, because it read `sides.length > 2 ? ' is-three'` while three was the most
+  // there were, and the first four-way switch got a thumb a third of the track wide that could
+  // not reach its fourth side. Nothing asks four questions at the moment; the counting stays
+  // right so that the next one that does is not the thing that finds this out again.
   const many = sides.length > 3 ? ' is-four' : sides.length > 2 ? ' is-three' : '';
   return `<span class="week-switch-label" id="${name}-label">${question}</span>
     <div class="week-switch${many}" role="radiogroup" aria-labelledby="${name}-label">

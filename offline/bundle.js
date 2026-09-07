@@ -4494,7 +4494,14 @@ function weekdayCompanionOf(sheet, state) {
 
 
 /** The chart row for one week, with rules and manual overrides applied, exactly as the
- *  printed chart would show it. */
+ *  printed chart would show it.
+ *
+ *  `season` comes back with it, and it is not always the sheet's own. A חורף sheet runs past
+ *  the spring clock change, and from there its weeks are built and headed as קיץ: eleven
+ *  columns rather than eight, four ערב שבת מנחה among them rather than one. Anything that lays
+ *  the row out has to go by this rather than by sheet.season, which the week on one sheet did
+ *  not: it asked for חורף's nine and so never asked for three of the four מנחה columns, and
+ *  from פרשת ויקרא to the end of that sheet those מנינים were not on it. */
 function rowFor(week, sheet, state, settings) {
   const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
   const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
@@ -4503,7 +4510,7 @@ function rowFor(week, sheet, state, settings) {
   const computed = build(week, settings);
   const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
   const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-  return { row, columns, overriddenKeys };
+  return { row, columns, overriddenKeys, season: effectiveSeason };
 }
 
 // ==== posters/shuva.js ====
@@ -5697,9 +5704,10 @@ function switchHtml(name, question, sides) {
   // tracks up with each other. aria-labelledby does not care how they are nested.
   // is-three or is-four when there are more than two answers, which is all the thumb needs to
   // know: how much of the track it covers, and how many places it has to stop. Counted rather
-  // than assumed, because it was `sides.length > 2 ? ' is-three'` while three was the most
-  // there were, and a fourth side under that rule got a thumb a third of the track wide that
-  // could not reach it.
+  // than assumed, because it read `sides.length > 2 ? ' is-three'` while three was the most
+  // there were, and the first four-way switch got a thumb a third of the track wide that could
+  // not reach its fourth side. Nothing asks four questions at the moment; the counting stays
+  // right so that the next one that does is not the thing that finds this out again.
   const many = sides.length > 3 ? ' is-four' : sides.length > 2 ? ' is-three' : '';
   return `<span class="week-switch-label" id="${name}-label">${question}</span>
     <div class="week-switch${many}" role="radiogroup" aria-labelledby="${name}-label">
@@ -11693,30 +11701,15 @@ function cellSource(value) {
 /** One row: the name on the right, the times on the left, the way a timetable is read.
  *
  *  The same markup the yomim noraim sheet's rows use, so the two are one design rather than
- *  two that look alike.
- *
- *  `stacked` is the other way of setting a row, and the whole of what the Blocks layout is: the
- *  name on a line of its own with its times centred under it, across the whole sheet. That is
- *  the חול card's own design and the צום גדליה sheet's, and it is what the weekday runs want,
- *  those being the long ones. A weekday מנחה at the end of סוכות is eleven מנינים, and a name
- *  facing its times leaves them half the sheet: on a סוכות week, where that block is all there
- *  is on the page and the type is set large to fill it, the row wrapped and then hung over the
- *  row's own padding. Given the width it is one line.
- *
- *  It is an option rather than the way this sheet is set, because it costs: the block is three
- *  lines a row where it was one, so the שבת block above it comes down several steps of type to
- *  make room. Measured on the שובה week, --op-scale 1.43 as rows against 1.22 as blocks. Which
- *  of the two is worth having is a question about the week in front of you, so it is asked on
- *  the switch rather than answered here. */
-function sheetRow(label, value, sub = '', { stacked = false, split = false } = {}) {
+ *  two that look alike. Setting the זמני חול block the other way round, with the name on a line
+ *  of its own and its times centred under it the way the חול card and the צום גדליה sheet set a
+ *  תפילה, was built and taken out again: it costs the שבת block above it several steps of type,
+ *  measured at --op-scale 1.43 as rows against 1.22 as blocks, and the two halves of one sheet
+ *  stopped looking like one sheet. */
+function sheetRow(label, value, sub = '', { split = false } = {}) {
   const times = sheetCellHtml(value, { split });
   if (!times) return '';
-  /* How many times the row carries, which the sheet needs when it sets a sparse week's rows
-     across the width: one time is not a run, has nothing to spread, and justified it would be
-     dragged off the edge every other row's times start at. שקיעה and הדלקת נרות are that row.
-     Counted here rather than looked for in CSS, which cannot count words in a line. */
-  const many = (times.match(/\d+:\d\d/g) || []).length > 1;
-  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}${many ? ' has-run' : ''}">
+  return `<div class="onepage-row">
       <span class="onepage-label"${hebrewLang(label)}>${esc(label)}${
         // The sub is isolated, because it is not always Hebrew: the days a special שחרית runs
         // on are "(Monday, Thursday)", and a bracketed English list inside a right to left name
@@ -11810,13 +11803,16 @@ function weekSpecialShacharis(showing, state, settings) {
 }
 
 /** The week's blocks, out of the chart's own cells. */
-function sheetSections(showing, index, state, settings, withChol, blocks) {
+function sheetSections(showing, index, state, settings, withChol) {
   const { week, sheet } = index.get(showing);
   const out = [];
 
   if (sheet && SHEET_PLAN[sheet.season]) {
     const built = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-    const { row, columns } = built;
+    // The season the row was built for, which past the spring clock change is קיץ even on a
+    // חורף sheet: see rowFor. The order has to follow the columns it actually got.
+    const { row, columns, season } = built;
+    const plan = SHEET_PLAN[season] || SHEET_PLAN[sheet.season];
     const byKey = new Map(columns.map((c) => [c.key, c]));
     // הדלקת נרות is the first line of its cell and שקיעה the second, which is how
     // candleLightingCell writes it. Split rather than parsed: the second line is the word and
@@ -11832,7 +11828,7 @@ function sheetSections(showing, index, state, settings, withChol, blocks) {
       const { label, sub } = nameAndBasis(col.header);
       return sheetRow(label, row[key], sub);
     };
-    out.push([SHEET_TEXT.shabbos, SHEET_PLAN[sheet.season].order.map(one)]);
+    out.push([SHEET_TEXT.shabbos, plan.order.map(one)]);
   }
 
   // The weekday side of the week, the same three the חול card carries. Built from the
@@ -11841,9 +11837,9 @@ function sheetSections(showing, index, state, settings, withChol, blocks) {
   const weekdayWeek = weekday && weekday.weeks.find((w) => w.serial === showing);
   if (weekdayWeek) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
-    // Split whichever way the block is set: its lines are two schedules rather than one run
-    // cut to fit a column, so every break the chart gave a cell is kept. See sheetCellHtml.
-    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { stacked: blocks, split: true });
+    // Split: the block's lines are two schedules rather than one run cut to fit a column, so
+    // every break the chart gave a cell is kept. See sheetCellHtml.
+    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
     out.push([SHEET_TEXT.chol, [
       chol('שחרית', state.settings.weekdayShacharis),
       ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
@@ -11870,8 +11866,8 @@ function sheetLegend(html) {
  *
  *  `title` comes in rather than being worked out here, because the card already has a name
  *  for this week and the two should not be able to disagree about what it is called. */
-function weekSheetHtml(showing, index, state, settings, title, { withChol = true, blocks = false } = {}) {
-  const sections = sheetSections(showing, index, state, settings, withChol, blocks);
+function weekSheetHtml(showing, index, state, settings, title, { withChol = true } = {}) {
+  const sections = sheetSections(showing, index, state, settings, withChol);
   const body = sections.map(([name, rows]) => sheetSection(name, rows)).join('');
   if (!body) return '';
   const legend = sheetLegend(body);
@@ -11931,8 +11927,6 @@ const WS_PT = 9.5 * (96 / 72);
 const WS_LINE = 1.2;
 const WS_LEAD = 0.34;
 const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
-
-
 
 /** Sets the type to the largest that still fits the sheet.
  *
@@ -12011,31 +12005,15 @@ function fitWeekSheet(container) {
       return tall <= box.height / z - WS_ROOM && cols.scrollWidth <= cols.clientWidth + 1
         && !spills();
     };
-    const grow = () => {
-      let at = WS_MIN;
-      for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
-        if (!fits(s)) break;
-        at = s;
-      }
-      for (let s = at + 0.01; s <= Math.min(at + 0.05, WS_MAX) + 1e-9; s += 0.01) {
-        if (!fits(s)) break;
-        at = s;
-      }
-      return at;
-    };
-    let best = grow();
-    /* A week that has run the type up against its ceiling spreads its times across the sheet.
-     *
-     * The type stops at WS_MAX whatever room is left, and on a sparse week there is a lot of it:
-     * measured, every Without חול week came out at 3.20 with each row carrying a single line of
-     * times bunched hard against the left edge and a third of the sheet empty down the middle.
-     * The page was full top to bottom and the ink was not spread over it. .is-spread hands those
-     * rows the width and sets the times across it, which is what fills the middle. See app.css.
-     *
-     * Only at the ceiling. Below it the leftover is already going into the type, which is the
-     * better place for it, and a run there is long enough to fill its line on its own. So a
-     * full week, which is every week with חול on it, is not touched. */
-    sheet.classList.toggle('is-spread', best >= WS_MAX - 1e-9);
+    let best = WS_MIN;
+    for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
+      if (!fits(s)) break;
+      best = s;
+    }
+    for (let s = best + 0.01; s <= Math.min(best + 0.05, WS_MAX) + 1e-9; s += 0.01) {
+      if (!fits(s)) break;
+      best = s;
+    }
     const lead = leadFor(best);
     sheet.style.setProperty('--op-scale', best.toFixed(2));
     sheet.style.setProperty('--ws-gap', `${lead.toFixed(2)}px`);
@@ -12212,7 +12190,7 @@ let pairView = false;
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
  *  congregation's page still shows anybody who does not go looking for the others. */
-let weekLayout = 'charts'; // 'charts' | 'sheet' | 'blocks' | 'shabbos'
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -13353,8 +13331,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
   // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings),
-    { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
+    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
   const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
   const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
@@ -13411,14 +13388,9 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
                 ? switchHtml('week-layout', 'Layout', [
                   { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
                   { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
-                  // The same sheet with its זמני חול set as the חול card sets it, a name on a
-                  // line of its own with its times under it. Its own side of the switch rather
-                  // than the way the sheet is set, because it costs the שבת block above it
-                  // several steps of type: see sheetRow in week-sheet.js.
-                  { value: 'blocks', label: 'Blocks', on: weekLayout === 'blocks' },
                   // The side beside it says sheet, so this reads as one sheet without חול
-                  // without having to say it, which it has no room to: four sides of a
-                  // switch get 65px of text each on a phone.
+                  // without having to say it, which it has no room to: three sides of a
+                  // switch get 86px of text each on a phone.
                   { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
@@ -13651,8 +13623,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
       const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings),
-        { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
+        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);

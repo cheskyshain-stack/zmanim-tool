@@ -148,7 +148,7 @@ let pairView = false;
  *  is how you are looking at this week now, not something about the shul. Opening the page
  *  fresh shows the charts, which is what every device has shown until now and what the
  *  congregation's page still shows anybody who does not go looking for the others. */
-let weekLayout = 'charts'; // 'charts' | 'sheet' | 'blocks' | 'shabbos'
+let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -1289,8 +1289,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
   // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings),
-    { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
+    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
   const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
   const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
@@ -1347,14 +1346,9 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
                 ? switchHtml('week-layout', 'Layout', [
                   { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
                   { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
-                  // The same sheet with its זמני חול set as the חול card sets it, a name on a
-                  // line of its own with its times under it. Its own side of the switch rather
-                  // than the way the sheet is set, because it costs the שבת block above it
-                  // several steps of type: see sheetRow in week-sheet.js.
-                  { value: 'blocks', label: 'Blocks', on: weekLayout === 'blocks' },
                   // The side beside it says sheet, so this reads as one sheet without חול
-                  // without having to say it, which it has no room to: four sides of a
-                  // switch get 65px of text each on a phone.
+                  // without having to say it, which it has no room to: three sides of a
+                  // switch get 86px of text each on a phone.
                   { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
                 ])
                 : ''
@@ -1587,8 +1581,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
       const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings),
-        { withChol: weekLayout !== 'shabbos', blocks: weekLayout === 'blocks' });
+        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);

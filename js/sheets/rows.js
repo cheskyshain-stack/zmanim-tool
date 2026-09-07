@@ -53,7 +53,14 @@ export function weekdayCompanionOf(sheet, state) {
 
 
 /** The chart row for one week, with rules and manual overrides applied, exactly as the
- *  printed chart would show it. */
+ *  printed chart would show it.
+ *
+ *  `season` comes back with it, and it is not always the sheet's own. A חורף sheet runs past
+ *  the spring clock change, and from there its weeks are built and headed as קיץ: eleven
+ *  columns rather than eight, four ערב שבת מנחה among them rather than one. Anything that lays
+ *  the row out has to go by this rather than by sheet.season, which the week on one sheet did
+ *  not: it asked for חורף's nine and so never asked for three of the four מנחה columns, and
+ *  from פרשת ויקרא to the end of that sheet those מנינים were not on it. */
 export function rowFor(week, sheet, state, settings) {
   const effectiveSeason = sheet.season === 'choref' && inSpringDstWindow(week.date, settings) ? 'kayitz' : sheet.season;
   const columns = effectiveSeason === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
@@ -62,6 +69,6 @@ export function rowFor(week, sheet, state, settings) {
   const computed = build(week, settings);
   const ruled = applyRules(computed, { ...week, hebrew }, state.rules, effectiveSeason, new Set());
   const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
-  return { row, columns, overriddenKeys };
+  return { row, columns, overriddenKeys, season: effectiveSeason };
 }
 
