@@ -16,7 +16,8 @@
 // keep in step. See .poster in app.css and the @page rule in print.css.
 import { resolveSettings } from '../settings.js';
 import { buildShuvaPoster, buildShuvaFromCalendar, shuvaWeekOf, shuvaSheetsFor, shabbosShuvaSerial, SHUVA_TEXT } from '../posters/shuva.js';
-import { buildSlichosPoster, parseTimes, SLICHOS_TEXT } from '../posters/slichos.js';
+import { buildSlichosPoster, parseTimes, SLICHOS_TEXT, SLICHOS_ELSEWHERE, SLICHOS_MOVED }
+  from '../posters/slichos.js';
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
@@ -1274,7 +1275,11 @@ const onePlain = (text) => [{ text, underlined: false, mark: '' }];
  *  key, so adding a poster to the run and adding it here are the same word twice and a
  *  poster with no entry simply does not appear. */
 const ONEPAGE_SECTIONS = {
-  slichos: (p) => [oneSection(SLICHOS_TEXT.title, p.rows)],
+  /* Less the three lines that are a whole block further down this same sheet, and less
+     עשי"ת, which is a block of its own placed by date below. The סליחות sheet on its own keeps
+     all of them: it is hung alone and has to say what happens on every morning it covers. */
+  slichos: (p) => [oneSection(SLICHOS_TEXT.title, p.rows.filter(
+    (r) => !SLICHOS_ELSEWHERE.includes(r.label) && !SLICHOS_MOVED.includes(r.label)))],
   roshhashana: (p) => [
     // The day in the label as well as in the heading is the same word twice on two lines
     // running, so under a block that is already named these are סליחות and מנחה.
@@ -1383,10 +1388,34 @@ function onePageRows(r) {
  *
  *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
 function renderOnePagePoster(built, settings) {
+  /* עשי"ת as a block of its own, after the last of the two days it runs between.
+   *
+   * On the סליחות sheet it is a line among the rest, being a stretch of ordinary mornings
+   * rather than a day. Here every other day of the season has a block, and it read as though
+   * those mornings belonged to the סליחות before ר"ה rather than to the days after it.
+   *
+   * צום גדליה or שבת שובה, whichever the year puts second: the items are already in date order
+   * (postersByDate), so this is the later of the two rather than a rule about the calendar. In
+   * a year where ר"ה is on Thursday שבת שובה is 3 תשרי and the fast is נדחה to the 4th, and the
+   * two change places; this follows them. Neither on the sheet, which a group filter can do,
+   * and it stays with the סליחות block it came off. */
+  const keys = built.items.map((it) => it.key);
+  const at = (k) => keys.lastIndexOf(k);
+  const afterKey = ['tzomgedalia', 'shuva'].filter((k) => at(k) >= 0)
+    .sort((a, b) => at(b) - at(a))[0] || 'slichos';
+  const moved = (built.items.find((it) => it.key === 'slichos')?.poster.rows || [])
+    .filter((r) => SLICHOS_MOVED.includes(r.label));
+
   const sections = [];
   for (const it of built.items) {
     const cut = ONEPAGE_SECTIONS[it.key];
     if (cut) sections.push(...cut(it.poster));
+    // The block takes the line's own name as its heading, and the row under it is called by
+    // what is said at those mornings, which is the same word the סליחות sheet is titled with.
+    if (it.key === afterKey) {
+      sections.push(...moved.map((r) => oneSection(r.label,
+        [{ label: SLICHOS_TEXT.title, times: r.times, note: r.note }])));
+    }
   }
   /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
      Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים

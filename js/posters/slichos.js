@@ -108,11 +108,32 @@ export const SLICHOS_ROWS = [
   { label: 'סליחות מוצ"ש', times: '12:55' },
   { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
   { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
-  { label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
-  { label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
-  { label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
-  { label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+  { elsewhere: true, label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  { elsewhere: true, label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
+  { moved: true, label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
+  { elsewhere: true, label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
 ];
+
+/** The lines of this sheet that are a whole day somewhere else.
+ *
+ *  On the סליחות sheet itself they belong. It is hung on its own, and a sheet that ran from
+ *  the first סליחות to ערב יו"כ and then said nothing about the three days in the middle of
+ *  that stretch would be a sheet with holes in it.
+ *
+ *  On the sheet that carries every poster at once they do not: ערב ראש השנה, צום גדליה and
+ *  ערב יום כיפור each have a block of their own further down it, with the same מנינים and the
+ *  rest of the day besides, so listing them up here says the same times twice.
+ *
+ *  Derived from the table rather than written out beside it, so rewording a row's label
+ *  cannot leave this pointing at a line that no longer exists. */
+export const SLICHOS_ELSEWHERE = SLICHOS_ROWS.filter((r) => r.elsewhere).map((r) => r.label);
+
+/** The line of this sheet that is a block of its own on the all-on-one sheet.
+ *
+ *  עשי"ת is a stretch of ordinary mornings rather than a day, so here it is one line among
+ *  the rest. On the sheet that carries every poster at once it is a block, placed between the
+ *  two days it runs between: see renderOnePagePoster. */
+export const SLICHOS_MOVED = SLICHOS_ROWS.filter((r) => r.moved).map((r) => r.label);
 
 export const SLICHOS_TEXT = {
   title: 'סליחות',
