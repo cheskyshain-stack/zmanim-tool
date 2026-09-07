@@ -11711,7 +11711,12 @@ function cellSource(value) {
 function sheetRow(label, value, sub = '', { stacked = false, split = false } = {}) {
   const times = sheetCellHtml(value, { split });
   if (!times) return '';
-  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}">
+  /* How many times the row carries, which the sheet needs when it sets a sparse week's rows
+     across the width: one time is not a run, has nothing to spread, and justified it would be
+     dragged off the edge every other row's times start at. שקיעה and הדלקת נרות are that row.
+     Counted here rather than looked for in CSS, which cannot count words in a line. */
+  const many = (times.match(/\d+:\d\d/g) || []).length > 1;
+  return `<div class="onepage-row${stacked ? ' is-stacked' : ''}${many ? ' has-run' : ''}">
       <span class="onepage-label"${hebrewLang(label)}>${esc(label)}${
         // The sub is isolated, because it is not always Hebrew: the days a special שחרית runs
         // on are "(Monday, Thursday)", and a bracketed English list inside a right to left name
@@ -11927,6 +11932,8 @@ const WS_LINE = 1.2;
 const WS_LEAD = 0.34;
 const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
 
+
+
 /** Sets the type to the largest that still fits the sheet.
  *
  *  A week is far less to fit than a whole yomim noraim, which is the whole difficulty here
@@ -12004,15 +12011,31 @@ function fitWeekSheet(container) {
       return tall <= box.height / z - WS_ROOM && cols.scrollWidth <= cols.clientWidth + 1
         && !spills();
     };
-    let best = WS_MIN;
-    for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
-      if (!fits(s)) break;
-      best = s;
-    }
-    for (let s = best + 0.01; s <= Math.min(best + 0.05, WS_MAX) + 1e-9; s += 0.01) {
-      if (!fits(s)) break;
-      best = s;
-    }
+    const grow = () => {
+      let at = WS_MIN;
+      for (let s = WS_MIN; s <= WS_MAX + 1e-9; s += 0.05) {
+        if (!fits(s)) break;
+        at = s;
+      }
+      for (let s = at + 0.01; s <= Math.min(at + 0.05, WS_MAX) + 1e-9; s += 0.01) {
+        if (!fits(s)) break;
+        at = s;
+      }
+      return at;
+    };
+    let best = grow();
+    /* A week that has run the type up against its ceiling spreads its times across the sheet.
+     *
+     * The type stops at WS_MAX whatever room is left, and on a sparse week there is a lot of it:
+     * measured, every Without חול week came out at 3.20 with each row carrying a single line of
+     * times bunched hard against the left edge and a third of the sheet empty down the middle.
+     * The page was full top to bottom and the ink was not spread over it. .is-spread hands those
+     * rows the width and sets the times across it, which is what fills the middle. See app.css.
+     *
+     * Only at the ceiling. Below it the leftover is already going into the type, which is the
+     * better place for it, and a run there is long enough to fill its line on its own. So a
+     * full week, which is every week with חול on it, is not touched. */
+    sheet.classList.toggle('is-spread', best >= WS_MAX - 1e-9);
     const lead = leadFor(best);
     sheet.style.setProperty('--op-scale', best.toFixed(2));
     sheet.style.setProperty('--ws-gap', `${lead.toFixed(2)}px`);

@@ -2724,6 +2724,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    rows and floated in the gaps. fitWeekSheet works out how much, and caps it, so three rows on
    a Yom Tov week do not end up an inch and a half apart. */
 .poster.is-weeksheet .onepage-row { padding-block: calc(0.014in + var(--ws-gap, 0px) / 2); }
+/* A sparse week, spread. fitWeekSheet puts .is-spread on a sheet whose type has run up against
+   its ceiling with room still on the page, which is every week light enough not to fill it: nine
+   rows an inch and a quarter apart, each carrying one short line of times bunched against the
+   left edge with a third of the sheet empty down the middle.
+
+   So those rows hand the times the whole width and set them across it. A run already long enough
+   to fill its line is not moved, which is what justification does and a fixed spacing would not.
+   The gap between the times and the name grows with the type: at 30pt the flat tenth of an inch
+   the rows carry was a hairline, and the last time in a run sat against the name. */
+/* .has-run is a row carrying more than one time: see sheetRow. A row with one, שקיעה or
+   הדלקת נרות, has nothing to spread and keeps its time where every other row's times start. */
+.poster.is-weeksheet.is-spread .onepage-row.has-run:not(.is-stacked) { gap: calc(0.06in + 0.55em); }
+.poster.is-weeksheet.is-spread .onepage-row.has-run:not(.is-stacked) .onepage-times { flex: 1 1 auto; }
+.poster.is-weeksheet.is-spread .onepage-row.has-run:not(.is-stacked) .onepage-line {
+  text-align: justify; text-align-last: justify;
+}
 /* The Blocks layout: a row set as the חול card sets a תפילה and as the צום גדליה sheet does,
    the name on a line of its own with its times centred under it, across the whole sheet.
 
