@@ -176,9 +176,13 @@ and by then only one band exists at a time.
 
 Three properties are checked by the test suite rather than asserted here:
 
-- **Tiling changes nothing.** Tile padding is 20 source pixels, which is the receptive
-  field radius of the deeper network, counted from its layer stack. Upscaling with 48 px
-  tiles and with one 1024 px tile gives byte for byte identical output.
+- **Tiling changes nothing.** Every tile is read with 20 source pixels of context around
+  it, which is then thrown away. That number is counted rather than guessed: walking the
+  longest path through each network's layer graph gives a receptive field radius of 17.25
+  source pixels for the deeper model and 9.25 for the smaller one, so 20 covers both. The
+  logic tests recompute those radii from the shipped model files and fail if the padding
+  ever drops below them. Upscaling with 48 px tiles and with one 1024 px tile gives byte
+  for byte identical output.
 - **Band count changes nothing.** Rendering the same job in 8 row bands and in one
   single band gives byte for byte identical files. If it did not, every export would
   have faint horizontal lines across it.

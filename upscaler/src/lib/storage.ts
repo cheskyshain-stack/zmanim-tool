@@ -99,9 +99,11 @@ export function deviceProfile(settings: Settings): DeviceProfile {
   const tile = settings.tileOverride ?? (memoryGb <= 4 ? 128 : 256)
   return {
     tile,
-    // 20 is the receptive field radius of the deeper of the two networks, measured from
-    // its layer stack rather than guessed. Tiles then join with no seam at all, which
-    // the test suite checks byte for byte.
+    // Counted from the networks' own layer graphs rather than guessed. The longest
+    // path through the deeper one reaches 17.25 source pixels, and through the smaller
+    // one 9.25, so 20 covers both with margin. tests/logic.test.mts recomputes those
+    // radii from the shipped model files and fails if this drops below either, and the
+    // browser suite checks byte for byte that tiling then changes nothing at all.
     pad: 20,
     bandBudget: budgetMb * 1024 * 1024,
     // In pixels, held as bytes, so three bytes each. The flagship job's first pass

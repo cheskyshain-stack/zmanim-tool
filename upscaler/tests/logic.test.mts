@@ -2,6 +2,7 @@
 // the sharpener. No browser and no models, so this runs in under a second and is the
 // first thing to run after a change.
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -25,6 +26,7 @@ import { planUpscale } from '../src/lib/plan'
 import { modeById } from '../src/lib/models'
 import { buildTaps, resampleImage, sourceSpan, CHANNELS } from '../src/lib/lanczos'
 import { sharpenInPlace, sharpenMargin } from '../src/lib/enhance'
+import { DEFAULTS, deviceProfile } from '../src/lib/storage'
 
 const BANNER = PRESETS.find((p) => p.id === '36x96')!
 
@@ -287,4 +289,75 @@ test('sharpen margin covers the blur it actually uses', () => {
   assert.equal(sharpenMargin('none'), 0)
   assert.ok(sharpenMargin('light') >= 4)
   assert.ok(sharpenMargin('strong') >= sharpenMargin('light'))
+})
+
+/**
+ * Walks a shipped model's layer graph and returns its receptive field radius in source
+ * pixels: how far one output pixel can see into the input. Tile padding has to be at
+ * least this, or a tile's border is computed from context that is not there and the
+ * seams show. Computed from the files rather than written down, so replacing a model
+ * with a deeper one fails this test instead of quietly producing banded prints.
+ */
+function receptiveFieldRadius(modelPath: string): number {
+  const model = JSON.parse(readFileSync(modelPath, 'utf8'))
+  const config = model.modelTopology.model_config.config
+  const layers = new Map<string, Record<string, never>>(
+    config.layers.map((l: { config: { name: string } }) => [l.config.name, l]),
+  )
+
+  // Convolutions after the upsample work in output pixels, so their reach into the
+  // source is divided by the scale.
+  let scale = 1
+  let afterUpsample = false
+  for (const layer of config.layers) {
+    if (layer.class_name === 'UpSampling2D') {
+      afterUpsample = true
+      scale = layer.config.size[0]
+    } else if (layer.class_name === 'Conv2D' && afterUpsample) {
+      layer.config.upsampledBy = scale
+    }
+  }
+
+  const seen = new Map<string, number>()
+  const walk = (name: string): number => {
+    const cached = seen.get(name)
+    if (cached !== undefined) return cached
+    const layer = layers.get(name) as unknown as {
+      class_name: string
+      config: { kernel_size?: number[]; upsampledBy?: number }
+      inbound_nodes?: unknown[][]
+    }
+    const inbound = (layer.inbound_nodes ?? [])
+      .flat()
+      .filter((ref): ref is [string] => Array.isArray(ref) && typeof ref[0] === 'string')
+      .map((ref) => ref[0])
+    // Branches rejoin, so the reach is set by the longest path, not the sum.
+    let radius = inbound.length ? Math.max(...inbound.map(walk)) : 0
+    if (layer.class_name === 'Conv2D' && layer.config.kernel_size) {
+      radius += (layer.config.kernel_size[0] - 1) / 2 / (layer.config.upsampledBy ?? 1)
+    }
+    seen.set(name, radius)
+    return radius
+  }
+  return walk(config.output_layers[0][0])
+}
+
+test('tile padding covers every shipped network reach into the source', () => {
+  const pad = deviceProfile({ ...DEFAULTS }).pad
+  const measured: Record<string, number> = {}
+  for (const family of ['esrgan-slim', 'esrgan-medium']) {
+    for (const scale of [2, 3, 4]) {
+      const path = `public/models/${family}/x${scale}/model.json`
+      if (!existsSync(path)) continue
+      const radius = receptiveFieldRadius(path)
+      measured[`${family}/x${scale}`] = radius
+      assert.ok(
+        pad >= radius,
+        `pad ${pad} is under ${family} x${scale}'s reach of ${radius}`,
+      )
+    }
+  }
+  // Guard against the loop silently finding nothing, which would pass vacuously.
+  assert.ok(Object.keys(measured).length >= 6, `only checked ${Object.keys(measured)}`)
+  assert.ok(Math.max(...Object.values(measured)) > 10, 'radii look wrong')
 })

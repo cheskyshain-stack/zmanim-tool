@@ -85,9 +85,12 @@ export interface TileOptions {
   /** Tile edge in source pixels. Smaller uses less GPU memory and runs slower. */
   tile: number
   /**
-   * Context in source pixels kept around every tile and thrown away afterwards. The
-   * networks have a receptive field of roughly 25 source pixels, so without this each
-   * tile's border would be computed from nothing and the seams would show.
+   * Context in source pixels kept around every tile and thrown away afterwards.
+   *
+   * Without it a tile's border pixels would be computed from nothing and every tile
+   * edge would show. The longest path through the deeper network reaches 17.25 source
+   * pixels, so anything from 18 up makes tiling exact rather than merely acceptable.
+   * See deviceProfile, which is where the number is chosen and explained.
    */
   pad: number
   onProgress?: (completed: number, total: number) => void
