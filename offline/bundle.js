@@ -3495,7 +3495,10 @@ function buildSukkosPoster(year, settings) {
     const yizkor = [
       line(SK_TEXT.shacharis, [txt('7:30', true)],
         { calc: 'shacharis',
-          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly)] } }),
+          // Underlined like the שחרית it belongs to: it is that מנין's own יזכור and it is
+          // said where that מנין is, בבית מדרש למטה. The 8:15's is in the main בית מדרש and
+          // is left plain.
+          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly, true)] } }),
       line(SK_TEXT.shacharis, [txt('8:15')],
         { calc: 'shacharis',
           extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate)] } }),
@@ -9240,7 +9243,7 @@ const POSTER_SHEETS = [
         exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed at all in a year where the day runs into Shabbos: the Shabbos block below gives that evening instead.',
       },
       yizkor: {
-        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 למטה and 10:25 after the 8:15.',
+        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 and 10:25 after the 8:15. The first is underlined like the שחרית it belongs to, being said למטה where that מנין is; the second is in the main בית מדרש.',
         exact: 'Not calculated. On a Shabbos both run later, the davening being longer: 9:40 and 10:55. The Shabbos year used to print one יזכור for the two מנינים and the למטה one had no time on the sheet at all.',
       },
       shminiMincha: {

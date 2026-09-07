@@ -715,7 +715,10 @@ export function buildSukkosPoster(year, settings) {
     const yizkor = [
       line(SK_TEXT.shacharis, [txt('7:30', true)],
         { calc: 'shacharis',
-          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly)] } }),
+          // Underlined like the שחרית it belongs to: it is that מנין's own יזכור and it is
+          // said where that מנין is, בבית מדרש למטה. The 8:15's is in the main בית מדרש and
+          // is left plain.
+          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly, true)] } }),
       line(SK_TEXT.shacharis, [txt('8:15')],
         { calc: 'shacharis',
           extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate)] } }),

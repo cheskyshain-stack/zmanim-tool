@@ -564,7 +564,7 @@ const POSTER_SHEETS = [
         exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed at all in a year where the day runs into Shabbos: the Shabbos block below gives that evening instead.',
       },
       yizkor: {
-        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 למטה and 10:25 after the 8:15.',
+        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 and 10:25 after the 8:15. The first is underlined like the שחרית it belongs to, being said למטה where that מנין is; the second is in the main בית מדרש.',
         exact: 'Not calculated. On a Shabbos both run later, the davening being longer: 9:40 and 10:55. The Shabbos year used to print one יזכור for the two מנינים and the למטה one had no time on the sheet at all.',
       },
       shminiMincha: {
