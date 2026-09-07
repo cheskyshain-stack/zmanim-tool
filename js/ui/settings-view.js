@@ -115,7 +115,7 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
           </div>
         </details>
         <p class="hint">The token is stored in this browser only, and deliberately kept out of the backup file, so exporting a backup never carries it. Anyone using this computer could take it and change the site, so do not set it on a shared machine. You can revoke it on GitHub at any time.</p>
-        <label>Publishing token<input type="password" id="publish-token" autocomplete="off" placeholder="${getPublishToken() ? '' : 'github_pat_...'}" value="${getPublishToken()}"></label>
+        <label>Publishing token<input type="password" id="publish-token" autocomplete="off" placeholder="${getPublishToken() ? '' : 'github_pat_...'}" value="${escAttr(getPublishToken())}"></label>
         <div class="backup-row">
           <button type="button" id="save-token-btn" class="btn-primary">Save token</button>
           <button type="button" id="clear-token-btn" class="btn-danger">Remove token</button>
