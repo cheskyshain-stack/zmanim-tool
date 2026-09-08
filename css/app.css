@@ -3323,12 +3323,24 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   --op-band: #d3dae2;
   --op-rule: #16283f;
   --op-hair: #dfe3e9;
-  /* Half an inch all round, which the shul asked for. It was 0.42in top and bottom against
-     0.5in at the sides, so this is the top and the foot coming in by five hundredths of an
-     inch each and the sides staying where they are. That is a tenth of an inch off the room
-     the type is fitted into, which fitOnePage spends by taking the size down a step where a
-     year needs it to. */
-  padding: 0.5in;
+  /* 0.35in all round. It was 0.5in, and before that 0.42in top and foot against 0.5in at the
+     sides; the half inch was asked for and so is this, the sheet having come off the printer
+     looking as though it had an inch of white round it.
+
+     Half of that inch was never ours. Measured on the file that goes to the printer, the old
+     0.5in came out as 0.55in top, 0.55in foot and 0.50in each side, symmetric and exactly
+     what was set. What is added after that is the printer's own unprintable border, which is
+     0.16in to 0.25in on most machines and cannot be reached from here.
+
+     So this is as far in as it is safe to go. Below about 0.3in the design starts landing
+     inside that border and the printer clips the sheet rather than shrinking it. The 0.15in
+     it gives back goes to the type: fitOnePage spends it, and every occasion comes up about
+     four percent, ימים נוראים from 0.92 to 0.96 and both of the others from 1.12 to 1.16.
+
+     The number itself comes off the bar, which has a stepper for it: --op-pad is set on the
+     sheet by fitOnePage before it measures. The value here is the fallback, and it is what
+     the week's own sheet and any sheet drawn outside the Posters tab get. */
+  padding: var(--op-pad, 0.35in);
 }
 /* The two rules that make the frame, off. They are a ::before and a ::after on .poster, so
    there is nothing to unset: the content property is what draws them. */

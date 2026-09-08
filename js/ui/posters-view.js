@@ -1678,6 +1678,11 @@ function fitOnePage(container) {
     if (!col || col.length !== 2) continue;
     const secs = [...cols.querySelectorAll('.onepage-sec')];
     if (secs.length < 2) continue;
+    /* Before anything is measured: the padding decides how much room the columns have, and
+       the search below fits the type to that room. Set on the sheet rather than in the CSS so
+       the bar can move it; the CSS still carries 0.35in as the fallback, which is what the
+       week's own sheet and a sheet drawn outside this tab get. */
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     const set = (v) => sheet.style.setProperty('--op-scale', v);
     /* One entry per block: the box it lives in, its heading, and its rows. splitColumns hands
        them out between the two columns and may cut one block in two to do it.
@@ -1920,6 +1925,12 @@ function recallBar() {
     else if (typeof saved.all === 'boolean') chosenSheets = saved.all ? (saved.onePage ? 'all' : 'each') : 'one';
     if (typeof saved.combined === 'boolean') chosenCombined = saved.combined;
     if (saved.brk === 'even' || saved.brk === 'day') chosenBreak = saved.brk;
+    // Snapped to a step and held inside the ends, so a hand-edited value cannot put the
+    // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
+    if (Number.isFinite(saved.margin)) {
+      const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
+      chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
+    }
     if (saved.orientation === 'portrait' || saved.orientation === 'landscape') {
       chosenOrientation = saved.orientation;
     }
@@ -1933,6 +1944,7 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
+      margin: chosenMargin,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -1953,6 +1965,34 @@ let chosenCombined = false;
    Even by default, which is what the sheet has always done. Only the one-page sheet reads it:
    the סוכות poster's own two columns are fitted by fitSukkos and are left as they were. */
 let chosenBreak = 'even';
+/* The white the one-page sheet leaves round itself, in inches, and what the stepper in the
+   bar walks through.
+ *
+ * 0.35 is the shipped answer and the one "Original" goes back to. It was 0.5in, and the sheet
+ * came off the printer looking as though it had an inch round it: measured on the print file,
+ * the 0.5in was 0.55in top and foot and 0.50in each side, exactly what was set, and what is
+ * added after that is the printer's own unprintable border, 0.16in to 0.25in on most machines
+ * and out of reach from here.
+ *
+ * Which is the whole reason this is a control rather than a number. How much of that border a
+ * machine takes is a fact about the machine, so the person standing at it is the one who can
+ * see the answer. The floor is 0.15in, which is inside most printers' border and will be
+ * clipped on them: that is the point of being able to try it. The ceiling is where it started
+ * out from before any of this.
+ *
+ * Remembered with the rest of the bar, so a shul that has found its number keeps it. Only the
+ * poster's one-page sheet reads it; the week's own sheet keeps the CSS default. */
+const OP_PAD = 0.35;
+const OP_PAD_MIN = 0.15;
+const OP_PAD_MAX = 0.75;
+const OP_PAD_STEP = 0.05;
+const padSteps = () => {
+  const out = [];
+  for (let v = OP_PAD_MIN; v <= OP_PAD_MAX + 1e-9; v += OP_PAD_STEP) out.push(Math.round(v * 100) / 100);
+  return out;
+};
+const padLabel = (v) => `${v.toFixed(2)}in`;
+let chosenMargin = OP_PAD;
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -2203,6 +2243,28 @@ export function renderPosters(container, state, routeChanged, tables) {
           ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
+      <!-- The margin, built like the year and the yom tov beside it: a step either side of a
+           control that is still the whole list, and a reset at the end. Only on the one-page
+           sheet, which is the only one that reads it.
+
+           A stepper because the number nobody can work out from here is how much of the paper
+           the printer refuses to mark. Whoever is standing at the machine can see that in one
+           print, so they get to walk it in a step at a time rather than ask for a number. -->
+      ${!empty && onePage ? `<div class="poster-year">
+        <span class="poster-year-label" id="poster-margin-label">Margin</span>
+        <div class="poster-year-step">
+          <button type="button" id="poster-margin-back" aria-label="A narrower margin"
+            ${chosenMargin <= OP_PAD_MIN + 1e-9 ? 'disabled' : ''}>&minus;</button>
+          <select id="poster-margin" aria-labelledby="poster-margin-label">
+            ${padSteps().map((v) => `<option value="${v}" ${Math.abs(v - chosenMargin) < 1e-9 ? 'selected' : ''}>${padLabel(v)}</option>`).join('')}
+          </select>
+          <button type="button" id="poster-margin-next" aria-label="A wider margin"
+            ${chosenMargin >= OP_PAD_MAX - 1e-9 ? 'disabled' : ''}>+</button>
+          <button type="button" id="poster-margin-reset" class="poster-year-reset"
+            aria-label="Back to the margin the sheet ships with"
+            ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
+        </div>
+      </div>` : ''}
       ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
         // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
         // and "Start at a day" both sit inside that where a sentence would not.
@@ -2311,6 +2373,21 @@ export function renderPosters(container, state, routeChanged, tables) {
     rememberBar();
     again();
   });
+  /* The margin, from the two steppers, the list, or the reset. All four end in the same place,
+     so the one that does the work takes a number and the four ways in hand it one. Held inside
+     the ends rather than wrapped, the same as the year's and the yom tov's. */
+  const toMargin = (v) => {
+    if (!Number.isFinite(v)) return;
+    const next = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
+    if (Math.abs(next - chosenMargin) < 1e-9) return;
+    chosenMargin = next;
+    rememberBar();
+    again();
+  };
+  container.querySelector('#poster-margin-back')?.addEventListener('click', () => toMargin(chosenMargin - OP_PAD_STEP));
+  container.querySelector('#poster-margin-next')?.addEventListener('click', () => toMargin(chosenMargin + OP_PAD_STEP));
+  container.querySelector('#poster-margin-reset')?.addEventListener('click', () => toMargin(OP_PAD));
+  container.querySelector('#poster-margin')?.addEventListener('change', (e) => toMargin(Number(e.target.value)));
   wireSwitch(container, 'poster-combined', (value) => {
     chosenCombined = value === 'yes';
     rememberBar();
