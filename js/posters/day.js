@@ -23,13 +23,14 @@
 // charts overlap: the sheet works them off the שבת חורף chart's own columns, so what it hands
 // over is the chart's answer with the two lines the chart has no column for added. Every other
 // day it covers is one the charts do not have.
-import { roshHashana, hebrewDateExtended } from '../hebrew-calendar.js';
+import { roshHashana, hebrewDateExtended, specialDaysInWeek } from '../hebrew-calendar.js';
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
 import { buildSukkosPoster } from './sukkos.js';
-import { slichosMornings } from './slichos.js';
+import { slichosMornings, slichosWeekLines } from './slichos.js';
 import { minyanList, MORNING } from './minyanim.js';
+import { DAY_NAMES, differsFromSchedule } from '../util.js';
 
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
@@ -118,4 +119,53 @@ export function specialShacharis(serial, settings) {
     if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
   }
   return [];
+}
+
+/** The mornings of one week's חול block, and whether the everyday שחרית still belongs on it.
+ *
+ *  Two views draw this block, the week card and the week's One sheet, and they were working
+ *  the same three things out separately. The pieces are handed back rather than the finished
+ *  lines, because the two do not set them in the same order or label them the same way; what
+ *  they must not do is disagree about which mornings there are.
+ *
+ *  The everyday שחרית is the list out of Settings, and it stands only while some weekday of
+ *  the week is actually davening it. Through the ימים נוראים it often is not: measured on
+ *  תשפ״ז, the week of שבת שובה has צום גדליה on the Monday and סליחות on all four of the days
+ *  after it, and its Sunday is יום ב' ראש השנה, which the sheet on the wall speaks for. Every
+ *  morning of that week was already on the card under its own name, and the everyday 7:00
+ *  through 8:40 was printed above them as though it were the rule, which nobody davens that
+ *  week. So the line comes off when nothing is left for it.
+ *
+ *  A day counts as spoken for three ways: a סליחות line covers it, a line of its own covers it
+ *  (a fast, or the ר"ח and בה"ב list), or a sheet on the wall has taken the whole day over,
+ *  which is specialMinyanim above and is what the two days of ר"ה and יו"כ are.
+ *
+ *  Only the lines that are really drawn count. A סליחות line that only repeats the everyday
+ *  list is dropped and so covers nothing, and the ר"ח and בה"ב days are covered only where
+ *  there is a second list in Settings to print. Both of those tests live here rather than in
+ *  the two views, so what is counted and what is drawn cannot come apart. */
+export function weekdayMornings(shabbosSerial, settings, everyday, special) {
+  const season = slichosWeekLines(shabbosSerial, settings)
+    .filter((g) => differsFromSchedule(g.html, everyday));
+  const days = specialDaysInWeek(shabbosSerial, settings);
+  const fasts = days.filter((d) => d.fast);
+  const rest = days.filter((d) => !d.fast);
+  const others = rest.length && special ? rest : null;
+
+  const covered = new Set();
+  const mark = (list) => { for (const d of list) for (const name of d.split(', ')) covered.add(name); };
+  mark(season.map((g) => g.day));
+  mark(fasts.map((d) => d.day));
+  if (others) mark(others.map((d) => d.day));
+  // offset 6 is the Sunday of that week and offset 1 the Friday, the same walk
+  // specialDaysInWeek makes.
+  for (let offset = 6; offset >= 1; offset -= 1) {
+    if (specialMinyanim(shabbosSerial - offset, settings).length) covered.add(DAY_NAMES[6 - offset]);
+  }
+  return {
+    season,
+    fasts,
+    others,
+    everydayStands: DAY_NAMES.slice(0, 6).some((d) => !covered.has(d)),
+  };
 }

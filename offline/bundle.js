@@ -8256,6 +8256,7 @@ function renderPosters(container, state, routeChanged, tables) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -8343,6 +8344,55 @@ function specialShacharis(serial, settings) {
     if (found.length) return found.slice().sort((a, b) => a.mins - b.mins);
   }
   return [];
+}
+
+/** The mornings of one week's חול block, and whether the everyday שחרית still belongs on it.
+ *
+ *  Two views draw this block, the week card and the week's One sheet, and they were working
+ *  the same three things out separately. The pieces are handed back rather than the finished
+ *  lines, because the two do not set them in the same order or label them the same way; what
+ *  they must not do is disagree about which mornings there are.
+ *
+ *  The everyday שחרית is the list out of Settings, and it stands only while some weekday of
+ *  the week is actually davening it. Through the ימים נוראים it often is not: measured on
+ *  תשפ״ז, the week of שבת שובה has צום גדליה on the Monday and סליחות on all four of the days
+ *  after it, and its Sunday is יום ב' ראש השנה, which the sheet on the wall speaks for. Every
+ *  morning of that week was already on the card under its own name, and the everyday 7:00
+ *  through 8:40 was printed above them as though it were the rule, which nobody davens that
+ *  week. So the line comes off when nothing is left for it.
+ *
+ *  A day counts as spoken for three ways: a סליחות line covers it, a line of its own covers it
+ *  (a fast, or the ר"ח and בה"ב list), or a sheet on the wall has taken the whole day over,
+ *  which is specialMinyanim above and is what the two days of ר"ה and יו"כ are.
+ *
+ *  Only the lines that are really drawn count. A סליחות line that only repeats the everyday
+ *  list is dropped and so covers nothing, and the ר"ח and בה"ב days are covered only where
+ *  there is a second list in Settings to print. Both of those tests live here rather than in
+ *  the two views, so what is counted and what is drawn cannot come apart. */
+function weekdayMornings(shabbosSerial, settings, everyday, special) {
+  const season = slichosWeekLines(shabbosSerial, settings)
+    .filter((g) => differsFromSchedule(g.html, everyday));
+  const days = specialDaysInWeek(shabbosSerial, settings);
+  const fasts = days.filter((d) => d.fast);
+  const rest = days.filter((d) => !d.fast);
+  const others = rest.length && special ? rest : null;
+
+  const covered = new Set();
+  const mark = (list) => { for (const d of list) for (const name of d.split(', ')) covered.add(name); };
+  mark(season.map((g) => g.day));
+  mark(fasts.map((d) => d.day));
+  if (others) mark(others.map((d) => d.day));
+  // offset 6 is the Sunday of that week and offset 1 the Friday, the same walk
+  // specialDaysInWeek makes.
+  for (let offset = 6; offset >= 1; offset -= 1) {
+    if (specialMinyanim(shabbosSerial - offset, settings).length) covered.add(DAY_NAMES[6 - offset]);
+  }
+  return {
+    season,
+    fasts,
+    others,
+    everydayStands: DAY_NAMES.slice(0, 6).some((d) => !covered.has(d)),
+  };
 }
 
 // ==== upcoming.js ====
@@ -11968,7 +12018,6 @@ function showToast(message) {
 
 
 
-
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
 const SHEET_FONT = 'Times New Roman';
@@ -12149,31 +12198,25 @@ const SHEET_TEXT = {
  *  not the general rule, and the lines go after the everyday שחרית, because most of the week
  *  still runs on those times and they are what should be read first. */
 function weekSpecialShacharis(showing, state, settings) {
-  const days = specialDaysInWeek(showing, settings);
   // The same rule the card keeps: a fast morning is called by what is said at it, off the
   // constant its own sheet is headed with. See dayLabel in week-view.js.
   const name = (d) => `${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`;
+  /* Which mornings the week has is worked out in posters/day.js, so this sheet and the card
+     cannot come to different answers about it. The order and the labels are this sheet's:
+     the season first here, where the card puts a fast ahead of it. */
+  const mornings = weekdayMornings(showing, settings,
+    state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
   const out = [];
-  /* The יומים נוראים season first, which decides the morning outright rather than adding a day
-     to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,
-     and that list is on the סליחות sheet. One line per schedule, and a line that only repeats
-     the everyday שחרית dropped. */
-  for (const g of slichosWeekLines(showing, settings)) {
-    if (!differsFromSchedule(g.html, state.settings.weekdayShacharis)) continue;
-    out.push({ label: g.name, html: g.html, days: `(${g.day})` });
-  }
-  for (const d of days.filter((x) => x.fast)) {
-    out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
-  }
-  const rest = days.filter((x) => !x.fast);
-  if (rest.length && state.settings.weekdayShacharisSpecial) {
+  for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
+  for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
+  if (mornings.others) {
     out.push({
-      label: rest.map((d) => name(d)).join(' · '),
+      label: mornings.others.map((d) => name(d)).join(' · '),
       html: state.settings.weekdayShacharisSpecial,
-      days: `(${[...new Set(rest.map((d) => d.day))].join(', ')})`,
+      days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
     });
   }
-  return out;
+  return { lines: out, everydayStands: mornings.everydayStands };
 }
 
 /** The week's blocks, out of the chart's own cells. */
@@ -12214,9 +12257,12 @@ function sheetSections(showing, index, state, settings, withChol) {
     // Split: the block's lines are two schedules rather than one run cut to fit a column, so
     // every break the chart gave a cell is kept. See sheetCellHtml.
     const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
+    // The everyday שחרית comes off a week where every morning already has a line of its own:
+    // see weekdayMornings in posters/day.js.
+    const mornings = weekSpecialShacharis(showing, state, settings);
     out.push([SHEET_TEXT.chol, [
-      chol('שחרית', state.settings.weekdayShacharis),
-      ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
+      mornings.everydayStands ? chol('שחרית', state.settings.weekdayShacharis) : '',
+      ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       chol('מנחה', wdRow.C),
       chol('מעריב', wdRow.B),
     ]]);
@@ -13583,8 +13629,17 @@ function weekCardsHtml(showing, index, state, settings) {
     // A blank baseline here would print an empty מנחה and מעריב on every week nobody had
     // happened to type over, even though the schedule is computed now.
     const { row: wdRow, overriddenKeys: wdOverridden } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
+    /* The week's mornings, and whether the everyday שחרית is one of them. Worked out in
+       posters/day.js, which the One sheet asks the same question of: the two draw this block
+       and were deciding separately what was on it. */
+    const mornings = weekdayMornings(showing, settings,
+      state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
+      // The everyday שחרית comes off a week where every morning already has a line of its
+      // own: see weekdayMornings. Filtered rather than left out of the map, so the columns
+      // beside it keep their order.
+      .filter((c) => c.key !== 'E' || mornings.everydayStands)
       // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
       // nothing, or the card reads as though the minyan does not exist rather than as
       // though the time is not set yet.
@@ -13608,10 +13663,12 @@ function weekCardsHtml(showing, index, state, settings) {
        below keep. Spliced in at the same place they are, so the day that is not the general
        rule reads first: those splice after these and so end up above them, which puts a fast
        ahead of the season line covering the rest of its week. */
-    const season = slichosWeekLines(showing, settings)
-      .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
+    const season = mornings.season;
     if (season.length) {
-      parts.splice(1, 0, ...season.map((g) => line(
+      // Under the everyday line where there is one, and at the head of the block where there
+      // is not: splice(1) would put it after מנחה on a week whose שחרית has come off.
+      const at = mornings.everydayStands ? 1 : 0;
+      parts.splice(at, 0, ...season.map((g) => line(
         '',
         htmlLines(g.html),
         true, false,
@@ -13622,6 +13679,7 @@ function weekCardsHtml(showing, index, state, settings) {
 
     const special = specialDaysInWeek(showing, settings);
     if (special.length) {
+      const at = mornings.everydayStands ? 1 : 0;
       // The day names go on their own line, in their own direction. Run together with
       // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
       // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
@@ -13637,14 +13695,13 @@ function weekCardsHtml(showing, index, state, settings) {
          גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
          The fast first, since it is the one that is not the general rule. */
       const groups = [];
-      for (const d of special.filter((x) => x.fast)) {
+      for (const d of mornings.fasts) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
-      const rest = special.filter((x) => !x.fast);
-      if (rest.length && state.settings.weekdayShacharisSpecial) {
-        groups.push({ label: rest.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
+      if (mornings.others) {
+        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
       }
-      parts.splice(1, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
+      parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }
     weekdayLines = parts.join('');
   }

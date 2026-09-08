@@ -13,7 +13,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
 import { TZG_TEXT } from '../posters/tzomgedalia.js';
-import { slichosWeekLines } from '../posters/slichos.js';
+import { weekdayMornings } from '../posters/day.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
@@ -21,7 +21,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInW
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, differsFromSchedule } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
@@ -1167,8 +1167,17 @@ function weekCardsHtml(showing, index, state, settings) {
     // A blank baseline here would print an empty מנחה and מעריב on every week nobody had
     // happened to type over, even though the schedule is computed now.
     const { row: wdRow, overriddenKeys: wdOverridden } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
+    /* The week's mornings, and whether the everyday שחרית is one of them. Worked out in
+       posters/day.js, which the One sheet asks the same question of: the two draw this block
+       and were deciding separately what was on it. */
+    const mornings = weekdayMornings(showing, settings,
+      state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
+      // The everyday שחרית comes off a week where every morning already has a line of its
+      // own: see weekdayMornings. Filtered rather than left out of the map, so the columns
+      // beside it keep their order.
+      .filter((c) => c.key !== 'E' || mornings.everydayStands)
       // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
       // nothing, or the card reads as though the minyan does not exist rather than as
       // though the time is not set yet.
@@ -1192,10 +1201,12 @@ function weekCardsHtml(showing, index, state, settings) {
        below keep. Spliced in at the same place they are, so the day that is not the general
        rule reads first: those splice after these and so end up above them, which puts a fast
        ahead of the season line covering the rest of its week. */
-    const season = slichosWeekLines(showing, settings)
-      .filter((g) => differsFromSchedule(g.html, state.settings.weekdayShacharis));
+    const season = mornings.season;
     if (season.length) {
-      parts.splice(1, 0, ...season.map((g) => line(
+      // Under the everyday line where there is one, and at the head of the block where there
+      // is not: splice(1) would put it after מנחה on a week whose שחרית has come off.
+      const at = mornings.everydayStands ? 1 : 0;
+      parts.splice(at, 0, ...season.map((g) => line(
         '',
         htmlLines(g.html),
         true, false,
@@ -1206,6 +1217,7 @@ function weekCardsHtml(showing, index, state, settings) {
 
     const special = specialDaysInWeek(showing, settings);
     if (special.length) {
+      const at = mornings.everydayStands ? 1 : 0;
       // The day names go on their own line, in their own direction. Run together with
       // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
       // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
@@ -1221,14 +1233,13 @@ function weekCardsHtml(showing, index, state, settings) {
          גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
          The fast first, since it is the one that is not the general rule. */
       const groups = [];
-      for (const d of special.filter((x) => x.fast)) {
+      for (const d of mornings.fasts) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
-      const rest = special.filter((x) => !x.fast);
-      if (rest.length && state.settings.weekdayShacharisSpecial) {
-        groups.push({ label: rest.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
+      if (mornings.others) {
+        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
       }
-      parts.splice(1, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
+      parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }
     weekdayLines = parts.join('');
   }

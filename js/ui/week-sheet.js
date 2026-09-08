@@ -30,10 +30,9 @@ import { rowFor, weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { UL_START, UL_END } from '../format.js';
-import { specialDaysInWeek } from '../hebrew-calendar.js';
 import { TZG_TEXT } from '../posters/tzomgedalia.js';
-import { slichosWeekLines } from '../posters/slichos.js';
-import { hebrewLang, escAttr, SOFT_SLASH, differsFromSchedule } from '../util.js';
+import { weekdayMornings } from '../posters/day.js';
+import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
 
 /** The same face the posters are set in, for the same reason: a sheet is its own document
@@ -216,31 +215,25 @@ const SHEET_TEXT = {
  *  not the general rule, and the lines go after the everyday שחרית, because most of the week
  *  still runs on those times and they are what should be read first. */
 function weekSpecialShacharis(showing, state, settings) {
-  const days = specialDaysInWeek(showing, settings);
   // The same rule the card keeps: a fast morning is called by what is said at it, off the
   // constant its own sheet is headed with. See dayLabel in week-view.js.
   const name = (d) => `${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`;
+  /* Which mornings the week has is worked out in posters/day.js, so this sheet and the card
+     cannot come to different answers about it. The order and the labels are this sheet's:
+     the season first here, where the card puts a fast ahead of it. */
+  const mornings = weekdayMornings(showing, settings,
+    state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
   const out = [];
-  /* The יומים נוראים season first, which decides the morning outright rather than adding a day
-     to it: from the first סליחות to יום כיפור the shul opens earlier and on a different list,
-     and that list is on the סליחות sheet. One line per schedule, and a line that only repeats
-     the everyday שחרית dropped. */
-  for (const g of slichosWeekLines(showing, settings)) {
-    if (!differsFromSchedule(g.html, state.settings.weekdayShacharis)) continue;
-    out.push({ label: g.name, html: g.html, days: `(${g.day})` });
-  }
-  for (const d of days.filter((x) => x.fast)) {
-    out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
-  }
-  const rest = days.filter((x) => !x.fast);
-  if (rest.length && state.settings.weekdayShacharisSpecial) {
+  for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
+  for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
+  if (mornings.others) {
     out.push({
-      label: rest.map((d) => name(d)).join(' · '),
+      label: mornings.others.map((d) => name(d)).join(' · '),
       html: state.settings.weekdayShacharisSpecial,
-      days: `(${[...new Set(rest.map((d) => d.day))].join(', ')})`,
+      days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
     });
   }
-  return out;
+  return { lines: out, everydayStands: mornings.everydayStands };
 }
 
 /** The week's blocks, out of the chart's own cells. */
@@ -281,9 +274,12 @@ function sheetSections(showing, index, state, settings, withChol) {
     // Split: the block's lines are two schedules rather than one run cut to fit a column, so
     // every break the chart gave a cell is kept. See sheetCellHtml.
     const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
+    // The everyday שחרית comes off a week where every morning already has a line of its own:
+    // see weekdayMornings in posters/day.js.
+    const mornings = weekSpecialShacharis(showing, state, settings);
     out.push([SHEET_TEXT.chol, [
-      chol('שחרית', state.settings.weekdayShacharis),
-      ...weekSpecialShacharis(showing, state, settings).map((s) => chol(s.label, s.html, s.days)),
+      mornings.everydayStands ? chol('שחרית', state.settings.weekdayShacharis) : '',
+      ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       chol('מנחה', wdRow.C),
       chol('מעריב', wdRow.B),
     ]]);
