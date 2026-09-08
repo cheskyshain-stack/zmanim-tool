@@ -1061,7 +1061,10 @@ function renderSukkosShuavaPoster(poster, settings) {
       <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
       <hr class="poster-shuava-rule">
-      <h2 class="poster-shuava-head" lang="he">${escAttr(t.mishna)}</h2>
+      <!-- Where it is, spelled out. This sheet has no key on it and nothing on it is marked,
+           so the words are the only thing that can say it; the schedule says it with a star
+           instead and prints the name alone. -->
+      <h2 class="poster-shuava-head" lang="he">${escAttr(`${t.mishna} ${t.mishnaWhere}`)}</h2>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
       <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
     </div>`;
@@ -1287,6 +1290,22 @@ function balanceOnePageTimes(container) {
  *  with the same optional `sub`, `extra`, `note` and `sep` the sheets already use, so a row
  *  can be handed straight over from a poster without being rebuilt. */
 const oneSection = (title, rows) => ({ title, rows });
+
+/** A day block's heading with the yom tov named in it: "יום א' ראש השנה", "יום ב' סוכות".
+ *
+ *  Only on this sheet. A sheet of its own is headed ראש השנה or סוכות and the days sit under
+ *  it, so naming the yom tov again on every block would be the same word four times down one
+ *  page. Here the sheet is the whole season, and two of its occasions have a יום א' and a
+ *  יום ב': under one title reading ימים נוראים, "יום א'" says nothing about which.
+ *
+ *  The name goes after the day and before anything else the heading carries, so a Shabbos or
+ *  an עירוב תבשילין still reads last: "יום א' ראש השנה · שבת". Off the same separator the
+ *  headings are built with, and only where the first piece is exactly one of the day names,
+ *  so שבת חול המועד, הושענא רבה and the rest are left as they are. */
+const namedDay = (heading, yomtov, days, sep) => {
+  const parts = String(heading).split(sep);
+  return days.includes(parts[0]) ? [`${parts[0]} ${yomtov}`, ...parts.slice(1)].join(sep) : heading;
+};
 const onePlain = (text) => [{ text, underlined: false, mark: '' }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
@@ -1306,7 +1325,8 @@ const ONEPAGE_SECTIONS = {
       { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
       { label: RH_TEXT.erevMincha.short, times: parseTimes(RH_TEXT.erevMincha.times) },
     ]),
-    ...p.blocks.map((b) => oneSection(b.heading, b.lines)),
+    ...p.blocks.map((b) => oneSection(
+      namedDay(b.heading, RH_TEXT.title, RH_TEXT.day, RH_TEXT.daySep), b.lines)),
   ],
   tzomgedalia: (p) => [oneSection(TZG_TEXT.title, p.sets.map((s) => (s.note
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
@@ -1333,7 +1353,8 @@ const ONEPAGE_SECTIONS = {
      alone does not say which; but the blocks run in date order and each yom tov opens with its
      own ערב, so the day above says which as well as the label did, and the shul asked for the
      names on their own. */
-  sukkos: (p) => p.blocks.map((b) => oneSection(b.heading, b.lines)),
+  sukkos: (p) => p.blocks.map((b) => oneSection(
+    namedDay(b.heading, SK_TEXT.title, [SK_TEXT.day1, SK_TEXT.day2], SK_TEXT.daySep), b.lines)),
   /* No entry for the שמחת בית השואבה sheet, and that is deliberate rather than a gap: both
      halves of it are on the סוכות sheet's own blocks now, the evening under יום ב' and the
      משנה תורה under הושענא רבה, so a section here would put them on this sheet twice. */
