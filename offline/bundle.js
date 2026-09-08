@@ -2210,10 +2210,12 @@ const YK_TEXT = {
   yizkor: { label: 'יזכור בערך', times: '11:55' },
   mincha: 'מנחה',
   neila: 'נעילה',
-  // A third מעריב for anyone who has not davened yet, on every year's sheet. The label says
-  // where it is in words and the time is underlined as well, which is how the old sheets
-  // marked it: the underline is this system's way of saying the same thing.
-  maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
+  /* A third מעריב for anyone who has not davened yet, on every year's sheet. The name alone:
+     the time is underlined and the key at the foot says an underlined מנין is בבית מדרש למטה,
+     so the label read "מעריב ג' בבית מדרש למטה" against an underlined 10:00 and said where
+     twice over. The old sheets wrote it in words because they had no such mark; this system
+     does. */
+  maarivGimmel: { label: "מעריב ג'", times: '<u>10:00</u>' },
   // The gap goes after the name, and what follows is two ways of taking it rather than one
   // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
   kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
@@ -2526,10 +2528,12 @@ function buildYomKippurPoster(year, settings) {
   M.at(dayOn, YK_TEXT.neila, neila);
   M.at(dayOn, YK_TEXT.maariv, motzei60);
   M.at(dayOn, YK_TEXT.maariv, ykShkia + 72 * YK_MIN, { underlined: true });
-  // The third מעריב keeps its time and loses its underline on the way over: its label already
-  // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
-  // the name and once beside it.
-  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times).map((t) => ({ text: t.text })), AFTERNOON);
+  /* The third מעריב carries its underline over now. It used to lose it here, because the
+     label said בבית מדרש למטה in words and the card would have printed the room twice, once
+     in the name and once beside it. The label is the name alone now, so the underline is the
+     only thing left that knows where it is: the card spells a mark out in words (placeOf in
+     posters/minyanim.js), and stripping it would leave the card saying nothing at all. */
+  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times), AFTERNOON);
   // קידוש לבנה is given two ways on the sheet, אחר מעריב or a time. The words are not a time
   // and nothing can count down to them, so only the clock one goes over; clockMins reads
   // "אחר מעריב" as no time at all and it is dropped rather than guessed at.
@@ -2941,7 +2945,12 @@ const SK_SHUAVA = {
   when: "ליל ב' סוכות",
   at: '10:00',
   where: '798 vine ave.',
-  mishna: 'משנה תורה בעזרת נשים',
+  /* The name alone, because on the schedule the time beside it is starred and the key at the
+     foot says what a star means. It read "משנה תורה בעזרת נשים 8:00*", which says where twice
+     over in one row. The sheet of its own has no key and no star on it, so it prints the two
+     together: see renderSukkosShuavaPoster. */
+  mishna: 'משנה תורה',
+  mishnaWhere: 'בעזרת נשים',
   mishnaAt: '8:00',
   mishnaMaariv: 'מעריב אחר משנה תורה',
 };
@@ -3488,8 +3497,8 @@ function buildSukkosPoster(year, settings) {
     heading: SK_TEXT.hoshana,
     lines: [
       // Starred, because it is in the עזרת נשים and that is what a star means on these sheets.
-      // The words say so as well: that is the wording the shul's own sheet uses and it is left
-      // alone, so this row says where twice over, once in words and once in the key's mark.
+      // The name alone beside it: the star and the key already say where, and the row was
+      // saying it twice.
       line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt, false, '*')], { calc: 'mishna', wrap: true }),
       // It has no time of its own and names the שיעור above it, so the column break may not
       // come between the two: on its own at the head of a column it is a line about nothing.
@@ -7044,7 +7053,10 @@ function renderSukkosShuavaPoster(poster, settings) {
       <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
       <hr class="poster-shuava-rule">
-      <h2 class="poster-shuava-head" lang="he">${escAttr(t.mishna)}</h2>
+      <!-- Where it is, spelled out. This sheet has no key on it and nothing on it is marked,
+           so the words are the only thing that can say it; the schedule says it with a star
+           instead and prints the name alone. -->
+      <h2 class="poster-shuava-head" lang="he">${escAttr(`${t.mishna} ${t.mishnaWhere}`)}</h2>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
       <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
     </div>`;
@@ -7270,6 +7282,22 @@ function balanceOnePageTimes(container) {
  *  with the same optional `sub`, `extra`, `note` and `sep` the sheets already use, so a row
  *  can be handed straight over from a poster without being rebuilt. */
 const oneSection = (title, rows) => ({ title, rows });
+
+/** A day block's heading with the yom tov named in it: "יום א' ראש השנה", "יום ב' סוכות".
+ *
+ *  Only on this sheet. A sheet of its own is headed ראש השנה or סוכות and the days sit under
+ *  it, so naming the yom tov again on every block would be the same word four times down one
+ *  page. Here the sheet is the whole season, and two of its occasions have a יום א' and a
+ *  יום ב': under one title reading ימים נוראים, "יום א'" says nothing about which.
+ *
+ *  The name goes after the day and before anything else the heading carries, so a Shabbos or
+ *  an עירוב תבשילין still reads last: "יום א' ראש השנה · שבת". Off the same separator the
+ *  headings are built with, and only where the first piece is exactly one of the day names,
+ *  so שבת חול המועד, הושענא רבה and the rest are left as they are. */
+const namedDay = (heading, yomtov, days, sep) => {
+  const parts = String(heading).split(sep);
+  return days.includes(parts[0]) ? [`${parts[0]} ${yomtov}`, ...parts.slice(1)].join(sep) : heading;
+};
 const onePlain = (text) => [{ text, underlined: false, mark: '' }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
@@ -7289,7 +7317,8 @@ const ONEPAGE_SECTIONS = {
       { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
       { label: RH_TEXT.erevMincha.short, times: parseTimes(RH_TEXT.erevMincha.times) },
     ]),
-    ...p.blocks.map((b) => oneSection(b.heading, b.lines)),
+    ...p.blocks.map((b) => oneSection(
+      namedDay(b.heading, RH_TEXT.title, RH_TEXT.day, RH_TEXT.daySep), b.lines)),
   ],
   tzomgedalia: (p) => [oneSection(TZG_TEXT.title, p.sets.map((s) => (s.note
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
@@ -7316,7 +7345,8 @@ const ONEPAGE_SECTIONS = {
      alone does not say which; but the blocks run in date order and each yom tov opens with its
      own ערב, so the day above says which as well as the label did, and the shul asked for the
      names on their own. */
-  sukkos: (p) => p.blocks.map((b) => oneSection(b.heading, b.lines)),
+  sukkos: (p) => p.blocks.map((b) => oneSection(
+    namedDay(b.heading, SK_TEXT.title, [SK_TEXT.day1, SK_TEXT.day2], SK_TEXT.daySep), b.lines)),
   /* No entry for the שמחת בית השואבה sheet, and that is deliberate rather than a gap: both
      halves of it are on the סוכות sheet's own blocks now, the evening under יום ב' and the
      משנה תורה under הושענא רבה, so a section here would put them on this sheet twice. */
@@ -9213,7 +9243,7 @@ const POSTER_SHEETS = [
       },
       maarivGimmel: {
         plain: 'A third מעריב, למטה, for anybody who has not davened yet. On every year\'s sheet.',
-        exact: 'Not calculated: a fixed 10:00, underlined for למטה.',
+        exact: 'Not calculated: a fixed 10:00, underlined for למטה. The label is the name alone; it used to carry "בבית מדרש למטה" in words as well, against an underlined time, which said where twice over.',
       },
       kiddushLevana: {
         plain: 'קידוש לבנה, offered two ways: after מעריב, or at a set time.',
@@ -9419,7 +9449,7 @@ const POSTER_SHEETS = [
         exact: 'Not calculated. It is on this sheet under יום ב\', which is the night it is on, and has a sheet of its own as well.',
       },
       mishna: {
-        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with.',
+        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with. The name alone beside it, the star saying where; the sheet of its own has no key and prints the two words instead.',
         exact: 'Not calculated.',
       },
       mishnaMaariv: {

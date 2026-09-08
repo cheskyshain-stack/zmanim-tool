@@ -67,10 +67,12 @@ export const YK_TEXT = {
   yizkor: { label: 'יזכור בערך', times: '11:55' },
   mincha: 'מנחה',
   neila: 'נעילה',
-  // A third מעריב for anyone who has not davened yet, on every year's sheet. The label says
-  // where it is in words and the time is underlined as well, which is how the old sheets
-  // marked it: the underline is this system's way of saying the same thing.
-  maarivGimmel: { label: "מעריב ג' בבית מדרש למטה", times: '<u>10:00</u>' },
+  /* A third מעריב for anyone who has not davened yet, on every year's sheet. The name alone:
+     the time is underlined and the key at the foot says an underlined מנין is בבית מדרש למטה,
+     so the label read "מעריב ג' בבית מדרש למטה" against an underlined 10:00 and said where
+     twice over. The old sheets wrote it in words because they had no such mark; this system
+     does. */
+  maarivGimmel: { label: "מעריב ג'", times: '<u>10:00</u>' },
   // The gap goes after the name, and what follows is two ways of taking it rather than one
   // long label: אחר מעריב, or 10:30. So they are set as a pair, joined by the &.
   kiddushLevana: { label: 'קידוש לבנה', times: ['אחר מעריב', '10:30'] },
@@ -383,10 +385,12 @@ export function buildYomKippurPoster(year, settings) {
   M.at(dayOn, YK_TEXT.neila, neila);
   M.at(dayOn, YK_TEXT.maariv, motzei60);
   M.at(dayOn, YK_TEXT.maariv, ykShkia + 72 * YK_MIN, { underlined: true });
-  // The third מעריב keeps its time and loses its underline on the way over: its label already
-  // says בבית מדרש למטה in words, and the card would otherwise print the room twice, once in
-  // the name and once beside it.
-  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times).map((t) => ({ text: t.text })), AFTERNOON);
+  /* The third מעריב carries its underline over now. It used to lose it here, because the
+     label said בבית מדרש למטה in words and the card would have printed the room twice, once
+     in the name and once beside it. The label is the name alone now, so the underline is the
+     only thing left that knows where it is: the card spells a mark out in words (placeOf in
+     posters/minyanim.js), and stripping it would leave the card saying nothing at all. */
+  M.list(dayOn, YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times), AFTERNOON);
   // קידוש לבנה is given two ways on the sheet, אחר מעריב or a time. The words are not a time
   // and nothing can count down to them, so only the clock one goes over; clockMins reads
   // "אחר מעריב" as no time at all and it is dropped rather than guessed at.

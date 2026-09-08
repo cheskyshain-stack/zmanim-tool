@@ -414,7 +414,7 @@ const POSTER_SHEETS = [
       },
       maarivGimmel: {
         plain: 'A third מעריב, למטה, for anybody who has not davened yet. On every year\'s sheet.',
-        exact: 'Not calculated: a fixed 10:00, underlined for למטה.',
+        exact: 'Not calculated: a fixed 10:00, underlined for למטה. The label is the name alone; it used to carry "בבית מדרש למטה" in words as well, against an underlined time, which said where twice over.',
       },
       kiddushLevana: {
         plain: 'קידוש לבנה, offered two ways: after מעריב, or at a set time.',
@@ -620,7 +620,7 @@ const POSTER_SHEETS = [
         exact: 'Not calculated. It is on this sheet under יום ב\', which is the night it is on, and has a sheet of its own as well.',
       },
       mishna: {
-        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with.',
+        plain: 'The משנה תורה in the עזרת נשים on the night of הושענא רבה. A fixed 8:00, starred, which is what this sheet\'s key says בעזרת נשים with. The name alone beside it, the star saying where; the sheet of its own has no key and prints the two words instead.',
         exact: 'Not calculated.',
       },
       mishnaMaariv: {

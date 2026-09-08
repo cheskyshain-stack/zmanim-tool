@@ -144,7 +144,12 @@ export const SK_SHUAVA = {
   when: "ליל ב' סוכות",
   at: '10:00',
   where: '798 vine ave.',
-  mishna: 'משנה תורה בעזרת נשים',
+  /* The name alone, because on the schedule the time beside it is starred and the key at the
+     foot says what a star means. It read "משנה תורה בעזרת נשים 8:00*", which says where twice
+     over in one row. The sheet of its own has no key and no star on it, so it prints the two
+     together: see renderSukkosShuavaPoster. */
+  mishna: 'משנה תורה',
+  mishnaWhere: 'בעזרת נשים',
   mishnaAt: '8:00',
   mishnaMaariv: 'מעריב אחר משנה תורה',
 };
@@ -691,8 +696,8 @@ export function buildSukkosPoster(year, settings) {
     heading: SK_TEXT.hoshana,
     lines: [
       // Starred, because it is in the עזרת נשים and that is what a star means on these sheets.
-      // The words say so as well: that is the wording the shul's own sheet uses and it is left
-      // alone, so this row says where twice over, once in words and once in the key's mark.
+      // The name alone beside it: the star and the key already say where, and the row was
+      // saying it twice.
       line(SK_SHUAVA.mishna, [txt(SK_SHUAVA.mishnaAt, false, '*')], { calc: 'mishna', wrap: true }),
       // It has no time of its own and names the שיעור above it, so the column break may not
       // come between the two: on its own at the head of a column it is a line about nothing.
