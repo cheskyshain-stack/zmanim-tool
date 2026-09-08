@@ -9073,13 +9073,21 @@ function specialShacharis(serial, settings) {
  *  (a fast, or the ר"ח and בה"ב list), or a sheet on the wall has taken the whole day over,
  *  which is specialMinyanim above and is what the two days of ר"ה and יו"כ are.
  *
- *  Only the lines that are really drawn count. A סליחות line that only repeats the everyday
- *  list is dropped and so covers nothing, and the ר"ח and בה"ב days are covered only where
- *  there is a second list in Settings to print. Both of those tests live here rather than in
- *  the two views, so what is counted and what is drawn cannot come apart. */
+ *  Only the lines that are really drawn count: the ר"ח and בה"ב days are covered only where
+ *  there is a second list in Settings to print. That test lives here rather than in the two
+ *  views, so what is counted and what is drawn cannot come apart.
+ *
+ *  Once the season has said anything at all about a week, it says all of it. The first day of
+ *  סליחות has none in the morning and davens the ordinary list, so its line reads the same as
+ *  the everyday one; that line used to be dropped as a repeat, which left its day unspoken for
+ *  and put the everyday list back at the head of the block with no day on it. On the week of
+ *  ר"ה תשפ״ז that read as "שחרית 7:00 ... " over two סליחות lines, as though the week ran on
+ *  those times and the סליחות were the exception, where it is the other way round. Kept, it is
+ *  the same times under the day they belong to. The whole season comes off only where it says
+ *  nothing the everyday list does not, which is a week nobody would call a סליחות week. */
 function weekdayMornings(shabbosSerial, settings, everyday, special) {
-  const season = slichosWeekLines(shabbosSerial, settings)
-    .filter((g) => differsFromSchedule(g.html, everyday));
+  const lines = slichosWeekLines(shabbosSerial, settings);
+  const season = lines.some((g) => differsFromSchedule(g.html, everyday)) ? lines : [];
   const days = specialDaysInWeek(shabbosSerial, settings);
   const fasts = days.filter((d) => d.fast);
   const rest = days.filter((d) => !d.fast);
