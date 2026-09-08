@@ -3306,7 +3306,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    a question about the year: --op-scale multiplies every size below. */
 .poster.is-onepage {
   --op-scale: 1;
-  --op-ink: #16283f;      /* the navy of the wordmark on the congregation's site */
+  /* Black, asked for. It was #16283f, the navy of the wordmark on the congregation's site,
+     which is right on a screen and thin on paper: a navy is a tint and a printer builds it
+     out of dots, where black is solid toner and comes out as ink. Both gold sheets read this,
+     the poster one and the week's, so the two cannot end up different colours. */
+  --op-ink: #000;
   --op-band: #f4efe3;
   --op-rule: #b99a55;
   --op-hair: #e2dccc;
