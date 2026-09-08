@@ -3461,7 +3461,20 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: 0.1in;
   padding-top: 0.05in;
   border-top: 1.5pt solid var(--op-rule);
+  /* A point off the 10.5pt every other sheet's key is set at. On a poster read from across a
+     room the key is the same size as the schedule; here the schedule is 9.5pt before the fit
+     scales it, so at 10.5 the key was the largest type on the page after the title and three
+     lines of it sat heavy under a sheet of small print. It is not scaled with --op-scale on
+     purpose: it has to stay readable in a year the columns are fitted right down, and it is
+     three lines whatever the year, so it is the one part of the sheet whose height does not
+     have to move.
+
+     Not the week's One sheet, which carries this same design and was not asked about. Its
+     type is fitted by a different rule (fitWeekSheet), so a smaller key there would give its
+     rows room and change the size the week prints at, on a sheet that is already settled. */
+  font-size: 9.5pt;
 }
+.poster.is-onepage.is-weeksheet .poster-legend { font-size: 10.5pt; }
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
 /* Air between the lines of a run that has been cut in two or three, and only there.
