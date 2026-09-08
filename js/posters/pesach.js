@@ -17,7 +17,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js';
 import { SLASH } from '../util.js';
-import { buildChorefRow } from '../sheets/choref.js';
+import { buildKayitzRow, earlyMinchaPlag, hasEarlyPlag } from '../sheets/kayitz.js';
 import { parseTimes } from './slichos.js';
 import { twoReckonings, nineHours } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
@@ -122,7 +122,17 @@ export const PS_TEXT = {
   neila: 'נעילת החג',
   achila: 'סוף זמן אכילת חמץ',
   biur: 'סוף זמן ביעור חמץ',
+  /* Said beside the word מעריב rather than under the times: it is a note about that מנין, not
+     a time of its own. It goes on the first מעריב after the two first days that is not a יום
+     טוב, which is מוצאי יום ב' in most years and מוצאי שבת in a year where יום ב' is a Friday.
+     Only that one: the sheets it was ported from print it once. */
   vsenBracha: 'מתחילין לומר ותן ברכה',
+  /* The early מנחה and פלג, off the קיץ chart's own columns I, J and K. The shul asked for them
+     on שבת חול המועד and on שביעי של פסח, which are the two nights of this sheet a person can
+     bring in early from a weekday. One line a column: the label names the מנחה and the פלג it
+     is a quarter of an hour before, the reckoning's own name after it, and the two times in the
+     same order the label reads. */
+  earlyMincha: 'מנחה / פלג',
 
   // The two morning runs, which do not move with the year.
   // The יום טוב morning of the first days, and of שביעי and אחרון, which is the ordinary
@@ -264,6 +274,12 @@ export function buildPesachPoster(year, settings) {
   const eiruvDay1 = excelWeekday(day(PS_DAY2 + 1)) === PS_SHABBOS;
   const eiruvShvii = excelWeekday(day(PS_ACHRON + 1)) === PS_SHABBOS;
 
+  /* Where ותן ברכה is said for the first time. In most years יום ב' goes out into a weekday
+     night and its own מוצאי is the first מעריב that is neither יום טוב nor שבת. In a year where
+     יום ב' is a Friday there is no such מעריב that evening at all: Shabbos comes straight in,
+     and the first one is מוצאי שבת חול המועד. */
+  const day2Friday = excelWeekday(day(PS_DAY2)) === PS_FRIDAY;
+
   /* --- ליל בדיקת חמץ ------------------------------------------------------------------
      The night of the 14th, which is the evening at the end of the 13th, and the Thursday night
      before in a year where the 14th is Shabbos: nothing is searched on Shabbos itself and the
@@ -333,6 +349,22 @@ export function buildPesachPoster(year, settings) {
     return out;
   };
 
+  /** The three early מנחה and פלג pairs of an evening a person can bring in early from a
+   *  weekday, off the קיץ chart's own columns: see earlyMinchaPlag in sheets/kayitz.js.
+   *
+   *  Earliest first, which is the chart's columns read backwards: the board sets them out
+   *  left to right and a poster reads down the evening in the order it happens. The מנין
+   *  carries the mark, the פלג does not, it being a זמן and not a place to daven. Nothing at
+   *  all outside the window the chart prints them in, which פסח is always inside. */
+  const earlyLines = (friday) => (hasEarlyPlag(friday, settings)
+    ? earlyMinchaPlag(dateFromSerial(friday), settings).reverse().map((e) => {
+      // The מנחה is a מנין; the פלג beside it is the זמן it is set against and is not one.
+      M.at(friday, PS_TEXT.mincha, e.mincha, { underlined: e.underlined, mark: e.mark });
+      return line(`${PS_TEXT.earlyMincha} ${e.name}`,
+        [tm(e.mincha, e.underlined, e.mark), tm(e.plag)], { calc: 'earlyMincha' });
+    })
+    : []);
+
   /** The morning of a day of this sheet: the fixed pair, ס"ז ק"ש both ways, and ט' שעות on a
    *  Shabbos. */
   const morningLines = (n, times) => [
@@ -361,7 +393,6 @@ export function buildPesachPoster(year, settings) {
     const shkia = shkiaOf(PS_DAY1);
     const maariv = shkia + 50 * PS_MIN;
     const on = day(PS_DAY1);
-    const day2Friday = excelWeekday(day(PS_DAY2)) === PS_FRIDAY;
     blocks.push({
       at: day(PS_DAY2),
       heading: heading(PS_TEXT.day2, PS_DAY2),
@@ -380,7 +411,7 @@ export function buildPesachPoster(year, settings) {
         day2Friday ? null
           : line(PS_TEXT.maariv,
             [tm(shkiaOf(PS_DAY2) + 60 * PS_MIN), tm(shkiaOf(PS_DAY2) + 72 * PS_MIN, true)],
-            { calc: 'motzeiMaariv', note: PS_TEXT.vsenBracha }),
+            { calc: 'motzeiMaariv', sub: PS_TEXT.vsenBracha }),
       ].filter(Boolean),
     });
     M.at(on, PS_TEXT.maariv, maariv);
@@ -414,25 +445,29 @@ export function buildPesachPoster(year, settings) {
     }
   }
 
-  /* שבת חול המועד, worked off the שבת חורף chart's own columns the way the סוכות sheet works
+  /* שבת חול המועד, worked off the שבת קיץ chart's own columns the way the סוכות sheet works
      its Shabbosos: the shul asked for those to be calculated like a regular Shabbos of the
      year, and this is the same call. It opens with the ערב שבת מנחה menu unless that Friday is
      יום ב', whose own block has already given the afternoon. */
   const shabbosChm = PS_CHM.map((n) => day(n)).find((s) => excelWeekday(s) === PS_SHABBOS);
   if (shabbosChm) {
     const friday = shabbosChm - 1;
-    const row = buildChorefRow({ serial: shabbosChm, specialParsha: '' }, settings);
+    /* The קיץ chart's row, not the חורף one. פסח is inside the spring clock window, so the
+       board for that week is a קיץ row whatever season the saved sheet says (see rowFor in
+       sheets/rows.js), and this Shabbos should be the board's own answer. */
+    const row = buildKayitzRow({ serial: shabbosChm, specialParsha: '' }, settings);
     const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
     const candles = shkia - settings.candleLightingMinutes * PS_MIN;
     const erev = friday > day(PS_DAY2);
     const lines = [];
     if (erev) {
       lines.push(line(PS_TEXT.erevMinchaShabbos, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }));
-      lines.push(line(PS_TEXT.candles, [tm(candles)], { calc: 'shabbosCandles' }));
-      lines.push(line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }));
-    } else {
-      lines.push(line(PS_TEXT.candles, [tm(candles)], { calc: 'shabbosCandles' }));
     }
+    // Only where that Friday is an ordinary weekday. In a year where יום ב' is the Friday
+    // there is nothing to bring in early from: the day is already יום טוב.
+    if (erev) lines.push(...earlyLines(friday));
+    lines.push(line(PS_TEXT.candles, [tm(candles)], { calc: 'shabbosCandles' }));
+    if (erev) lines.push(line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }));
     lines.push(line(PS_TEXT.shkia, [tm(shkia)], { calc: 'shabbosShkia' }));
     lines.push(line(PS_TEXT.maariv, [tm(shkia + 20 * PS_MIN)], { calc: 'shabbosMaariv',
       extra: { label: PS_TEXT.maarivLmata, times: chartTimes(row.F) } }));
@@ -440,7 +475,8 @@ export function buildPesachPoster(year, settings) {
     lines.push(line(PS_TEXT.krias, bothWays(shabbosChm), { calc: 'krias' }));
     lines.push(line(PS_TEXT.nineHours, nineWays(shabbosChm), { calc: 'nineHours' }));
     lines.push(line(PS_TEXT.mincha, chartTimes(row.C), { calc: 'shabbosMincha' }));
-    lines.push(line(PS_TEXT.maariv, chartTimes(row.B), { calc: 'shabbosMotzei' }));
+    lines.push(line(PS_TEXT.maariv, chartTimes(row.B), { calc: 'shabbosMotzei',
+      ...(day2Friday ? { sub: PS_TEXT.vsenBracha } : {}) }));
     blocks.push({
       at: shabbosChm,
       heading: [PS_TEXT.shabbosChm, PS_TEXT.shirHashirim].join(PS_TEXT.daySep),
@@ -467,6 +503,9 @@ export function buildPesachPoster(year, settings) {
       lines: [
         erevShabbos ? null
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
+        // The same gate: an ערב שביעי that is Shabbos is already Shabbos and has nothing to
+        // bring in early from.
+        ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),
         ...eveningLines(PS_SHVII - 1),
         line(PS_TEXT.maarivLmata, [tm(shkiaOf(PS_SHVII - 1) + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
         ...morningLines(n, PS_TEXT.lastDaysShacharis),
@@ -498,7 +537,7 @@ export function buildPesachPoster(year, settings) {
         line(PS_TEXT.neila, [tm(neila)], { calc: 'neila' }),
         line(PS_TEXT.maariv,
           [tm(dayShkia + 60 * PS_MIN), tm(dayShkia + 72 * PS_MIN, true)],
-          { calc: 'motzeiMaariv', note: PS_TEXT.vsenBracha }),
+          { calc: 'motzeiMaariv' }),
       ],
     });
     M.at(day(n) - 1, PS_TEXT.maariv, nightShkia + 50 * PS_MIN);
@@ -522,6 +561,9 @@ export function buildPesachPoster(year, settings) {
 
   return {
     hebrewYear: year,
+    // The heading of the full sheet. It shares its renderer with סוכות, whose own title was
+    // the only one that renderer knew.
+    title: PS_TEXT.title,
     // From the night of בדיקת חמץ to אחרון של פסח, which is every date on the sheet.
     span: { from: bedikaOn, to: day(PS_ACHRON) },
     blocks: blocks.map(({ at, ...b }) => b),

@@ -1048,8 +1048,13 @@ function sukkosRow(ln) {
   // שמחת בית השואבה line carries. A row is set right to left, so "798 vine ave." left to itself
   // came out with the full stop at the front of the line.
   const name = ln.ltrLabel ? `<bdi dir="ltr">${escAttr(ln.label)}</bdi>` : escAttr(ln.label);
+  /* `sub` is a word about the מנין rather than a time of its own, and it goes beside the label
+     rather than in with the run: the פסח sheet's "מתחילין לומר ותן ברכה" is the one line that
+     has one. Its own label span, so it is held off the name in front of it and off the times
+     after it by the same gap every other row uses. */
+  const sub = ln.sub ? `<span class="poster-row-label">${escAttr(ln.sub)}</span>` : '';
   return `<p class="poster-row${ln.wrap ? ' is-sentence' : ''}"${keepUpAttr(ln)} lang="he">`
-    + `<span class="poster-row-label">${name}</span>${times}${extra}</p>`;
+    + `<span class="poster-row-label">${name}</span>${sub}${times}${extra}</p>`;
 }
 
 /** The סוכות sheet: seven blocks at most, in two columns with a rule between them.
@@ -1067,13 +1072,16 @@ function sukkosRow(ln) {
  *  Each block is one element rather than a heading and some loose rows, because that is what
  *  lets a whole block be moved from one column to the other without a heading being left
  *  behind at the foot of the first. */
+/* Two sheets are drawn by this: סוכות and פסח, which have the same shape and the same two
+   columns. The heading is the poster's own, falling back to סוכות's for the sheet this was
+   written for; without that the פסח sheet printed under the word סוכות. */
 function renderSukkosPoster(poster, settings) {
   const block = (b) => `<section class="poster-block">
       <h3 class="poster-day" lang="he">${escAttr(b.heading)}</h3>
       ${b.lines.map(sukkosRow).join('')}
     </section>`;
   const body = `
-    <h2 class="poster-title" lang="he">${escAttr(SK_TEXT.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(poster.title || SK_TEXT.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     <div class="poster-pair">
       <div class="poster-pair-col"><div class="poster-rows is-dense">${poster.blocks.map(block).join('')}</div></div>
       <div class="poster-pair-col"><div class="poster-rows is-dense"></div></div>

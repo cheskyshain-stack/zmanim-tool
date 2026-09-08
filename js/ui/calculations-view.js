@@ -662,7 +662,8 @@ const POSTER_SHEETS = [
     rows: (built) => built.blocks.flatMap((block) => block.lines.map((l) => ({
       key: l.calc,
       name: `${block.heading} · ${l.label}`,
-      value: (typeof l.note === 'string' && l.note ? l.note + ' ' : '') + posterTimes(l.times)
+      value: (typeof l.note === 'string' && l.note ? l.note + ' ' : '')
+        + (l.sub ? l.sub + ' ' : '') + posterTimes(l.times)
         + (l.extra ? '   ' + l.extra.label + ' ' + posterTimes(l.extra.times) : ''),
     }))),
     rules: {
@@ -735,8 +736,12 @@ const POSTER_SHEETS = [
         exact: 'That night\'s מעריב less 20 minutes, taken down to the last 5.',
       },
       motzeiMaariv: {
-        plain: 'מוצאי יום טוב, sixty and seventy two minutes after that day\'s שקיעה, with the note that ותן ברכה starts.',
-        exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed on a יום ב\' that is a Friday: nothing goes out that evening and the שבת חול המועד block gives the night instead.',
+        plain: 'מוצאי יום טוב, sixty and seventy two minutes after that day\'s שקיעה. On מוצאי יום ב\' it also carries מתחילין לומר ותן ברכה, said beside the word מעריב rather than under the times.',
+        exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed on a יום ב\' that is a Friday: nothing goes out that evening and the שבת חול המועד block gives the night instead. ותן ברכה goes on the first מעריב after the two first days that is neither יום טוב nor שבת, which is this one in most years and מוצאי שבת חול המועד in a year where יום ב\' is a Friday. Once, which is how the five sheets say it.',
+      },
+      earlyMincha: {
+        plain: 'The early מנחה and the פלג it is set against, on שבת חול המועד and on שביעי של פסח: three of them, earliest first, off the קיץ chart\'s own columns.',
+        exact: 'Columns I, J and K of the שבת קיץ chart, read backwards so the evening runs in the order it happens: the גר"א\'s פלג, then the מגן אברהם\'s counted to צאת 50, then to צאת 72. מנחה is a quarter of an hour before its own פלג and both are put up to the whole minute. Where each davens is in those columns\' headers rather than in their cells, so it is said on the time itself here: the מ"א 72 is בעזר"נ and the מ"א 50 is למטה. Nothing outside the season the chart runs them in, which פסח is always inside, and nothing on an evening that is already Shabbos or יום טוב, there being nothing to bring in early from.',
       },
       chmShacharis: {
         plain: 'The חול המועד mornings: three fixed מנינים, 7:00 למטה, 8:00 and 8:40 למטה.',
@@ -752,7 +757,7 @@ const POSTER_SHEETS = [
       },
       shabbosCandles: {
         plain: 'הדלקת נרות before שבת חול המועד, worked exactly as the board works it.',
-        exact: (settings) => `Sunset at the shul\'s horizon on the Friday, taken down to the whole minute, less the ${settings.candleLightingMinutes} minutes set in Settings. The same formula as column H of the שבת חורף chart.`,
+        exact: (settings) => `Sunset at the shul\'s horizon on the Friday, taken down to the whole minute, less the ${settings.candleLightingMinutes} minutes set in Settings. The same formula as column H of the שבת קיץ chart.`,
       },
       shabbosShkia: {
         plain: 'שקיעה on that Friday, the one printed on the board beside הדלקת נרות.',
@@ -760,19 +765,19 @@ const POSTER_SHEETS = [
       },
       shabbosMaariv: {
         plain: 'The first מעריב of that Shabbos, twenty minutes after שקיעה, with the later one beside it.',
-        exact: 'The printed שקיעה plus 20 minutes. The מעריב ג\' beside it is column F of the שבת חורף chart.',
+        exact: 'The printed שקיעה plus 20 minutes. The מעריב ג\' beside it is column F of the שבת קיץ chart.',
       },
       shabbosShacharis: {
         plain: 'The Shabbos morning, straight off the board.',
-        exact: 'Column E of the שבת חורף chart, which is fixed.',
+        exact: 'Column E of the שבת קיץ chart, which is fixed.',
       },
       shabbosMincha: {
         plain: 'That Shabbos afternoon, straight off the board.',
-        exact: 'Column C of the שבת חורף chart. The shul asked for a שבת חול המועד to be calculated like a regular Shabbos of the year, which is the same call the סוכות sheet makes for its own Shabbosos.',
+        exact: 'Column C of the שבת קיץ chart. The shul asked for a שבת חול המועד to be calculated like a regular Shabbos of the year, which is the same call the סוכות sheet makes for its own Shabbosos.',
       },
       shabbosMotzei: {
-        plain: 'מוצאי שבת, straight off the board: 60 and 72 minutes after שקיעה.',
-        exact: 'Column B of the שבת חורף chart, both put up to the whole minute, the later one למטה.',
+        plain: 'מוצאי שבת, straight off the board: 60 and 72 minutes after שקיעה. In a year where יום ב\' is a Friday it is also where ותן ברכה starts.',
+        exact: 'Column B of the שבת קיץ chart, both put up to the whole minute, the later one למטה. In a year where יום ב\' is a Friday this is the first מעריב of פסח that is neither יום טוב nor שבת, so מתחילין לומר ותן ברכה is said here rather than on מוצאי יום ב\'.',
       },
       yizkor: {
         plain: 'יזכור on אחרון של פסח, announced rather than worked out: 10:20.',
