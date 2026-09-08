@@ -723,10 +723,6 @@ const POSTER_SHEETS = [
         plain: 'ס"ז קריאת שמע, given on both reckonings with each time under the name of its own.',
         exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is.',
       },
-      nineHours: {
-        plain: 'ט\' שעות, printed on a day of this sheet that falls on Shabbos and on no other.',
-        exact: 'Nine seasonal hours into the day on each reckoning, the same זמן and the same code the ראש השנה and סוכות sheets print on their own Shabbosos.',
-      },
       dayMincha: {
         plain: 'The afternoon of a יום טוב: 2:00 למטה, 5:30, 6:00 למטה, and a last מנין half an hour before שקיעה.',
         exact: 'Three fixed times and a last at that day\'s own שקיעה less 30 minutes, which the shul asked for. All five sheets carry those three and mark them this way round; a 6:30 between the 6:00 and the last one is on two of the five and is left off. The last מנין on those sheets ran anywhere from 15 to 29 minutes before שקיעה and followed no rule. Note this is not the סוכות sheet\'s afternoon, which is 2:00 and 5:30 with no 6:00 and the marks the other way round.',

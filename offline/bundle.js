@@ -2772,7 +2772,6 @@ const PS_TEXT = {
   drasha: 'דרשה מאת הרב שליט"א',
   shiur: 'שיעור בעניני החג מאחד מבני החבורה',
   krias: 'ס"ז ק"ש',
-  nineHours: "ט' שעות",
   chatzos: 'חצות הלילה',
   tzais: 'צאת הכוכבים',
   yizkor: 'יזכור בערך',
@@ -2902,15 +2901,6 @@ function buildPesachPoster(year, settings) {
     Z.sofZmanShmaMGA72(dateFromSerial(serial), settings),
     Z.sofZmanShmaGRA(dateFromSerial(serial), settings)
   ).map((r) => ({ ...tm(r.at), name: r.name }));
-  const nineWays = (serial) => {
-    const nine = nineHours(dateFromSerial(serial), settings);
-    return twoReckonings(nine.mga, nine.gra).map((r) => ({ ...tm(r.at), name: r.name }));
-  };
-  /** ט' שעות, on a day of this sheet that falls on Shabbos and on no other, which is the rule
-   *  the ראש השנה and סוכות sheets already keep. */
-  const nineLine = (n) => (isShabbos(n)
-    ? [line(PS_TEXT.nineHours, nineWays(day(n)), { calc: 'nineHours' })] : []);
-
   /** חצות הלילה of the night that opens a day, which is what the seder is timed against.
    *  Solar noon of that night's own day plus twelve hours. */
   const chatzosLine = (nightDay) => line(PS_TEXT.chatzos,
@@ -3022,12 +3012,12 @@ function buildPesachPoster(year, settings) {
     })
     : []);
 
-  /** The morning of a day of this sheet: the fixed pair, ס"ז ק"ש both ways, and ט' שעות on a
-   *  Shabbos. */
+  /** The morning of a day of this sheet: the fixed pair and ס"ז ק"ש both ways. No ט' שעות,
+   *  which the ראש השנה and סוכות sheets print on their Shabbosos: the shul asked for it off
+   *  this one. */
   const morningLines = (n, times) => [
     line(PS_TEXT.shacharis, parseTimes(times), { calc: 'shacharis' }),
     line(PS_TEXT.krias, bothWays(day(n)), { calc: 'krias' }),
-    ...nineLine(n),
   ];
 
   // יום א'
@@ -3130,7 +3120,6 @@ function buildPesachPoster(year, settings) {
       extra: { label: PS_TEXT.maarivLmata, times: chartTimes(row.F) } }));
     lines.push(line(PS_TEXT.shacharis, chartTimes(row.E), { calc: 'shabbosShacharis' }));
     lines.push(line(PS_TEXT.krias, bothWays(shabbosChm), { calc: 'krias' }));
-    lines.push(line(PS_TEXT.nineHours, nineWays(shabbosChm), { calc: 'nineHours' }));
     lines.push(line(PS_TEXT.mincha, chartTimes(row.C), { calc: 'shabbosMincha' }));
     lines.push(line(PS_TEXT.maariv, chartTimes(row.B), { calc: 'shabbosMotzei',
       ...(day2Friday ? { sub: PS_TEXT.vsenBracha } : {}) }));
@@ -10240,10 +10229,6 @@ const POSTER_SHEETS = [
       krias: {
         plain: 'ס"ז קריאת שמע, given on both reckonings with each time under the name of its own.',
         exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is.',
-      },
-      nineHours: {
-        plain: 'ט\' שעות, printed on a day of this sheet that falls on Shabbos and on no other.',
-        exact: 'Nine seasonal hours into the day on each reckoning, the same זמן and the same code the ראש השנה and סוכות sheets print on their own Shabbosos.',
       },
       dayMincha: {
         plain: 'The afternoon of a יום טוב: 2:00 למטה, 5:30, 6:00 למטה, and a last מנין half an hour before שקיעה.',
