@@ -6369,13 +6369,18 @@ function postersByDate(year, settings) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  return [...POSTERS].sort((a, b) => {
+  const sorted = [...POSTERS].sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
     if (x.from != null && y2.from != null && x.from !== y2.from) return x.from - y2.from;
     return x.i - y2.i;
   });
+  /* The days it worked out, handed back with the order they decided. Each one is a poster
+     built, and the occasion picker's Current button wants the same numbers: without this it
+     would build every sheet of the year a second time on every draw of the bar. */
+  sorted.starts = at;
+  return sorted;
 }
 
 /** The occasions the picker offers, in the order of the year.
@@ -6415,15 +6420,22 @@ const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
 function posterGroups(year, settings) {
   const byName = new Map();
   const loose = [];
-  for (const p of postersByDate(year, settings)) {
+  const sorted = postersByDate(year, settings);
+  for (const p of sorted) {
     if (p.last) { loose.push(p); continue; }
     const name = p.group || POSTER_GROUP_DEFAULT;
     if (!byName.has(name)) byName.set(name, []);
     byName.get(name).push(p);
   }
+  /* The last day any of a group's sheets opens on, which is what says whether that occasion
+     is still ahead. Off the dates postersByDate already worked out. */
+  const lastStart = (items) => {
+    const days = items.map((p) => sorted.starts.get(p)?.from).filter((d) => d != null);
+    return days.length ? Math.max(...days) : null;
+  };
   return [
-    ...[...byName].map(([name, items]) => ({ name, items })),
-    ...loose.map((p) => ({ name: null, items: [p] })),
+    ...[...byName].map(([name, items]) => ({ name, items, lastStart: lastStart(items) })),
+    ...loose.map((p) => ({ name: null, items: [p], lastStart: null })),
   ];
 }
 
@@ -8021,11 +8033,30 @@ function renderPosters(container, state, routeChanged, tables) {
      has been drawn (see POSTER_OCCASIONS). Only the first of them has sheets so far.
      The nameless group is dropped: it holds the run, which is now the other side of the
      "one at a time or all of them" switch rather than an entry in the list. */
-  const drawn = new Map(posterGroups(year, settings).filter((g) => g.name).map((g) => [g.name, g.items]));
+  /* Each occasion keeps the day its last sheet opens on as well as its sheets. The list is
+     rebuilt here in the picker's own order rather than the year's, and dropping that day was
+     what left the Current button with nothing to go back to. */
+  const drawn = new Map(posterGroups(year, settings).filter((g) => g.name).map((g) => [g.name, g]));
   const groups = [
-    ...POSTER_OCCASIONS.map((name) => ({ name, items: drawn.get(name) || [] })),
-    ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name)).map(([name, items]) => ({ name, items })),
+    ...POSTER_OCCASIONS.map((name) => ({
+      name, items: drawn.get(name)?.items || [], lastStart: drawn.get(name)?.lastStart ?? null,
+    })),
+    ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name))
+      .map(([name, g]) => ({ name, items: g.items, lastStart: g.lastStart })),
   ];
+  /* The occasion that is on, which the Current button goes back to.
+     The first one of the year still ahead of today, by the last day any of its sheets opens
+     on: in אלול that is the ימים נוראים, whose יום כיפור sheet is still to come, and once
+     יו"כ is past it is סוכות. Past the whole year it stays on the last occasion that has
+     sheets rather than falling back to the first, since that is the one whose paper is still
+     on the wall. The year picker has rolled to the next year by then anyway (see
+     posterYears), which puts everything ahead again.
+     Off the days postersByDate already worked out, so nothing is built for it. */
+  const withSheets = groups.filter((g) => g.items.length && g.lastStart != null);
+  const nowSerial = excelSerial(new Date());
+  const current = withSheets.find((g) => g.lastStart >= nowSerial)
+    || withSheets[withSheets.length - 1] || null;
+
   const group = groups.find((g) => g.name === chosenGroup) || groups[0];
   // Where the occasion showing sits in that list, which is what the two steppers move along
   // and what disables one of them at either end.
@@ -8091,7 +8122,7 @@ function renderPosters(container, state, routeChanged, tables) {
                way the two steppers are at the ends of the list, so it keeps its place in
                the box rather than the bar changing shape as the year moves. -->
           <button type="button" id="poster-year-today" class="poster-year-reset"
-            aria-label="The year coming up" ${year === preferred ? 'disabled' : ''}>Today</button>
+            aria-label="The year coming up" ${year === preferred ? 'disabled' : ''}>Current</button>
         </div>
       </div>
       <!-- The occasion, in the same box as the year: a step either side of a control that is
@@ -8109,6 +8140,13 @@ function renderPosters(container, state, routeChanged, tables) {
           </select>
           <button type="button" id="poster-group-next" aria-label="The yom tov after"
             ${gAt >= groups.length - 1 ? 'disabled' : ''}>+</button>
+          <!-- Back to the occasion that is on, the same way the year's button goes back to
+               the year coming up. Left off entirely where there is no occasion to go back
+               to, rather than sat there dead: the year's is always answerable and this one
+               is not. -->
+          ${current ? `<button type="button" id="poster-group-now" class="poster-year-reset"
+            aria-label="The yom tov on now"
+            ${group && current.name === group.name ? 'disabled' : ''}>Current</button>` : ''}
         </div>
       </div>
       ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
@@ -8194,6 +8232,7 @@ function renderPosters(container, state, routeChanged, tables) {
     onRoute?.();
     again();
   };
+  container.querySelector('#poster-group-now')?.addEventListener('click', () => toGroup(current?.name));
   container.querySelector('#poster-group-back')?.addEventListener('click', () => toGroup(groups[gAt - 1]?.name));
   container.querySelector('#poster-group-next')?.addEventListener('click', () => toGroup(groups[gAt + 1]?.name));
   container.querySelector('#poster-group')?.addEventListener('change', (e) => {
