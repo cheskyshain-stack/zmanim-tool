@@ -3311,9 +3311,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      out of dots, where black is solid toner and comes out as ink. Both gold sheets read this,
      the poster one and the week's, so the two cannot end up different colours. */
   --op-ink: #000;
-  --op-band: #f4efe3;
-  --op-rule: #b99a55;
-  --op-hair: #e2dccc;
+  /* A navy theme, chosen off a set of four printed on the shul's own printer, and the darker
+     of them: the rule is the navy, and the band and the hairlines are that same navy laid
+     over white at 20% and at 12%. Mixed from the rule rather than picked to look close, so
+     the three are one hue and cannot drift out of key. They were a gold rule over a warm
+     beige band, which stopped agreeing once the rule went cool.
+
+     Still open on paper. The band is a tint whatever colour it is, and a tint is what a
+     printer builds out of dots, so a lighter band or none at all may yet win. See the four
+     under discussion: 6%, 12%, 20%, none. */
+  --op-band: #d3dae2;
+  --op-rule: #16283f;
+  --op-hair: #dfe3e9;
   /* Half an inch all round, which the shul asked for. It was 0.42in top and bottom against
      0.5in at the sides, so this is the top and the foot coming in by five hundredths of an
      inch each and the sides staying where they are. That is a tenth of an inch off the room
