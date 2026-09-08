@@ -22,6 +22,7 @@ import { twoReckonings, nineHours } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { everydayShacharis, afterSchedule } from './yomkippur.js';
 import { openingMincha } from './early-mincha.js';
+import { chartTimes } from './chart-cell.js';
 
 const SK_MIN = 1 / 1440;
 const SK_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -370,33 +371,6 @@ export function buildSukkosAfter(rh, settings) {
     // prints today.
     { lastFifteen: true }
   );
-}
-
-/** A chart cell read back as the poster's own times.
- *
- *  The wall chart writes a cell as one string: times joined with SLASH, a line break where the
- *  formula splits them in two, and a private-use character each side of a time that is למטה
- *  (UL_START, UL_END in format.js). This turns that back into the { text, underlined, mark }
- *  pieces every row on a poster is made of, so a Shabbos on this sheet can be the chart's own
- *  answer rather than a second implementation of it that drifts. */
-function chartTimes(cell) {
-  return String(cell ?? '')
-    .split('\n').join(SLASH)
-    .split(SLASH)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const bare = part.replace(/[\uE000\uE001\u00A0]/g, '').trim();
-      // A star stuck to the digits is \u05D1\u05E2\u05D6\u05E8\u05EA \u05E0\u05E9\u05D9\u05DD, the same notation the charts and the other
-      // posters read. None of the four columns used here carries one today; taken off rather
-      // than left in the text so a column that grows one does not print "5:41*" as a time.
-      const stars = (bare.match(/\*+$/) || [''])[0];
-      return {
-        text: bare.slice(0, bare.length - stars.length),
-        underlined: part.startsWith(UL_START),
-        mark: stars,
-      };
-    });
 }
 
 /** A Shabbos that falls inside this sheet, worked the way an ordinary Shabbos of the year is.

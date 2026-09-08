@@ -23,6 +23,7 @@ import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../pos
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
+import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -314,6 +315,25 @@ const POSTERS = [
       }));
     },
     render: renderSukkosShuavaPoster,
+  },
+  {
+    key: 'pesach',
+    label: 'פסח',
+    group: 'פסח',
+    covers: (y) => `${PS_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildPesachPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildPesachPoster(y, settings) }),
+      }));
+    },
+    render: renderSukkosPoster,
   },
   // Last in the list whatever the dates say, because it is a way of looking at the others
   // rather than a poster with a date of its own.
@@ -1367,6 +1387,11 @@ const ONEPAGE_SECTIONS = {
      names on their own. */
   sukkos: (p) => p.blocks.map((b) => oneSection(
     namedDay(b.heading, SK_TEXT.title, [SK_TEXT.day1, SK_TEXT.day2], SK_TEXT.daySep), b.lines)),
+  /* פסח, the same way: one block a section, in the order the days run. Its own builder has
+     already sorted them, and the day headings take the yom tov's name here for the same reason
+     the סוכות ones do. */
+  pesach: (p) => p.blocks.map((b) => oneSection(
+    namedDay(b.heading, PS_TEXT.title, [PS_TEXT.day1, PS_TEXT.day2], PS_TEXT.daySep), b.lines)),
   /* No entry for the שמחת בית השואבה sheet, and that is deliberate rather than a gap: both
      halves of it are on the סוכות sheet's own blocks now, the evening under יום ב' and the
      משנה תורה under הושענא רבה, so a section here would put them on this sheet twice. */

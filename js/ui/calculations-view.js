@@ -26,6 +26,7 @@ import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildSukkosPoster, SK_SHUAVA } from '../posters/sukkos.js';
+import { buildPesachPoster } from '../posters/pesach.js';
 import { nextYomimNoraim } from './posters-view.js';
 import { hebrewYear } from '../hebrew-calendar.js';
 import { KAYITZ_COLUMNS, buildKayitzRow } from '../sheets/kayitz.js';
@@ -650,6 +651,136 @@ const POSTER_SHEETS = [
       chmMaariv: {
         plain: 'The first is fifty minutes after the latest שקיעה of those days, so it clears on all of them, announced to a round five. Then the top and the bottom of every hour through to 12:00, with the 8:45 kept in its place.',
         exact: 'The latest שקיעה of the same days plus 50 minutes, taken up to the next 5, then 7:00, 7:30, 8:00 and so on to 12:00 midnight, with the shul\'s own 8:45 among them. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 7:30 off. Everything is למטה except the 8:45 and the 10:30, the same way round as the weekday chart. The sheets it was ported from stop at 11:30; the shul asked for the run to reach 12:00.',
+      },
+    },
+  },
+  {
+    key: 'pesach',
+    name: 'פסח',
+    note: 'Ported off five sheets the shul hung, תשפ"ב through תשפ"ו, which between them cover every shape this one takes: a ערב פסח on a Friday and on a Shabbos, a יום א\' on Shabbos, a שביעי on Shabbos, an אחרון on Shabbos, and a שבת חול המועד both early in the week and late in it. Where those five disagree with each other the later year wins, which is what the shul asked for. Three lines on it are the shul\'s own answer rather than the old sheets\': the last מנחה of a יום טוב day, נעילת החג, and the דרשה, all of which the five sheets set differently every year and none of which followed a rule. The days are in the order they happen, where the sheets it came from put שביעי and אחרון at the head of the first column.',
+    build: (year, settings) => buildPesachPoster(year, settings),
+    rows: (built) => built.blocks.flatMap((block) => block.lines.map((l) => ({
+      key: l.calc,
+      name: `${block.heading} · ${l.label}`,
+      value: (typeof l.note === 'string' && l.note ? l.note + ' ' : '') + posterTimes(l.times)
+        + (l.extra ? '   ' + l.extra.label + ' ' + posterTimes(l.extra.times) : ''),
+    }))),
+    rules: {
+      bedikaMaariv: {
+        plain: 'מעריב on the night of בדיקת חמץ: fifty minutes after that evening\'s שקיעה, and a 10:30 למטה after it.',
+        exact: 'שקיעה of the day the search is on plus 50 minutes. That is 13 ניסן normally, and 12 ניסן in a year where ערב פסח is Shabbos, the search being brought forward to the Thursday night. The 10:30 is announced and does not move.',
+      },
+      erevShacharis: {
+        plain: 'The morning of ערב פסח, which is the everyday שחרית out of Settings.',
+        exact: 'Not calculated. The same list the boards print, so a change in Settings reaches the board and this sheet at once.',
+      },
+      achila: {
+        plain: 'סוף זמן אכילת חמץ, the end of the fourth hour on the מגן אברהם\'s day.',
+        exact: 'עלות 72 minutes before נץ, plus four twelfths of the way to צאת 72 minutes after שקיעה. Measured against all five sheets: the מ"א\'s fourth hour reproduces every one of their printed numbers to the minute, where the גר"א\'s is a good twenty minutes later than any of them.',
+      },
+      biur: {
+        plain: 'סוף זמן ביעור חמץ, the end of the fifth hour on the same reckoning.',
+        exact: 'The same day, five twelfths of the way through it rather than four. Reproduces all five sheets to the minute.',
+      },
+      erevMincha: {
+        plain: 'The afternoon before a יום טוב: 1:35 למטה, 1:50, 2:15 and 3:00.',
+        exact: 'Not calculated, and no 1:15 or 1:20 the way the סוכות sheet opens its afternoons. חצות is an hour later in ניסן, so מנחה גדולה לחומרא lands between 1:29 and 1:31 on these days, measured across all five years, and 1:35 is the first מנין that clears it on every one of them.',
+      },
+      candles: {
+        plain: 'הדלקת נרות before a יום טוב, the usual number of minutes before שקיעה.',
+        exact: (settings) => `שקיעה of the night that opens the day, less the ${settings.candleLightingMinutes} minutes set in Settings.`,
+      },
+      candlesMincha: {
+        plain: 'The מנחה that goes with הדלקת נרות, three minutes after it.',
+        exact: 'הדלקת נרות plus 3 minutes, the same convention every יום טוב night on these sheets uses.',
+      },
+      nightShkia: {
+        plain: 'שקיעה of the night that opens this day. A זמן, not a מנין.',
+        exact: 'Sunset at the shul\'s horizon on the day before the block\'s own day.',
+      },
+      drasha: {
+        plain: 'The דרשה on the first night, at least twenty eight minutes before מעריב and announced to a round five.',
+        exact: 'That night\'s מעריב, taken to the minute it prints as, less 28 minutes and then down to the last 5, so the gap comes out between 28 and 32. The same rule and the same number the סוכות sheet\'s דרשה runs on. The five sheets this was ported from range from 28 to 33 and follow no rule.',
+      },
+      nightMaariv: {
+        plain: 'מעריב on the night that opens a day, fifty minutes after שקיעה, with צאת הכוכבים beside it.',
+        exact: 'That night\'s שקיעה plus 50 minutes. The צאת in brackets is the same שקיעה plus 72.',
+      },
+      maarivLmata: {
+        plain: 'A third מעריב, למטה, seventy two minutes after שקיעה, which is צאת הכוכבים itself.',
+        exact: 'That night\'s שקיעה plus 72 minutes, underlined for למטה. The sheets it was ported from print the same number twice, once as this מנין and once as the צאת beside the מעריב above it.',
+      },
+      chatzos: {
+        plain: 'חצות הלילה, which the seder is timed against.',
+        exact: 'True solar noon of that night\'s own day plus twelve hours. Worked per night, so the two seder nights read a minute apart where the sun says they do; the five sheets print one number on both.',
+      },
+      shacharis: {
+        plain: 'The morning. 8:00 למטה and 8:55 on the two first days, 7:30 למטה and 8:15 on שביעי and אחרון.',
+        exact: 'Not calculated. The pair on the last two days is the ordinary Shabbos pair and is the same on all five sheets; the second מנין of the first days moved between 8:40, 8:45 and 8:55 over those years and the latest is what is here.',
+      },
+      krias: {
+        plain: 'ס"ז קריאת שמע, given on both reckonings with each time under the name of its own.',
+        exact: 'The מגן אברהם\'s, counted from 72 minutes before נץ to 72 after שקיעה, and the גר"א\'s, from נץ to שקיעה, a quarter of the day after the start in each case. The earlier of the two is set on the left whichever reckoning it is.',
+      },
+      nineHours: {
+        plain: 'ט\' שעות, printed on a day of this sheet that falls on Shabbos and on no other.',
+        exact: 'Nine seasonal hours into the day on each reckoning, the same זמן and the same code the ראש השנה and סוכות sheets print on their own Shabbosos.',
+      },
+      dayMincha: {
+        plain: 'The afternoon of a יום טוב: 2:00 למטה, 5:30, 6:00 למטה, and a last מנין half an hour before שקיעה.',
+        exact: 'Three fixed times and a last at that day\'s own שקיעה less 30 minutes, which the shul asked for. All five sheets carry those three and mark them this way round; a 6:30 between the 6:00 and the last one is on two of the five and is left off. The last מנין on those sheets ran anywhere from 15 to 29 minutes before שקיעה and followed no rule. Note this is not the סוכות sheet\'s afternoon, which is 2:00 and 5:30 with no 6:00 and the marks the other way round.',
+      },
+      shiur: {
+        plain: 'The שיעור on the second night, at least twenty minutes before מעריב, announced to a round five.',
+        exact: 'That night\'s מעריב less 20 minutes, taken down to the last 5.',
+      },
+      motzeiMaariv: {
+        plain: 'מוצאי יום טוב, sixty and seventy two minutes after that day\'s שקיעה, with the note that ותן ברכה starts.',
+        exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed on a יום ב\' that is a Friday: nothing goes out that evening and the שבת חול המועד block gives the night instead.',
+      },
+      chmShacharis: {
+        plain: 'The חול המועד mornings: three fixed מנינים, 7:00 למטה, 8:00 and 8:40 למטה.',
+        exact: 'Not calculated. The same three the סוכות sheet\'s חול המועד prints, and the same three on all five פסח sheets.',
+      },
+      chmMincha: {
+        plain: '1:35, 1:50 and 4:15 to open, then every twenty minutes from 6:00, and last a מנין a quarter of an hour before the earliest שקיעה of those days, on a round five.',
+        exact: 'The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them one goes back in. The same shape as the סוכות sheet\'s run. The five sheets are not consistent with each other here: תשפ"ה is a clean twenty minute run and the rest are not.',
+      },
+      chmMaariv: {
+        plain: 'The first is fifty minutes after the latest שקיעה of those days, announced to a round five. Then 8:45, 9:30, and the top and the bottom of every hour to 12:00.',
+        exact: 'A written list rather than a grid, because none of the five sheets has a 9:00 in it where the סוכות sheet\'s own run does. A time within a quarter of an hour of the first is not printed, which in a year with a late שקיעה takes the 8:45 off. Everything is למטה except the 8:45 and the 10:30.',
+      },
+      shabbosCandles: {
+        plain: 'הדלקת נרות before שבת חול המועד, worked exactly as the board works it.',
+        exact: (settings) => `Sunset at the shul\'s horizon on the Friday, taken down to the whole minute, less the ${settings.candleLightingMinutes} minutes set in Settings. The same formula as column H of the שבת חורף chart.`,
+      },
+      shabbosShkia: {
+        plain: 'שקיעה on that Friday, the one printed on the board beside הדלקת נרות.',
+        exact: 'Sunset at the shul\'s horizon, taken down to the whole minute, so this and the chart agree.',
+      },
+      shabbosMaariv: {
+        plain: 'The first מעריב of that Shabbos, twenty minutes after שקיעה, with the later one beside it.',
+        exact: 'The printed שקיעה plus 20 minutes. The מעריב ג\' beside it is column F of the שבת חורף chart.',
+      },
+      shabbosShacharis: {
+        plain: 'The Shabbos morning, straight off the board.',
+        exact: 'Column E of the שבת חורף chart, which is fixed.',
+      },
+      shabbosMincha: {
+        plain: 'That Shabbos afternoon, straight off the board.',
+        exact: 'Column C of the שבת חורף chart. The shul asked for a שבת חול המועד to be calculated like a regular Shabbos of the year, which is the same call the סוכות sheet makes for its own Shabbosos.',
+      },
+      shabbosMotzei: {
+        plain: 'מוצאי שבת, straight off the board: 60 and 72 minutes after שקיעה.',
+        exact: 'Column B of the שבת חורף chart, both put up to the whole minute, the later one למטה.',
+      },
+      yizkor: {
+        plain: 'יזכור on אחרון של פסח, announced rather than worked out: 10:20.',
+        exact: 'Not calculated. 10:20 on four of the five sheets and 10:40 on תשפ"ב alone.',
+      },
+      neila: {
+        plain: 'נעילת החג on אחרון של פסח, three quarters of an hour before שקיעה, announced to the nearest five.',
+        exact: 'That day\'s own שקיעה less 45 minutes, rounded to the nearest 5. Asked for. The five sheets put it anywhere from 39 to 53 minutes before שקיעה and followed no rule.',
       },
     },
   },
