@@ -3465,18 +3465,27 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: 0.1in;
   padding-top: 0.05in;
   border-top: 1.5pt solid var(--op-rule);
-  /* A point off the 10.5pt every other sheet's key is set at. On a poster read from across a
-     room the key is the same size as the schedule; here the schedule is 9.5pt before the fit
-     scales it, so at 10.5 the key was the largest type on the page after the title and three
-     lines of it sat heavy under a sheet of small print. It is not scaled with --op-scale on
-     purpose: it has to stay readable in a year the columns are fitted right down, and it is
-     three lines whatever the year, so it is the one part of the sheet whose height does not
-     have to move.
+  /* Smaller than every line of the schedule, on every year. Asked for: a key that reads
+     larger than the times takes the page over.
 
-     Not the week's One sheet, which carries this same design and was not asked about. Its
-     type is fitted by a different rule (fitWeekSheet), so a smaller key there would give its
-     rows room and change the size the week prints at, on a sheet that is already settled. */
-  font-size: 9.5pt;
+     It has to be scaled to manage that. A row is 9.5pt times --op-scale, and the fit runs
+     that scale from 0.90 to 1.25 across the years, so the schedule itself is anywhere from
+     8.55pt to 11.87pt. Against a flat 9.5pt key that came out at 0.80 of the row on the
+     busiest year and 1.11 on the lightest, where the note about where to daven was set
+     larger than the מנינים it is about. Measured on all twenty sheets.
+
+     0.8 of the row, which is 7.6pt before the scale: that is the ratio the busiest year
+     already had and liked, held on every year now instead of drifting. The floor is there
+     because a key still has to be read on the tightest year, and it only bites below 0.92,
+     where it leaves the key at 7pt against a 8.55pt row, still the smaller of the two.
+
+     The reckoning names over a pair of זמנים (מ"א, גר"א) are smaller than this and are meant
+     to be. They are labels on a time rather than a line of the schedule.
+
+     Not the week's One sheet below, which carries this same design and was not asked about.
+     Its type is fitted by a different rule (fitWeekSheet), its rows are far larger than its
+     key already, and changing it would move the size the week prints at. */
+  font-size: max(7pt, calc(7.6pt * var(--op-scale)));
 }
 .poster.is-onepage.is-weeksheet .poster-legend { font-size: 10.5pt; }
 .onepage-times { font-weight: 700; text-align: left; }
