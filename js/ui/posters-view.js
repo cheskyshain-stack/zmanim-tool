@@ -508,6 +508,13 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
   // portrait page and the sheet inside it is taken out of the flow and rotated, so its 11in
   // width cannot push the page wider.
   const sideways = landscape;
+  /* Whether anything in this run can be turned at all, which is what the note under it is
+     about. Without this it was printed under every run: סוכות has no sheet carrying two
+     schedules and none that can be set landscape, so its run was being told to reach for a
+     Paper switch that is not on the bar and about two sheets that are not in it. Asked of the
+     run's own items rather than written down, the same way the bar decides whether to offer
+     the switch. */
+  const turnable = built.items.some((it) => it.orientations);
   return `<div class="poster-all">
     ${built.items.map((it) => {
       const turned = sideways && it.orientations;
@@ -522,7 +529,7 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
     ${(built.leftOut || []).length
       ? `<p class="hint no-print">Left out, one occasion a sheet: ${escAttr(built.leftOut.join(', '))}</p>`
       : ''}
-    ${(built.leftOut || []).length ? '' : `<p class="hint no-print">${sideways
+    ${!turnable || (built.leftOut || []).length ? '' : `<p class="hint no-print">${sideways
       ? 'The two sheets that carry two schedules are on their side here, because one print run can only be one size of paper. They come out whole on the same paper as the rest; turn the sheet to read them.'
       : 'Set Paper to Landscape to have the two sheets that carry two schedules come out that way, turned on their side so they still fit the run.'}</p>`}
   </div>`;
@@ -2007,6 +2014,9 @@ export function renderPosters(container, state, routeChanged, tables) {
     ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name)).map(([name, items]) => ({ name, items })),
   ];
   const group = groups.find((g) => g.name === chosenGroup) || groups[0];
+  // Where the occasion showing sits in that list, which is what the two steppers move along
+  // and what disables one of them at either end.
+  const gAt = groups.indexOf(group);
   /* Written back, so the occasion the picker is showing and the occasion the run is built from
      are one name. Nothing has been picked on a fresh load and chosenGroup is null, which the
      line above resolves to the first occasion for the picker's sake; the run read the null and
@@ -2071,11 +2081,23 @@ export function renderPosters(container, state, routeChanged, tables) {
             aria-label="The year coming up" ${year === preferred ? 'disabled' : ''}>Today</button>
         </div>
       </div>
-      <label>Yom tov
-        <select id="poster-group">
-          ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
-        </select>
-      </label>
+      <!-- The occasion, in the same box as the year: a step either side of a control that is
+           still the whole list. The two are one question asked twice, "which sheet am I
+           printing", and the year already answers it this way. A dropdown alone made you open
+           a menu of nine and read it to move one occasion, and there are only ever a few
+           between the one showing and the one wanted. -->
+      <div class="poster-year">
+        <span class="poster-year-label" id="poster-group-label">Yom tov</span>
+        <div class="poster-year-step">
+          <button type="button" id="poster-group-back" aria-label="The yom tov before"
+            ${gAt <= 0 ? 'disabled' : ''}>&minus;</button>
+          <select id="poster-group" aria-labelledby="poster-group-label">
+            ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
+          </select>
+          <button type="button" id="poster-group-next" aria-label="The yom tov after"
+            ${gAt >= groups.length - 1 ? 'disabled' : ''}>+</button>
+        </div>
+      </div>
       ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
         { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
         { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
@@ -2145,6 +2167,22 @@ export function renderPosters(container, state, routeChanged, tables) {
     rememberBar();
     again();
   });
+  /* The occasion, from the two steppers or from the list. Both end in the same place, so the
+     one that does the work takes a name and the three ways in hand it one.
+     No wrapping at the ends, like the year's: holding a button down cannot walk off the list. */
+  const toGroup = (name) => {
+    if (name == null) return;
+    chosenGroup = name;
+    // The sheet chosen belongs to the occasion that was showing, so it is let go of here
+    // rather than left pointing into a list it is not in any more.
+    chosen = null;
+    conflictPick = 0;
+    rememberBar();
+    onRoute?.();
+    again();
+  };
+  container.querySelector('#poster-group-back')?.addEventListener('click', () => toGroup(groups[gAt - 1]?.name));
+  container.querySelector('#poster-group-next')?.addEventListener('click', () => toGroup(groups[gAt + 1]?.name));
   container.querySelector('#poster-group')?.addEventListener('change', (e) => {
     chosenGroup = e.target.value;
     // The sheet chosen belongs to the occasion that was showing, so it is let go of here

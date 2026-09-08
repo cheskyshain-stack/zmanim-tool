@@ -3650,6 +3650,27 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   color: var(--ink); font-size: var(--fs-md); font-weight: 600; line-height: 1.4;
   text-align: center; white-space: nowrap;
 }
+/* The occasion picker, which sits inside that same box with a step either side of it. It is
+   still a select and still opens the whole list; what it gives up is its own outline, so the
+   three read as one control rather than a menu with two buttons stuck to it.
+   The caret stays. It is what says the middle of this box can be opened, where the year's
+   middle is a word and cannot. Everything else is .poster-year-now's box: the same rules down
+   each side, the same minimum width so the bar does not change shape as the name changes, and
+   the same block padding, which is the Print button's, so the row still lines up along its
+   bottom edge. */
+.poster-bar .poster-year-step select {
+  min-width: 11.5rem;
+  border: 0; border-inline: 1px solid var(--border); border-radius: 0;
+  background-color: transparent;
+  padding-block: 0.55rem;
+}
+.poster-bar .poster-year-step select:hover { background-color: var(--ui-accent-soft); }
+/* Inside the box the ring would be drawn half outside it and clipped by the overflow, so the
+   focus mark is the one the two buttons beside it use: an outline laid just inside the edge. */
+.poster-bar .poster-year-step select:focus-visible {
+  outline: 2px solid var(--ui-accent); outline-offset: -2px;
+  border-color: var(--border); box-shadow: none;
+}
 /* Back to the year coming up, at the end of the same box. A word rather than a sign, since
    the two either side of the year say which way they go by where they sit and this one is
    not going anywhere in particular; the rule under it is what keeps it from reading as a
