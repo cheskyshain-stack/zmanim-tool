@@ -130,8 +130,11 @@ That runs the tests, gathers Tesseract, freezes the program and produces
 You do not need a Windows machine. Every push to this branch builds the
 installer on a Windows runner and attaches it to the run: open the Actions tab,
 pick the newest **Build Ksav for Windows**, and download **Ksav-Windows-Installer**
-from the artifacts. The build runs the tests, opens the frozen program to check
-it actually starts, and fails if it does not.
+from the artifacts. The build runs the tests, checks Ksav can actually see
+Tesseract with Hebrew data, opens the frozen program to confirm it starts and
+seeds its dictionary, and fails if any of that is untrue.
+
+The installer is about 200 MB. Models are not in it.
 
 PyInstaller freezes for the platform it runs on and does not cross compile, and
 Inno Setup is Windows only, so a Windows installer can only be built on Windows.

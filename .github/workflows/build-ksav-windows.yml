@@ -48,11 +48,33 @@ jobs:
         # Windows build verifies nothing about reading pages.
         run: python packaging/fetch-vendor.py
 
+      - name: Check Ksav can actually see Tesseract
+        # The OCR tests skip themselves when Hebrew data is missing, so without
+        # this a build could ship with no Hebrew OCR at all and every test would
+        # still pass by not running. Failing here is the point.
+        run: |
+          python -c @"
+import sys
+sys.path.insert(0, '.')
+from app.ocr.tesseract_engine import TesseractEngine
+engine = TesseractEngine()
+usable, reason = engine.is_available()
+languages = sorted(engine.languages())
+print('binary   :', engine.binary())
+print('usable   :', usable, '-', reason)
+print('languages:', languages)
+if not usable:
+    raise SystemExit('Ksav cannot use Tesseract in this build.')
+for needed in ('heb', 'eng'):
+    if needed not in languages:
+        raise SystemExit(f'{needed} language data is missing, so Ksav would ship without it.')
+print('Hebrew and English page reading are both present.')
+"@
+
       - name: Run the tests
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          tesseract --list-langs
           # -rs prints why anything skipped. A test that quietly skips itself on
           # the one platform that matters is worse than no test.
           python -m pytest tests -q -rs
