@@ -4535,6 +4535,12 @@ const VS_TEXT = {
      for one מנין out of several being in the hall and would end up on every time on the page
      and bring a key back to a sheet that has none. */
   where: 'באולם השמחות',
+  /* And the street it is on, beside the hall rather than under it: that sheet has 0.17in
+     clear at the foot and a line of its own costs 0.44in.
+     English in a Hebrew line, so the view sets it in its own <bdi dir="ltr"> or the 44 comes
+     off the front of it and lands at the other end of the line. Measured after rendering, the
+     way every bidi decision in this program is: see the note in CLAUDE.md. */
+  address: '44 Coles Way',
   roshHashana: 'ראש השנה',
   yomKippur: 'יום כיפור',
   day1: "יום א'",
@@ -8240,7 +8246,8 @@ function renderVasikinPoster(poster, settings) {
     const stacked = `
       <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
       <h2 class="poster-title" lang="he">${escAttr(poster.title)} · ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-      <p class="poster-line poster-where" lang="he">${escAttr(VS_TEXT.where)}</p>
+      <p class="poster-line poster-where" lang="he">${escAttr(VS_TEXT.where)}
+        <bdi dir="ltr">${escAttr(VS_TEXT.address)}</bdi></p>
       ${poster.sections.map(section).join('<hr class="poster-both-rule">')}`;
     return posterShell(settings, stacked, poster.legend || [], {
       dense: true, pair: true, vasikin: true, both: true,
