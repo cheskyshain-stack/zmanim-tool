@@ -112,7 +112,11 @@ function vasikinDay(serial, settings, heading) {
 /** The whole sheet for one year.
  *
  *  `which` is 'rh' for the two days of ראש השנה on one sheet, or 'yk' for יום כיפור on its own,
- *  which is how the shul hangs them. */
+ *  which is how the shul hangs them, or 'both' for the two of them on one page.
+ *
+ *  A sheet is a list of sections and a section is a list of days, which is one shape for all
+ *  three: ר"ה is one section of two days, יו"כ is one section of one, and 'both' is the two of
+ *  them in order. `days` is the same days again, flat, for the span and the מנינים. */
 export function buildVasikinPoster(year, settings, which = 'rh') {
   if (!year) return null;
   const rh = roshHashana(year - 3761);
@@ -120,10 +124,15 @@ export function buildVasikinPoster(year, settings, which = 'rh') {
   const M = minyanList();
 
   // ר"ה is the first two days of the year; יו"כ is the tenth, which is nine days after it.
-  const days = which === 'yk'
-    ? [vasikinDay(rh + 9, settings, '')]
-    : [vasikinDay(rh, settings, VS_TEXT.day1),
-      vasikinDay(rh + 1, settings, VS_TEXT.day2)];
+  const roshSection = () => ({
+    heading: VS_TEXT.roshHashana,
+    days: [vasikinDay(rh, settings, VS_TEXT.day1), vasikinDay(rh + 1, settings, VS_TEXT.day2)],
+  });
+  const kippurSection = () => ({ heading: VS_TEXT.yomKippur, days: [vasikinDay(rh + 9, settings, '')] });
+  const sections = which === 'yk' ? [kippurSection()]
+    : which === 'both' ? [roshSection(), kippurSection()]
+      : [roshSection()];
+  const days = sections.flatMap((s) => s.days);
 
   // The one מנין on the sheet. The other three lines are זמנים and an anchor, not מנינים, so
   // they are deliberately not offered as "what is on next": see posters/minyanim.js.
@@ -132,8 +141,12 @@ export function buildVasikinPoster(year, settings, which = 'rh') {
   return {
     hebrewYear: year,
     which,
-    title: which === 'yk' ? VS_TEXT.yomKippur : VS_TEXT.roshHashana,
+    // On the two-in-one sheet the occasion is a heading over each half, so the line at the top
+    // names the מנין instead of naming one of the two days it is about.
+    title: which === 'both' ? VS_TEXT.who
+      : which === 'yk' ? VS_TEXT.yomKippur : VS_TEXT.roshHashana,
     span: { from: days[0].serial, to: days[days.length - 1].serial },
+    sections,
     days,
     minyanim: M.out,
     // Nothing on this sheet is marked, so there is no key at the foot. The Word sheets carry

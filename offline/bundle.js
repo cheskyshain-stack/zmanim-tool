@@ -4603,7 +4603,11 @@ function vasikinDay(serial, settings, heading) {
 /** The whole sheet for one year.
  *
  *  `which` is 'rh' for the two days of ראש השנה on one sheet, or 'yk' for יום כיפור on its own,
- *  which is how the shul hangs them. */
+ *  which is how the shul hangs them, or 'both' for the two of them on one page.
+ *
+ *  A sheet is a list of sections and a section is a list of days, which is one shape for all
+ *  three: ר"ה is one section of two days, יו"כ is one section of one, and 'both' is the two of
+ *  them in order. `days` is the same days again, flat, for the span and the מנינים. */
 function buildVasikinPoster(year, settings, which = 'rh') {
   if (!year) return null;
   const rh = roshHashana(year - 3761);
@@ -4611,10 +4615,15 @@ function buildVasikinPoster(year, settings, which = 'rh') {
   const M = minyanList();
 
   // ר"ה is the first two days of the year; יו"כ is the tenth, which is nine days after it.
-  const days = which === 'yk'
-    ? [vasikinDay(rh + 9, settings, '')]
-    : [vasikinDay(rh, settings, VS_TEXT.day1),
-      vasikinDay(rh + 1, settings, VS_TEXT.day2)];
+  const roshSection = () => ({
+    heading: VS_TEXT.roshHashana,
+    days: [vasikinDay(rh, settings, VS_TEXT.day1), vasikinDay(rh + 1, settings, VS_TEXT.day2)],
+  });
+  const kippurSection = () => ({ heading: VS_TEXT.yomKippur, days: [vasikinDay(rh + 9, settings, '')] });
+  const sections = which === 'yk' ? [kippurSection()]
+    : which === 'both' ? [roshSection(), kippurSection()]
+      : [roshSection()];
+  const days = sections.flatMap((s) => s.days);
 
   // The one מנין on the sheet. The other three lines are זמנים and an anchor, not מנינים, so
   // they are deliberately not offered as "what is on next": see posters/minyanim.js.
@@ -4623,8 +4632,12 @@ function buildVasikinPoster(year, settings, which = 'rh') {
   return {
     hebrewYear: year,
     which,
-    title: which === 'yk' ? VS_TEXT.yomKippur : VS_TEXT.roshHashana,
+    // On the two-in-one sheet the occasion is a heading over each half, so the line at the top
+    // names the מנין instead of naming one of the two days it is about.
+    title: which === 'both' ? VS_TEXT.who
+      : which === 'yk' ? VS_TEXT.yomKippur : VS_TEXT.roshHashana,
     span: { from: days[0].serial, to: days[days.length - 1].serial },
+    sections,
     days,
     minyanim: M.out,
     // Nothing on this sheet is marked, so there is no key at the foot. The Word sheets carry
@@ -7042,6 +7055,28 @@ const POSTERS = [
     },
     render: renderVasikinPoster,
   },
+  /* And the two of them on one page, for the years the shul would rather hang one sheet than
+     two. Marked combined, the same as the other two-in-one sheets, so "All of them" does not
+     print the ותיקין schedule twice unless it is asked to. */
+  {
+    key: 'vasikinboth',
+    label: `${VS_TEXT.who} · ${VS_TEXT.roshHashana} ו${VS_TEXT.yomKippur} על דף אחד`,
+    combined: true,
+    covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.roshHashana} ו${VS_TEXT.yomKippur} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildVasikinPoster(y, settings, 'both')?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildVasikinPoster(y, settings, 'both') }),
+      }));
+    },
+    render: renderVasikinPoster,
+  },
   {
     key: 'afteryk',
     label: 'Starting after יום כיפור',
@@ -7451,6 +7486,30 @@ function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), l
         html: renderOnePagePoster(built, settings),
       });
     }
+    /* And the ותיקין sheet, both occasions on one page, as a sheet of its own beside them.
+       It is not part of the one-page run and never has been: that sheet is the shul's own
+       schedule, and this is a second מנין with its own times on the same days, which is why
+       the shul hangs it as its own paper. Left out of the run it was on nothing the
+       congregation could read at all, so here it is the second sheet on the page, the same as
+       the second sheet on the wall.
+       The two-in-one is the one to show rather than the pair: this page is read on a phone,
+       where a sheet is a sheet to scroll past whether it holds one occasion or two. */
+    let vasikin = null;
+    try {
+      vasikin = buildVasikinPoster(year, settings, 'both');
+    } catch {
+      vasikin = null;
+    }
+    if (vasikin?.span && on >= vasikin.span.from - lead && on <= vasikin.span.to) {
+      out.push({
+        key: `vasikin-${year}`,
+        year,
+        label: VS_TEXT.who,
+        span: vasikin.span,
+        when: when(vasikin.span.from, vasikin.span.to),
+        html: renderVasikinPoster(vasikin, settings),
+      });
+    }
   }
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
@@ -7527,11 +7586,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
-    + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`;
+    + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
+    + `${both ? ' is-both' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -7708,6 +7768,29 @@ function renderVasikinPoster(poster, settings) {
      יום א' belongs.
      .poster-pair is the two-column box the ראש השנה ויום כיפור sheet already uses, with the
      rule down the middle it already has, so this is that layout and not a second one. */
+  /* Both sheets on one page: ראש השנה with its two days beside each other the way its own sheet
+     has them, a rule, and יום כיפור under it.
+     Across rather than down was tried first and measured: three columns on a portrait page
+     broke the occasion headings to "ראש / השנה", wrapped זמן טלית onto two lines, and still
+     left 2.29in of the page empty at the foot, because what a portrait page is short of is
+     width and what it has spare is height. Stacked, the two sheets are the two sheets, 0.33in
+     clear at the foot. Landscape does take the three across, but that is a page the shul did
+     not ask for. */
+  if (poster.which === 'both') {
+    const section = (s) => `<section class="poster-both-part">
+        <h3 class="poster-occasion" lang="he">${escAttr(s.heading)}</h3>
+        <div class="poster-pair${s.days.length > 1 ? '' : ' is-solo'}">
+          ${s.days.map((d) => `<div class="poster-pair-col">${day(d)}</div>`).join('')}
+        </div>
+      </section>`;
+    const stacked = `
+      <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
+      <h2 class="poster-title" lang="he">${escAttr(poster.title)} · ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+      ${poster.sections.map(section).join('<hr class="poster-both-rule">')}`;
+    return posterShell(settings, stacked, poster.legend || [], {
+      dense: true, pair: true, vasikin: true, both: true,
+    });
+  }
   const body = `
     <h2 class="poster-title" lang="he">${escAttr(poster.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>

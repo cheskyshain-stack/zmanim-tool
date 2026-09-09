@@ -3070,6 +3070,56 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair .poster-rows,
 .poster.is-pair .poster-sets { padding: 0.13in 0 0; }
 .poster.is-pair .poster-rows { display: flex; flex-direction: column; }
+
+/* --- Both ותיקין sheets on one page ---------------------------------------------------
+   ראש השנה with its two days beside each other, a rule, and יום כיפור under it: the two
+   sheets stacked, each still laid out the way its own paper has it.
+
+   Across was tried first and measured. Three columns on a portrait page break the occasion
+   headings to "ראש / השנה", wrap זמן טלית onto two lines, and still leave 2.29in of the page
+   empty at the foot: what a portrait page is short of is width, and what it has going spare
+   is height, so the two sheets go one over the other and not side by side.
+
+   The sizes here are the file's 26pt brought down, and they are written at four classes
+   because the 26pt above is written at five and would otherwise win. Ten rows and four
+   headings under the letterhead do not fit a page at 26pt; at these they clear the foot by
+   0.33in, measured. */
+/* Said out loud, because a poster is a centred flex column: a section left to itself shrinks
+   to its own content, and then the half-width יום כיפור block below is half of that rather
+   than half of the page. Measured before this: its column came out 128px wide against the
+   264px the ראש השנה ones get, and זמן טלית broke over two lines. */
+.poster.is-vasikin.is-both .poster-both-part { width: 100%; }
+.poster.is-vasikin.is-both .poster-line { text-align: center; font-size: 21pt; }
+.poster.is-vasikin.is-both .poster-title { text-align: center; font-size: 24pt; margin: 0 0 0.06in; }
+/* The occasion, over the whole half rather than over a column, since ראש השנה's half is two
+   columns and both of them are it. Underlined like a title, because that is what it is. */
+.poster.is-vasikin.is-both .poster-occasion {
+  font-size: 27pt; font-weight: 700; text-align: center; margin: 0.2in 0 0.06in;
+  text-decoration: underline; text-underline-offset: 0.08em; text-decoration-skip-ink: none;
+}
+.poster.is-vasikin.is-both .poster-both-rule {
+  border: 0; border-top: 1.5pt solid #000; width: 60%; margin: 0.32in auto 0;
+}
+/* Wider than the 0.1in the other two-in-one sheets give a column: there the rule down the
+   middle is holding two full schedules apart, here it is holding apart two days that read
+   almost the same, and they want the air. */
+.poster.is-vasikin.is-both .poster-pair-col { padding-inline: 0.5in; }
+.poster.is-vasikin.is-both .poster-rows { padding: 0.04in 0 0; }
+/* יום כיפור is one day, held to the width of one ראש השנה column above it so its two edges
+   land on the same measure instead of sprawling across the sheet. */
+.poster.is-vasikin.is-both .poster-pair.is-solo { width: 50%; margin-inline: auto; }
+.poster.is-vasikin.is-both .poster-rows.is-dense .poster-day,
+.poster.is-vasikin.is-both .poster-rows > .poster-day:first-child {
+  font-size: 21pt; line-height: 1.2; margin: 0 0 0.12in;
+}
+/* The words square up on the right of a column and the times on the left, so both edges are a
+   straight line down the page rather than every row floating in the middle of it. */
+.poster.is-vasikin.is-both .poster-rows.is-dense .poster-row {
+  font-size: 23pt; line-height: 1.34;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.poster.is-vasikin.is-both .poster-rows.is-dense .poster-row .poster-row-label { text-align: right; }
+.poster.is-vasikin.is-both .poster-rows.is-dense .poster-row .poster-row-times { text-align: left; }
 /* The wall charts' header rather than the Word posters', on the sheets that carry two
    schedules. Not a copy of it: the same .page-header / .header-row / .header-center /
    .header-logo / .header-subtitle / .header-rabbi rules the charts use, written once, above.
