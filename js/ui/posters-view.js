@@ -785,11 +785,11 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
-    + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}`;
+    + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -973,7 +973,9 @@ function renderVasikinPoster(poster, settings) {
     ${poster.days.length > 1
       ? `<div class="poster-pair">${poster.days.map((d) => `<div class="poster-pair-col">${day(d)}</div>`).join('')}</div>`
       : poster.days.map(day).join('')}`;
-  return posterShell(settings, body, poster.legend || [], { dense: true, pair: poster.days.length > 1 });
+  return posterShell(settings, body, poster.legend || [], {
+    dense: true, pair: poster.days.length > 1, vasikin: true,
+  });
 }
 
 /** The יום כיפור sheet: ערב יו"כ, the day, the morning after, and the box of everyday times

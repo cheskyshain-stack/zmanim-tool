@@ -3020,6 +3020,33 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-pair:has(.poster-sets) { --pair-lead: 2.2; }
 .poster.is-pair:has(.poster-sets).is-landscape { --pair-lead: 1.75; }
 .poster.is-pair .poster-row { line-height: var(--pair-lead); }
+/* The ותיקין sheets, set to the Word file's own numbers.
+   Read out of the two .doc files, character and paragraph formatting both: every paragraph of
+   the body is 26pt bold, and every one of them is on 1.5 line spacing (sprmPDyaLine 360 twips
+   at fMultLinespace, which is 360/240) with no space before or after. One size for the motto,
+   the minyan's name, the title, the day headings and all five rows alike, which is why they
+   are set here in one rule rather than four.
+   The two rules the other sheets fill a page with are both wrong for a five-line schedule:
+   .poster-rows spreads its children with space-between over the whole column and .is-pair
+   opens the leading to 1.75 to use up what a half-width column has going spare. Five lines
+   spread over seven inches is a line every inch and a half, which is not a schedule. So the
+   rows pack to the top on the file's own leading and the white falls at the foot. */
+.poster.is-vasikin .poster-rows { flex: 0 0 auto; justify-content: flex-start; padding-bottom: 0; }
+.poster.is-vasikin .poster-pair { flex: 0 0 auto; }
+.poster.is-vasikin .poster-title,
+.poster.is-vasikin .poster-line,
+.poster.is-vasikin .poster-rows.is-dense .poster-day,
+.poster.is-vasikin .poster-rows.is-dense .poster-row,
+.poster.is-vasikin.is-pair .poster-row {
+  font-size: 26pt; font-weight: 700; line-height: 1.5;
+}
+/* The title keeps its underline and loses the 0.42in the other sheets hang under it: on this
+   sheet the line under the title is another 26pt line, not the top of a schedule set smaller,
+   so the gap belongs to the leading like every other gap here. */
+.poster.is-vasikin .poster-title { margin-bottom: 0; }
+.poster.is-vasikin .poster-line { margin: 0; }
+.poster.is-vasikin .poster-rows.is-dense .poster-day { margin: 0.14in 0 0; }
+.poster.is-vasikin .poster-rows > .poster-day:first-child { margin-top: 0.14in; }
 .poster.is-pair .poster-rows.is-dense .poster-day { margin-top: calc(var(--pair-lead) * 0.11in); }
 /* Not on the first thing in a column. The יום כיפור column opens with a section heading and
    the ראש השנה one opens with a plain row, so the heading's own space above it put the two
