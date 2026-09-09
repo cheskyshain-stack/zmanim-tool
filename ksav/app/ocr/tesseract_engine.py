@@ -160,7 +160,7 @@ class TesseractEngine(OcrEngine):
         return self._languages
 
     def _env(self) -> dict:
-        """The environment Tesseract is run in.
+        r"""The environment Tesseract is run in.
 
         TESSDATA_PREFIX must point at the tessdata directory ITSELF. Tesseract 3
         and 4 wanted its parent and appended "tessdata" themselves; Tesseract 5
