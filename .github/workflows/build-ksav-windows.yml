@@ -62,6 +62,21 @@ jobs:
           # the one platform that matters is worse than no test.
           python -m pytest tests -q -rs
 
+      - name: Confirm the shipped layout test actually ran
+        env:
+          QT_QPA_PLATFORM: offscreen
+        # This is the one test that reads a Hebrew page through the exact
+        # arrangement a shipped Ksav has. It has skipped itself once already,
+        # and a skip here looks identical to a pass in the summary above.
+        run: |
+          $name = "tests/test_ocr.py::test_ocr_works_with_vendored_language_data"
+          $out = (python -m pytest $name -q 2>&1 | Out-String)
+          Write-Host $out
+          if ($out -notmatch "1 passed") {
+            Write-Error "The shipped layout OCR test did not run. A skip here is not a pass."
+            exit 1
+          }
+
       - name: Build the program
         run: python -m PyInstaller packaging/ksav.spec --noconfirm
 

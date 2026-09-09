@@ -186,6 +186,12 @@ def test_the_workflow_is_valid_yaml():
     tests_at = next(i for i, n in enumerate(names) if "Run the tests" in n)
     assert tesseract_at < tests_at
 
+    # A skip reads exactly like a pass in a pytest summary line, and the shipped
+    # layout test has already skipped itself once on the platform it exists for.
+    assert any("actually ran" in n for n in names), (
+        "nothing confirms the shipped layout test ran rather than skipped"
+    )
+
 
 def test_the_tesseract_check_script_reports_rather_than_raises():
     """It runs in CI, so a crash would look like a build failure of another kind."""
