@@ -39,10 +39,18 @@ def test_speech_and_page_reading_are_both_catalogued():
     assert all(s.kind == "ocr" for s in ocr_models())
 
 
-def test_installed_language_packs_are_gathered_into_one_folder(tmp_path):
-    """Tesseract wants all its language data in one directory."""
+def test_installed_language_packs_are_gathered_into_one_folder(tmp_path, monkeypatch):
+    """Tesseract wants all its language data in one directory.
+
+    The vendored folder is pointed somewhere empty for this test. On a build
+    machine it holds the language data that ships with Ksav, which
+    tessdata_dir merges in by design, and this test is about the manager's own
+    behaviour rather than that.
+    """
+    from app.core import paths
     from app.platform.models import BY_ID, ModelManager
 
+    monkeypatch.setattr(paths, "VENDOR_DIR", tmp_path / "no-vendor")
     manager = ModelManager(tmp_path / "models")
     for model_id in ("ocr-heb", "ocr-eng"):
         spec = BY_ID[model_id]
@@ -62,6 +70,35 @@ def test_installed_language_packs_are_gathered_into_one_folder(tmp_path):
     assert {p.name for p in manager.tessdata_dir().glob("*.traineddata")} == {
         "heb.traineddata"
     }
+
+
+def test_language_data_shipped_with_ksav_is_not_hidden_by_an_install(tmp_path, monkeypatch):
+    """Installing one pack must not lose the ones that came with the program.
+
+    tessdata_dir builds a single folder for Tesseract, and an early version
+    built it from installed packs alone, so installing Yiddish would have
+    hidden the Hebrew that shipped in the box.
+    """
+    from app.core import paths
+    from app.platform.models import BY_ID, ModelManager
+
+    vendor = tmp_path / "vendor"
+    shipped = vendor / "tesseract" / "tessdata"
+    shipped.mkdir(parents=True)
+    (shipped / "heb.traineddata").write_bytes(b"shipped")
+    (shipped / "osd.traineddata").write_bytes(b"shipped")
+    monkeypatch.setattr(paths, "VENDOR_DIR", vendor)
+
+    manager = ModelManager(tmp_path / "models")
+    spec = BY_ID["ocr-yid"]
+    source = tmp_path / "usb" / spec.id
+    source.mkdir(parents=True)
+    for f in spec.files:
+        (source / f.name).write_bytes(b"downloaded")
+    manager.import_from_folder(spec, source)
+
+    names = {p.name for p in manager.tessdata_dir().glob("*.traineddata")}
+    assert names == {"heb.traineddata", "osd.traineddata", "yid.traineddata"}
 
 
 def test_nothing_is_installed_on_a_fresh_machine(tmp_path):

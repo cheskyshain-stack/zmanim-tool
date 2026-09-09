@@ -53,7 +53,9 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           tesseract --list-langs
-          python -m pytest tests -q
+          # -rs prints why anything skipped. A test that quietly skips itself on
+          # the one platform that matters is worse than no test.
+          python -m pytest tests -q -rs
 
       - name: Build the program
         run: python -m PyInstaller packaging/ksav.spec --noconfirm
