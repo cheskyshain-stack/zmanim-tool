@@ -2874,14 +2874,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   text-underline-offset: 0.06em; text-decoration-skip-ink: none; margin: 0 0 0.42in;
 }
 .poster-line { font-size: 24pt; font-weight: 700; margin: 0 0 0.24in; line-height: 1.25; }
-/* The two lines the ותיקין sheets open with, over the title: what a ותיקין מנין is for, and
-   whose it is. They sit above the title rather than in the letterhead because that is where
-   the Word sheets have them, and because the letterhead is the shul's and these two lines are
-   this minyan's. The title's own 0.42in margin is under it already, so only the gap between
-   these two and the title is set here. */
-.poster-vasikin-head { margin: 0 0 0.16in; }
-.poster-vasikin-motto { font-size: 20pt; font-weight: 700; line-height: 1.3; }
-.poster-vasikin-who { font-size: 17pt; font-weight: 700; line-height: 1.3; }
 /* One line per part of the yomim noraim, spread down the sheet the way the hand-made ones
    are. Measured off a scan of the poster on the wall: its eight rows sit at an even pitch
    of 0.075 of the page across 0.53 of its height, so they are given the space between the

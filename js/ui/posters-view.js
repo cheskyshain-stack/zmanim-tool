@@ -947,19 +947,19 @@ function renderRoshHashanaPoster(poster, settings) {
   return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
 }
 
-/** A מנין ותיקין sheet: the motto, who it is, the occasion and the year, and then four or five
- *  lines a day.
+/** A מנין ותיקין sheet: the occasion and the year, the two lines that say whose minyan it is,
+ *  and then five lines a day.
  *
- *  The same rows as the ראש השנה sheet, so a person holding the two reads them alike. What it
- *  adds is the two lines over the title, which is how the Word sheets open, and the day
- *  headings, which ר"ה has and יו"כ does not. */
+ *  Nothing of its own. The title is the title every sheet on this tab carries, the two lines
+ *  under it are .poster-line, which is what the שבת שובה sheet says its own lines with, the day
+ *  headings are .poster-day, and the rows are the ראש השנה sheet's rows. It was drawn with a
+ *  header block of its own for a while and that was a page layout nobody had asked for: a new
+ *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
 function renderVasikinPoster(poster, settings) {
   const body = `
-    <div class="poster-vasikin-head">
-      <div class="poster-vasikin-motto" lang="he">${escAttr(VS_TEXT.motto)}</div>
-      <div class="poster-vasikin-who" lang="he">${escAttr(VS_TEXT.who)}</div>
-    </div>
     <h2 class="poster-title" lang="he">${escAttr(poster.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
+    <p class="poster-line" lang="he">${escAttr(VS_TEXT.who)}</p>
     <div class="poster-rows is-dense">
       ${poster.days.map((d) => `
         ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}

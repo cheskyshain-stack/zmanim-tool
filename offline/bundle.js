@@ -4501,8 +4501,8 @@ function buildTzomGedaliaPoster(year, settings) {
 // typed by hand, and the ר"ה one still carried the year before's title at the top of it, which
 // is the sort of thing this replaces.
 //
-// The gaps are the shul's own and are not the same on the two sheets: ר"ה opens 46 minutes
-// before נץ and יו"כ 50, the davening before שמונה עשרה being longer on יו"כ. See VS_GAPS.
+// The rules are the shul's own and were given for both sheets at once, so the two now run on
+// one set rather than a pair read off the old paper. See VS_RULES.
 
 
 
@@ -4525,20 +4525,21 @@ const VS_TEXT = {
   netz: 'נץ',
 };
 
-/** How many minutes before נץ each line is, per occasion.
+/** The sheet in minutes, as the shul gave it. One set for both sheets: they were read off the
+ *  old paper as two before this, where ר"ה opened 46 minutes before נץ and יו"כ 50, and the
+ *  shul settled it with one rule for the pair.
  *
- *  Read off the two sheets. עלות is the ordinary עלות 72, and המלך is 21 minutes before נץ on
- *  both. The other two are the shul's own and differ: ר"ה opens 46 minutes before נץ with the
- *  טלית 44 before, and יו"כ opens 50 before with the טלית 51, which is the one line where the
- *  טלית comes before the מנין rather than after it.
+ *  Three of the four hang off נץ and one hangs off another line:
  *
- *  Kept as data rather than as five numbers in the builder, because these are the whole of
- *  what the two sheets disagree about and they belong in one place where they can be seen
- *  side by side. */
-const VS_GAPS = {
-  rh: { alos: 72, shacharis: 46, tallis: 44, hamelech: 21 },
-  yk: { alos: 72, shacharis: 50, tallis: 51, hamelech: 21 },
-};
+ *    עלות       72 minutes before נץ
+ *    זמן טלית   50 minutes before נץ
+ *    המלך       21 minutes before נץ
+ *    שחרית      30 minutes before המלך, so 51 before נץ once המלך has been rounded
+ *
+ *  שחרית is counted off המלך rather than off נץ because that is what it is: the מנין opens far
+ *  enough ahead to reach המלך when it should. Off a המלך already taken to the whole minute, so
+ *  it lands on a whole minute itself and the half hour on the sheet is exactly half an hour. */
+const VS_RULES = { alos: 72, tallis: 50, hamelech: 21, shacharisBeforeHamelech: 30 };
 
 /** נץ with the seconds kept, which is the only place in the program that wants them.
  *
@@ -4570,28 +4571,32 @@ function netzText(t) {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** One day of a sheet: the four מנינים and זמנים in front of נץ, then נץ itself.
+/** One day of a sheet: the four times in front of נץ, then נץ itself.
  *
- *  Every one of the four is taken down to the whole minute, which is how the ר"ה sheet has
- *  them: at a נץ of 6:45:41 it prints עלות 5:33 where 5:33:41 is the true value. The יו"כ sheet
- *  rounds the other way and comes out a minute later on all four, which is the one thing about
- *  these two sheets that cannot both be right. Down is what is here, so the ר"ה sheet, which is
- *  the one hung first and the one this was asked for, comes out to the minute it always has. */
-function vasikinDay(serial, settings, gaps, heading) {
+ *  To the closer minute, which is what the shul asked for on המלך and is kept for the other
+ *  two off נץ so one sheet is not rounded three ways. The old paper took ר"ה down and יו"כ up
+ *  and so came out a minute apart from itself; this is one rule for the pair.
+ *
+ *  שחרית is not rounded at all. It is half an hour before a המלך that is already a whole
+ *  minute, so it is one by arithmetic, and rounding it again could only move it off the half
+ *  hour it is meant to be. */
+function vasikinDay(serial, settings, heading) {
   const netz = vasikinNetz(serial, settings);
-  const at = (mins) => floorToMinute(netz - mins * VS_MIN);
+  const before = (mins) => roundToMinute(netz - mins * VS_MIN);
+  const hamelech = before(VS_RULES.hamelech);
+  const shacharis = hamelech - VS_RULES.shacharisBeforeHamelech * VS_MIN;
   return {
     serial,
     heading,
     lines: [
-      { label: VS_TEXT.alos, text: formatTime(at(gaps.alos)), calc: 'alos' },
-      { label: VS_TEXT.shacharis, text: formatTime(at(gaps.shacharis)), calc: 'shacharis' },
-      { label: VS_TEXT.tallis, text: formatTime(at(gaps.tallis)), calc: 'tallis' },
-      { label: VS_TEXT.hamelech, text: formatTime(at(gaps.hamelech)), calc: 'hamelech' },
+      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos' },
+      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis' },
+      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis' },
+      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech' },
       // The anchor, and the only time in the program printed to the second.
       { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz' },
     ],
-    shacharisAt: at(gaps.shacharis),
+    shacharisAt: shacharis,
   };
 }
 
@@ -4603,14 +4608,13 @@ function buildVasikinPoster(year, settings, which = 'rh') {
   if (!year) return null;
   const rh = roshHashana(year - 3761);
   if (!rh) return null;
-  const gaps = VS_GAPS[which] || VS_GAPS.rh;
   const M = minyanList();
 
   // ר"ה is the first two days of the year; יו"כ is the tenth, which is nine days after it.
   const days = which === 'yk'
-    ? [vasikinDay(rh + 9, settings, gaps, '')]
-    : [vasikinDay(rh, settings, gaps, VS_TEXT.day1),
-      vasikinDay(rh + 1, settings, gaps, VS_TEXT.day2)];
+    ? [vasikinDay(rh + 9, settings, '')]
+    : [vasikinDay(rh, settings, VS_TEXT.day1),
+      vasikinDay(rh + 1, settings, VS_TEXT.day2)];
 
   // The one מנין on the sheet. The other three lines are זמנים and an anchor, not מנינים, so
   // they are deliberately not offered as "what is on next": see posters/minyanim.js.
@@ -7685,19 +7689,19 @@ function renderRoshHashanaPoster(poster, settings) {
   return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
 }
 
-/** A מנין ותיקין sheet: the motto, who it is, the occasion and the year, and then four or five
- *  lines a day.
+/** A מנין ותיקין sheet: the occasion and the year, the two lines that say whose minyan it is,
+ *  and then five lines a day.
  *
- *  The same rows as the ראש השנה sheet, so a person holding the two reads them alike. What it
- *  adds is the two lines over the title, which is how the Word sheets open, and the day
- *  headings, which ר"ה has and יו"כ does not. */
+ *  Nothing of its own. The title is the title every sheet on this tab carries, the two lines
+ *  under it are .poster-line, which is what the שבת שובה sheet says its own lines with, the day
+ *  headings are .poster-day, and the rows are the ראש השנה sheet's rows. It was drawn with a
+ *  header block of its own for a while and that was a page layout nobody had asked for: a new
+ *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
 function renderVasikinPoster(poster, settings) {
   const body = `
-    <div class="poster-vasikin-head">
-      <div class="poster-vasikin-motto" lang="he">${escAttr(VS_TEXT.motto)}</div>
-      <div class="poster-vasikin-who" lang="he">${escAttr(VS_TEXT.who)}</div>
-    </div>
     <h2 class="poster-title" lang="he">${escAttr(poster.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
+    <p class="poster-line" lang="he">${escAttr(VS_TEXT.who)}</p>
     <div class="poster-rows is-dense">
       ${poster.days.map((d) => `
         ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
@@ -10685,7 +10689,7 @@ const POSTER_SHEETS = [
   {
     key: 'vasikin',
     name: `${VS_TEXT.who}`,
-    note: `The two sheets the shul hangs for the מנין ותיקין, one for ראש השנה holding both days and one for יום כיפור. A ותיקין מנין says שמונה עשרה at sunrise, so נץ is the anchor and every other line is a number of minutes in front of it. It is the one sheet in the program that prints a time to the second. Worked through on ראש השנה below; the יום כיפור sheet is the same five lines against its own נץ, with its own two gaps (${VS_GAPS.yk.shacharis} minutes to שחרית and ${VS_GAPS.yk.tallis} to the טלית, against ${VS_GAPS.rh.shacharis} and ${VS_GAPS.rh.tallis} on ראש השנה).`,
+    note: `The two sheets the shul hangs for the מנין ותיקין, one for ראש השנה holding both days and one for יום כיפור. A ותיקין מנין says שמונה עשרה at sunrise, so נץ is the anchor and the rest of the sheet is counted back from it. It is the one sheet in the program that prints a time to the second. One set of rules for both sheets, given by the shul: עלות ${VS_RULES.alos} minutes before נץ, זמן טלית ${VS_RULES.tallis} before, המלך ${VS_RULES.hamelech} before, and שחרית ${VS_RULES.shacharisBeforeHamelech} minutes before המלך. Worked through on ראש השנה below; the יום כיפור sheet is the same five lines against its own נץ.`,
     build: (year, settings) => buildVasikinPoster(year, settings, 'rh'),
     rows: (built) => built.days.flatMap((d) => d.lines.map((l) => ({
       key: l.calc,
@@ -10695,23 +10699,23 @@ const POSTER_SHEETS = [
     rules: {
       netz: {
         plain: 'נץ, sunrise, printed to the second. Everything else on the sheet is a number of minutes in front of it.',
-        exact: 'Sunrise at the shul\'s horizon, snapped to the second it prints as, and the four lines above it worked off that snapped value rather than off the raw one. Otherwise the sheet can contradict itself: on ראש השנה תשפ״ז the sun rises at 6:34:59.6, which prints as 6:35:00, and עלות taken off the raw number came out at 5:22 where 6:35:00 less 72 minutes is plainly 5:23. Measured against the two sheets the shul hangs, this is within a second of the ראש השנה one and six seconds of the יום כיפור one.',
+        exact: 'Sunrise at the shul\'s horizon (sunriseElev, the very call the boards make), snapped to the second it prints as, and the lines above it worked off that snapped value rather than off the raw one. Otherwise the sheet can contradict itself: on ראש השנה תשפ״ז the sun rises at 6:34:59.6, which prints as 6:35:00, and עלות taken off the raw number came out at 5:22 where 6:35:00 less 72 minutes is plainly 5:23. Measured against the two sheets the shul hangs, this is within a second of the ראש השנה one and six seconds of the יום כיפור one.',
       },
       alos: {
-        plain: `עלות, ${VS_GAPS.rh.alos} minutes before נץ.`,
-        exact: `נץ less ${VS_GAPS.rh.alos} minutes, taken down to the whole minute. The ordinary עלות 72, the same one the boards and the other sheets use, counted back from sunrise rather than forward from anything.`,
+        plain: `עלות, ${VS_RULES.alos} minutes before נץ.`,
+        exact: `נץ less ${VS_RULES.alos} minutes, to the closer minute. The ordinary עלות 72, the same one the boards and the other sheets use (alos72 in zmanim/zmanim.js is this very number), counted back from sunrise rather than forward from anything.`,
       },
       shacharis: {
-        plain: `שחרית, ${VS_GAPS.rh.shacharis} minutes before נץ on ראש השנה and ${VS_GAPS.yk.shacharis} on יום כיפור.`,
-        exact: `נץ less the occasion's own gap, taken down to the whole minute. The two gaps are the shul's own and are read off its sheets: the davening before שמונה עשרה is longer on יום כיפור, so that מנין opens ${VS_GAPS.yk.shacharis - VS_GAPS.rh.shacharis} minutes earlier against its own sunrise.`,
+        plain: `שחרית, ${VS_RULES.shacharisBeforeHamelech} minutes before המלך.`,
+        exact: `המלך less ${VS_RULES.shacharisBeforeHamelech} minutes. Counted off המלך rather than off נץ, which is what it is: the מנין opens far enough ahead to reach המלך when it should. Not rounded, and it does not need to be: המלך has already been taken to the whole minute, so half an hour before it is a whole minute too and the gap on the sheet is exactly half an hour. It works out at ${VS_RULES.hamelech + VS_RULES.shacharisBeforeHamelech} minutes before נץ, give or take the rounding of המלך.`,
       },
       tallis: {
-        plain: `זמן טלית, ${VS_GAPS.rh.tallis} minutes before נץ on ראש השנה and ${VS_GAPS.yk.tallis} on יום כיפור.`,
-        exact: 'נץ less the occasion\'s own gap, taken down to the whole minute. Not a calculated משיכיר: these are the numbers the shul\'s own sheets carry, and on יום כיפור the one that puts the טלית a minute before the מנין rather than after it.',
+        plain: `זמן טלית, ${VS_RULES.tallis} minutes before נץ.`,
+        exact: `נץ less ${VS_RULES.tallis} minutes, to the closer minute. A number the shul sets rather than a calculated משיכיר.`,
       },
       hamelech: {
-        plain: `המלך, ${VS_GAPS.rh.hamelech} minutes before נץ.`,
-        exact: `נץ less ${VS_GAPS.rh.hamelech} minutes, taken down to the whole minute. The same gap on both sheets.`,
+        plain: `המלך, ${VS_RULES.hamelech} minutes before נץ, to the closer minute.`,
+        exact: `נץ less ${VS_RULES.hamelech} minutes, rounded to the nearest whole minute rather than up or down. Asked for in those words, and it is the line שחרית is then counted back from, so it is the one rounding on the sheet that moves another time with it.`,
       },
     },
   },

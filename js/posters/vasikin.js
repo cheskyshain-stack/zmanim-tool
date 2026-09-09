@@ -8,12 +8,12 @@
 // typed by hand, and the ר"ה one still carried the year before's title at the top of it, which
 // is the sort of thing this replaces.
 //
-// The gaps are the shul's own and are not the same on the two sheets: ר"ה opens 46 minutes
-// before נץ and יו"כ 50, the davening before שמונה עשרה being longer on יו"כ. See VS_GAPS.
+// The rules are the shul's own and were given for both sheets at once, so the two now run on
+// one set rather than a pair read off the old paper. See VS_RULES.
 import { roshHashana } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, floorToMinute } from '../format.js';
+import { formatTime, roundToMinute } from '../format.js';
 import { minyanList } from './minyanim.js';
 
 const VS_MIN = 1 / 1440;
@@ -34,20 +34,21 @@ export const VS_TEXT = {
   netz: 'נץ',
 };
 
-/** How many minutes before נץ each line is, per occasion.
+/** The sheet in minutes, as the shul gave it. One set for both sheets: they were read off the
+ *  old paper as two before this, where ר"ה opened 46 minutes before נץ and יו"כ 50, and the
+ *  shul settled it with one rule for the pair.
  *
- *  Read off the two sheets. עלות is the ordinary עלות 72, and המלך is 21 minutes before נץ on
- *  both. The other two are the shul's own and differ: ר"ה opens 46 minutes before נץ with the
- *  טלית 44 before, and יו"כ opens 50 before with the טלית 51, which is the one line where the
- *  טלית comes before the מנין rather than after it.
+ *  Three of the four hang off נץ and one hangs off another line:
  *
- *  Kept as data rather than as five numbers in the builder, because these are the whole of
- *  what the two sheets disagree about and they belong in one place where they can be seen
- *  side by side. */
-export const VS_GAPS = {
-  rh: { alos: 72, shacharis: 46, tallis: 44, hamelech: 21 },
-  yk: { alos: 72, shacharis: 50, tallis: 51, hamelech: 21 },
-};
+ *    עלות       72 minutes before נץ
+ *    זמן טלית   50 minutes before נץ
+ *    המלך       21 minutes before נץ
+ *    שחרית      30 minutes before המלך, so 51 before נץ once המלך has been rounded
+ *
+ *  שחרית is counted off המלך rather than off נץ because that is what it is: the מנין opens far
+ *  enough ahead to reach המלך when it should. Off a המלך already taken to the whole minute, so
+ *  it lands on a whole minute itself and the half hour on the sheet is exactly half an hour. */
+export const VS_RULES = { alos: 72, tallis: 50, hamelech: 21, shacharisBeforeHamelech: 30 };
 
 /** נץ with the seconds kept, which is the only place in the program that wants them.
  *
@@ -79,28 +80,32 @@ export function netzText(t) {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** One day of a sheet: the four מנינים and זמנים in front of נץ, then נץ itself.
+/** One day of a sheet: the four times in front of נץ, then נץ itself.
  *
- *  Every one of the four is taken down to the whole minute, which is how the ר"ה sheet has
- *  them: at a נץ of 6:45:41 it prints עלות 5:33 where 5:33:41 is the true value. The יו"כ sheet
- *  rounds the other way and comes out a minute later on all four, which is the one thing about
- *  these two sheets that cannot both be right. Down is what is here, so the ר"ה sheet, which is
- *  the one hung first and the one this was asked for, comes out to the minute it always has. */
-function vasikinDay(serial, settings, gaps, heading) {
+ *  To the closer minute, which is what the shul asked for on המלך and is kept for the other
+ *  two off נץ so one sheet is not rounded three ways. The old paper took ר"ה down and יו"כ up
+ *  and so came out a minute apart from itself; this is one rule for the pair.
+ *
+ *  שחרית is not rounded at all. It is half an hour before a המלך that is already a whole
+ *  minute, so it is one by arithmetic, and rounding it again could only move it off the half
+ *  hour it is meant to be. */
+function vasikinDay(serial, settings, heading) {
   const netz = vasikinNetz(serial, settings);
-  const at = (mins) => floorToMinute(netz - mins * VS_MIN);
+  const before = (mins) => roundToMinute(netz - mins * VS_MIN);
+  const hamelech = before(VS_RULES.hamelech);
+  const shacharis = hamelech - VS_RULES.shacharisBeforeHamelech * VS_MIN;
   return {
     serial,
     heading,
     lines: [
-      { label: VS_TEXT.alos, text: formatTime(at(gaps.alos)), calc: 'alos' },
-      { label: VS_TEXT.shacharis, text: formatTime(at(gaps.shacharis)), calc: 'shacharis' },
-      { label: VS_TEXT.tallis, text: formatTime(at(gaps.tallis)), calc: 'tallis' },
-      { label: VS_TEXT.hamelech, text: formatTime(at(gaps.hamelech)), calc: 'hamelech' },
+      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos' },
+      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis' },
+      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis' },
+      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech' },
       // The anchor, and the only time in the program printed to the second.
       { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz' },
     ],
-    shacharisAt: at(gaps.shacharis),
+    shacharisAt: shacharis,
   };
 }
 
@@ -112,14 +117,13 @@ export function buildVasikinPoster(year, settings, which = 'rh') {
   if (!year) return null;
   const rh = roshHashana(year - 3761);
   if (!rh) return null;
-  const gaps = VS_GAPS[which] || VS_GAPS.rh;
   const M = minyanList();
 
   // ר"ה is the first two days of the year; יו"כ is the tenth, which is nine days after it.
   const days = which === 'yk'
-    ? [vasikinDay(rh + 9, settings, gaps, '')]
-    : [vasikinDay(rh, settings, gaps, VS_TEXT.day1),
-      vasikinDay(rh + 1, settings, gaps, VS_TEXT.day2)];
+    ? [vasikinDay(rh + 9, settings, '')]
+    : [vasikinDay(rh, settings, VS_TEXT.day1),
+      vasikinDay(rh + 1, settings, VS_TEXT.day2)];
 
   // The one מנין on the sheet. The other three lines are זמנים and an anchor, not מנינים, so
   // they are deliberately not offered as "what is on next": see posters/minyanim.js.
