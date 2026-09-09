@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_WEEKDAY_SHACHARIS,
   LEGACY_WEEKDAY_SHACHARIS,
+  LEGACY_WEEKDAY_SHACHARIS_SPECIAL,
   LEGACY_WEEKDAY_FOOTER,
   LEGACY_FOOTER_ADDRESS,
   DEFAULT_ACCENT_COLOR,
@@ -156,6 +157,9 @@ function normalizeSettings(raw) {
   // See LEGACY_WEEKDAY_SHACHARIS: carry a never-edited old default forward to the
   // current one, so an existing install doesn't stay stuck on an outdated schedule.
   if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
+  if (LEGACY_WEEKDAY_SHACHARIS_SPECIAL.includes(merged.weekdayShacharisSpecial)) {
+    merged.weekdayShacharisSpecial = DEFAULT_SETTINGS.weekdayShacharisSpecial;
+  }
   if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
   if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
