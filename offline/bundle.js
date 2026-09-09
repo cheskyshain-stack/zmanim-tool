@@ -7698,16 +7698,24 @@ function renderRoshHashanaPoster(poster, settings) {
  *  header block of its own for a while and that was a page layout nobody had asked for: a new
  *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
 function renderVasikinPoster(poster, settings) {
+  const day = (d) => `<div class="poster-rows is-dense">
+      ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
+      ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+    </div>`;
+  /* Two days side by side, one day down the middle. That is how the Word sheets are built:
+     read out of the file, ראש השנה's two days are a two-column section and יום כיפור's one day
+     is not. The sheet is dir="rtl", so the first column is the right-hand one, which is where
+     יום א' belongs.
+     .poster-pair is the two-column box the ראש השנה ויום כיפור sheet already uses, with the
+     rule down the middle it already has, so this is that layout and not a second one. */
   const body = `
     <h2 class="poster-title" lang="he">${escAttr(poster.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
     <p class="poster-line" lang="he">${escAttr(VS_TEXT.who)}</p>
-    <div class="poster-rows is-dense">
-      ${poster.days.map((d) => `
-        ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
-        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}`).join('')}
-    </div>`;
-  return posterShell(settings, body, poster.legend || [], { dense: true });
+    ${poster.days.length > 1
+      ? `<div class="poster-pair">${poster.days.map((d) => `<div class="poster-pair-col">${day(d)}</div>`).join('')}</div>`
+      : poster.days.map(day).join('')}`;
+  return posterShell(settings, body, poster.legend || [], { dense: true, pair: poster.days.length > 1 });
 }
 
 /** The יום כיפור sheet: ערב יו"כ, the day, the morning after, and the box of everyday times
