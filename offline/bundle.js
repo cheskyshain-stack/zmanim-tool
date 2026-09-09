@@ -8482,6 +8482,9 @@ function fitOnePage(container) {
        the bar can move it; the CSS still carries 0.35in as the fallback, which is what the
        week's own sheet and a sheet drawn outside this tab get. */
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    // Colour only, so it cannot move the fit; set here with the padding so the two cannot get
+    // out of step, and so a sheet redrawn on a turned phone comes back the way it was left.
+    sheet.classList.toggle('is-mono', chosenInk === 'mono');
     const set = (v) => sheet.style.setProperty('--op-scale', v);
     /* One entry per block: the box it lives in, its heading, and its rows. splitColumns hands
        them out between the two columns and may cut one block in two to do it.
@@ -8726,6 +8729,7 @@ function recallBar() {
     if (saved.brk === 'even' || saved.brk === 'day') chosenBreak = saved.brk;
     // Snapped to a step and held inside the ends, so a hand-edited value cannot put the
     // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
+    if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
     if (Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
       chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
@@ -8743,7 +8747,7 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
-      margin: chosenMargin,
+      margin: chosenMargin, ink: chosenInk,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -8792,6 +8796,18 @@ const padSteps = () => {
 };
 const padLabel = (v) => `${v.toFixed(2)}in`;
 let chosenMargin = OP_PAD;
+/* Whether the one-page sheet is drawn in its colours or in black and greys.
+ *
+ * Asked for: some printers make heavy weather of the navy, and a shul running off a hundred of
+ * these on the office machine wants to be able to take the colour out without anyone here
+ * changing a line. It is three CSS variables and nothing else, so no time and no measurement
+ * moves; see .poster.is-onepage.is-mono in app.css.
+ *
+ * The photo at the head keeps its colour. It is a photograph of the building rather than part
+ * of the design, and it is the one thing the shul asked to leave alone.
+ *
+ * Remembered with the rest of the bar, so a shul that prints in black and white stays there. */
+let chosenInk = 'colour';
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -9064,6 +9080,13 @@ function renderPosters(container, state, routeChanged, tables) {
             ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
         </div>
       </div>` : ''}
+      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
+        { value: 'colour', label: 'Colour', on: chosenInk !== 'mono' },
+        // Two words, which is what a side of a switch holds on a phone. The photo keeps its
+        // colour either way and the switch does not try to say so: the sheet in front of you
+        // shows it.
+        { value: 'mono', label: 'Black and white', on: chosenInk === 'mono' },
+      ])}</div>` : ''}
       ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
         // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
         // and "Start at a day" both sit inside that where a sentence would not.
@@ -9165,6 +9188,11 @@ function renderPosters(container, state, routeChanged, tables) {
     chosenOrientation = value;
     rememberBar();
     onRoute?.();
+    again();
+  });
+  wireSwitch(container, 'poster-ink', (value) => {
+    chosenInk = value === 'mono' ? 'mono' : 'colour';
+    rememberBar();
     again();
   });
   wireSwitch(container, 'poster-break', (value) => {

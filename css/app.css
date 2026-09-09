@@ -3361,6 +3361,19 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   padding: var(--op-pad, 0.35in);
   padding-bottom: max(0.15in, calc(var(--op-pad, 0.35in) - 0.1in));
 }
+/* The same sheet with the colour taken out of it, off a switch in the bar.
+   Some printers make heavy weather of a navy, and a shul running off a hundred of these on
+   whatever machine is in the office should not have to find that out on the hundredth. Black
+   and greys only: the rule goes black, and the band and the hairlines become the neutral greys
+   nearest what the navy ones weigh, so nothing on the sheet moves and it reads the same.
+   Only the three colour variables, which is why this is four lines rather than a second design.
+   The photo at the head is deliberately left alone: it is a photograph of the building rather
+   than part of the design, and everything besides the picture is what was asked for. */
+.poster.is-onepage.is-mono {
+  --op-band: #e2e2e2;
+  --op-rule: #000;
+  --op-hair: #dcdcdc;
+}
 /* The two rules that make the frame, off. They are a ::before and a ::after on .poster, so
    there is nothing to unset: the content property is what draws them. */
 .poster.is-onepage::before,
