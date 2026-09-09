@@ -4,7 +4,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-ink-950: #070c16;
+  /* #080b12 is CJ Portal's background, so the tool reads as part of the site. */
+  --color-ink-950: #080b12;
   --color-ink-900: #0b1220;
   --color-ink-850: #111a2b;
   --color-ink-800: #16213a;

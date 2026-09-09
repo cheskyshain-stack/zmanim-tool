@@ -16,7 +16,8 @@
     "test:app": "node tests/run-app.mjs",
     "test:encoders": "node tests/build-encoder-fixtures.mjs && python3 tests/verify-encoders.py tests/tmp/encoders",
     "bench:encoders": "tsx tests/encoder-timing.mts",
-    "shots": "node tests/screenshots.mjs"
+    "shots": "node tests/screenshots.mjs",
+    "publish:tools": "node scripts/publish-to-portal.mjs"
   },
   "dependencies": {
     "@tensorflow/tfjs-backend-cpu": "4.22.0",

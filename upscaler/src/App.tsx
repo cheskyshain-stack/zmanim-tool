@@ -27,6 +27,10 @@ import { RunStep } from './ui/RunStep'
 import { ResultStep } from './ui/ResultStep'
 import { SettingsSheet } from './ui/SettingsSheet'
 
+// Set at build time by "npm run build:portal". Empty for a standalone deployment,
+// where there is no portal to go home to.
+const PORTAL_HOME = import.meta.env.VITE_PORTAL_HOME ?? ''
+
 const STEPS = ['upload', 'size', 'crop', 'enhance', 'run', 'result'] as const
 type Step = (typeof STEPS)[number]
 
@@ -390,6 +394,23 @@ export default function App() {
     <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col">
       <header className="sticky top-0 z-10 border-b border-paper-300 bg-paper-100/95 backdrop-blur dark:border-ink-800 dark:bg-ink-950/95">
         <div className="flex items-center gap-2 px-4 py-3">
+          {/* Under CJ Portal the leftmost thing is always the way home, next to Back
+              rather than instead of it: a floating logo would sit on top of this
+              header, and reaching home by pressing Back five times is not a way home. */}
+          {PORTAL_HOME && (
+            <a
+              href={PORTAL_HOME}
+              className="-ml-1 block h-9 w-9 shrink-0 overflow-hidden rounded-lg shadow"
+              aria-label="CJ Portal home"
+              title="CJ Portal home"
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}icon.png`}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </a>
+          )}
           {canGoBack ? (
             <button
               type="button"
@@ -400,7 +421,7 @@ export default function App() {
               ‹ Back
             </button>
           ) : (
-            <span className="text-base font-black">Print Upscaler</span>
+            !PORTAL_HOME && <span className="text-base font-black">Print Upscaler</span>
           )}
           <span className="flex-1 text-center text-sm font-bold">{STEP_LABEL[step]}</span>
           <button

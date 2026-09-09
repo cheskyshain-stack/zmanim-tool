@@ -12,10 +12,15 @@ picture. It is drawn with plain shapes so it stays legible at 48 px on a home sc
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "public" / "icons"
+ART = ROOT / "assets" / "icon-source.png"
+
+# Where the artwork's own neon frame sits, as a fraction of its width. Measured, not
+# guessed: the band runs from 94 to 1174 of 1254 px.
+FRAME_INSET = 94 / 1254
 
 INK = (11, 18, 32, 255)
 BRAND = (79, 147, 245, 255)
@@ -101,14 +106,54 @@ def draw_mark(size: int, inset: float) -> Image.Image:
     return image.resize((size, size), Image.LANCZOS)
 
 
+def portal_tile(size: int = 512) -> Image.Image:
+    """The CJ Portal card icon, from the supplied artwork in assets/icon-source.png.
+
+    The artwork carries its own neon frame, and that repo's icon rules say an icon with
+    a visible frame of its own reads as boxed in, because the cards draw their own
+    rounded frame around it. So it is cropped just inside that frame. Rendered on a real
+    card next to Stopwatch and QR Code, the cropped version fills its tile the way they
+    do and the label stays legible; the uncropped one sits small inside a double border.
+
+    FRAME_INSET was measured off the artwork: the neon band runs from 94 to 1174 of
+    1254 px. Replacing the artwork means measuring it again.
+    """
+    source = Image.open(ART).convert("RGB")
+    if source.width != source.height:
+        raise SystemExit(f"{ART} is {source.width}x{source.height}, expected a square")
+    inset = round(source.width * FRAME_INSET)
+    cropped = source.crop((inset, inset, source.width - inset, source.height - inset))
+    return cropped.resize((size, size), Image.LANCZOS)
+
+
+def _label_font(size: int):
+    for path in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ):
+        if Path(path).exists():
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    draw_mark(192, 0.16).save(OUT / "icon-192.png")
-    draw_mark(512, 0.16).save(OUT / "icon-512.png")
-    # Maskable: everything important inside the middle 80%, so a circular mask on an
-    # Android launcher cannot clip it.
-    draw_mark(512, 0.26).save(OUT / "icon-maskable-512.png")
-    draw_mark(180, 0.16).save(OUT / "apple-touch-icon.png")
+    tile = portal_tile()
+    tile.save(ROOT / "public" / "icon.png")
+    tile.resize((192, 192), Image.LANCZOS).save(OUT / "icon-192.png")
+    tile.save(OUT / "icon-512.png")
+    tile.resize((180, 180), Image.LANCZOS).save(OUT / "apple-touch-icon.png")
+
+    # Maskable: an Android launcher may crop to a circle, which would take the corners
+    # and the ends of the label with it. So the whole tile is shrunk into the middle
+    # 76% and the rest is the black the artwork already sits on.
+    maskable = Image.new("RGB", (512, 512), (0, 0, 0))
+    inner = tile.resize((389, 389), Image.LANCZOS)
+    maskable.paste(inner, ((512 - 389) // 2, (512 - 389) // 2))
+    maskable.save(OUT / "icon-maskable-512.png")
+
+    # The favicon stays the drawn mark: at 16 px the artwork is a blue smudge, while
+    # two squares and an arrow still read.
 
     g = geometry(100, 0.16)
     sx, sy, small = g["small"]
@@ -129,7 +174,7 @@ def main() -> None:
 """,
         encoding="utf-8",
     )
-    print(f"icons: wrote {len(list(OUT.iterdir()))} files to public/icons")
+    print(f"icons: wrote {len(list(OUT.iterdir()))} files to public/icons, plus public/icon.png")
 
 
 if __name__ == "__main__":
