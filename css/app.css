@@ -3999,32 +3999,78 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 
 /* --- The PIN on the admin ------------------------------------------------------------
-   See ui/lock.js for what it is for and what it is worth. A card in the middle of the
-   screen with four digits in it and nothing else on the page: the sidebar is still there,
-   because it is in the document rather than drawn, but its nav is empty until the program
-   is built, which is the other side of the same gate. */
-.lock { display: flex; align-items: center; justify-content: center; min-height: 70vh; padding: 2rem 1rem; }
-.lock-card {
-  display: grid; gap: 0.9rem; justify-items: center; text-align: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); padding: 2rem 1.6rem; width: min(22rem, 100%);
+   See ui/lock.js for what it is for and what it is worth.
+
+   Over the whole window, sidebar and all: a lock with the program drawn behind it looks
+   like a page that failed to load. One thing on the screen, and it is the question.
+
+   Nothing on it says what is behind it or how long an answer lasts. */
+body.is-locked { overflow: hidden; }
+.lock-screen {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 1.5rem;
+  background: radial-gradient(120% 90% at 50% 0%, var(--nav-bg-2) 0%, var(--nav-bg) 55%, #080f1e 100%);
+  animation: lock-in 0.35s ease both;
 }
-.lock-title { margin: 0; font-size: var(--fs-lg); }
-/* Wide, spaced and centred: it is four digits, and it should look like four digits rather
-   than like a password box that happens to be short. */
-.lock-pin {
-  font: inherit; font-size: 1.9rem; letter-spacing: 0.5em; text-align: center;
-  width: 100%; max-width: 11rem; padding: 0.45rem 0 0.45rem 0.5em;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: #fff;
+@keyframes lock-in { from { opacity: 0; } to { opacity: 1; } }
+.lock-panel {
+  display: grid; justify-items: center; gap: 1.5rem;
+  padding: 2.4rem 2rem 2rem; width: min(19.5rem, 100%);
+  border-radius: 22px; border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+  /* The glass, which is the whole look: a pane lifted off the navy behind it, lit from
+     inside its top edge rather than by a border all the way round. */
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transition: transform 0.28s ease, opacity 0.28s ease;
 }
-.lock-note { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
-.lock-card button { min-width: 8rem; }
-/* A wrong answer shakes rather than turning red: the card is the only thing on the screen,
-   so the movement is enough to say no and there is nothing else for a colour to mean. */
-.lock-card.is-wrong { animation: lock-shake 0.3s ease; }
+.lock-mark { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; color: rgba(255, 255, 255, 0.62); }
+.lock-mark svg { width: 100%; height: 100%; }
+/* Four of them, filling as the digits go in. The ring stays where it is and the middle
+   fills, so the row never changes width and nothing jumps. */
+.lock-dots { display: flex; gap: 0.95rem; }
+.lock-dot {
+  width: 0.85rem; height: 0.85rem; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.4); background: transparent;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+.lock-dot.is-on { background: #fff; border-color: #fff; transform: scale(1.12); }
+.lock-keys { display: grid; grid-template-columns: repeat(3, 4rem); gap: 0.85rem; justify-content: center; }
+.lock-key, .lock-key-gap { width: 4rem; height: 4rem; }
+.lock-key {
+  display: grid; place-items: center;
+  font: inherit; font-size: 1.45rem; font-weight: 500; color: #fff;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.lock-key:hover { background: rgba(255, 255, 255, 0.13); }
+/* The press is the feedback, since there is no other: it goes down and comes back. */
+.lock-key:active { background: rgba(255, 255, 255, 0.22); transform: scale(0.94); }
+.lock-key:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 2px; }
+.lock-key.is-del { background: none; border-color: transparent; color: rgba(255, 255, 255, 0.55); }
+.lock-key.is-del svg { width: 1.5rem; height: 1.5rem; }
+.lock-key.is-del:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+/* A wrong answer shakes and clears, the way a phone does it. No colour and no words: there
+   is one thing that can be wrong here and the movement says which. */
+.lock-panel.is-wrong { animation: lock-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
 @keyframes lock-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-6px); }
-  75% { transform: translateX(6px); }
+  10%, 90% { transform: translateX(-3px); }
+  20%, 80% { transform: translateX(6px); }
+  30%, 50%, 70% { transform: translateX(-10px); }
+  40%, 60% { transform: translateX(10px); }
 }
-@media (prefers-reduced-motion: reduce) { .lock-card.is-wrong { animation: none; } }
+/* And the right one lifts away rather than blinking out. */
+.lock-panel.is-open { transform: translateY(-10px) scale(0.97); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .lock-screen, .lock-panel.is-wrong, .lock-panel.is-open { animation: none; transition: none; }
+  .lock-panel.is-open { opacity: 0; }
+}
+/* A small phone: the keys come down a little so the panel still sits clear of both ends. */
+@media (max-height: 40rem), (max-width: 22rem) {
+  .lock-panel { gap: 1.15rem; padding: 1.8rem 1.5rem 1.5rem; }
+  .lock-keys { grid-template-columns: repeat(3, 3.5rem); gap: 0.7rem; }
+  .lock-key, .lock-key-gap { width: 3.5rem; height: 3.5rem; }
+  .lock-key { font-size: 1.3rem; }
+}

@@ -12840,44 +12840,115 @@ function closeLock() {
   try { localStorage.removeItem(LOCK_KEY); } catch { /* nothing to forget */ }
 }
 
-/** The screen itself: four digits and nothing else.
+/** The screen itself: a mark, four dots and a keypad.
  *
- *  Deliberately says nothing about what is behind it. A page that explains it is the zmanim
- *  admin for a shul is an invitation to try four digits; a page asking for a PIN is a closed
- *  door with nothing written on it. */
+ *  Over the whole window rather than inside the program's page: a lock with the app drawn
+ *  behind it looks like a page that failed to load, and this way there is one thing on the
+ *  screen and it is the question.
+ *
+ *  It says nothing about what is behind it, and nothing about how long an answer lasts. A
+ *  page that explains it is a shul's zmanim program is an invitation to try four digits, and
+ *  a page that says "you will not be asked again for three days" is a page that tells a
+ *  stranger how long a device they borrowed stays open.
+ *
+ *  Its own keypad rather than a text box, which is the difference between this and a form:
+ *  on a phone no keyboard slides up over it, and on a desk the number row still works,
+ *  because the keys are listened for as well. */
 function renderLock(container, onOpen) {
   container.className = '';
+  const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'];
+  const key = (k) => {
+    if (k === null) return '<span class="lock-key-gap" aria-hidden="true"></span>';
+    if (k === 'del') {
+      return `<button type="button" class="lock-key is-del" data-key="del" aria-label="Delete">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6H9.5L4 12l5.5 6H20a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/><path d="M17 9.5 12.5 14M12.5 9.5 17 14"/>
+          </svg>
+        </button>`;
+    }
+    return `<button type="button" class="lock-key" data-key="${k}">${k}</button>`;
+  };
   container.innerHTML = `
-    <div class="lock">
-      <form class="lock-card" id="lock-form">
-        <h2 class="lock-title">Enter the PIN</h2>
-        <input class="lock-pin" id="lock-pin" inputmode="numeric" autocomplete="off"
-          pattern="[0-9]*" maxlength="4" aria-label="PIN" autofocus>
-        <p class="lock-note" id="lock-note" role="status">This device will not be asked again for ${LOCK_DAYS} days.</p>
-        <button type="submit" class="btn-primary">Open</button>
-      </form>
+    <div class="lock-screen" id="lock-screen">
+      <div class="lock-panel" id="lock-panel" role="group" aria-label="PIN">
+        <span class="lock-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/>
+            <path d="M8.2 10.5V7.6a3.8 3.8 0 0 1 7.6 0v2.9"/>
+          </svg>
+        </span>
+        <div class="lock-dots" id="lock-dots" role="status" aria-live="polite" aria-label="No digits entered">
+          ${[0, 1, 2, 3].map(() => '<span class="lock-dot"></span>').join('')}
+        </div>
+        <div class="lock-keys" id="lock-keys">${keys.map(key).join('')}</div>
+      </div>
     </div>`;
-  const form = container.querySelector('#lock-form');
-  const box = container.querySelector('#lock-pin');
-  const note = container.querySelector('#lock-note');
-  box.focus();
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (await tryPin(box.value)) { onOpen(); return; }
-    // The box is emptied rather than left holding a wrong answer to edit, which is how
-    // every other PIN pad on a phone behaves.
-    box.value = '';
-    box.focus();
-    note.textContent = 'That is not it. Try again.';
-    form.classList.add('is-wrong');
-    setTimeout(() => form.classList.remove('is-wrong'), 600);
+
+  const screen = container.querySelector('#lock-screen');
+  const panel = container.querySelector('#lock-panel');
+  const dotsBox = container.querySelector('#lock-dots');
+  const dots = [...container.querySelectorAll('.lock-dot')];
+  document.body.classList.add('is-locked');
+  let pin = '';
+  let checking = false;
+
+  const paint = () => {
+    dots.forEach((d, i) => d.classList.toggle('is-on', i < pin.length));
+    dotsBox.setAttribute('aria-label', `${pin.length} of 4 digits entered`);
+  };
+  const wrong = () => {
+    panel.classList.add('is-wrong');
+    setTimeout(() => {
+      panel.classList.remove('is-wrong');
+      pin = '';
+      paint();
+      checking = false;
+    }, 500);
+  };
+  const done = () => {
+    /* A moment of "yes" before the program appears, because four dots going out and a whole
+       app arriving in the same frame reads as a glitch rather than as an answer. */
+    panel.classList.add('is-open');
+    setTimeout(() => {
+      document.body.classList.remove('is-locked');
+      screen.remove();
+      onOpen();
+    }, 420);
+  };
+  const push = async (digit) => {
+    if (checking || pin.length >= 4) return;
+    pin += digit;
+    paint();
+    if (pin.length < 4) return;
+    checking = true;
+    if (await tryPin(pin)) done(); else wrong();
+  };
+  const back = () => {
+    if (checking || !pin) return;
+    pin = pin.slice(0, -1);
+    paint();
+  };
+
+  container.querySelector('#lock-keys').addEventListener('click', (event) => {
+    const btn = event.target.closest('.lock-key');
+    if (!btn) return;
+    if (btn.dataset.key === 'del') back(); else push(btn.dataset.key);
   });
-  // Four digits is the whole answer, so it is taken as soon as there are four of them and
-  // the button is there for a keyboard that has no Go on it.
-  box.addEventListener('input', () => {
-    box.value = box.value.replace(/\D/g, '').slice(0, 4);
-    if (box.value.length === 4) form.requestSubmit();
-  });
+  // The number row and the keypad on a real keyboard, so a desk does not have to use a
+  // mouse for four digits. Kept on the window rather than on an input, since there is no
+  // input: the whole screen is the control.
+  const onKey = (event) => {
+    if (!document.body.classList.contains('is-locked')) {
+      window.removeEventListener('keydown', onKey);
+      return;
+    }
+    if (/^\d$/.test(event.key)) { event.preventDefault(); push(event.key); }
+    else if (event.key === 'Backspace') { event.preventDefault(); back(); }
+  };
+  window.addEventListener('keydown', onKey);
+  paint();
 }
 
 // ==== ui/program-view.js ====
