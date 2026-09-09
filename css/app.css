@@ -3167,6 +3167,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    land on the same measure instead of sprawling across the sheet. */
 .poster.is-vasikin.is-both .poster-pair.is-solo { width: 50%; margin-inline: auto; }
 .poster.is-vasikin.is-both .poster-day { font-size: 21pt; line-height: 1.2; margin: 0 0 0.12in; }
+/* No underline on the day headings or on the line naming the מנין, on this sheet only.
+   Asked for, and it is the sheet with the most rules on it: two occasion headings underlined,
+   two day headings under those, and the מנין's name over the lot. The occasion headings keep
+   theirs, so what is underlined on the page is what divides it. The two single sheets keep
+   their day headings underlined, which is how the Word originals have them. */
+.poster.is-vasikin.is-both .poster-day,
+.poster.is-vasikin.is-both .poster-title { text-decoration: none; }
 /* The words square up on the right of a column and the times on the left, so both edges are a
    straight line down the page rather than every row floating in the middle of it. */
 .poster.is-vasikin.is-both .poster-rows.is-dense .poster-row {
