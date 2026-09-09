@@ -54,6 +54,13 @@ same job three times and takes several minutes, and the three `large*` checks ea
 25 megapixel job through two 4x passes. On a machine with a real GPU it is
 seconds. Nothing about the test is waiting on a timeout; it is genuinely computing.
 
+## Looking at it
+
+`npm run build && npm run shots` walks the built app end to end and writes a screenshot
+of every screen to `tests/tmp/shots/`, in a phone and a desktop viewport and in both
+themes. It asserts nothing; it exists so the interface can be looked at without a device
+to hand.
+
 ## Chromium
 
 The runners look for Chromium at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`,
