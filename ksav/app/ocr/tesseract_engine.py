@@ -19,8 +19,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ..core import paths as _paths
 from ..core.logging import get
 from ..core.models import BlockKind, PageText, TextBlock
+
+
+def paths_module():
+    return _paths
 from . import layout, preprocess
 from .base import (
     CancelFn,
@@ -139,28 +144,66 @@ class TesseractEngine(OcrEngine):
                 timeout=20, creationflags=_NO_WINDOW, env=self._env(),
             )
             lines = result.stdout.splitlines() + result.stderr.splitlines()
-            self._languages = {
-                line.strip() for line in lines
-                if line.strip() and " " not in line.strip() and not line.startswith("List")
-            }
+            names = set()
+            for line in lines:
+                text = line.strip()
+                if not text or " " in text or text.startswith("List"):
+                    continue
+                # Take the last path segment. A misconfigured prefix reports
+                # "tessdata/heb", and treating that as a language name means
+                # asking Tesseract for a language it will not find.
+                names.add(text.replace("\\", "/").rsplit("/", 1)[-1])
+            self._languages = names
         except (OSError, subprocess.SubprocessError) as exc:
             log.warning("could not list Tesseract languages: %s", exc)
             self._languages = set()
         return self._languages
 
     def _env(self) -> dict:
+        """The environment Tesseract is run in.
+
+        TESSDATA_PREFIX must point at the tessdata directory ITSELF. Tesseract 3
+        and 4 wanted its parent and appended "tessdata" themselves; Tesseract 5
+        does not. Pointing at the parent does not fail loudly: --list-langs
+        cheerfully reports "tessdata\heb" as though it were a language, and then
+        every recognition call dies with "Error opening data file". It only
+        happens with vendored language data, which is to say only in a shipped
+        build, which is where it was caught.
+        """
         import os
 
         env = dict(os.environ)
-        if self._tessdata:
-            env["TESSDATA_PREFIX"] = str(self._tessdata)
-        else:
-            from ..core import paths
-
-            bundled = paths.VENDOR_DIR / "tesseract" / "tessdata"
-            if bundled.is_dir():
-                env["TESSDATA_PREFIX"] = str(bundled.parent)
+        tessdata = Path(self._tessdata) if self._tessdata else (
+            paths_module().VENDOR_DIR / "tesseract" / "tessdata"
+        )
+        if tessdata.is_dir():
+            env["TESSDATA_PREFIX"] = str(tessdata)
         return env
+
+    def configure_pytesseract(self) -> None:
+        """Point pytesseract at the program and language data Ksav ships.
+
+        pytesseract shells out to whatever "tesseract" is on the PATH and
+        inherits the ambient environment. A shipped Ksav carries its own copy
+        and a machine that never installed Tesseract has nothing on the PATH,
+        so without this is_available says yes, because it looks for the binary
+        properly, and then every recognition call fails with
+        TesseractNotFoundError. Development never sees it: there is always a
+        Tesseract on the PATH here.
+        """
+        import os
+
+        import pytesseract
+
+        binary = self.binary()
+        if binary:
+            pytesseract.pytesseract.tesseract_cmd = binary
+
+        prefix = self._env().get("TESSDATA_PREFIX")
+        if prefix:
+            # pytesseract gives no way to pass an environment, so it has to go
+            # into this process's own.
+            os.environ["TESSDATA_PREFIX"] = prefix
 
     def resolve_languages(self, options: OcrOptions) -> tuple[list[str], str]:
         """What to ask Tesseract for, and a note when it is not what was wanted."""
@@ -217,6 +260,8 @@ class TesseractEngine(OcrEngine):
         import numpy as np
         import pytesseract
         from PIL import Image
+
+        self.configure_pytesseract()
 
         image_path = Path(image_path)
         if on_progress:

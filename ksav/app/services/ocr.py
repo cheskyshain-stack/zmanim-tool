@@ -139,10 +139,9 @@ class OcrService:
         # and the symptom is "Tesseract is installed but has no language data"
         # on a machine where it plainly does.
         installed = self._manager.installed_ocr_languages()
-        if installed:
-            engine._tessdata = self._manager.tessdata_dir().parent
-        else:
-            engine._tessdata = None
+        # The tessdata directory itself, not its parent: Tesseract 5 does not
+        # append "tessdata" the way 3 and 4 did.
+        engine._tessdata = self._manager.tessdata_dir() if installed else None
         engine._languages = None           # re-read after an install or removal
         return engine
 

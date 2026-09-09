@@ -458,3 +458,68 @@ def test_pdf_export_of_a_transcript_keeps_hebrew(tmp_path):
     )
     text = pdf_reader.text_layer(path, 0).text()
     assert any(0x590 <= ord(c) <= 0x5FF for c in text)
+
+
+# -- the shipped configuration ------------------------------------------
+
+
+@needs_tesseract
+def test_ocr_works_with_vendored_language_data(tmp_path, monkeypatch):
+    """The configuration a shipped build actually has, which is not the one a
+    development machine has.
+
+    TESSDATA_PREFIX must point at the tessdata directory itself. Tesseract 3 and
+    4 wanted its parent and appended "tessdata" themselves; 5 does not. Ksav
+    passed the parent, and the failure is quiet in the worst way: --list-langs
+    reports "tessdata/heb" as though it were a language and every recognition
+    call then dies with "Error opening data file". It never showed up in
+    development because there is no vendored folder there, so the variable was
+    never set at all and the system default was used. A Windows installer was
+    built and published with this in it.
+    """
+    import shutil
+
+    from app.core import paths
+
+    # Build the layout a shipped Ksav has: its own Tesseract data folder.
+    vendor = tmp_path / "vendor"
+    tessdata = vendor / "tesseract" / "tessdata"
+    tessdata.mkdir(parents=True)
+
+    system = TesseractEngine()
+    source = None
+    for candidate in (Path("/usr/share/tesseract-ocr/5/tessdata"),
+                      Path("/usr/share/tesseract-ocr/4.00/tessdata"),
+                      Path(r"C:\Program Files\Tesseract-OCR\tessdata")):
+        if (candidate / "heb.traineddata").is_file():
+            source = candidate
+            break
+    if source is None:
+        pytest.skip("no Hebrew traineddata to copy into a vendored layout")
+
+    for name in ("heb", "eng"):
+        shutil.copy(source / f"{name}.traineddata", tessdata)
+
+    # And Ksav's own copy of the program, which is what a shipped build has and
+    # a development machine does not.
+    program = shutil.which("tesseract")
+    if program:
+        shutil.copy(program, vendor / "tesseract" / Path(program).name)
+
+    monkeypatch.setenv("TESSDATA_PREFIX", "")   # so monkeypatch restores it after
+    monkeypatch.setattr(paths, "VENDOR_DIR", vendor)
+    engine = TesseractEngine()
+
+    languages = engine.languages()
+    assert "heb" in languages, f"the language names came back as {sorted(languages)}"
+    assert not any("/" in name or "\\" in name for name in languages), (
+        "a language name carrying a path means the prefix is pointing at the "
+        "wrong directory, and recognition will fail even though this listing works"
+    )
+
+    # And it must actually read, which is the thing the listing does not prove.
+    page = make_page(tmp_path / "p.png", [(80, ["בראשית ברא אלהים"])])
+    result = engine.recognize(page, OcrOptions(script_hint=ScriptHint.HEBREW_PLAIN))
+    assert "בראשית" in result.text(), (
+        "Tesseract listed Hebrew but could not read with it"
+    )
