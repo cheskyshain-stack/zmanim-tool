@@ -3340,7 +3340,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      The number itself comes off the bar, which has a stepper for it: --op-pad is set on the
      sheet by fitOnePage before it measures. The value here is the fallback, and it is what
      the week's own sheet and any sheet drawn outside the Posters tab get. */
+  /* The foot gets less than the other three sides, by exactly the 0.1in the key already
+     carries above its own rule. The key is the last thing on the sheet: above it there is
+     that 0.1in and whatever the fit could not spend, below it there was the full margin and
+     nothing else at all, so the white under three lines of small print was half again the
+     white over them. Measured at 0.35in: 0.216in above the rule against 0.350in below the
+     last line. Taking the 0.1in off the foot brings the two level.
+
+     max, so the stepper's floor cannot drive it to nothing: at 0.15in the foot stays at
+     0.15in and the sheet goes back to even all round, which is the right answer when the
+     margin is already as tight as the paper will take. */
   padding: var(--op-pad, 0.35in);
+  padding-bottom: max(0.15in, calc(var(--op-pad, 0.35in) - 0.1in));
 }
 /* The two rules that make the frame, off. They are a ::before and a ::after on .poster, so
    there is nothing to unset: the content property is what draws them. */
