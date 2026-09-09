@@ -26,6 +26,7 @@ import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildSukkosPoster, SK_SHUAVA } from '../posters/sukkos.js';
+import { buildVasikinPoster, VS_TEXT, VS_GAPS } from '../posters/vasikin.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { nextYomimNoraim } from './posters-view.js';
 import { hebrewYear } from '../hebrew-calendar.js';
@@ -782,6 +783,39 @@ const POSTER_SHEETS = [
       neila: {
         plain: 'נעילת החג on אחרון של פסח, three quarters of an hour before שקיעה, announced to the nearest five.',
         exact: 'That day\'s own שקיעה less 45 minutes, rounded to the nearest 5. Asked for. The five sheets put it anywhere from 39 to 53 minutes before שקיעה and followed no rule.',
+      },
+    },
+  },
+  {
+    key: 'vasikin',
+    name: `${VS_TEXT.who}`,
+    note: `The two sheets the shul hangs for the מנין ותיקין, one for ראש השנה holding both days and one for יום כיפור. A ותיקין מנין says שמונה עשרה at sunrise, so נץ is the anchor and every other line is a number of minutes in front of it. It is the one sheet in the program that prints a time to the second. Worked through on ראש השנה below; the יום כיפור sheet is the same five lines against its own נץ, with its own two gaps (${VS_GAPS.yk.shacharis} minutes to שחרית and ${VS_GAPS.yk.tallis} to the טלית, against ${VS_GAPS.rh.shacharis} and ${VS_GAPS.rh.tallis} on ראש השנה).`,
+    build: (year, settings) => buildVasikinPoster(year, settings, 'rh'),
+    rows: (built) => built.days.flatMap((d) => d.lines.map((l) => ({
+      key: l.calc,
+      name: `${d.heading || built.title} · ${l.label}`,
+      value: l.text,
+    }))),
+    rules: {
+      netz: {
+        plain: 'נץ, sunrise, printed to the second. Everything else on the sheet is a number of minutes in front of it.',
+        exact: 'Sunrise at the shul\'s horizon, snapped to the second it prints as, and the four lines above it worked off that snapped value rather than off the raw one. Otherwise the sheet can contradict itself: on ראש השנה תשפ״ז the sun rises at 6:34:59.6, which prints as 6:35:00, and עלות taken off the raw number came out at 5:22 where 6:35:00 less 72 minutes is plainly 5:23. Measured against the two sheets the shul hangs, this is within a second of the ראש השנה one and six seconds of the יום כיפור one.',
+      },
+      alos: {
+        plain: `עלות, ${VS_GAPS.rh.alos} minutes before נץ.`,
+        exact: `נץ less ${VS_GAPS.rh.alos} minutes, taken down to the whole minute. The ordinary עלות 72, the same one the boards and the other sheets use, counted back from sunrise rather than forward from anything.`,
+      },
+      shacharis: {
+        plain: `שחרית, ${VS_GAPS.rh.shacharis} minutes before נץ on ראש השנה and ${VS_GAPS.yk.shacharis} on יום כיפור.`,
+        exact: `נץ less the occasion's own gap, taken down to the whole minute. The two gaps are the shul's own and are read off its sheets: the davening before שמונה עשרה is longer on יום כיפור, so that מנין opens ${VS_GAPS.yk.shacharis - VS_GAPS.rh.shacharis} minutes earlier against its own sunrise.`,
+      },
+      tallis: {
+        plain: `זמן טלית, ${VS_GAPS.rh.tallis} minutes before נץ on ראש השנה and ${VS_GAPS.yk.tallis} on יום כיפור.`,
+        exact: 'נץ less the occasion\'s own gap, taken down to the whole minute. Not a calculated משיכיר: these are the numbers the shul\'s own sheets carry, and on יום כיפור the one that puts the טלית a minute before the מנין rather than after it.',
+      },
+      hamelech: {
+        plain: `המלך, ${VS_GAPS.rh.hamelech} minutes before נץ.`,
+        exact: `נץ less ${VS_GAPS.rh.hamelech} minutes, taken down to the whole minute. The same gap on both sheets.`,
       },
     },
   },

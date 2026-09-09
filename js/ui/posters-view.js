@@ -24,6 +24,7 @@ import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
+import { buildVasikinPoster, VS_TEXT } from '../posters/vasikin.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -259,6 +260,45 @@ const POSTERS = [
       }));
     },
     render: renderYomKippurPoster,
+  },
+  /* The two ותיקין sheets. Their own entries rather than one with a pick between them,
+     because the shul hangs two sheets and they fall on two different days: the list is
+     ordered by date, so ר"ה's sits with ר"ה and יו"כ's with יו"כ. */
+  {
+    key: 'vasikinrh',
+    label: `${VS_TEXT.who} · ${VS_TEXT.roshHashana}`,
+    covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.roshHashana} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildVasikinPoster(y, settings, 'rh')?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildVasikinPoster(y, settings, 'rh') }),
+      }));
+    },
+    render: renderVasikinPoster,
+  },
+  {
+    key: 'vasikinyk',
+    label: `${VS_TEXT.who} · ${VS_TEXT.yomKippur}`,
+    covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.yomKippur} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildVasikinPoster(y, settings, 'yk')?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildVasikinPoster(y, settings, 'yk') }),
+      }));
+    },
+    render: renderVasikinPoster,
   },
   {
     key: 'afteryk',
@@ -859,6 +899,27 @@ function rhBody(poster, { year = true } = {}) {
 
 function renderRoshHashanaPoster(poster, settings) {
   return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
+}
+
+/** A מנין ותיקין sheet: the motto, who it is, the occasion and the year, and then four or five
+ *  lines a day.
+ *
+ *  The same rows as the ראש השנה sheet, so a person holding the two reads them alike. What it
+ *  adds is the two lines over the title, which is how the Word sheets open, and the day
+ *  headings, which ר"ה has and יו"כ does not. */
+function renderVasikinPoster(poster, settings) {
+  const body = `
+    <div class="poster-vasikin-head">
+      <div class="poster-vasikin-motto" lang="he">${escAttr(VS_TEXT.motto)}</div>
+      <div class="poster-vasikin-who" lang="he">${escAttr(VS_TEXT.who)}</div>
+    </div>
+    <h2 class="poster-title" lang="he">${escAttr(poster.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="poster-rows is-dense">
+      ${poster.days.map((d) => `
+        ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}`).join('')}
+    </div>`;
+  return posterShell(settings, body, poster.legend || [], { dense: true });
 }
 
 /** The יום כיפור sheet: ערב יו"כ, the day, the morning after, and the box of everyday times
