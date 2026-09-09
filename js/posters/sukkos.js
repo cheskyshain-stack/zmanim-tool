@@ -686,21 +686,21 @@ export function buildSukkosPoster(year, settings) {
   // שמיני עצרת
   {
     const n = SK_SHMINI;
-    /* Each שחרית carries its own יזכור, which is how the sheet sets them: the 7:30 is the
-       למטה מנין and the 8:15 the main בית מדרש, and each one davens יזכור when it gets there.
-       On Shabbos both run later, the davening being longer: 9:40 and 10:55 against 9:10 and
-       10:25. The Shabbos year used to print one יזכור for the two of them and the למטה מנין
-       had no time on the sheet at all. */
+    /* Two lines, the two שחרית on one and their two יזכור on the other, read down: the 7:30
+       davens יזכור at the first time and the 8:15 at the second. It was four lines, a שחרית
+       and its own יזכור and then the same again, which said the pairing outright and cost
+       twice the room; the shul asked for the two.
+
+       Each יזכור keeps the mark of the מנין it belongs to. The 7:30 is the למטה מנין, so its
+       יזכור is underlined too, being said where that מנין is; the 8:15's is in the main בית
+       מדרש and stays plain. On Shabbos both run later, the davening being longer: 9:40 and
+       10:55 against 9:10 and 10:25. */
     const yizkor = [
-      line(SK_TEXT.shacharis, [txt('7:30', true)],
-        { calc: 'shacharis',
-          // Underlined like the שחרית it belongs to: it is that מנין's own יזכור and it is
-          // said where that מנין is, בבית מדרש למטה. The 8:15's is in the main בית מדרש and
-          // is left plain.
-          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly, true)] } }),
-      line(SK_TEXT.shacharis, [txt('8:15')],
-        { calc: 'shacharis',
-          extra: { label: SK_TEXT.yizkor, times: [txt(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate)] } }),
+      line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
+      line(SK_TEXT.yizkor, [
+        txt(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly, true),
+        txt(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate),
+      ], { calc: 'yizkor' }),
     ];
     const shminiMincha = sukkosDayMincha(day(n), settings,
       { five: false, fiveIfRoom: true, early: isShabbos(n) });

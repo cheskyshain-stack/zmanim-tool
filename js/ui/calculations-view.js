@@ -538,7 +538,7 @@ const POSTER_SHEETS = [
       },
       shacharis: {
         plain: 'The יום טוב morning. Two fixed מנינים, 7:30 למטה and 8:15, the same on every day of the sheet.',
-        exact: 'Not calculated. On שמיני עצרת each of the two carries its own יזכור beside it.',
+        exact: 'Not calculated. On שמיני עצרת the line under it is the two יזכור, in the same order, so the pair is read down.',
       },
       krias: {
         plain: 'ס"ז קריאת שמע, given on both reckonings with each time under the name of its own.',
@@ -565,8 +565,8 @@ const POSTER_SHEETS = [
         exact: 'The day\'s own שקיעה plus 60 and plus 72 minutes, the later one למטה. Not printed at all in a year where the day runs into Shabbos: the Shabbos block below gives that evening instead.',
       },
       yizkor: {
-        plain: 'יזכור on שמיני עצרת, announced rather than worked out. One per שחרית: 9:10 after the 7:30 and 10:25 after the 8:15. The first is underlined like the שחרית it belongs to, being said למטה where that מנין is; the second is in the main בית מדרש.',
-        exact: 'Not calculated. On a Shabbos both run later, the davening being longer: 9:40 and 10:55. The Shabbos year used to print one יזכור for the two מנינים and the למטה one had no time on the sheet at all.',
+        plain: 'יזכור on שמיני עצרת, announced rather than worked out: 9:10 and 10:25, on one line under the two שחרית and read down against them. The 7:30 davens at the first and the 8:15 at the second.',
+        exact: 'Not calculated. The first is underlined like the שחרית it belongs to, being said למטה where that מנין is; the second is in the main בית מדרש. On a Shabbos both run later, the davening being longer: 9:40 and 10:55. It was four lines, each שחרית with its own יזכור beside it, which said the pairing outright and cost twice the room.',
       },
       shminiMincha: {
         plain: 'שמיני עצרת\'s afternoon: 2:00 and 5:00 rather than 5:30, a 5:30 as well where there is room for it, and a last מנין half an hour before שקיעה.',
