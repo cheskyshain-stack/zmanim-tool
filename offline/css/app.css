@@ -2884,6 +2884,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   flex: 1; width: 100%;
   padding: 0.16in 0 0.85in;
 }
+/* Black, like the rest of the sheet. Every heading on every poster is an h3, and the app's own
+   h3 rule up at the top of this file colours one --accent-dark, which is the grey the interface
+   is built out of and has no business on printed paper. It reached the day headings on seven of
+   the sheets: measured at rgb(61, 65, 69) against the black of every line around them. The
+   poster sets its own colour, so the headings take it from the sheet they are on rather than
+   naming a colour again here. */
+.poster h3 { color: inherit; }
 /* The יום א' / יום ב' headings inside the ראש השנה sheet, underlined the way they are on
    the sheets the shul hangs. */
 .poster-day {
@@ -3035,7 +3042,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-vasikin .poster-pair { flex: 0 0 auto; }
 .poster.is-vasikin .poster-title,
 .poster.is-vasikin .poster-line,
-.poster.is-vasikin .poster-rows.is-dense .poster-day,
+.poster.is-vasikin .poster-day,
 .poster.is-vasikin .poster-rows.is-dense .poster-row,
 .poster.is-vasikin.is-pair .poster-row {
   font-size: 26pt; font-weight: 700; line-height: 1.5;
@@ -3045,8 +3052,24 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    so the gap belongs to the leading like every other gap here. */
 .poster.is-vasikin .poster-title { margin-bottom: 0; }
 .poster.is-vasikin .poster-line { margin: 0; }
-.poster.is-vasikin .poster-rows.is-dense .poster-day { margin: 0.14in 0 0; }
-.poster.is-vasikin .poster-rows > .poster-day:first-child { margin-top: 0.14in; }
+/* The day's heading stands above its rows box on these sheets rather than inside it, so the
+   0.13in a pair column hangs over its rows is carried by the heading instead: measured before
+   and after, the heading is in the same place and its first row still sits directly under it.
+   See the rule between the two days, below. */
+.poster.is-vasikin .poster-day { margin: 0.13in 0 0; }
+.poster.is-vasikin .poster-pair-col > .poster-rows { padding-top: 0; }
+/* And that rule, which runs beside the times and no higher: from the top of the rows box down
+   to the last of them, so יום א' and יום ב' stand clear above it rather than being cut apart by
+   it. It is drawn on the rows box for that reason, and pulled back out over the column's own
+   padding so it still lands midway between the two columns. */
+.poster.is-vasikin { --vs-gutter: 0.1in; }
+.poster.is-vasikin .poster-pair-col + .poster-pair-col { border-inline-start: 0; }
+.poster.is-vasikin .poster-pair-col + .poster-pair-col .poster-rows { position: relative; }
+.poster.is-vasikin .poster-pair-col + .poster-pair-col .poster-rows::before {
+  content: ""; position: absolute; inset-block: 0;
+  inset-inline-start: calc(-1 * var(--vs-gutter));
+  border-inline-start: 1px solid #000;
+}
 .poster.is-pair .poster-rows.is-dense .poster-day { margin-top: calc(var(--pair-lead) * 0.11in); }
 /* Not on the first thing in a column. The יום כיפור column opens with a section heading and
    the ראש השנה one opens with a plain row, so the heading's own space above it put the two
@@ -3103,22 +3126,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* Wider than the 0.1in the other two-in-one sheets give a column: there the rule down the
    middle is holding two full schedules apart, here it is holding apart two days that read
    almost the same, and they want the air. */
-.poster.is-vasikin.is-both .poster-pair-col { padding-inline: 0.5in; }
+.poster.is-vasikin.is-both { --vs-gutter: 0.5in; }
+.poster.is-vasikin.is-both .poster-pair-col { padding-inline: var(--vs-gutter); }
 .poster.is-vasikin.is-both .poster-rows { padding: 0.04in 0 0; }
 /* יום כיפור is one day, held to the width of one ראש השנה column above it so its two edges
    land on the same measure instead of sprawling across the sheet. */
 .poster.is-vasikin.is-both .poster-pair.is-solo { width: 50%; margin-inline: auto; }
 .poster.is-vasikin.is-both .poster-day { font-size: 21pt; line-height: 1.2; margin: 0 0 0.12in; }
-/* The rule between the two days runs beside the times and no higher: from the top of the rows
-   box down to the last of them, so יום א' and יום ב' stand clear above it rather than being
-   cut apart by it. Drawn on the rows box for that reason, and pulled back out over the
-   column's own padding so it still lands midway between the two columns. */
-.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col { border-inline-start: 0; }
-.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col .poster-rows { position: relative; }
-.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col .poster-rows::before {
-  content: ""; position: absolute; inset-block: 0; inset-inline-start: -0.5in;
-  border-inline-start: 1px solid #000;
-}
 /* The words square up on the right of a column and the times on the left, so both edges are a
    straight line down the page rather than every row floating in the middle of it. */
 .poster.is-vasikin.is-both .poster-rows.is-dense .poster-row {

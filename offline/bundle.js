@@ -7758,8 +7758,12 @@ function renderRoshHashanaPoster(poster, settings) {
  *  header block of its own for a while and that was a page layout nobody had asked for: a new
  *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
 function renderVasikinPoster(poster, settings) {
-  const day = (d) => `<div class="poster-rows is-dense">
-      ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
+  /* The day's heading stands above its rows box rather than inside it, which the other sheets
+     do not need and this one does: the rule between יום א' and יום ב' is drawn down the side of
+     that box, so with the headings in it the rule ran the whole height of the column and cut
+     the two of them apart instead of standing between the two schedules. */
+  const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
+    <div class="poster-rows is-dense">
       ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
@@ -7777,19 +7781,10 @@ function renderVasikinPoster(poster, settings) {
      clear at the foot. Landscape does take the three across, but that is a page the shul did
      not ask for. */
   if (poster.which === 'both') {
-    /* The day's heading is outside its rows here, where the single sheets keep it inside them.
-       The rule between יום א' and יום ב' is drawn down the side of the rows box, and with the
-       headings in that box it ran the whole height of the column, up past both of them. */
-    const bothCol = (d) => `<div class="poster-pair-col">
-        ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
-        <div class="poster-rows is-dense">
-          ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
-        </div>
-      </div>`;
     const section = (s) => `<section class="poster-both-part">
         <h3 class="poster-occasion" lang="he">${escAttr(s.heading)}</h3>
         <div class="poster-pair${s.days.length > 1 ? '' : ' is-solo'}">
-          ${s.days.map(bothCol).join('')}
+          ${s.days.map((d) => `<div class="poster-pair-col">${day(d)}</div>`).join('')}
         </div>
       </section>`;
     const stacked = `
