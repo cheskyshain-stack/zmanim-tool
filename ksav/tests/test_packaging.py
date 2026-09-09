@@ -119,3 +119,46 @@ def test_the_vendor_fetcher_only_takes_a_self_contained_installation():
 
     assert not module.is_self_contained(Path("/usr/bin"))
     assert not module.is_self_contained(Path("/usr/share/tesseract-ocr/5"))
+
+
+def _pins(path: Path) -> dict[str, str]:
+    """Every pinned requirement in a requirements file."""
+    pins = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#")[0].strip()
+        if "==" in line and not line.startswith("-"):
+            name, version = line.split("==", 1)
+            pins[name.strip().lower().replace("_", "-")] = version.strip()
+    return pins
+
+
+@pytest.mark.parametrize("filename", ["requirements.txt", "requirements-dev.txt"])
+def test_every_pinned_version_is_one_that_actually_exists(filename):
+    """The pins must match a real, installed package.
+
+    Six of them were written from memory and were wrong. The Windows build
+    failed on the first one it reached, six seconds in, having downloaded
+    nothing useful. A pin that does not exist is not a version conflict, it is
+    a typo, and this is where it should be caught.
+    """
+    import importlib.metadata as metadata
+
+    missing = []
+    wrong = []
+    for name, pinned in _pins(ROOT / filename).items():
+        try:
+            installed = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            missing.append(name)
+            continue
+        if installed != pinned:
+            wrong.append(f"{name}: pinned {pinned}, installed {installed}")
+
+    assert not wrong, (
+        "These pins do not match what is installed, so a clean build would get "
+        "something different or fail outright:\n  " + "\n  ".join(wrong)
+    )
+    # A package that is simply not installed here is reported rather than
+    # failed, since the dev environment may legitimately lack an optional one.
+    if missing:
+        print(f"not installed in this environment: {', '.join(missing)}")
