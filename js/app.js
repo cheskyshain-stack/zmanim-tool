@@ -11,6 +11,7 @@ import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
+import { isOpen, renderLock } from './ui/lock.js';
 
 const state = loadState();
 let tables = null;
@@ -349,14 +350,25 @@ function paint() {
 // other direction. Wired once, since the sidebar is in the page rather than rendered.
 wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 
-loadTables()
-  .then((t) => {
-    tables = t;
-    // Whatever the address says, before anything is drawn, so a refresh comes back to the
-    // screen it was on instead of flashing Generate first.
-    readRoute();
-    render();
-  })
-  .catch((err) => {
-    main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
-  });
+function start() {
+  loadTables()
+    .then((t) => {
+      tables = t;
+      // Whatever the address says, before anything is drawn, so a refresh comes back to the
+      // screen it was on instead of flashing Generate first.
+      readRoute();
+      render();
+    })
+    .catch((err) => {
+      main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
+    });
+}
+
+/* The PIN, before any of it. The admin is a page on a public site and anybody who guesses
+   the address lands on it, so a device that has not answered in three days answers now.
+   Ahead of loadTables as well as ahead of the drawing: nothing is fetched and nothing is
+   built for a visitor who is not getting in. The nav is left empty while the lock is up,
+   since it is filled by the first render and that is the other side of this.
+   What this is and is not worth is written at the top of ui/lock.js. */
+if (isOpen()) start();
+else renderLock(main, start);

@@ -3997,3 +3997,34 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .own-editor .own-text, .own-editor .own-offset { width: 100%; }
   .own-del-row { margin-inline-start: 0; justify-self: start; }
 }
+
+/* --- The PIN on the admin ------------------------------------------------------------
+   See ui/lock.js for what it is for and what it is worth. A card in the middle of the
+   screen with four digits in it and nothing else on the page: the sidebar is still there,
+   because it is in the document rather than drawn, but its nav is empty until the program
+   is built, which is the other side of the same gate. */
+.lock { display: flex; align-items: center; justify-content: center; min-height: 70vh; padding: 2rem 1rem; }
+.lock-card {
+  display: grid; gap: 0.9rem; justify-items: center; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); padding: 2rem 1.6rem; width: min(22rem, 100%);
+}
+.lock-title { margin: 0; font-size: var(--fs-lg); }
+/* Wide, spaced and centred: it is four digits, and it should look like four digits rather
+   than like a password box that happens to be short. */
+.lock-pin {
+  font: inherit; font-size: 1.9rem; letter-spacing: 0.5em; text-align: center;
+  width: 100%; max-width: 11rem; padding: 0.45rem 0 0.45rem 0.5em;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: #fff;
+}
+.lock-note { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+.lock-card button { min-width: 8rem; }
+/* A wrong answer shakes rather than turning red: the card is the only thing on the screen,
+   so the movement is enough to say no and there is nothing else for a colour to mean. */
+.lock-card.is-wrong { animation: lock-shake 0.3s ease; }
+@keyframes lock-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) { .lock-card.is-wrong { animation: none; } }

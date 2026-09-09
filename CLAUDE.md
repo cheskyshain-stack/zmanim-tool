@@ -162,6 +162,23 @@ Export/Import in Settings moves it between devices.
 - A sheet view is exempt from the cap entirely; a page is a fixed 11in.
 - `.gen-column` holds the Generate flow to 42rem.
 
+## The PIN on the admin
+
+`/admin/` asks for four digits before it draws anything, remembered on that device for three
+days in `zmanim-admin-unlock`. See `js/ui/lock.js`, which also says what it is worth: it
+turns away somebody who guessed the address, and it is not security, because the check runs
+in the reader's browser. The PIN itself is not in the source, only a salted SHA-256 of it.
+
+**Any browser test of the admin has to set that key**, next to the app state and before the
+reload, or the tab never renders and a check comes back empty rather than failing:
+
+```js
+localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
+```
+
+It is off where `crypto.subtle` is not there to check an answer with, which is the offline
+copy on `file://` and an admin served over plain http.
+
 ## Verify before you call it done
 
 Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
