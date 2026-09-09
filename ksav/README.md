@@ -118,14 +118,33 @@ point, online or offline. `docs/usb.md` has the detail.
 
 ## Building the Windows installer
 
+On Windows, one command:
+
 ```
-pyinstaller packaging/ksav.spec --noconfirm
-iscc packaging\installer.iss
+python packaging\build.py
 ```
 
-The result is a per user installer that needs no administrator rights. Models
-are not bundled: they are downloaded once from the Model Vault, or imported from
-a folder for a machine that has never been online.
+That runs the tests, gathers Tesseract, freezes the program and produces
+`dist\Ksav-Setup-0.1.0.exe`. It refuses to build if the tests are red.
+
+You do not need a Windows machine. Every push to this branch builds the
+installer on a Windows runner and attaches it to the run: open the Actions tab,
+pick the newest **Build Ksav for Windows**, and download **Ksav-Windows-Installer**
+from the artifacts. The build runs the tests, opens the frozen program to check
+it actually starts, and fails if it does not.
+
+PyInstaller freezes for the platform it runs on and does not cross compile, and
+Inno Setup is Windows only, so a Windows installer can only be built on Windows.
+That is what the CI job is for.
+
+The installer is per user: no administrator password, no consent prompt. Models
+are not bundled. They install once from the Model Vault or from a USB stick,
+which keeps the download small enough to send to somebody and lets one download
+serve several machines.
+
+Without a code signing certificate, Windows SmartScreen warns the first time
+anyone runs it. That is a certificate purchase rather than a code problem, and
+it is the last thing between this and an ordinary Windows application.
 
 ## Privacy
 

@@ -1,0 +1,91 @@
+name: Build Ksav for Windows
+
+# PyInstaller freezes for the platform it runs on and does not cross compile,
+# and Inno Setup is Windows only. So the installer is built here, on a Windows
+# runner, and attached to the run for download. Nobody needs a Windows machine
+# to get a Windows installer.
+
+on:
+  push:
+    branches: ["claude/yeshivish-transcription-ocr-gi9vsr"]
+    paths: ["ksav/**", ".github/workflows/build-ksav-windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ksav
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ksav/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run the tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests -q
+
+      - name: Install Tesseract
+        run: choco install tesseract --no-progress -y
+
+      - name: Gather the bundled binaries
+        run: python packaging/fetch-vendor.py
+
+      - name: Build the program
+        run: python -m PyInstaller packaging/ksav.spec --noconfirm
+
+      - name: Check the built program starts
+        run: |
+          # A build that cannot open is worse than no build, and the failure is
+          # almost always a missing hidden import that only shows at run time.
+          $env:KSAV_DATA_DIR = "$env:RUNNER_TEMP\ksav-smoke"
+          $proc = Start-Process -FilePath "dist\Ksav\Ksav.exe" -PassThru
+          Start-Sleep -Seconds 25
+          if ($proc.HasExited) {
+            Write-Error "Ksav exited on its own with code $($proc.ExitCode)"
+            Get-Content "$env:KSAV_DATA_DIR\logs\ksav.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Stop-Process -Id $proc.Id -Force
+          if (-not (Test-Path "$env:KSAV_DATA_DIR\lexicon.sqlite")) {
+            Write-Error "Ksav started but never seeded its dictionary"
+            Get-Content "$env:KSAV_DATA_DIR\logs\ksav.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "Ksav opened and seeded its dictionary."
+          Get-Content "$env:KSAV_DATA_DIR\logs\ksav.log"
+
+      - name: Build the installer
+        run: |
+          choco install innosetup --no-progress -y
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
+
+      - name: Report the sizes
+        run: |
+          $app = (Get-ChildItem dist\Ksav -Recurse | Measure-Object Length -Sum).Sum / 1MB
+          $setup = (Get-Item dist\Ksav-Setup-*.exe).Length / 1MB
+          Write-Host ("Program:   {0:N0} MB" -f $app)
+          Write-Host ("Installer: {0:N0} MB" -f $setup)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ksav-Windows-Installer
+          path: ksav/dist/Ksav-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 30
