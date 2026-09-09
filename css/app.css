@@ -3157,6 +3157,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    0.27in clear at the foot and the line costs 0.44in, so it came out 0.17in past the frame
    before the space was found; see the two margins around it. */
 .poster.is-vasikin.is-both .poster-where { font-size: 20pt; margin: 0.02in 0 0; }
+/* The street, a step smaller again than the hall it is beside. At the one size they are set
+   the same and do not read the same: measured on the rendered line, the Hebrew paints 22.0px
+   of ink and the address 19.0px, so it is not actually taller, but it is Latin capitals and
+   digits at a bold weight against Hebrew letters that have no ascender or descender to them,
+   and it reads as the louder of the two. Taken to 73% of the Hebrew's ink, which puts it
+   where a street under a name belongs. */
+.poster.is-vasikin.is-both .poster-where bdi { font-size: 0.85em; }
 /* Wider than the 0.1in the other two-in-one sheets give a column: there the rule down the
    middle is holding two full schedules apart, here it is holding apart two days that read
    almost the same, and they want the air. */
