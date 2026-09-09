@@ -36,16 +36,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Install Tesseract
+        run: |
+          choco install tesseract --no-progress -y
+          # Chocolatey does not always put it on PATH for the current job.
+          "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Gather the bundled binaries
+        # Before the tests, not after: this fetches the Hebrew and Yiddish
+        # language data, and without it the OCR tests skip themselves and the
+        # Windows build verifies nothing about reading pages.
+        run: python packaging/fetch-vendor.py
+
       - name: Run the tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest tests -q
-
-      - name: Install Tesseract
-        run: choco install tesseract --no-progress -y
-
-      - name: Gather the bundled binaries
-        run: python packaging/fetch-vendor.py
+        run: |
+          tesseract --list-langs
+          python -m pytest tests -q
 
       - name: Build the program
         run: python -m PyInstaller packaging/ksav.spec --noconfirm

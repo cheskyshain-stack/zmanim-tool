@@ -184,7 +184,17 @@ class TesseractEngine(OcrEngine):
             note = f"Missing language data for {', '.join(missing)}."
 
         if not available:
-            available = ["eng"] if "eng" in installed else sorted(installed)[:1]
+            # Never hand Tesseract an empty -l, which fails obscurely. With
+            # nothing installed at all this returns eng, and is_available above
+            # is what actually stops the engine running: a Windows build with
+            # no language data returned [] here and the failure surfaced deep
+            # inside the recognition call instead of at the gate.
+            available = sorted(installed)[:1] if installed else ["eng"]
+            if not installed:
+                note = (
+                    "Tesseract has no language data on this computer. Install the "
+                    "page reading packs from the Model Vault."
+                )
         return available, note
 
     def quality_note(self, options: OcrOptions) -> str:

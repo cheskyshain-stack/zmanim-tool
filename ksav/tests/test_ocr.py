@@ -235,12 +235,28 @@ def test_a_region_the_user_drew_is_read_on_its_own(engine, tmp_path):
 
 
 def test_missing_yiddish_data_falls_back_and_says_so(engine):
+    installed = engine.languages()
     languages, note = engine.resolve_languages(OcrOptions(script_hint=ScriptHint.YIDDISH))
-    if "yid" in engine.languages():
+
+    if "yid" in installed:
         assert "yid" in languages
-    else:
+    elif "heb" in installed:
         assert languages == ["heb"]
         assert "Yiddish" in note and "Model Vault" in note
+    else:
+        # No language data at all. This came back as [] on a Windows runner,
+        # which would have handed Tesseract an empty -l flag.
+        assert languages, "an empty language list would fail deep inside Tesseract"
+        assert note
+
+
+def test_a_language_is_always_chosen_even_with_nothing_installed(engine, monkeypatch):
+    """The gate is is_available, not an empty list surfacing later."""
+    monkeypatch.setattr(engine, "_languages", set())
+    for hint in ScriptHint:
+        languages, note = engine.resolve_languages(OcrOptions(script_hint=hint))
+        assert languages, f"{hint.value} produced no language at all"
+        assert note, f"{hint.value} said nothing about the missing data"
 
 
 def test_the_hard_scripts_warn_before_the_work_not_after(engine):
