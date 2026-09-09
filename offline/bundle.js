@@ -4538,7 +4538,17 @@ const VS_TEXT = {
   tallis: 'זמן טלית',
   hamelech: 'המלך',
   netz: 'נץ',
+  /* What a day's heading adds where it falls on Shabbos. The word and the separator are the
+     ראש השנה sheet's (see RH_TEXT.daySep), because these sheets hang beside those and a dot
+     is what they all use: the heading is underlined, and an underline running under a bracket
+     reads as though it is cutting through it.
+     On a day with no heading of its own, which is יום כיפור's, שבת is the heading. The sheet
+     is already titled יום כיפור, so the line under it has only the one thing left to say. */
+  shabbos: 'שבת',
+  daySep: ' · ',
 };
+
+const VS_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
 
 /** The sheet in minutes, as the shul gave it. One set for both sheets: they were read off the
  *  old paper as two before this, where ר"ה opened 46 minutes before נץ and יו"כ 50, and the
@@ -4596,13 +4606,17 @@ function netzText(t) {
  *  minute, so it is one by arithmetic, and rounding it again could only move it off the half
  *  hour it is meant to be. */
 function vasikinDay(serial, settings, heading) {
+  const shabbos = excelWeekday(serial) === VS_SHABBOS;
+  const named = shabbos
+    ? (heading ? heading + VS_TEXT.daySep + VS_TEXT.shabbos : VS_TEXT.shabbos)
+    : heading;
   const netz = vasikinNetz(serial, settings);
   const before = (mins) => roundToMinute(netz - mins * VS_MIN);
   const hamelech = before(VS_RULES.hamelech);
   const shacharis = hamelech - VS_RULES.shacharisBeforeHamelech * VS_MIN;
   return {
     serial,
-    heading,
+    heading: named,
     lines: [
       { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos' },
       { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis' },
@@ -8185,9 +8199,16 @@ function renderVasikinPoster(poster, settings) {
      do not need and this one does: the rule between יום א' and יום ב' is drawn down the side of
      that box, so with the headings in it the rule ran the whole height of the column and cut
      the two of them apart instead of standing between the two schedules. */
+  /* The rows sit in a box of their own inside the block, which is one more box than the other
+     sheets need and is there for the rule between the two days. On the single sheets the rows
+     square up as a table, which is as wide as its own two columns and no wider; the rule is
+     drawn on the block, which stays the width of the column, so it still falls midway between
+     the two columns rather than moving in against the words with the table. */
   const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
     <div class="poster-rows is-dense">
-      ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+      <div class="poster-times">
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+      </div>
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
      read out of the file, ראש השנה's two days are a two-column section and יום כיפור's one day

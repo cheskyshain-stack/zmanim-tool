@@ -1045,9 +1045,16 @@ function renderVasikinPoster(poster, settings) {
      do not need and this one does: the rule between יום א' and יום ב' is drawn down the side of
      that box, so with the headings in it the rule ran the whole height of the column and cut
      the two of them apart instead of standing between the two schedules. */
+  /* The rows sit in a box of their own inside the block, which is one more box than the other
+     sheets need and is there for the rule between the two days. On the single sheets the rows
+     square up as a table, which is as wide as its own two columns and no wider; the rule is
+     drawn on the block, which stays the width of the column, so it still falls midway between
+     the two columns rather than moving in against the words with the table. */
   const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
     <div class="poster-rows is-dense">
-      ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+      <div class="poster-times">
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+      </div>
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
      read out of the file, ראש השנה's two days are a two-column section and יום כיפור's one day
