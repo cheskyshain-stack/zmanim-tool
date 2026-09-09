@@ -7142,14 +7142,27 @@ const POSTERS = [
         preferred: y === preferred,
         // The one-page sheet takes one occasion a sheet: it lays the schedules out itself,
         // so a sheet carrying two of them would put those two on it twice.
-        build: () => buildEveryPoster(state, settings, y, {
-          combined: chosenSheets === 'all' ? false : chosenCombined,
-          group: chosenGroup,
-        }),
+        build: () => (chosenSheets === 'all' && chosenScope === 'all'
+          ? buildEveryOnePage(state, settings, y)
+          : buildEveryPoster(state, settings, y, {
+            combined: chosenSheets === 'all' ? false : chosenCombined,
+            // null is every sheet of the year, which is what the whole-year run is.
+            group: chosenScope === 'all' ? null : chosenGroup,
+          })),
       }));
     },
     render: (built, settings, opts) => (chosenSheets === 'all'
-      ? renderOnePagePoster(built, settings)
+      /* A run of gold sheets is those sheets one after another, each drawn the way it is
+         drawn on its own, so nothing about a single one had to change to allow the run.
+         In the run's own wrapper, which is what puts each on its own sheet of paper:
+         .poster-all-item carries break-after: page in print.css, and without it Chrome laid
+         all three on top of each other and the PDF came out one page long. Measured. */
+      ? (built.sheets
+        ? `<div class="poster-all">${built.sheets.map((b) => `<div class="poster-all-item">
+            <p class="poster-all-name no-print"${hebrewLang(b.title)}>${escAttr(b.title)}</p>
+            ${renderOnePagePoster(b, settings)}
+          </div>`).join('')}</div>`
+        : renderOnePagePoster(built, settings))
       : renderAllPosters(built, settings, opts)),
   },
 ];
@@ -7303,6 +7316,39 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
       span: spans.length
         ? { from: Math.min(...spans.map((s) => s.from)), to: Math.max(...spans.map((s) => s.to)) }
         : { from: roshHashana(year - 3761), to: roshHashana(year - 3761) },
+    },
+  };
+}
+
+/** One gold sheet per yom tov, for a run that is the whole year of them.
+ *
+ *  Not one sheet with every occasion on it: the one-page sheet lays a season out in two
+ *  columns and fits the type to what is left, and three seasons will not go on one page at any
+ *  size worth reading. So each yom tov is built exactly as it is built on its own, and the run
+ *  is those sheets one after another. fitOnePage already walks every one of them on the page,
+ *  so each is fitted to its own year's worth of blocks.
+ *
+ *  An occasion with nothing behind it yet is passed over rather than printed empty. */
+function buildEveryOnePage(state, settings, year) {
+  const sheets = [];
+  for (const g of posterGroups(year, settings)) {
+    if (!g.name || !g.items.length) continue;
+    const one = buildEveryPoster(state, settings, year, { combined: false, group: g.name });
+    if (one.poster) sheets.push(one.poster);
+  }
+  if (!sheets.length) return { missing: 'Nothing to build for this year.' };
+  const spans = sheets.map((b) => b.span).filter(Boolean);
+  return {
+    poster: {
+      hebrewYear: year,
+      // What the run is called where a single sheet would be named. Each sheet inside it keeps
+      // its own yom tov's title, which is what a person reads off the paper.
+      title: ONEPAGE_TEXT.title,
+      sheets,
+      span: {
+        from: Math.min(...spans.map((x) => x.from)),
+        to: Math.max(...spans.map((x) => x.to)),
+      },
     },
   };
 }
@@ -8730,6 +8776,7 @@ function recallBar() {
     // Snapped to a step and held inside the ends, so a hand-edited value cannot put the
     // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
+    if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
     if (Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
       chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
@@ -8747,7 +8794,7 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
-      margin: chosenMargin, ink: chosenInk,
+      margin: chosenMargin, ink: chosenInk, scope: chosenScope,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -8808,6 +8855,18 @@ let chosenMargin = OP_PAD;
  *
  * Remembered with the rest of the bar, so a shul that prints in black and white stays there. */
 let chosenInk = 'colour';
+/* Whether the run is one yom tov or the whole year of them.
+ *
+ * Asked for: ראש השנה, יום כיפור and סוכות printed in one go rather than three trips to the
+ * Print button. It only means anything to a run, so the switch is off the bar when a single
+ * sheet is showing, and while it is on the whole year the yom tov picker decides nothing and
+ * comes off with it: a picker that changes nothing is a control that lies about what is there,
+ * which is the rule the rest of this bar already keeps.
+ *
+ * On the one-page sheet it is one gold sheet per yom tov rather than one sheet with all of
+ * them on it: that sheet lays a season out in two columns and three seasons will not go on it.
+ * See buildEveryOnePage. */
+let chosenScope = 'one';
 // Which chart to read when two saved ones cover the same שבת שובה and disagree. Only ever
 // looked at in that case, which is why it is not part of the source id.
 let conflictPick = 0;
@@ -8962,7 +9021,11 @@ function renderPosters(container, state, routeChanged, tables) {
      line above resolves to the first occasion for the picker's sake; the run read the null and
      built every sheet of the year under it. */
   if (group) chosenGroup = group.name;
-  const items = group ? group.items : [];
+  /* The whole year of them, or the one showing. Everything below reads `items`, so the
+     switches, the Print button and the "nothing here yet" message all answer for what is
+     actually in the run rather than for the occasion the picker happens to be on. */
+  const scopeAll = chosenSheets !== 'one' && chosenScope === 'all';
+  const items = scopeAll ? groups.flatMap((g) => g.items) : (group ? group.items : []);
   // An occasion nobody has given times for yet. Everything past the picker is left off: a
   // Sheets switch over nothing, or a Print button that would hand over a blank page, is a
   // control that lies about what is there.
@@ -9026,7 +9089,7 @@ function renderPosters(container, state, routeChanged, tables) {
            printing", and the year already answers it this way. A dropdown alone made you open
            a menu of nine and read it to move one occasion, and there are only ever a few
            between the one showing and the one wanted. -->
-      <div class="poster-year">
+      ${scopeAll ? '' : `<div class="poster-year">
         <span class="poster-year-label" id="poster-group-label">Yom tov</span>
         <div class="poster-year-step">
           <button type="button" id="poster-group-back" aria-label="The yom tov before"
@@ -9044,7 +9107,13 @@ function renderPosters(container, state, routeChanged, tables) {
             aria-label="The yom tov on now"
             ${group && current.name === group.name ? 'disabled' : ''}>Current</button>` : ''}
         </div>
-      </div>
+      </div>`}
+      <!-- One yom tov or the whole year of them. Only over a run: on a single sheet there is
+           nothing for it to decide, and it is the picker above that says which sheet. -->
+      ${chosenSheets !== 'one' ? `<div class="poster-bar-switch">${switchHtml('poster-scope', 'Yom tovim', [
+        { value: 'one', label: 'Just this one', on: !scopeAll },
+        { value: 'all', label: 'All of them', on: scopeAll },
+      ])}</div>` : ''}
       ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
         { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
         { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
@@ -9188,6 +9257,12 @@ function renderPosters(container, state, routeChanged, tables) {
     chosenOrientation = value;
     rememberBar();
     onRoute?.();
+    again();
+  });
+  wireSwitch(container, 'poster-scope', (value) => {
+    chosenScope = value === 'all' ? 'all' : 'one';
+    conflictPick = 0;
+    rememberBar();
     again();
   });
   wireSwitch(container, 'poster-ink', (value) => {
