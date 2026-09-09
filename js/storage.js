@@ -198,8 +198,22 @@ function normalizeSheets(sheets) {
   return Array.isArray(sheets) ? sheets : [];
 }
 
+/** The sheets the shul has written itself (see posters/own.js), which live here with
+ *  everything else and so travel with an export like everything else.
+ *
+ *  Anything without an id is dropped: a sheet is found by its id from the Posters tab's own
+ *  address, and one without it could be picked but never come back to. */
+function normalizeOwn(own) {
+  return (Array.isArray(own) ? own : []).filter((s) => s && s.id).map((s) => ({
+    ...s,
+    blocks: (Array.isArray(s.blocks) ? s.blocks : []).map((b) => ({
+      ...b, rows: Array.isArray(b.rows) ? b.rows : [],
+    })),
+  }));
+}
+
 function defaultState() {
-  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {} });
+  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {}, own: [] });
 }
 
 export function loadState() {
@@ -212,6 +226,7 @@ export function loadState() {
       sheets: normalizeSheets(parsed.sheets || []),
       rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
       seeded: parsed.seeded || {},
+      own: normalizeOwn(parsed.own),
     });
   } catch (e) {
     console.error('Failed to load saved state, starting fresh.', e);

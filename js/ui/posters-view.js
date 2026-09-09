@@ -25,6 +25,9 @@ import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
 import { buildVasikinPoster, VS_TEXT } from '../posters/vasikin.js';
+import { buildOwnPoster } from '../posters/own.js';
+import { renderOwnEditor, newOwnSheet } from './own-view.js';
+import { saveState } from '../storage.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -465,14 +468,49 @@ const POSTERS = [
  *
  *  A poster that cannot say when it starts keeps its place in the table rather than being
  *  dropped or thrown to the end. */
-function postersByDate(year, settings) {
+/** The sheets the shul has written itself, as entries of the same shape as the ones above.
+ *
+ *  Written here rather than in the table because they are not a list this program knows: they
+ *  come out of the state and change while the tab is open. Everything else about them is the
+ *  same, which is the point: they sort into the year by date, they sit under an occasion in
+ *  the picker, they print with the run, and the tab below does not know the difference.
+ *
+ *  They are drawn on the one-page sheet, the gold one with the ruled blocks, because that is
+ *  the sheet this was asked for: it is the one that takes a list of blocks of any shape and
+ *  fits them to the page. See buildOwnPoster, which hands over the blocks already cut. */
+function ownPosters(state) {
+  return (state?.own || []).filter((s) => s && s.id).map((sheet) => ({
+    key: `own:${sheet.id}`,
+    label: sheet.name || 'Untitled sheet',
+    group: sheet.group || POSTER_GROUP_DEFAULT,
+    // What the tab hangs the editor off. Nothing else reads it.
+    own: sheet,
+    covers: (y) => `${sheet.name || 'Untitled sheet'} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildOwnPoster(sheet, y, settings)?.span.from ?? null,
+    sources: (st, settings) => {
+      const { years, preferred } = posterYears(st);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildOwnPoster(sheet, y, settings) }),
+      }));
+    },
+    render: renderOnePagePoster,
+  }));
+}
+
+function postersByDate(year, settings, state) {
+  const all = [...POSTERS, ...ownPosters(state)];
   const at = new Map();
-  POSTERS.forEach((p, i) => {
+  all.forEach((p, i) => {
     let from = null;
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  const sorted = [...POSTERS].sort((a, b) => {
+  const sorted = [...all].sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
@@ -520,10 +558,10 @@ const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
  *  handed in is already in date order, so the order the names are first seen is the order the
  *  days come. All of them belongs to no yom tov and sits on its own at the end, outside any
  *  heading, which is where a group of one would look like a mistake. */
-function posterGroups(year, settings) {
+function posterGroups(year, settings, state) {
   const byName = new Map();
   const loose = [];
-  const sorted = postersByDate(year, settings);
+  const sorted = postersByDate(year, settings, state);
   for (const p of sorted) {
     if (p.last) { loose.push(p); continue; }
     const name = p.group || POSTER_GROUP_DEFAULT;
@@ -557,7 +595,7 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
   const items = [];
   const missing = [];
   const left = [];
-  for (const p of postersByDate(year, settings)) {
+  for (const p of postersByDate(year, settings, state)) {
     if (p.last) continue;
     /* Only the occasion showing in the picker. "All of them" used to mean every sheet of the
        year whichever yom tov was chosen, so picking סוכות and asking for a sheet each handed
@@ -615,7 +653,7 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
  *  An occasion with nothing behind it yet is passed over rather than printed empty. */
 function buildEveryOnePage(state, settings, year) {
   const sheets = [];
-  for (const g of posterGroups(year, settings)) {
+  for (const g of posterGroups(year, settings, state)) {
     if (!g.name || !g.items.length) continue;
     const one = buildEveryPoster(state, settings, year, { combined: false, group: g.name });
     if (one.poster) sheets.push(one.poster);
@@ -1674,17 +1712,31 @@ function renderOnePagePoster(built, settings) {
    * a year where ר"ה is on Thursday שבת שובה is 3 תשרי and the fast is נדחה to the 4th, and the
    * two change places; this follows them. Neither on the sheet, which a group filter can do,
    * and it stays with the סליחות block it came off. */
-  const keys = built.items.map((it) => it.key);
+  /* A sheet the shul wrote itself arrives with its blocks already cut, because there are no
+     other sheets under it to cut them out of: it is one schedule typed on the Posters tab
+     rather than a season's worth of posters gathered onto one page. Everything past this
+     point is the same for both, which is the whole reason it draws on this sheet at all.
+     See posters/own.js. */
+  const own = built.own === true && Array.isArray(built.sections);
+  const items = own ? [] : built.items;
+  const keys = items.map((it) => it.key);
   const at = (k) => keys.lastIndexOf(k);
   const afterKey = ['tzomgedalia', 'shuva'].filter((k) => at(k) >= 0)
     .sort((a, b) => at(b) - at(a))[0] || 'slichos';
-  const moved = (built.items.find((it) => it.key === 'slichos')?.poster.rows || [])
+  const moved = (items.find((it) => it.key === 'slichos')?.poster.rows || [])
     .filter((r) => SLICHOS_MOVED.includes(r.label));
 
-  const sections = [];
-  for (const it of built.items) {
+  const sections = own ? [...built.sections] : [];
+  for (const it of items) {
     const cut = ONEPAGE_SECTIONS[it.key];
     if (cut) sections.push(...cut(it.poster));
+    /* A sheet the shul wrote itself is not cut out of anything: its blocks are the blocks.
+       Without this it was quietly missing from the whole-occasion sheet, since there is no
+       entry in the table above under its key and there never will be.
+       On the flag rather than on having a `sections` array: the ותיקין poster has one too and
+       means something else by it, a list of days rather than a list of blocks, and reading it
+       as blocks took the whole sheet down with "rows is undefined". */
+    else if (it.poster.own === true) sections.push(...(it.poster.sections || []));
     // The block takes the line's own name as its heading, and the row under it is called by
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
     if (it.key === afterKey) {
@@ -1699,8 +1751,8 @@ function renderOnePagePoster(built, settings) {
      under itself. A line is kept only where no other line already covers it. Asked of the
      lines rather than of the times, so the wording stays where it is written and this does
      not become a second place that has to say what a star means. */
-  const lines = [];
-  for (const it of built.items) for (const l of it.poster.legend || []) lines.push(l);
+  const lines = own ? [...(built.legend || [])] : [];
+  for (const it of items) for (const l of it.poster.legend || []) lines.push(l);
   const legend = lines.filter((l, i) =>
     !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
     // Two identical lines: keep the first.
@@ -1725,7 +1777,7 @@ function renderOnePagePoster(built, settings) {
       <div class="onepage-col"></div>
     </div>`;
   return posterShell(settings, body, legend, { onepage: true, chartHead: true })
-    + (built.notBuilt.length
+    + ((built.notBuilt || []).length
       ? `<p class="hint no-print">Not on this sheet, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : '');
 }
@@ -2057,6 +2109,15 @@ export function setPosterRoute(parts = []) {
   // and which way up, and everything it does not say is left as it was left.
   recallBar();
   const [key, orient] = parts;
+  // A sheet of your own is not in the table, so it is recognised by its key. Which occasion
+  // it sits under is not in the address either, and is whatever was remembered.
+  if (String(key).startsWith('own:')) {
+    chosenSheets = 'one';
+    chosen = key;
+    conflictPick = 0;
+    rememberBar();
+    return;
+  }
   const poster = POSTERS.find((p) => p.key === key);
   if (poster?.last) {
     // A link to the whole set says only that, not which of the two ways of laying it out, so
@@ -2337,7 +2398,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   /* Each occasion keeps the day its last sheet opens on as well as its sheets. The list is
      rebuilt here in the picker's own order rather than the year's, and dropping that day was
      what left the Current button with nothing to go back to. */
-  const drawn = new Map(posterGroups(year, settings).filter((g) => g.name).map((g) => [g.name, g]));
+  const drawn = new Map(posterGroups(year, settings, state).filter((g) => g.name).map((g) => [g.name, g]));
   const groups = [
     ...POSTER_OCCASIONS.map((name) => ({
       name, items: drawn.get(name)?.items || [], lastStart: drawn.get(name)?.lastStart ?? null,
@@ -2532,9 +2593,17 @@ export function renderPosters(container, state, routeChanged, tables) {
       : ''}
     ${empty
       ? `<p class="hint no-print">Nothing is drawn for <bdi${hebrewLang(group.name)}>${escAttr(group.name)}</bdi> yet. It is in the list so the whole year is in one place; the sheets follow once the shul's times for it are in, and then this fills in on its own the way <bdi${hebrewLang(POSTER_GROUP_DEFAULT)}>${escAttr(POSTER_GROUP_DEFAULT)}</bdi> does.</p>`
-      : built
-        ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-        : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
+      : ''}
+    <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
+         without redrawing the panel the caret is in. -->
+    <div id="poster-sheet">${!empty && built
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
+      : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
+    ${!showAll ? `<div class="poster-own-bar no-print">
+      ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}
+      <span class="hint">A sheet of your own is typed here and prints on this same page. Its blocks are dated by the Hebrew date, so it comes back every year, and a line can hang off a זמן instead of being typed.</span>
+    </div>
+    <div id="poster-own"></div>` : ''}`;
 
   const again = () => redrawInPlace(container, state);
   // A year either side, and no further: the buttons at the ends are disabled rather than
@@ -2645,6 +2714,56 @@ export function renderPosters(container, state, routeChanged, tables) {
     conflictPick = Number(e.target.value) || 0;
     again();
   });
+  /* A sheet of your own: the button that starts one, and the panel that writes it.
+     The new sheet is put under the occasion the picker is on, which is the answer nine times
+     out of ten and is a select on the panel when it is not. */
+  container.querySelector('#poster-own-new')?.addEventListener('click', () => {
+    const sheet = newOwnSheet(group?.name || POSTER_GROUP_DEFAULT);
+    state.own = [...(state.own || []), sheet];
+    saveState(state);
+    chosenSheets = 'one';
+    chosen = `own:${sheet.id}`;
+    chosenGroup = sheet.group;
+    rememberBar();
+    onRoute?.();
+    again();
+  });
+  if (poster?.own && container.querySelector('#poster-own')) {
+    /* The paper on its own, without the panel around it. Typing a name or a time is a change
+       to the sheet and not to the tab: a full redraw would take the caret out of the box mid
+       word, which is exactly what the soft path is here to avoid. The two lines above the
+       sheet name it as well, so they are written again from the same call. */
+    const drawSheet = () => {
+      const holder = container.querySelector('#poster-sheet');
+      const src = poster.sources(state, settings).find((s) => s.year === year);
+      const now = src ? src.build().poster : null;
+      holder.innerHTML = now ? poster.render(now, settings) : '';
+      const what = container.querySelector('.poster-when-what');
+      if (what && now) {
+        what.textContent = poster.covers(year);
+        const w = poster.when(now);
+        container.querySelector('.poster-when-he').textContent = w.he;
+        container.querySelector('.poster-when-en').textContent = w.en;
+      }
+      layoutPosters(container);
+    };
+    renderOwnEditor(container.querySelector('#poster-own'), poster.own, POSTER_OCCASIONS, {
+      onChange: (hard) => {
+        saveState(state);
+        if (hard) again(); else drawSheet();
+      },
+      onDelete: () => {
+        state.own = (state.own || []).filter((s) => s.id !== poster.own.id);
+        saveState(state);
+        // Back to whatever the occasion's first sheet is, which is where the picker would
+        // have opened if this sheet had never been written.
+        chosen = null;
+        rememberBar();
+        onRoute?.();
+        again();
+      },
+    });
+  }
   if (built) {
     /* Every sheet on this tab prints on portrait paper, the landscape ones included: they
        go on it turned a quarter turn, which is what the run has always done with them and

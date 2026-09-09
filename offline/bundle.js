@@ -614,8 +614,22 @@ function normalizeSheets(sheets) {
   return Array.isArray(sheets) ? sheets : [];
 }
 
+/** The sheets the shul has written itself (see posters/own.js), which live here with
+ *  everything else and so travel with an export like everything else.
+ *
+ *  Anything without an id is dropped: a sheet is found by its id from the Posters tab's own
+ *  address, and one without it could be picked but never come back to. */
+function normalizeOwn(own) {
+  return (Array.isArray(own) ? own : []).filter((s) => s && s.id).map((s) => ({
+    ...s,
+    blocks: (Array.isArray(s.blocks) ? s.blocks : []).map((b) => ({
+      ...b, rows: Array.isArray(b.rows) ? b.rows : [],
+    })),
+  }));
+}
+
 function defaultState() {
-  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {} });
+  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {}, own: [] });
 }
 
 function loadState() {
@@ -628,6 +642,7 @@ function loadState() {
       sheets: normalizeSheets(parsed.sheets || []),
       rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
       seeded: parsed.seeded || {},
+      own: normalizeOwn(parsed.own),
     });
   } catch (e) {
     console.error('Failed to load saved state, starting fresh.', e);
@@ -5113,6 +5128,183 @@ function unlockNav() {
   navIsUnlocked = true;
 }
 
+// ==== posters/own.js ====
+// A sheet the shul writes itself.
+//
+// Every other sheet in this folder is an occasion someone here has written code for: its
+// blocks, its rows and its times are all worked out from the workbook's rules. That covers
+// the yomim noraim and פסח and nothing else, so a chart for חנוכה or פורים meant somebody
+// writing another one of these files.
+//
+// This is the same sheet with the writing left to the shul. A sheet is a list of blocks, a
+// block is a day and a list of rows, and a row is a name and its times. That is exactly the
+// shape the one-page chart already draws (see ONEPAGE_SECTIONS in ui/posters-view.js), so a
+// sheet typed here comes out on the same paper, in the same two columns, at the same fitted
+// size, with the same key at its foot.
+//
+// Two things are chosen rather than typed, and both are why this is worth having:
+//
+//  - A block is dated by its Hebrew date, not by a date in a year. So the sheet is not for
+//    תשפ"ז, it is for חנוכה: step the year on the Posters tab and every block moves to that
+//    year's day by itself.
+//  - A row's time can hang off a זמן instead of being typed. "20 minutes before שקיעה" is
+//    worked out for that block's day, off the same calls the boards are made of, so it is
+//    right in a year nobody has looked at yet.
+//
+// Nothing here is a second reckoning of anything: the זמנים are zmanim/zmanim.js, which is
+// the workbook, and the times are written in the notation the charts already use.
+
+
+
+
+/** The months, as the Hebrew date counts them: Nisan is 1, the way rules count them too.
+ *  Both Adars are offered; a plain year has neither and takes אדר. */
+const OWN_MONTHS = JEWISH_MONTHS_HE.map((name, i) => ({ value: i + 1, name }));
+
+/** The זמנים a row can be hung off.
+ *
+ *  Every one of them is a call in zmanim/zmanim.js, which is the workbook's own formula
+ *  under the workbook's own name, and every one reads the same Settings the boards read: the
+ *  shul's latitude and longitude, its horizon, its elevation toggle. So a row here and the
+ *  same זמן on the chart cannot come out a minute apart.
+ *
+ *  A short list on purpose. These are the זמנים the shul's own sheets are built out of; the
+ *  ones that are not here are the ones no sheet has ever asked for. */
+const OWN_ZMANIM = [
+  { key: 'alos72', label: 'עלות (72 דקות)', at: (d, s) => Z.alos72(d, s) },
+  { key: 'alos161', label: 'עלות (16.1°)', at: (d, s) => Z.alos16_1(d, s) },
+  { key: 'misheyakir', label: 'משיכיר (10.2°)', at: (d, s) => Z.misheyakir10_2(d, s) },
+  { key: 'netz', label: 'נץ', at: (d, s) => Z.sunriseElev(d, s) },
+  { key: 'shmaMga', label: 'סוף זמן ק"ש מ"א', at: (d, s) => Z.sofZmanShmaMGA72(d, s) },
+  { key: 'shmaGra', label: 'סוף זמן ק"ש גר"א', at: (d, s) => Z.sofZmanShmaGRA(d, s) },
+  { key: 'tfilaGra', label: 'סוף זמן תפילה גר"א', at: (d, s) => Z.sofZmanTfilaGRA(d, s) },
+  { key: 'chatzos', label: 'חצות', at: (d, s) => Z.solarNoon(d, s) },
+  { key: 'minchaGedola', label: 'מנחה גדולה', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
+  { key: 'minchaKetana', label: 'מנחה קטנה', at: (d, s) => Z.minchaKetana(d, s) },
+  { key: 'plag', label: 'פלג המנחה', at: (d, s) => Z.plagHamincha(d, s) },
+  { key: 'shkia', label: 'שקיעה', at: (d, s) => Z.sunsetElev(d, s) },
+  // The shul's own candle lighting, which is the Settings number and not a fixed 18.
+  { key: 'candles', label: 'הדלקת נרות', at: (d, s) => Z.sunsetElev(d, s) - (s.candleLightingMinutes ?? 18) / 1440 },
+  { key: 'tzais50', label: 'צאת הכוכבים (50 דקות)', at: (d, s) => Z.tzais50(d, s) },
+  { key: 'tzais72', label: 'צאת הכוכבים (72 דקות)', at: (d, s) => Z.tzais72(d, s) },
+];
+
+/** What to do with the seconds. A מנין is announced on a whole minute, and which way it is
+ *  taken is a question about what the line is: a זמן that runs out is taken down, a זמן that
+ *  starts is taken up, and a מנין set beside one is taken to the nearest. Down to the last
+ *  five and up to the next five are here because that is how the boards write a מנחה. */
+const OWN_ROUNDING = [
+  { key: 'near', label: 'To the nearest minute', apply: (t) => roundToMinute(t) },
+  { key: 'down', label: 'Down to the minute', apply: (t) => floorToMinute(t) },
+  { key: 'up', label: 'Up to the minute', apply: (t) => ceilToMinute(t) },
+  { key: 'down5', label: 'Down to the last 5 minutes', apply: (t) => Math.floor(t * 288) / 288 },
+  { key: 'up5', label: 'Up to the next 5 minutes', apply: (t) => Math.ceil(t * 288) / 288 },
+];
+
+/** The names a row is likely to want, so a sheet is picked rather than spelled. Anything not
+ *  here is typed instead: the list is a shortcut, not a fence. Off the shul's own sheets. */
+const OWN_LABELS = [
+  'שחרית', 'מנחה', 'מעריב', 'סליחות', 'מוסף', 'נעילה', 'כל נדרי',
+  'עלות', 'נץ', 'זמן טלית', 'המלך', 'ס"ז ק"ש', 'ט\' שעות', 'חצות',
+  'הדלקת נרות', 'שקיעה', 'צאת הכוכבים', 'קידוש לבנה',
+  'דרשה', 'יזכור', 'תקיעת שופר', 'קריאת המגילה', 'הדלקת נר חנוכה', 'אבות ובנים',
+];
+
+/** And the same for a block's heading. */
+const OWN_HEADINGS = [
+  'ערב יום טוב', 'יום א\'', 'יום ב\'', 'ערב שבת', 'שבת', 'חול המועד',
+  'ערב ראש חודש', 'ראש חודש', 'מוצאי יום טוב', 'זמני היום', 'כל השנה',
+];
+
+/** A blank sheet, and a blank block and row for it, so the editor and an import agree on
+ *  what one of these looks like. */
+const ownBlankRow = () => ({ label: OWN_LABELS[0], mode: 'typed', text: '', zman: 'shkia', offset: -15, round: 'near' });
+const ownBlankBlock = () => ({ heading: OWN_HEADINGS[0], month: 9, day: 25, rows: [ownBlankRow()] });
+
+/** The day a block falls on in one year.
+ *
+ *  A Hebrew date is a month and a day and holds for every year, which is the point of dating
+ *  a block this way: the sheet is for חנוכה rather than for חנוכה תשפ"ז. */
+function ownBlockSerial(block, year) {
+  const month = Number(block?.month) || 1;
+  const day = Math.min(30, Math.max(1, Number(block?.day) || 1));
+  return dateFromHebrew(day, month, year);
+}
+
+/** One row's times.
+ *
+ *  Typed, it is read with the charts' own notation: <u> for למטה, a trailing * for בעזרת
+ *  נשים, ** for באולם השמחות, commas between מנינים. Off a זמן, it is that זמן for this
+ *  block's day, moved by the minutes given and taken to a whole minute the way the row says.
+ *
+ *  A row that names a זמן this file does not have is empty rather than broken: an import from
+ *  a later version of the program can carry one, and a line with nothing in it is a great
+ *  deal better than a sheet that will not draw. */
+function ownRowTimes(row, serial, settings) {
+  if (!row) return [];
+  if (row.mode !== 'zman') return parseTimes(row.text);
+  const zman = OWN_ZMANIM.find((z) => z.key === row.zman);
+  if (!zman) return [];
+  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const at = zman.at(dateFromSerial(serial), settings) + (Number(row.offset) || 0) / 1440;
+  return [{ text: formatTime(round.apply(at)), underlined: Boolean(row.underlined), mark: row.mark || '' }];
+}
+
+/** What a row off a זמן says it is, in words, for the editor and for the Calculations page:
+ *  "20 minutes before שקיעה, down to the last 5 minutes". */
+function ownRuleText(row) {
+  const zman = OWN_ZMANIM.find((z) => z.key === row.zman);
+  if (!zman) return '';
+  const mins = Number(row.offset) || 0;
+  const when = mins === 0 ? 'at' : `${Math.abs(mins)} minutes ${mins < 0 ? 'before' : 'after'}`;
+  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  return `${when} ${zman.label}, ${round.label.toLowerCase()}`;
+}
+
+/** The sheet, built for one year.
+ *
+ *  Everything the one-page chart needs and nothing else: the blocks in the order they were
+ *  typed, each with the day it falls on this year, and the key at the foot worked out from
+ *  the marks that are actually on it, the same way every other sheet here does it.
+ *
+ *  In the order they were typed rather than in date order. The shul knows what belongs where
+ *  on its own sheet, and a block with no times in it yet has a day like any other and would
+ *  jump around the page as it was filled in. */
+function buildOwnPoster(sheet, year, settings) {
+  if (!sheet || !year) return null;
+  const blocks = (sheet.blocks || []).map((b) => {
+    const serial = ownBlockSerial(b, year);
+    return {
+      serial,
+      title: b.heading || '',
+      rows: (b.rows || []).map((r) => ({ label: r.label || '', times: ownRowTimes(r, serial, settings) })),
+    };
+  });
+  if (!blocks.length) return null;
+  const all = blocks.flatMap((b) => b.rows.flatMap((r) => r.times));
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  const days = blocks.map((b) => b.serial);
+  return {
+    hebrewYear: year,
+    own: true,
+    title: sheet.name || '',
+    // The days it speaks for: the first of its blocks through the last, whichever way round
+    // they were typed.
+    span: { from: Math.min(...days), to: Math.max(...days) },
+    sections: blocks.map((b) => ({ title: b.title, rows: b.rows })),
+    // Same two lines, in the same order, on the same reasoning as every other sheet: see
+    // buildSlichosPoster. The underline line is an English sentence with Hebrew in it and is
+    // set left to right; the star line is Hebrew and is set right to left.
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
 // ==== posters/pair.js ====
 // ראש השנה and יום כיפור on one sheet.
 //
@@ -5723,6 +5915,199 @@ function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
   };
   const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
   return posterFromCell(week, row.C);
+}
+
+// ==== ui/own-view.js ====
+// The editor for a sheet the shul writes itself. See posters/own.js for what a sheet is.
+//
+// Pickers rather than a page of empty boxes, which is what was asked for: the block's day,
+// its heading, every row's name, and the זמן a row hangs off are all chosen from a list, and
+// anything the list has not got is typed instead. Nothing here is free text that has to be
+// spelled a particular way to work.
+//
+// It writes straight into the sheet in state and hands back to the Posters tab, which redraws
+// the paper underneath: the chart on screen is the sheet as it will print, at every keystroke,
+// so there is nothing to preview and nothing to save.
+
+
+
+/** A fresh sheet, under the occasion the picker is on. */
+function newOwnSheet(group) {
+  return { id: newId('own'), name: group || '', group, blocks: [ownBlankBlock()] };
+}
+
+/** A select whose list is a set of words, with "Other" at the foot for anything else.
+ *
+ *  Two controls in one: the list, and a box that appears beside it holding whatever was
+ *  typed. The box is not hidden when the value is off the list, which is the whole point of
+ *  it: a sheet imported from another shul, or a name typed once and picked again later, has
+ *  to be editable without being retyped. */
+function wordPicker(cls, value, words, placeholder) {
+  const known = words.includes(value);
+  return `<span class="own-word">
+      <select class="${cls}-pick" aria-label="${escText(placeholder)}">
+        ${words.map((w) => `<option value="${escText(w)}" ${known && w === value ? 'selected' : ''}>${escText(w)}</option>`).join('')}
+        <option value="" ${known ? '' : 'selected'}>Something else…</option>
+      </select>
+      <input class="${cls}-text" value="${escText(value)}" placeholder="${escText(placeholder)}"
+        ${known ? 'hidden' : ''} aria-label="${escText(placeholder)}">
+    </span>`;
+}
+
+/** One row: its name, then either what to type or what to hang it off. */
+function rowHtml(row, bi, ri) {
+  const zman = row.mode === 'zman';
+  return `<div class="own-row" data-block="${bi}" data-row="${ri}">
+      ${wordPicker('own-label', row.label || '', OWN_LABELS, 'Name of the line')}
+      <select class="own-mode" aria-label="Where the time comes from">
+        <option value="typed" ${zman ? '' : 'selected'}>Times I type</option>
+        <option value="zman" ${zman ? 'selected' : ''}>Off a זמן</option>
+      </select>
+      <input class="own-text" value="${escText(row.text || '')}" ${zman ? 'hidden' : ''}
+        placeholder="7:00, 7:20*, &lt;u&gt;7:35&lt;/u&gt;" aria-label="The times">
+      <span class="own-rule" ${zman ? '' : 'hidden'}>
+        <input class="own-offset" type="number" step="1" value="${Number(row.offset) || 0}" aria-label="Minutes">
+        <select class="own-side" aria-label="Before or after">
+          <option value="before" ${(Number(row.offset) || 0) <= 0 ? 'selected' : ''}>minutes before</option>
+          <option value="after" ${(Number(row.offset) || 0) > 0 ? 'selected' : ''}>minutes after</option>
+        </select>
+        <select class="own-zman" aria-label="Which זמן">
+          ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escText(z.label)}</option>`).join('')}
+        </select>
+        <select class="own-round" aria-label="Rounding">
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escText(r.label)}</option>`).join('')}
+        </select>
+      </span>
+      <button type="button" class="own-del-row" title="Take this line off">&times;</button>
+    </div>`;
+}
+
+/** One block: the day it is, what it is called, and its lines. */
+function blockHtml(block, bi) {
+  return `<fieldset class="own-block" data-block="${bi}">
+      <legend>Block ${bi + 1}</legend>
+      <div class="own-block-head">
+        ${wordPicker('own-head', block.heading || '', OWN_HEADINGS, 'Heading over the block')}
+        <span class="own-date">
+          <select class="own-day" aria-label="Day of the month">
+            ${Array.from({ length: 30 }, (_, i) => i + 1).map((d) =>
+              `<option value="${d}" ${Number(block.day) === d ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+          <select class="own-month" aria-label="Month">
+            ${OWN_MONTHS.map((m) => `<option value="${m.value}" ${Number(block.month) === m.value ? 'selected' : ''}>${escText(m.name)}</option>`).join('')}
+          </select>
+        </span>
+        <button type="button" class="own-del-block" title="Take this block off">Remove block</button>
+      </div>
+      <div class="own-rows">${(block.rows || []).map((r, ri) => rowHtml(r, bi, ri)).join('')}</div>
+      <div class="own-block-foot">
+        <button type="button" class="own-add-row">+ Add a line</button>
+        <span class="hint own-when"></span>
+      </div>
+    </fieldset>`;
+}
+
+/** The editor for one sheet.
+ *
+ *  `onChange` saves and redraws the paper. `onDelete` takes the whole sheet away. Both are
+ *  the Posters tab's, because this panel knows about a sheet and not about the tab it is on.
+ */
+function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
+  container.innerHTML = `
+    <details class="own-editor panel no-print" open>
+      <summary>Writing this sheet</summary>
+      <p class="hint">A block is a day and its lines. The day is a Hebrew date, so the sheet is for the occasion and not for one year: step the year above and every block moves with it. A line's times are either typed the way a chart writes them (commas between מנינים, <code>*</code> for בעזרת נשים, <code>&lt;u&gt;</code> for למטה) or hung off a זמן, which is worked out from the same calculations the boards use.</p>
+      <div class="own-top">
+        <label>What the sheet is called<input class="own-name" value="${escText(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
+        <label>Where it sits in the year<select class="own-group">
+          ${occasions.map((o) => `<option value="${escText(o)}" ${sheet.group === o ? 'selected' : ''}>${escText(o)}</option>`).join('')}
+        </select></label>
+      </div>
+      <div class="own-blocks">${(sheet.blocks || []).map(blockHtml).join('')}</div>
+      <div class="actions">
+        <button type="button" class="own-add-block btn-primary">+ Add a block</button>
+        <button type="button" class="own-delete secondary-btn">Delete this sheet</button>
+      </div>
+    </details>`;
+
+  const at = (el) => {
+    const b = Number(el.closest('.own-block').dataset.block);
+    const rowEl = el.closest('.own-row');
+    return { block: sheet.blocks[b], row: rowEl ? sheet.blocks[b].rows[Number(rowEl.dataset.row)] : null };
+  };
+  /* Two ways back from a change. `soft` writes the value and redraws the paper, leaving this
+     panel exactly as it is, which is what typing into a box needs: a redraw of the editor
+     would take the caret with it. `hard` redraws the panel too, for the changes that alter
+     what controls are on it. */
+  const soft = () => { refreshWhen(); onChange(false); };
+  const hard = () => onChange(true);
+
+  /* What each block's rule rows come to, said in words under the block. It is the one thing
+     on this panel that is not a control: a row reading "20 minutes before שקיעה" is easy to
+     get the wrong way round, and the sheet beside it only shows the answer.
+     Written again on every change, including the ones that leave the panel standing: minutes
+     are typed into a box, which is a soft change, and this line saying 15 while the box said
+     20 would be worse than not having it. */
+  const refreshWhen = () => {
+    container.querySelectorAll('.own-block').forEach((el, bi) => {
+      const rules = (sheet.blocks[bi]?.rows || []).filter((r) => r.mode === 'zman');
+      el.querySelector('.own-when').textContent = rules.length
+        ? rules.map((r) => `${r.label}: ${ownRuleText(r)}`).join(' · ') : '';
+    });
+  };
+
+  const on = (sel, event, fn) => container.querySelectorAll(sel).forEach((el) => el.addEventListener(event, () => fn(el)));
+
+  on('.own-name', 'input', (el) => { sheet.name = el.value; soft(); });
+  on('.own-group', 'change', (el) => { sheet.group = el.value; hard(); });
+
+  // A word picker: choosing a word off the list writes it and hides the box; choosing
+  // "Something else…" opens the box on what is there and puts the caret in it.
+  const wordPair = (pickSel, textSel, write) => {
+    on(pickSel, 'change', (el) => {
+      const box = el.parentElement.querySelector(textSel);
+      if (el.value) { box.value = el.value; box.hidden = true; } else { box.hidden = false; box.focus(); }
+      write(el, box.value);
+      soft();
+    });
+    on(textSel, 'input', (el) => { write(el, el.value); soft(); });
+  };
+  wordPair('.own-head-pick', '.own-head-text', (el, value) => { at(el).block.heading = value; });
+  wordPair('.own-label-pick', '.own-label-text', (el, value) => { at(el).row.label = value; });
+
+  on('.own-day', 'change', (el) => { at(el).block.day = Number(el.value); soft(); });
+  on('.own-month', 'change', (el) => { at(el).block.month = Number(el.value); soft(); });
+  on('.own-mode', 'change', (el) => { at(el).row.mode = el.value; hard(); });
+  on('.own-text', 'input', (el) => { at(el).row.text = el.value; soft(); });
+  on('.own-zman', 'change', (el) => { at(el).row.zman = el.value; soft(); });
+  on('.own-round', 'change', (el) => { at(el).row.round = el.value; soft(); });
+  // The minutes and the side of the זמן are one number here and two controls on screen, which
+  // is the way round that reads: nobody writes "minus twenty minutes before שקיעה".
+  const setOffset = (el) => {
+    const box = el.closest('.own-rule');
+    const mins = Math.abs(Number(box.querySelector('.own-offset').value) || 0);
+    at(el).row.offset = box.querySelector('.own-side').value === 'before' ? -mins : mins;
+    soft();
+  };
+  on('.own-offset', 'input', setOffset);
+  on('.own-side', 'change', setOffset);
+
+  on('.own-add-row', 'click', (el) => { at(el).block.rows.push(ownBlankRow()); hard(); });
+  on('.own-del-row', 'click', (el) => {
+    const b = Number(el.closest('.own-block').dataset.block);
+    sheet.blocks[b].rows.splice(Number(el.closest('.own-row').dataset.row), 1);
+    hard();
+  });
+  on('.own-add-block', 'click', () => { sheet.blocks.push(ownBlankBlock()); hard(); });
+  on('.own-del-block', 'click', (el) => {
+    sheet.blocks.splice(Number(el.closest('.own-block').dataset.block), 1);
+    hard();
+  });
+  on('.own-delete', 'click', () => {
+    if (confirm('Delete this sheet? Everything typed on it goes with it.')) onDelete();
+  });
+
+  refreshWhen();
 }
 
 // ==== ui/print-page.js ====
@@ -6787,6 +7172,9 @@ function wireSwitch(root, name, apply) {
 
 
 
+
+
+
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
  *  change when somebody picks a different font for the board. fontStackFor() adds the
@@ -7220,14 +7608,49 @@ const POSTERS = [
  *
  *  A poster that cannot say when it starts keeps its place in the table rather than being
  *  dropped or thrown to the end. */
-function postersByDate(year, settings) {
+/** The sheets the shul has written itself, as entries of the same shape as the ones above.
+ *
+ *  Written here rather than in the table because they are not a list this program knows: they
+ *  come out of the state and change while the tab is open. Everything else about them is the
+ *  same, which is the point: they sort into the year by date, they sit under an occasion in
+ *  the picker, they print with the run, and the tab below does not know the difference.
+ *
+ *  They are drawn on the one-page sheet, the gold one with the ruled blocks, because that is
+ *  the sheet this was asked for: it is the one that takes a list of blocks of any shape and
+ *  fits them to the page. See buildOwnPoster, which hands over the blocks already cut. */
+function ownPosters(state) {
+  return (state?.own || []).filter((s) => s && s.id).map((sheet) => ({
+    key: `own:${sheet.id}`,
+    label: sheet.name || 'Untitled sheet',
+    group: sheet.group || POSTER_GROUP_DEFAULT,
+    // What the tab hangs the editor off. Nothing else reads it.
+    own: sheet,
+    covers: (y) => `${sheet.name || 'Untitled sheet'} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildOwnPoster(sheet, y, settings)?.span.from ?? null,
+    sources: (st, settings) => {
+      const { years, preferred } = posterYears(st);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildOwnPoster(sheet, y, settings) }),
+      }));
+    },
+    render: renderOnePagePoster,
+  }));
+}
+
+function postersByDate(year, settings, state) {
+  const all = [...POSTERS, ...ownPosters(state)];
   const at = new Map();
-  POSTERS.forEach((p, i) => {
+  all.forEach((p, i) => {
     let from = null;
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  const sorted = [...POSTERS].sort((a, b) => {
+  const sorted = [...all].sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
@@ -7275,10 +7698,10 @@ const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
  *  handed in is already in date order, so the order the names are first seen is the order the
  *  days come. All of them belongs to no yom tov and sits on its own at the end, outside any
  *  heading, which is where a group of one would look like a mistake. */
-function posterGroups(year, settings) {
+function posterGroups(year, settings, state) {
   const byName = new Map();
   const loose = [];
-  const sorted = postersByDate(year, settings);
+  const sorted = postersByDate(year, settings, state);
   for (const p of sorted) {
     if (p.last) { loose.push(p); continue; }
     const name = p.group || POSTER_GROUP_DEFAULT;
@@ -7312,7 +7735,7 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
   const items = [];
   const missing = [];
   const left = [];
-  for (const p of postersByDate(year, settings)) {
+  for (const p of postersByDate(year, settings, state)) {
     if (p.last) continue;
     /* Only the occasion showing in the picker. "All of them" used to mean every sheet of the
        year whichever yom tov was chosen, so picking סוכות and asking for a sheet each handed
@@ -7370,7 +7793,7 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
  *  An occasion with nothing behind it yet is passed over rather than printed empty. */
 function buildEveryOnePage(state, settings, year) {
   const sheets = [];
-  for (const g of posterGroups(year, settings)) {
+  for (const g of posterGroups(year, settings, state)) {
     if (!g.name || !g.items.length) continue;
     const one = buildEveryPoster(state, settings, year, { combined: false, group: g.name });
     if (one.poster) sheets.push(one.poster);
@@ -8429,17 +8852,31 @@ function renderOnePagePoster(built, settings) {
    * a year where ר"ה is on Thursday שבת שובה is 3 תשרי and the fast is נדחה to the 4th, and the
    * two change places; this follows them. Neither on the sheet, which a group filter can do,
    * and it stays with the סליחות block it came off. */
-  const keys = built.items.map((it) => it.key);
+  /* A sheet the shul wrote itself arrives with its blocks already cut, because there are no
+     other sheets under it to cut them out of: it is one schedule typed on the Posters tab
+     rather than a season's worth of posters gathered onto one page. Everything past this
+     point is the same for both, which is the whole reason it draws on this sheet at all.
+     See posters/own.js. */
+  const own = built.own === true && Array.isArray(built.sections);
+  const items = own ? [] : built.items;
+  const keys = items.map((it) => it.key);
   const at = (k) => keys.lastIndexOf(k);
   const afterKey = ['tzomgedalia', 'shuva'].filter((k) => at(k) >= 0)
     .sort((a, b) => at(b) - at(a))[0] || 'slichos';
-  const moved = (built.items.find((it) => it.key === 'slichos')?.poster.rows || [])
+  const moved = (items.find((it) => it.key === 'slichos')?.poster.rows || [])
     .filter((r) => SLICHOS_MOVED.includes(r.label));
 
-  const sections = [];
-  for (const it of built.items) {
+  const sections = own ? [...built.sections] : [];
+  for (const it of items) {
     const cut = ONEPAGE_SECTIONS[it.key];
     if (cut) sections.push(...cut(it.poster));
+    /* A sheet the shul wrote itself is not cut out of anything: its blocks are the blocks.
+       Without this it was quietly missing from the whole-occasion sheet, since there is no
+       entry in the table above under its key and there never will be.
+       On the flag rather than on having a `sections` array: the ותיקין poster has one too and
+       means something else by it, a list of days rather than a list of blocks, and reading it
+       as blocks took the whole sheet down with "rows is undefined". */
+    else if (it.poster.own === true) sections.push(...(it.poster.sections || []));
     // The block takes the line's own name as its heading, and the row under it is called by
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
     if (it.key === afterKey) {
@@ -8454,8 +8891,8 @@ function renderOnePagePoster(built, settings) {
      under itself. A line is kept only where no other line already covers it. Asked of the
      lines rather than of the times, so the wording stays where it is written and this does
      not become a second place that has to say what a star means. */
-  const lines = [];
-  for (const it of built.items) for (const l of it.poster.legend || []) lines.push(l);
+  const lines = own ? [...(built.legend || [])] : [];
+  for (const it of items) for (const l of it.poster.legend || []) lines.push(l);
   const legend = lines.filter((l, i) =>
     !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
     // Two identical lines: keep the first.
@@ -8480,7 +8917,7 @@ function renderOnePagePoster(built, settings) {
       <div class="onepage-col"></div>
     </div>`;
   return posterShell(settings, body, legend, { onepage: true, chartHead: true })
-    + (built.notBuilt.length
+    + ((built.notBuilt || []).length
       ? `<p class="hint no-print">Not on this sheet, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : '');
 }
@@ -8812,6 +9249,15 @@ function setPosterRoute(parts = []) {
   // and which way up, and everything it does not say is left as it was left.
   recallBar();
   const [key, orient] = parts;
+  // A sheet of your own is not in the table, so it is recognised by its key. Which occasion
+  // it sits under is not in the address either, and is whatever was remembered.
+  if (String(key).startsWith('own:')) {
+    chosenSheets = 'one';
+    chosen = key;
+    conflictPick = 0;
+    rememberBar();
+    return;
+  }
   const poster = POSTERS.find((p) => p.key === key);
   if (poster?.last) {
     // A link to the whole set says only that, not which of the two ways of laying it out, so
@@ -9092,7 +9538,7 @@ function renderPosters(container, state, routeChanged, tables) {
   /* Each occasion keeps the day its last sheet opens on as well as its sheets. The list is
      rebuilt here in the picker's own order rather than the year's, and dropping that day was
      what left the Current button with nothing to go back to. */
-  const drawn = new Map(posterGroups(year, settings).filter((g) => g.name).map((g) => [g.name, g]));
+  const drawn = new Map(posterGroups(year, settings, state).filter((g) => g.name).map((g) => [g.name, g]));
   const groups = [
     ...POSTER_OCCASIONS.map((name) => ({
       name, items: drawn.get(name)?.items || [], lastStart: drawn.get(name)?.lastStart ?? null,
@@ -9287,9 +9733,17 @@ function renderPosters(container, state, routeChanged, tables) {
       : ''}
     ${empty
       ? `<p class="hint no-print">Nothing is drawn for <bdi${hebrewLang(group.name)}>${escAttr(group.name)}</bdi> yet. It is in the list so the whole year is in one place; the sheets follow once the shul's times for it are in, and then this fills in on its own the way <bdi${hebrewLang(POSTER_GROUP_DEFAULT)}>${escAttr(POSTER_GROUP_DEFAULT)}</bdi> does.</p>`
-      : built
-        ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-        : `<p class="hint no-print">${escAttr(result.missing || '')}</p>`}`;
+      : ''}
+    <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
+         without redrawing the panel the caret is in. -->
+    <div id="poster-sheet">${!empty && built
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
+      : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
+    ${!showAll ? `<div class="poster-own-bar no-print">
+      ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}
+      <span class="hint">A sheet of your own is typed here and prints on this same page. Its blocks are dated by the Hebrew date, so it comes back every year, and a line can hang off a זמן instead of being typed.</span>
+    </div>
+    <div id="poster-own"></div>` : ''}`;
 
   const again = () => redrawInPlace(container, state);
   // A year either side, and no further: the buttons at the ends are disabled rather than
@@ -9400,6 +9854,56 @@ function renderPosters(container, state, routeChanged, tables) {
     conflictPick = Number(e.target.value) || 0;
     again();
   });
+  /* A sheet of your own: the button that starts one, and the panel that writes it.
+     The new sheet is put under the occasion the picker is on, which is the answer nine times
+     out of ten and is a select on the panel when it is not. */
+  container.querySelector('#poster-own-new')?.addEventListener('click', () => {
+    const sheet = newOwnSheet(group?.name || POSTER_GROUP_DEFAULT);
+    state.own = [...(state.own || []), sheet];
+    saveState(state);
+    chosenSheets = 'one';
+    chosen = `own:${sheet.id}`;
+    chosenGroup = sheet.group;
+    rememberBar();
+    onRoute?.();
+    again();
+  });
+  if (poster?.own && container.querySelector('#poster-own')) {
+    /* The paper on its own, without the panel around it. Typing a name or a time is a change
+       to the sheet and not to the tab: a full redraw would take the caret out of the box mid
+       word, which is exactly what the soft path is here to avoid. The two lines above the
+       sheet name it as well, so they are written again from the same call. */
+    const drawSheet = () => {
+      const holder = container.querySelector('#poster-sheet');
+      const src = poster.sources(state, settings).find((s) => s.year === year);
+      const now = src ? src.build().poster : null;
+      holder.innerHTML = now ? poster.render(now, settings) : '';
+      const what = container.querySelector('.poster-when-what');
+      if (what && now) {
+        what.textContent = poster.covers(year);
+        const w = poster.when(now);
+        container.querySelector('.poster-when-he').textContent = w.he;
+        container.querySelector('.poster-when-en').textContent = w.en;
+      }
+      layoutPosters(container);
+    };
+    renderOwnEditor(container.querySelector('#poster-own'), poster.own, POSTER_OCCASIONS, {
+      onChange: (hard) => {
+        saveState(state);
+        if (hard) again(); else drawSheet();
+      },
+      onDelete: () => {
+        state.own = (state.own || []).filter((s) => s.id !== poster.own.id);
+        saveState(state);
+        // Back to whatever the occasion's first sheet is, which is where the picker would
+        // have opened if this sheet had never been written.
+        chosen = null;
+        rememberBar();
+        onRoute?.();
+        again();
+      },
+    });
+  }
   if (built) {
     /* Every sheet on this tab prints on portrait paper, the landscape ones included: they
        go on it turned a quarter turn, which is what the run has always done with them and

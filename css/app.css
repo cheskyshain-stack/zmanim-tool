@@ -3902,3 +3902,56 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .poster-year-step { width: 100%; }
   .poster-year-now { flex: 1; min-width: 0; }
 }
+
+/* --- A sheet the shul writes itself --------------------------------------------------
+   The panel under the poster on the Posters tab. See ui/own-view.js for what is on it and
+   posters/own.js for what it is writing.
+
+   A row of controls rather than a form of labelled boxes, because a line of the sheet reads
+   as one sentence: the name, where its time comes from, and then either the time or the זמן
+   it hangs off. Labelled boxes down a column had every line four rows tall and a block of
+   five lines filling a screen.
+
+   The panel is the app's own .panel, so it opens and shuts like the ones in Settings and is
+   not a second kind of card. Everything here is no-print: the paper above it is the sheet. */
+.own-editor .own-top { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.6rem 0 1rem; }
+.own-editor .own-top label { display: grid; gap: 0.3rem; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+.own-editor .own-top input { min-width: 14rem; }
+.own-block { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.8rem 0.8rem; margin: 0 0 0.9rem; }
+.own-block > legend { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); padding: 0 0.4rem; }
+.own-block-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.own-block-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.7rem; margin-top: 0.5rem; }
+/* The day and its month stay together when the row wraps: they are one date. */
+.own-date, .own-word { display: inline-flex; gap: 0.35rem; align-items: center; }
+.own-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0; border-top: 1px solid var(--border);
+}
+.own-rows .own-row:first-child { border-top: 0; }
+.own-rule { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.own-editor input, .own-editor select { font: inherit; padding: 0.3rem 0.45rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: #fff; }
+.own-editor .own-offset { width: 4.5rem; }
+.own-editor .own-text { flex: 1 1 12rem; min-width: 9rem; }
+.own-editor .own-when { color: var(--muted); }
+.own-del-row {
+  margin-inline-start: auto; border: 1px solid var(--border); background: none;
+  border-radius: var(--radius-sm); cursor: pointer; padding: 0.15rem 0.5rem; color: var(--muted);
+}
+.own-del-row:hover, .own-del-block:hover { color: #b42318; border-color: #b42318; }
+.own-add-row, .own-del-block {
+  border: 1px solid var(--border); background: var(--accent-soft); color: var(--accent-dark);
+  border-radius: var(--radius-sm); cursor: pointer; padding: 0.3rem 0.7rem; font: inherit;
+}
+.poster-own-bar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.7rem; margin: 1.2rem 0 0.6rem; }
+.poster-own-bar .hint { margin: 0; max-width: 60ch; }
+#poster-own-new {
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--ui-accent-dark);
+  border-radius: var(--radius-sm); cursor: pointer; padding: 0.4rem 0.8rem; font: inherit; font-weight: 600;
+}
+/* On a phone every control on a line takes the width, the way the poster bar's own pickers
+   do: three selects across a 375px screen leave none of them wide enough to read a זמן. */
+@media (max-width: 32rem) {
+  .own-row, .own-rule, .own-word, .own-date { display: grid; grid-template-columns: 1fr; gap: 0.4rem; width: 100%; }
+  .own-editor .own-text, .own-editor .own-offset { width: 100%; }
+  .own-del-row { margin-inline-start: 0; justify-self: start; }
+}
