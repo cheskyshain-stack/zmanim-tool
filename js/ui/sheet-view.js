@@ -8,6 +8,7 @@ import { hebrewLang, escText } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
+import { announcedWeekCell } from '../announced.js';
 import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
@@ -88,7 +89,12 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
   const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
   return split.map(({ weeks: pw, effectiveSeason }, i) => {
     const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason);
+    /* A read-only chart is the reading copy, so it quotes what the shul has announced: see
+       js/announced.js. The editable one never does. That is the whole reason the flag is
+       carried this far rather than the swap being done for everybody: a cell in the admin is
+       a box somebody types into, and a swapped time sitting in it would be saved over the
+       board's own the moment that week was edited for any other reason. */
+    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly });
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style); // variables only - row heights need the page in the document
@@ -440,7 +446,7 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false } = {}) {
   const page = document.createElement('div');
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
@@ -501,7 +507,8 @@ ${special}` : '');
         // holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
+          const value = announced ? announcedWeekCell(row[c.key] ?? '', c.key, week.serial) : row[c.key] ?? '';
+          const html = overriddenKeys.has(c.key) ? value : nl2br(value);
           return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
