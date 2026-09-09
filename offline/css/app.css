@@ -3145,12 +3145,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The occasion, over the whole half rather than over a column, since ראש השנה's half is two
    columns and both of them are it. Underlined like a title, because that is what it is. */
 .poster.is-vasikin.is-both .poster-occasion {
-  font-size: 27pt; font-weight: 700; text-align: center; margin: 0.2in 0 0.06in;
+  font-size: 27pt; font-weight: 700; text-align: center; margin: 0.12in 0 0.06in;
   text-decoration: underline; text-underline-offset: 0.08em; text-decoration-skip-ink: none;
 }
 .poster.is-vasikin.is-both .poster-both-rule {
-  border: 0; border-top: 1.5pt solid #000; width: 60%; margin: 0.32in auto 0;
+  border: 0; border-top: 1.5pt solid #000; width: 60%; margin: 0.14in auto 0;
 }
+/* Where the מנין davens, under the line that says whose it is. A step below that line rather
+   than level with it: the name is what is being said and the hall is where it happens.
+   The air over the rule and over the two occasion headings above pays for it. This sheet had
+   0.27in clear at the foot and the line costs 0.44in, so it came out 0.17in past the frame
+   before the space was found; see the two margins around it. */
+.poster.is-vasikin.is-both .poster-where { font-size: 20pt; margin: 0.02in 0 0; }
 /* Wider than the 0.1in the other two-in-one sheets give a column: there the rule down the
    middle is holding two full schedules apart, here it is holding apart two days that read
    almost the same, and they want the air. */

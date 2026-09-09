@@ -1080,6 +1080,7 @@ function renderVasikinPoster(poster, settings) {
     const stacked = `
       <p class="poster-line" lang="he">${escAttr(VS_TEXT.motto)}</p>
       <h2 class="poster-title" lang="he">${escAttr(poster.title)} · ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+      <p class="poster-line poster-where" lang="he">${escAttr(VS_TEXT.where)}</p>
       ${poster.sections.map(section).join('<hr class="poster-both-rule">')}`;
     return posterShell(settings, stacked, poster.legend || [], {
       dense: true, pair: true, vasikin: true, both: true,

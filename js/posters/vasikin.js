@@ -23,6 +23,12 @@ export const VS_TEXT = {
   // The line over the title on both sheets, which is what a ותיקין מנין is for.
   motto: '"ייראוך עם שמש"',
   who: 'מנין ותיקין דליקוואוד קאמענס',
+  /* Where the מנין davens, on the sheet that carries all three days.
+     Said once, at the head, under the line that says whose מנין it is: where belongs with who,
+     and every line on that sheet is this one מנין. Not as the charts' ** mark, which is there
+     for one מנין out of several being in the hall and would end up on every time on the page
+     and bring a key back to a sheet that has none. */
+  where: 'באולם השמחות',
   roshHashana: 'ראש השנה',
   yomKippur: 'יום כיפור',
   day1: "יום א'",
