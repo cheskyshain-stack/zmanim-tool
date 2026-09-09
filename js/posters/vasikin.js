@@ -154,7 +154,19 @@ export function buildVasikinPoster(year, settings, which = 'rh') {
     heading: VS_TEXT.roshHashana,
     days: [vasikinDay(rh, settings, VS_TEXT.day1), vasikinDay(rh + 1, settings, VS_TEXT.day2)],
   });
-  const kippurSection = () => ({ heading: VS_TEXT.yomKippur, days: [vasikinDay(rh + 9, settings, '')] });
+  /* יום כיפור, and on the years it is Shabbos the sheet has to say so somewhere.
+     On its own sheet that is a heading over the times, which is where the ראש השנה sheet puts
+     יום א' and יום ב'. On the three-day sheet it goes up into the occasion heading instead:
+     that sheet has 0.17in clear at the foot and a heading of its own costs 0.47in, so in
+     תשפ"ה, the first year this could happen, the last line printed straight through the frame.
+     "יום כיפור · שבת" is a line the sheet already has, and it is how the יום כיפור poster
+     itself writes that day. */
+  const kippurSection = () => {
+    const day = vasikinDay(rh + 9, settings, '');
+    return which === 'both' && day.heading
+      ? { heading: VS_TEXT.yomKippur + VS_TEXT.daySep + day.heading, days: [{ ...day, heading: '' }] }
+      : { heading: VS_TEXT.yomKippur, days: [day] };
+  };
   const sections = which === 'yk' ? [kippurSection()]
     : which === 'both' ? [roshSection(), kippurSection()]
       : [roshSection()];
