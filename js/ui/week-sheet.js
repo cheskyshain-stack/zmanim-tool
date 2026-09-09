@@ -27,6 +27,7 @@
 //   line here. A line carrying a word does not: a פלג, a דרשה or a ט באב note keeps the
 //   cell's own break, since those lines are not simply more times.
 import { rowFor, weekdayChartFor } from '../sheets/rows.js';
+import { announcedWeekCell } from '../announced.js';
 import { mergeRow } from '../overrides.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { UL_START, UL_END } from '../format.js';
@@ -280,8 +281,9 @@ function sheetSections(showing, index, state, settings, withChol) {
     out.push([SHEET_TEXT.chol, [
       mornings.everydayStands ? chol('שחרית', state.settings.weekdayShacharis) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
-      chol('מנחה', wdRow.C),
-      chol('מעריב', wdRow.B),
+      // Both through announced.js, the same as the card and "what is on next": see there.
+      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing)),
+      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing)),
     ]]);
   }
   return out;

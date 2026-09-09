@@ -25,6 +25,7 @@ import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
+import { announcedWeekCell } from '../announced.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
@@ -1187,7 +1188,9 @@ function weekCardsHtml(showing, index, state, settings) {
       .map((c) =>
         c.key === 'E'
           ? line(c.header, htmlLines(state.settings.weekdayShacharis), true, false, '', true)
-          : line(c.header, wdRow[c.key], wdOverridden.has(c.key), true)
+          // Through announced.js as well: see the same call in upcoming.js. A block is one
+          // line for the whole week, so a swap that covers any weekday of it shows on it.
+          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
       );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,

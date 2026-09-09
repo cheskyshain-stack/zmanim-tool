@@ -23,6 +23,7 @@ import { DAY_NAMES } from './util.js';
 import { KAYITZ_COLUMNS } from './sheets/kayitz.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
 import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
+import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis } from './posters/day.js';
@@ -238,7 +239,12 @@ export function minyanimForDay(serial, state, settings) {
     for (const column of WEEKDAY_COLUMNS) {
       if (column.key === 'E') continue; // שחרית, handled below
       const name = nameFromHeader(column.header);
-      for (const t of parseCell(row[column.key])) out.push({ ...t, name });
+      /* Read through announced.js, which is where a time the shul has announced differently
+         from the board for a day or two is swapped in. Before parseCell rather than after, so
+         the minutes come off the time that is being shown: a card counting down to 8:15 while
+         printing 8:10 would be worse than either time on its own. Nothing there most days,
+         and nothing there ever reaches the board or the formula. */
+      for (const t of parseCell(announcedCell(row[column.key], column.key, serial))) out.push({ ...t, name });
     }
     /* The morning, which through the סליחות season is not the everyday one. From the Sunday
        סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the
