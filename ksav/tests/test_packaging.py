@@ -162,3 +162,35 @@ def test_every_pinned_version_is_one_that_actually_exists(filename):
     # failed, since the dev environment may legitimately lack an optional one.
     if missing:
         print(f"not installed in this environment: {', '.join(missing)}")
+
+
+@pytest.mark.skipif(not WORKFLOW.is_file(), reason="no CI workflow in this checkout")
+def test_the_workflow_is_valid_yaml():
+    """A malformed workflow does not fail the build, it fails to be a build.
+
+    An embedded PowerShell here-string once put its lines at column zero, outside
+    the block scalar, and YAML read them as new keys. GitHub showed the run name
+    as the file path and the job never started. It was written, eyeballed, and
+    pushed without being parsed once.
+    """
+    yaml = pytest.importorskip("yaml")
+
+    data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    steps = data["jobs"]["build"]["steps"]
+    names = [s.get("name", "") for s in steps]
+
+    assert data["name"] == "Build Ksav for Windows"
+    assert any("Tesseract" in n for n in names), "nothing checks Hebrew OCR is present"
+    # The Tesseract check must come before the tests, or the OCR tests skip.
+    tesseract_at = next(i for i, n in enumerate(names) if "see Tesseract" in n)
+    tests_at = next(i for i, n in enumerate(names) if "Run the tests" in n)
+    assert tesseract_at < tests_at
+
+
+def test_the_tesseract_check_script_reports_rather_than_raises():
+    """It runs in CI, so a crash would look like a build failure of another kind."""
+    script = ROOT / "packaging" / "check-tesseract.py"
+    assert script.is_file()
+    source = script.read_text(encoding="utf-8")
+    assert "def main() -> int:" in source
+    assert "return 1" in source, "it must fail the build, not just print"
