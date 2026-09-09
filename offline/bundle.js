@@ -4542,17 +4542,24 @@ const VS_GAPS = {
 
 /** נץ with the seconds kept, which is the only place in the program that wants them.
  *
- *  Sunrise at sea level rather than at the shul's own horizon: measured against both sheets,
- *  sea level reproduces the printed second to within a second on ר"ה and six on יו"כ, and the
- *  horizon reading is the same number here because the shul's elevation is set to sea level.
- *  If that ever changes, this is the line to look at. */
+ *  sunriseElev, which is the very call the boards make and the one the סוכות sheet's own נץ on
+ *  הושענא רבה is worked from, so this sheet cannot come to a different sunrise from the paper
+ *  beside it. It reads the same Settings as everything else: the shul's latitude, longitude,
+ *  horizon and elevation toggle. The toggle is off today, so this is sunrise at the horizon in
+ *  Settings; turn it on and the boards and this sheet move together.
+ *
+ *  That also makes עלות here the workbook's own עלות 72, which is sunriseElev less 72 minutes
+ *  (see alos72 in zmanim/zmanim.js), rather than a second reckoning of it.
+ *
+ *  Measured against the two sheets the shul hangs: within a second of the ר"ה one's printed נץ
+ *  and six seconds of the יו"כ one's. */
 function vasikinNetz(serial, settings) {
   /* Snapped to the second it prints as, and everything else on the sheet taken off that.
      Otherwise the sheet can contradict itself in front of the reader: on ר"ה תשפ״ז the sun
      rises at 6:34:59.6, which prints as נץ 6:35:00, and עלות taken off the raw value came out
      at 5:22 where 6:35:00 less 72 minutes is plainly 5:23. The same rule pesach.js keeps for
      its own comparisons: work from the number that is on the paper. */
-  return Math.round(Z.sunrise(dateFromSerial(serial), settings) * 86400) / 86400;
+  return Math.round(Z.sunriseElev(dateFromSerial(serial), settings) * 86400) / 86400;
 }
 
 /** נץ printed to the second, the way both sheets print it. */
