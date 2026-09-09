@@ -3108,9 +3108,16 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* יום כיפור is one day, held to the width of one ראש השנה column above it so its two edges
    land on the same measure instead of sprawling across the sheet. */
 .poster.is-vasikin.is-both .poster-pair.is-solo { width: 50%; margin-inline: auto; }
-.poster.is-vasikin.is-both .poster-rows.is-dense .poster-day,
-.poster.is-vasikin.is-both .poster-rows > .poster-day:first-child {
-  font-size: 21pt; line-height: 1.2; margin: 0 0 0.12in;
+.poster.is-vasikin.is-both .poster-day { font-size: 21pt; line-height: 1.2; margin: 0 0 0.12in; }
+/* The rule between the two days runs beside the times and no higher: from the top of the rows
+   box down to the last of them, so יום א' and יום ב' stand clear above it rather than being
+   cut apart by it. Drawn on the rows box for that reason, and pulled back out over the
+   column's own padding so it still lands midway between the two columns. */
+.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col { border-inline-start: 0; }
+.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col .poster-rows { position: relative; }
+.poster.is-vasikin.is-both .poster-pair-col + .poster-pair-col .poster-rows::before {
+  content: ""; position: absolute; inset-block: 0; inset-inline-start: -0.5in;
+  border-inline-start: 1px solid #000;
 }
 /* The words square up on the right of a column and the times on the left, so both edges are a
    straight line down the page rather than every row floating in the middle of it. */

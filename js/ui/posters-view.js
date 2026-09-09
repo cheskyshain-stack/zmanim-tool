@@ -1022,10 +1022,19 @@ function renderVasikinPoster(poster, settings) {
      clear at the foot. Landscape does take the three across, but that is a page the shul did
      not ask for. */
   if (poster.which === 'both') {
+    /* The day's heading is outside its rows here, where the single sheets keep it inside them.
+       The rule between יום א' and יום ב' is drawn down the side of the rows box, and with the
+       headings in that box it ran the whole height of the column, up past both of them. */
+    const bothCol = (d) => `<div class="poster-pair-col">
+        ${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
+        <div class="poster-rows is-dense">
+          ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+        </div>
+      </div>`;
     const section = (s) => `<section class="poster-both-part">
         <h3 class="poster-occasion" lang="he">${escAttr(s.heading)}</h3>
         <div class="poster-pair${s.days.length > 1 ? '' : ' is-solo'}">
-          ${s.days.map((d) => `<div class="poster-pair-col">${day(d)}</div>`).join('')}
+          ${s.days.map(bothCol).join('')}
         </div>
       </section>`;
     const stacked = `
