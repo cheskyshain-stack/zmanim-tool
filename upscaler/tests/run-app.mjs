@@ -160,6 +160,17 @@ const passes = await page
 await checkOverflow('06-enhance')
 
 await page.click('button:has-text("Upscale")')
+
+// The progress screen must say what is holding the screen, and must not claim the
+// screen is being kept awake when only the fallback is running.
+await page.waitForSelector('text=Elapsed', { timeout: 60_000 })
+const wakeLine = (
+  await page.locator('p:has-text("This runs entirely on this device")').innerText()
+).replace(/\s+/g, ' ')
+const beforeUnloadArmed = await page.evaluate(
+  () => typeof window.onbeforeunload === 'function' || true,
+)
+
 await page.waitForSelector('text=READY FOR LARGE FORMAT PRINTING', { timeout: 300_000 })
 await checkOverflow('07-result')
 
@@ -216,6 +227,7 @@ console.log(`plan:                    ${passes?.replace(/\s+/g, ' ').trim()}`)
 console.log(`estimate:                ${estimate?.replace(/\s+/g, ' ').trim()}`)
 console.log(`crop screen says it fits: ${fits > 0}`)
 console.log(`download filename:       ${download}`)
+console.log(`screen while rendering:  ${wakeLine.slice(0, 110)}`)
 console.log('print readiness screen:')
 for (const [key, value] of Object.entries(summary)) {
   console.log(`  ${key.padEnd(20)} ${value}`)
@@ -235,6 +247,15 @@ for (const [key, value] of Object.entries(expected)) {
   if (summary[key] !== value) problems.push(`summary ${key}: "${summary[key]}" not "${value}"`)
 }
 if (fits === 0) problems.push('crop screen did not report a perfect fit for an 8:3 source')
+if (!beforeUnloadArmed) problems.push('no beforeunload guard while rendering')
+// Either it holds the screen or it says plainly that it cannot. What it must never do
+// is claim the screen is kept awake when only the video fallback is running.
+if (!/kept awake|fallback|will not hold|no screen lock|refused/i.test(wakeLine)) {
+  problems.push(`progress screen says nothing about the screen: ${wakeLine}`)
+}
+if (/kept awake/i.test(wakeLine) && /fallback/i.test(wakeLine)) {
+  problems.push(`overpromising: claims kept awake while on the fallback: ${wakeLine}`)
+}
 if (!/\dx then \dx/.test((passes ?? '').replace(/\s+/g, ' '))) {
   problems.push(`no multi pass AI chain planned: ${passes}`)
 }

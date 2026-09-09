@@ -78,6 +78,25 @@ const checks = [
     pass: (r) => r['esrgan-slim-x4'] > 10_000,
   },
   {
+    name: 'wakeLock',
+    describe: (r) =>
+      `no API: "${r.noApi.text}" | refused: "${r.refused.text}" | ` +
+      `granted: "${r.granted.text}" | re-taken after release: ${r.retakenAfterRelease} ${JSON.stringify(r.grants)}`,
+    pass: (r) =>
+      // Never claim the screen is held when it is not.
+      r.noApi.solid === false &&
+      r.refused.solid === false &&
+      !/kept awake/i.test(r.noApi.text) &&
+      !/kept awake/i.test(r.refused.text) &&
+      // Say what a person can act on when battery saver refuses it.
+      /battery saver/i.test(r.refused.text) &&
+      // A real lock is reported as one.
+      r.granted.solid === true &&
+      /kept awake/i.test(r.granted.text) &&
+      // And a lock the system took back is asked for again.
+      r.retakenAfterRelease === true,
+  },
+  {
     name: 'flagshipExport',
     describe: (r) =>
       `${r.headerWidth} x ${r.headerHeight} (${r.megapixels} MP) PNG in ` +

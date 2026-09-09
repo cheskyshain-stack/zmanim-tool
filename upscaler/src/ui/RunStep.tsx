@@ -1,4 +1,5 @@
 import { formatDuration } from '../lib/image'
+import { describeWake, type WakeStatus } from '../lib/wake-lock'
 import { PHASE_LABEL, type Phase } from '../worker/protocol'
 import { Button, Card, Note } from './primitives'
 
@@ -21,6 +22,7 @@ export function RunStep({
   detail,
   elapsedSeconds,
   estimateSeconds,
+  wake,
   error,
   onCancel,
   onRetry,
@@ -30,11 +32,13 @@ export function RunStep({
   detail: string
   elapsedSeconds: number
   estimateSeconds: number | null
+  wake: WakeStatus
   error: string | null
   onCancel: () => void
   onRetry: () => void
 }) {
   const percent = Math.min(100, Math.max(0, progress * 100))
+  const screen = describeWake(wake)
   // Once a job is a fifth of the way in, its own measured rate beats the up front
   // estimate, so switch to it.
   const remaining =
@@ -115,10 +119,10 @@ export function RunStep({
         </ol>
       </Card>
 
-      <Note>
-        This runs entirely on this device. Nothing is uploaded anywhere. You can put the
-        screen to sleep on a desktop, but on a phone leaving the browser can suspend the
-        job, so it is best to leave this screen open.
+      <Note tone={screen.solid ? 'info' : 'warn'}>
+        <strong>{screen.text}.</strong> This runs entirely on this device, so leaving the
+        browser or locking the phone can suspend it. A desktop or laptop has no such
+        limit and is much faster, and this is the same page there.
       </Note>
 
       <Button variant="danger" onClick={onCancel} className="w-full">

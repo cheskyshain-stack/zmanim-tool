@@ -3,6 +3,7 @@
 // what the models and the streaming loop actually do rather than what they should do.
 import { benchmark, initBackend, loadModel, upscaleBuffer, currentBackend } from '../../src/worker/engine'
 import { runRender, rgbaToFloatRgb } from '../../src/worker/pipeline'
+import { ScreenWakeLock, describeWake } from '../../src/lib/wake-lock'
 import { resampleImage, CHANNELS } from '../../src/lib/lanczos'
 import type { RenderRequest, Tuning } from '../../src/worker/protocol'
 
@@ -498,10 +499,92 @@ async function testFlagshipExport() {
   }
 }
 
+
+/**
+ * The screen lock, on all three of its paths. This is the piece with the most ways to
+ * be quietly wrong: the three bugs listed in wake-lock.ts all looked fine and were not,
+ * and the worst outcome is a page that says the screen is being held when it is not.
+ */
+async function testWakeLock() {
+  const original = Object.getOwnPropertyDescriptor(navigator, 'wakeLock')
+  const setApi = (value: unknown) =>
+    Object.defineProperty(navigator, 'wakeLock', { value, configurable: true })
+  // Read the status while it is still running: stop() deliberately reports the released
+  // state, so sampling after it would only ever say "not holding the screen".
+  const latest = () =>
+    new Promise<{ awakeBy: string; error: string; retakes: number }>((resolve) => {
+      const lock = new ScreenWakeLock()
+      let last = { awakeBy: '', error: '', retakes: 0 }
+      lock.start((status) => {
+        last = status
+      })
+      setTimeout(() => {
+        const seen = last
+        lock.stop()
+        resolve(seen)
+      }, 400)
+    })
+
+  const out: Record<string, unknown> = {}
+
+  // 1. No API at all. Must fall back and must not claim the screen is held.
+  setApi(undefined)
+  const none = await latest()
+  out.noApi = describeWake(none)
+
+  // 2. The API exists but is refused, which on Android is nearly always battery saver.
+  setApi({
+    request: () => Promise.reject(Object.assign(new Error('nope'), { name: 'NotAllowedError' })),
+  })
+  out.refused = describeWake(await latest())
+
+  // 3. A working lock.
+  let granted = 0
+  const sentinel = {
+    released: false,
+    release: () => Promise.resolve(),
+    addEventListener: () => {},
+  }
+  setApi({
+    request: () => {
+      granted++
+      return Promise.resolve(sentinel)
+    },
+  })
+  out.granted = describeWake(await latest())
+  out.grantCount = granted
+
+  // 4. Lesson 2: once the sentinel says it was released, the page must ask again
+  // rather than sitting on a dead lock for the rest of the session.
+  granted = 0
+  const dying = { released: false, release: () => Promise.resolve(), addEventListener: () => {} }
+  setApi({
+    request: () => {
+      granted++
+      return Promise.resolve(dying)
+    },
+  })
+  const lock = new ScreenWakeLock()
+  lock.start(() => {})
+  await new Promise((r) => setTimeout(r, 200))
+  const afterFirst = granted
+  dying.released = true // the system quietly took it back
+  await new Promise((r) => setTimeout(r, 3600)) // one watchdog tick
+  const afterRelease = granted
+  lock.stop()
+  out.retakenAfterRelease = afterRelease > afterFirst
+  out.grants = [afterFirst, afterRelease]
+
+  if (original) Object.defineProperty(navigator, 'wakeLock', original)
+  else setApi(undefined)
+  return out
+}
+
 const TESTS: Record<string, () => Promise<unknown>> = {
   superResolution: testSuperResolution,
   referenceOutput: testReferenceOutput,
   throughput: testThroughput,
+  wakeLock: testWakeLock,
   tileInvariance: testTileInvariance,
   bandInvariance: testBandInvariance,
   borders: testBorders,

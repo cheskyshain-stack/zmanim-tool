@@ -312,8 +312,42 @@ and sizes its tiles and bands from it, and Settings exposes both if a particular
 needs smaller. If an export fails part way through, lower both a step.
 
 **iOS note**: printing and downloading a very large file from Safari can be
-memory-limited in ways the app cannot see. If a 300 MB PNG will not save, try TIFF,
-which is usually smaller on photographic content, or drop to 150 DPI.
+memory-limited in ways the app cannot see. If a 300 MB PNG will not save, drop to 150
+DPI, or use JPEG at quality 95.
+
+### Running it somewhere other than a phone
+
+It is the same page on a desktop or a laptop, at the same address, and that is the
+better place for a big job: a real GPU is far faster than a phone's, and a desktop
+browser does not suspend a tab when you look at something else.
+
+### Can a render run in the background?
+
+Not really, and it is worth being exact about why rather than hinting.
+
+A web page cannot run work in the background on a phone. Switch apps or lock the screen
+and the browser suspends the page: timers stop, workers stop, and the WebGL context is
+usually dropped, which ends the job. None of the background web APIs help here. Service
+workers are killed after seconds of idle and cannot hold a GPU job; Background Sync and
+Background Fetch move network transfers, not computation. There is no API that lets a
+page keep a neural network running while you use another app.
+
+What the app does about it, which is everything available to a page:
+
+- **It holds the screen awake while rendering**, through the Screen Wake Lock API, with
+  a playing-video fallback where that API is missing or refused. The progress screen
+  says which of the two is holding, or that neither is, and it never claims the screen
+  is being kept awake when only the fallback is running. Battery saver refusing the lock
+  is reported in those words, because that is the usual cause and it is something you
+  can turn off.
+- **It objects if you try to leave the page** mid render, so a stray tap does not throw
+  away half an hour of work.
+
+So on a phone: leave the screen on this page and it will keep going. To genuinely put
+the phone down and come back to a finished file, the work has to happen on a machine
+that is not the phone, which means either running it on a desktop or standing up the GPU
+backend described under
+[What is free and what could cost money](#what-is-free-and-what-could-cost-money).
 
 ---
 
@@ -570,8 +604,11 @@ Worth knowing before you rely on it.
   difference of 6 levels out of 255 on the worst pixel, and a mean of 0.23, spread
   evenly rather than collecting anywhere. For a 4x memory saving that is the right trade
   on a phone, and it is the reason a 300 megapixel job fits at all.
-- **Leaving the browser can suspend a long job on a phone.** The app says so on the
-  progress screen. There is no way around this from a web page.
+- **Leaving the browser can suspend a long job on a phone.** The app holds the screen
+  awake and warns before you navigate away, but there is no web API that keeps a render
+  going while you use another app. See
+  [Can a render run in the background?](#can-a-render-run-in-the-background) for what
+  that leaves you.
 - **A device reporting 2 GB or less streams every pass**, including the first, rather
   than holding an intermediate. That is a lot of repeated work at the tile padding, so
   those devices are noticeably slower. It is deliberate: slow beats out of memory, and

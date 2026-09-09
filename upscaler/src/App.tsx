@@ -16,6 +16,7 @@ import {
   saveSettings,
   type Settings,
 } from './lib/storage'
+import { ScreenWakeLock, type WakeStatus } from './lib/wake-lock'
 import { RenderWorker, CancelledError } from './state/worker-client'
 import type { Phase } from './worker/protocol'
 import { Button } from './ui/primitives'
@@ -79,6 +80,7 @@ export default function App() {
   const [benchmarking, setBenchmarking] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [now, setNow] = useState(0)
+  const [wake, setWake] = useState<WakeStatus>({ awakeBy: '', error: '', retakes: 0 })
 
   const workerRef = useRef<RenderWorker | null>(null)
   const baseUrl = import.meta.env.BASE_URL
@@ -189,11 +191,33 @@ export default function App() {
   }, [source])
 
   // Ticks the elapsed clock while a job runs, without re-rendering when nothing runs.
+  const rendering = step === 'run' && !job.error
   useEffect(() => {
-    if (step !== 'run' || job.error) return
+    if (!rendering) return
     const timer = window.setInterval(() => setNow(Date.now()), 500)
     return () => window.clearInterval(timer)
-  }, [step, job.error])
+  }, [rendering])
+
+  // Hold the screen while a render is going, and object to leaving the page.
+  //
+  // Neither makes the job run in the background: a phone browser suspends a page the
+  // moment you switch apps, and no web API gets around that. What they stop is the
+  // screen turning itself off, which is what actually kills most long renders, and a
+  // stray tap on a link throwing one away.
+  useEffect(() => {
+    if (!rendering) return
+    const lock = new ScreenWakeLock()
+    lock.start(setWake)
+    const guard = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', guard)
+    return () => {
+      window.removeEventListener('beforeunload', guard)
+      lock.stop()
+    }
+  }, [rendering])
 
   // --- benchmark -----------------------------------------------------------
   const benchmarkKey = [
@@ -500,6 +524,7 @@ export default function App() {
             detail={job.detail}
             elapsedSeconds={elapsedSeconds}
             estimateSeconds={estimateSeconds}
+            wake={wake}
             error={job.error}
             onCancel={() => {
               if (job.id !== null) getWorker().cancel(job.id)
