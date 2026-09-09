@@ -40,7 +40,7 @@ Every change follows this, in order:
    and compare against the local `index.html`. Do not tell the user it is live until the
    hash matches.
 
-### build-offline.py does six jobs
+### build-offline.py does seven jobs
 
 Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
 
@@ -61,6 +61,11 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   comment in the output. `/*!` licence banners are kept and `vendor/` is copied byte for
   byte. HTML comments written into markup by the JS are stripped too: they become real
   comment nodes in the DOM and are just as readable in devtools.
+- Stamps the analytics tag into `index.html` from `ANALYTICS_TOKEN`, before the route pages
+  are written so they inherit it. Empty means nothing is written and anything an earlier run
+  wrote is taken out, so turning analytics off is emptying that line. The congregation's page
+  only: `/admin/` is a different file and the offline copy is built out of `/admin`, so a USB
+  stick carries nothing that would try to phone home.
 - Writes `week/`, `chart/` and `donate/` out of `index.html`, and `sitemap.xml` with them.
   Those three folders and the sitemap are **build output**: do not hand-edit them, the same
   as the import map and `offline/`. The per-page titles and blurbs live in the `ROUTES`
