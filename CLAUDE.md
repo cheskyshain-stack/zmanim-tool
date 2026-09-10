@@ -61,11 +61,22 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   comment in the output. `/*!` licence banners are kept and `vendor/` is copied byte for
   byte. HTML comments written into markup by the JS are stripped too: they become real
   comment nodes in the DOM and are just as readable in devtools.
-- Stamps the analytics tag into `index.html` from `ANALYTICS_TOKEN`, before the route pages
+- Stamps the analytics loader into `index.html` from `ANALYTICS_TOKEN`, before the route pages
   are written so they inherit it. Empty means nothing is written and anything an earlier run
   wrote is taken out, so turning analytics off is emptying that line. The congregation's page
   only: `/admin/` is a different file and the offline copy is built out of `/admin`, so a USB
   stick carries nothing that would try to phone home.
+  It is a loader rather than the beacon's own tag because two of the three answers to "who is
+  being counted" have to be given before the request goes out. It asks for the beacon only when
+  `location.hostname` is `SITE_URL`'s own host, so a local `python -m http.server` and any
+  preview count nothing, and only when this browser has not asked to be left out. **Opening the
+  live site once with `?count=off` marks that device and it stops being counted; `?count=on`
+  undoes it.** The mark is `zmanim-nocount` in localStorage, per device and per browser like the
+  admin's unlock, and it is lost when site data is cleared. A browser that refuses localStorage
+  is counted rather than broken.
+  Measure this the way it was measured the first time, since the beacon is not reachable from a
+  container: run Chromium with `--host-resolver-rules=MAP lczmanim.cjaffa.com 127.0.0.1:<port>`
+  and watch whether the page asks for `static.cloudflareinsights.com` at all.
 - Writes `week/`, `chart/` and `donate/` out of `index.html`, and `sitemap.xml` with them.
   Those three folders and the sitemap are **build output**: do not hand-edit them, the same
   as the import map and `offline/`. The per-page titles and blurbs live in the `ROUTES`

@@ -65,8 +65,26 @@ SITE_URL_MARKER = "<!-- site address: stamped by build-offline.py from SITE_URL,
 # written, so /week/, /chart/, /schedules/ and /donate/ carry it too; /admin/ is a different
 # file and never gets it, and the offline copy is built out of /admin, so a USB stick has
 # nothing in it that would try to phone home from a shul's laptop.
+#
+# Three things are kept out of the count, which matter because most of the traffic to a shul's
+# new site in its first month is the person building it:
+#
+#   - Anywhere that is not the live address. The beacon is only asked for when the page is
+#     being read at SITE_URL's own host, so a local `python -m http.server`, a preview, or
+#     somebody's fork of the repository counts nothing.
+#   - The admin, which never carries the tag at all.
+#   - A device that has asked not to be counted. Opening the site once with ?count=off marks
+#     that browser and it is not counted again; ?count=on undoes it. See ANALYTICS_OPT_OUT.
 ANALYTICS_TOKEN = ""
 ANALYTICS_MARKER = "<!-- analytics: stamped by build-offline.py from ANALYTICS_TOKEN, do not edit by hand -->"
+
+# The mark a browser carries when it has asked not to be counted, and the parameter that sets
+# it. localStorage rather than a cookie: nothing is sent anywhere, it is one browser on one
+# device saying something about itself, and there is no consent question to answer about a
+# value that never leaves the machine. It is lost with the site's data, the same as the admin's
+# unlock, so clearing the browser means visiting the link again.
+ANALYTICS_OPT_OUT = "zmanim-nocount"
+ANALYTICS_OPT_PARAM = "count"
 
 # The three pages behind the menu, and the addresses they answer at.
 #
@@ -586,24 +604,51 @@ def stamp_site_url(page: Path):
 
 
 def stamp_analytics(page: Path):
-    """Write the analytics tag into the page head, or take it out again.
+    """Write the analytics loader into the page head, or take it out again.
 
     Between markers like everything else stamped here, so a second run replaces rather than
     doubles up, and so emptying ANALYTICS_TOKEN removes what the last run wrote instead of
     leaving a dead beacon on the site.
 
-    defer, because nothing on the page waits for it and a reader should never be waiting for
-    a counter. It is the only third-party script on the site, and it is one the reader can
-    block with no effect on anything: if it does not load, the pages work exactly as they do
-    now and the only thing lost is the count.
+    A few lines that decide whether to ask for the beacon, rather than the beacon's own tag,
+    because two of the three answers to "who is this counting" have to be given before the
+    request goes out:
+
+      - the live address only, so a page served from a laptop counts nothing;
+      - not a browser that has asked not to be counted, which is how the shul keeps its own
+        testing out of its own numbers.
+
+    The third, the admin, is handled by not stamping that file at all.
+
+    The script it writes is deferred, because nothing on the page waits for a counter, and it
+    is the only third-party script on the site: blocked, the pages work exactly as they do now
+    and the only thing lost is the count. Everything the loader itself touches is wrapped, so a
+    browser that refuses localStorage (a private window, or one set to block site data) is
+    counted rather than broken.
     """
     html = page.read_text(encoding="utf-8")
-    block = (
-        f"{ANALYTICS_MARKER}\n"
-        f"""<script defer src="https://static.cloudflareinsights.com/beacon.min.js" """
-        f"""data-cf-beacon='{{"token": "{ANALYTICS_TOKEN}"}}'></script>"""
-    ) if ANALYTICS_TOKEN else ""
-    pattern = re.escape(ANALYTICS_MARKER) + r"\n<script defer src=\"https://static\.cloudflareinsights\.com/.*?</script>\n"
+    host = SITE_URL.split("//", 1)[-1].split("/", 1)[0]
+    # Written on one line on purpose: it is inline in the head of five pages, and the comment
+    # stripper that keeps this repository's reasoning out of the browser would have to be
+    # taught about it otherwise. The reasoning is above, where it belongs.
+    loader = (
+        "<script>(function(){try{"
+        f'if(location.hostname!=="{host}")return;'
+        f'var p=new URLSearchParams(location.search),k="{ANALYTICS_OPT_OUT}";'
+        f'if(p.has("{ANALYTICS_OPT_PARAM}")){{'
+        f'var off=p.get("{ANALYTICS_OPT_PARAM}")!=="on";'
+        "try{off?localStorage.setItem(k,'1'):localStorage.removeItem(k);"
+        "alert(off?'This device will not be counted in the site\\u2019s visitor numbers.'"
+        ":'This device will be counted in the site\\u2019s visitor numbers again.');}"
+        "catch(e){alert('This browser will not remember the setting.');}}"
+        "try{if(localStorage.getItem(k))return;}catch(e){}"
+        'var s=document.createElement("script");s.defer=true;'
+        's.src="https://static.cloudflareinsights.com/beacon.min.js";'
+        f"s.setAttribute(\"data-cf-beacon\",'{{\"token\": \"{ANALYTICS_TOKEN}\"}}');"
+        "document.head.appendChild(s);}catch(e){}})();</script>"
+    )
+    block = f"{ANALYTICS_MARKER}\n{loader}" if ANALYTICS_TOKEN else ""
+    pattern = re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n"
     if ANALYTICS_MARKER in html:
         html = re.sub(pattern, (block + "\n") if block else "", html, flags=re.S)
     elif block:
