@@ -652,7 +652,12 @@ def stamp_analytics(page: Path):
     block = f"{ANALYTICS_MARKER}\n{loader}" if ANALYTICS_TOKEN else ""
     pattern = re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n"
     if ANALYTICS_MARKER in html:
-        html = re.sub(pattern, (block + "\n") if block else "", html, flags=re.S)
+        # Replaced through a function, so the loader goes in as the text it is. As a plain
+        # replacement string the regex engine reads it for escapes of its own, and the loader
+        # carries a ’ (the apostrophe in the message it shows): re.sub calls that a bad
+        # escape and stops the build. It only ever bit on a second run, since the first run
+        # has no marker to replace and takes the branch below.
+        html = re.sub(pattern, lambda _: (block + "\n") if block else "", html, flags=re.S)
     elif block:
         html = html.replace("</head>", block + "\n</head>")
     page.write_text(html, encoding="utf-8", newline="\n")
