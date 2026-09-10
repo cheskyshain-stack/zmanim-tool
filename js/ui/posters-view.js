@@ -264,52 +264,19 @@ const POSTERS = [
     },
     render: renderYomKippurPoster,
   },
-  /* The two ותיקין sheets. Their own entries rather than one with a pick between them,
-     because the shul hangs two sheets and they fall on two different days: the list is
-     ordered by date, so ר"ה's sits with ר"ה and יו"כ's with יו"כ. */
-  {
-    key: 'vasikinrh',
-    label: `${VS_TEXT.who} · ${VS_TEXT.roshHashana}`,
-    covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.roshHashana} ${hebrewYear(y)}`,
-    when: (built) => when(built.span.from, built.span.to),
-    starts: (y, settings) => buildVasikinPoster(y, settings, 'rh')?.span.from ?? null,
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildVasikinPoster(y, settings, 'rh') }),
-      }));
-    },
-    render: renderVasikinPoster,
-  },
-  {
-    key: 'vasikinyk',
-    label: `${VS_TEXT.who} · ${VS_TEXT.yomKippur}`,
-    covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.yomKippur} ${hebrewYear(y)}`,
-    when: (built) => when(built.span.from, built.span.to),
-    starts: (y, settings) => buildVasikinPoster(y, settings, 'yk')?.span.from ?? null,
-    sources: (state, settings) => {
-      const { years, preferred } = posterYears(state);
-      return years.map((y) => ({
-        id: String(y),
-        year: y,
-        label: yearLabel(y),
-        preferred: y === preferred,
-        build: () => ({ poster: buildVasikinPoster(y, settings, 'yk') }),
-      }));
-    },
-    render: renderVasikinPoster,
-  },
-  /* And the two of them on one page, for the years the shul would rather hang one sheet than
-     two. Marked combined, the same as the other two-in-one sheets, so "All of them" does not
-     print the ותיקין schedule twice unless it is asked to. */
+  /* The ותיקין sheet: ראש השנה and יום כיפור together, which is the only one the shul wants.
+     There were three entries here, this one and a single sheet for each of the two days, and
+     the shul asked for the pair alone.
+     Not marked combined, and that is the point of the change rather than an oversight. The
+     other two-in-one sheets carry that mark so that "one occasion a sheet" leaves them out and
+     prints their halves separately instead; there are no halves to print here any more, so
+     marking it would mean a run of every sheet with no ותיקין schedule in it at all.
+     buildVasikinPoster can still build either day on its own (see `which` there). Nothing asks
+     it to, and it is left because a single day is what the shul hung for years and may again;
+     it is one argument, not a screen. */
   {
     key: 'vasikinboth',
-    label: `${VS_TEXT.who} · ${VS_TEXT.roshHashana} ו${VS_TEXT.yomKippur} על דף אחד`,
-    combined: true,
+    label: `${VS_TEXT.who} · ${VS_TEXT.roshHashana} ו${VS_TEXT.yomKippur}`,
     covers: (y) => `${VS_TEXT.who}, ${VS_TEXT.roshHashana} ו${VS_TEXT.yomKippur} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     starts: (y, settings) => buildVasikinPoster(y, settings, 'both')?.span.from ?? null,
