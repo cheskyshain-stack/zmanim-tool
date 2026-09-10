@@ -493,7 +493,7 @@ const POSTER_SHEETS = [
     rules: {
       drasha: {
         plain: 'The time of the דרשה, taken off the board: it is the time on the line that says דרשה.',
-        exact: 'Read out of the שבת שובה week\'s מנחה cell, column C of whichever chart covers that week. Found by the words in front of it rather than by its position, and asked of its own line rather than of the whole cell, so a hand-edited cell can put it anywhere and a second time on another line is not mistaken for it. The דרשה itself is put on the board by the seeded שבת שובה rule, which is in Settings and can be switched off.',
+        exact: 'Read out of the שבת שובה week\'s מנחה cell, column C of whichever chart covers that week. Found by the words in front of it rather than by its position, and asked of its own line rather than of the whole cell, so a hand-edited cell can put it anywhere and a second time on another line is not mistaken for it. The דרשה itself is worked out by the chart, an hour before the מנחה that is 45 minutes before שקיעה and rounded to the nearest 5, the same way שבת הגדול is.',
       },
       mincha: {
         plain: 'Every other time in that cell, in order, keeping the marks the board gives them.',

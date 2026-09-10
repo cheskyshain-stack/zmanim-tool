@@ -71,6 +71,18 @@ export function fridayMainMinchaMenu(fridayDate, settings) {
  *  of what this Shabbos is called. */
 export const SHUVA_NAMES = ['שובה', 'Shuva'];
 
+/** The two Shabbosos the דרשה afternoon belongs to.
+ *
+ *  שבת הגדול keeps the same shape as שבת שובה, asked for once the שובה cell had been printing
+ *  for a season: an afternoon built around the דרשה rather than the standing 5:30, 6:00 and
+ *  6:30. Before this it was a rule that appended the bare word "דרשה" under the ordinary times,
+ *  which said one was happening and left the time to be typed in by hand each year.
+ *
+ *  Separate from SHUVA_NAMES rather than folded into it, because that list answers a different
+ *  question: the שבת שובה poster asks it to find its week, and it wants that Shabbos and not a
+ *  Shabbos that happens to be built the same way. */
+export const DRASHA_NAMES = [...SHUVA_NAMES, 'הגדול', 'Hagadol'];
+
 /** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
  *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */
 function roundTo5(dayFraction) {
@@ -85,7 +97,7 @@ export function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
   const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
   const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
 
-  /* שבת שובה: the דרשה, and the מנחה that goes with it.
+  /* שבת שובה and שבת הגדול: the דרשה, and the מנחה that goes with it.
    *
    * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
    * itself, because that is the minyan the דרשה is timed against: an hour before it, to
@@ -122,7 +134,7 @@ export function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
    * Hebrew word joined that word's run and the whole line reversed, measured on the chart
    * as "6:29 / 6:14 / 5:15 דרשה". Alone on its own line there is nothing left to reverse,
    * and it stays for the day somebody puts it back among the times. */
-  const drasha = SHUVA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
+  const drasha = DRASHA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
   if (drasha !== null) {
     return [
       `${early}${SLASH}${underlineTime(drasha - 30 / 1440)}`,

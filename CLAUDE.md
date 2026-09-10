@@ -164,9 +164,14 @@ Export/Import in Settings moves it between devices.
 - **Rules** apply at generation time to every future sheet. Conditions: `always`,
   `specialParsha`, `parsha`, `dateISO`, `hebrewDate` (`"5-9"`, month-day counting Nisan
   as 1, recurs yearly). Column keys are sheet-qualified: `kayitz:C`, `choref:B`.
-- Three rules are **seeded** (שבת הגדול, שבת שובה, ט באב), guarded by flags in
-  `state.seeded` so deleting one stays deleted. Seeding skips a rule already covering the
-  same special Shabbos, so browsers holding hand-made versions do not end up with two.
+- One rule is **seeded** (ט באב), guarded by a flag in `state.seeded` so deleting it stays
+  deleted. There were three. שבת שובה and שבת הגדול each appended the bare word דרשה, and
+  both afternoons are now computed by the chart instead (`DRASHA_NAMES` and
+  `shabbosMinchaMenu` in `js/sheets/common.js`): the דרשה an hour before the מנחה that is 45
+  minutes before שקיעה, its מנחה למטה half an hour before that, and no 5:30 / 6:00 / 6:30.
+  `isRetiredDrashaRule` in `js/storage.js` takes the old rules back off a browser that holds
+  one, matching on what a rule does rather than the id it was seeded with, since both were
+  hand-made on some browsers before they were ever seeded.
 - When a shipped default's wording changes, add the old value to a `LEGACY_*` list in
   `js/settings.js` and carry it forward in `normalizeSettings`. That upgrades installs
   that never edited it, while leaving anything hand-typed alone. See
@@ -237,7 +242,8 @@ copy on `file://` and an admin served over plain http.
 ## Verify before you call it done
 
 Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
-seeded rules firing (look for "דרשה" on מצורע/הגדול in a חורף sheet), no console errors,
+the דרשה afternoon built (מצורע/הגדול in a חורף sheet and האזינו/שובה in a קיץ one both
+read as three lines: times, then a דרשה line, then times), no console errors,
 no horizontal overflow at 375px on every screen, and the live hash matches after deploy.
 
 If you touched the congregation site's routing, also check `/week/`, `/chart/` and

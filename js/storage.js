@@ -44,45 +44,31 @@ const TISHA_BAV_RULE = {
   value: 'ט באב',
 };
 
-/** The two דרשה rules, seeded for the same reason the Lakewood settings are built in:
- *  they're the shul's standing schedule, not one person's preference, so a new browser
- *  (a phone, say) should have them without anyone re-entering them. Same seeded-flag
- *  treatment as ט באב - installed once, and deleting one stays deleted. */
-const DRASHA_RULES = [
-  {
-    id: 'rule-shabbos-hagadol',
-    name: 'שבת הגדול: דרשה',
-    enabled: true,
-    condition: { specialParsha: ['הגדול', 'Hagadol'] },
-    columnKeys: ['kayitz:C', 'choref:C'],
-    mode: 'append',
-    value: 'דרשה',
-  },
-];
-
-/** The שבת שובה rule that used to sit beside שבת הגדול above.
+/** The דרשה rules, both of which have now been retired.
  *
- *  It appended the bare word "דרשה" and nothing else, so the time had to be typed into the
- *  cell by hand every year. The דרשה is now worked out in the sheet itself, an hour before
- *  the מנחה that is 45 minutes before שקיעה, with its מנחה למטה half an hour before that
- *  (see shabbosMinchaMenu in sheets/common.js). Leaving the rule in place would append a
- *  second, wordless "דרשה" underneath the computed one.
+ *  There were two, שבת שובה and שבת הגדול, and each appended the bare word "דרשה" and nothing
+ *  else. That said a דרשה was happening and left its time to be typed into the cell by hand
+ *  every year. Both afternoons are now worked out in the sheet itself: the דרשה an hour before
+ *  the מנחה that is 45 minutes before שקיעה, its מנחה למטה half an hour before that, and the
+ *  standing 5:30, 6:00 and 6:30 left off, since the מנחה למטה is what happens instead of them.
+ *  See DRASHA_NAMES and shabbosMinchaMenu in sheets/common.js.
  *
- *  Removed only where it is still exactly as it was seeded. Somebody who edited theirs
- *  meant something by it, and this quietly deleting that is worse than a duplicate they
- *  can see and remove. */
-const RETIRED_SHUVA_RULE = {
-  id: 'rule-shabbos-shuva',
-  mode: 'append',
-  value: 'דרשה',
-};
-
-/** True if some rule already covers the same special Shabbos. These two were hand-made
- *  before they were seeded, so on the browser they were made in they exist under their
- *  own ids - seeding by id alone would sit a second "דרשה" on top of the first. */
-function alreadyCovered(rules, rule) {
-  const wanted = rule.condition.specialParsha;
-  return rules.some((r) => r.id === rule.id || (r.condition?.specialParsha || []).some((p) => wanted.includes(p)));
+ *  שובה went first and הגדול followed once the שובה cell had been printing for a season. So
+ *  nothing is seeded here any more, and what is left is taking the old ones back off the
+ *  browsers that were given them: left in place, either would sit a second, wordless "דרשה"
+ *  underneath the computed one.
+ *
+ *  Matched on what the rule does rather than on the id it was seeded with. Both of these were
+ *  hand-made before they were ever seeded, so on the browser they were made in they carry their
+ *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
+ *  is matched is an append of nothing but the word itself, which is the rule that is now
+ *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
+ *  alone: quietly deleting that is worse than a duplicate they can see and remove. */
+const RETIRED_DRASHA_NAMES = ['שובה', 'Shuva', 'הגדול', 'Hagadol'];
+function isRetiredDrashaRule(rule) {
+  return rule?.mode === 'append'
+    && String(rule.value || '').trim() === 'דרשה'
+    && (rule.condition?.specialParsha || []).some((p) => RETIRED_DRASHA_NAMES.includes(p));
 }
 
 /** The 8:40 put back on the end of the ר"ח / בה"ב / תענית שחרית, once.
@@ -115,18 +101,15 @@ function applySeeds(state) {
     if (RESTORE_840.has(saved)) state.settings.weekdayShacharisSpecial = RESTORE_840.get(saved);
     seeded.special840Back = true;
   }
-  if (!seeded.drashos) {
-    for (const rule of DRASHA_RULES) {
-      if (!alreadyCovered(state.rules, rule)) state.rules.push({ ...rule });
-    }
-    seeded.drashos = true;
-  }
-  if (!seeded.shuvaComputed) {
-    state.rules = state.rules.filter(
-      (r) => !(r.id === RETIRED_SHUVA_RULE.id && r.mode === RETIRED_SHUVA_RULE.mode && r.value === RETIRED_SHUVA_RULE.value)
-    );
-    seeded.shuvaComputed = true;
-  }
+  /* Both bare-word דרשה rules off, on any browser still holding one. Not guarded by a flag
+     that can be satisfied once: the שובה pass ran under seeded.shuvaComputed and matched on
+     the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
+     duplicate. This runs every load and is cheap, and a rule it removes cannot come back,
+     because nothing seeds one any more. See isRetiredDrashaRule for what it will not touch. */
+  state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r));
+  seeded.drashos = true;
+  seeded.shuvaComputed = true;
+  seeded.hagadolComputed = true;
   if (!seeded.tishaBav) {
     if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
     seeded.tishaBav = true;
