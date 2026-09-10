@@ -14943,6 +14943,9 @@ function autoCardOrder(state, settings) {
  *  anyone who ever touched it once. */
 function cardOrder(showing, state, settings) {
   const auto = autoCardOrder(state, settings);
+  // The congregation's page never asks, so there is nothing to have picked: it leads with
+  // whichever card is the next one to be used, every time.
+  if (congregationView) return auto;
   try {
     const [pick, week, against] = (localStorage.getItem(CARD_ORDER_KEY) || '').split('|');
     if ((pick === 'shabbos' || pick === 'weekday') && week === String(showing) && against === auto) return pick;
@@ -14987,6 +14990,25 @@ let pairView = false;
  *  fresh shows the charts, which is what every device has shown until now and what the
  *  congregation's page still shows anybody who does not go looking for the others. */
 let weekLayout = 'charts'; // 'charts' | 'sheet' | 'shabbos'
+
+/** Whether this is the congregation's page rather than the admin.
+ *
+ *  The two views are one renderer on purpose, so the shul is never looking at a week built by
+ *  different code from the week the congregation is looking at. But they are not the same
+ *  audience: the admin is somebody laying out paper and wants every control, and the
+ *  congregation's page is somebody who came to find out what time מנחה is.
+ *
+ *  So the layout questions are the admin's. On the congregation's page the week is the two
+ *  charts, and which of them comes first is worked out from the day rather than asked about:
+ *  see cardOrder and layoutNow, which are the only two things that read this.
+ *
+ *  Set by renderWeek on every render rather than passed down, because the two functions that
+ *  need it are called from inside the markup and threading a flag through them would put the
+ *  word "luach" into a dozen signatures that are otherwise about zmanim. The admin and the
+ *  congregation are different documents, so there is no page where both values are wanted at
+ *  once. */
+let congregationView = false;
+const layoutNow = () => (congregationView ? 'charts' : weekLayout);
 
 /** Whether More options is open, kept for the same reason and in the same way.
  *
@@ -16124,6 +16146,9 @@ function chartStretchSerials(showing, index, state) {
 function renderWeek(container, state, onSerialChange, serial = null, opts = {}) {
   // opts.luach: the congregation-facing view, which has no app chrome around it.
   const luach = Boolean(opts.luach);
+  // Set before anything is built, since the markup below is what reads it. See the note on
+  // congregationView.
+  congregationView = luach;
   // opts.heading: false where whatever put this on the screen has already written the
   // heading itself. On This week the pages and the wall chart are two sides of one screen,
   // so the title and the buttons that swap them belong to the screen, not to this half.
@@ -16164,9 +16189,9 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   // whose Shabbos is Yom Tov has no שבת rows on any chart, so its sheet without חול is
   // nothing at all and that position falls back to the charts rather than to a blank page.
   const sheetHtml = weekSheetHtml(showing, index, state, settings,
-    weekTitle(showing, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+    weekTitle(showing, index, state, settings), { withChol: layoutNow() !== 'shabbos' });
   const sheetAvailable = Boolean(weekSheetHtml(showing, index, state, settings, '', { withChol: true }));
-  const onOneSheet = weekLayout !== 'charts' && Boolean(sheetHtml);
+  const onOneSheet = layoutNow() !== 'charts' && Boolean(sheetHtml);
   // A card is 8.5in across, and so is the two-card sheet: a column of times wants height
   // rather than width. See setPrintPage for why the document's one page size is set from
   // the view rather than from a named page in the stylesheet.
@@ -16217,7 +16242,12 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
               // is the whole week in one list, set the way the yomim noraim sheet is set.
               // Offered wherever there is a sheet to build: a week with one card still has
               // both halves of the week to say, and the one-sheet version says them.
-              sheetAvailable
+              //
+              // The admin only. The congregation's page is the two charts and is not asked
+              // about it: somebody who came to find out what time מנחה is has no view about
+              // how the week should be laid out on paper, and a switch that changes what the
+              // page looks like is a switch that can leave it looking wrong. See layoutNow.
+              !luach && sheetAvailable
                 ? switchHtml('week-layout', 'Layout', [
                   { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
                   { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
@@ -16243,10 +16273,18 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
                     { value: 'one', label: 'One', on: !pairView },
                     { value: 'two', label: 'Two', on: pairView },
                   ])}
-                  ${switchHtml('week-order', 'Which page first', [
-                    { value: 'shabbos', label: '<bdi lang="he">שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
-                    { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
-                  ])}`
+                  ${
+                    // Which page first is the admin's too, and for a better reason than
+                    // tidiness: the answer the congregation wants is always the same one, so
+                    // asking is offering somebody the chance to get it wrong. The page leads
+                    // with the card whose times are next, weekday from Sunday and שבת from
+                    // Friday, worked out on every render off the shul's own clock. See
+                    // autoCardOrder, which has been what this switch defaults to all along.
+                    luach ? '' : switchHtml('week-order', 'Which page first', [
+                      { value: 'shabbos', label: '<bdi lang="he">שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
+                      { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
+                    ])
+                  }`
                 : ''
             }
           </div>
@@ -16455,8 +16493,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
       // The layout the screen is on, week after week. A run that came out as two charts
       // while the screen showed one sheet would be the one place the two could disagree,
       // and it is the place nobody would check: the run is looked at in the print dialog.
-      const asSheet = weekLayout !== 'charts' && weekSheetHtml(serial, index, state, settings,
-        weekTitle(serial, index, state, settings), { withChol: weekLayout !== 'shabbos' });
+      const asSheet = layoutNow() !== 'charts' && weekSheetHtml(serial, index, state, settings,
+        weekTitle(serial, index, state, settings), { withChol: layoutNow() !== 'shabbos' });
       if (asSheet) {
         host.innerHTML = asSheet;
         fitWeekSheet(host);
