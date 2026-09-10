@@ -41,6 +41,7 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
         <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
+        <p class="hint">The printed chart puts this under a heading naming only the ones that actually fall in it, so a season with no בה"ב does not say בה"ב, and a season with none of the three leaves this schedule off altogether. The week card names the day itself.</p>
         <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
         <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>

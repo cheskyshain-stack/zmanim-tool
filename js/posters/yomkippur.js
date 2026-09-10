@@ -107,6 +107,15 @@ export function everydayShacharis(settings) {
   const html = String(settings.weekdayShacharis || '')
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
+    /* The slashes between a pair of times, which are separators and not times. The field used
+       to be one time to a line and the whitespace split below was the whole of it; it now
+       reads "7:00 / 7:20*" two to a line, and every one of those slashes was coming through as
+       an item of its own and printing on the שמחת בית השואבה and ערב סוכות sheets as NaN:NaN.
+       Matched only with whitespace on both sides, which the pair separator has and the one in
+       "</u>" does not: that slash is preceded by a "<" and has to survive, since parseTimes
+       reads the tag to know a time is underlined. NBSP counts as whitespace to \s, and the
+       separator is NBSP on both sides (see SLASH in util.js). */
+    .replace(/(?<=\s)\/(?=\s)/g, ' ')
     .trim()
     .split(/\s+/)
     .filter(Boolean)

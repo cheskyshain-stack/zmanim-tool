@@ -426,8 +426,30 @@ const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 / 7:20*\n<u>7:35</u>
  *  since it covers a whole season at once. */
 const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>';
 
-/** The heading printed above the second schedule on the wall chart. */
-const SPECIAL_SHACHARIS_HEADING = 'ר"ח בה"ב ותענ"צ';
+/** The heading printed above the second schedule on the wall chart, and the three pieces it
+ *  is built out of.
+ *
+ *  All three of them where all three are on the chart, and only the ones that are otherwise:
+ *  the shul asked for that, and it is the honest thing to print. בה"ב is two weeks of the year
+ *  and a whole season can pass with no weekday תענית, so a heading naming all three was
+ *  naming days that are not on the paper. Which of them a chart holds is
+ *  specialShacharisKinds in hebrew-calendar.js.
+ *
+ *  Joined with a ו on the last, the way the full heading has always read: "ר"ח בה"ב ותענ"צ",
+ *  "ר"ח ותענ"צ", "בה"ב". */
+const SPECIAL_SHACHARIS_PARTS = [
+  ['roshChodesh', 'ר"ח'],
+  ['behab', 'בה"ב'],
+  ['taanis', 'תענ"צ'],
+];
+
+function specialShacharisHeading(kinds) {
+  const parts = SPECIAL_SHACHARIS_PARTS.filter(([key]) => kinds?.[key]).map(([, word]) => word);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(' ')} ו${parts[parts.length - 1]}`;
+}
+
 
 /** Cuts a saved value that still holds both schedules in one field into the two the
  *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
@@ -1421,6 +1443,43 @@ function hasTaanis(serial, settings) {
  *  earlier that day": both have their own sheet entirely, and listing them beside a regular
  *  שחרית time would be worse than saying nothing.
  */
+/** Which of the three kinds the second שחרית list is for actually fall on the weekdays of
+ *  these weeks.
+ *
+ *  The wall chart printed "ר"ח בה"ב ותענ"צ" over that list on every chart of every season,
+ *  which names two things that are not on the paper more often than not: בה"ב is two weeks a
+ *  year, in אייר and חשון, and a whole season can go by with no תענית on a weekday at all.
+ *  So the heading is built from what the weeks in front of the reader actually hold, and where
+ *  they hold none of the three the list comes off with it. See specialShacharisHeading in
+ *  settings.js for the wording.
+ *
+ *  Sunday through Friday, which is what that list is for: the chart's own מנחה and מעריב stop
+ *  at Thursday, but Friday morning davens the weekday שחרית too (see minyanimForDay), so a
+ *  ר"ח on a Friday is a ר"ח this heading is about. Shabbos is not, whatever falls on it.
+ *
+ *  Two of the fasts are left out, for the reason specialDaysInWeek leaves them out: יום כפור
+ *  and תשעה באב have sheets of their own, and neither runs a schedule that can be read as
+ *  "שחרית is earlier that day". A season whose only fast is one of those two is a season with
+ *  no תענ"צ in this heading.
+ *
+ *  The other four count, צום גדליה with them. It was left out at first, on the grounds that the
+ *  shul's own sheet for that day opens earlier than this list does, and the shul said otherwise:
+ *  it is a תענית ציבור, the heading names the kinds of day the list is for, and a קיץ chart whose
+ *  only weekday fast is צום גדליה is a chart that should read ר"ח ותענ"צ. */
+function specialShacharisKinds(shabbosSerials, settings) {
+  const kinds = { roshChodesh: false, behab: false, taanis: false };
+  for (const shabbos of shabbosSerials) {
+    for (let offset = 6; offset >= 1; offset -= 1) {
+      const serial = shabbos - offset;
+      if (hasRoshChodesh(serial, settings)) kinds.roshChodesh = true;
+      if (hasBehab(serial, settings)) kinds.behab = true;
+      const fast = hasTaanis(serial, settings);
+      if (fast && !/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(fast)) kinds.taanis = true;
+    }
+  }
+  return kinds;
+}
+
 function specialDaysInWeek(shabbosSerial, settings) {
   // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
   // than naming the same month twice, and בה״ב lists its Monday and Thursday together.
@@ -2208,6 +2267,15 @@ function everydayShacharis(settings) {
   const html = String(settings.weekdayShacharis || '')
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
+    /* The slashes between a pair of times, which are separators and not times. The field used
+       to be one time to a line and the whitespace split below was the whole of it; it now
+       reads "7:00 / 7:20*" two to a line, and every one of those slashes was coming through as
+       an item of its own and printing on the שמחת בית השואבה and ערב סוכות sheets as NaN:NaN.
+       Matched only with whitespace on both sides, which the pair separator has and the one in
+       "</u>" does not: that slash is preceded by a "<" and has to survive, since parseTimes
+       reads the tag to know a time is underlined. NBSP counts as whitespace to \s, and the
+       separator is NBSP on both sides (see SLASH in util.js). */
+    .replace(/(?<=\s)\/(?=\s)/g, ' ')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -7079,9 +7147,18 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
   // one shul-wide value straight from Settings, not per-week: instead of repeating it
   // in every row (which would make a multi-line schedule absurdly tall over many
-  // weeks), it prints once as a single cell spanning the whole page's rows, matching
-  // how it looks in the original printed chart. It's sourced live from Settings with
-  // no per-cell override - change it in Settings and it updates everywhere at once.
+  // weeks), it prints once on a panel laid over the whole column, matching how it looks
+  // in the original printed chart. It's sourced live from Settings with no per-cell
+  // override - change it in Settings and it updates everywhere at once.
+  /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
+     than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
+     hair shorter than a row (the collapsed border between two rows is not part of it, see
+     .shacharis-panel). At 100% that is made up exactly, but under Fit to screen's zoom a
+     hairline does not scale the way a percentage does and a little is left over per row.
+     Hung from the first row, all of it lands at the foot: measured on a phone, 6px of chart
+     above the panel against 12px below. Hung from the middle, the half above and the half
+     below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
+  const panelRow = Math.round((pageWeeks.length - 0.7) / 2);
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -7097,22 +7174,49 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
       const cellHtml = (c) => {
-        // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
-        // first row (browsers naturally leave that column slot filled on later rows).
-        // Stored as real HTML straight from Settings' rich-text editor (see
-        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
+        /* שחרית on the Weekday chart: one cell a row, like every other column, and the
+           schedule on a panel laid over them.
+           A rowspan cell was the obvious way to say "one schedule for the page" and it was
+           the wrong one: it erased its column for the whole height of the page, so the row a
+           reader was following stopped dead at שחרית and picked up again on the far side of
+           it. These are real rows now, so the band and the rule under each of them are the
+           row's own and cannot drift from the rest of the chart, and the schedule is said
+           once on a panel over the top rather than repeated down the column.
+           Stored as real HTML straight from Settings' rich-text editor (see
+           settings-view.js), so it prints out as-is instead of through nl2br/esc. */
         if (isWeekday && c.key === 'E') {
-          if (rowIndex !== 0) return '';
-          // Both schedules on the printed chart, rebuilt from the two fields with the
-          // heading between them, so the wall chart looks exactly as it always has.
-          const special = state.settings.weekdayShacharisSpecial;
+          // Every row but the one the panel hangs from is an empty cell carrying nothing
+          // but its own row.
+          if (rowIndex !== panelRow) return '<td class="shacharis-through"></td>';
+          /* Both schedules on the printed chart, rebuilt from the two fields with the heading
+             between them, so the wall chart looks the way it always has.
+             The heading names only the kinds of day this page's own weeks actually hold, and
+             where they hold none of the three the second schedule comes off with it: see
+             specialShacharisKinds. It used to read ר"ח בה"ב ותענ"צ on every chart of every
+             season, which named days that were not on the paper, בה"ב being two weeks of the
+             year and a weekday תענית missing from whole seasons. Asked for by the shul, and
+             worked out per page rather than per chart because this cell is a page's cell: a
+             season split over two pages says on each what that page is about. */
+          const heading = specialShacharisHeading(
+            specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
+          const special = heading ? state.settings.weekdayShacharisSpecial : '';
           const html =
             (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
             (special ? `
 
-<u>${escText(SPECIAL_SHACHARIS_HEADING)}</u>
+<u>${escText(heading)}</u>
 ${special}` : '');
-          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
+          /* This row's cell is a row like the others and carries the panel, which is laid out
+             of it and over the whole column.
+             --rows is the page's row count and --above is how many rows sit above this one,
+             and the two are what let the panel be a panel with nothing measured: this cell is
+             one row tall and every row on the page is the same height (see
+             syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
+             rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
+             the arithmetic. */
+          return `<td class="shacharis-through is-panel"
+            style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
+            <div class="shacharis-panel"><div class="shacharis-panel-in">${html}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a
@@ -14034,6 +14138,7 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
         <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
         <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
         <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
+        <p class="hint">The printed chart puts this under a heading naming only the ones that actually fall in it, so a season with no בה"ב does not say בה"ב, and a season with none of the three leaves this schedule off altogether. The week card names the day itself.</p>
         <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
         <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
         <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>

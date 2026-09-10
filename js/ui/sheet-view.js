@@ -1,5 +1,5 @@
-import { resolveSettings, SPECIAL_SHACHARIS_HEADING, DEFAULT_ACCENT_COLOR } from '../settings.js';
-import { hebrewDateExtended, weekOfLabel } from '../hebrew-calendar.js';
+import { resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR } from '../settings.js';
+import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
@@ -466,9 +466,18 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
   // one shul-wide value straight from Settings, not per-week: instead of repeating it
   // in every row (which would make a multi-line schedule absurdly tall over many
-  // weeks), it prints once as a single cell spanning the whole page's rows, matching
-  // how it looks in the original printed chart. It's sourced live from Settings with
-  // no per-cell override - change it in Settings and it updates everywhere at once.
+  // weeks), it prints once on a panel laid over the whole column, matching how it looks
+  // in the original printed chart. It's sourced live from Settings with no per-cell
+  // override - change it in Settings and it updates everywhere at once.
+  /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
+     than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
+     hair shorter than a row (the collapsed border between two rows is not part of it, see
+     .shacharis-panel). At 100% that is made up exactly, but under Fit to screen's zoom a
+     hairline does not scale the way a percentage does and a little is left over per row.
+     Hung from the first row, all of it lands at the foot: measured on a phone, 6px of chart
+     above the panel against 12px below. Hung from the middle, the half above and the half
+     below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
+  const panelRow = Math.round((pageWeeks.length - 0.7) / 2);
 
   const rows = pageWeeks
     .map((week, rowIndex) => {
@@ -484,22 +493,49 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
       const cellHtml = (c) => {
-        // שחרית on the Weekday chart: a plain rowspan cell, only emitted on the page's
-        // first row (browsers naturally leave that column slot filled on later rows).
-        // Stored as real HTML straight from Settings' rich-text editor (see
-        // settings-view.js), so it prints out as-is instead of through nl2br/esc.
+        /* שחרית on the Weekday chart: one cell a row, like every other column, and the
+           schedule on a panel laid over them.
+           A rowspan cell was the obvious way to say "one schedule for the page" and it was
+           the wrong one: it erased its column for the whole height of the page, so the row a
+           reader was following stopped dead at שחרית and picked up again on the far side of
+           it. These are real rows now, so the band and the rule under each of them are the
+           row's own and cannot drift from the rest of the chart, and the schedule is said
+           once on a panel over the top rather than repeated down the column.
+           Stored as real HTML straight from Settings' rich-text editor (see
+           settings-view.js), so it prints out as-is instead of through nl2br/esc. */
         if (isWeekday && c.key === 'E') {
-          if (rowIndex !== 0) return '';
-          // Both schedules on the printed chart, rebuilt from the two fields with the
-          // heading between them, so the wall chart looks exactly as it always has.
-          const special = state.settings.weekdayShacharisSpecial;
+          // Every row but the one the panel hangs from is an empty cell carrying nothing
+          // but its own row.
+          if (rowIndex !== panelRow) return '<td class="shacharis-through"></td>';
+          /* Both schedules on the printed chart, rebuilt from the two fields with the heading
+             between them, so the wall chart looks the way it always has.
+             The heading names only the kinds of day this page's own weeks actually hold, and
+             where they hold none of the three the second schedule comes off with it: see
+             specialShacharisKinds. It used to read ר"ח בה"ב ותענ"צ on every chart of every
+             season, which named days that were not on the paper, בה"ב being two weeks of the
+             year and a weekday תענית missing from whole seasons. Asked for by the shul, and
+             worked out per page rather than per chart because this cell is a page's cell: a
+             season split over two pages says on each what that page is about. */
+          const heading = specialShacharisHeading(
+            specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
+          const special = heading ? state.settings.weekdayShacharisSpecial : '';
           const html =
             (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
             (special ? `
 
-<u>${escText(SPECIAL_SHACHARIS_HEADING)}</u>
+<u>${escText(heading)}</u>
 ${special}` : '');
-          return `<td class="shacharis-merged" rowspan="${pageWeeks.length}">${html}</td>`;
+          /* This row's cell is a row like the others and carries the panel, which is laid out
+             of it and over the whole column.
+             --rows is the page's row count and --above is how many rows sit above this one,
+             and the two are what let the panel be a panel with nothing measured: this cell is
+             one row tall and every row on the page is the same height (see
+             syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
+             rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
+             the arithmetic. */
+          return `<td class="shacharis-through is-panel"
+            style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
+            <div class="shacharis-panel"><div class="shacharis-panel-in">${html}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a

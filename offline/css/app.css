@@ -818,12 +818,63 @@ td.ruled .cell { background: var(--ruled); }
    Serif for Times New Roman, whose ע does not reach the line, so it has to be checked in the
    font that actually ships (see HEBREW_STAND_IN in sheet-view.js). */
 .ul, u { text-decoration: underline; text-underline-offset: 2px; text-decoration-skip-ink: none; }
-/* Weekday chart's שחרית column: one shul-wide schedule spanning every row on the page
-   (see sheet-view.js) rather than a per-week editable cell - not contenteditable, so
-   style it as plainly distinct from the surrounding editable cells. direction:ltr for
-   the same reason as .cell above - without it the bidi algorithm visually reverses
-   "/"-or-","-separated time lists. */
-.shacharis-merged { white-space: pre-line; line-height: 1.3; direction: ltr; }
+/* Weekday chart's שחרית column: one shul-wide schedule for the whole page (see
+   sheet-view.js) rather than a per-week editable cell - not contenteditable, so style it
+   as plainly distinct from the surrounding editable cells. direction:ltr for the same
+   reason as .cell above - without it the bidi algorithm visually reverses
+   "/"-or-","-separated time lists.
+   One cell a row, and every one of them empty. That is the whole point: the row's band and
+   the rule under it are the row's own, exactly as in מנחה and מעריב, so the chart's rows carry
+   the full width of the paper and cannot drift from the rest of it. Nothing is drawn here to
+   imitate them. It was drawn once, when this was a single rowspan cell that had to paint what
+   it was covering, and painting it is one more thing that can go out of step with the thing it
+   is copying. */
+.shacharis-through { padding: 0; }
+.shacharis-through.is-panel { position: relative; }
+/* And the panel: the schedule said once, on a piece of white paper laid over the rows.
+   Positioned out of one row's cell (the middle one, see panelRow in sheet-view.js), which is
+   what lets it be a panel at all rather than a cell that swallows its column. Everything about
+   its size is in that cell's own terms:
+     - one cell is exactly one row (every row on a page is the same height, see
+       syncHeaderRowHeight), so a height of (--rows - 0.7) rows runs the panel down almost the
+       whole body: it starts a third of a row under the header and stops a third of a row above
+       the bottom border, covering part of every row on the page, the first and the last
+       included. The fraction is what makes it a card rather than a block of merged cells: an
+       edge that lands on a row divider reads as a cell boundary, so neither edge is allowed
+       near one. It was two whole rows shorter than this at first, over rows 2 to N-1, and that
+       is exactly what it looked like.
+       The 1px a row is the collapsed border between two rows. A percentage of this cell
+       resolves against its padding box, which is the row less that border, so nine rows of
+       plain percentage came out 9px short. One border per row, and the table draws them 1px
+       (see `th, td`).
+     - --above is how many rows are above this cell, so the panel is lifted that many rows and
+       set down a third of one, which puts its top a third of a row under the header wherever
+       on the page it is hung from. And it is hung from the middle, so what the browser makes of
+       a hairline under Fit to screen's zoom cancels between the half above and the half below
+       instead of piling up at one end: see panelRow in sheet-view.js. Measured at 100%: 17.9px
+       of chart above the panel and 17.9px below it, on a 51.1px row.
+     - 18% off each side leaves it 64% of the column, centred, with a third of the column's
+       width of chart showing to its left and its right. The rows visibly run past it and
+       behind it. It was 7% first, which is a 20px sliver, and the column still read as a white
+       box with a bruise down each side.
+   A hairline in a light grey and a very faint shadow, which is what makes it read as laid on
+   top rather than as a hole in the chart, and z-index so it is over the rules whatever order
+   the rows happen to paint in.
+   place-content centres the schedule in the panel, and it is safe here because the panel holds
+   exactly one child. Put on the text itself it would make every piece of the schedule its own
+   item and swallow the blank line between the two blocks, which is what happened the first
+   time this was tried. */
+.shacharis-panel {
+  position: absolute; z-index: 2;
+  top: calc((0.35 - var(--above, 0)) * 100% + (0.35 - var(--above, 0)) * 1px);
+  height: calc((var(--rows, 3) - 0.7) * 100% + (var(--rows, 3) - 0.7) * 1px);
+  left: 18%; right: 18%;
+  background: #fff; border: 1px solid #ccd3da; border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13);
+  display: grid; place-content: center;
+  padding: 0.14in 0.1in; box-sizing: border-box;
+  white-space: pre-line; line-height: 1.3; direction: ltr;
+}
 
 /* Settings' מנחה/מעריב option lists - one editable row per option (rich text, so an
    option can carry the underlining the printed board uses). */
@@ -847,17 +898,17 @@ td.ruled .cell { background: var(--ruled); }
 /* Weekday chart layout, matching the original printed board: 4 evenly-split columns
    (table-layout:fixed instead of auto, which would otherwise let the multi-line שחרית
    schedule claim far more width than the one-line מנחה/מעריב cells) and a shared
-   per-row minimum height generous enough that the merged שחרית cell's own content (see
-   .shacharis-merged) never needs to force extra height onto just one or two rows -
-   rows can still grow taller than this floor if their own content needs more room. */
+   per-row minimum height, which is now what gives the שחרית panel (see .shacharis-panel)
+   room: the panel is positioned, so it adds nothing to any row's height and cannot stretch
+   whichever one or two rows happen to sit beside its text. Rows can still grow taller than
+   this floor if their own content needs more room. */
 .weekday-table { table-layout: fixed; }
 /* Only the parsha/week-name column shrinks - שחרית/מנחה/מעריב (unset here) share the
    rest equally between themselves, table-layout:fixed's default for columns with no
    explicit width. */
 .weekday-table col[data-colkey="parsha"] { width: 14%; }
-/* A shared floor for every body row (they can still grow past it for longer content) so
-   the merged שחרית cell's own height gets spread evenly instead of stretching whichever
-   one or two rows happen to sit next to its text. calc() against the shared
+/* A shared floor for every body row (they can still grow past it for longer content), which
+   is also what holds the column tall enough for the שחרית panel laid over it. calc() against the shared
    --sheet-font-size custom property rather than em, which would resolve against each
    row's own font-size. The *header* row is matched to the body separately, by
    syncHeaderRowHeight() in sheet-view.js - see there for why that can't be pure CSS. */

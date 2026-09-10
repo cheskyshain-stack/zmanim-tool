@@ -321,6 +321,43 @@ export function hasTaanis(serial, settings) {
  *  earlier that day": both have their own sheet entirely, and listing them beside a regular
  *  שחרית time would be worse than saying nothing.
  */
+/** Which of the three kinds the second שחרית list is for actually fall on the weekdays of
+ *  these weeks.
+ *
+ *  The wall chart printed "ר"ח בה"ב ותענ"צ" over that list on every chart of every season,
+ *  which names two things that are not on the paper more often than not: בה"ב is two weeks a
+ *  year, in אייר and חשון, and a whole season can go by with no תענית on a weekday at all.
+ *  So the heading is built from what the weeks in front of the reader actually hold, and where
+ *  they hold none of the three the list comes off with it. See specialShacharisHeading in
+ *  settings.js for the wording.
+ *
+ *  Sunday through Friday, which is what that list is for: the chart's own מנחה and מעריב stop
+ *  at Thursday, but Friday morning davens the weekday שחרית too (see minyanimForDay), so a
+ *  ר"ח on a Friday is a ר"ח this heading is about. Shabbos is not, whatever falls on it.
+ *
+ *  Two of the fasts are left out, for the reason specialDaysInWeek leaves them out: יום כפור
+ *  and תשעה באב have sheets of their own, and neither runs a schedule that can be read as
+ *  "שחרית is earlier that day". A season whose only fast is one of those two is a season with
+ *  no תענ"צ in this heading.
+ *
+ *  The other four count, צום גדליה with them. It was left out at first, on the grounds that the
+ *  shul's own sheet for that day opens earlier than this list does, and the shul said otherwise:
+ *  it is a תענית ציבור, the heading names the kinds of day the list is for, and a קיץ chart whose
+ *  only weekday fast is צום גדליה is a chart that should read ר"ח ותענ"צ. */
+export function specialShacharisKinds(shabbosSerials, settings) {
+  const kinds = { roshChodesh: false, behab: false, taanis: false };
+  for (const shabbos of shabbosSerials) {
+    for (let offset = 6; offset >= 1; offset -= 1) {
+      const serial = shabbos - offset;
+      if (hasRoshChodesh(serial, settings)) kinds.roshChodesh = true;
+      if (hasBehab(serial, settings)) kinds.behab = true;
+      const fast = hasTaanis(serial, settings);
+      if (fast && !/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(fast)) kinds.taanis = true;
+    }
+  }
+  return kinds;
+}
+
 export function specialDaysInWeek(shabbosSerial, settings) {
   // Grouped by name, so a two-day ראש חודש reads "ראש חדש חשון (Sunday, Monday)" rather
   // than naming the same month twice, and בה״ב lists its Monday and Thursday together.

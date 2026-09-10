@@ -97,6 +97,12 @@
      wipe the dark header row, the tinted parsha column and the striped body rows - the
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* The one thing the screen has that the paper should not: the שחרית panel's shadow. On
+     screen it is what tells the eye the panel is lying on the rows rather than cut into
+     them, and a laser printer has no soft grey to render it with, so it dithers a faint
+     halo into a band of dots along two edges of the panel. The border does the same job on
+     paper. Turn this off and print a real page before deciding otherwise. */
+  .shacharis-panel { box-shadow: none; }
 }
 
 /* --- The week cards on paper -------------------------------------------------------

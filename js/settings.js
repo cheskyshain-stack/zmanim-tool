@@ -31,8 +31,30 @@ export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 / 7:20*\n<u>7
  *  since it covers a whole season at once. */
 export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>';
 
-/** The heading printed above the second schedule on the wall chart. */
-export const SPECIAL_SHACHARIS_HEADING = 'ר"ח בה"ב ותענ"צ';
+/** The heading printed above the second schedule on the wall chart, and the three pieces it
+ *  is built out of.
+ *
+ *  All three of them where all three are on the chart, and only the ones that are otherwise:
+ *  the shul asked for that, and it is the honest thing to print. בה"ב is two weeks of the year
+ *  and a whole season can pass with no weekday תענית, so a heading naming all three was
+ *  naming days that are not on the paper. Which of them a chart holds is
+ *  specialShacharisKinds in hebrew-calendar.js.
+ *
+ *  Joined with a ו on the last, the way the full heading has always read: "ר"ח בה"ב ותענ"צ",
+ *  "ר"ח ותענ"צ", "בה"ב". */
+export const SPECIAL_SHACHARIS_PARTS = [
+  ['roshChodesh', 'ר"ח'],
+  ['behab', 'בה"ב'],
+  ['taanis', 'תענ"צ'],
+];
+
+export function specialShacharisHeading(kinds) {
+  const parts = SPECIAL_SHACHARIS_PARTS.filter(([key]) => kinds?.[key]).map(([, word]) => word);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(' ')} ו${parts[parts.length - 1]}`;
+}
+
 
 /** Cuts a saved value that still holds both schedules in one field into the two the
  *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
