@@ -29,7 +29,14 @@
  * with no secrecy to justify it. The site tag is the beacon token out of the site's own head,
  * which every visitor can read, so it is written below. The account id is something the token
  * itself can be asked for, so the Worker asks. Both can still be overridden by a variable of
- * the same name, which is what an account holding more than one Cloudflare account needs.
+ * the same name.
+ *
+ * CF_ACCOUNT_ID is the one that has to be set by hand sometimes, and there are two such cases,
+ * both of which the Worker names on the screen rather than leaving as a dead end: a token that
+ * can see more than one account, where there is a real choice this cannot make, and a token
+ * that /accounts hands back nothing for, which is what an account-owned token does. The value
+ * is the 32 characters after dash.cloudflare.com/ in the dashboard address, and it is not a
+ * secret: it is in the address bar of every page of the dashboard.
  *
  * The admin shows whatever comes back, errors included, verbatim. That is deliberate: the
  * shape of Cloudflare's analytics schema is the one thing here that cannot be checked from
@@ -87,7 +94,11 @@ async function accountFor(env) {
   }
   const list = body.result || [];
   if (!list.length) {
-    throw new Error('This token can see no account. It needs Account, Account Analytics, Read.');
+    throw new Error('This token is attached to no account, so this cannot work out which account '
+      + 'to ask about. Set CF_ACCOUNT_ID on this Worker, as a plain variable, to the 32 characters '
+      + 'after dash.cloudflare.com/ in the dashboard address. If the numbers still do not come, the '
+      + 'token is missing Account, Account Analytics, Read, or was made without an account picked '
+      + 'under Account Resources.');
   }
   if (list.length > 1) {
     throw new Error('This token can see more than one account, so CF_ACCOUNT_ID has to say which: '

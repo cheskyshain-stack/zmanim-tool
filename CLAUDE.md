@@ -194,8 +194,10 @@ The token is a Worker secret instead, and the admin asks the Worker.
   site tag is the beacon token out of the site's own head, which every visitor can read, so the
   Worker carries it; the account id is something the token can be asked for, so the Worker asks
   and caches the answer. `CF_SITE_TAG` and `CF_ACCOUNT_ID` still override, and `CF_ACCOUNT_ID`
-  is needed where the token can see more than one account, which the Worker says outright
-  rather than guessing.
+  has to be set by hand in two cases, both of which the Worker names on the screen rather than
+  guessing: a token that can see more than one account, and a token `/accounts` hands back
+  nothing for. The value is the 32 characters after `dash.cloudflare.com/` in the dashboard
+  address, and it is not a secret.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
