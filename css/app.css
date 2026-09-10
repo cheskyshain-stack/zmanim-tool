@@ -1521,6 +1521,17 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
    where there is slack it costs nothing: the auto simply takes 30px less of it, so the
    roomy case still measures the same 228px it did. */
 .luach-home > .luach-rule { margin-top: auto; padding-top: 1.9rem; }
+/* The plain-HTML stand-in inside a route page, taken off the screen as soon as we know an app
+   is coming to replace it (the `js` class, see the note in index.html's head).
+   Only the part of it that does not match the page it stands in for: the bar above it is the
+   app's own bar and stays. What goes is a blurb about the page and links to the other two,
+   which on a phone read like the wrong page for four and a half seconds while the modules
+   came down. Measured, over fast 3G, on the shul's own week page.
+   Not simply deleted from the shell, because it is doing a job: it is what a crawler reads
+   and what a reader with JavaScript off gets, and both of those see it exactly as before.
+   Neither does the menu page carry this class: its stand-in is a fair picture of what the app
+   draws there, so there is nothing to hide. */
+html.js .luach-home.is-preapp { display: none; }
 
 /* The shul, small, in the top left of the navy cap.
    Placed rather than laid out, so it cannot push the wordmark off centre or move anything

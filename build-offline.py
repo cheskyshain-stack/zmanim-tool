@@ -751,6 +751,12 @@ def route_shell(name: str, meta: dict) -> str:
 
     No times in it. Those come out of published.json and change every week, and a shell
     saying last season's mincha would be worse than a shell saying none.
+
+    The bar at the top is the app's own bar and stays on the screen throughout. What follows
+    it is not: it is a description of the page and the way to the other two, standing in for a
+    week's times that have not arrived yet. That part is marked is-preapp and hidden as soon as
+    we know an app is coming, because on a phone it is not a flicker: measured over fast 3G it
+    read like the wrong page for 4.6 seconds. See the note in index.html's head.
     """
     others = [
         (n, ROUTES[n]["heading"]) for n in ROUTES if n != name
@@ -775,7 +781,7 @@ def route_shell(name: str, meta: dict) -> str:
     <a class="luach-back" href="/">&larr; Menu</a>
     <h1 class="luach-bar-title">{meta['heading']}</h1>{give}
   </div>
-  <div class="luach-home">
+  <div class="luach-home is-preapp">
     <p class="luach-intro">
       {meta['blurb']}
       <span lang="he">קהל לב מנחם</span>, 44 Coles Way, Lakewood, NJ 08701.
