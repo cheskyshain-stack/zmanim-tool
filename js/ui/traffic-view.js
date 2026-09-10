@@ -15,7 +15,7 @@
  *
  *  Empty until the Worker is deployed, and while it is empty this screen is the deploying
  *  instructions rather than an error. */
-const TRAFFIC_API = '';
+const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 
 /** How far back, and what each choice is called. Cloudflare's free Web Analytics keeps a
  *  month, so a year is not offered: it would come back short and look like a fault. */
