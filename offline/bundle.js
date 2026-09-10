@@ -5629,11 +5629,11 @@ function buildSlichosTzomPoster(year, settings) {
 //
 //   Erev P' Ki Savo
 //   Mincha 1:35d, 1:50m, 2:15m, 3:00m
-//   Mincha 5:57m & ns, Plag Gra 6:12
+//   Mincha 5:57m, Plag Gra 6:12
 //   Mincha 6:33d, Plag MA 6:48
 //   Mincha 6:53en Plag 7:08
 //   Hadlakas Neiros 7:16
-//   Mincha 7:19m & ns
+//   Mincha 7:19m
 //   Have a great Shabbos!
 //
 // Where each piece comes from:
@@ -5649,9 +5649,12 @@ function buildSlichosTzomPoster(year, settings) {
 //                    underline.
 //   Plag Gra / MA    the פלג on the second line of those two columns, named for whichever
 //                    the column is headed with.
-//   & ns             NOT on the board. The פלג גר"א מנחה and the מנחה מעריב also daven in
-//                    the עזרת נשים, which is something the sender knows and the chart does
-//                    not say. Fixed to those two columns, on instruction.
+//
+// Everything in the message is now read off the board and nothing is added to it. There was
+// one exception, "& ns" on the פלג גר"א מנחה and the מנחה מעריב, saying those two also daven
+// in the עזרת נשים. It was on instruction, it was never on the board, and the shul has since
+// said to stop sending it. Said here rather than only in the history, because the next person
+// to compare an old message with a new one will wonder where it went.
 //
 // Winter has none of the פלג columns (CHOREF_COLUMNS is eight wide against קיץ's twelve),
 // so those three lines simply do not appear. Nothing here asks for a column by name: each
@@ -5661,9 +5664,6 @@ function buildSlichosTzomPoster(year, settings) {
 /** The closing line, and the only words here that are not read off the board. */
 const EREV_SIGN_OFF = 'Have a great Shabbos!';
 
-/** Which columns get "& ns" bolted on. Named by what their heading says rather than by
- *  column key, since the keys differ between the two seasons. */
-const EREV_ALSO_NASHIM = ['plagGra', 'minchaMaariv'];
 
 /** A cell as it is stored is plain text carrying the underline sentinels, but an override
  *  typed by hand is real HTML. Both are flattened to the same thing here: text, newlines,
@@ -5764,10 +5764,9 @@ function erevShabbosText(columns, row, parshaEnglish) {
     }
 
     const first = times[0];
-    const alsoNashim = EREV_ALSO_NASHIM.includes(kind) ? ' & ns' : '';
     // The פלג is the time written under the מנין, so anything on a later line of the cell.
     const plag = times.find((t) => t.line > first.line);
-    let line = `Mincha ${first.text}${erevWhere(kind, first)}${alsoNashim}`;
+    let line = `Mincha ${first.text}${erevWhere(kind, first)}`;
     if (plag) {
       // No comma on the בעזר״נ line, which is how the message is written. The others take
       // one.
