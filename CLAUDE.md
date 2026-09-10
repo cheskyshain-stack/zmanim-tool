@@ -34,8 +34,8 @@ Every change follows this, in order:
    Reusing a port you served from earlier in the session gets you a cached page and a
    false pass.
 4. `git add -A && git commit && git pull origin main --no-edit && git push origin main`
-5. Poll the live site until the change is actually there. GitHub Pages takes about a
-   minute:
+5. Poll the live site until the change is actually there. The workflow builds and then
+   deploys, so give it about two minutes:
    `curl -s "https://lczmanim.cjaffa.com/?b=$(date +%s)" | grep -o 'app.css?v=[0-9a-f]*'`
    and compare against the local `index.html`. Do not tell the user it is live until the
    hash matches.
@@ -52,7 +52,11 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   URL.
 - Stamps the whole-address tags (canonical, `og:url`, `og:image`) from `SITE_URL`, the one
   place the domain is written. Moving to another domain is that line and a rebuild.
-- Writes `dist/`, the copy of the site that gets published, with every comment taken out.
+- Writes `dist/`, **the copy of the site that gets published**, with every comment taken out.
+  `dist/` is gitignored and is built again by `.github/workflows/pages.yml` on every push to
+  `main`, which is what deploys it. Pages will only publish a branch root or `/docs`, so
+  reaching `dist/` at all is why that workflow exists rather than a setting. For a long time it
+  did not, the root was published, and every comment here was on the live site.
   **Comments live in this repository and must not reach a browser.** They were 54% of what
   a visitor downloaded and they carry the reasoning behind every decision here. The
   strippers scan rather than pattern-match, because `accept="image/*"`, `data/*.json` and

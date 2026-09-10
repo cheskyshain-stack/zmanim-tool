@@ -1,0 +1,64 @@
+# Publishing the congregation's site.
+#
+# What is on lczmanim.cjaffa.com is dist/, the copy build-offline.py writes with every comment
+# taken out, and not the repository root. The two are the same site, and the difference is that
+# this repository's reasoning is in the root and is nobody's download: comments were 54% of what
+# a visitor was fetching, and they are the thinking behind every decision here, readable in
+# devtools by anybody who opened the page.
+#
+# It has to be a workflow rather than a setting. GitHub Pages will publish a branch's root or
+# its /docs, and dist/ is neither. It is also gitignored, because it is build output and the
+# thing that should be reviewed in a commit is the source it came out of.
+#
+# So the build runs here instead of being trusted from a commit, which also means the site can
+# never be a rebuild behind the source it was built from. build-offline.py is standard library
+# only, so this needs nothing installed.
+#
+# The comment stripping is not checked here because it is checked there: build-offline.py
+# refuses to write dist/ at all if its own scanners still find a comment in the output, so a
+# stripper that missed something fails this job rather than publishing.
+
+name: Publish the site
+
+on:
+  push:
+    branches: [main]
+  # So the site can be republished without a commit, which is the thing to reach for if a
+  # deployment is ever lost or half done.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and a newer push wins. Two pushes a minute apart should not race
+# over which of them the site ends up being.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build the site
+        run: python build-offline.py
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
