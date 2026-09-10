@@ -189,9 +189,13 @@ token cannot live in the admin. `/admin/` is a public address, the four digits i
 are not security, and this repository is public, so anything the page carries is published.
 The token is a Worker secret instead, and the admin asks the Worker.
 
-- Deploying it is written at the top of `worker/traffic-worker.js`: a read-only Account
-  Analytics token as `CF_API_TOKEN`, plus `CF_ACCOUNT_ID` and `CF_SITE_TAG` as plain
-  variables. Only the first is a secret.
+- Deploying it is written at the top of `worker/traffic-worker.js`, and it is now **one**
+  setting: `CF_API_TOKEN`, a read-only Account Analytics token, as a Secret. It was three. The
+  site tag is the beacon token out of the site's own head, which every visitor can read, so the
+  Worker carries it; the account id is something the token can be asked for, so the Worker asks
+  and caches the answer. `CF_SITE_TAG` and `CF_ACCOUNT_ID` still override, and `CF_ACCOUNT_ID`
+  is needed where the token can see more than one account, which the Worker says outright
+  rather than guessing.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret

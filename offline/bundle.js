@@ -14443,8 +14443,8 @@ function trafficSetup() {
         Account, Account Analytics, Read.</li>
         <li>Workers and Pages, Create, and paste in <code>worker/traffic-worker.js</code>
         from this repository.</li>
-        <li>On that Worker, Settings, Variables: <code>CF_API_TOKEN</code> as a secret,
-        <code>CF_ACCOUNT_ID</code> and <code>CF_SITE_TAG</code> as plain variables.</li>
+        <li>On that Worker, Settings, Variables and Secrets: <code>CF_API_TOKEN</code>, as a
+        Secret, holding the token from the first step. That is the only setting it needs.</li>
         <li>Put the Worker's address into <code>TRAFFIC_API</code> in
         <code>js/ui/traffic-view.js</code> and rebuild.</li>
       </ol>

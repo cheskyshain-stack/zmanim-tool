@@ -19,14 +19,17 @@
  *      Permissions: Account, Account Analytics, Read. Nothing else, so a leak of it reads
  *      numbers and cannot touch the site, the DNS or the Workers.
  *   2. Workers and Pages, Create, paste this file, deploy.
- *   3. On the Worker: Settings, Variables.
- *        CF_API_TOKEN   the token from step 1, as a SECRET (encrypted, write only)
- *        CF_ACCOUNT_ID  the account id out of any dashboard URL, a plain variable
- *        CF_SITE_TAG    the Web Analytics site tag, a plain variable. It is the same value
- *                       as the beacon token in the site's head, which is public.
- *      Neither of the last two is a secret; only the first one is.
+ *   3. On the Worker, add one variable: CF_API_TOKEN, the token from step 1, as a SECRET.
+ *      That is the whole of it. It is the only value here that has to be kept, so it is the
+ *      only one asked for.
  *   4. Give the Worker's address to whoever is editing the admin, and it goes in
  *      TRAFFIC_API in js/ui/traffic-view.js.
+ *
+ * There were three variables to set and now there is one, because the other two were work
+ * with no secrecy to justify it. The site tag is the beacon token out of the site's own head,
+ * which every visitor can read, so it is written below. The account id is something the token
+ * itself can be asked for, so the Worker asks. Both can still be overridden by a variable of
+ * the same name, which is what an account holding more than one Cloudflare account needs.
  *
  * The admin shows whatever comes back, errors included, verbatim. That is deliberate: the
  * shape of Cloudflare's analytics schema is the one thing here that cannot be checked from
@@ -53,6 +56,46 @@ const CACHE_SECONDS = 300;
 /** The most days that can be asked for at once, so a mistyped range cannot ask Cloudflare
  *  for a year of buckets. Web Analytics keeps less than this anyway on the free plan. */
 const MAX_DAYS = 90;
+
+/** Which site's numbers. This is the Web Analytics site tag, and it is the same string as the
+ *  beacon token in the congregation site's head: public by construction, since every visitor's
+ *  browser is handed it. Written here rather than asked for as a variable, because a value
+ *  anybody can read off the page is not worth a setup step. CF_SITE_TAG overrides it. */
+const SITE_TAG = 'e96217102b81416db30f31a0c105fece';
+
+/** The account the site sits in.
+ *
+ *  Asked of Cloudflare with the same token rather than typed in: a token is issued against an
+ *  account and can be asked which, so making somebody copy a 32-character string out of a
+ *  dashboard URL was a step that existed only because this file did not think to ask.
+ *
+ *  Cached on the Worker for as long as the isolate lives, which is what stops this being an
+ *  extra request on every call. CF_ACCOUNT_ID still wins if it is set, and it has to be set
+ *  where the token can see more than one account, since then there is a real choice to make
+ *  and this cannot make it. That case says so rather than guessing. */
+let knownAccount = null;
+async function accountFor(env) {
+  if (env.CF_ACCOUNT_ID) return env.CF_ACCOUNT_ID;
+  if (knownAccount) return knownAccount;
+  const res = await fetch('https://api.cloudflare.com/client/v4/accounts?per_page=50', {
+    headers: { authorization: `Bearer ${env.CF_API_TOKEN}` },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.success) {
+    const said = body?.errors?.map((e) => e.message).join('; ') || `HTTP ${res.status}`;
+    throw new Error(`Could not ask Cloudflare which account this token is for: ${said}`);
+  }
+  const list = body.result || [];
+  if (!list.length) {
+    throw new Error('This token can see no account. It needs Account, Account Analytics, Read.');
+  }
+  if (list.length > 1) {
+    throw new Error('This token can see more than one account, so CF_ACCOUNT_ID has to say which: '
+      + list.map((a) => `${a.name} = ${a.id}`).join(', '));
+  }
+  knownAccount = list[0].id;
+  return knownAccount;
+}
 
 /* The query.
  *
@@ -148,10 +191,9 @@ export default {
     if (!origin) {
       return json({ error: 'Not a caller this Worker answers.' }, 403, origin);
     }
-    for (const name of ['CF_API_TOKEN', 'CF_ACCOUNT_ID', 'CF_SITE_TAG']) {
-      if (!env[name]) {
-        return json({ error: `${name} is not set on this Worker. See the note at the top of traffic-worker.js.` }, 500, origin);
-      }
+    if (!env.CF_API_TOKEN) {
+      return json({ error: 'CF_API_TOKEN is not set on this Worker. It is the only setting this '
+        + 'needs: add it under Settings, Variables and Secrets, as a Secret, and deploy.' }, 500, origin);
     }
 
     const url = new URL(request.url);
@@ -169,6 +211,13 @@ export default {
     }
 
     const { since, until } = dayRange(days);
+    let account;
+    try {
+      account = await accountFor(env);
+    } catch (e) {
+      return json({ error: e.message }, 502, origin);
+    }
+
     let res;
     let body;
     try {
@@ -180,7 +229,7 @@ export default {
         },
         body: JSON.stringify({
           query: QUERY,
-          variables: { accountTag: env.CF_ACCOUNT_ID, siteTag: env.CF_SITE_TAG, since, until },
+          variables: { accountTag: account, siteTag: env.CF_SITE_TAG || SITE_TAG, since, until },
         }),
       });
       body = await res.json();
@@ -197,21 +246,21 @@ export default {
       return json({ error: body.errors.map((e) => e.message).join('; '), detail: body.errors }, 502, origin);
     }
 
-    const account = body?.data?.viewer?.accounts?.[0];
-    if (!account) {
-      return json({ error: 'Cloudflare returned no account. Is CF_ACCOUNT_ID right?', detail: body }, 502, origin);
+    const found = body?.data?.viewer?.accounts?.[0];
+    if (!found) {
+      return json({ error: `Cloudflare returned nothing for account ${account}.`, detail: body }, 502, origin);
     }
 
     const out = {
       days,
       since,
       until,
-      byDay: (account.byDay || []).map((g) => ({
+      byDay: (found.byDay || []).map((g) => ({
         date: g.dimensions.date,
         views: g.count,
         visits: g.sum?.visits ?? 0,
       })),
-      byPage: (account.byPage || []).map((g) => ({
+      byPage: (found.byPage || []).map((g) => ({
         path: g.dimensions.requestPath,
         views: g.count,
         visits: g.sum?.visits ?? 0,
