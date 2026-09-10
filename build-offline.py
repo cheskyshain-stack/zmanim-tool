@@ -75,7 +75,7 @@ SITE_URL_MARKER = "<!-- site address: stamped by build-offline.py from SITE_URL,
 #   - The admin, which never carries the tag at all.
 #   - A device that has asked not to be counted. Opening the site once with ?count=off marks
 #     that browser and it is not counted again; ?count=on undoes it. See ANALYTICS_OPT_OUT.
-ANALYTICS_TOKEN = ""
+ANALYTICS_TOKEN = "e96217102b81416db30f31a0c105fece"
 ANALYTICS_MARKER = "<!-- analytics: stamped by build-offline.py from ANALYTICS_TOKEN, do not edit by hand -->"
 
 # The mark a browser carries when it has asked not to be counted, and the parameter that sets
@@ -620,11 +620,13 @@ def stamp_analytics(page: Path):
 
     The third, the admin, is handled by not stamping that file at all.
 
-    The script it writes is deferred, because nothing on the page waits for a counter, and it
-    is the only third-party script on the site: blocked, the pages work exactly as they do now
-    and the only thing lost is the count. Everything the loader itself touches is wrapped, so a
-    browser that refuses localStorage (a private window, or one set to block site data) is
-    counted rather than broken.
+    The script it writes is a module, which is what Cloudflare's own snippet asks for and is
+    also deferred by definition, so nothing on the page ever waits for a counter. It is the
+    only third-party script on the site and it is one a reader can block with no effect on
+    anything: if it does not load, the pages work exactly as they do now and the only thing
+    lost is the count. Everything the loader itself touches is wrapped, so a browser that
+    refuses localStorage (a private window, or one set to block site data) is counted rather
+    than broken.
     """
     html = page.read_text(encoding="utf-8")
     host = SITE_URL.split("//", 1)[-1].split("/", 1)[0]
@@ -642,7 +644,7 @@ def stamp_analytics(page: Path):
         ":'This device will be counted in the site\\u2019s visitor numbers again.');}"
         "catch(e){alert('This browser will not remember the setting.');}}"
         "try{if(localStorage.getItem(k))return;}catch(e){}"
-        'var s=document.createElement("script");s.defer=true;'
+        'var s=document.createElement("script");s.type="module";'
         's.src="https://static.cloudflareinsights.com/beacon.min.js";'
         f"s.setAttribute(\"data-cf-beacon\",'{{\"token\": \"{ANALYTICS_TOKEN}\"}}');"
         "document.head.appendChild(s);}catch(e){}})();</script>"
