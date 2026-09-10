@@ -4136,3 +4136,70 @@ body.is-locked { overflow: hidden; }
   .lock-key, .lock-key-gap { width: 3.5rem; height: 3.5rem; }
   .lock-key { font-size: 1.3rem; }
 }
+
+/* --- Traffic ------------------------------------------------------------------------
+   How many people are reading the congregation's site. The numbers come from a Worker in
+   the shul's Cloudflare account (see js/ui/traffic-view.js); everything here is about
+   putting them on a screen that is mostly opened on a phone. */
+.traffic-ranges { display: flex; gap: 0.4rem; margin: 0.2rem 0 1rem; }
+.traffic-range {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 0.35rem 0.9rem; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm);
+}
+.traffic-range:hover { background: var(--accent-soft); }
+.traffic-range.is-on { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
+/* The two figures, side by side and big enough to read across a desk. They wrap on a phone
+   rather than shrinking, since a number that has to be squinted at is no use. */
+.traffic-totals { display: flex; flex-wrap: wrap; gap: 1.4rem; margin-bottom: 1.2rem; }
+.traffic-total { display: flex; flex-direction: column; }
+.traffic-total-n { font-size: 2.1rem; font-weight: 600; line-height: 1.1; color: var(--ink); }
+.traffic-total-w { font-size: var(--fs-sm); color: var(--muted); }
+/* One bar a day. The row has the height, each bar's fill has a percentage of it, so nothing
+   is measured and it is right at any width. align-items:end is what stands them on the axis
+   rather than hanging them from the top. */
+.traffic-chart {
+  display: flex; align-items: flex-end; gap: 3px; height: 130px;
+  padding-bottom: 1.3rem; margin-bottom: 1.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.traffic-bar { flex: 1 1 0; position: relative; height: 100%; display: flex; align-items: flex-end; min-width: 4px; }
+/* --ui-accent, the blue this program's own controls are, and not --accent: that one is the
+   printed chart's grey and its value is load-bearing for what comes out of a printer. A screen
+   of numbers is a screen, not a board. */
+.traffic-bar-fill {
+  width: 100%; background: var(--ui-accent); border-radius: 2px 2px 0 0; min-height: 2px;
+}
+/* The day under its own bar, and only where there is room for it: at 30 bars on a phone the
+   labels would be a grey smear, so they are dropped and the bars keep the space. The title
+   on each bar still says the day and the count on a hover or a long press. */
+.traffic-bar-day {
+  position: absolute; bottom: -1.15rem; left: 50%; transform: translateX(-50%);
+  font-size: 0.62rem; color: var(--muted); white-space: nowrap;
+}
+.traffic-chart:has(.traffic-bar:nth-child(9)) .traffic-bar-day { display: none; }
+.traffic-heading { font-size: var(--fs-lg); margin: 0 0 0.5rem; }
+/* Its own borders and its own background, said outright. A bare table in this stylesheet
+   inherits the printed chart's rules further up (`th, td` and the striped body rows), and this
+   one came out banded grey with a dark header, which is a wall chart's clothes on a list of
+   numbers. */
+.traffic-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.traffic-table th, .traffic-table td {
+  border: 0; border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.5rem; text-align: left; background: none; vertical-align: top;
+}
+.traffic-table th { color: var(--muted); font-weight: 500; }
+.traffic-table tbody tr:last-child td { border-bottom: 0; }
+/* And the band on every second row, which is the chart's again and needs one more class than
+   `tbody tr:nth-child(even) td` carries before it will let go. */
+.traffic-table tbody tr:nth-child(even) td { background: none; }
+.traffic-figure { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The address under the page's name, small: the name is what it is, the path is how to
+   check that it is. */
+.traffic-page { display: flex; flex-direction: column; }
+.traffic-path { font-size: 0.7rem; color: var(--muted); }
+.traffic-foot { margin-top: 1.1rem; }
+.traffic-setup ol { margin: 0.6rem 0 0.8rem 1.1rem; padding: 0; }
+.traffic-setup li { margin-bottom: 0.4rem; }
+.traffic-setup code, .traffic-error code { background: var(--accent-soft); border-radius: 3px; padding: 0.05rem 0.3rem; }
+.traffic-error h3 { color: var(--danger); margin-top: 0; }

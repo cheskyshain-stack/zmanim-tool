@@ -178,6 +178,35 @@ Export/Import in Settings moves it between devices.
 - A sheet view is exempt from the cap entirely; a page is a fixed 11in.
 - `.gen-column` holds the Generate flow to 42rem.
 
+## Traffic, and the one thing in this project that is not a browser
+
+The admin's **Traffic** tab shows the congregation site's visitor numbers. They are counted by
+the Cloudflare beacon the congregation's pages carry (`ANALYTICS_TOKEN`, above) and read back
+through **`worker/traffic-worker.js`**, a Cloudflare Worker in the shul's own account.
+
+The Worker exists for one reason: reading the numbers needs a Cloudflare **API token**, and a
+token cannot live in the admin. `/admin/` is a public address, the four digits in front of it
+are not security, and this repository is public, so anything the page carries is published.
+The token is a Worker secret instead, and the admin asks the Worker.
+
+- Deploying it is written at the top of `worker/traffic-worker.js`: a read-only Account
+  Analytics token as `CF_API_TOKEN`, plus `CF_ACCOUNT_ID` and `CF_SITE_TAG` as plain
+  variables. Only the first is a secret.
+- The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
+  the tab is the deploying instructions**, not an error.
+- `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
+  either way.
+- The endpoint is open, and that is a decision rather than an oversight: CORS is a rule only
+  browsers keep, and a key in the admin page would be as public as the page. What it hands out
+  is aggregate visit counts for one shul's zmanim. Closing it properly means Cloudflare Access
+  in front of the Worker.
+- The tab shows Cloudflare's own error text verbatim when something is wrong. The shape of the
+  analytics schema is the one thing here that cannot be checked from this repository, so the
+  useful thing on the screen is exactly what Cloudflare said.
+- Test the screen by pointing `TRAFFIC_API` at a made-up address and fulfilling the request in
+  Playwright with `page.route`. Four states are worth covering: not set up, numbers, nobody has
+  visited yet, and the Worker refusing.
+
 ## The PIN on the admin
 
 `/admin/` asks for four digits before it draws anything, remembered on that device for three
