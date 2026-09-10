@@ -168,12 +168,20 @@ function corsHeaders(origin) {
   };
 }
 
+/** A reply, with the numbers kept for a while and a failure kept not at all.
+ *
+ *  The freshness header goes on an answer and never on a refusal. It used to go on both, and
+ *  that turned every failure into a five minute one: a setting was corrected, the Worker was
+ *  redeployed, and the admin went on showing the browser's copy of the old complaint, which
+ *  reads exactly like the correction not having worked. Whoever is looking at an error is
+ *  about to change something and reload, and that reload has to ask. */
 function json(body, status, origin) {
+  const ok = status >= 200 && status < 300;
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': `public, max-age=${CACHE_SECONDS}`,
+      'cache-control': ok ? `public, max-age=${CACHE_SECONDS}` : 'no-store',
       ...corsHeaders(origin),
     },
   });
