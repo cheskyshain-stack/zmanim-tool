@@ -104,6 +104,122 @@ function trafficPages(byPage) {
     </table>`;
 }
 
+/** A panel that could not be had, said in Cloudflare's own words.
+ *
+ *  These panels are asked for one at a time precisely so that one of them failing is a note in
+ *  its own place rather than a blank screen, and what makes the note worth reading is the real
+ *  message: what goes wrong here is a dimension this project guessed the name of, and only
+ *  Cloudflare can say how it is actually spelled. */
+const trafficPanelError = (title, message) => `
+  <h3 class="traffic-heading">${trafficEsc(title)}</h3>
+  <p class="hint traffic-panel-error">Cloudflare would not answer this one:
+  ${trafficEsc(message)}</p>`;
+
+/** A breakdown: one row a thing, with a bar behind it for its share.
+ *
+ *  The bar is drawn as a background on the row rather than as an element of its own, so the
+ *  numbers stay in an ordinary table that lines up its columns and can be read out by a screen
+ *  reader as a table. Share is of the largest row, not of the total, because the question these
+ *  answer is "which of these is the big one" rather than "what percentage". */
+function trafficBreakdown(title, group, { name = (k) => k, col = 'Name', empty = 'Nothing recorded.' } = {}) {
+  if (!group) return '';
+  if (group.error) return trafficPanelError(title, group.error);
+  const rows = (group.rows || []).filter((r) => r.views > 0);
+  if (!rows.length) {
+    return `<h3 class="traffic-heading">${trafficEsc(title)}</h3><p class="hint">${trafficEsc(empty)}</p>`;
+  }
+  const top = Math.max(...rows.map((r) => r.views), 1);
+  const total = rows.reduce((n, r) => n + r.views, 0);
+  const body = rows.map((r) => {
+    const share = Math.round((r.views / top) * 100);
+    const pct = Math.round((r.views / total) * 100);
+    return `
+    <tr>
+      <td class="traffic-page" style="--share: ${share}%">${trafficEsc(name(r.key))}</td>
+      <td class="traffic-figure">${trafficNum(r.views)}</td>
+      <td class="traffic-figure traffic-pct">${pct}%</td>
+    </tr>`;
+  }).join('');
+  return `
+    <h3 class="traffic-heading">${trafficEsc(title)}</h3>
+    <table class="traffic-table traffic-shares">
+      <thead><tr><th>${trafficEsc(col)}</th><th class="traffic-figure">Page views</th><th class="traffic-figure">Share</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+/** Tidier names for what the device dimension calls things. */
+const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
+const trafficDeviceName = (k) => TRAFFIC_DEVICES[String(k).toLowerCase()] || k || '(not said)';
+
+/** Where somebody came from. An empty referrer is not a gap in the data: it is the address
+ *  typed in, opened from a home screen, or followed from a link in an app that sends no
+ *  referrer, which for this site means WhatsApp and email. That is the common case here and
+ *  deserves a name rather than a blank. */
+const SITE_HOST_NAME = 'lczmanim.cjaffa.com';
+function trafficRefererName(host) {
+  const h = String(host || '').trim();
+  if (!h || h === 'null' || h === '(none)') return 'Typed in, or a link in an app';
+  if (h === SITE_HOST_NAME) return 'Another page on this site';
+  return h;
+}
+
+/** When the board is read, folded into the 24 hours of a day.
+ *
+ *  The Worker asks for real hours, one bucket per hour of the range, and they are added up
+ *  here into hour-of-day. Done in the browser on purpose: these are UTC instants, and the hour
+ *  worth showing a Lakewood gabbai is the hour it was on his clock, which is the clock this code
+ *  is running on. Doing it at the Worker would have fixed it to whatever timezone the edge that
+ *  answered happened to think in. */
+function trafficHours(group) {
+  if (!group) return '';
+  if (group.error) return trafficPanelError('When people look', group.error);
+  const hours = new Array(24).fill(0);
+  let seen = 0;
+  for (const r of group.rows || []) {
+    const at = new Date(r.key);
+    if (Number.isNaN(at.getTime())) continue;
+    hours[at.getHours()] += r.views;
+    seen += r.views;
+  }
+  if (!seen) {
+    return '<h3 class="traffic-heading">When people look</h3><p class="hint">Nothing recorded.</p>';
+  }
+  const top = Math.max(...hours, 1);
+  const label = (h) => (h === 0 ? '12a' : h === 12 ? '12p' : h > 12 ? `${h - 12}p` : `${h}a`);
+  /* An hour with nothing gets no fill at all, not a short one. The fill has a 2px floor so that
+     a quiet day is still visible on the chart above, and across 24 bars that floor turned every
+     empty hour into a stub, which reads as somebody checking the zmanim at three in the morning.
+     Most hours here really are empty and the chart should say so. */
+  const bars = hours.map((n, h) => `
+    <div class="traffic-bar" title="${label(h)}: ${trafficNum(n)} page views">
+      ${n ? `<div class="traffic-bar-fill" style="height: ${Math.round((n / top) * 100)}%"></div>` : ''}
+      <span class="traffic-bar-day">${h % 3 === 0 ? label(h) : ''}</span>
+    </div>`).join('');
+  return `
+    <h3 class="traffic-heading">When people look</h3>
+    <div class="traffic-chart traffic-hours" role="img" aria-label="Page views by hour of the day">${bars}</div>
+    <p class="hint">Hour of the day, on this device's clock, added up across the whole period.</p>`;
+}
+
+/** Which day of the week, worked out of the per-day figures rather than asked for.
+ *
+ *  Nothing extra is fetched: the days are already in hand for the chart at the top, and a date
+ *  knows which weekday it is. Worth having on a zmanim board, where Friday is not an ordinary
+ *  day and neither is מוצאי שבת. */
+function trafficWeekdays(byDay) {
+  if (byDay.length < 7) return '';
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Shabbos'];
+  const sums = new Array(7).fill(0);
+  for (const d of byDay) {
+    const [y, m, day] = String(d.date).split('-').map(Number);
+    if (!y || !m || !day) continue;
+    sums[new Date(Date.UTC(y, m - 1, day)).getUTCDay()] += d.views;
+  }
+  const rows = names.map((n, i) => ({ key: n, views: sums[i], visits: 0 }));
+  return trafficBreakdown('Which day of the week', { rows }, { col: 'Day' });
+}
+
 /** What is on the screen while there is no Worker to ask. Not an error: nothing is wrong,
  *  it has not been set up, and the thing to do about it is a list. */
 function trafficSetup() {
@@ -195,6 +311,12 @@ export function renderTraffic(container) {
       </div>
       ${trafficChart(byDay)}
       ${trafficPages(byPage)}
+      ${trafficBreakdown('Phone or desktop', data.groups?.device, { name: trafficDeviceName, col: 'Device' })}
+      ${trafficHours(data.groups?.hour)}
+      ${trafficWeekdays(byDay)}
+      ${trafficBreakdown('How people arrive', data.groups?.referer, { name: trafficRefererName, col: 'Came from' })}
+      ${trafficBreakdown('Browser', data.groups?.browser, { col: 'Browser' })}
+      ${trafficBreakdown('Operating system', data.groups?.os, { col: 'System' })}
       <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
       they opened. Anyone reading with an ad blocker is not counted, so these are a floor
       rather than a headcount.${data.cached ? ' Cloudflare was last asked a few minutes ago.' : ''}</p>`;

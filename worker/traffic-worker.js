@@ -150,14 +150,23 @@ async function siteTagFor(env, account) {
   }
 }
 
-/* The query.
+/* What is asked for, and why it is asked for one grouping at a time.
  *
  * rumPageloadEventsAdaptiveGroups is Cloudflare's own Web Analytics dataset: one group per
  * bucket, `count` being page views and `sum { visits }` being visits, which is the pair the
- * dashboard shows. Asked for twice over the same range, grouped two ways: by day, which is
- * the chart, and by path, which is what people actually opened.
+ * dashboard shows. The same range is asked about several ways over: per day, per page, per
+ * device, per hour, per referrer, per browser, per operating system.
  *
- * Both are narrowed to this one site, because an account can hold several, and there are two
+ * Every one of those is a separate HTTP request, which looks wasteful and is deliberate. One
+ * GraphQL document with seven aliases in it fails as a whole: a single dimension this account's
+ * schema spells differently takes the entire screen down, including the panels that were fine.
+ * The dimension names here cannot be checked from the repository this Worker is kept in, so they
+ * are educated guesses until the day somebody runs them. Separate requests make a wrong guess
+ * cost exactly one panel, which then says what Cloudflare said about it, and the rest still draw.
+ * They go out together, so the wall-clock cost is one round trip, and the whole reply is cached
+ * for five minutes anyway.
+ *
+ * Every one is narrowed to this one site, because an account can hold several, and there are two
  * ways to say which: the site's tag, or the host its pages are served from. Which one is used
  * depends on whether the tag could be had at all (see siteTagFor), and the reply says which so
  * the admin can show it.
@@ -166,31 +175,76 @@ async function siteTagFor(env, account) {
  * needs its type named, Cloudflare's filter input types are long and version-specific, and
  * getting one wrong is a query that does not run at all. What is interpolated is this file's
  * own constants or a tag out of Cloudflare's own API, never anything a caller sends. */
-const query = (where) => `
+const GROUPS = [
+  // The two that are known to work, since they are what the tab has been drawing all along.
+  { key: 'byDay', dim: 'date', limit: 100, order: 'date_ASC' },
+  { key: 'byPage', dim: 'requestPath', limit: 25, order: 'count_DESC' },
+  // Phone or desk. The one number that settles an argument rather than starting one.
+  { key: 'byDevice', dim: 'deviceType', limit: 10, order: 'count_DESC' },
+  /* When the board is read. A month is 744 hours and the limit has to clear that or the tail of
+     a 30 day range goes missing without saying so. The admin folds these into 24 buckets; they
+     are asked for as real hours because the day they fall on is what makes that fold correct
+     across a timezone. */
+  { key: 'byHour', dim: 'datetimeHour', limit: 800, order: 'datetimeHour_ASC' },
+  // How people got here: a link someone sent, a search, or typed in (which reports as nothing).
+  { key: 'byReferer', dim: 'refererHost', limit: 15, order: 'count_DESC' },
+  // Asked separately rather than as one two-dimension group, which would multiply out into a
+  // row per combination and answer neither question on its own.
+  { key: 'byBrowser', dim: 'userAgentBrowser', limit: 10, order: 'count_DESC' },
+  { key: 'byOS', dim: 'userAgentOS', limit: 10, order: 'count_DESC' },
+];
+
+const groupQuery = (where, g) => `
 query Traffic($accountTag: string!, $since: Time!, $until: Time!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
-      byDay: rumPageloadEventsAdaptiveGroups(
-        limit: 100
+      rows: rumPageloadEventsAdaptiveGroups(
+        limit: ${g.limit}
         filter: { ${where}, datetime_geq: $since, datetime_leq: $until }
-        orderBy: [date_ASC]
+        orderBy: [${g.order}]
       ) {
         count
         sum { visits }
-        dimensions { date }
-      }
-      byPage: rumPageloadEventsAdaptiveGroups(
-        limit: 25
-        filter: { ${where}, datetime_geq: $since, datetime_leq: $until }
-        orderBy: [count_DESC]
-      ) {
-        count
-        sum { visits }
-        dimensions { requestPath }
+        dimensions { ${g.dim} }
       }
     }
   }
 }`;
+
+/** One grouping, as `{ rows }` or as `{ error }`.
+ *
+ *  Never throws. A panel that cannot be had is a panel that says why, next to the ones that
+ *  could, and Cloudflare's own words are what it says: the thing that goes wrong here is a
+ *  dimension named differently than this file guessed, and only Cloudflare knows how. */
+async function askGroup(env, account, where, since, until, g) {
+  try {
+    const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${env.CF_API_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: groupQuery(where, g),
+        variables: { accountTag: account, since, until },
+      }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) return { error: `Cloudflare answered ${res.status}` };
+    if (body?.errors?.length) return { error: body.errors.map((e) => e.message).join('; ') };
+    const rows = body?.data?.viewer?.accounts?.[0]?.rows;
+    if (!rows) return { error: 'Cloudflare returned nothing for this grouping.' };
+    return {
+      rows: rows.map((r) => ({
+        key: r.dimensions?.[g.dim] ?? '',
+        views: r.count,
+        visits: r.sum?.visits ?? 0,
+      })),
+    };
+  } catch (e) {
+    return { error: `Could not reach Cloudflare: ${e.message}` };
+  }
+}
 
 /** The origin to answer with, or null where the caller is not one of ours.
  *
@@ -296,37 +350,18 @@ export default {
       ? `siteTag: ${JSON.stringify(siteTag)}`
       : `requestHost: ${JSON.stringify(SITE_HOST)}`;
 
-    let res;
-    let body;
-    try {
-      res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${env.CF_API_TOKEN}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: query(where),
-          variables: { accountTag: account, since, until },
-        }),
-      });
-      body = await res.json();
-    } catch (e) {
-      return json({ error: `Could not reach Cloudflare: ${e.message}` }, 502, origin);
-    }
+    // All of them at once. Separate requests so one bad dimension name costs one panel, but
+    // sent together so the reader waits for the slowest rather than for the sum.
+    const answered = await Promise.all(
+      GROUPS.map((g) => askGroup(env, account, where, since, until, g)),
+    );
+    const groups = Object.fromEntries(GROUPS.map((g, i) => [g.key, answered[i]]));
 
-    // Handed on as they are, because the admin can say more with the real message than with
-    // anything this could put in its place.
-    if (!res.ok) {
-      return json({ error: `Cloudflare answered ${res.status}`, detail: body }, 502, origin);
-    }
-    if (body.errors && body.errors.length) {
-      return json({ error: body.errors.map((e) => e.message).join('; '), detail: body.errors }, 502, origin);
-    }
-
-    const found = body?.data?.viewer?.accounts?.[0];
-    if (!found) {
-      return json({ error: `Cloudflare returned nothing for account ${account}.`, detail: body }, 502, origin);
+    /* The day and page groupings are the tab itself rather than a panel on it, so if both of
+       them failed there is nothing to show and this is an error, not a screen with holes in it.
+       One of the two failing is still worth drawing: the other panels stand on their own. */
+    if (groups.byDay.error && groups.byPage.error) {
+      return json({ error: groups.byDay.error }, 502, origin);
     }
 
     const out = {
@@ -338,16 +373,17 @@ export default {
       // site is what happened once already (see siteTagFor). Not a secret: it names a site.
       narrowedBy,
       site: siteTag || SITE_HOST,
-      byDay: (found.byDay || []).map((g) => ({
-        date: g.dimensions.date,
-        views: g.count,
-        visits: g.sum?.visits ?? 0,
-      })),
-      byPage: (found.byPage || []).map((g) => ({
-        path: g.dimensions.requestPath,
-        views: g.count,
-        visits: g.sum?.visits ?? 0,
-      })),
+      // Kept in the shape the tab already reads, since these two are its spine.
+      byDay: (groups.byDay.rows || []).map((r) => ({ date: r.key, views: r.views, visits: r.visits })),
+      byPage: (groups.byPage.rows || []).map((r) => ({ path: r.key, views: r.views, visits: r.visits })),
+      // The rest as they came, each still carrying its own error where it has one.
+      groups: {
+        device: groups.byDevice,
+        hour: groups.byHour,
+        referer: groups.byReferer,
+        browser: groups.byBrowser,
+        os: groups.byOS,
+      },
       fetchedAt: new Date().toISOString(),
     };
     const reply = json(out, 200, origin);
