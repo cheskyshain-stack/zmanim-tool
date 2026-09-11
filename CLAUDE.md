@@ -218,6 +218,15 @@ The token is a Worker secret instead, and the admin asks the Worker.
   the same site said another way and is what is actually running. The reply says which of the two
   it used and the empty state prints it, because an answer of zero and a wrong question look
   identical. Measured once it worked: 23 visits and 51 page views, matching the dashboard.
+- **Cloudflare counts days in UTC, and this shul is not in UTC.** From about 8pm in Lakewood the
+  UTC day has already turned over, which put a bar labelled tomorrow on the chart at 9:40 at
+  night and, far worse, filed every evening visit under the next day: Friday night counted as
+  Shabbos. The per-day chart and the weekday panel are therefore rebuilt in the browser out of
+  the **hourly** buckets, which are real instants (`trafficLocalDays`), and the tab asks the
+  Worker for one day more than it shows so the oldest local day is whole. Both figures sum across
+  that fold: a page view is one event and a visit belongs to exactly one hour. Where the hourly
+  grouping is unavailable it falls back to the UTC days and says so on screen. Do not "simplify"
+  this back to `byDay`.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret

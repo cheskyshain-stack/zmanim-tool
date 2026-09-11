@@ -14480,6 +14480,47 @@ function trafficRefererName(host) {
   return h;
 }
 
+/** The days of the range, counted on a Lakewood clock rather than on UTC.
+ *
+ *  This is not a detail. Cloudflare buckets by UTC day, and Lakewood is four or five hours
+ *  behind it, so from about 8pm local the UTC day has already turned over. What that produced on
+ *  screen was a bar labelled with tomorrow's date, at 9:40 at night, holding that evening's
+ *  visits. The stray bar is the harmless half. The half that matters is that **every evening
+ *  visit was being filed under the next day**, and on a zmanim board the evening is exactly when
+ *  people look: Friday night counted as Shabbos and מוצאי שבת counted as Sunday, in a panel
+ *  whose whole point is telling those days apart.
+ *
+ *  So the days are rebuilt here out of the hourly buckets, which are real instants and can be
+ *  put in whatever day they fell on locally. `new Date(instant)` and `getFullYear` are the
+ *  browser's own timezone, which is the one the person reading this is standing in.
+ *
+ *  Both figures add up across the fold. A page view is one event. A visit is a pageload that did
+ *  not come from this site, so it belongs to exactly one hour, which is why it can be summed
+ *  rather than being double counted: the per-page table on this screen already demonstrates it,
+ *  its visits column summing to the same total shown at the top.
+ *
+ *  Where the hourly grouping is not available, the UTC days are used as they came and the screen
+ *  says so, rather than quietly presenting them as local. */
+function trafficLocalDays(data, wanted) {
+  const rows = data.groups?.hour?.rows || [];
+  if (!rows.length) {
+    // Trimmed because one extra day is asked for, to make the oldest local day a whole one.
+    return { days: (data.byDay || []).slice(-wanted), utc: true };
+  }
+  const buckets = new Map();
+  for (const r of rows) {
+    const at = new Date(r.key);
+    if (Number.isNaN(at.getTime())) continue;
+    const key = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+    const b = buckets.get(key) || { date: key, visits: 0, views: 0 };
+    b.visits += r.visits;
+    b.views += r.views;
+    buckets.set(key, b);
+  }
+  const days = [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return { days: days.slice(-wanted), utc: false };
+}
+
 /** When the board is read, folded into the 24 hours of a day.
  *
  *  The Worker asks for real hours, one bucket per hour of the range, and they are added up
@@ -14603,7 +14644,7 @@ function renderTraffic(container) {
   });
 
   const show = (data) => {
-    const byDay = data.byDay || [];
+    const { days: byDay, utc: daysAreUtc } = trafficLocalDays(data, trafficDays);
     const byPage = data.byPage || [];
     const visits = byDay.reduce((n, d) => n + d.visits, 0);
     const views = byDay.reduce((n, d) => n + d.views, 0);
@@ -14643,6 +14684,9 @@ function renderTraffic(container) {
             trafficEsc(Object.entries(data.dims).map(([k, v]) => `${k}=${v}`).join(', '))}</code></p>`
           : ''
       }
+      ${daysAreUtc ? `<p class="hint">Days here are counted in UTC, not on a Lakewood clock, so a
+        visit after about 8pm falls on the next day. That is what happens when the hourly figures
+        are not available to count them properly by.</p>` : ''}
       <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
       they opened. Anyone reading with an ad blocker is not counted, so these are a floor
       rather than a headcount.${data.cached ? ' Cloudflare was last asked a few minutes ago.' : ''}</p>`;
@@ -14651,7 +14695,11 @@ function renderTraffic(container) {
   const seen = trafficSeen.get(trafficDays);
   if (seen) show(seen);
 
-  fetch(`${TRAFFIC_API}?days=${trafficDays}`, { headers: { accept: 'application/json' } })
+  /* One day more than is shown. The hourly buckets get folded back into local days, and the
+     oldest local day would otherwise be missing its first few hours: a UTC-midnight boundary is
+     8pm the evening before in Lakewood. Asking for the extra day makes every day drawn a whole
+     one, and the extra is trimmed off in trafficLocalDays. */
+  fetch(`${TRAFFIC_API}?days=${trafficDays + 1}`, { headers: { accept: 'application/json' } })
     .then(async (res) => {
       const data = await res.json().catch(() => ({ error: `Cloudflare's Worker answered ${res.status} and not in JSON.` }));
       if (!res.ok || data.error) throw new Error(data.error || `The Worker answered ${res.status}.`);
