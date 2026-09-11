@@ -83,8 +83,32 @@ function trafficChart(byDay) {
     aria-label="Visits a day, ${trafficEsc(trafficDayLabel(byDay[0].date))} to ${trafficEsc(trafficDayLabel(byDay[byDay.length - 1].date))}">${bars}</div>`;
 }
 
+/** One row a page, not one row an address.
+ *
+ *  Cloudflare reports the path it saw, and one page can be several: `/donate` and `/donate/` are
+ *  both counted, and so is anything carrying a query string. On the screen they all print the
+ *  same name, so the table showed "Donate" twice with the visits divided between them and no
+ *  way to tell why. Rows that resolve to the same page are added together, and the address
+ *  underneath is the busiest spelling of it. */
+function trafficMergePages(byPage) {
+  const merged = new Map();
+  for (const p of byPage) {
+    const name = trafficPageName(p.path);
+    const at = merged.get(name);
+    if (!at) {
+      merged.set(name, { ...p, name });
+      continue;
+    }
+    if (p.views > at.views) at.path = p.path;
+    at.visits += p.visits;
+    at.views += p.views;
+  }
+  return [...merged.values()].sort((a, b) => b.views - a.views);
+}
+
 /** The pages table, busiest first. */
-function trafficPages(byPage) {
+function trafficPages(rawPages) {
+  const byPage = trafficMergePages(rawPages);
   if (!byPage.length) return '';
   const rows = byPage.map((p) => `
     <tr>
