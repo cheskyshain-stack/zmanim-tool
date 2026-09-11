@@ -12,8 +12,10 @@
 // deliberately, so nothing on it invites somebody who was given one link to wander into the
 // rest of the program.
 //
-// It is still behind the same four digits, because it is still the shul's own screen. What that
-// is worth is in ui/lock.js and has not changed.
+// It asks for no PIN. The admin does, because somebody wandering in there can change the boards;
+// nothing here changes anything, and what it prints is about to be sent to the whole congregation
+// in any case. A gate would only mean handing the admin's four digits to the one person this page
+// was built for, which is the opposite of the point of giving them their own address.
 
 import { weekIndex, rowFor } from '../sheets/rows.js';
 import { currentSerial } from './nav-helpers.js';

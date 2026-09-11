@@ -5,15 +5,16 @@
 // back into the admin or out to the congregation's site, because the address is meant to be
 // handed to whoever sends the messages and to nobody else's job.
 //
-// The PIN comes first, exactly as it does on the admin and for the same reason: this is a page
-// on a public site and anybody who guesses the address lands on it. Ahead of loading anything,
-// so nothing is fetched for a visitor who is not getting in. What the four digits are worth is
-// written at the top of ui/lock.js and is not changed by there being two doors now.
+// **No PIN here, deliberately, and not by omission.** The admin asks for four digits because
+// somebody wandering into the generator can change the shul's boards. Nothing on this page
+// changes anything: it reads the same state and prints messages that are about to be sent to
+// the whole congregation anyway. Putting a gate in front of it would only mean the person it
+// was built for has to be given the admin's PIN, which is the opposite of the point. See
+// ui/lock.js for what those four digits are and are not worth.
 
 import { loadState } from './storage.js';
 import { resolveSettings } from './settings.js';
 import { loadTables } from './data-loader.js';
-import { isOpen, renderLock } from './ui/lock.js';
 import { renderTexts } from './ui/texts-view.js';
 
 const main = document.getElementById('main');
@@ -31,5 +32,4 @@ function start() {
     });
 }
 
-if (isOpen()) start();
-else renderLock(main, start);
+start();

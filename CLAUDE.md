@@ -267,7 +267,10 @@ and listed in `DIST_TREES`.
   asserts there are zero `<a>` elements on it. Do not "helpfully" add a back link.
 - The admin's sidebar gets a **Messages** entry, and it is an `<a href="/texts/">` rather than
   a tab, because it leaves the page.
-- Behind the same four digits as the admin, same key, same `ui/lock.js`.
+- **No PIN, and that is a decision rather than an oversight.** The admin asks for four digits
+  because somebody wandering in there can change the shul's boards. This page changes nothing
+  and prints messages that are about to be sent to the whole congregation anyway, so a gate
+  would only mean handing the admin's PIN to the one person it was built for. Do not add one.
 - Every message is **read off the same sheet the times are printed from**, never recomputed
   beside it: `erev-text.js` for ערב שבת (off the chart row) and `erev-yomtov-text.js` for the
   yom tov ones (off the built poster). A message with a time nobody printed is the failure to
