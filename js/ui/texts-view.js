@@ -31,13 +31,21 @@ import { hebrewYear } from '../hebrew-calendar.js';
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/** This week's Erev Shabbos message, or null where no saved sheet covers the week.
- *
- *  Null rather than a message built from nothing: the chart is where these times live, and a
- *  week with no chart has no times to send. The screen says so in its place. */
+/** The coming Shabbos's Erev Shabbos message, or null where there is no Shabbos to send one for
+ *  within the window. */
 function txErevShabbos(state, settings, tables, today) {
   const found = txWeekNow(state, settings, tables, today);
   if (!found) return null;
+  /* Only when that Shabbos is actually near.
+     This is the case the window is really for. A שבת that is ראש השנה, יום כיפור or a day of
+     yom tov is not a row on the chart at all, so on those weeks the search for "this week" walks
+     forward and lands on the next week that is: in תשפ"ז, ר"ה falls on Shabbos and the answer
+     came back האזינו, eight days out, presented as this week's message. The shul spotted it,
+     and it was the same mistake twice over, since that Shabbos wants the ראש השנה schedule and
+     not a שבת one.
+     Measured to the Shabbos itself rather than to the week, so a row that is not this week's
+     simply does not appear until it is four days off. */
+  if (found.week.serial - today > TX_AHEAD_DAYS) return null;
   const { columns, row } = rowFor(found.week, found.sheet, state, settings);
   const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
   return {
@@ -187,8 +195,7 @@ export function renderTexts(container, state, settings, tables) {
       and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
       are for this visit only: reload and the times come back fresh, which is the way round that
       cannot leave an old time in a new message.</p>
-      ${shabbos ? '' : `<div class="panel"><p>No Erev Shabbos message this week: the calendar
-        built no שבת week covering it.</p></div>`}
+
       ${messages.map(txCard).join('')}
       ${messages.length ? '' : `<div class="panel"><p>Nothing to send just now. Yom tov messages
         appear ${TX_AHEAD_DAYS} days before the yom tov and stay up until it is over.</p></div>`}
