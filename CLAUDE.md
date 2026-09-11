@@ -297,6 +297,21 @@ and listed in `DIST_TREES`.
   fifty of them, and again to put it back. For checking, not for sending: nothing is stored and a
   reload is back to the four days. It listens on the heading rather than the page so that triple
   clicking a message to select it does not turn the year on.
+- **The shul's SMS history is the spec.** Fourteen real erev yom tov messages, May 2025 to
+  September 2026, and they are one skeleton: title, optional Selichos / Chatzos / סוף זמן lines,
+  the Mincha menu, an optional `ERUV TAVSHILIN`, Hadlakas Neiros, an evening Mincha (כל נדרי on
+  יו"כ), an optional Ravs Drasha, then a sign-off that is fixed words per yom tov. Build a new one
+  off a real sent message, not off a guess.
+- **`ERUV TAVSHILIN` goes in when the last day of yom tov is a Friday**, between the Mincha menu
+  and Hadlakas Neiros, in capitals on its own line. Asked of the date rather than the name: two
+  examples make it look like a פסח and שבועות thing, but ראש השנה falls on a Thursday often enough
+  and wants one too (5789, 5792, 5795, 5796, 5798, 5799 in the next fifteen). יום כיפור never
+  falls on a Friday, so it never gets one.
+- **The room letters are the sheet's marks**: underlined is `d`, one star is `en`, two stars is
+  `sh`, unmarked is `m`. Confirmed against the shul's ערב יום כיפור message, which is
+  `YK_TEXT.erevShacharis` mark for mark.
+- **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
+  schedule; wait for it rather than giving the message its own times.
 - The shul is feeding these over time as they send them. Each new one is a builder plus an
   entry in `renderTexts`.
 

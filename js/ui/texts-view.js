@@ -23,9 +23,10 @@ import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { erevRoshHashanaText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
+import { buildYomKippurPoster } from '../posters/yomkippur.js';
 import { hebrewYear } from '../hebrew-calendar.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -155,6 +156,18 @@ function txErevRoshHashana(year, settings, today) {
   };
 }
 
+/** The ערב יום כיפור message. */
+function txErevYomKippur(year, settings, today) {
+  const poster = buildYomKippurPoster(year, settings);
+  if (!txInWindow(poster, today)) return null;
+  return {
+    id: `erev-yk-${year}`,
+    name: 'Erev Yom Kippur',
+    when: hebrewYear(year),
+    text: erevYomKippurText(poster),
+  };
+}
+
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
  *
  *  Built separately rather than from the two-in-one sheet, because the message is per occasion:
@@ -215,6 +228,8 @@ export function renderTexts(container, state, settings, tables) {
        tov ones first, since they are the ones being checked; the Shabbosos are the long tail. */
     const rh = txErevRoshHashana(year, settings, today);
     if (rh) messages.push(rh);
+    const yk = txErevYomKippur(year, settings, today);
+    if (yk) messages.push(yk);
     messages.push(...txNetz(year, settings, today));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
@@ -235,6 +250,8 @@ export function renderTexts(container, state, settings, tables) {
     if (shabbos) messages.push(shabbos);
     const rh = txErevRoshHashana(year, settings, today);
     if (rh) messages.push(rh);
+    const yk = txErevYomKippur(year, settings, today);
+    if (yk) messages.push(yk);
     messages.push(...txNetz(year, settings, today));
   }
 

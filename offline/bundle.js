@@ -5408,6 +5408,8 @@ function unlockNav() {
 
 
 
+
+
 /** The room the ותיקין מנין davens in, said the way the message says it.
  *
  *  The sheet is where this lives: VS_TEXT.where, the line under whose מנין it is. The message
@@ -5457,8 +5459,31 @@ function netzMinyanText(poster, which = 'rh') {
 /** The closing line. The only words in the message that are not read off the sheet. */
 const YT_SIGN_OFF_RH = 'KESIVA VACHASIMA TOVA!';
 
-/** d or m: where this מנין davens, said the way the message says it. */
-const ytWhere = (t) => (t.underlined ? 'd' : 'm');
+/** Where this מנין davens, said the way the messages say it.
+ *
+ *  The sheets mark a room and the messages name it with a letter, and these are the same four
+ *  things: underlined is בית מדרש למטה, one star is the עזרת נשים, two is אולם השמחות, and
+ *  anything unmarked is the main בית מדרש. Read off the shul's own ערב יום כיפור message, whose
+ *  "Selichos 7:00m, 7:20en, 7:35d, 8:00sh, 8:20m" is YK_TEXT.erevShacharis mark for mark. */
+const ytWhere = (t) => {
+  if (t.mark === '**') return 'sh';
+  if (t.mark === '*') return 'en';
+  return t.underlined ? 'd' : 'm';
+};
+
+/** Whether this yom tov wants an עירוב תבשילין line.
+ *
+ *  When its last day is a Friday, so that Shabbos is cooked for from yom tov. Checked against
+ *  every erev yom tov message the shul has sent: it is on ערב פסח 2026 and ערב שבועות 2026, both
+ *  of which end on a Friday, and on none of ערב סוכות 2025, ערב ר"ה 2025 or ערב שבועות 2025,
+ *  none of which do.
+ *
+ *  It is not only a פסח and שבועות thing, which is what two examples on their own would suggest:
+ *  ראש השנה falls on a Thursday often enough, and then it ends on the Friday and wants one too.
+ *  So the question is asked of the date rather than of the name. יום כיפור never falls on a
+ *  Friday at all, so it never gets one, and nothing has to say so. */
+const ytEruv = (poster) => excelWeekday(poster?.span?.to) === 6;
+const YT_ERUV_LINE = 'ERUV TAVSHILIN';
 
 /** A row of מנינים, each with the room it is in. */
 const ytList = (times) => times.map((t) => t.text + ytWhere(t)).join(', ');
@@ -5485,6 +5510,8 @@ function erevRoshHashanaText(poster) {
   const mincha = parseTimes(RH_TEXT.erevMincha.times);
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
+  if (ytEruv(poster)) lines.push(YT_ERUV_LINE);
+
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
 
@@ -5492,6 +5519,54 @@ function erevRoshHashanaText(poster) {
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
   lines.push(YT_SIGN_OFF_RH);
+  return lines.join('\n');
+}
+
+/** The closing line of the ערב יום כיפור message, as the shul writes it. */
+const YT_SIGN_OFF_YK =
+  "May HKBH answer everyone's Tefilos Litova & grant us all a Gmar Chasima Tova";
+
+/** The ערב יום כיפור message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev Yom Kippur
+ *    Selichos 7:00m, 7:20en, 7:35d, 8:00sh, 8:20m
+ *    Mincha 1:30m, 2:00m, 2:30m, 3:00m, 3:30m, 4:00m
+ *    Hadlakas Neiros 6:21
+ *    Kol Nidrei 6:25
+ *    Ravs Drasha 7:20
+ *    May HKBH answer everyone's Tefilos Litova & grant us all a Gmar Chasima Tova
+ *
+ *  Its own builder rather than a variant of the ראש השנה one, because it is a different message
+ *  wearing the same shape: its own Selichos set, an afternoon of six מנחות rather than four, and
+ *  כל נדרי where the others have the evening מנחה. Folding it into one function with three
+ *  conditionals would hide that rather than express it.
+ *
+ *  No עירוב תבשילין line ever: יום כיפור cannot fall on a Friday.
+ *
+ *  @param poster - straight from buildYomKippurPoster. */
+function erevYomKippurText(poster) {
+  const timeFor = (calc) => poster?.dayLines?.find((l) => l.calc === calc)?.times?.[0];
+
+  const lines = ['Erev Yom Kippur'];
+
+  const selichos = parseTimes(YK_TEXT.erevShacharis.times);
+  if (selichos.length) lines.push(`Selichos ${ytList(selichos)}`);
+
+  const mincha = parseTimes(YK_TEXT.erevMincha.times);
+  if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  const candles = timeFor('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const kolNidrei = timeFor('kolNidrei');
+  if (kolNidrei) lines.push(`Kol Nidrei ${kolNidrei.text}`);
+
+  const drasha = timeFor('nightDrasha');
+  if (drasha) lines.push(`Ravs Drasha ${drasha.text}`);
+
+  lines.push(YT_SIGN_OFF_YK);
   return lines.join('\n');
 }
 
