@@ -1,0 +1,54 @@
+# Ksav runtime dependencies.
+#
+# Every entry is MIT, BSD, Apache-2.0 or LGPL. Nothing here is GPL, AGPL, or
+# carries a revenue capped model licence, because the application may be
+# distributed later and unwinding a licence mistake at that point is expensive.
+# See docs/licensing.md before adding anything.
+#
+# The versions are taken from a working environment, not written from memory.
+# Six of them were wrong the first time and the Windows build failed on the
+# first one it reached. tests/test_packaging.py now checks them against what is
+# actually installed.
+
+# --- Phase 0: shell, settings, hardware, model vault ---
+PySide6==6.11.2          # LGPL-3.0. Dynamically linked, no fee. Not PyQt, which is GPL.
+psutil==7.2.2            # BSD-3-Clause. CPU, cores and memory.
+
+# --- Phase 1: transcription, dictionary, exports ---
+faster-whisper==1.2.1    # MIT. CTranslate2 backed Whisper.
+ctranslate2==4.8.2       # MIT. The inference engine underneath it.
+av==18.1.0               # BSD-3-Clause, and it bundles FFmpeg built under the
+                         # LGPL. This is why Ksav ships no ffmpeg.exe at all:
+                         # no separate binary, and no risk of picking up a GPL
+                         # FFmpeg build by accident. See docs/licensing.md.
+python-docx==1.2.0       # MIT. Word export, with Hebrew marked as complex script.
+
+# The dictionary uses SQLite with FTS5, which is in the standard library, and a
+# token n-gram index written in plain Python. There is deliberately no
+# pyahocorasick dependency: see the note in app/language/matcher.py.
+
+# --- Phase 2: reading pages ---
+pytesseract==0.3.13       # Apache-2.0. A thin wrapper; Tesseract itself is vendored.
+opencv-python-headless==5.0.0.93   # Apache-2.0. Deskew, denoise, threshold, crop.
+pypdfium2==5.13.0        # BSD-3-Clause and Apache-2.0. Deliberately not PyMuPDF,
+                         # which is AGPL and would take the whole app with it.
+pillow==12.3.0           # MIT-CMU.
+reportlab==5.0.1         # BSD-3-Clause. PDF export.
+python-bidi==0.6.11      # LGPL-3.0. Reorders mixed Hebrew and English for PDF,
+                         # which has no layout engine of its own.
+
+# Frank Ruhl Libre ships in app/export/fonts under the Open Font Licence, with
+# its licence text beside it. The PDF standard fonts have no Hebrew at all.
+
+# --- Phase 3: dictation ---
+sounddevice==0.5.6       # MIT. Microphone capture. Needs PortAudio, which the
+                         # Windows wheel bundles.
+onnxruntime==1.29.0      # MIT. Runs Silero speech detection without pulling in
+                         # PyTorch. Optional: dictation falls back to loudness
+                         # detection when the Silero model is not installed.
+
+# The global shortcut and typing into other programs use Win32 through ctypes,
+# which is in the standard library. No extra dependency, and nothing to install.
+
+# --- Phase 4: diarization ---
+# sherpa-onnx           # Apache-2.0. Speaker segmentation with no account and no token.
