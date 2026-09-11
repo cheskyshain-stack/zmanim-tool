@@ -72,11 +72,13 @@ function txErevShabbos(state, settings, tables, today) {
  *  A saved chart still wins where one covers the week, so a cell somebody edited by hand reaches
  *  the message rather than being computed back to what it was. Where there is none, a sheet is
  *  made up on the spot with no overrides on it, which is the same chart minus the hand edits. */
-function txWeekNow(state, settings, tables, today) {
-  const saved = weekIndex(state);
+function txSeasonWeeks(settings, tables, today, years = 2) {
   const weeks = new Map();
   const year = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
-  for (const [season, y] of [['kayitz', year - 1], ['choref', year], ['kayitz', year], ['choref', year + 1]]) {
+  const pairs = [['kayitz', year - 1], ['choref', year], ['kayitz', year], ['choref', year + 1]];
+  // One more year of both seasons for the everything view, which reaches a year ahead.
+  if (years > 1) pairs.push(['kayitz', year + 1], ['choref', year + 2]);
+  for (const [season, y] of pairs) {
     let built = [];
     try {
       // It answers { startSerial, endSerial, weeks }, not a bare list.
@@ -89,15 +91,24 @@ function txWeekNow(state, settings, tables, today) {
       if (!weeks.has(week.serial)) weeks.set(week.serial, { week, season });
     }
   }
-  const serials = [...weeks.keys()].sort((a, b) => a - b);
-  if (!serials.length) return null;
-  const serial = currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  return weeks;
+}
 
-  const savedEntry = saved.get(serial);
+/** A week, against a saved chart where one covers it and a made-up sheet where none does. */
+function txAgainst(state, weeks, serial) {
+  const savedEntry = weekIndex(state).get(serial);
   if (savedEntry?.sheet) return { week: savedEntry.week, sheet: savedEntry.sheet };
   const computed = weeks.get(serial);
   if (!computed) return null;
   return { week: computed.week, sheet: { season: computed.season, overrides: {} } };
+}
+
+function txWeekNow(state, settings, tables, today) {
+  const weeks = txSeasonWeeks(settings, tables, today, 1);
+  const serials = [...weeks.keys()].sort((a, b) => a - b);
+  if (!serials.length) return null;
+  const serial = currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  return txAgainst(state, weeks, serial);
 }
 
 /** How long before a yom tov its messages appear here.
@@ -111,9 +122,26 @@ function txWeekNow(state, settings, tables, today) {
  *  calendar. One number, changed here. */
 const TX_AHEAD_DAYS = 4;
 
-/** Whether a sheet's occasion is close enough, or still running. */
+/** Whether a sheet's occasion is close enough, or still running.
+ *  Everything passes while the whole year is showing, which is what that mode is. */
 const txInWindow = (poster, today) =>
-  Boolean(poster) && poster.span.to >= today && poster.span.from - today <= TX_AHEAD_DAYS;
+  Boolean(poster) && (txAll || (poster.span.to >= today && poster.span.from - today <= TX_AHEAD_DAYS));
+
+/** The year ahead instead of the next four days.
+ *
+ *  For checking. The page is built to show only what is about to be sent, which is right for the
+ *  person sending it and useless for anybody wanting to see what a message will say at פסח. A
+ *  triple click on the heading turns the window off and shows every message the year holds;
+ *  another triple click puts it back.
+ *
+ *  Triple click rather than a button, because this is not for the person the page is for and a
+ *  button would be one more thing on a screen whose whole point is having almost nothing on it.
+ *  Nothing is stored, so a reload is back to the four days.
+ *
+ *  A year of Shabbosos is about fifty messages, each one a real calculation. That is slow enough
+ *  to notice and it only happens when somebody asks for it. */
+let txAll = false;
+const TX_ALL_DAYS = 380;
 
 /** The ערב ראש השנה message for a given Hebrew year. */
 function txErevRoshHashana(year, settings, today) {
@@ -180,17 +208,42 @@ export function renderTexts(container, state, settings, tables) {
   const messages = [];
   const today = Math.floor((Date.now() - Date.UTC(1899, 11, 30)) / 86400000);
 
-  const shabbos = txErevShabbos(state, settings, tables, today);
-  if (shabbos) messages.push(shabbos);
-
   const year = txRoshHashanaYear(settings, today);
-  const rh = txErevRoshHashana(year, settings, today);
-  if (rh) messages.push(rh);
-  messages.push(...txNetz(year, settings, today));
+
+  if (txAll) {
+    /* Every yom tov message the year holds, and then every Shabbos of it in date order. The yom
+       tov ones first, since they are the ones being checked; the Shabbosos are the long tail. */
+    const rh = txErevRoshHashana(year, settings, today);
+    if (rh) messages.push(rh);
+    messages.push(...txNetz(year, settings, today));
+    const weeks = txSeasonWeeks(settings, tables, today, 2);
+    for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
+      if (serial < today || serial - today > TX_ALL_DAYS) continue;
+      const found = txAgainst(state, weeks, serial);
+      if (!found) continue;
+      const { columns, row } = rowFor(found.week, found.sheet, state, settings);
+      const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+      messages.push({
+        id: `erev-shabbos-${serial}`,
+        name: 'Erev Shabbos',
+        when: english || '',
+        text: erevShabbosText(columns, row, english),
+      });
+    }
+  } else {
+    const shabbos = txErevShabbos(state, settings, tables, today);
+    if (shabbos) messages.push(shabbos);
+    const rh = txErevRoshHashana(year, settings, today);
+    if (rh) messages.push(rh);
+    messages.push(...txNetz(year, settings, today));
+  }
 
   container.innerHTML = `
     <div class="tx-page">
-      <h1 class="tx-title">Messages</h1>
+      <h1 class="tx-title" title="Triple click to show the whole year">Messages</h1>
+      ${txAll ? `<p class="tx-all">Showing everything for the year ahead, ${messages.length}
+        ${messages.length === 1 ? 'message' : 'messages'}. Triple click the heading again for the
+        next ${TX_AHEAD_DAYS} days only.</p>` : ''}
       <p class="tx-hint">Every time here is read off the shul's own boards and sheets, so this
       and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
       are for this visit only: reload and the times come back fresh, which is the way round that
@@ -200,6 +253,15 @@ export function renderTexts(container, state, settings, tables) {
       ${messages.length ? '' : `<div class="panel"><p>Nothing to send just now. Yom tov messages
         appear ${TX_AHEAD_DAYS} days before the yom tov and stay up until it is over.</p></div>`}
     </div>`;
+
+  /* Triple click on the heading, which is `detail` reaching 3 on an ordinary click. Listened
+     for on the heading rather than the page so that selecting a message by triple clicking it,
+     which is how somebody selects a paragraph, does not turn the whole year on by accident. */
+  container.querySelector('.tx-title')?.addEventListener('click', (e) => {
+    if (e.detail < 3) return;
+    txAll = !txAll;
+    renderTexts(container, state, settings, tables);
+  });
 
   /* Each box opened to the height of what is in it, and kept there as it is typed into.
      A textarea has no height of its own, so without this every message would open as one line

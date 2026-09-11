@@ -289,6 +289,14 @@ and listed in `DIST_TREES`.
 - `d` and `m` mean בית מדרש למטה and the main בית מדרש, from whether the time is underlined on
   the board. `en` is the עזרת נשים column. Times that are not מנינים (חצות, הדלקת נרות) carry
   no letter.
+- **A שבת that is yom tov gets no Erev Shabbos message and Shabbos is not mentioned.** Asked and
+  answered: on a year where ערב ר"ה is a Friday, the shul sends the ערב ראש השנה message and says
+  nothing about שבת. The window does this on its own, since such a Shabbos is not a chart row, but
+  do not "fix" it by folding Shabbos times into the yom tov message.
+- **Triple click the heading** to drop the window and show every message the year holds, about
+  fifty of them, and again to put it back. For checking, not for sending: nothing is stored and a
+  reload is back to the four days. It listens on the heading rather than the page so that triple
+  clicking a message to select it does not turn the year on.
 - The shul is feeding these over time as they send them. Each new one is a builder plus an
   entry in `renderTexts`.
 
