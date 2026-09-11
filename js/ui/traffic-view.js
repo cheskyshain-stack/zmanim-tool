@@ -317,6 +317,16 @@ export function renderTraffic(container) {
       ${trafficBreakdown('How people arrive', data.groups?.referer, { name: trafficRefererName, col: 'Came from' })}
       ${trafficBreakdown('Browser', data.groups?.browser, { col: 'Browser' })}
       ${trafficBreakdown('Operating system', data.groups?.os, { col: 'System' })}
+      ${
+        /* What Cloudflare answered to. Only worth a line on the screen while some panel is
+           missing: the names are guesses probed until one works, and these are the answer to
+           "which one was it", which is what gets written back into the Worker so it stops
+           probing. When every panel drew, nobody needs to know. */
+        Object.values(data.groups || {}).some((g) => g?.error) && data.dims
+          ? `<p class="hint">Dimensions Cloudflare accepted: <code>${
+            trafficEsc(Object.entries(data.dims).map(([k, v]) => `${k}=${v}`).join(', '))}</code></p>`
+          : ''
+      }
       <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
       they opened. Anyone reading with an ad blocker is not counted, so these are a floor
       rather than a headcount.${data.cached ? ' Cloudflare was last asked a few minutes ago.' : ''}</p>`;

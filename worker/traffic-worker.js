@@ -175,48 +175,64 @@ async function siteTagFor(env, account) {
  * needs its type named, Cloudflare's filter input types are long and version-specific, and
  * getting one wrong is a query that does not run at all. What is interpolated is this file's
  * own constants or a tag out of Cloudflare's own API, never anything a caller sends. */
+/* Each panel names the dimensions it would accept, best first, rather than one it insists on.
+ *
+ * The names cannot be checked from here. This Worker is kept in a repository on a machine that
+ * cannot reach Cloudflare at all (api.cloudflare.com, the workers.dev address and the dashboard
+ * all refuse to open a connection), so a name written here is a guess until it runs. It is not
+ * a permissions problem and a token would not fix it.
+ *
+ * So the Worker finds out instead of being told: it asks with the first name, and if Cloudflare
+ * says there is no such field it asks with the next. Whichever answers is remembered for the
+ * life of the isolate, so the cost of being wrong is one extra request, once. A panel with no
+ * name that works says so and prints what Cloudflare said about the last one it tried.
+ *
+ * Every fallback has to answer the same question as the name in front of it. That rules out the
+ * tempting one: `date` would be accepted where `datetimeHour` is not, and it would quietly make
+ * every visit look like midnight. A fallback that is accepted and wrong is worse than a panel
+ * that is missing, because only one of those two says anything. */
 const GROUPS = [
   // The two that are known to work, since they are what the tab has been drawing all along.
-  { key: 'byDay', dim: 'date', limit: 100, order: 'date_ASC' },
-  { key: 'byPage', dim: 'requestPath', limit: 25, order: 'count_DESC' },
+  { key: 'byDay', dims: ['date'], limit: 100, byDim: true },
+  { key: 'byPage', dims: ['requestPath'], limit: 25 },
   // Phone or desk. The one number that settles an argument rather than starting one.
-  { key: 'byDevice', dim: 'deviceType', limit: 10, order: 'count_DESC' },
+  { key: 'byDevice', dims: ['deviceType'], limit: 10 },
   /* When the board is read. A month is 744 hours and the limit has to clear that or the tail of
      a 30 day range goes missing without saying so. The admin folds these into 24 buckets; they
-     are asked for as real hours because the day they fall on is what makes that fold correct
-     across a timezone. */
-  { key: 'byHour', dim: 'datetimeHour', limit: 800, order: 'datetimeHour_ASC' },
+     are asked for as real instants because the day they fall on is what makes that fold correct
+     across a timezone. Every fallback here still carries an hour, for the reason above. */
+  { key: 'byHour', dims: ['datetimeHour', 'datetimeFifteenMinutes', 'datetimeMinute', 'datetime'], limit: 800, byDim: true },
   // How people got here: a link someone sent, a search, or typed in (which reports as nothing).
-  { key: 'byReferer', dim: 'refererHost', limit: 15, order: 'count_DESC' },
+  { key: 'byReferer', dims: ['refererHost', 'refererDomain', 'referer'], limit: 15 },
   // Asked separately rather than as one two-dimension group, which would multiply out into a
   // row per combination and answer neither question on its own.
-  { key: 'byBrowser', dim: 'userAgentBrowser', limit: 10, order: 'count_DESC' },
-  { key: 'byOS', dim: 'userAgentOS', limit: 10, order: 'count_DESC' },
+  { key: 'byBrowser', dims: ['userAgentBrowser', 'browser'], limit: 10 },
+  { key: 'byOS', dims: ['userAgentOS', 'os', 'operatingSystem'], limit: 10 },
 ];
 
-const groupQuery = (where, g) => `
+/** The dimension each panel settled on, once one of them worked. Per isolate, like the account
+ *  and the site tag, so the probing happens once and not on every reader's reload. */
+const settledDim = new Map();
+
+const groupQuery = (where, g, dim) => `
 query Traffic($accountTag: string!, $since: Time!, $until: Time!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
       rows: rumPageloadEventsAdaptiveGroups(
         limit: ${g.limit}
         filter: { ${where}, datetime_geq: $since, datetime_leq: $until }
-        orderBy: [${g.order}]
+        orderBy: [${g.byDim ? `${dim}_ASC` : 'count_DESC'}]
       ) {
         count
         sum { visits }
-        dimensions { ${g.dim} }
+        dimensions { ${dim} }
       }
     }
   }
 }`;
 
-/** One grouping, as `{ rows }` or as `{ error }`.
- *
- *  Never throws. A panel that cannot be had is a panel that says why, next to the ones that
- *  could, and Cloudflare's own words are what it says: the thing that goes wrong here is a
- *  dimension named differently than this file guessed, and only Cloudflare knows how. */
-async function askGroup(env, account, where, since, until, g) {
+/** One grouping under one dimension name, as `{ rows }` or as `{ error }`. */
+async function askOne(env, account, where, since, until, g, dim) {
   try {
     const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
       method: 'POST',
@@ -225,7 +241,7 @@ async function askGroup(env, account, where, since, until, g) {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        query: groupQuery(where, g),
+        query: groupQuery(where, g, dim),
         variables: { accountTag: account, since, until },
       }),
     });
@@ -235,8 +251,9 @@ async function askGroup(env, account, where, since, until, g) {
     const rows = body?.data?.viewer?.accounts?.[0]?.rows;
     if (!rows) return { error: 'Cloudflare returned nothing for this grouping.' };
     return {
+      dim,
       rows: rows.map((r) => ({
-        key: r.dimensions?.[g.dim] ?? '',
+        key: r.dimensions?.[dim] ?? '',
         views: r.count,
         visits: r.sum?.visits ?? 0,
       })),
@@ -244,6 +261,31 @@ async function askGroup(env, account, where, since, until, g) {
   } catch (e) {
     return { error: `Could not reach Cloudflare: ${e.message}` };
   }
+}
+
+/** One grouping, under whichever of its names Cloudflare will answer to.
+ *
+ *  Never throws. A panel that cannot be had is a panel that says why, next to the ones that
+ *  could, and what it says is Cloudflare's own words about the last name tried.
+ *
+ *  Only a complaint about the name itself moves on to the next candidate. Anything else, a
+ *  refused token or an account that answered nothing, is the same answer whatever the dimension
+ *  is called, and trying three more names for it would be three more requests to be told the
+ *  same thing. */
+async function askGroup(env, account, where, since, until, g) {
+  const known = settledDim.get(g.key);
+  const names = known ? [known] : g.dims;
+  let last = { error: 'No dimension tried.' };
+  for (const dim of names) {
+    const got = await askOne(env, account, where, since, until, g, dim);
+    if (got.rows) {
+      settledDim.set(g.key, dim);
+      return got;
+    }
+    last = got;
+    if (!/field|dimension|unknown|cannot query|no such/i.test(got.error || '')) break;
+  }
+  return last;
 }
 
 /** The origin to answer with, or null where the caller is not one of ours.
@@ -373,6 +415,10 @@ export default {
       // site is what happened once already (see siteTagFor). Not a secret: it names a site.
       narrowedBy,
       site: siteTag || SITE_HOST,
+      /* Which dimension name each panel settled on. Handed back so the screen can show it, and
+         so the names that actually worked can be read off once and written into GROUPS in front
+         of the guesses, rather than being rediscovered by probing on every cold isolate. */
+      dims: Object.fromEntries([...settledDim]),
       // Kept in the shape the tab already reads, since these two are its spine.
       byDay: (groups.byDay.rows || []).map((r) => ({ date: r.key, views: r.views, visits: r.visits })),
       byPage: (groups.byPage.rows || []).map((r) => ({ path: r.key, views: r.views, visits: r.visits })),
