@@ -254,6 +254,30 @@ The token is a Worker secret instead, and the admin asks the Worker.
   Playwright with `page.route`. Four states are worth covering: not set up, numbers, nobody has
   visited yet, and the Worker refusing.
 
+## The messages page, `/texts/`
+
+The chat messages the shul sends out, on a page of their own. **A third entry page beside
+`index.html` and `admin/index.html`**, with its own entry module (`js/texts-app.js`) and its
+own view (`js/ui/texts-view.js`), stamped by `build-offline.py` exactly the way the admin is
+and listed in `DIST_TREES`.
+
+- **It carries no link of any kind**, no sidebar, nothing back to the admin or out to the
+  congregation's site. That is the whole point: the person who sends the weekly message is not
+  the person who prints the boards, so the address is handed to them on its own. A browser test
+  asserts there are zero `<a>` elements on it. Do not "helpfully" add a back link.
+- The admin's sidebar gets a **Messages** entry, and it is an `<a href="/texts/">` rather than
+  a tab, because it leaves the page.
+- Behind the same four digits as the admin, same key, same `ui/lock.js`.
+- Every message is **read off the same sheet the times are printed from**, never recomputed
+  beside it: `erev-text.js` for ערב שבת (off the chart row) and `erev-yomtov-text.js` for the
+  yom tov ones (off the built poster). A message with a time nobody printed is the failure to
+  avoid, so a line the sheet has not got is left out rather than guessed at.
+- `d` and `m` mean בית מדרש למטה and the main בית מדרש, from whether the time is underlined on
+  the board. `en` is the עזרת נשים column. Times that are not מנינים (חצות, הדלקת נרות) carry
+  no letter.
+- The shul is feeding these over time as they send them. Each new one is a builder plus an
+  entry in `renderTexts`.
+
 ## The PIN on the admin
 
 `/admin/` asks for four digits before it draws anything, remembered on that device for three

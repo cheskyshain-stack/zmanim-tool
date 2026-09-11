@@ -17319,6 +17319,8 @@ const tabIcons = {
   calc: '<rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M7 6h6"/><path d="M7 9.5h2M11 9.5h2M7 13h2M11 13h2"/>',
   // A line climbing over two low bars: what the screen itself draws.
   traffic: '<path d="M3 16.5h14"/><rect x="4.5" y="11" width="3" height="5.5" rx="0.6"/><rect x="9" y="8" width="3" height="8.5" rx="0.6"/><rect x="13.5" y="4.5" width="3" height="12" rx="0.6"/>',
+  // A speech bubble with two lines in it: the message, rather than the sheet it is read off.
+  texts: '<path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v7a1.5 1.5 0 0 1-1.5 1.5H8l-4 3.5V14h-.5A1.5 1.5 0 0 1 3 12.5z"/><path d="M6.5 7.5h7M6.5 10.5h4"/>',
   // A sheet on a wall, with a pin at the top.
   posters: '<rect x="4.5" y="4" width="11" height="13.5" rx="1"/><path d="M10 1.5v2.5"/><circle cx="10" cy="1.6" r="1.1"/><path d="M7.5 8.5h5M7.5 11.5h5M7.5 14.5h3"/>',
 };
@@ -17347,7 +17349,13 @@ function persist() {
 function renderNav() {
   nav.innerHTML = tabs
     .map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${icon(t)}<span>${tabLabels[t]}</span></button>`)
-    .join('');
+    .join('')
+    /* Messages is a link out, not a tab. It opens /texts/, which is its own small program: the
+       chat messages, and nothing else on it. That page carries no way back here on purpose, so
+       the address can be handed to whoever sends them without handing them the whole generator
+       as well. A link rather than a nav button because it leaves this page, and the browser's
+       own back is the way back rather than anything drawn. See js/ui/texts-view.js. */
+    + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`;
   nav.querySelectorAll('.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;

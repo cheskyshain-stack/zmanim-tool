@@ -4234,3 +4234,31 @@ body.is-locked { overflow: hidden; }
 .traffic-setup li { margin-bottom: 0.4rem; }
 .traffic-setup code, .traffic-error code { background: var(--accent-soft); border-radius: 3px; padding: 0.05rem 0.3rem; }
 .traffic-error h3 { color: var(--danger); margin-top: 0; }
+
+/* ── The messages page, /texts/ ────────────────────────────────────────────────────────────
+   Its own screen rather than a tab inside the program, because the person who sends the
+   weekly message is not the person who prints the boards and the address is handed to them
+   alone. Nothing here links anywhere: no sidebar, no back, no congregation site. That is the
+   point of it and not an oversight. See js/ui/texts-view.js. */
+.tx-page { max-width: 44rem; margin: 0 auto; padding: 1.6rem 1rem 3rem; }
+.tx-title { font-size: 1.6rem; margin: 0 0 0.3rem; }
+.tx-hint { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 1.4rem; }
+.tx-card {
+  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  margin-bottom: 1rem; overflow: hidden;
+}
+.tx-head {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border);
+}
+.tx-name { font-size: var(--fs-lg); margin: 0; }
+/* Pushed against the button rather than against the name, so the button stays at the right
+   edge at every width and the two words in front of it wrap without moving it. */
+.tx-when { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
+/* The message as it will be pasted, spacing and all. pre rather than a div, because the line
+   breaks are the message: a chat message that lost them is not the same message. Wrapping is
+   on so a long line is readable on a phone without the card scrolling sideways. */
+.tx-body {
+  margin: 0; padding: 0.9rem; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere;
+  line-height: 1.5;
+}
