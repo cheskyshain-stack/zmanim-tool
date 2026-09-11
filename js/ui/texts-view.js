@@ -53,6 +53,9 @@ function txErevShabbos(state, settings, tables, today) {
   const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
   return {
     id: 'erev-shabbos',
+    kind: 'parsha',
+    // The Friday, which is the day it goes out, not the Shabbos it is about.
+    serial: found.week.serial - 1,
     name: 'Erev Shabbos',
     when: english || '',
     text: erevShabbosText(columns, row, english),
@@ -334,12 +337,32 @@ function txTishreiYear(todaySerial) {
   return civil + 3761;
 }
 
-/** One message, with what it is, when it is for, and a button that copies it. */
+/** The day a message goes out, written so nobody has to work out which year it is.
+ *
+ *  Asked for, and the reason is the bug above: a card carrying last פסח's times looked exactly
+ *  like one carrying this year's, since a message is only times and the year was a Hebrew one in
+ *  small grey letters. A weekday and a full date cannot be mistaken for another year's.
+ *
+ *  The device's own locale, so a date reads the way the reader writes dates. UTC parts throughout,
+ *  because a serial is a whole day and turning it into a local midnight puts it on the day before
+ *  anywhere west of Greenwich. */
+function txDateLabel(serial) {
+  if (!Number.isFinite(serial)) return '';
+  const at = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+  return at.toLocaleDateString(undefined, {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  });
+}
+
+/** One message, with what it is, the day it goes out, when it is for, and a button that copies
+ *  it. */
 function txCard(msg) {
+  const date = txDateLabel(msg.serial);
   return `
     <section class="tx-card" data-id="${txEsc(msg.id)}">
       <header class="tx-head">
         <h2 class="tx-name">${txEsc(msg.name)}</h2>
+        ${date ? `<span class="tx-date">${txEsc(date)}</span>` : ''}
         ${msg.when ? `<span class="tx-when">${txEsc(msg.when)}</span>` : ''}
         <button type="button" class="copy-btn tx-copy">Copy</button>
       </header>

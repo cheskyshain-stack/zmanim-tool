@@ -4252,8 +4252,12 @@ body.is-locked { overflow: hidden; }
   padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border);
 }
 .tx-name { font-size: var(--fs-lg); margin: 0; }
+/* The day the message goes out, and it is the loudest thing in the header after the name:
+   asked for so that two cards a year apart cannot be mistaken for each other, which needs it
+   to be read rather than skipped over. */
+.tx-date { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); white-space: nowrap; }
 /* Pushed against the button rather than against the name, so the button stays at the right
-   edge at every width and the two words in front of it wrap without moving it. */
+   edge at every width and the words in front of it wrap without moving it. */
 .tx-when { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
 /* The message as it will be pasted, spacing and all. pre rather than a div, because the line
    breaks are the message: a chat message that lost them is not the same message. Wrapping is

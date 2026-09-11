@@ -320,6 +320,10 @@ and listed in `DIST_TREES`.
 - **A yom tov card is windowed on its own days, not on its sheet's span**, wherever the two differ.
   The סוכות sheet speaks past שמחת תורה and the פסח sheet to the last day, so both would otherwise
   leave an "Erev" card up through חול המועד. ערב שביעי של פסח covers the far end of פסח.
+- **Every card shows the day the message goes out**, weekday and full date, in the device's own
+  locale (`txDateLabel`, UTC parts throughout, since a serial is a whole day and a local midnight
+  lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
+  is only times, so one carrying last year's looked exactly like one carrying this year's.
 - **The year view has two buttons, Parsha and Yom Tov**, and everything on it is in **date order**,
   which is the order these get sent in. Independent toggles, both on to begin with, so the pair
   reads as what is showing rather than as a choice between them; turning both off says so. The four
