@@ -5411,6 +5411,7 @@ function unlockNav() {
 
 
 
+
 /** The room the ותיקין מנין davens in, said the way the message says it.
  *
  *  The sheet is where this lives: VS_TEXT.where, the line under whose מנין it is. The message
@@ -5510,6 +5511,17 @@ const ytFirst = (poster, calc) => {
   }
   return null;
 };
+
+/** One named block of a sheet, and a line off it.
+ *
+ *  For the message that is not about the sheet's first night: ערב שמיני עצרת is the evening of
+ *  הושענא רבה, five blocks into the סוכות sheet, and every one of those blocks before it carries
+ *  the same three calcs. Matched on the heading the block prints, which is the sheet's own name
+ *  for the day, rather than on a block number that a sheet gaining a block would quietly shift. A
+ *  heading can have שבת or עירוב תבשילין joined onto it, so this matches the front of it. */
+const ytBlock = (poster, name) =>
+  (poster?.blocks || []).find((b) => String(b.heading || '').startsWith(name)) || null;
+const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc) || null;
 
 /** The ערב ראש השנה message.
  *
@@ -5710,6 +5722,59 @@ function erevSukkosText(poster) {
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
   lines.push(YT_SIGN_OFF_SUKKOS);
+  return lines.join('\n');
+}
+
+
+/** The ערב שמיני עצרת message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev Shemini Atzeres
+ *    Mincha 1:15d, 1:35d, 1:50m, 2:15m, 3:00m
+ *    Hadlakas Neiros 6:02
+ *    Mincha 6:05m
+ *
+ *  **No sign-off, and that is what the sent message does.** Every other one of these ends on a
+ *  fixed line and this one simply stops after the מנחה. Written the way it was sent rather than
+ *  given a "Chag Kosher V'Sameiach" of its own to match its neighbours.
+ *
+ *  Off the שמיני עצרת block rather than the first block on the sheet: this evening is הושענא
+ *  רבה's, five blocks in, and every block before it carries the same three calcs.
+ *
+ *  **The afternoon is the sheet's and it disagrees with the message that was sent.** The sheet
+ *  prints the whole run למטה, because the shul asked for it: the main בית מדרש is being set up
+ *  for the night and there is nowhere upstairs to daven (see sukkosErevMincha's allDown). The
+ *  October 2025 message says 1:50m, 2:15m and 3:00m, which is the old arrangement. The sheet is
+ *  what gets printed and hung, so the sheet is what this reads, which is the whole point of these
+ *  messages being read off it. If the shul says the message was right and the sheet is wrong, the
+ *  fix belongs in sukkosErevMincha and both move together.
+ *
+ *  The עירוב is asked of 22 and 23 תשרי, שמיני עצרת and שמחת תורה, which is the same question
+ *  the sheet asks over its own heading (eiruvShmini).
+ *
+ *  @param poster - straight from buildSukkosPoster. */
+function erevShminiAtzeresText(poster) {
+  const block = ytBlock(poster, SK_TEXT.shmini);
+  if (!block) return '';
+  const timeOf = (calc) => ytLine(block, calc)?.times?.[0];
+
+  const lines = ['Erev Shemini Atzeres'];
+
+  const mincha = ytLine(block, 'erevMincha')?.times;
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  const year = poster?.hebrewYear;
+  if (year && ytEruv([dateFromHebrew(22, 7, year), dateFromHebrew(23, 7, year)])) {
+    lines.push(YT_ERUV_LINE);
+  }
+
+  const candles = timeOf('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const nightMincha = timeOf('candlesMincha');
+  if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
+
   return lines.join('\n');
 }
 
@@ -14929,26 +14994,73 @@ function trafficRefererName(host) {
  *  rather than being double counted: the per-page table on this screen already demonstrates it,
  *  its visits column summing to the same total shown at the top.
  *
- *  Where the hourly grouping is not available, the UTC days are used as they came and the screen
- *  says so, rather than quietly presenting them as local. */
+ *  Where the hourly grouping does not reach back far enough to answer the range, the UTC days are
+ *  used as they came and the screen says so, rather than quietly presenting them as local.
+ *
+ *  **The days are the calendar's, not the ones that happen to have traffic in them.** This used to
+ *  take the last `wanted` buckets that had rows, and that is two wrong answers at once. A quiet day
+ *  vanished instead of being drawn empty, so the chart's bars were not consecutive days. Worse, the
+ *  newest bucket with rows is not necessarily today: for the hours before the first visit of the
+ *  morning it is yesterday, and the screen put yesterday's whole day under a button marked Today.
+ *  The shul saw both, which is what this now asks the calendar rather than the data.
+ *
+ *  `new Date(y, m, d - i)` rather than subtracting 86400000, which lands on 23:00 or 01:00 across a
+ *  daylight saving change and can name the same date twice. */
+const trafficDayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function trafficCalendarDays(wanted, utc = false) {
+  const now = new Date();
+  const out = [];
+  for (let i = wanted - 1; i >= 0; i -= 1) {
+    out.push(utc
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i)).toISOString().slice(0, 10)
+      : trafficDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)));
+  }
+  return out;
+}
+
+/** How far past the start of the range the first hourly bucket may sit and the hours still be
+ *  taken as covering it.
+ *
+ *  A day with nothing in it has no rows, so the earliest row is not the same thing as how far back
+ *  the hourly figures reach, and a quiet morning at the start of the range would read as a gap. A
+ *  whole day of slack is enough for that and nowhere near enough to hide the real case, which is
+ *  hourly detail that stops after a day or two while thirty were asked for. That case was on the
+ *  shul's screen: every range, Today and 7 days and 30 days alike, was drawing one bar, because one
+ *  day was all the hourly rows there were. A month cannot read lower than a day, and it did. */
+const TRAFFIC_HOUR_SLACK_MS = 24 * 3600 * 1000;
+
 function trafficLocalDays(data, wanted) {
   const rows = data.groups?.hour?.rows || [];
-  if (!rows.length) {
-    // Trimmed because one extra day is asked for, to make the oldest local day a whole one.
-    return { days: (data.byDay || []).slice(-wanted), utc: true };
+  const stamps = rows.map((r) => new Date(r.key).getTime()).filter((t) => !Number.isNaN(t));
+  const want = trafficCalendarDays(wanted);
+  const now = new Date();
+  const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (wanted - 1)).getTime();
+  const covered = stamps.length > 0 && Math.min(...stamps) - startsAt <= TRAFFIC_HOUR_SLACK_MS;
+
+  if (!covered) {
+    /* Cloudflare's own UTC days, laid onto the calendar so the chart is consecutive days and the
+       range asked for is the range added up. A day it did not mention is a day with nothing in it,
+       which is a bar of zero rather than a day left out. */
+    const utcDays = new Map((data.byDay || []).map((d) => [d.date, d]));
+    return {
+      days: trafficCalendarDays(wanted, true).map((date) => utcDays.get(date) || { date, visits: 0, views: 0 }),
+      utc: true,
+    };
   }
-  const buckets = new Map();
+
+  const buckets = new Map(want.map((date) => [date, { date, visits: 0, views: 0 }]));
   for (const r of rows) {
     const at = new Date(r.key);
     if (Number.isNaN(at.getTime())) continue;
-    const key = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
-    const b = buckets.get(key) || { date: key, visits: 0, views: 0 };
+    const b = buckets.get(trafficDayKey(at));
+    // Rows outside the days being drawn are the extra day asked for, and the hours of today that
+    // have not happened yet cannot appear at all. Neither belongs in the total.
+    if (!b) continue;
     b.visits += r.visits;
     b.views += r.views;
-    buckets.set(key, b);
   }
-  const days = [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date));
-  return { days: days.slice(-wanted), utc: false };
+  return { days: want.map((date) => buckets.get(date)), utc: false };
 }
 
 /** When the board is read, folded into the 24 hours of a day.
@@ -15142,12 +15254,16 @@ function renderTraffic(container) {
           : ''
       }
       ${daysAreUtc ? `<p class="hint">Days here are counted in UTC, not on a Lakewood clock, so a
-        visit after about 8pm falls on the next day. That is what happens when the hourly figures
-        are not available to count them properly by.</p>` : ''}
+        visit after about 8pm falls on the next day. That is what happens when Cloudflare's hourly
+        figures do not reach back over the whole period, which is the only way to count these days
+        properly. The totals are still the whole period.</p>` : ''}
       ${trafficArchiveNote(data)}
-      <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
-      they opened. Anyone reading with an ad blocker is not counted, so these are a floor
-      rather than a headcount.${
+      <p class="hint traffic-foot">The panels under the chart count the whole period Cloudflare was
+      asked about, which begins at midnight UTC and so reaches a few hours further back than the
+      days above: on Today they take in the last of yesterday evening. Only the two figures at the
+      top and the chart are counted on a Lakewood clock. A visit is one person's stay; a page view
+      is each page they opened. Anyone reading with an ad blocker is not counted, so these are a
+      floor rather than a headcount.${
         /* When these particular numbers were taken. Each range is its own question with its own
            answer, so two of them on the same screen can be from moments apart; printing the time
            is what makes that readable rather than a contradiction. */

@@ -38,6 +38,7 @@ import { RH_TEXT } from './posters/roshhashana.js';
 import { VS_TEXT } from './posters/vasikin.js';
 import { YK_TEXT } from './posters/yomkippur.js';
 import { PS_TEXT } from './posters/pesach.js';
+import { SK_TEXT } from './posters/sukkos.js';
 import { parseTimes } from './posters/slichos.js';
 import { excelWeekday, dateFromHebrew } from './hebrew-calendar.js';
 
@@ -140,6 +141,17 @@ const ytFirst = (poster, calc) => {
   }
   return null;
 };
+
+/** One named block of a sheet, and a line off it.
+ *
+ *  For the message that is not about the sheet's first night: ערב שמיני עצרת is the evening of
+ *  הושענא רבה, five blocks into the סוכות sheet, and every one of those blocks before it carries
+ *  the same three calcs. Matched on the heading the block prints, which is the sheet's own name
+ *  for the day, rather than on a block number that a sheet gaining a block would quietly shift. A
+ *  heading can have שבת or עירוב תבשילין joined onto it, so this matches the front of it. */
+const ytBlock = (poster, name) =>
+  (poster?.blocks || []).find((b) => String(b.heading || '').startsWith(name)) || null;
+const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc) || null;
 
 /** The ערב ראש השנה message.
  *
@@ -340,5 +352,58 @@ export function erevSukkosText(poster) {
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
   lines.push(YT_SIGN_OFF_SUKKOS);
+  return lines.join('\n');
+}
+
+
+/** The ערב שמיני עצרת message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev Shemini Atzeres
+ *    Mincha 1:15d, 1:35d, 1:50m, 2:15m, 3:00m
+ *    Hadlakas Neiros 6:02
+ *    Mincha 6:05m
+ *
+ *  **No sign-off, and that is what the sent message does.** Every other one of these ends on a
+ *  fixed line and this one simply stops after the מנחה. Written the way it was sent rather than
+ *  given a "Chag Kosher V'Sameiach" of its own to match its neighbours.
+ *
+ *  Off the שמיני עצרת block rather than the first block on the sheet: this evening is הושענא
+ *  רבה's, five blocks in, and every block before it carries the same three calcs.
+ *
+ *  **The afternoon is the sheet's and it disagrees with the message that was sent.** The sheet
+ *  prints the whole run למטה, because the shul asked for it: the main בית מדרש is being set up
+ *  for the night and there is nowhere upstairs to daven (see sukkosErevMincha's allDown). The
+ *  October 2025 message says 1:50m, 2:15m and 3:00m, which is the old arrangement. The sheet is
+ *  what gets printed and hung, so the sheet is what this reads, which is the whole point of these
+ *  messages being read off it. If the shul says the message was right and the sheet is wrong, the
+ *  fix belongs in sukkosErevMincha and both move together.
+ *
+ *  The עירוב is asked of 22 and 23 תשרי, שמיני עצרת and שמחת תורה, which is the same question
+ *  the sheet asks over its own heading (eiruvShmini).
+ *
+ *  @param poster - straight from buildSukkosPoster. */
+export function erevShminiAtzeresText(poster) {
+  const block = ytBlock(poster, SK_TEXT.shmini);
+  if (!block) return '';
+  const timeOf = (calc) => ytLine(block, calc)?.times?.[0];
+
+  const lines = ['Erev Shemini Atzeres'];
+
+  const mincha = ytLine(block, 'erevMincha')?.times;
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  const year = poster?.hebrewYear;
+  if (year && ytEruv([dateFromHebrew(22, 7, year), dateFromHebrew(23, 7, year)])) {
+    lines.push(YT_ERUV_LINE);
+  }
+
+  const candles = timeOf('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const nightMincha = timeOf('candlesMincha');
+  if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
+
   return lines.join('\n');
 }

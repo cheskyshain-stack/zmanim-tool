@@ -225,8 +225,22 @@ The token is a Worker secret instead, and the admin asks the Worker.
   the **hourly** buckets, which are real instants (`trafficLocalDays`), and the tab asks the
   Worker for one day more than it shows so the oldest local day is whole. Both figures sum across
   that fold: a page view is one event and a visit belongs to exactly one hour. Where the hourly
-  grouping is unavailable it falls back to the UTC days and says so on screen. Do not "simplify"
-  this back to `byDay`.
+  grouping does not reach back over the whole period it falls back to the UTC days and says so on
+  screen. Do not "simplify" this back to `byDay`.
+- **The days drawn are the calendar's, not the ones that have traffic in them.** `trafficLocalDays`
+  used to take the last N hourly buckets that had rows, which is two wrong answers at once. A quiet
+  day vanished rather than being drawn empty. And the newest bucket with rows is not today: before
+  the first visit of the morning it is yesterday, so the screen put **yesterday's whole day under a
+  button marked Today**. Worse, Cloudflare's hourly detail was reaching back only about a day, so
+  every range, Today and 7 days and 30 days alike, was adding up that one day: **30 days read lower
+  than Today**, which is an impossible number rather than a stale one. The shul reported both. The
+  days now come from the calendar and the hourly rows are used only where they actually cover the
+  period asked for (`TRAFFIC_HOUR_SLACK_MS`, one day of slack for a quiet morning at the start).
+- The panels under the chart (pages, device, hours, referrers, browser, system) are Cloudflare's own
+  aggregates over the window the Worker was asked about, which starts at midnight UTC and takes in
+  one extra day, so they reach a few hours further back than the chart. Only the two headline
+  figures and the chart are on a Lakewood clock. The foot of the tab says so. Narrowing the panels
+  properly means the browser sending the Worker explicit instants rather than a day count.
 - **Cloudflare keeps about a month, so the Worker keeps the shul's own copy.** An optional KV
   namespace bound as `ARCHIVE` holds one entry: UTC date to two arrays of 24 hours (visits and
   page views), plus that day's pages, devices, systems and referrers. Hours rather than day
