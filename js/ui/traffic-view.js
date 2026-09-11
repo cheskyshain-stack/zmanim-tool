@@ -35,11 +35,26 @@ const TRAFFIC_RANGES = [
  *  you are looking at this now, the same call the week's own switches make. */
 let trafficDays = 7;
 /** The last answer, so switching range and coming back does not re-ask for something
- *  already in hand. Keyed by the range. */
+ *  already in hand. Keyed by the range, and each one remembers when it was taken.
+ *
+ *  The age matters. Each range is its own question and its own answer, so a kept one can be
+ *  minutes older than the one beside it, and that is how a screen once showed 30 days reading
+ *  lower than 7 days: an old long range next to a fresh short one. A longer range showing less
+ *  than a shorter one is not a stale number, it is an impossible one. So nothing is shown from
+ *  here once it is older than the Worker's own cache: past that, wait for the real answer rather
+ *  than paint a figure that might contradict the one already on screen. */
+const TRAFFIC_KEEP_MS = 45000;
 const trafficSeen = new Map();
 
 const trafficEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/** A time of day on this device's clock, from the instant the Worker stamped the answer with. */
+function trafficClock(iso) {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+  return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 /** A whole number with thousands separated, which is the only formatting these need. */
 const trafficNum = (n) => Number(n || 0).toLocaleString('en-US');
@@ -431,11 +446,16 @@ export function renderTraffic(container) {
       ${trafficArchiveNote(data)}
       <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
       they opened. Anyone reading with an ad blocker is not counted, so these are a floor
-      rather than a headcount.${data.cached ? ' Cloudflare was last asked a few minutes ago.' : ''}</p>`;
+      rather than a headcount.${
+        /* When these particular numbers were taken. Each range is its own question with its own
+           answer, so two of them on the same screen can be from moments apart; printing the time
+           is what makes that readable rather than a contradiction. */
+        data.fetchedAt ? ` Counted as of ${trafficEsc(trafficClock(data.fetchedAt))}.` : ''
+      }${data.cached ? ' (from the last look, not asked again)' : ''}</p>`;
   };
 
   const seen = trafficSeen.get(trafficDays);
-  if (seen) show(seen);
+  if (seen && Date.now() - seen.at < TRAFFIC_KEEP_MS) show(seen.data);
 
   /* One day more than is shown. The hourly buckets get folded back into local days, and the
      oldest local day would otherwise be missing its first few hours: a UTC-midnight boundary is
@@ -445,7 +465,7 @@ export function renderTraffic(container) {
     .then(async (res) => {
       const data = await res.json().catch(() => ({ error: `Cloudflare's Worker answered ${res.status} and not in JSON.` }));
       if (!res.ok || data.error) throw new Error(data.error || `The Worker answered ${res.status}.`);
-      trafficSeen.set(trafficDays, data);
+      trafficSeen.set(trafficDays, { at: Date.now(), data });
       show(data);
     })
     .catch((err) => {

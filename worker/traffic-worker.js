@@ -55,10 +55,18 @@ const ALLOWED = [
 
 /** How long a reply is reused before Cloudflare is asked again.
  *
- *  Five minutes. The numbers are visits over days and nobody is watching them tick; the
- *  point is that the tab can be opened and reopened, and left open on a desk, without
- *  spending the account's API allowance on a figure that has not moved. */
-const CACHE_SECONDS = 300;
+ *  It was five minutes, and five minutes was too long for a reason that only shows up once there
+ *  is more than one range to pick from. Each range is cached on its own, so the buttons can be
+ *  showing moments several minutes apart, and that produced a screen where **30 days read lower
+ *  than 7 days**: the long range was a five minute old snapshot sitting next to a fresh short
+ *  one. A longer range showing less than a shorter one is not a stale number, it is an
+ *  impossible one, and it costs the reader their trust in all the other figures on the page.
+ *
+ *  Forty-five seconds instead. Long enough that a tab left open on a desk, or a reader clicking
+ *  between ranges, is not asking Cloudflare each time; short enough that two ranges can no
+ *  longer disagree by anything this shul would notice. The reply carries the time it was taken,
+ *  and the screen prints it, so whatever drift is left can be read rather than guessed at. */
+const CACHE_SECONDS = 45;
 
 /** Which version of this Worker wrote a cached reply, and part of the key it is filed under.
  *
@@ -69,7 +77,7 @@ const CACHE_SECONDS = 300;
  *
  *  **Change this on any deploy that changes the shape of the reply.** A date and a letter is
  *  enough; nothing reads it but the cache. */
-const BUILD = '2026-09-11a';
+const BUILD = '2026-09-11b';
 
 /** The most days that can be asked for at once, so a mistyped range cannot ask for something
  *  absurd. Cloudflare itself is never asked past LIVE_DAYS; everything beyond that is the
