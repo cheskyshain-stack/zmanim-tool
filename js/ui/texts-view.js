@@ -23,10 +23,11 @@ import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { erevRoshHashanaText, erevYomKippurText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
+import { buildPesachPoster } from '../posters/pesach.js';
 import { hebrewYear } from '../hebrew-calendar.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -168,6 +169,26 @@ function txErevYomKippur(year, settings, today) {
   };
 }
 
+/** The ערב פסח message.
+ *
+ *  Its own Hebrew year rather than ראש השנה's: פסח is in ניסן, half a year along, so the year
+ *  whose ר"ה is being counted from has its פסח six months later. Asked of both candidates and
+ *  whichever is still to come, or still running, is the one. */
+function txErevPesach(rhYear, settings, today) {
+  for (const y of [rhYear - 1, rhYear]) {
+    const poster = buildPesachPoster(y, settings);
+    if (!poster || poster.span.to < today) continue;
+    if (!txInWindow(poster, today)) continue;
+    return {
+      id: `erev-pesach-${y}`,
+      name: 'Erev Pesach',
+      when: hebrewYear(y),
+      text: erevPesachText(poster),
+    };
+  }
+  return null;
+}
+
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
  *
  *  Built separately rather than from the two-in-one sheet, because the message is per occasion:
@@ -230,6 +251,8 @@ export function renderTexts(container, state, settings, tables) {
     if (rh) messages.push(rh);
     const yk = txErevYomKippur(year, settings, today);
     if (yk) messages.push(yk);
+    const ps = txErevPesach(year, settings, today);
+    if (ps) messages.push(ps);
     messages.push(...txNetz(year, settings, today));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
@@ -252,6 +275,8 @@ export function renderTexts(container, state, settings, tables) {
     if (rh) messages.push(rh);
     const yk = txErevYomKippur(year, settings, today);
     if (yk) messages.push(yk);
+    const ps = txErevPesach(year, settings, today);
+    if (ps) messages.push(ps);
     messages.push(...txNetz(year, settings, today));
   }
 

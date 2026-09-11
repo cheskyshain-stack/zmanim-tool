@@ -5410,6 +5410,7 @@ function unlockNav() {
 
 
 
+
 /** The room the ותיקין מנין davens in, said the way the message says it.
  *
  *  The sheet is where this lives: VS_TEXT.where, the line under whose מנין it is. The message
@@ -5576,6 +5577,77 @@ function erevYomKippurText(poster) {
   if (drasha) lines.push(`Ravs Drasha ${drasha.text}`);
 
   lines.push(YT_SIGN_OFF_YK);
+  return lines.join('\n');
+}
+
+
+/** The closing line of the ערב פסח message, as the shul writes it.
+ *  Spelled the way that message spells it, which is not the way ערב סוכות spells the same two
+ *  words. Both are the shul's own and neither is being tidied into the other. */
+const YT_SIGN_OFF_PESACH = "Chag Kosher V'Sameach";
+
+/** The ערב פסח message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev Pesach
+ *    Sof Zeman Achila 10:30
+ *    Sof Zeman Biur 11:46
+ *    Mincha 1:35d, 1:50m, 2:15m, 3:00m
+ *    ERUV TAVSHILIN
+ *    Hadlakas Neiros 7:03
+ *    Mincha 7:06m
+ *    Chag Kosher V'Sameach
+ *
+ *  Every line off buildPesachPoster: סוף זמן אכילה is four שעות זמניות after עלות and ביעור five,
+ *  the afternoon is PS_TEXT.erevMincha4, and the מנחה is three minutes after candle lighting,
+ *  which is the sheet's own rule and matches the 7:03 and 7:06 the shul sent.
+ *
+ *  The lines are found by their calc rather than by position, and the first of each is taken.
+ *  The ערב block comes before the day blocks, so the first candle lighting on the sheet is the
+ *  one on ערב פסח rather than one of the later nights.
+ *
+ *  The עירוב is asked about the first days only, 15 and 16 ניסן. Those are what this message
+ *  announces. שביעי and אחרון running into Shabbos is a second עירוב and a different message,
+ *  sent a week later, and putting it on this one would be a week early.
+ *
+ *  @param poster - straight from buildPesachPoster. */
+function erevPesachText(poster) {
+  const blocks = poster?.blocks || [];
+  const firstLine = (calc) => {
+    for (const b of blocks) {
+      const l = (b.lines || []).find((x) => x.calc === calc);
+      if (l) return l;
+    }
+    return null;
+  };
+  const timeOf = (calc) => firstLine(calc)?.times?.[0];
+
+  const lines = ['Erev Pesach'];
+
+  const achila = timeOf('achila');
+  if (achila) lines.push(`Sof Zeman Achila ${achila.text}`);
+
+  const biur = timeOf('biur');
+  if (biur) lines.push(`Sof Zeman Biur ${biur.text}`);
+
+  /* Absent in a year where ערב פסח is Shabbos: that afternoon is Shabbos's own and is on the
+     board rather than on this sheet, so the sheet does not carry the line and neither does this. */
+  const mincha = firstLine('erevMincha')?.times;
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  const year = poster?.hebrewYear;
+  if (year && ytEruv([dateFromHebrew(15, 1, year), dateFromHebrew(16, 1, year)])) {
+    lines.push(YT_ERUV_LINE);
+  }
+
+  const candles = timeOf('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const nightMincha = timeOf('candlesMincha');
+  if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
+
+  lines.push(YT_SIGN_OFF_PESACH);
   return lines.join('\n');
 }
 
