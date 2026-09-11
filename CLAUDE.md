@@ -250,6 +250,13 @@ localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
 It is off where `crypto.subtle` is not there to check an answer with, which is the offline
 copy on `file://` and an admin served over plain http.
 
+**The PIN is not a secret and the shul knows it.** The number is in the message of an
+orphaned commit (`3da0493`), which GitHub keeps reachable by SHA forever, and in any case a
+salted SHA-256 of four digits is ten thousand guesses: the whole space was searched against
+the shipped hash in 0.004 seconds. This was put to the shul with both facts and the answer
+was that it does not really have to be hidden. So do not raise it again, and do not quietly
+"harden" it. Behind it is one browser's own localStorage and nothing else.
+
 ## Verify before you call it done
 
 Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
