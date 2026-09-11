@@ -5407,6 +5407,24 @@ function unlockNav() {
 
 
 
+
+/** The room the ותיקין מנין davens in, said the way the message says it.
+ *
+ *  The sheet is where this lives: VS_TEXT.where, the line under whose מנין it is. The message
+ *  does not carry its own copy of the address, because then moving the מנין would mean changing
+ *  it in two places and whichever was forgotten would keep sending people to the old room.
+ *
+ *  Hebrew on the sheet, English in the message, so the two are held together here. If the sheet
+ *  ever says something this does not know the English for, the מנין has moved and nobody can
+ *  invent the wording for it: the Hebrew goes into the message as it stands, which reads oddly
+ *  in an English sentence and is meant to. That is the sender seeing it has changed and writing
+ *  the line themselves, rather than a message that quietly names the wrong room. The box on the
+ *  messages page can be typed into for exactly that. */
+const NETZ_WHERE = {
+  'באולם השמחות': 'in the Simcha Hall of the main B"M',
+};
+const netzWhere = () => NETZ_WHERE[VS_TEXT.where] || VS_TEXT.where;
+
 /** The ותיקין announcement, off the ותיקין sheet.
  *
  *  What the shul sends for ראש השנה:
@@ -5432,7 +5450,7 @@ function netzMinyanText(poster, which = 'rh') {
   const hamelech = at('hamelech');
   if (!shacharis.length || !hamelech.length) return '';
   const when = which === 'yk' ? 'on Yom Kippur' : 'BOTH days of Yom Tov';
-  return `There will be a Netz Minyan in the Simcha Hall of the main B"M ${when}. `
+  return `There will be a Netz Minyan ${netzWhere()} ${when}. `
     + `Shacharis ${shacharis.join('/')} Hamelech ${hamelech.join('/')}`;
 }
 
