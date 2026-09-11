@@ -302,16 +302,22 @@ and listed in `DIST_TREES`.
   the Mincha menu, an optional `ERUV TAVSHILIN`, Hadlakas Neiros, an evening Mincha (כל נדרי on
   יו"כ), an optional Ravs Drasha, then a sign-off that is fixed words per yom tov. Build a new one
   off a real sent message, not off a guess.
-- **`ERUV TAVSHILIN` goes in when the last day of yom tov is a Friday**, between the Mincha menu
-  and Hadlakas Neiros, in capitals on its own line. Asked of the date rather than the name: two
-  examples make it look like a פסח and שבועות thing, but ראש השנה falls on a Thursday often enough
-  and wants one too (5789, 5792, 5795, 5796, 5798, 5799 in the next fifteen). יום כיפור never
-  falls on a Friday, so it never gets one.
+- **`ERUV TAVSHILIN` goes in when ANY day of yom tov is a Friday**, first day or second, between
+  the Mincha menu and Hadlakas Neiros, in capitals on its own line. Said by the shul in those
+  words after this was first written as "the last day", which is the same answer for a yom tov
+  running Thursday into Friday and the wrong one for a yom tov running Friday into Shabbos.
+  Asked of the date rather than the name: two sent messages make it look like a פסח and שבועות
+  thing, but ראש השנה falls Thursday and Friday often enough (5789, 5792, 5795, 5796, 5798, 5799
+  in the next fifteen). יום כיפור never falls on a Friday, so it never asks.
+  **The days are handed to `ytEruv`, never taken off a sheet's span**: פסח's span runs from
+  bedikas chometz to the last day with חול המועד in the middle, and a Friday in חול המועד is an
+  ordinary Friday.
 - **The room letters are the sheet's marks**: underlined is `d`, one star is `en`, two stars is
   `sh`, unmarked is `m`. Confirmed against the shul's ערב יום כיפור message, which is
   `YK_TEXT.erevShacharis` mark for mark.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
-  schedule; wait for it rather than giving the message its own times.
+  schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
+  line rather than carrying a time of its own.
 - The shul is feeding these over time as they send them. Each new one is a builder plus an
   entry in `renderTexts`.
 

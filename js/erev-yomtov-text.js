@@ -103,16 +103,24 @@ const ytWhere = (t) => {
 
 /** Whether this yom tov wants an עירוב תבשילין line.
  *
- *  When its last day is a Friday, so that Shabbos is cooked for from yom tov. Checked against
- *  every erev yom tov message the shul has sent: it is on ערב פסח 2026 and ערב שבועות 2026, both
- *  of which end on a Friday, and on none of ערב סוכות 2025, ערב ר"ה 2025 or ערב שבועות 2025,
- *  none of which do.
+ *  **When any day of yom tov is a Friday**, first day or second, because that is the day Shabbos
+ *  gets cooked for. Corrected by the shul: this asked whether the *last* day was a Friday, which
+ *  is the same answer whenever yom tov runs Thursday into Friday, and the wrong one for a yom tov
+ *  that runs Friday into Shabbos. There the Friday is the first day, the last day is Shabbos, and
+ *  the עירוב is needed just as much.
  *
- *  It is not only a פסח and שבועות thing, which is what two examples on their own would suggest:
- *  ראש השנה falls on a Thursday often enough, and then it ends on the Friday and wants one too.
- *  So the question is asked of the date rather than of the name. יום כיפור never falls on a
- *  Friday at all, so it never gets one, and nothing has to say so. */
-const ytEruv = (poster) => excelWeekday(poster?.span?.to) === 6;
+ *  ראש השנה happens not to show the difference, since it can fall on a Monday, Tuesday, Thursday
+ *  or Saturday and never on a Friday, so its Friday is always the second day. פסח and שבועות do
+ *  show it, which is why this is written the general way now rather than when those messages get
+ *  built.
+ *
+ *  The days are handed in rather than taken off the sheet's span, because a span is not a list of
+ *  yom tov days: פסח's runs from bedikas chometz to the last day and has חול המועד in the middle,
+ *  and a Friday in חול המועד is an ordinary Friday. Each message names its own days, which is the
+ *  one place that knows them.
+ *
+ *  יום כיפור never falls on a Friday, so it does not ask. */
+const ytEruv = (daySerials) => (daySerials || []).some((s) => excelWeekday(s) === 6);
 const YT_ERUV_LINE = 'ERUV TAVSHILIN';
 
 /** A row of מנינים, each with the room it is in. */
@@ -140,7 +148,8 @@ export function erevRoshHashanaText(poster) {
   const mincha = parseTimes(RH_TEXT.erevMincha.times);
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  if (ytEruv(poster)) lines.push(YT_ERUV_LINE);
+  // ראש השנה is its two days, which are the day before the sheet's last and that last day.
+  if (ytEruv([poster?.span?.to - 1, poster?.span?.to])) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
