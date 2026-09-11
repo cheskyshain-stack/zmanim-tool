@@ -20,15 +20,27 @@ import { renderTexts } from './ui/texts-view.js';
 const main = document.getElementById('main');
 
 function start() {
+  /* Two catches, not one, and that is the point of the shape.
+     They were one, and it said the data files had failed to load whatever had actually gone
+     wrong. A mistake inside the drawing then reported itself as a fetch problem, on a page that
+     had fetched everything perfectly well, and the real message ("built is not iterable") was
+     only visible by reading the sentence to the end. A screen that names the wrong cause is
+     worse than one that says nothing, because it sends whoever is looking somewhere else. */
   loadTables()
+    .catch((err) => {
+      main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}.
+        Make sure this is being served over http:// rather than opened as a file, so the
+        data/*.json files can load.</p>`;
+      throw err;
+    })
     .then((tables) => {
       const state = loadState();
       renderTexts(main, state, resolveSettings(state.settings), tables);
     })
     .catch((err) => {
-      main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}.
-        Make sure this is being served over http:// rather than opened as a file, so the
-        data/*.json files can load.</p>`;
+      if (main.querySelector('.error')) return; // the loader already said its piece
+      console.error('messages page', err);
+      main.innerHTML = `<p class="error">Could not build the messages: ${err.message}</p>`;
     });
 }
 

@@ -275,6 +275,17 @@ and listed in `DIST_TREES`.
   beside it: `erev-text.js` for ערב שבת (off the chart row) and `erev-yomtov-text.js` for the
   yom tov ones (off the built poster). A message with a time nobody printed is the failure to
   avoid, so a line the sheet has not got is left out rather than guessed at.
+- **The weeks are computed, not looked up** (`txWeekNow`). This page must never need somebody to
+  have generated a chart first: the chart is where these times are printed, not where they come
+  from. Four candidate seasons are built and whichever contains this week wins, which is brute
+  force and cannot be subtly wrong the way a branch on the date can. A saved chart still wins
+  where one covers the week, so a hand-edited cell reaches the message.
+- **`TX_AHEAD_DAYS` is 4**, asked for: whatever is applicable within four days is on the page and
+  nothing else is. Without a window the yom tov cards sit there for eleven months.
+- The message box is a **textarea and editable**, because whoever sends these wanted to add a
+  line first. Copy takes what is in the box, not what was built into it. Edits do not persist:
+  a reload rebuilds from the calendar, which is the way round that cannot leave a stale time in
+  a fresh message.
 - `d` and `m` mean בית מדרש למטה and the main בית מדרש, from whether the time is underlined on
   the board. `en` is the עזרת נשים column. Times that are not מנינים (חצות, הדלקת נרות) carry
   no letter.

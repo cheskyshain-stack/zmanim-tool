@@ -5407,6 +5407,35 @@ function unlockNav() {
 
 
 
+/** The ותיקין announcement, off the ותיקין sheet.
+ *
+ *  What the shul sends for ראש השנה:
+ *
+ *    There will be a Netz Minyan in the Simcha Hall of the main B"M BOTH days of Yom Tov.
+ *    Shacharis 5:44/5:45 Hamelech 6:14/6:15
+ *
+ *  Two times to a line, slash separated, one per day of yom tov, in the order the sheet prints
+ *  them. ראש השנה is always two days, so "BOTH days" is a fixed phrase there and not something
+ *  worked out. יום כיפור is always one, so it gets a line of its own wording and one time in
+ *  each place rather than a pair.
+ *
+ *  No d or m on these. The message says where the מנין is in words, in the sentence itself, and
+ *  it is neither of the two rooms the letters stand for.
+ *
+ *  @param poster - straight from buildVasikinPoster, so this reads the sheet rather than
+ *    working the times out a second time beside it. */
+function netzMinyanText(poster, which = 'rh') {
+  const days = poster?.days || [];
+  if (!days.length) return '';
+  const at = (calc) => days.map((d) => d.lines?.find((l) => l.calc === calc)?.text).filter(Boolean);
+  const shacharis = at('shacharis');
+  const hamelech = at('hamelech');
+  if (!shacharis.length || !hamelech.length) return '';
+  const when = which === 'yk' ? 'on Yom Kippur' : 'BOTH days of Yom Tov';
+  return `There will be a Netz Minyan in the Simcha Hall of the main B"M ${when}. `
+    + `Shacharis ${shacharis.join('/')} Hamelech ${hamelech.join('/')}`;
+}
+
 /** The closing line. The only words in the message that are not read off the sheet. */
 const YT_SIGN_OFF_RH = 'KESIVA VACHASIMA TOVA!';
 
