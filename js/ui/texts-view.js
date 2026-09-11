@@ -126,9 +126,14 @@ function txWeekNow(state, settings, tables, today) {
 const TX_AHEAD_DAYS = 4;
 
 /** Whether a stretch of days is close enough, or still running.
- *  Everything passes while the whole year is showing, which is what that mode is. */
+ *
+ *  Two halves, and only one of them is relaxed by the year view. **Finished is finished in both
+ *  views**: the year view showing everything means everything ahead, not everything ever, and
+ *  letting a past occasion through is how the page opened on last פסח's שביעי message. It sorted
+ *  to the top, being the earliest date on the screen, which is exactly where a stale message does
+ *  the most harm. The half the year view does drop is the four day one. */
 const txDaysInWindow = (from, to, today) =>
-  txAll || (to >= today && from - today <= TX_AHEAD_DAYS);
+  to >= today && (txAll || from - today <= TX_AHEAD_DAYS);
 
 /** The same asked of a sheet, which is what most of these messages have to hand. */
 const txInWindow = (poster, today) =>
@@ -238,8 +243,12 @@ function txErevShminiAtzeres(year, settings, today) {
 function txErevPesach(rhYear, settings, today) {
   for (const y of [rhYear - 1, rhYear]) {
     const poster = buildPesachPoster(y, settings);
-    if (!poster || poster.span.to < today) continue;
-    if (!txInWindow(poster, today)) continue;
+    if (!poster) continue;
+    /* The two first days, not the sheet's span, for the same reason ערב סוכות is windowed that
+       way: the פסח sheet speaks to the last day, and an "Erev Pesach" card sitting there through
+       חול המועד is a message nobody is about to send. ערב שביעי של פסח covers the far end. */
+    const first = dateFromHebrew(15, 1, y);
+    if (!txDaysInWindow(first - 1, first + 1, today)) continue;
     return {
       id: `erev-pesach-${y}`,
       kind: 'yomtov',
@@ -261,6 +270,7 @@ function txErevShviiShelPesach(rhYear, settings, today) {
     const poster = buildPesachPoster(y, settings);
     if (!poster) continue;
     const shvii = dateFromHebrew(21, 1, y);
+    // txDaysInWindow turns away the year already gone, which is what picks between the two.
     if (!txDaysInWindow(shvii - 1, shvii + 1, today)) continue;
     const text = erevShviiShelPesachText(poster);
     if (!text) continue;
@@ -302,20 +312,24 @@ function txNetz(year, settings, today) {
   return out;
 }
 
-/** Which ראש השנה is the one worth showing.
+/** Which Hebrew year's תשרי is the one worth showing.
  *
- *  The one coming, and the one just gone until its second day is over, so somebody sending the
- *  message on ערב ר"ה itself is not handed next year's by a screen that has already moved on.
- *  Worked from the poster's own span rather than from a date this file decides, so it turns over
- *  when the sheet does. */
-function txRoshHashanaYear(settings, todaySerial) {
-  /* Three candidates rather than arithmetic on which Hebrew year it is. ר"ה falls in September
-     or October, so the civil year plus 3760, 3761 or 3762 always contains the right one, and
-     the poster's own span settles which without this file having to know the calendar. */
+ *  **Held until שמחת תורה is over, not until ראש השנה is.** This used to turn over the moment the
+ *  ראש השנה sheet finished, which meant that from the day after ראש השנה every other message of
+ *  the season was asked of next year: ערב יום כיפור, ערב סוכות, ערב שמיני עצרת and the יום כיפור
+ *  ותיקין announcement were a year out and so never appeared at all. Found by walking a year of
+ *  dates a day at a time and printing what each day's page held, which is the only way a hole like
+ *  that shows up: every one of those days looked fine on its own, it just had nothing on it.
+ *
+ *  23 תשרי is the last day this file has a תשרי message about. פסח picks its own year, being half
+ *  a year along, so nothing here has to hold past שמחת תורה.
+ *
+ *  Three candidates rather than arithmetic on which Hebrew year it is: ראש השנה falls in September
+ *  or October, so the civil year plus 3760, 3761 or 3762 always contains the right one. */
+function txTishreiYear(todaySerial) {
   const civil = new Date(Date.UTC(1899, 11, 30) + todaySerial * 86400000).getUTCFullYear();
   for (const y of [civil + 3760, civil + 3761, civil + 3762]) {
-    const poster = buildRoshHashanaPoster(y, settings);
-    if (poster && poster.span.to >= todaySerial) return y;
+    if (dateFromHebrew(23, 7, y) >= todaySerial) return y;
   }
   return civil + 3761;
 }
@@ -352,7 +366,7 @@ export function renderTexts(container, state, settings, tables) {
   const messages = [];
   const today = Math.floor((Date.now() - Date.UTC(1899, 11, 30)) / 86400000);
 
-  const year = txRoshHashanaYear(settings, today);
+  const year = txTishreiYear(today);
 
   /* The yom tov messages. The same list in both views: each builder keeps its own window and
      txInWindow lets everything through while the year is showing, so the only difference between

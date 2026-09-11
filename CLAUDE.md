@@ -307,6 +307,19 @@ and listed in `DIST_TREES`.
   answered: on a year where ערב ר"ה is a Friday, the shul sends the ערב ראש השנה message and says
   nothing about שבת. The window does this on its own, since such a Shabbos is not a chart row, but
   do not "fix" it by folding Shabbos times into the yom tov message.
+- **Finished is finished in both views.** `txDaysInWindow` relaxes only its four day half for the
+  year view, never the "still to come, or still running" half. Showing everything means everything
+  ahead, not everything ever: letting a past occasion through opened the page on last פסח's שביעי
+  message, sorted to the top because it was the earliest date on the screen. The shul saw it.
+- **The תשרי year is held until שמחת תורה, not until ראש השנה** (`txTishreiYear`). Turning it over
+  when the ראש השנה sheet finished meant that from the day after ראש השנה, ערב יום כיפור, ערב סוכות,
+  ערב שמיני עצרת and the יום כיפור ותיקין announcement were all asked of next year and so **never
+  appeared at all**. Found by walking a year of dates a day at a time and printing what each day's
+  page held, which is the only way a hole like that shows: every day looked fine on its own, it just
+  had nothing on it. Worth re-running that sweep after any change to a window here.
+- **A yom tov card is windowed on its own days, not on its sheet's span**, wherever the two differ.
+  The סוכות sheet speaks past שמחת תורה and the פסח sheet to the last day, so both would otherwise
+  leave an "Erev" card up through חול המועד. ערב שביעי של פסח covers the far end of פסח.
 - **The year view has two buttons, Parsha and Yom Tov**, and everything on it is in **date order**,
   which is the order these get sent in. Independent toggles, both on to begin with, so the pair
   reads as what is showing rather than as a choice between them; turning both off says so. The four
