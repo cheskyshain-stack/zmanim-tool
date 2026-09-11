@@ -127,6 +127,20 @@ const YT_ERUV_LINE = 'ERUV TAVSHILIN';
 /** A row of מנינים, each with the room it is in. */
 const ytList = (times) => times.map((t) => t.text + ytWhere(t)).join(', ');
 
+/** The first line on a sheet carrying a given calc, blocks read in the order they print.
+ *
+ *  The sheets that run over several days carry the same calc more than once: פסח and סוכות both
+ *  open every night of yom tov with a הדלקת נרות and a מנחה three minutes after it. The ערב block
+ *  is the first of them, so the first of each is the one these messages are about, and a later
+ *  night's candle lighting cannot get into a message sent before the first. */
+const ytFirst = (poster, calc) => {
+  for (const b of poster?.blocks || []) {
+    const l = (b.lines || []).find((x) => x.calc === calc);
+    if (l) return l;
+  }
+  return null;
+};
+
 /** The ערב ראש השנה message.
  *
  *  @param poster - straight from buildRoshHashanaPoster, so this reads exactly what the
@@ -243,15 +257,7 @@ const YT_SIGN_OFF_PESACH = "Chag Kosher V'Sameach";
  *
  *  @param poster - straight from buildPesachPoster. */
 export function erevPesachText(poster) {
-  const blocks = poster?.blocks || [];
-  const firstLine = (calc) => {
-    for (const b of blocks) {
-      const l = (b.lines || []).find((x) => x.calc === calc);
-      if (l) return l;
-    }
-    return null;
-  };
-  const timeOf = (calc) => firstLine(calc)?.times?.[0];
+  const timeOf = (calc) => ytFirst(poster, calc)?.times?.[0];
 
   const lines = ['Erev Pesach'];
 
@@ -263,7 +269,7 @@ export function erevPesachText(poster) {
 
   /* Absent in a year where ערב פסח is Shabbos: that afternoon is Shabbos's own and is on the
      board rather than on this sheet, so the sheet does not carry the line and neither does this. */
-  const mincha = firstLine('erevMincha')?.times;
+  const mincha = ytFirst(poster, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   const year = poster?.hebrewYear;
@@ -278,5 +284,61 @@ export function erevPesachText(poster) {
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
   lines.push(YT_SIGN_OFF_PESACH);
+  return lines.join('\n');
+}
+
+
+/** The opening and closing lines of the ערב סוכות message, as the shul writes them.
+ *
+ *  The sign-off is the same two words פסח's is and is spelled differently, "Sameiach" against
+ *  "Sameach". Both are copied off the shul's own sent messages and neither is being tidied into
+ *  the other: this file's job is to write what the shul writes. */
+const YT_TITLE_SUKKOS = 'Erev Sukkos-Chag Simchaseinu';
+const YT_SIGN_OFF_SUKKOS = "Chag Kosher V'Sameiach";
+
+/** The ערב סוכות message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev Sukkos-Chag Simchaseinu
+ *    Mincha 1:15d, 1:35d, 1:50m, 2:15m, 3:00m
+ *    Hadlakas Neiros 6:13
+ *    Mincha 6:16
+ *    Chag Kosher V'Sameiach
+ *
+ *  The shortest of them: no סליחות, no חצות, no סוף זמן. The afternoon is sukkosErevMincha, which
+ *  is where the 1:15 that moves to 1:20 or drops out altogether is decided, so a year whose מנחה
+ *  גדולה is late sends four times rather than five and this does not have to know why.
+ *
+ *  The evening מנחה carries its room letter where the sent message left it off. The letters are
+ *  the sheet's marks everywhere else in this file, and that מנין is in the main בית מדרש, so the
+ *  line reads "6:16m". One character, and it is the one that makes every message on the page say
+ *  the room the same way.
+ *
+ *  The עירוב is asked of 15 and 16 תשרי. 15 תשרי is never a Friday, since ראש השנה never is and
+ *  they are the same weekday, so in practice this is asking about יום ב'. That is the same day the
+ *  sheet puts its own עירוב תבשילין note over, which is the check that these two agree.
+ *
+ *  @param poster - straight from buildSukkosPoster. */
+export function erevSukkosText(poster) {
+  const timeOf = (calc) => ytFirst(poster, calc)?.times?.[0];
+
+  const lines = [YT_TITLE_SUKKOS];
+
+  const mincha = ytFirst(poster, 'erevMincha')?.times;
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  const year = poster?.hebrewYear;
+  if (year && ytEruv([dateFromHebrew(15, 7, year), dateFromHebrew(16, 7, year)])) {
+    lines.push(YT_ERUV_LINE);
+  }
+
+  const candles = timeOf('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const nightMincha = timeOf('candlesMincha');
+  if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
+
+  lines.push(YT_SIGN_OFF_SUKKOS);
   return lines.join('\n');
 }

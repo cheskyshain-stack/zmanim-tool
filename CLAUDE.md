@@ -314,7 +314,14 @@ and listed in `DIST_TREES`.
   ordinary Friday.
 - **The room letters are the sheet's marks**: underlined is `d`, one star is `en`, two stars is
   `sh`, unmarked is `m`. Confirmed against the shul's ערב יום כיפור message, which is
-  `YK_TEXT.erevShacharis` mark for mark.
+  `YK_TEXT.erevShacharis` mark for mark. The sent ערב סוכות message leaves the letter off its
+  evening מנחה where every other sent message carries one, and this writes the letter: one
+  character, and it is the one that makes every message on the page say the room the same way.
+- Built so far: ערב ראש השנה, ערב יום כיפור, ערב סוכות, ערב פסח, and the two ותיקין
+  announcements. Each is measured against the shul's own sent message before it is called done,
+  line for line. A sheet that carries the same `calc` on several nights (פסח and סוכות both open
+  every night of yom tov with a הדלקת נרות) is read with `ytFirst`, which takes the first, since
+  the ערב block prints before the day blocks.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
   schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
   line rather than carrying a time of its own.

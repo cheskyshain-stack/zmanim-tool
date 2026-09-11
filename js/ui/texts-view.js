@@ -23,11 +23,12 @@ import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { erevRoshHashanaText, erevYomKippurText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
 import { buildPesachPoster } from '../posters/pesach.js';
+import { buildSukkosPoster } from '../posters/sukkos.js';
 import { hebrewYear } from '../hebrew-calendar.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -124,10 +125,14 @@ function txWeekNow(state, settings, tables, today) {
  *  calendar. One number, changed here. */
 const TX_AHEAD_DAYS = 4;
 
-/** Whether a sheet's occasion is close enough, or still running.
+/** Whether a stretch of days is close enough, or still running.
  *  Everything passes while the whole year is showing, which is what that mode is. */
+const txDaysInWindow = (from, to, today) =>
+  txAll || (to >= today && from - today <= TX_AHEAD_DAYS);
+
+/** The same asked of a sheet, which is what most of these messages have to hand. */
 const txInWindow = (poster, today) =>
-  Boolean(poster) && (txAll || (poster.span.to >= today && poster.span.from - today <= TX_AHEAD_DAYS));
+  Boolean(poster) && txDaysInWindow(poster.span.from, poster.span.to, today);
 
 /** The year ahead instead of the next four days.
  *
@@ -166,6 +171,28 @@ function txErevYomKippur(year, settings, today) {
     name: 'Erev Yom Kippur',
     when: hebrewYear(year),
     text: erevYomKippurText(poster),
+  };
+}
+
+/** The ערב סוכות message.
+ *
+ *  ראש השנה's own year, since סוכות is a fortnight after it and inside the same one.
+ *
+ *  Windowed on the two days of יום טוב rather than on the sheet's span, which is the one place
+ *  here where those differ: the סוכות sheet speaks all the way past שמחת תורה and into the week
+ *  after it, and an "Erev Sukkos" card still on the page a fortnight later is not a message
+ *  anybody is about to send. ערב סוכות is the day before the sheet's first day, which is where
+ *  the span starts. */
+function txErevSukkos(year, settings, today) {
+  const poster = buildSukkosPoster(year, settings);
+  if (!poster) return null;
+  const erev = poster.span.from;
+  if (!txDaysInWindow(erev, erev + 2, today)) return null;
+  return {
+    id: `erev-sukkos-${year}`,
+    name: 'Erev Sukkos',
+    when: hebrewYear(year),
+    text: erevSukkosText(poster),
   };
 }
 
@@ -251,6 +278,8 @@ export function renderTexts(container, state, settings, tables) {
     if (rh) messages.push(rh);
     const yk = txErevYomKippur(year, settings, today);
     if (yk) messages.push(yk);
+    const sk = txErevSukkos(year, settings, today);
+    if (sk) messages.push(sk);
     const ps = txErevPesach(year, settings, today);
     if (ps) messages.push(ps);
     messages.push(...txNetz(year, settings, today));
@@ -275,6 +304,8 @@ export function renderTexts(container, state, settings, tables) {
     if (rh) messages.push(rh);
     const yk = txErevYomKippur(year, settings, today);
     if (yk) messages.push(yk);
+    const sk = txErevSukkos(year, settings, today);
+    if (sk) messages.push(sk);
     const ps = txErevPesach(year, settings, today);
     if (ps) messages.push(ps);
     messages.push(...txNetz(year, settings, today));
