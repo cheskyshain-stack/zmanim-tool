@@ -19,6 +19,7 @@ import { buildShuvaPoster, buildShuvaFromCalendar, shuvaWeekOf, shuvaSheetsFor, 
 import { buildSlichosPoster, parseTimes, SLICHOS_TEXT, SLICHOS_ELSEWHERE, SLICHOS_MOVED }
   from '../posters/slichos.js';
 import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
+import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
@@ -182,6 +183,11 @@ const POSTERS = [
       }));
     },
     render: renderRoshHashanaPoster,
+    /* The message somebody sends out the day before, built off this same sheet so the chat
+       and the paper cannot come to disagree. Declared here rather than switched on by name
+       further down, so the next sheet that wants one says so beside itself and the button
+       appears on its own. See js/erev-yomtov-text.js. */
+    erevText: (built) => erevRoshHashanaText(built),
   },
   {
     key: 'pair',
@@ -2554,6 +2560,7 @@ export function renderPosters(container, state, routeChanged, tables) {
         { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
       ])}</div>` : ''}
       ${built ? printButtonHtml() : ''}
+      ${built && poster.erevText ? '<button type="button" class="copy-btn" id="poster-copy-btn">Copy text</button>' : ''}
     </div>
     ${built ? (() => { const w = poster.when(built); return `
       <div class="poster-when no-print">
@@ -2747,6 +2754,39 @@ export function renderPosters(container, state, routeChanged, tables) {
        for why it is not left to the paper to be landscape. */
     setPrintPage('letter portrait');
     wirePrintButton(container);
+
+    /* The erev message onto the clipboard, for the sheets that have one.
+       The clipboard is asked for twice over, the same as the week card's own copy button:
+       navigator.clipboard is refused outside a secure context and on some older phones, and a
+       message nobody can paste is no use, so the old hidden-textarea route is kept behind it.
+       What happened is said on the button rather than in an alert. */
+    const copyBtn = container.querySelector('#poster-copy-btn');
+    if (copyBtn && poster.erevText) {
+      copyBtn.addEventListener('click', async () => {
+        const said = copyBtn.textContent;
+        try {
+          const text = poster.erevText(built);
+          if (!text) throw new Error('this sheet built no message');
+          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+          else {
+            const box = document.createElement('textarea');
+            box.value = text;
+            box.setAttribute('readonly', '');
+            box.style.position = 'fixed';
+            box.style.opacity = '0';
+            document.body.appendChild(box);
+            box.select();
+            document.execCommand('copy');
+            box.remove();
+          }
+          copyBtn.textContent = 'Copied';
+        } catch (err) {
+          console.error('copy failed', err);
+          copyBtn.textContent = 'Copy failed';
+        }
+        setTimeout(() => { copyBtn.textContent = said; }, 2000);
+      });
+    }
     // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
     // is what the congregation's page calls as well so the two cannot come to differ.
     layoutPosters(container);
