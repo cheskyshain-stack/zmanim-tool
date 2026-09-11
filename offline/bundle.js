@@ -5778,6 +5778,120 @@ function erevShminiAtzeresText(poster) {
   return lines.join('\n');
 }
 
+
+/** A printed clock time, plus so many minutes, printed the same way.
+ *
+ *  String arithmetic on purpose. The value it is adding to is the one on the paper, so the answer
+ *  cannot be half a minute away from what a reader is holding. Twelve hour, no am or pm, which is
+ *  how every time in this program prints: 12 rolls to 1 rather than to 13. Everything it is used on
+ *  is an evening between about five and nine, so the hour never has to reach twelve at all, but it
+ *  is written to survive it rather than to be right by luck. */
+function ytPlus(text, mins) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text || '').trim());
+  if (!m) return '';
+  const total = (Number(m[1]) % 12) * 60 + Number(m[2]) + mins;
+  const h = Math.floor(total / 60) % 12;
+  return `${h === 0 ? 12 : h}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** The three early מנחה lines of an evening somebody can bring in early, as the messages write
+ *  them, off a block's own מנחה / פלג rows.
+ *
+ *  The same three lines and the same wording as the Erev Shabbos message (see erevShabbosText),
+ *  which reads the chart's columns rather than a poster's rows and arrives at the same place. The
+ *  פלג is named off the room the מנין beside it is in, which is the sheet's own mark: the עזרת
+ *  נשים one is פלג מ"א 72 and the message writes it as a bare "Plag" with no comma in front of it,
+ *  the למטה one is מ"א, and the one in the main בית מדרש is גר"א.
+ *
+ *  `maarivAfter` adds "(Mariv HH:MM)" to each line, which an ערב יום טוב has and an ערב שבת has
+ *  not: this evening is a weekday running into yom tov, so somebody who davens מנחה at פלג davens
+ *  מעריב after it rather than waiting for Shabbos. **It is the one figure on this page that is not
+ *  on a sheet.** The shul's ערב שביעי של פסח message has all three exactly ten minutes after their
+ *  פלג, and that is where the ten comes from. If the shul confirms those מנינים, the right home for
+ *  them is the פסח sheet itself and this reads them off it like everything else. */
+function ytEarlyLines(block, { maarivAfter = 0 } = {}) {
+  const out = [];
+  for (const l of block?.lines || []) {
+    if (l.calc !== 'earlyMincha') continue;
+    const [mincha, plag] = l.times || [];
+    if (!mincha) continue;
+    const where = ytWhere(mincha);
+    let text = `Mincha ${mincha.text}${where}`;
+    if (plag) {
+      const name = where === 'en' ? 'Plag' : where === 'd' ? 'Plag MA' : 'Plag Gra';
+      // No comma on the בעזר״נ line, which is how the shul writes it. The other two take one.
+      text += where === 'en' ? ` ${name} ${plag.text}` : `, ${name} ${plag.text}`;
+      const maariv = maarivAfter ? ytPlus(plag.text, maarivAfter) : '';
+      if (maariv) text += ` (Mariv ${maariv})`;
+    }
+    out.push(text);
+  }
+  return out;
+}
+
+/** The closing line of the ערב שביעי של פסח message, as the shul writes it. */
+const YT_SIGN_OFF_YOMTOV = 'Have a great Yom Tov!';
+
+/** How long after the פלג the מעריב of an ערב יום טוב is announced. See ytEarlyLines. */
+const YT_MAARIV_AFTER_PLAG = 10;
+
+/** The ערב שביעי של פסח message.
+ *
+ *  The shul's own, for reference:
+ *
+ *    Erev P' Shevii Shel Pesach
+ *    Mincha 1:35d, 1:50m, 2:15m, 3:00m
+ *    Mincha 5:51m, Plag Gra 6:06 (Mariv 6:16)
+ *    Mincha 6:27d, Plag MA 6:42 (Mariv 6:52)
+ *    Mincha 6:47en Plag 7:02 (Mariv 7:12)
+ *    Hadlakas Neiros 7:09
+ *    Mincha 7:12m
+ *    Have a great Yom Tov!
+ *
+ *  **The shape of an Erev Shabbos message rather than of the other yom tov ones**, and the title
+ *  says so: "Erev P'" is what the Friday messages open with. That is what this afternoon is. חול
+ *  המועד is a weekday, so the evening carries the three early מנחה and פלג מנינים a Friday
+ *  afternoon carries, and the sheet prints them for exactly that reason (earlyLines in
+ *  posters/pesach.js, off the קיץ chart's own columns).
+ *
+ *  Read off the שביעי של פסח block rather than the sheet's first, which carries the same calcs for
+ *  the first night, in the same way ערב שמיני עצרת reads its own.
+ *
+ *  The עירוב is asked of 21 and 22 ניסן, the two last days. This is the message a week after the
+ *  one the first days' עירוב goes in.
+ *
+ *  In a year where ערב שביעי is Shabbos the sheet carries no afternoon and no early מנינים for it,
+ *  that afternoon being Shabbos's own and on the board. Those lines are then simply absent, which
+ *  is this file's rule everywhere: a line the sheet has not got is left out rather than invented.
+ *
+ *  @param poster - straight from buildPesachPoster. */
+function erevShviiShelPesachText(poster) {
+  const block = ytBlock(poster, PS_TEXT.shvii);
+  if (!block) return '';
+  const timeOf = (calc) => ytLine(block, calc)?.times?.[0];
+
+  const lines = ["Erev P' Shevii Shel Pesach"];
+
+  const mincha = ytLine(block, 'erevMincha')?.times;
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+
+  lines.push(...ytEarlyLines(block, { maarivAfter: YT_MAARIV_AFTER_PLAG }));
+
+  const year = poster?.hebrewYear;
+  if (year && ytEruv([dateFromHebrew(21, 1, year), dateFromHebrew(22, 1, year)])) {
+    lines.push(YT_ERUV_LINE);
+  }
+
+  const candles = timeOf('candles');
+  if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
+
+  const nightMincha = timeOf('candlesMincha');
+  if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
+
+  lines.push(YT_SIGN_OFF_YOMTOV);
+  return lines.join('\n');
+}
+
 // ==== posters/own.js ====
 // A sheet the shul writes itself.
 //

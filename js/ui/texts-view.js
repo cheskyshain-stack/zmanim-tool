@@ -23,7 +23,7 @@ import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
@@ -252,6 +252,30 @@ function txErevPesach(rhYear, settings, today) {
   return null;
 }
 
+/** The ערב שביעי של פסח message.
+ *
+ *  Off the same פסח sheet the ערב פסח one is, a week further into it, and windowed on שביעי and
+ *  אחרון rather than on the sheet. Both candidate years for the same reason ערב פסח asks both. */
+function txErevShviiShelPesach(rhYear, settings, today) {
+  for (const y of [rhYear - 1, rhYear]) {
+    const poster = buildPesachPoster(y, settings);
+    if (!poster) continue;
+    const shvii = dateFromHebrew(21, 1, y);
+    if (!txDaysInWindow(shvii - 1, shvii + 1, today)) continue;
+    const text = erevShviiShelPesachText(poster);
+    if (!text) continue;
+    return {
+      id: `erev-shvii-${y}`,
+      kind: 'yomtov',
+      serial: shvii - 1,
+      name: "Erev Shevii Shel Pesach",
+      when: hebrewYear(y),
+      text,
+    };
+  }
+  return null;
+}
+
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
  *
  *  Built separately rather than from the two-in-one sheet, because the message is per occasion:
@@ -341,6 +365,7 @@ export function renderTexts(container, state, settings, tables) {
       txErevSukkos(year, settings, today),
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
+      txErevShviiShelPesach(year, settings, today),
       ...txNetz(year, settings, today),
     ]) {
       if (msg) out.push(msg);

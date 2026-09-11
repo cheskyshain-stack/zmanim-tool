@@ -345,8 +345,22 @@ and listed in `DIST_TREES`.
   `YK_TEXT.erevShacharis` mark for mark. The sent ערב סוכות message leaves the letter off its
   evening מנחה where every other sent message carries one, and this writes the letter: one
   character, and it is the one that makes every message on the page say the room the same way.
-- Built so far: ערב ראש השנה, ערב יום כיפור, ערב סוכות, ערב שמיני עצרת, ערב פסח, and the two
-  ותיקין announcements. Each is measured against the shul's own sent message before it is called done,
+- **ערב שביעי של פסח has the shape of an Erev Shabbos message**, not of the other yom tov ones,
+  and its title says so: "Erev P' Shevii Shel Pesach". חול המועד is a weekday, so that evening
+  carries the three early מנחה and פלג מנינים a Friday carries, and the sheet prints them for that
+  reason. `ytEarlyLines` writes them with the same wording `erevShabbosText` uses, naming each פלג
+  off the room its מנין is in: עזרת נשים is פלג מ"א 72 and takes a bare "Plag" with no comma,
+  למטה is מ"א, the main בית מדרש is גר"א.
+  **`(Mariv HH:MM)` is the one figure on the page that is not on a sheet.** An ערב יום טוב has a
+  מעריב after each early מנחה where an ערב שבת cannot, and the shul's sent message puts all three
+  exactly ten minutes after their פלג, which is where `YT_MAARIV_AFTER_PLAG` comes from. If the shul
+  confirms those מנינים, the right home for them is the פסח sheet and the message reads them off it.
+  **That sent message and the sheet disagree by a day**, measured: its 5:51/6:06, 6:27/6:42 and
+  6:47/7:02 are 6 April 2026's פלג times exactly, while ערב שביעי was the 7th, whose are
+  5:52/6:07, 6:28/6:43 and 6:48/7:03. Its own הדלקת נרות, 7:09, is the 7th's (the 6th is 7:08), so
+  the message mixes two days and the candle line is the one that is right. The sheet is kept.
+- Built so far: ערב ראש השנה, ערב יום כיפור, ערב סוכות, ערב שמיני עצרת, ערב פסח,
+  ערב שביעי של פסח, and the two ותיקין announcements. Each is measured against the shul's own sent message before it is called done,
   line for line. A sheet that carries the same `calc` on several nights (פסח and סוכות both open
   every night of yom tov with a הדלקת נרות) is read with `ytFirst`, which takes the first, since
   the ערב block prints before the day blocks.
