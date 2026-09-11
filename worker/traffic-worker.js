@@ -71,9 +71,10 @@ const CACHE_SECONDS = 300;
  *  enough; nothing reads it but the cache. */
 const BUILD = '2026-09-11a';
 
-/** The most days that can be asked for at once, so a mistyped range cannot ask Cloudflare
- *  for a year of buckets. Web Analytics keeps less than this anyway on the free plan. */
-const MAX_DAYS = 90;
+/** The most days that can be asked for at once, so a mistyped range cannot ask for something
+ *  absurd. Cloudflare itself is never asked past LIVE_DAYS; everything beyond that is the
+ *  archive's, which is why this is years rather than a month. */
+const MAX_DAYS = 800;
 
 /** The beacon token, out of the congregation site's own head. Public by construction, since
  *  every visitor's browser is handed it. See ANALYTICS_TOKEN in build-offline.py. */
@@ -355,8 +356,235 @@ function dayRange(days) {
   return { since: since.toISOString(), until: until.toISOString() };
 }
 
+/* ── Keeping the numbers after Cloudflare has forgotten them ───────────────────────────────
+ *
+ * Cloudflare's free Web Analytics keeps about a month. Ask it for last Pesach and it does not
+ * say no, it says zero, which is the same shape as an answer. So the shul's own record of its
+ * own numbers is kept here instead, in a KV namespace on this Worker, and grows for as long as
+ * the Worker runs.
+ *
+ * **The binding is optional and everything works without it.** With no ARCHIVE bound this
+ * behaves exactly as it did, and the reply says so rather than silently keeping nothing. That
+ * matters because the alternative is a Worker that cannot be deployed until a namespace exists,
+ * and a half-deployed Worker is how the numbers went missing for a day the last time.
+ *
+ * What is kept is one entry, a map of UTC date to two arrays of 24 hours, visits and page views,
+ * plus that day's pages, devices, systems and referrers. Hours rather than day totals, because
+ * the screen folds them back into Lakewood days and that fold needs the hour (see the UTC note
+ * in CLAUDE.md). A year of it is on the order of a hundred kilobytes, well inside what KV holds
+ * in one value, and one value means one read to answer any range rather than one read a day.
+ *
+ * Cloudflare stays the authority for the days it still has: they are written over the archive on
+ * every read, so a day that was still filling in when it was first stored is corrected rather
+ * than frozen half done.
+ *
+ * Two writers can race, the daily cron and somebody opening the tab, and the loser's day is
+ * dropped. It comes back on the next write, because Cloudflare still has the last month to
+ * rebuild it from. Worth knowing, not worth a lock. */
+const ARCHIVE_KEY = 'days';
+
+/** How far back Cloudflare itself is asked. Beyond this it answers zero rather than answering
+ *  no, so asking is worse than not asking: the archive holds those days and a live zero written
+ *  over a real figure would be a wrong answer rather than a missing one. */
+const LIVE_DAYS = 30;
+
+const dayOf = (iso) => String(iso).slice(0, 10);
+const hourOf = (iso) => Number(String(iso).slice(11, 13));
+
+async function readArchive(env) {
+  if (!env.ARCHIVE) return null;
+  try {
+    return (await env.ARCHIVE.get(ARCHIVE_KEY, 'json')) || {};
+  } catch {
+    return null;
+  }
+}
+
+/** Fold a day's live answer into the archive, whole days only.
+ *
+ *  Today is stored too, and stored again on the next read, because a day still happening is a
+ *  day whose figures still move. Nothing is deleted: the point of this is the years Cloudflare
+ *  will not keep. */
+function foldIntoArchive(store, out) {
+  const touched = new Set();
+  const dayEntry = (date) => {
+    touched.add(date);
+    if (!store[date]) store[date] = { v: new Array(24).fill(0), w: new Array(24).fill(0) };
+    return store[date];
+  };
+
+  /* Built from the hourly grouping and only from it. A day total with no hours in it cannot be
+     folded back into a Lakewood day later, so storing one would be storing something that reads
+     as history and answers the wrong question forever after. If the hour grouping is ever
+     refused, the archive stops growing and the screen says the range it can show; that is the
+     honest failure. */
+  // Every day the live answer covers is rebuilt from scratch, so a correction replaces rather
+  // than adds to what was stored while the day was still filling up.
+  for (const r of out.groups.hour.rows || []) {
+    const d = dayEntry(dayOf(r.key));
+    if (!d.cleared) { d.v = new Array(24).fill(0); d.w = new Array(24).fill(0); d.cleared = true; }
+  }
+  for (const r of out.groups.hour.rows || []) {
+    const d = store[dayOf(r.key)];
+    const h = hourOf(r.key);
+    if (!d || !(h >= 0 && h < 24)) continue;
+    d.v[h] += r.visits;
+    d.w[h] += r.views;
+  }
+  for (const date of touched) delete store[date].cleared;
+
+  /* The categorical breakdowns are kept per day as well, so a year-old month can still say which
+     pages were opened and what people read it on. They come back from Cloudflare for the whole
+     range at once rather than per day, so they can only be stored against the range's last whole
+     day: split evenly they would be invented, and attached to every day they would be counted
+     over and over. One day carrying the range's totals is a lie of a different shape, so what is
+     stored is only ever a single-day range, which is what the cron asks for. */
+  if (out.days === 1) {
+    const only = dayOf(out.since);
+    if (store[only]) {
+      const put = (key, rows) => {
+        if (!rows) return;
+        store[only][key] = Object.fromEntries(rows.map((r) => [r.key || '(none)', [r.visits, r.views]]));
+      };
+      put('p', out.groups.page?.rows);
+      put('d', out.groups.device?.rows);
+      put('o', out.groups.os?.rows);
+      put('r', out.groups.referer?.rows);
+    }
+  }
+  return store;
+}
+
+async function writeArchive(env, store) {
+  if (!env.ARCHIVE || !store) return;
+  try {
+    await env.ARCHIVE.put(ARCHIVE_KEY, JSON.stringify(store));
+  } catch {
+    // A archive that will not write is a screen with less history on it, not a broken screen.
+  }
+}
+
+/** The archive's own hour rows and day rows for a range, in the shape a live answer has. */
+function archiveRows(store, sinceISO, untilISO) {
+  const from = dayOf(sinceISO);
+  const to = dayOf(untilISO);
+  const hours = [];
+  const byDay = [];
+  for (const date of Object.keys(store).sort()) {
+    if (date < from || date > to) continue;
+    const day = store[date];
+    let visits = 0;
+    let views = 0;
+    for (let h = 0; h < 24; h += 1) {
+      const v = day.v?.[h] || 0;
+      const w = day.w?.[h] || 0;
+      if (!v && !w) continue;
+      hours.push({ key: `${date}T${String(h).padStart(2, '0')}:00:00Z`, visits: v, views: w });
+      visits += v;
+      views += w;
+    }
+    if (visits || views) byDay.push({ date, visits, views });
+  }
+  return { hours, byDay };
+}
+
+/** The live answer laid over the archive, keyed so Cloudflare wins wherever it has something.
+ *
+ *  Cloudflare is the authority for the month it keeps: a day it can still see is a day it can
+ *  see more accurately than a copy taken while that day was still happening. Everything older is
+ *  the archive's, which is the whole point of having one. */
+function overlay(archived, live, keyOf) {
+  const at = new Map(archived.map((r) => [keyOf(r), r]));
+  for (const r of live) at.set(keyOf(r), r);
+  return [...at.values()].sort((a, b) => String(keyOf(a)).localeCompare(String(keyOf(b))));
+}
+
+/** Ask Cloudflare about a range and shape the answer. Shared by the request handler and by the
+ *  daily cron, which is the whole reason it is a function rather than the body of `fetch`. */
+async function gather(env, days, range = null) {
+  const { since, until } = range || dayRange(days);
+  const account = await accountFor(env);
+  const siteTag = await siteTagFor(env, account);
+
+  // Which site, said whichever way is available. Both name one site; the tag is the more
+  // exact of the two, and the host is what is left when the tag cannot be read.
+  const narrowedBy = siteTag ? 'siteTag' : 'requestHost';
+  const where = siteTag
+    ? `siteTag: ${JSON.stringify(siteTag)}`
+    : `requestHost: ${JSON.stringify(SITE_HOST)}`;
+
+  // All of them at once. Separate requests so one bad dimension name costs one panel, but
+  // sent together so the reader waits for the slowest rather than for the sum.
+  const answered = await Promise.all(
+    GROUPS.map((g) => askGroup(env, account, where, since, until, g)),
+  );
+  const groups = Object.fromEntries(GROUPS.map((g, i) => [g.key, answered[i]]));
+
+  return {
+    days,
+    since,
+    until,
+    // Handed back so a zero can be told apart from a zero. An answer of "no visits" is the
+    // same shape whether nobody came or the query asked about the wrong site, and the wrong
+    // site is what happened once already (see siteTagFor). Not a secret: it names a site.
+    narrowedBy,
+    site: siteTag || SITE_HOST,
+    /* Which dimension name each panel settled on. Handed back so the screen can show it, and
+       so the names that actually worked can be read off once and written into GROUPS in front
+       of the guesses, rather than being rediscovered by probing on every cold isolate. */
+    dims: Object.fromEntries([...settledDim]),
+    // Kept in the shape the tab already reads, since these two are its spine.
+    byDay: (groups.byDay.rows || []).map((r) => ({ date: r.key, views: r.views, visits: r.visits })),
+    byPage: (groups.byPage.rows || []).map((r) => ({ path: r.key, views: r.views, visits: r.visits })),
+    // The rest as they came, each still carrying its own error where it has one.
+    groups: {
+      day: groups.byDay,
+      page: groups.byPage,
+      device: groups.byDevice,
+      hour: groups.byHour,
+      referer: groups.byReferer,
+      browser: groups.byBrowser,
+      os: groups.byOS,
+    },
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 export default {
-  async fetch(request, env) {
+  /** Once a day, so the archive grows whether or not anybody opened the admin.
+   *
+   *  Without this the record would have holes in exactly the stretches nobody was looking, which
+   *  are the stretches a record is for. One day at a time, because a single-day range is the only
+   *  one whose pages and devices can honestly be filed against a date (see foldIntoArchive).
+   *
+   *  Set it up under the Worker's Settings, Triggers, Cron Triggers: `0 6 * * *` is a little
+   *  after 1am in Lakewood, which is a quiet hour and safely inside the finished day. Optional,
+   *  like the namespace: without it the archive still grows every time the tab is opened. */
+  async scheduled(event, env, ctx) {
+    if (!env.ARCHIVE || !env.CF_API_TOKEN) return;
+    ctx.waitUntil((async () => {
+      try {
+        const store = (await readArchive(env)) || {};
+        // Yesterday and the day before: yesterday is whole by now, and the day before catches a
+        // run that was missed or that landed while the day was still being written. One whole
+        // UTC day at a time, so the pages and devices that come back belong to the day they are
+        // filed under rather than to a range straddling two.
+        for (const back of [1, 2]) {
+          const at = new Date(Date.now() - back * 86400000);
+          const from = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+          const to = new Date(from.getTime() + 86400000 - 1);
+          const out = await gather(env, 1, { since: from.toISOString(), until: to.toISOString() });
+          foldIntoArchive(store, out);
+        }
+        await writeArchive(env, store);
+      } catch {
+        // A cron that could not run is a gap the next read fills, since Cloudflare still holds
+        // the month. Nothing here is worth failing loudly at 1am.
+      }
+    })());
+  },
+
+  async fetch(request, env, ctx) {
     const origin = allowedOrigin(request);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
@@ -386,68 +614,48 @@ export default {
       return json({ ...body, cached: true }, 200, origin);
     }
 
-    const { since, until } = dayRange(days);
-    let account;
-    let siteTag;
+    /* Cloudflare is only asked about the month it actually keeps. Past that it answers zero
+       rather than answering no, and a live zero written over a real figure in the archive would
+       turn a missing answer into a wrong one. The older days come from the archive. */
+    let out;
     try {
-      account = await accountFor(env);
-      siteTag = await siteTagFor(env, account);
+      out = await gather(env, Math.min(days, LIVE_DAYS));
     } catch (e) {
       return json({ error: e.message }, 502, origin);
     }
 
-    // Which site, said whichever way is available. Both name one site; the tag is the more
-    // exact of the two, and the host is what is left when the tag cannot be read.
-    const narrowedBy = siteTag ? 'siteTag' : 'requestHost';
-    const where = siteTag
-      ? `siteTag: ${JSON.stringify(siteTag)}`
-      : `requestHost: ${JSON.stringify(SITE_HOST)}`;
-
-    // All of them at once. Separate requests so one bad dimension name costs one panel, but
-    // sent together so the reader waits for the slowest rather than for the sum.
-    const answered = await Promise.all(
-      GROUPS.map((g) => askGroup(env, account, where, since, until, g)),
-    );
-    const groups = Object.fromEntries(GROUPS.map((g, i) => [g.key, answered[i]]));
-
     /* The day and page groupings are the tab itself rather than a panel on it, so if both of
        them failed there is nothing to show and this is an error, not a screen with holes in it.
        One of the two failing is still worth drawing: the other panels stand on their own. */
-    if (groups.byDay.error && groups.byPage.error) {
-      return json({ error: groups.byDay.error }, 502, origin);
+    if (out.groups.day.error && out.groups.page.error) {
+      return json({ error: out.groups.day.error }, 502, origin);
     }
 
-    const out = {
-      days,
-      since,
-      until,
-      // Handed back so a zero can be told apart from a zero. An answer of "no visits" is the
-      // same shape whether nobody came or the query asked about the wrong site, and the wrong
-      // site is what happened once already (see siteTagFor). Not a secret: it names a site.
-      narrowedBy,
-      site: siteTag || SITE_HOST,
-      /* Which dimension name each panel settled on. Handed back so the screen can show it, and
-         so the names that actually worked can be read off once and written into GROUPS in front
-         of the guesses, rather than being rediscovered by probing on every cold isolate. */
-      dims: Object.fromEntries([...settledDim]),
-      // Kept in the shape the tab already reads, since these two are its spine.
-      byDay: (groups.byDay.rows || []).map((r) => ({ date: r.key, views: r.views, visits: r.visits })),
-      byPage: (groups.byPage.rows || []).map((r) => ({ path: r.key, views: r.views, visits: r.visits })),
-      // The rest as they came, each still carrying its own error where it has one.
-      groups: {
-        device: groups.byDevice,
-        hour: groups.byHour,
-        referer: groups.byReferer,
-        browser: groups.byBrowser,
-        os: groups.byOS,
-      },
-      fetchedAt: new Date().toISOString(),
-    };
+    // What was asked for, not what Cloudflare was asked for, since the archive covers the rest.
+    const wanted = dayRange(days);
+    out.days = days;
+    out.since = wanted.since;
+
+    const store = await readArchive(env);
+    out.archive = env.ARCHIVE ? (store ? 'on' : 'unreadable') : 'off';
+    if (store) {
+      const older = archiveRows(store, wanted.since, wanted.until);
+      out.byDay = overlay(older.byDay, out.byDay, (r) => r.date);
+      if (out.groups.hour.rows) {
+        out.groups.hour = { ...out.groups.hour, rows: overlay(older.hours, out.groups.hour.rows, (r) => r.key) };
+      } else if (older.hours.length) {
+        out.groups.hour = { rows: older.hours };
+      }
+      out.archiveDays = Object.keys(store).length;
+      // Written back after the reply is built, so the reader is not kept waiting on a store.
+      ctx.waitUntil(writeArchive(env, foldIntoArchive(store, out)));
+    }
+
     const reply = json(out, 200, origin);
-    // waitUntil is not available on a plain fetch handler's arguments here, so the copy is
-    // put in the cache before the reply goes back. It is a small body and the write is local
-    // to the edge that is already answering.
-    await cache.put(key, reply.clone());
+    // The copy goes in the cache after the reply has gone back, which is what waitUntil is for.
+    // An earlier comment here claimed it was not available on a fetch handler. It is: a module
+    // Worker's fetch takes (request, env, ctx), and ctx is where it lives.
+    ctx.waitUntil(cache.put(key, reply.clone()));
     return reply;
   },
 };

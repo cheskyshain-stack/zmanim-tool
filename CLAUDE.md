@@ -227,6 +227,18 @@ The token is a Worker secret instead, and the admin asks the Worker.
   that fold: a page view is one event and a visit belongs to exactly one hour. Where the hourly
   grouping is unavailable it falls back to the UTC days and says so on screen. Do not "simplify"
   this back to `byDay`.
+- **Cloudflare keeps about a month, so the Worker keeps the shul's own copy.** An optional KV
+  namespace bound as `ARCHIVE` holds one entry: UTC date to two arrays of 24 hours (visits and
+  page views), plus that day's pages, devices, systems and referrers. Hours rather than day
+  totals, because the screen folds them into Lakewood days and that fold needs the hour. Nothing
+  is asked of Cloudflare past `LIVE_DAYS` (30), because past that it answers zero rather than
+  answering no, and a live zero written over a real figure turns a missing answer into a wrong
+  one. Cloudflare wins for the days it still has, so a day stored while it was still filling in
+  gets corrected rather than frozen. A daily Cron Trigger folds in yesterday and the day before,
+  one whole UTC day at a time, so the record has no holes in the stretches nobody was looking.
+  **The binding and the cron are both optional and the Worker deploys and runs without either**,
+  saying on screen which it is. Two writers can race and the loser's day is dropped; it comes
+  back on the next write while Cloudflare still holds the month.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret

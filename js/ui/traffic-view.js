@@ -17,12 +17,18 @@
  *  instructions rather than an error. */
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 
-/** How far back, and what each choice is called. Cloudflare's free Web Analytics keeps a
- *  month, so a year is not offered: it would come back short and look like a fault. */
+/** How far back, and what each choice is called.
+ *
+ *  Cloudflare's free Web Analytics keeps about a month, which used to be the end of it. The
+ *  Worker now keeps the shul's own copy as the days go by, so the longer ranges are answerable
+ *  for as long as it has been running: they will be short to begin with and fill in from here.
+ *  See the archive note at the top of worker/traffic-worker.js. */
 const TRAFFIC_RANGES = [
   { days: 1, label: 'Today' },
   { days: 7, label: '7 days' },
   { days: 30, label: '30 days' },
+  { days: 90, label: '3 months' },
+  { days: 365, label: '1 year' },
 ];
 
 /** The range being looked at, kept for as long as the tab is open. Not stored: it is how
@@ -285,6 +291,33 @@ function trafficWeekdays(byDay) {
   return trafficBreakdown('Which day of the week', { rows }, { col: 'Day' });
 }
 
+/** Whether anything is being kept, said plainly.
+ *
+ *  Cloudflare forgets after about a month. The Worker can keep the shul's own copy, and whether
+ *  it is doing so is the difference between the long ranges filling in over the coming year and
+ *  them staying stuck at a month forever. That is worth a line on the screen: it is the kind of
+ *  thing nobody notices is switched off until they want last Pesach and it is not there.
+ *
+ *  Only shown while it is off, or while it is on and still shallow. Once there is more history
+ *  than the range being looked at, it is just working and needs no announcement. */
+function trafficArchiveNote(data) {
+  if (data.archive === 'off') {
+    return `<p class="hint">Nothing is being kept: Cloudflare forgets after about a month, and no
+      archive is set up on the Worker, so the longer ranges will stay short. See the archive note
+      at the top of <code>worker/traffic-worker.js</code>.</p>`;
+  }
+  if (data.archive === 'unreadable') {
+    return `<p class="hint traffic-panel-error">The Worker has an archive bound but could not read
+      it, so nothing is being kept.</p>`;
+  }
+  if (data.archive === 'on' && data.archiveDays && data.archiveDays < (data.days || 0)) {
+    return `<p class="hint">Keeping the shul's own copy, ${trafficNum(data.archiveDays)}
+      ${data.archiveDays === 1 ? 'day' : 'days'} of it so far. Cloudflare forgets after about a
+      month; from here on this does not.</p>`;
+  }
+  return '';
+}
+
 /** What is on the screen while there is no Worker to ask. Not an error: nothing is wrong,
  *  it has not been set up, and the thing to do about it is a list. */
 function trafficSetup() {
@@ -395,6 +428,7 @@ export function renderTraffic(container) {
       ${daysAreUtc ? `<p class="hint">Days here are counted in UTC, not on a Lakewood clock, so a
         visit after about 8pm falls on the next day. That is what happens when the hourly figures
         are not available to count them properly by.</p>` : ''}
+      ${trafficArchiveNote(data)}
       <p class="hint traffic-foot">A visit is one person's stay; a page view is each page
       they opened. Anyone reading with an ad blocker is not counted, so these are a floor
       rather than a headcount.${data.cached ? ' Cloudflare was last asked a few minutes ago.' : ''}</p>`;
