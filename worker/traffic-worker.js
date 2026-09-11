@@ -60,6 +60,17 @@ const ALLOWED = [
  *  spending the account's API allowance on a figure that has not moved. */
 const CACHE_SECONDS = 300;
 
+/** Which version of this Worker wrote a cached reply, and part of the key it is filed under.
+ *
+ *  Deploying a Worker does not empty the cache it wrote into, so for five minutes after a deploy
+ *  the new code goes on serving the old code's answer. That is a genuinely confusing five
+ *  minutes: the change was made, the Worker says it deployed, the screen is unchanged, and it
+ *  reads as the paste not having worked. It happened, so this exists.
+ *
+ *  **Change this on any deploy that changes the shape of the reply.** A date and a letter is
+ *  enough; nothing reads it but the cache. */
+const BUILD = '2026-09-11a';
+
 /** The most days that can be asked for at once, so a mistyped range cannot ask Cloudflare
  *  for a year of buckets. Web Analytics keeps less than this anyway on the free plan. */
 const MAX_DAYS = 90;
@@ -367,7 +378,7 @@ export default {
 
     // Cached on the range asked for rather than on the whole URL, so two tabs asking the
     // same question share one answer and a stray parameter cannot slip past the cache.
-    const key = new Request(`${url.origin}/traffic?days=${days}`, { method: 'GET' });
+    const key = new Request(`${url.origin}/traffic?v=${BUILD}&days=${days}`, { method: 'GET' });
     const cache = caches.default;
     const hit = await cache.match(key);
     if (hit) {
