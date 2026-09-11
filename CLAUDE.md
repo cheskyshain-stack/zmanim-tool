@@ -304,7 +304,14 @@ and listed in `DIST_TREES`.
   the person who prints the boards, so the address is handed to them on its own. A browser test
   asserts there are zero `<a>` elements on it. Do not "helpfully" add a back link.
 - The admin's sidebar gets a **Messages** entry, and it is an `<a href="/texts/">` rather than
-  a tab, because it leaves the page.
+  a tab, because it leaves the page. Beside it is **Congregation site**, `<a href="/">`, asked for:
+  there was no door from the admin to the congregation's own page at all and the only way across
+  was typing the address. The congregation's site does not get a matching link back and should not,
+  being the page the whole neighbourhood opens. The browser's own back is the way home from either.
+  `renderNav` binds its click handler on `button.nav-btn` rather than `.nav-btn`: the two links
+  carry the class to be drawn the same, and on the class alone the handler set the current tab to
+  nothing and redrew the page underneath a navigation that was already happening. It only ever
+  looked fine because the browser won the race.
 - **No PIN, and that is a decision rather than an oversight.** The admin asks for four digits
   because somebody wandering in there can change the shul's boards. This page changes nothing
   and prints messages that are about to be sent to the whole congregation anyway, so a gate

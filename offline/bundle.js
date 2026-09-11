@@ -17906,6 +17906,8 @@ const tabIcons = {
   traffic: '<path d="M3 16.5h14"/><rect x="4.5" y="11" width="3" height="5.5" rx="0.6"/><rect x="9" y="8" width="3" height="8.5" rx="0.6"/><rect x="13.5" y="4.5" width="3" height="12" rx="0.6"/>',
   // A speech bubble with two lines in it: the message, rather than the sheet it is read off.
   texts: '<path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v7a1.5 1.5 0 0 1-1.5 1.5H8l-4 3.5V14h-.5A1.5 1.5 0 0 1 3 12.5z"/><path d="M6.5 7.5h7M6.5 10.5h4"/>',
+  // A house, for the congregation's own site: its home page is what this opens.
+  site: '<path d="M3 9.5 10 3.5l7 6"/><path d="M4.8 8.2v8.3a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1V8.2"/><path d="M8.2 17.5v-5h3.6v5"/>',
   // A sheet on a wall, with a pin at the top.
   posters: '<rect x="4.5" y="4" width="11" height="13.5" rx="1"/><path d="M10 1.5v2.5"/><circle cx="10" cy="1.6" r="1.1"/><path d="M7.5 8.5h5M7.5 11.5h5M7.5 14.5h3"/>',
 };
@@ -17940,8 +17942,20 @@ function renderNav() {
        the address can be handed to whoever sends them without handing them the whole generator
        as well. A link rather than a nav button because it leaves this page, and the browser's
        own back is the way back rather than anything drawn. See js/ui/texts-view.js. */
-    + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`;
-  nav.querySelectorAll('.nav-btn').forEach((btn) => {
+    + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`
+    /* And the way out to the congregation's own site, which is the other half of this program
+       and had no door from this side at all: the only way across was typing the address. It sits
+       beside Messages because the two are the same kind of thing, a link that leaves this page,
+       and the browser's own back is the way home from either.
+       The congregation's site does not get a matching link back, and should not: it is the page
+       the whole neighbourhood opens, and the admin is where the shul's boards are changed. */
+    + `<a class="nav-btn" href="/">${icon('site')}<span>Congregation site</span></a>`;
+  /* Buttons only. The two links above are drawn to match them and carry the same class, and
+     querying on the class alone put a click handler on both: `btn.dataset.tab` is undefined
+     there, so the handler set the current tab to nothing and redrew the page underneath the
+     navigation that was already happening. It only ever looked fine because the browser won
+     the race. */
+  nav.querySelectorAll('button.nav-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       currentTab = btn.dataset.tab;
       currentSheetId = null;
