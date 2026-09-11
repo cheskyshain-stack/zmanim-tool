@@ -53,8 +53,23 @@ export const placeOf = (t) => POSTER_PLACES[t?.mark || (t?.underlined ? 'u' : ''
  *  rather than added as a gap. */
 export function minyanList() {
   const out = [];
+  const zmanim = [];
   return {
     out,
+    zmanim,
+    /** A זמן the day has that is not a מנין, kept in a list of its own.
+     *
+     *  One thing uses this: הדלקת נרות, which the congregation's home page shows beside the
+     *  next מנין and not among them. It has to be apart from `out`, because everything in
+     *  there is offered as "what is on next" and a card reading "next minyan: הדלקת נרות"
+     *  would be wrong in exactly the way the note at the top of this file describes.
+     *
+     *  Registered in the builder beside the line, the same as a מנין, so the number the
+     *  phone shows and the number on the sheet on the wall are one thing. No room: these
+     *  are not davened anywhere. */
+    zman(serial, name, fraction) {
+      zmanim.push({ serial, name, mins: fracMins(fraction), place: '' });
+    },
     /** A computed time: the day it is on, what it is called, the day fraction it was worked
      *  out as, and the printed time object it went into, which is where the room comes from. */
     at(serial, name, fraction, time) {

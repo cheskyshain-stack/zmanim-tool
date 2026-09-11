@@ -268,6 +268,30 @@ The token is a Worker secret instead, and the admin asks the Worker.
   Playwright with `page.route`. Four states are worth covering: not set up, numbers, nobody has
   visited yet, and the Worker refusing.
 
+## הדלקת נרות on the congregation's home page
+
+The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
+read that off the chart's H column alone, which only ever has one on a **Friday with a שבת row
+behind it**, so **every ערב יום טוב had no candle lighting at all**: ערב ר"ה, ערב יו"כ, ערב סוכות,
+ערב שמיני עצרת, ערב פסח and ערב שביעי של פסח, plus the Friday before a שבת חול המועד. A שבת that
+is yom tov has no chart row, so even the ones that fall on a Friday fell through. The shul reported
+it on ערב ראש השנה, where the card named the מנין off the sheet and said nothing about candles.
+
+- Each poster now registers its own הדלקת נרות through **`M.zman`** (`posters/minyanim.js`), a list
+  kept **apart from `minyanim`**. Everything in `minyanim` is offered as "what is on next", and a
+  card reading "next minyan: הדלקת נרות" would be wrong in exactly the way that file warns about.
+  Registered in the builder beside the printed line, like every מנין, so the phone and the paper
+  cannot come apart.
+- **`specialCandleLighting` in `posters/day.js` is a separate walk from `specialMinyanim`**, and it
+  reaches further: the **פסח sheet is in it**. `specialMinyanim` is deliberately only the תשרי
+  stretch, because that is where a sheet takes a whole day over from the charts, and widening it
+  would change what the home page calls the next מנין across all of פסח. Reading one number off the
+  פסח sheet changes nothing else.
+- `candleLightingForDay` asks the sheet **before** the chart, because the two overlap on the
+  Shabbosos the סוכות and פסח sheets carry, and there the sheet is what is hanging on the wall.
+- Measured over three years: all eighteen erev yom tov candle times match the printed sheet to the
+  minute, and over a year of days 29 Fridays still come off the chart and 7 off a sheet.
+
 ## The messages page, `/texts/`
 
 The chat messages the shul sends out, on a page of their own. **A third entry page beside

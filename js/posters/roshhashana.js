@@ -150,6 +150,10 @@ export function buildRoshHashanaPoster(year, settings) {
     // way this could be a whole day out, so it is taken from the same `night` the שקיעה
     // above is worked out from rather than from the block's own index.
     const nightOn = rh + i - 1;
+    // הדלקת נרות is a זמן rather than a מנין, so it goes in the list of its own: see the note
+    // on `zman` in posters/minyanim.js. The congregation's home page shows it beside the next
+    // מנין on an ערב יום טוב the same way it does on an ערב שבת.
+    if (i === 0) M.zman(nightOn, RH_TEXT.candles, shkia - settings.candleLightingMinutes * RH_MIN);
     if (i === 0) M.at(nightOn, RH_TEXT.mincha, shkia - 15 * RH_MIN);
     M.at(nightOn, RH_TEXT.maariv, shkia + 60 * RH_MIN);
 
@@ -227,5 +231,6 @@ export function buildRoshHashanaPoster(year, settings) {
     // The three days' מנינים, for the congregation's "what is on next". Nothing on the
     // printed sheet reads this.
     minyanim: M.out,
+    zmanim: M.zmanim,
   };
 }

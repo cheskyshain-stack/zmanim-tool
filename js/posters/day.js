@@ -28,6 +28,7 @@ import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
 import { buildSukkosPoster } from './sukkos.js';
+import { buildPesachPoster } from './pesach.js';
 import { slichosMornings, slichosWeekLines } from './slichos.js';
 import { minyanList, MORNING } from './minyanim.js';
 import { DAY_NAMES, differsFromSchedule } from '../util.js';
@@ -54,15 +55,58 @@ let built = null;
 function sheetsFor(year, settings) {
   if (built && built.year === year && built.settings === settings) return built.list;
   const list = [];
+  const zmanim = [];
   for (const build of [buildRoshHashanaPoster, buildYomKippurPoster, buildTzomGedaliaPoster, buildSukkosPoster]) {
     let poster = null;
     // A sheet that will not build must not take the home page's card down with it. The card
     // then falls back to the charts, which is where it was before any of this.
     try { poster = build(year, settings); } catch { poster = null; }
     if (poster?.minyanim) list.push(...poster.minyanim);
+    if (poster?.zmanim) zmanim.push(...poster.zmanim);
   }
-  built = { year, settings, list };
+  built = { year, settings, list, zmanim };
   return list;
+}
+
+/** הדלקת נרות off a sheet, on the days a sheet has one.
+ *
+ *  A separate walk from specialMinyanim above, and deliberately so on both counts.
+ *
+ *  It is a different list because הדלקת נרות is a זמן, not a מנין: everything specialMinyanim
+ *  hands back is offered as "what is on next", and candle lighting must never be offered that
+ *  way. Each builder registers it through `zman` instead (see posters/minyanim.js).
+ *
+ *  And it reaches further, because the פסח sheet is in it. specialMinyanim is deliberately only
+ *  the תשרי stretch, since that is where a sheet takes a whole day over from the charts, and
+ *  widening it would change what the home page calls the next מנין across all of פסח. Reading
+ *  one number off the פסח sheet changes nothing else, and without it ערב פסח and ערב שביעי של
+ *  פסח are two erev yom tovs with no candle lighting anywhere: they are not Fridays, so the
+ *  chart has none either.
+ *
+ *  The shul reported the same hole on ערב ראש השנה, where the card offered a מנין off the sheet
+ *  and no candle lighting beside it, because candleLightingForDay asked only the charts and a
+ *  שבת that is yom tov has no chart row. */
+let pesachBuilt = null;
+function pesachZmanim(year, settings) {
+  if (pesachBuilt && pesachBuilt.year === year && pesachBuilt.settings === settings) return pesachBuilt.list;
+  let list = [];
+  try { list = buildPesachPoster(year, settings)?.zmanim || []; } catch { list = []; }
+  pesachBuilt = { year, settings, list };
+  return list;
+}
+
+export function specialCandleLighting(serial, settings) {
+  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  for (const year of [here, here + 1]) {
+    const rh = roshHashana(year - 3761);
+    if (serial < rh - BEFORE || serial > rh + AFTER) continue;
+    sheetsFor(year, settings);
+    const found = built.zmanim.find((z) => z.serial === serial);
+    if (found) return found;
+  }
+  // פסח is half a year from ר"ה, so it is asked of this Hebrew year only and on its own.
+  const found = pesachZmanim(here, settings).find((z) => z.serial === serial);
+  return found || null;
 }
 
 /** Every מנין on one day that comes off a sheet rather than off a chart, earliest first.

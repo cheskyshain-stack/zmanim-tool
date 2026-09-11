@@ -15,7 +15,8 @@
 // הדלקת נרות is read the same way and for the same reason: its column is שקיעה floored to
 // the minute less the figure set in Settings, and it can be reshaped by a rule or typed
 // over, so computing it again here would quietly disagree with the board on the weeks
-// where any of that made a difference.
+// where any of that made a difference. On the days a sheet on the wall speaks for, it is
+// read off that sheet instead, for the same reason again: see candleLightingForDay.
 import { dateFromSerial, timezoneOffset, shulNow } from './zmanim/solar.js';
 import { tzais72 } from './zmanim/zmanim.js';
 import { formatTime, UL_START, UL_END } from './format.js';
@@ -26,7 +27,7 @@ import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-cale
 import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
-import { specialMinyanim, specialShacharis } from './posters/day.js';
+import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -260,8 +261,7 @@ export function minyanimForDay(serial, state, settings) {
   return out;
 }
 
-/** הדלקת נרות on one calendar day, or nothing if that day is not an Erev Shabbos with a
- *  chart row behind it.
+/** הדלקת נרות on one calendar day, or nothing if that day has none.
  *
  *  Read off the chart's own הדלקת נרות column rather than worked out here. The column is
  *  שקיעה floored to the minute, less the number of minutes set in Settings, and it can be
@@ -269,6 +269,16 @@ export function minyanimForDay(serial, state, settings) {
  *  the same answer most weeks and quietly disagreed with the printed board on the ones
  *  where the flooring or an override made a minute of difference. */
 export function candleLightingForDay(serial, state, settings) {
+  /* A sheet on the wall first, where one speaks for this day. The charts only ever carry
+     הדלקת נרות on a Friday with a שבת row behind it, so before this an ערב יום טוב had none at
+     all: ערב ר"ה, ערב יו"כ, ערב סוכות, ערב שמיני עצרת, ערב פסח and ערב שביעי של פסח were six
+     evenings a year where the home page named the מנין off the sheet and said nothing about
+     candles. The shul reported it on ערב ראש השנה. A שבת that is yom tov has no chart row, so
+     even the Friday ones fell through.
+     Asked before the chart rather than after, because the two overlap on the Shabbosos the
+     סוכות and פסח sheets carry, and there the sheet is what is hanging on the wall. */
+  const sheet = specialCandleLighting(serial, settings);
+  if (sheet) return { name: sheet.name, mins: sheet.mins, place: '' };
   if (excelWeekday(serial) !== FRIDAY) return null;
   const found = entryForDay(serial, state);
   if (!found || !found.entry.sheet || excelWeekday(found.anchor) !== SHABBOS) return null;

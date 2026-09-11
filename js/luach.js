@@ -292,7 +292,7 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
   <path d="M7 3h10M7 21h10M7 3c0 4.5 5 5.6 5 9 0-3.4 5-4.5 5-9M7 21c0-4.5 5-5.6 5-9 0 3.4 5 4.5 5 9"/>
 </svg>`;
 
-/** What is on next: the next מנין, and on an Erev Shabbos הדלקת נרות beside it.
+/** What is on next: the next מנין, and on an ערב שבת or an ערב יום טוב הדלקת נרות beside it.
  *
  *  The first thing on the page, because it is the one question the site is opened to
  *  answer most of the time. Everything it says comes out of upcoming.js, which reads the
@@ -304,8 +304,9 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
  *  narrow enough phone they stack instead of being squeezed.
  *
  *  Either box can be missing. Past the end of what has been published there is no מנין
- *  left to name, and הדלקת נרות only ever appears on a Friday. Nothing is drawn at all
- *  rather than a box with a dash in it.
+ *  left to name, and הדלקת נרות appears only on a day that has one: an ערב שבת with a chart
+ *  row, or an ערב יום טוב off the sheet the shul hangs for it. Nothing is drawn at all rather
+ *  than a box with a dash in it.
  *
  *  aria-live, so that when the card redraws itself on the timer a screen reader is told
  *  what changed instead of the page silently becoming something else. */

@@ -386,6 +386,8 @@ export function buildYomKippurPoster(year, settings) {
   M.list(erevOn, YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), MORNING);
   M.list(erevOn, YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), AFTERNOON);
   // The night that opens יו"כ, which is ערב יו"כ's evening.
+  // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+  M.zman(erevOn, YK_TEXT.candles, candles);
   M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
   M.at(erevOn, YK_TEXT.maariv, nightMaariv);
   // The day itself, and its מוצאי.
@@ -444,6 +446,7 @@ export function buildYomKippurPoster(year, settings) {
     // ערב יו"כ's and יו"כ's מנינים, for the congregation's "what is on next". Nothing on the
     // printed sheet reads this.
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

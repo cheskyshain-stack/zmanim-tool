@@ -434,6 +434,10 @@ function addShabbosMinyanim(M, shabbosSerial, settings, erevMincha) {
   const friday = shabbosSerial - 1;
   const row = buildChorefRow({ serial: shabbosSerial, specialParsha: '' }, settings);
   const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
+  // הדלקת נרות of that Friday, in the זמנים list rather than among the מנינים. The Shabbosos
+  // this sheet carries are weeks the charts have no row for, so without this their Friday has
+  // no candle lighting anywhere. See `zman` in posters/minyanim.js.
+  M.zman(friday, SK_TEXT.candles, shkia - settings.candleLightingMinutes * SK_MIN);
   if (erevMincha) {
     M.list(friday, SK_TEXT.erevMinchaShabbos, erevMincha, AFTERNOON);
     M.at(friday, SK_TEXT.mincha, shkia - settings.candleLightingMinutes * SK_MIN + 3 * SK_MIN);
@@ -505,6 +509,8 @@ export function buildSukkosPoster(year, settings) {
     }
     out.push(line(SK_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv' }));
     M.list(on, SK_TEXT.erevMincha, list(erevMincha), AFTERNOON);
+    // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+    M.zman(on, SK_TEXT.candles, candles);
     M.at(on, SK_TEXT.mincha, candles + 3 * SK_MIN);
     M.at(on, SK_TEXT.maariv, maariv);
     return out;
@@ -821,6 +827,7 @@ export function buildSukkosPoster(year, settings) {
        years. Widening that window is a change to the congregation's home page, not to this
        sheet, and belongs with it. */
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

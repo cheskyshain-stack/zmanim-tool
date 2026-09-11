@@ -334,6 +334,8 @@ export function buildPesachPoster(year, settings) {
     }
     out.push(line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
       note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }));
+    // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+    M.zman(on, PS_TEXT.candles, candles);
     M.at(on, PS_TEXT.mincha, candles + 3 * PS_MIN);
     M.at(on, PS_TEXT.maariv, maariv);
     return out;
@@ -471,6 +473,9 @@ export function buildPesachPoster(year, settings) {
       heading: [PS_TEXT.shabbosChm, PS_TEXT.shirHashirim].join(PS_TEXT.daySep),
       lines,
     });
+    // The same as the סוכות sheet's Shabbosos: that week has no chart row, so this Friday's
+    // candle lighting is on the sheet and nowhere else. See `zman` in posters/minyanim.js.
+    M.zman(friday, PS_TEXT.candles, candles);
     if (erev) {
       M.list(friday, PS_TEXT.erevMinchaShabbos, parseTimes(PS_TEXT.erevMincha4), AFTERNOON);
       M.at(friday, PS_TEXT.mincha, candles + 3 * PS_MIN);
@@ -557,6 +562,7 @@ export function buildPesachPoster(year, settings) {
     span: { from: bedikaOn, to: day(PS_ACHRON) },
     blocks: blocks.map(({ at, ...b }) => b),
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,

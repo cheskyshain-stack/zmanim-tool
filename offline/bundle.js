@@ -1581,8 +1581,23 @@ const placeOf = (t) => POSTER_PLACES[t?.mark || (t?.underlined ? 'u' : '')] || '
  *  rather than added as a gap. */
 function minyanList() {
   const out = [];
+  const zmanim = [];
   return {
     out,
+    zmanim,
+    /** A זמן the day has that is not a מנין, kept in a list of its own.
+     *
+     *  One thing uses this: הדלקת נרות, which the congregation's home page shows beside the
+     *  next מנין and not among them. It has to be apart from `out`, because everything in
+     *  there is offered as "what is on next" and a card reading "next minyan: הדלקת נרות"
+     *  would be wrong in exactly the way the note at the top of this file describes.
+     *
+     *  Registered in the builder beside the line, the same as a מנין, so the number the
+     *  phone shows and the number on the sheet on the wall are one thing. No room: these
+     *  are not davened anywhere. */
+    zman(serial, name, fraction) {
+      zmanim.push({ serial, name, mins: fracMins(fraction), place: '' });
+    },
     /** A computed time: the day it is on, what it is called, the day fraction it was worked
      *  out as, and the printed time object it went into, which is where the room comes from. */
     at(serial, name, fraction, time) {
@@ -2529,6 +2544,8 @@ function buildYomKippurPoster(year, settings) {
   M.list(erevOn, YK_TEXT.erevShacharis.label, parseTimes(YK_TEXT.erevShacharis.times), MORNING);
   M.list(erevOn, YK_TEXT.erevMincha.label, parseTimes(YK_TEXT.erevMincha.times), AFTERNOON);
   // The night that opens יו"כ, which is ערב יו"כ's evening.
+  // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+  M.zman(erevOn, YK_TEXT.candles, candles);
   M.at(erevOn, YK_TEXT.kolNidrei, kolNidrei);
   M.at(erevOn, YK_TEXT.maariv, nightMaariv);
   // The day itself, and its מוצאי.
@@ -2587,6 +2604,7 @@ function buildYomKippurPoster(year, settings) {
     // ערב יו"כ's and יו"כ's מנינים, for the congregation's "what is on next". Nothing on the
     // printed sheet reads this.
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
@@ -3208,6 +3226,8 @@ function buildPesachPoster(year, settings) {
     }
     out.push(line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
       note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }));
+    // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+    M.zman(on, PS_TEXT.candles, candles);
     M.at(on, PS_TEXT.mincha, candles + 3 * PS_MIN);
     M.at(on, PS_TEXT.maariv, maariv);
     return out;
@@ -3345,6 +3365,9 @@ function buildPesachPoster(year, settings) {
       heading: [PS_TEXT.shabbosChm, PS_TEXT.shirHashirim].join(PS_TEXT.daySep),
       lines,
     });
+    // The same as the סוכות sheet's Shabbosos: that week has no chart row, so this Friday's
+    // candle lighting is on the sheet and nowhere else. See `zman` in posters/minyanim.js.
+    M.zman(friday, PS_TEXT.candles, candles);
     if (erev) {
       M.list(friday, PS_TEXT.erevMinchaShabbos, parseTimes(PS_TEXT.erevMincha4), AFTERNOON);
       M.at(friday, PS_TEXT.mincha, candles + 3 * PS_MIN);
@@ -3431,6 +3454,7 @@ function buildPesachPoster(year, settings) {
     span: { from: bedikaOn, to: day(PS_ACHRON) },
     blocks: blocks.map(({ at, ...b }) => b),
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
@@ -3590,6 +3614,10 @@ function buildRoshHashanaPoster(year, settings) {
     // way this could be a whole day out, so it is taken from the same `night` the שקיעה
     // above is worked out from rather than from the block's own index.
     const nightOn = rh + i - 1;
+    // הדלקת נרות is a זמן rather than a מנין, so it goes in the list of its own: see the note
+    // on `zman` in posters/minyanim.js. The congregation's home page shows it beside the next
+    // מנין on an ערב יום טוב the same way it does on an ערב שבת.
+    if (i === 0) M.zman(nightOn, RH_TEXT.candles, shkia - settings.candleLightingMinutes * RH_MIN);
     if (i === 0) M.at(nightOn, RH_TEXT.mincha, shkia - 15 * RH_MIN);
     M.at(nightOn, RH_TEXT.maariv, shkia + 60 * RH_MIN);
 
@@ -3667,6 +3695,7 @@ function buildRoshHashanaPoster(year, settings) {
     // The three days' מנינים, for the congregation's "what is on next". Nothing on the
     // printed sheet reads this.
     minyanim: M.out,
+    zmanim: M.zmanim,
   };
 }
 
@@ -4153,6 +4182,10 @@ function addShabbosMinyanim(M, shabbosSerial, settings, erevMincha) {
   const friday = shabbosSerial - 1;
   const row = buildChorefRow({ serial: shabbosSerial, specialParsha: '' }, settings);
   const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
+  // הדלקת נרות of that Friday, in the זמנים list rather than among the מנינים. The Shabbosos
+  // this sheet carries are weeks the charts have no row for, so without this their Friday has
+  // no candle lighting anywhere. See `zman` in posters/minyanim.js.
+  M.zman(friday, SK_TEXT.candles, shkia - settings.candleLightingMinutes * SK_MIN);
   if (erevMincha) {
     M.list(friday, SK_TEXT.erevMinchaShabbos, erevMincha, AFTERNOON);
     M.at(friday, SK_TEXT.mincha, shkia - settings.candleLightingMinutes * SK_MIN + 3 * SK_MIN);
@@ -4224,6 +4257,8 @@ function buildSukkosPoster(year, settings) {
     }
     out.push(line(SK_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv' }));
     M.list(on, SK_TEXT.erevMincha, list(erevMincha), AFTERNOON);
+    // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
+    M.zman(on, SK_TEXT.candles, candles);
     M.at(on, SK_TEXT.mincha, candles + 3 * SK_MIN);
     M.at(on, SK_TEXT.maariv, maariv);
     return out;
@@ -4540,6 +4575,7 @@ function buildSukkosPoster(year, settings) {
        years. Widening that window is a change to the congregation's home page, not to this
        sheet, and belongs with it. */
     minyanim: M.out,
+    zmanim: M.zmanim,
     legend: [
       all.some((t) => t.underlined)
         ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
@@ -10772,6 +10808,7 @@ function renderPosters(container, state, routeChanged, tables) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -10794,15 +10831,58 @@ let built = null;
 function sheetsFor(year, settings) {
   if (built && built.year === year && built.settings === settings) return built.list;
   const list = [];
+  const zmanim = [];
   for (const build of [buildRoshHashanaPoster, buildYomKippurPoster, buildTzomGedaliaPoster, buildSukkosPoster]) {
     let poster = null;
     // A sheet that will not build must not take the home page's card down with it. The card
     // then falls back to the charts, which is where it was before any of this.
     try { poster = build(year, settings); } catch { poster = null; }
     if (poster?.minyanim) list.push(...poster.minyanim);
+    if (poster?.zmanim) zmanim.push(...poster.zmanim);
   }
-  built = { year, settings, list };
+  built = { year, settings, list, zmanim };
   return list;
+}
+
+/** הדלקת נרות off a sheet, on the days a sheet has one.
+ *
+ *  A separate walk from specialMinyanim above, and deliberately so on both counts.
+ *
+ *  It is a different list because הדלקת נרות is a זמן, not a מנין: everything specialMinyanim
+ *  hands back is offered as "what is on next", and candle lighting must never be offered that
+ *  way. Each builder registers it through `zman` instead (see posters/minyanim.js).
+ *
+ *  And it reaches further, because the פסח sheet is in it. specialMinyanim is deliberately only
+ *  the תשרי stretch, since that is where a sheet takes a whole day over from the charts, and
+ *  widening it would change what the home page calls the next מנין across all of פסח. Reading
+ *  one number off the פסח sheet changes nothing else, and without it ערב פסח and ערב שביעי של
+ *  פסח are two erev yom tovs with no candle lighting anywhere: they are not Fridays, so the
+ *  chart has none either.
+ *
+ *  The shul reported the same hole on ערב ראש השנה, where the card offered a מנין off the sheet
+ *  and no candle lighting beside it, because candleLightingForDay asked only the charts and a
+ *  שבת that is yom tov has no chart row. */
+let pesachBuilt = null;
+function pesachZmanim(year, settings) {
+  if (pesachBuilt && pesachBuilt.year === year && pesachBuilt.settings === settings) return pesachBuilt.list;
+  let list = [];
+  try { list = buildPesachPoster(year, settings)?.zmanim || []; } catch { list = []; }
+  pesachBuilt = { year, settings, list };
+  return list;
+}
+
+function specialCandleLighting(serial, settings) {
+  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  for (const year of [here, here + 1]) {
+    const rh = roshHashana(year - 3761);
+    if (serial < rh - BEFORE || serial > rh + AFTER) continue;
+    sheetsFor(year, settings);
+    const found = built.zmanim.find((z) => z.serial === serial);
+    if (found) return found;
+  }
+  // פסח is half a year from ר"ה, so it is asked of this Hebrew year only and on its own.
+  const found = pesachZmanim(here, settings).find((z) => z.serial === serial);
+  return found || null;
 }
 
 /** Every מנין on one day that comes off a sheet rather than off a chart, earliest first.
@@ -10936,7 +11016,8 @@ function weekdayMornings(shabbosSerial, settings, everyday, special) {
 // הדלקת נרות is read the same way and for the same reason: its column is שקיעה floored to
 // the minute less the figure set in Settings, and it can be reshaped by a rule or typed
 // over, so computing it again here would quietly disagree with the board on the weeks
-// where any of that made a difference.
+// where any of that made a difference. On the days a sheet on the wall speaks for, it is
+// read off that sheet instead, for the same reason again: see candleLightingForDay.
 
 
 
@@ -11180,8 +11261,7 @@ function minyanimForDay(serial, state, settings) {
   return out;
 }
 
-/** הדלקת נרות on one calendar day, or nothing if that day is not an Erev Shabbos with a
- *  chart row behind it.
+/** הדלקת נרות on one calendar day, or nothing if that day has none.
  *
  *  Read off the chart's own הדלקת נרות column rather than worked out here. The column is
  *  שקיעה floored to the minute, less the number of minutes set in Settings, and it can be
@@ -11189,6 +11269,16 @@ function minyanimForDay(serial, state, settings) {
  *  the same answer most weeks and quietly disagreed with the printed board on the ones
  *  where the flooring or an override made a minute of difference. */
 function candleLightingForDay(serial, state, settings) {
+  /* A sheet on the wall first, where one speaks for this day. The charts only ever carry
+     הדלקת נרות on a Friday with a שבת row behind it, so before this an ערב יום טוב had none at
+     all: ערב ר"ה, ערב יו"כ, ערב סוכות, ערב שמיני עצרת, ערב פסח and ערב שביעי של פסח were six
+     evenings a year where the home page named the מנין off the sheet and said nothing about
+     candles. The shul reported it on ערב ראש השנה. A שבת that is yom tov has no chart row, so
+     even the Friday ones fell through.
+     Asked before the chart rather than after, because the two overlap on the Shabbosos the
+     סוכות and פסח sheets carry, and there the sheet is what is hanging on the wall. */
+  const sheet = specialCandleLighting(serial, settings);
+  if (sheet) return { name: sheet.name, mins: sheet.mins, place: '' };
   if (excelWeekday(serial) !== FRIDAY) return null;
   const found = entryForDay(serial, state);
   if (!found || !found.entry.sheet || excelWeekday(found.anchor) !== SHABBOS) return null;
