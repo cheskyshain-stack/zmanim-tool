@@ -331,7 +331,14 @@ and listed in `DIST_TREES`.
   that month has one. **תשרי is skipped**, its ראש חודש being ראש השנה, which has its own message.
   אב is written "Menachem Av" and חשון "Mar Cheshvon" (`RC_TEXT.spelling`), which is how the shul
   writes them; `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the charts.
-  Two things the seventeen sent ones show that are deliberately not built: the list is not quite
+  **The `(T"T 7:25)` every one of the seventeen carries is deliberately left out**, on the shul's
+  instruction: it is not on any chart here, so nothing in this program knows how that time is
+  arrived at or what would move it. Every other time on the line is a מנין announced at a fixed
+  hour, which can be repeated without knowing anything; a time whose reckoning is unknown cannot be
+  kept right, and a line that is right until the year it quietly is not is worse than one that was
+  never there. The sender can type it back in. If the T"T ever reaches a chart it belongs here read
+  off that.
+  Two other things the seventeen show that are deliberately not built: the list is not quite
   fixed (6:50ns missing from four, 8:10ns on three), and three of them, in חשון, טבת and שבט, open
   "6:50m&ns, [Netz 7:15]" instead, where the bracket is real sunrise and the מנין is sunrise less
   twenty five minutes. That looks like a winter rule and is not one, since כסלו in the middle of

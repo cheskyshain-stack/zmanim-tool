@@ -36,8 +36,16 @@ import { JEWISH_MONTHS_EN, hebrewDateExtended } from './hebrew-calendar.js';
 export const RC_TEXT = {
   title: 'ROSH CHODESH',
   label: 'Shacharis',
-  /** The מנינים, in the form sixteen of the seventeen sent messages share. */
-  shacharis: '6:40m, 6:50ns, 7:00en, 7:15d, (T"T 7:25), 7:35sh, 8:00m, 8:20en, 8:40d',
+  /** The מנינים, in the form sixteen of the seventeen sent messages share.
+   *
+   *  **Without the (T"T 7:25) that every one of those seventeen carries.** Taken out on the shul's
+   *  instruction: it is not on any chart here, so nothing in this program knows how that time is
+   *  arrived at or what would move it. Every other time on this line is a מנין the shul announces
+   *  at a fixed hour, which this can repeat without knowing anything; a time whose reckoning is
+   *  unknown is one this cannot keep right, and a line that is right until the year it quietly is
+   *  not is worse than a line that was never there. Whoever sends the message can type it back in,
+   *  the box being editable, and if the T"T ever reaches a chart it belongs here read off that. */
+  shacharis: '6:40m, 6:50ns, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d',
   /** Where the shul spells a month differently from the program's own table.
    *  אב is "Menachem Av" in every one of the sent messages, and חשון is "Mar Cheshvon". Held here
    *  rather than changed in JEWISH_MONTHS_EN, which the charts and the date lines read: those say
