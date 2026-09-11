@@ -4275,7 +4275,18 @@ body.is-locked { overflow: hidden; }
 /* The line that says the whole year is showing. Only there in that mode, which is reached by
    triple clicking the heading and is for checking rather than for sending. */
 .tx-all {
-  margin: 0 0 1.2rem; padding: 0.5rem 0.7rem; border-radius: 6px;
+  margin: 0 0 0.8rem; padding: 0.5rem 0.7rem; border-radius: 6px;
   background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   color: var(--muted); font-size: var(--fs-sm);
 }
+/* Parsha and Yom Tov, in the year view only. Two independent toggles, both on to begin with,
+   so the pair reads as what is showing rather than as a choice between them. Wraps rather than
+   shrinks on a phone, like every other row of buttons here. */
+.tx-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1.2rem; }
+.tx-filter {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 0.35rem 0.9rem; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm);
+}
+.tx-filter:hover { background: var(--accent-soft); }
+.tx-filter.is-on { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }

@@ -23,13 +23,13 @@ import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { buildSukkosPoster } from '../posters/sukkos.js';
-import { hebrewYear } from '../hebrew-calendar.js';
+import { hebrewYear, dateFromHebrew } from '../hebrew-calendar.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -150,12 +150,21 @@ const txInWindow = (poster, today) =>
 let txAll = false;
 const TX_ALL_DAYS = 380;
 
+/** The ערב of a Hebrew date: the day the message about it goes out.
+ *
+ *  What every card is sorted by, and it is the day of the message rather than the day of the yom
+ *  tov, because that is the order somebody sending these works in. Month numbering counts ניסן as
+ *  1, so תשרי is 7. See dateFromHebrew. */
+const txErevOf = (day, month, year) => dateFromHebrew(day, month, year) - 1;
+
 /** The ערב ראש השנה message for a given Hebrew year. */
 function txErevRoshHashana(year, settings, today) {
   const poster = buildRoshHashanaPoster(year, settings);
   if (!txInWindow(poster, today)) return null;
   return {
     id: `erev-rh-${year}`,
+    kind: 'yomtov',
+    serial: txErevOf(1, 7, year),
     name: 'Erev Rosh Hashana',
     when: hebrewYear(year),
     text: erevRoshHashanaText(poster),
@@ -168,6 +177,8 @@ function txErevYomKippur(year, settings, today) {
   if (!txInWindow(poster, today)) return null;
   return {
     id: `erev-yk-${year}`,
+    kind: 'yomtov',
+    serial: txErevOf(10, 7, year),
     name: 'Erev Yom Kippur',
     when: hebrewYear(year),
     text: erevYomKippurText(poster),
@@ -190,9 +201,32 @@ function txErevSukkos(year, settings, today) {
   if (!txDaysInWindow(erev, erev + 2, today)) return null;
   return {
     id: `erev-sukkos-${year}`,
+    kind: 'yomtov',
+    serial: erev,
     name: 'Erev Sukkos',
     when: hebrewYear(year),
     text: erevSukkosText(poster),
+  };
+}
+
+/** The ערב שמיני עצרת message.
+ *
+ *  Off the same סוכות sheet the ערב סוכות one is, a fortnight further into it, and windowed on
+ *  שמיני עצרת and שמחת תורה rather than on the sheet. */
+function txErevShminiAtzeres(year, settings, today) {
+  const poster = buildSukkosPoster(year, settings);
+  if (!poster) return null;
+  const shmini = dateFromHebrew(22, 7, year);
+  if (!txDaysInWindow(shmini - 1, shmini + 1, today)) return null;
+  const text = erevShminiAtzeresText(poster);
+  if (!text) return null;
+  return {
+    id: `erev-shmini-${year}`,
+    kind: 'yomtov',
+    serial: shmini - 1,
+    name: 'Erev Shemini Atzeres',
+    when: hebrewYear(year),
+    text,
   };
 }
 
@@ -208,6 +242,8 @@ function txErevPesach(rhYear, settings, today) {
     if (!txInWindow(poster, today)) continue;
     return {
       id: `erev-pesach-${y}`,
+      kind: 'yomtov',
+      serial: txErevOf(15, 1, y),
       name: 'Erev Pesach',
       when: hebrewYear(y),
       text: erevPesachText(poster),
@@ -227,7 +263,17 @@ function txNetz(year, settings, today) {
     const poster = buildVasikinPoster(year, settings, which);
     if (!txInWindow(poster, today)) continue;
     const text = netzMinyanText(poster, which);
-    if (text) out.push({ id: `netz-${which}-${year}`, name, when: hebrewYear(year), text });
+    if (text) {
+      out.push({
+        id: `netz-${which}-${year}`,
+        kind: 'yomtov',
+        // Sent with the ערב message of the day it is about, so it sorts beside it.
+        serial: txErevOf(which === 'yk' ? 10 : 1, 7, year),
+        name,
+        when: hebrewYear(year),
+        text,
+      });
+    }
   }
   return out;
 }
@@ -264,6 +310,19 @@ function txCard(msg) {
     </section>`;
 }
 
+/** Which kinds of message the year view is showing.
+ *
+ *  Two buttons, asked for: about fifty Shabbos messages and a handful of yom tov ones is a list
+ *  nobody can find anything in, and the two are checked for different reasons. Independent
+ *  toggles rather than one switch with two positions, so both can be on, which is the state it
+ *  opens in. Not stored, like the year view itself: this is how you are looking at it now.
+ *
+ *  Only the year view has them. The four day window is a handful of cards and filtering that
+ *  would be two buttons over almost nothing. */
+const txKinds = { parsha: true, yomtov: true };
+
+const TX_KIND_NAMES = { parsha: 'Parsha', yomtov: 'Yom Tov' };
+
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
   const messages = [];
@@ -271,18 +330,26 @@ export function renderTexts(container, state, settings, tables) {
 
   const year = txRoshHashanaYear(settings, today);
 
+  /* The yom tov messages. The same list in both views: each builder keeps its own window and
+     txInWindow lets everything through while the year is showing, so the only difference between
+     the two views is the window, not which messages exist. */
+  const yomTov = () => {
+    const out = [];
+    for (const msg of [
+      txErevRoshHashana(year, settings, today),
+      txErevYomKippur(year, settings, today),
+      txErevSukkos(year, settings, today),
+      txErevShminiAtzeres(year, settings, today),
+      txErevPesach(year, settings, today),
+      ...txNetz(year, settings, today),
+    ]) {
+      if (msg) out.push(msg);
+    }
+    return out;
+  };
+
   if (txAll) {
-    /* Every yom tov message the year holds, and then every Shabbos of it in date order. The yom
-       tov ones first, since they are the ones being checked; the Shabbosos are the long tail. */
-    const rh = txErevRoshHashana(year, settings, today);
-    if (rh) messages.push(rh);
-    const yk = txErevYomKippur(year, settings, today);
-    if (yk) messages.push(yk);
-    const sk = txErevSukkos(year, settings, today);
-    if (sk) messages.push(sk);
-    const ps = txErevPesach(year, settings, today);
-    if (ps) messages.push(ps);
-    messages.push(...txNetz(year, settings, today));
+    messages.push(...yomTov());
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
       if (serial < today || serial - today > TX_ALL_DAYS) continue;
@@ -292,6 +359,9 @@ export function renderTexts(container, state, settings, tables) {
       const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
       messages.push({
         id: `erev-shabbos-${serial}`,
+        kind: 'parsha',
+        // The Friday, which is the day the message goes out, not the Shabbos it is about.
+        serial: serial - 1,
         name: 'Erev Shabbos',
         when: english || '',
         text: erevShabbosText(columns, row, english),
@@ -300,32 +370,45 @@ export function renderTexts(container, state, settings, tables) {
   } else {
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
-    const rh = txErevRoshHashana(year, settings, today);
-    if (rh) messages.push(rh);
-    const yk = txErevYomKippur(year, settings, today);
-    if (yk) messages.push(yk);
-    const sk = txErevSukkos(year, settings, today);
-    if (sk) messages.push(sk);
-    const ps = txErevPesach(year, settings, today);
-    if (ps) messages.push(ps);
-    messages.push(...txNetz(year, settings, today));
+    messages.push(...yomTov());
   }
+
+  /* Everything in date order, which is the order they get sent in and the only order somebody
+     looking for "what comes after סוכות" can read. It used to be the yom tov ones and then the
+     fifty Shabbosos, which put פסח in front of every Shabbos between here and it. A stable sort,
+     so the ותיקין announcement stays under the ערב message of the day it belongs to. */
+  messages.sort((a, b) => (a.serial ?? 0) - (b.serial ?? 0));
+
+  const shown = txAll ? messages.filter((m) => txKinds[m.kind] !== false) : messages;
+  const kinds = Object.keys(TX_KIND_NAMES).map((k) => `
+    <button type="button" class="tx-filter ${txKinds[k] ? 'is-on' : ''}" data-kind="${k}"
+      aria-pressed="${txKinds[k] ? 'true' : 'false'}">${TX_KIND_NAMES[k]}</button>`).join('');
 
   container.innerHTML = `
     <div class="tx-page">
       <h1 class="tx-title" title="Triple click to show the whole year">Messages</h1>
-      ${txAll ? `<p class="tx-all">Showing everything for the year ahead, ${messages.length}
-        ${messages.length === 1 ? 'message' : 'messages'}. Triple click the heading again for the
-        next ${TX_AHEAD_DAYS} days only.</p>` : ''}
+      ${txAll ? `<p class="tx-all">Showing everything for the year ahead, in date order. Triple
+        click the heading again for the next ${TX_AHEAD_DAYS} days only.</p>
+        <div class="tx-filters">${kinds}</div>` : ''}
       <p class="tx-hint">Every time here is read off the shul's own boards and sheets, so this
       and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
       are for this visit only: reload and the times come back fresh, which is the way round that
       cannot leave an old time in a new message.</p>
 
-      ${messages.map(txCard).join('')}
-      ${messages.length ? '' : `<div class="panel"><p>Nothing to send just now. Yom tov messages
-        appear ${TX_AHEAD_DAYS} days before the yom tov and stay up until it is over.</p></div>`}
+      ${shown.map(txCard).join('')}
+      ${shown.length ? '' : `<div class="panel"><p>${txAll
+        ? 'Both kinds are switched off, so there is nothing to show.'
+        : `Nothing to send just now. Yom tov messages appear ${TX_AHEAD_DAYS} days before the yom
+           tov and stay up until it is over.`}</p></div>`}
     </div>`;
+
+  for (const btn of container.querySelectorAll('.tx-filter')) {
+    btn.addEventListener('click', () => {
+      const k = btn.dataset.kind;
+      txKinds[k] = !txKinds[k];
+      renderTexts(container, state, settings, tables);
+    });
+  }
 
   /* Triple click on the heading, which is `detail` reaching 3 on an ordinary click. Listened
      for on the heading rather than the page so that selecting a message by triple clicking it,

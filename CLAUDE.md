@@ -307,6 +307,20 @@ and listed in `DIST_TREES`.
   answered: on a year where ערב ר"ה is a Friday, the shul sends the ערב ראש השנה message and says
   nothing about שבת. The window does this on its own, since such a Shabbos is not a chart row, but
   do not "fix" it by folding Shabbos times into the yom tov message.
+- **The year view has two buttons, Parsha and Yom Tov**, and everything on it is in **date order**,
+  which is the order these get sent in. Independent toggles, both on to begin with, so the pair
+  reads as what is showing rather than as a choice between them; turning both off says so. The four
+  day window has no buttons: it is a handful of cards and filtering that would be two buttons over
+  almost nothing. Each message carries the serial of the day it goes out, the ערב rather than the
+  day itself, which is what the sort runs on.
+- **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is
+  הושענא רבה's, five blocks in, and every block before it carries the same three calcs (`ytBlock`).
+  Its sent message carries **no sign-off**, where every other one ends on a fixed line, and that is
+  written the way it was sent. Its afternoon is the sheet's and **the sheet disagrees with the
+  message that was sent**: the shul asked for the whole run to be למטה (the main בית מדרש is being
+  set up for the night), and the October 2025 message says 1:50m, 2:15m, 3:00m, which is the old
+  arrangement. The sheet is what gets hung, so the sheet is what the message reads. If the shul says
+  otherwise the fix belongs in `sukkosErevMincha` and both move together.
 - **Triple click the heading** to drop the window and show every message the year holds, about
   fifty of them, and again to put it back. For checking, not for sending: nothing is stored and a
   reload is back to the four days. It listens on the heading rather than the page so that triple
@@ -331,8 +345,8 @@ and listed in `DIST_TREES`.
   `YK_TEXT.erevShacharis` mark for mark. The sent ערב סוכות message leaves the letter off its
   evening מנחה where every other sent message carries one, and this writes the letter: one
   character, and it is the one that makes every message on the page say the room the same way.
-- Built so far: ערב ראש השנה, ערב יום כיפור, ערב סוכות, ערב פסח, and the two ותיקין
-  announcements. Each is measured against the shul's own sent message before it is called done,
+- Built so far: ערב ראש השנה, ערב יום כיפור, ערב סוכות, ערב שמיני עצרת, ערב פסח, and the two
+  ותיקין announcements. Each is measured against the shul's own sent message before it is called done,
   line for line. A sheet that carries the same `calc` on several nights (פסח and סוכות both open
   every night of yom tov with a הדלקת נרות) is read with `ytFirst`, which takes the first, since
   the ערב block prints before the day blocks.
