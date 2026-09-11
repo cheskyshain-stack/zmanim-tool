@@ -210,9 +210,14 @@ The token is a Worker secret instead, and the admin asks the Worker.
   what goes in the page (`data-cf-beacon`, and `ANALYTICS_TOKEN` here); the tag is what the
   GraphQL dataset filters on. Assuming they were one string cost a day: the query ran, matched
   nothing, and the admin said "no visits counted in this period yet" while the dashboard showed
-  50 page views the same day. `siteTagFor` in the Worker now lists the account's sites and takes
-  the tag off the one whose `site_token` is the beacon token. The tag comes back in the reply and
-  the empty state prints it, because an answer of zero and a wrong question look identical.
+  50 page views the same day. `siteTagFor` tries to get the tag properly, by listing the
+  account's sites and taking it off the one whose `site_token` is the beacon token, but **on the
+  shul's own Worker that listing is refused**: the read-only Account Analytics token queries the
+  analytics data fine and gets "Authentication error" from that REST endpoint, which is a
+  different permission. So in practice the query narrows by **`requestHost`** instead, which is
+  the same site said another way and is what is actually running. The reply says which of the two
+  it used and the empty state prints it, because an answer of zero and a wrong question look
+  identical. Measured once it worked: 23 visits and 51 page views, matching the dashboard.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
