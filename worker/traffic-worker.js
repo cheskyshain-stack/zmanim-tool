@@ -26,9 +26,9 @@
  *      TRAFFIC_API in js/ui/traffic-view.js.
  *
  * There were three variables to set and now there is one, because the other two were work
- * with no secrecy to justify it. The site tag is the beacon token out of the site's own head,
- * which every visitor can read, so it is written below. The account id is something the token
- * itself can be asked for, so the Worker asks. Both can still be overridden by a variable of
+ * with no secrecy to justify it. Both are looked up instead: the account from the token itself,
+ * and the site from the beacon token the pages carry, which is written below and which every
+ * visitor can read anyway. Both can still be overridden by a variable of
  * the same name.
  *
  * CF_ACCOUNT_ID is the one that has to be set by hand sometimes, and there are two such cases,
@@ -64,11 +64,9 @@ const CACHE_SECONDS = 300;
  *  for a year of buckets. Web Analytics keeps less than this anyway on the free plan. */
 const MAX_DAYS = 90;
 
-/** Which site's numbers. This is the Web Analytics site tag, and it is the same string as the
- *  beacon token in the congregation site's head: public by construction, since every visitor's
- *  browser is handed it. Written here rather than asked for as a variable, because a value
- *  anybody can read off the page is not worth a setup step. CF_SITE_TAG overrides it. */
-const SITE_TAG = 'e96217102b81416db30f31a0c105fece';
+/** The beacon token, out of the congregation site's own head. Public by construction, since
+ *  every visitor's browser is handed it. See ANALYTICS_TOKEN in build-offline.py. */
+const SITE_TOKEN = 'e96217102b81416db30f31a0c105fece';
 
 /** The account the site sits in.
  *
@@ -106,6 +104,46 @@ async function accountFor(env) {
   }
   knownAccount = list[0].id;
   return knownAccount;
+}
+
+/** Which site's numbers, as the analytics API names sites.
+ *
+ *  A Web Analytics site has two identifiers and they are not interchangeable. The **token** is
+ *  what goes in the page, in data-cf-beacon, and is what the dashboard shows under the snippet.
+ *  The **tag** is what the GraphQL dataset filters on. This file used to assume they were one
+ *  string, which is the sort of assumption that fails quietly: the query ran, matched nothing,
+ *  and the admin said "no visits counted in this period yet" while the dashboard was showing 50
+ *  page views on the same day. An answer of zero is indistinguishable from a quiet zero, which
+ *  is why the wrong one stood for a day.
+ *
+ *  So the tag is looked up rather than assumed: the account's sites are listed and the one whose
+ *  site_token is the beacon token in the page is this site. Cached for the life of the isolate,
+ *  like the account. CF_SITE_TAG still wins, and is the way out if this lookup ever cannot run,
+ *  since the tag is on the dashboard's own Web Analytics page. */
+let knownSiteTag = null;
+async function siteTagFor(env, account) {
+  if (env.CF_SITE_TAG) return env.CF_SITE_TAG;
+  if (knownSiteTag) return knownSiteTag;
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info/list?per_page=100`,
+    { headers: { authorization: `Bearer ${env.CF_API_TOKEN}` } },
+  );
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.success) {
+    const said = body?.errors?.map((e) => e.message).join('; ') || `HTTP ${res.status}`;
+    throw new Error(`Could not ask Cloudflare which site the beacon belongs to: ${said}. `
+      + 'Set CF_SITE_TAG on this Worker, as a plain variable, to the site tag on the dashboard '
+      + 'under Analytics, Web Analytics.');
+  }
+  const sites = body.result || [];
+  const mine = sites.find((s) => s.site_token === SITE_TOKEN);
+  if (!mine?.site_tag) {
+    throw new Error(`No site in this account carries the beacon token the pages are using. `
+      + `Sites seen: ${sites.length}. Either the token in the site's head is not this account's, `
+      + 'or CF_SITE_TAG has to be set on this Worker by hand.');
+  }
+  knownSiteTag = mine.site_tag;
+  return knownSiteTag;
 }
 
 /* The query.
@@ -231,8 +269,10 @@ export default {
 
     const { since, until } = dayRange(days);
     let account;
+    let siteTag;
     try {
       account = await accountFor(env);
+      siteTag = await siteTagFor(env, account);
     } catch (e) {
       return json({ error: e.message }, 502, origin);
     }
@@ -248,7 +288,7 @@ export default {
         },
         body: JSON.stringify({
           query: QUERY,
-          variables: { accountTag: account, siteTag: env.CF_SITE_TAG || SITE_TAG, since, until },
+          variables: { accountTag: account, siteTag, since, until },
         }),
       });
       body = await res.json();
@@ -274,6 +314,10 @@ export default {
       days,
       since,
       until,
+      // Handed back so a zero can be told apart from a zero. An answer of "no visits" is the
+      // same shape whether nobody came or the query asked about the wrong site, and the wrong
+      // site is what happened once already (see siteTagFor). Not a secret: it names a site.
+      siteTag,
       byDay: (found.byDay || []).map((g) => ({
         date: g.dimensions.date,
         views: g.count,

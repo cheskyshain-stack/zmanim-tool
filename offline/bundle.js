@@ -14497,7 +14497,10 @@ function renderTraffic(container) {
       body.innerHTML = `<div class="panel"><p>No visits counted in this period yet.</p>
         <p class="hint">Counting started when the beacon went on the site. If you have
         opened the site yourself since then and it is not here, that is the opt-out doing
-        its job: this device asked not to be counted.</p></div>`;
+        its job: this device asked not to be counted.</p>
+        <p class="hint">Asked Cloudflare about site <code>${trafficEsc(data.siteTag || '(not said)')}</code>.
+        If dash.cloudflare.com shows visits for this period and this does not, the two are not
+        looking at the same site.</p></div>`;
       return;
     }
     body.innerHTML = `

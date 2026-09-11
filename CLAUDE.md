@@ -200,13 +200,19 @@ The token is a Worker secret instead, and the admin asks the Worker.
 
 - Deploying it is written at the top of `worker/traffic-worker.js`, and it is now **one**
   setting: `CF_API_TOKEN`, a read-only Account Analytics token, as a Secret. It was three. The
-  site tag is the beacon token out of the site's own head, which every visitor can read, so the
-  Worker carries it; the account id is something the token can be asked for, so the Worker asks
-  and caches the answer. `CF_SITE_TAG` and `CF_ACCOUNT_ID` still override, and `CF_ACCOUNT_ID`
+  account id and the site tag are both looked up and cached by the Worker. `CF_SITE_TAG` and
+  `CF_ACCOUNT_ID` still override, and `CF_ACCOUNT_ID`
   has to be set by hand in two cases, both of which the Worker names on the screen rather than
   guessing: a token that can see more than one account, and a token `/accounts` hands back
   nothing for. The value is the 32 characters after `dash.cloudflare.com/` in the dashboard
   address, and it is not a secret.
+- **A Web Analytics site has a token and a tag and they are different strings.** The token is
+  what goes in the page (`data-cf-beacon`, and `ANALYTICS_TOKEN` here); the tag is what the
+  GraphQL dataset filters on. Assuming they were one string cost a day: the query ran, matched
+  nothing, and the admin said "no visits counted in this period yet" while the dashboard showed
+  50 page views the same day. `siteTagFor` in the Worker now lists the account's sites and takes
+  the tag off the one whose `site_token` is the beacon token. The tag comes back in the reply and
+  the empty state prints it, because an answer of zero and a wrong question look identical.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
