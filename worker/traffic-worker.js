@@ -68,6 +68,10 @@ const MAX_DAYS = 90;
  *  every visitor's browser is handed it. See ANALYTICS_TOKEN in build-offline.py. */
 const SITE_TOKEN = 'e96217102b81416db30f31a0c105fece';
 
+/** The host the congregation's pages are served from. The other way of saying which site, used
+ *  where the site tag cannot be had. Same value as SITE_URL's host in build-offline.py. */
+const SITE_HOST = 'lczmanim.cjaffa.com';
+
 /** The account the site sits in.
  *
  *  Asked of Cloudflare with the same token rather than typed in: a token is issued against an
@@ -118,32 +122,32 @@ async function accountFor(env) {
  *
  *  So the tag is looked up rather than assumed: the account's sites are listed and the one whose
  *  site_token is the beacon token in the page is this site. Cached for the life of the isolate,
- *  like the account. CF_SITE_TAG still wins, and is the way out if this lookup ever cannot run,
- *  since the tag is on the dashboard's own Web Analytics page. */
+ *  like the account.
+ *
+ *  This can be refused, and on the shul's own Worker it is: the read-only Account Analytics token
+ *  queries the analytics data happily and gets "Authentication error" from this REST endpoint,
+ *  which is a different permission. That is not fatal and does not ask anybody for a second
+ *  setting, because the site can be named another way: by the host its pages are served from.
+ *  So this returns null rather than throwing, and the caller narrows by requestHost instead.
+ *
+ *  CF_SITE_TAG still wins over both, for the day one of them is wrong. */
 let knownSiteTag = null;
 async function siteTagFor(env, account) {
   if (env.CF_SITE_TAG) return env.CF_SITE_TAG;
   if (knownSiteTag) return knownSiteTag;
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info/list?per_page=100`,
-    { headers: { authorization: `Bearer ${env.CF_API_TOKEN}` } },
-  );
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.success) {
-    const said = body?.errors?.map((e) => e.message).join('; ') || `HTTP ${res.status}`;
-    throw new Error(`Could not ask Cloudflare which site the beacon belongs to: ${said}. `
-      + 'Set CF_SITE_TAG on this Worker, as a plain variable, to the site tag on the dashboard '
-      + 'under Analytics, Web Analytics.');
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info/list?per_page=100`,
+      { headers: { authorization: `Bearer ${env.CF_API_TOKEN}` } },
+    );
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.success) return null;
+    const mine = (body.result || []).find((s) => s.site_token === SITE_TOKEN);
+    knownSiteTag = mine?.site_tag || null;
+    return knownSiteTag;
+  } catch {
+    return null;
   }
-  const sites = body.result || [];
-  const mine = sites.find((s) => s.site_token === SITE_TOKEN);
-  if (!mine?.site_tag) {
-    throw new Error(`No site in this account carries the beacon token the pages are using. `
-      + `Sites seen: ${sites.length}. Either the token in the site's head is not this account's, `
-      + 'or CF_SITE_TAG has to be set on this Worker by hand.');
-  }
-  knownSiteTag = mine.site_tag;
-  return knownSiteTag;
 }
 
 /* The query.
@@ -153,14 +157,22 @@ async function siteTagFor(env, account) {
  * dashboard shows. Asked for twice over the same range, grouped two ways: by day, which is
  * the chart, and by path, which is what people actually opened.
  *
- * Both are filtered to this one site by siteTag, because an account can hold several. */
-const QUERY = `
-query Traffic($accountTag: string!, $siteTag: string!, $since: Time!, $until: Time!) {
+ * Both are narrowed to this one site, because an account can hold several, and there are two
+ * ways to say which: the site's tag, or the host its pages are served from. Which one is used
+ * depends on whether the tag could be had at all (see siteTagFor), and the reply says which so
+ * the admin can show it.
+ *
+ * The narrowing is written into the query text rather than passed as a variable. A variable
+ * needs its type named, Cloudflare's filter input types are long and version-specific, and
+ * getting one wrong is a query that does not run at all. What is interpolated is this file's
+ * own constants or a tag out of Cloudflare's own API, never anything a caller sends. */
+const query = (where) => `
+query Traffic($accountTag: string!, $since: Time!, $until: Time!) {
   viewer {
     accounts(filter: { accountTag: $accountTag }) {
       byDay: rumPageloadEventsAdaptiveGroups(
         limit: 100
-        filter: { siteTag: $siteTag, datetime_geq: $since, datetime_leq: $until }
+        filter: { ${where}, datetime_geq: $since, datetime_leq: $until }
         orderBy: [date_ASC]
       ) {
         count
@@ -169,7 +181,7 @@ query Traffic($accountTag: string!, $siteTag: string!, $since: Time!, $until: Ti
       }
       byPage: rumPageloadEventsAdaptiveGroups(
         limit: 25
-        filter: { siteTag: $siteTag, datetime_geq: $since, datetime_leq: $until }
+        filter: { ${where}, datetime_geq: $since, datetime_leq: $until }
         orderBy: [count_DESC]
       ) {
         count
@@ -277,6 +289,13 @@ export default {
       return json({ error: e.message }, 502, origin);
     }
 
+    // Which site, said whichever way is available. Both name one site; the tag is the more
+    // exact of the two, and the host is what is left when the tag cannot be read.
+    const narrowedBy = siteTag ? 'siteTag' : 'requestHost';
+    const where = siteTag
+      ? `siteTag: ${JSON.stringify(siteTag)}`
+      : `requestHost: ${JSON.stringify(SITE_HOST)}`;
+
     let res;
     let body;
     try {
@@ -287,8 +306,8 @@ export default {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          query: QUERY,
-          variables: { accountTag: account, siteTag, since, until },
+          query: query(where),
+          variables: { accountTag: account, since, until },
         }),
       });
       body = await res.json();
@@ -317,7 +336,8 @@ export default {
       // Handed back so a zero can be told apart from a zero. An answer of "no visits" is the
       // same shape whether nobody came or the query asked about the wrong site, and the wrong
       // site is what happened once already (see siteTagFor). Not a secret: it names a site.
-      siteTag,
+      narrowedBy,
+      site: siteTag || SITE_HOST,
       byDay: (found.byDay || []).map((g) => ({
         date: g.dimensions.date,
         views: g.count,
