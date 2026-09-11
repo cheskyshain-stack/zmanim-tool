@@ -324,10 +324,22 @@ and listed in `DIST_TREES`.
   locale (`txDateLabel`, UTC parts throughout, since a serial is a whole day and a local midnight
   lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
   is only times, so one carrying last year's looked exactly like one carrying this year's.
-- **The year view has two buttons, Parsha and Yom Tov**, and everything on it is in **date order**,
+- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) is the one message here with **no זמן in it at all**:
+  every time is an announced מנין, the same list month after month, so there is no sheet behind it
+  and nothing for it to disagree with. What it does read off the calendar is the part that can be
+  got wrong, the month and the day it starts on, which is the thirtieth of the month before wherever
+  that month has one. **תשרי is skipped**, its ראש חודש being ראש השנה, which has its own message.
+  אב is written "Menachem Av" and חשון "Mar Cheshvon" (`RC_TEXT.spelling`), which is how the shul
+  writes them; `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the charts.
+  Two things the seventeen sent ones show that are deliberately not built: the list is not quite
+  fixed (6:50ns missing from four, 8:10ns on three), and three of them, in חשון, טבת and שבט, open
+  "6:50m&ns, [Netz 7:15]" instead, where the bracket is real sunrise and the מנין is sunrise less
+  twenty five minutes. That looks like a winter rule and is not one, since כסלו in the middle of
+  that stretch uses the ordinary form. Three examples cannot say which months take it.
+- **The year view has three buttons, Parsha, Yom Tov and Rosh Chodesh**, and everything on it is in **date order**,
   which is the order these get sent in. Independent toggles, both on to begin with, so the pair
-  reads as what is showing rather than as a choice between them; turning both off says so. The four
-  day window has no buttons: it is a handful of cards and filtering that would be two buttons over
+  reads as what is showing rather than as a choice between them; turning them all off says so. The
+  four day window has no buttons: it is a handful of cards and filtering that would be two buttons over
   almost nothing. Each message carries the serial of the day it goes out, the ערב rather than the
   day itself, which is what the sort runs on.
 - **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is

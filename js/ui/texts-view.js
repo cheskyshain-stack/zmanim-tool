@@ -29,6 +29,7 @@ import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { buildSukkosPoster } from '../posters/sukkos.js';
+import { nextRoshChodesh, roshChodeshText, roshChodeshMonthName } from '../rosh-chodesh-text.js';
 import { hebrewYear, dateFromHebrew } from '../hebrew-calendar.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -289,6 +290,41 @@ function txErevShviiShelPesach(rhYear, settings, today) {
   return null;
 }
 
+/** The ראש חודש messages.
+ *
+ *  A list rather than one, because the year view wants every ראש חודש the year holds and the four
+ *  day window wants only the one coming. The walk is cheap: each step asks the calendar for the
+ *  next first of a month and carries on from the day after it.
+ *
+ *  Their own kind, `roshchodesh`, so the two buttons in the year view do not have to decide
+ *  whether a ראש חודש is a yom tov. It is neither a parsha message nor an erev yom tov one, and
+ *  twelve of them a year is enough to be worth turning off on its own.
+ *
+ *  @param howMany - 1 for the window, which only ever shows the one coming. */
+function txRoshChodesh(settings, today, howMany = 1) {
+  const out = [];
+  let from = today;
+  for (let i = 0; i < howMany; i += 1) {
+    const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
+    if (!rc) break;
+    from = rc.last + 1;
+    if (!txDaysInWindow(rc.first, rc.last, today)) continue;
+    const text = roshChodeshText(rc);
+    if (!text) continue;
+    out.push({
+      id: `rosh-chodesh-${rc.year}-${rc.month}`,
+      kind: 'roshchodesh',
+      // The first day, which is the day it is about. The shul sends it the night before or that
+      // morning, and the four day window covers both.
+      serial: rc.first,
+      name: `Rosh Chodesh ${roshChodeshMonthName(rc.month)}`,
+      when: hebrewYear(rc.year),
+      text,
+    });
+  }
+  return out;
+}
+
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
  *
  *  Built separately rather than from the two-in-one sheet, because the message is per occasion:
@@ -380,9 +416,9 @@ function txCard(msg) {
  *
  *  Only the year view has them. The four day window is a handful of cards and filtering that
  *  would be two buttons over almost nothing. */
-const txKinds = { parsha: true, yomtov: true };
+const txKinds = { parsha: true, yomtov: true, roshchodesh: true };
 
-const TX_KIND_NAMES = { parsha: 'Parsha', yomtov: 'Yom Tov' };
+const TX_KIND_NAMES = { parsha: 'Parsha', yomtov: 'Yom Tov', roshchodesh: 'Rosh Chodesh' };
 
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
@@ -412,6 +448,8 @@ export function renderTexts(container, state, settings, tables) {
 
   if (txAll) {
     messages.push(...yomTov());
+    // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
+    messages.push(...txRoshChodesh(settings, today, 14));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
       if (serial < today || serial - today > TX_ALL_DAYS) continue;
@@ -433,6 +471,7 @@ export function renderTexts(container, state, settings, tables) {
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
     messages.push(...yomTov());
+    messages.push(...txRoshChodesh(settings, today, 1));
   }
 
   /* Everything in date order, which is the order they get sent in and the only order somebody
