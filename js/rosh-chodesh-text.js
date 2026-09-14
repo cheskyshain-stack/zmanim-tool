@@ -3,55 +3,67 @@
 // The shul sends one before every ראש חודש, seventeen of them in the history this was built
 // from, and it is one line:
 //
-//   ROSH CHODESH Nissan Shacharis 6:40m, 6:50ns, 7:00en, 7:15d, (T"T 7:25), 7:35sh, 8:00m, 8:20en, 8:40d
+//   ROSH CHODESH Nissan Shacharis 6:40m, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
 //
-// **Nothing in it is a זמן.** Every time is an announced מנין, the same list month after month,
-// and the only thing that changes is which month it is. So this is the one message on the page
-// that is not read off a sheet, because there is no sheet with these times on it and nothing for
-// it to disagree with. What it does read off the calendar is the part that can be got wrong: the
-// month, and the day ראש חודש starts on, which is the thirtieth of the month before wherever that
-// month has one.
+// **Every time in it comes off the wall chart**, settings.weekdayShacharisSpecial, which is the
+// second schedule the chart prints on a ר"ח, a בה"ב and a תענית. Nothing here computes a time and
+// nothing here keeps its own copy of one. That is the rule the whole messages page runs on, and
+// this file broke it twice before the shul caught both:
 //
-// The list itself is a constant here rather than a setting, the same way RH_TEXT.slichos and
-// PS_TEXT.erevMincha4 are constants in their posters. When the shul changes a מנין, this line
-// changes with it, and the box on the messages page can be typed into in the meanwhile.
+//   It carried its own copy of the schedule, and the copy had a 6:50 בעזרת נשים the chart has not
+//   got, so the message announced a מנין the board does not show. A second copy of a schedule
+//   disagrees with the board the moment anybody edits either one, and the board is what people
+//   daven from.
 //
-// Two things the seventeen show that this deliberately does not try to do:
+//   It carried the "(T"T 7:25)" that every one of the seventeen sent messages has. That one is on
+//   no chart at all, so nothing here knows how it is arrived at or what would move it, and a line
+//   that is right until the year it quietly is not is worse than a line that was never there.
 //
-//   The list is not quite fixed. 6:50ns is missing from four of them, 8:10ns is on three, one
-//   carries a 9:00 T"T and one an instruction about which door to use. Those are the shul adding
-//   and dropping a מנין, not a rule, so the commonest form is what is written and the rest is a
-//   sentence somebody types into the box.
+// What this does work out is the calendar, not the clock: which month it is, and the day ראש חודש
+// starts on, which is the thirtieth of the month before wherever that month has one. Those are
+// the parts a person gets wrong, and they are not times.
 //
-//   Three of the seventeen, in חשון, טבת and שבט, open differently: "6:50m&ns, [Netz 7:15]"
-//   rather than "6:40m, 6:50ns". Both numbers there are real: the נץ in brackets is sunrise, and
-//   the מנין in front of it is sunrise less twenty five minutes, which is why it reads 6:50 in one
-//   year and 6:51 in another. It looks like a winter arrangement and it is not one, because כסלו,
-//   in the middle of that stretch, uses the ordinary form. Three examples cannot say which months
-//   take it, so none of them do until the shul says.
+// One thing the seventeen show that is deliberately not built. Three of them, in חשון, טבת and
+// שבט, open "6:50m&ns, [Netz 7:15]" instead. Both of those numbers are real: the bracket is
+// sunrise and the מנין is sunrise less twenty five minutes, which is why it reads 6:50 one year
+// and 6:51 the next. It looks like a winter rule and it is not one, because כסלו, in the middle
+// of that stretch, uses the ordinary form. Three examples cannot say which months take it, and in
+// any case neither number is on a chart, so neither is built.
 
 import { JEWISH_MONTHS_EN, hebrewDateExtended } from './hebrew-calendar.js';
+import { erevTimes, erevWhereMark } from './erev-text.js';
 
-/** The wording, as the shul writes it. */
+/** The wording, as the shul writes it. The times are not here: see roshChodeshShacharis. */
 export const RC_TEXT = {
   title: 'ROSH CHODESH',
   label: 'Shacharis',
-  /** The מנינים, in the form sixteen of the seventeen sent messages share.
-   *
-   *  **Without the (T"T 7:25) that every one of those seventeen carries.** Taken out on the shul's
-   *  instruction: it is not on any chart here, so nothing in this program knows how that time is
-   *  arrived at or what would move it. Every other time on this line is a מנין the shul announces
-   *  at a fixed hour, which this can repeat without knowing anything; a time whose reckoning is
-   *  unknown is one this cannot keep right, and a line that is right until the year it quietly is
-   *  not is worse than a line that was never there. Whoever sends the message can type it back in,
-   *  the box being editable, and if the T"T ever reaches a chart it belongs here read off that. */
-  shacharis: '6:40m, 6:50ns, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d',
   /** Where the shul spells a month differently from the program's own table.
    *  אב is "Menachem Av" in every one of the sent messages, and חשון is "Mar Cheshvon". Held here
    *  rather than changed in JEWISH_MONTHS_EN, which the charts and the date lines read: those say
    *  Av and Cheshvan and should keep saying it. */
   spelling: { Av: 'Menachem Av', Cheshvan: 'Mar Cheshvon' },
 };
+
+/** The מנינים, read off the wall chart's own ר"ח schedule.
+ *
+ *  **`settings.weekdayShacharisSpecial`, which is the cell the chart prints on a ר"ח, a בה"ב and a
+ *  תענית.** This carried its own copy of that list for a while and it should not have. The shul
+ *  caught it on one time: the copy had a 6:50 בעזרת נשים that the chart has not got, so the message
+ *  was announcing a מנין the board does not show. A second copy of a schedule is a schedule that
+ *  will disagree with the board the first time somebody edits one of them, and the board is the one
+ *  people daven from.
+ *
+ *  So the letters come off the chart's own marks rather than being typed beside the times:
+ *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Edit the schedule
+ *  in Settings and this message follows it, which is the whole point.
+ *
+ *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
+ *  not one to send, so the caller drops the card rather than sending the heading on its own. */
+export function roshChodeshShacharis(shacharisCell) {
+  const times = erevTimes(shacharisCell);
+  if (!times.length) return '';
+  return times.map((t) => t.text + erevWhereMark(t)).join(', ');
+}
 
 /** The English name of a Hebrew month, spelled the way the messages spell it. */
 export function roshChodeshMonthName(month) {
@@ -91,10 +103,13 @@ export function nextRoshChodesh(from, useGregorianBefore1582 = false) {
 
 /** The message.
  *
- *  @param rc - straight from nextRoshChodesh. */
-export function roshChodeshText(rc) {
+ *  @param rc - straight from nextRoshChodesh.
+ *  @param shacharisCell - the chart's own ר"ח schedule, settings.weekdayShacharisSpecial. */
+export function roshChodeshText(rc, shacharisCell) {
   if (!rc) return '';
   const name = roshChodeshMonthName(rc.month);
   if (!name) return '';
-  return `${RC_TEXT.title} ${name} ${RC_TEXT.label} ${RC_TEXT.shacharis}`;
+  const times = roshChodeshShacharis(shacharisCell);
+  if (!times) return '';
+  return `${RC_TEXT.title} ${name} ${RC_TEXT.label} ${times}`;
 }

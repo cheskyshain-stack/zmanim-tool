@@ -316,10 +316,21 @@ and listed in `DIST_TREES`.
   because somebody wandering in there can change the shul's boards. This page changes nothing
   and prints messages that are about to be sent to the whole congregation anyway, so a gate
   would only mean handing the admin's PIN to the one person it was built for. Do not add one.
-- Every message is **read off the same sheet the times are printed from**, never recomputed
-  beside it: `erev-text.js` for ערב שבת (off the chart row) and `erev-yomtov-text.js` for the
-  yom tov ones (off the built poster). A message with a time nobody printed is the failure to
-  avoid, so a line the sheet has not got is left out rather than guessed at.
+- **No message computes a time, and no message keeps its own copy of one.** Said by the shul as
+  "none of the announcements should work based on new calculations, everything has to work with the
+  charts", after two of these got through: a `(Mariv ...)` on ערב שביעי של פסח worked out as the
+  printed פלג plus ten, and a hand-written ROSH CHODESH schedule carrying a מנין the chart has not
+  got. Both are gone. Every figure on this page is read off a board or a sheet, and a line those
+  have not got is **left out** rather than invented: a number this code makes up is one the paper
+  cannot check and nobody would think to question. `erev-text.js` reads the chart row for ערב שבת,
+  `erev-yomtov-text.js` reads the built poster for the yom tov ones, `rosh-chodesh-text.js` reads
+  the chart's ר"ח schedule. Dates and weekdays are not times: working out which month ראש חודש is,
+  or whether a day of yom tov is a Friday, is the calendar and is fine.
+- **The room letter has one definition**, `erevWhereMark` in `erev-text.js`: underlined is `d`, one
+  star `en`, two `sh`, unmarked `m`. The yom tov messages read poster times and the others read
+  chart cells, and both carry the mark the same way, so the letter must not be worked out twice.
+  The day the two disagreed would be the day a message sent somebody to the wrong room.
+  `erevTimes` keeps the stars that follow a time for exactly this.
 - **The weeks are computed, not looked up** (`txWeekNow`). This page must never need somebody to
   have generated a chart first: the chart is where these times are printed, not where they come
   from. Four candidate seasons are built and whichever contains this week wins, which is brute
@@ -355,25 +366,24 @@ and listed in `DIST_TREES`.
   locale (`txDateLabel`, UTC parts throughout, since a serial is a whole day and a local midnight
   lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
   is only times, so one carrying last year's looked exactly like one carrying this year's.
-- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) is the one message here with **no זמן in it at all**:
-  every time is an announced מנין, the same list month after month, so there is no sheet behind it
-  and nothing for it to disagree with. What it does read off the calendar is the part that can be
-  got wrong, the month and the day it starts on, which is the thirtieth of the month before wherever
-  that month has one. **תשרי is skipped**, its ראש חודש being ראש השנה, which has its own message.
-  אב is written "Menachem Av" and חשון "Mar Cheshvon" (`RC_TEXT.spelling`), which is how the shul
-  writes them; `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the charts.
-  **The `(T"T 7:25)` every one of the seventeen carries is deliberately left out**, on the shul's
-  instruction: it is not on any chart here, so nothing in this program knows how that time is
-  arrived at or what would move it. Every other time on the line is a מנין announced at a fixed
-  hour, which can be repeated without knowing anything; a time whose reckoning is unknown cannot be
-  kept right, and a line that is right until the year it quietly is not is worse than one that was
-  never there. The sender can type it back in. If the T"T ever reaches a chart it belongs here read
-  off that.
-  Two other things the seventeen show that are deliberately not built: the list is not quite
-  fixed (6:50ns missing from four, 8:10ns on three), and three of them, in חשון, טבת and שבט, open
-  "6:50m&ns, [Netz 7:15]" instead, where the bracket is real sunrise and the מנין is sunrise less
-  twenty five minutes. That looks like a winter rule and is not one, since כסלו in the middle of
-  that stretch uses the ordinary form. Three examples cannot say which months take it.
+- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads its שחרית off the wall chart, from
+  `settings.weekdayShacharisSpecial`, the second schedule the chart prints on a ר"ח, a בה"ב and a
+  תענית. The letters come off that cell's own marks (`erevWhereMark`), so editing the schedule in
+  Settings moves the message with it. No times of its own: it broke that rule twice and the shul
+  caught both.
+  It carried a hand-written copy of the schedule, and the copy had a **6:50 בעזרת נשים the chart has
+  not got**, so the message announced a מנין the board does not show. And it carried the
+  `(T"T 7:25)` every one of the seventeen sent messages has, which is on no chart at all, so nothing
+  here knows how that time is arrived at or what would move it.
+  What it does work out is the calendar, not the clock: the month, and the day ראש חודש starts on,
+  which is the thirtieth of the month before wherever that month has one. **תשרי is skipped**, its
+  ראש חודש being ראש השנה, which has its own message. אב is written "Menachem Av" and חשון
+  "Mar Cheshvon" (`RC_TEXT.spelling`); `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the
+  charts. Where the chart has no second schedule the card is dropped rather than sent as a heading
+  with no times under it.
+  One thing deliberately not built: three of the seventeen, in חשון, טבת and שבט, open
+  "6:50m&ns, [Netz 7:15]" instead, where the bracket is sunrise and the מנין is sunrise less twenty
+  five minutes. Neither number is on a chart, so neither is built.
 - **The year view has three switches under "Include in messages", Parsha, Yom Tov and Rosh
   Chodesh**, and everything on it is in **date order**, which is the order these get sent in. All on
   to begin with, and turning them all off says so rather than looking broken.
@@ -425,10 +435,11 @@ and listed in `DIST_TREES`.
   reason. `ytEarlyLines` writes them with the same wording `erevShabbosText` uses, naming each פלג
   off the room its מנין is in: עזרת נשים is פלג מ"א 72 and takes a bare "Plag" with no comma,
   למטה is מ"א, the main בית מדרש is גר"א.
-  **`(Mariv HH:MM)` is the one figure on the page that is not on a sheet.** An ערב יום טוב has a
-  מעריב after each early מנחה where an ערב שבת cannot, and the shul's sent message puts all three
-  exactly ten minutes after their פלג, which is where `YT_MAARIV_AFTER_PLAG` comes from. If the shul
-  confirms those מנינים, the right home for them is the פסח sheet and the message reads them off it.
+  **The three "(Mariv ...)" the sent message has are not built.** An ערב יום טוב has a מעריב after
+  each early מנחה where an ערב שבת cannot, and the sent message puts all three exactly ten minutes
+  after their פלג. This worked them out from the printed פלג for a while and should not have: they
+  are on no board and no sheet, so there is nothing to read them off. If those מנינים are real they
+  belong on the פסח sheet, and then the message reads them off it like everything else.
   **That sent message and the sheet disagree by a day**, measured: its 5:51/6:06, 6:27/6:42 and
   6:47/7:02 are 6 April 2026's פלג times exactly, while ערב שביעי was the 7th, whose are
   5:52/6:07, 6:28/6:43 and 6:48/7:03. Its own הדלקת נרות, 7:09, is the 7th's (the 6th is 7:08), so

@@ -77,9 +77,12 @@ export function erevTimes(value) {
     if (ch === '\n') { line++; continue; }
     if (ch === UL_START) { underlined = true; continue; }
     if (ch === UL_END) { underlined = false; continue; }
-    const m = /^\d{1,2}:\d{2}/.exec(text.slice(i));
+    // The stars that follow a time are part of it: they say which room, the same as the
+    // underline does. Captured here so a reader can ask where a מנין is without going back
+    // to the raw cell for the characters just after it.
+    const m = /^(\d{1,2}:\d{2})(\*{0,2})/.exec(text.slice(i));
     if (m) {
-      out.push({ text: m[0], underlined, line, before: text.slice(0, i) });
+      out.push({ text: m[1], mark: m[2], underlined, line, before: text.slice(0, i) });
       i += m[0].length - 1;
     }
   }
@@ -106,7 +109,19 @@ function erevPlagLabel(kind) {
   return 'Plag';
 }
 
-/** d, m or en: where this מנין davens. */
+/** Where a מנין davens, off the marks the board itself carries: underlined is בית מדרש למטה,
+ *  one star is the עזרת נשים, two is the אולם השמחות, unmarked is the main בית מדרש.
+ *
+ *  One definition, used by every message. The yom tov ones read poster times and this reads
+ *  chart cells, and the two carry the mark the same way, so the letter must not be worked out
+ *  twice: the day they disagreed would be the day a message sent somebody to the wrong room. */
+export function erevWhereMark(time) {
+  if (time?.mark === '**') return 'sh';
+  if (time?.mark === '*') return 'en';
+  return time?.underlined ? 'd' : 'm';
+}
+
+/** d, m or en: where this מנין davens, for a column whose heading already says the room. */
 function erevWhere(kind, time) {
   if (kind === 'ezrasNashim') return 'en';
   return time.underlined ? 'd' : 'm';

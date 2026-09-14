@@ -302,15 +302,18 @@ function txErevShviiShelPesach(rhYear, settings, today) {
  *  twelve of them a year is enough to be worth turning off on its own.
  *
  *  @param howMany - 1 for the window, which only ever shows the one coming. */
-function txRoshChodesh(settings, today, howMany = 1) {
+function txRoshChodesh(state, settings, today, howMany = 1) {
   const out = [];
   let from = today;
+  /* The chart's own ר"ח schedule, read from where the chart reads it: the raw cell in state, not
+     the resolved settings, which is the same source upcoming.js uses for the same list. */
+  const shacharisCell = state?.settings?.weekdayShacharisSpecial || '';
   for (let i = 0; i < howMany; i += 1) {
     const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
     if (!rc) break;
     from = rc.last + 1;
     if (!txDaysInWindow(rc.first, rc.last, today)) continue;
-    const text = roshChodeshText(rc);
+    const text = roshChodeshText(rc, shacharisCell);
     if (!text) continue;
     out.push({
       id: `rosh-chodesh-${rc.year}-${rc.month}`,
@@ -450,7 +453,7 @@ export function renderTexts(container, state, settings, tables) {
   if (txAll) {
     messages.push(...yomTov());
     // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
-    messages.push(...txRoshChodesh(settings, today, 14));
+    messages.push(...txRoshChodesh(state, settings, today, 14));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
       if (serial < today || serial - today > TX_ALL_DAYS) continue;
@@ -472,7 +475,7 @@ export function renderTexts(container, state, settings, tables) {
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
     messages.push(...yomTov());
-    messages.push(...txRoshChodesh(settings, today, 1));
+    messages.push(...txRoshChodesh(state, settings, today, 1));
   }
 
   /* Everything in date order, which is the order they get sent in and the only order somebody

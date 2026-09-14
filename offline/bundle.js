@@ -5404,6 +5404,193 @@ function unlockNav() {
   navIsUnlocked = true;
 }
 
+// ==== erev-text.js ====
+// The Erev Shabbos message, as a line of text somebody can paste into a chat.
+//
+// Somebody sends this out every Friday, typed out by hand off the board. All of it is on
+// the board already, so it can be built from the same row the שבת card is built from, and
+// then there is one place the times come from rather than two.
+//
+// A worked example, checked against a real message for כי תבוא:
+//
+//   Erev P' Ki Savo
+//   Mincha 1:35d, 1:50m, 2:15m, 3:00m
+//   Mincha 5:57m, Plag Gra 6:12
+//   Mincha 6:33d, Plag MA 6:48
+//   Mincha 6:53en Plag 7:08
+//   Hadlakas Neiros 7:16
+//   Mincha 7:19m
+//   Have a great Shabbos!
+//
+// Where each piece comes from:
+//
+//   Erev P'          the parsha, in English, out of data/parsha_names.json, which already
+//                    carries "Ki Savo" beside כי תבוא for the chart's own use.
+//   d                the time is underlined on the board. The printed footer already says
+//                    "All underlined מנינים will be למטה", so underlined is downstairs and
+//                    d is what the message calls it.
+//   m                not underlined, so the main בית מדרש.
+//   en               the מנחה (בעזר״נ) column, which says where it davens in its own
+//                    heading. It is the room, like d, so it does not depend on the
+//                    underline.
+//   Plag Gra / MA    the פלג on the second line of those two columns, named for whichever
+//                    the column is headed with.
+//
+// Everything in the message is now read off the board and nothing is added to it. There was
+// one exception, "& ns" on the פלג גר"א מנחה and the מנחה מעריב, saying those two also daven
+// in the עזרת נשים. It was on instruction, it was never on the board, and the shul has since
+// said to stop sending it. Said here rather than only in the history, because the next person
+// to compare an old message with a new one will wonder where it went.
+//
+// Winter has none of the פלג columns (CHOREF_COLUMNS is eight wide against קיץ's twelve),
+// so those three lines simply do not appear. Nothing here asks for a column by name: each
+// one is recognised by its own heading and skipped when the season has not got it.
+
+
+/** The closing line, and the only words here that are not read off the board. */
+const EREV_SIGN_OFF = 'Have a great Shabbos!';
+
+
+/** A cell as it is stored is plain text carrying the underline sentinels, but an override
+ *  typed by hand is real HTML. Both are flattened to the same thing here: text, newlines,
+ *  and the sentinels marking what is underlined.
+ *
+ *  Exported because the שבת שובה poster reads the same cells. One reader for both, or the
+ *  poster would drift from the board it is supposed to be quoting. */
+function erevPlain(value) {
+  return String(value ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?u\b[^>]*>/gi, (tag) => (tag[1] === '/' ? UL_END : UL_START))
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+/** Every clock time in a cell, in order, each with whether it was underlined and which
+ *  line of the cell it sat on. The line matters because the פלג of a column is written
+ *  under its מנחה rather than beside it. */
+function erevTimes(value) {
+  const text = erevPlain(value);
+  const out = [];
+  let line = 0;
+  let underlined = false;
+  // Walked character by character rather than by one regex, so that a sentinel opening
+  // before a time and closing after it is tracked across the whole cell.
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\n') { line++; continue; }
+    if (ch === UL_START) { underlined = true; continue; }
+    if (ch === UL_END) { underlined = false; continue; }
+    // The stars that follow a time are part of it: they say which room, the same as the
+    // underline does. Captured here so a reader can ask where a מנין is without going back
+    // to the raw cell for the characters just after it.
+    const m = /^(\d{1,2}:\d{2})(\*{0,2})/.exec(text.slice(i));
+    if (m) {
+      out.push({ text: m[1], mark: m[2], underlined, line, before: text.slice(0, i) });
+      i += m[0].length - 1;
+    }
+  }
+  return out;
+}
+
+/** What a column is, by what its heading says. Headings carry newlines and quote marks of
+ *  several kinds, so this asks only for the words that tell the columns apart. */
+function erevKindOf(header) {
+  const h = String(header ?? '').replace(/\s+/g, ' ');
+  if (h.includes('ערב שבת')) return 'erevShabbos';
+  if (h.includes('הדלקת')) return 'candles';
+  if (h.includes('בעזר')) return 'ezrasNashim';
+  if (h.includes('למטה')) return 'lmata';
+  if (h.includes('פלג גר')) return 'plagGra';
+  if (h.includes('מנחה') && h.includes('מעריב')) return 'minchaMaariv';
+  return null;
+}
+
+/** Which פלג a column's second line is, said the way the message says it. */
+function erevPlagLabel(kind) {
+  if (kind === 'plagGra') return 'Plag Gra';
+  if (kind === 'lmata') return 'Plag MA';
+  return 'Plag';
+}
+
+/** Where a מנין davens, off the marks the board itself carries: underlined is בית מדרש למטה,
+ *  one star is the עזרת נשים, two is the אולם השמחות, unmarked is the main בית מדרש.
+ *
+ *  One definition, used by every message. The yom tov ones read poster times and this reads
+ *  chart cells, and the two carry the mark the same way, so the letter must not be worked out
+ *  twice: the day they disagreed would be the day a message sent somebody to the wrong room. */
+function erevWhereMark(time) {
+  if (time?.mark === '**') return 'sh';
+  if (time?.mark === '*') return 'en';
+  return time?.underlined ? 'd' : 'm';
+}
+
+/** d, m or en: where this מנין davens, for a column whose heading already says the room. */
+function erevWhere(kind, time) {
+  if (kind === 'ezrasNashim') return 'en';
+  return time.underlined ? 'd' : 'm';
+}
+
+/** The message for one week.
+ *
+ *  @param columns/row - straight from rowFor(), so this reads exactly what the card and
+ *    the chart read and cannot drift from them.
+ *  @param parshaEnglish - "Ki Savo". Left to the caller because looking it up needs the
+ *    tables, which are loaded asynchronously, and this stays a plain function.
+ *
+ *  The order is the order the message is written in, which is the order the evening
+ *  happens in, and that is the printed order of the columns reversed. */
+function erevShabbosText(columns, row, parshaEnglish) {
+  const lines = [];
+  lines.push(`Erev P' ${parshaEnglish}`);
+
+  for (const col of [...columns].reverse()) {
+    const kind = erevKindOf(col.header);
+    if (!kind) continue;
+    const times = erevTimes(row[col.key]);
+    if (!times.length) continue;
+
+    if (kind === 'erevShabbos') {
+      // The whole row, every time with where it davens, which is the one column that
+      // lists more than one מנין.
+      lines.push('Mincha ' + times.map((t) => t.text + erevWhere(kind, t)).join(', '));
+      continue;
+    }
+    if (kind === 'candles') {
+      // The first time only. The second is שקיעה, which the message does not carry.
+      lines.push(`Hadlakas Neiros ${times[0].text}`);
+      continue;
+    }
+
+    const first = times[0];
+    // The פלג is the time written under the מנין, so anything on a later line of the cell.
+    const plag = times.find((t) => t.line > first.line);
+    let line = `Mincha ${first.text}${erevWhere(kind, first)}`;
+    if (plag) {
+      // No comma on the בעזר״נ line, which is how the message is written. The others take
+      // one.
+      line += kind === 'ezrasNashim'
+        ? ` ${erevPlagLabel(kind)} ${plag.text}`
+        : `, ${erevPlagLabel(kind)} ${plag.text}`;
+    }
+    lines.push(line);
+  }
+
+  lines.push(EREV_SIGN_OFF);
+  return lines.join('\n');
+}
+
+/** "Ki Savo" for כי תבוא, out of the table the chart already uses. Falls back to the Hebrew
+ *  rather than to nothing: a message naming the parsha in Hebrew is still usable, one
+ *  naming no parsha at all is not. */
+function erevParshaEnglish(hebrewParsha, parshaNames) {
+  const want = String(hebrewParsha ?? '').trim();
+  const row = parshaNames?.rows?.find((r) => String(r[0]).trim() === want);
+  return (row && row[1]) || want;
+}
+
 // ==== erev-yomtov-text.js ====
 // The Erev Yom Tov message, as a block of text somebody can paste into a chat.
 //
@@ -5440,6 +5627,7 @@ function unlockNav() {
 //
 // Names here are prefixed rather than shared with erev-text.js on purpose: the offline build
 // flattens every module into one scope, where a second const of the same name is a hard error.
+
 
 
 
@@ -5503,11 +5691,7 @@ const YT_SIGN_OFF_RH = 'KESIVA VACHASIMA TOVA!';
  *  things: underlined is בית מדרש למטה, one star is the עזרת נשים, two is אולם השמחות, and
  *  anything unmarked is the main בית מדרש. Read off the shul's own ערב יום כיפור message, whose
  *  "Selichos 7:00m, 7:20en, 7:35d, 8:00sh, 8:20m" is YK_TEXT.erevShacharis mark for mark. */
-const ytWhere = (t) => {
-  if (t.mark === '**') return 'sh';
-  if (t.mark === '*') return 'en';
-  return t.underlined ? 'd' : 'm';
-};
+const ytWhere = (t) => erevWhereMark(t);
 
 /** Whether this yom tov wants an עירוב תבשילין line.
  *
@@ -5815,21 +5999,6 @@ function erevShminiAtzeresText(poster) {
 }
 
 
-/** A printed clock time, plus so many minutes, printed the same way.
- *
- *  String arithmetic on purpose. The value it is adding to is the one on the paper, so the answer
- *  cannot be half a minute away from what a reader is holding. Twelve hour, no am or pm, which is
- *  how every time in this program prints: 12 rolls to 1 rather than to 13. Everything it is used on
- *  is an evening between about five and nine, so the hour never has to reach twelve at all, but it
- *  is written to survive it rather than to be right by luck. */
-function ytPlus(text, mins) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text || '').trim());
-  if (!m) return '';
-  const total = (Number(m[1]) % 12) * 60 + Number(m[2]) + mins;
-  const h = Math.floor(total / 60) % 12;
-  return `${h === 0 ? 12 : h}:${String(total % 60).padStart(2, '0')}`;
-}
-
 /** The three early מנחה lines of an evening somebody can bring in early, as the messages write
  *  them, off a block's own מנחה / פלג rows.
  *
@@ -5839,13 +6008,12 @@ function ytPlus(text, mins) {
  *  נשים one is פלג מ"א 72 and the message writes it as a bare "Plag" with no comma in front of it,
  *  the למטה one is מ"א, and the one in the main בית מדרש is גר"א.
  *
- *  `maarivAfter` adds "(Mariv HH:MM)" to each line, which an ערב יום טוב has and an ערב שבת has
- *  not: this evening is a weekday running into yom tov, so somebody who davens מנחה at פלג davens
- *  מעריב after it rather than waiting for Shabbos. **It is the one figure on this page that is not
- *  on a sheet.** The shul's ערב שביעי של פסח message has all three exactly ten minutes after their
- *  פלג, and that is where the ten comes from. If the shul confirms those מנינים, the right home for
- *  them is the פסח sheet itself and this reads them off it like everything else. */
-function ytEarlyLines(block, { maarivAfter = 0 } = {}) {
+ *  **No מעריב beside them.** The shul's sent message puts one ten minutes after each פלג, and this
+ *  worked it out from the printed פלג for a while. It should not have: nothing here may compute a
+ *  time. Every other figure on this page is read off a board or a sheet, and a number this code
+ *  invents is one the paper cannot check and nobody would think to question. If those three מעריב
+ *  מנינים are real they belong on the פסח sheet, and then this reads them off it like the rest. */
+function ytEarlyLines(block) {
   const out = [];
   for (const l of block?.lines || []) {
     if (l.calc !== 'earlyMincha') continue;
@@ -5857,8 +6025,6 @@ function ytEarlyLines(block, { maarivAfter = 0 } = {}) {
       const name = where === 'en' ? 'Plag' : where === 'd' ? 'Plag MA' : 'Plag Gra';
       // No comma on the בעזר״נ line, which is how the shul writes it. The other two take one.
       text += where === 'en' ? ` ${name} ${plag.text}` : `, ${name} ${plag.text}`;
-      const maariv = maarivAfter ? ytPlus(plag.text, maarivAfter) : '';
-      if (maariv) text += ` (Mariv ${maariv})`;
     }
     out.push(text);
   }
@@ -5867,9 +6033,6 @@ function ytEarlyLines(block, { maarivAfter = 0 } = {}) {
 
 /** The closing line of the ערב שביעי של פסח message, as the shul writes it. */
 const YT_SIGN_OFF_YOMTOV = 'Have a great Yom Tov!';
-
-/** How long after the פלג the מעריב of an ערב יום טוב is announced. See ytEarlyLines. */
-const YT_MAARIV_AFTER_PLAG = 10;
 
 /** The ערב שביעי של פסח message.
  *
@@ -5880,6 +6043,9 @@ const YT_MAARIV_AFTER_PLAG = 10;
  *    Mincha 5:51m, Plag Gra 6:06 (Mariv 6:16)
  *    Mincha 6:27d, Plag MA 6:42 (Mariv 6:52)
  *    Mincha 6:47en Plag 7:02 (Mariv 7:12)
+ *
+ *  The three "(Mariv ...)" are **not built**: see ytEarlyLines. They are the only times in the
+ *  shul's sent messages that no board or sheet carries, so there is nothing here to read them off.
  *    Hadlakas Neiros 7:09
  *    Mincha 7:12m
  *    Have a great Yom Tov!
@@ -5911,7 +6077,7 @@ function erevShviiShelPesachText(poster) {
   const mincha = ytLine(block, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  lines.push(...ytEarlyLines(block, { maarivAfter: YT_MAARIV_AFTER_PLAG }));
+  lines.push(...ytEarlyLines(block));
 
   const year = poster?.hebrewYear;
   if (year && ytEruv([dateFromHebrew(21, 1, year), dateFromHebrew(22, 1, year)])) {
@@ -6171,178 +6337,6 @@ function buildSlichosTzomPoster(year, settings) {
     tzom,
     legend: pairLegend(slichos, tzom),
   };
-}
-
-// ==== erev-text.js ====
-// The Erev Shabbos message, as a line of text somebody can paste into a chat.
-//
-// Somebody sends this out every Friday, typed out by hand off the board. All of it is on
-// the board already, so it can be built from the same row the שבת card is built from, and
-// then there is one place the times come from rather than two.
-//
-// A worked example, checked against a real message for כי תבוא:
-//
-//   Erev P' Ki Savo
-//   Mincha 1:35d, 1:50m, 2:15m, 3:00m
-//   Mincha 5:57m, Plag Gra 6:12
-//   Mincha 6:33d, Plag MA 6:48
-//   Mincha 6:53en Plag 7:08
-//   Hadlakas Neiros 7:16
-//   Mincha 7:19m
-//   Have a great Shabbos!
-//
-// Where each piece comes from:
-//
-//   Erev P'          the parsha, in English, out of data/parsha_names.json, which already
-//                    carries "Ki Savo" beside כי תבוא for the chart's own use.
-//   d                the time is underlined on the board. The printed footer already says
-//                    "All underlined מנינים will be למטה", so underlined is downstairs and
-//                    d is what the message calls it.
-//   m                not underlined, so the main בית מדרש.
-//   en               the מנחה (בעזר״נ) column, which says where it davens in its own
-//                    heading. It is the room, like d, so it does not depend on the
-//                    underline.
-//   Plag Gra / MA    the פלג on the second line of those two columns, named for whichever
-//                    the column is headed with.
-//
-// Everything in the message is now read off the board and nothing is added to it. There was
-// one exception, "& ns" on the פלג גר"א מנחה and the מנחה מעריב, saying those two also daven
-// in the עזרת נשים. It was on instruction, it was never on the board, and the shul has since
-// said to stop sending it. Said here rather than only in the history, because the next person
-// to compare an old message with a new one will wonder where it went.
-//
-// Winter has none of the פלג columns (CHOREF_COLUMNS is eight wide against קיץ's twelve),
-// so those three lines simply do not appear. Nothing here asks for a column by name: each
-// one is recognised by its own heading and skipped when the season has not got it.
-
-
-/** The closing line, and the only words here that are not read off the board. */
-const EREV_SIGN_OFF = 'Have a great Shabbos!';
-
-
-/** A cell as it is stored is plain text carrying the underline sentinels, but an override
- *  typed by hand is real HTML. Both are flattened to the same thing here: text, newlines,
- *  and the sentinels marking what is underlined.
- *
- *  Exported because the שבת שובה poster reads the same cells. One reader for both, or the
- *  poster would drift from the board it is supposed to be quoting. */
-function erevPlain(value) {
-  return String(value ?? '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/?u\b[^>]*>/gi, (tag) => (tag[1] === '/' ? UL_END : UL_START))
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-}
-
-/** Every clock time in a cell, in order, each with whether it was underlined and which
- *  line of the cell it sat on. The line matters because the פלג of a column is written
- *  under its מנחה rather than beside it. */
-function erevTimes(value) {
-  const text = erevPlain(value);
-  const out = [];
-  let line = 0;
-  let underlined = false;
-  // Walked character by character rather than by one regex, so that a sentinel opening
-  // before a time and closing after it is tracked across the whole cell.
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '\n') { line++; continue; }
-    if (ch === UL_START) { underlined = true; continue; }
-    if (ch === UL_END) { underlined = false; continue; }
-    const m = /^\d{1,2}:\d{2}/.exec(text.slice(i));
-    if (m) {
-      out.push({ text: m[0], underlined, line, before: text.slice(0, i) });
-      i += m[0].length - 1;
-    }
-  }
-  return out;
-}
-
-/** What a column is, by what its heading says. Headings carry newlines and quote marks of
- *  several kinds, so this asks only for the words that tell the columns apart. */
-function erevKindOf(header) {
-  const h = String(header ?? '').replace(/\s+/g, ' ');
-  if (h.includes('ערב שבת')) return 'erevShabbos';
-  if (h.includes('הדלקת')) return 'candles';
-  if (h.includes('בעזר')) return 'ezrasNashim';
-  if (h.includes('למטה')) return 'lmata';
-  if (h.includes('פלג גר')) return 'plagGra';
-  if (h.includes('מנחה') && h.includes('מעריב')) return 'minchaMaariv';
-  return null;
-}
-
-/** Which פלג a column's second line is, said the way the message says it. */
-function erevPlagLabel(kind) {
-  if (kind === 'plagGra') return 'Plag Gra';
-  if (kind === 'lmata') return 'Plag MA';
-  return 'Plag';
-}
-
-/** d, m or en: where this מנין davens. */
-function erevWhere(kind, time) {
-  if (kind === 'ezrasNashim') return 'en';
-  return time.underlined ? 'd' : 'm';
-}
-
-/** The message for one week.
- *
- *  @param columns/row - straight from rowFor(), so this reads exactly what the card and
- *    the chart read and cannot drift from them.
- *  @param parshaEnglish - "Ki Savo". Left to the caller because looking it up needs the
- *    tables, which are loaded asynchronously, and this stays a plain function.
- *
- *  The order is the order the message is written in, which is the order the evening
- *  happens in, and that is the printed order of the columns reversed. */
-function erevShabbosText(columns, row, parshaEnglish) {
-  const lines = [];
-  lines.push(`Erev P' ${parshaEnglish}`);
-
-  for (const col of [...columns].reverse()) {
-    const kind = erevKindOf(col.header);
-    if (!kind) continue;
-    const times = erevTimes(row[col.key]);
-    if (!times.length) continue;
-
-    if (kind === 'erevShabbos') {
-      // The whole row, every time with where it davens, which is the one column that
-      // lists more than one מנין.
-      lines.push('Mincha ' + times.map((t) => t.text + erevWhere(kind, t)).join(', '));
-      continue;
-    }
-    if (kind === 'candles') {
-      // The first time only. The second is שקיעה, which the message does not carry.
-      lines.push(`Hadlakas Neiros ${times[0].text}`);
-      continue;
-    }
-
-    const first = times[0];
-    // The פלג is the time written under the מנין, so anything on a later line of the cell.
-    const plag = times.find((t) => t.line > first.line);
-    let line = `Mincha ${first.text}${erevWhere(kind, first)}`;
-    if (plag) {
-      // No comma on the בעזר״נ line, which is how the message is written. The others take
-      // one.
-      line += kind === 'ezrasNashim'
-        ? ` ${erevPlagLabel(kind)} ${plag.text}`
-        : `, ${erevPlagLabel(kind)} ${plag.text}`;
-    }
-    lines.push(line);
-  }
-
-  lines.push(EREV_SIGN_OFF);
-  return lines.join('\n');
-}
-
-/** "Ki Savo" for כי תבוא, out of the table the chart already uses. Falls back to the Hebrew
- *  rather than to nothing: a message naming the parsha in Hebrew is still usable, one
- *  naming no parsha at all is not. */
-function erevParshaEnglish(hebrewParsha, parshaNames) {
-  const want = String(hebrewParsha ?? '').trim();
-  const row = parshaNames?.rows?.find((r) => String(r[0]).trim() === want);
-  return (row && row[1]) || want;
 }
 
 // ==== overrides.js ====
