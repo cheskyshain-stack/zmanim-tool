@@ -1,5 +1,5 @@
 import { loadState, saveState } from './storage.js';
-import { loadTables } from './data-loader.js';
+import { loadTables, showDataError } from './data-loader.js';
 import { renderSettings } from './ui/settings-view.js';
 import { renderGenerate } from './ui/generate-view.js';
 import { renderSavedSheets } from './ui/saved-sheets-view.js';
@@ -377,6 +377,7 @@ function paint() {
 // other direction. Wired once, since the sidebar is in the page rather than rendered.
 wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 
+
 function start() {
   loadTables()
     .then((t) => {
@@ -387,7 +388,9 @@ function start() {
       render();
     })
     .catch((err) => {
-      main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}. Make sure you're serving this folder over http:// (not opening index.html directly) so the data/*.json files can load.</p>`;
+      /* Set as text, not as markup. What this prints quotes whatever answered instead of the
+         data, and that is by definition something that is not the site. See dataErrorMessage. */
+      showDataError(main, err);
     });
 }
 

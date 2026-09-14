@@ -14,10 +14,11 @@
 
 import { loadState } from './storage.js';
 import { resolveSettings } from './settings.js';
-import { loadTables } from './data-loader.js';
+import { loadTables, showDataError } from './data-loader.js';
 import { renderTexts } from './ui/texts-view.js';
 
 const main = document.getElementById('main');
+
 
 function start() {
   /* Two catches, not one, and that is the point of the shape.
@@ -28,9 +29,10 @@ function start() {
      worse than one that says nothing, because it sends whoever is looking somewhere else. */
   loadTables()
     .catch((err) => {
-      main.innerHTML = `<p class="error">Failed to load Hebrew-calendar data files: ${err.message}.
-        Make sure this is being served over http:// rather than opened as a file, so the
-        data/*.json files can load.</p>`;
+      /* This is the page that got the bad message: somebody opening it on a phone was told
+         "Unexpected token '<'" and nothing else. Set as text, not as markup, since what it
+         quotes came off the network. See dataErrorMessage. */
+      showDataError(main, err);
       throw err;
     })
     .then((tables) => {
