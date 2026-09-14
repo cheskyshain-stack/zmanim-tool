@@ -149,12 +149,22 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
   the small one, with every asterisk flush against its own time. Each row is padded on the left by
   one asterisk column so the slash sits at the middle of the row's box, which is what puts the two
   blocks' slashes on the same line (0.5px apart, the rest being the glyph's own ink).
+  **An asterisk column is as wide as the widest mark in that position and no wider**, asked per
+  position: two asterisks are twice the ink of one (1.0em against 0.5em, measured), so a column cut
+  for one left 7:35** hanging out of its row, and cutting every column for two would push the pair
+  apart to pay for a mark that is on one line of the board. Each mark carries a lead-in in front of
+  it and room behind it, since an asterisk against the 0 of 8:20, or with the slash hard against
+  it, is what the shul saw and said so.
+  **Each row holds whatever number of times it holds**, two, three or four, so writing the schedule
+  three to a line in Settings is all it takes to have it printed that way. Rows with the same count
+  line up with each other; a row with more is wider and centred, the way the shul's own mock-up of
+  it is.
   **It reads what is in Settings rather than being told it**, since that is hand-typed rich text
-  whose separators have been commas, spaces and slashes over the years. Markup it does not know,
-  or a block whose rows hold different numbers of times, and it hands the block back untouched to
-  print exactly as it did before: a wall chart is not the place to be clever with somebody's
-  typing. A line that is not a row of times (the ר"ח ובה"ב heading, the lone 8:40 that ends the
-  block) is centred under the rows, which is where the hand-made boards put it.
+  whose separators have been commas, spaces and slashes over the years. Markup it does not know and
+  it hands the block back untouched to print exactly as it did before: a wall chart is not the
+  place to be clever with somebody's typing. A line that is not a row of times (the ר"ח ובה"ב
+  heading, the lone 8:40 that ends the block) is centred under the rows, which is where the
+  hand-made boards put it.
 
 ## Hebrew and bidirectional text
 
@@ -546,14 +556,19 @@ and listed in `DIST_TREES`.
   time for time, 6:35 on the two קריאת התורה mornings and 6:40 on the rest, which is what their
   "6:40(m&t6:35)" says; the week of שבועות is their שחרית time for time. Where a מנחה or מעריב
   differs from what they sent (6:55 against their 7:00 that week), the chart is what is kept.
-- **The fast day message** (`js/taanis-text.js`) is **צום גדליה only, and that is the whole of what
-  the boards can answer**. Its sheet (`posters/tzomgedalia.js`) carries all three schedules, so the
-  message is the sheet's own שחרית, מנחה and מעריב with the sign-off the sent ones end on. The other
-  three public fasts have no sheet: their morning is the ר"ח / בה"ב / תענית list out of Settings,
-  but a fast afternoon is not the everyday one (the sent תענית אסתר runs 4:45, 5:10 and 5:15 after
-  the chart's own list ends) and מעריב is at the end of the fast. A message missing two of its three
-  lines, or carrying times this program made up, are both worse than no message. When the shul hangs
-  a sheet for one of the others, its message reads off that sheet the way this one does.
+- **The fast day messages** (`js/taanis-text.js`). **צום גדליה is the only fast with a sheet and
+  the only one with all three lines**: `posters/tzomgedalia.js` carries שחרית, מנחה and מעריב, so
+  the message is the sheet's own. The other three public fasts carry **the morning and nothing
+  else**, which is the ר"ח / בה"ב / תענית list out of Settings, the second schedule the wall chart
+  prints, and their sent messages carry it time for time. Their מנחה and מעריב are on no board: a
+  fast afternoon is not the everyday one (the sent תענית אסתר runs 4:45, 5:10 and 5:15 after the
+  chart's own list ends) and מעריב is at the end of the fast, so those two lines are left out rather
+  than invented and whoever sends it adds them in the box. The page carried צום גדליה alone at
+  first, for fear a message missing two lines is worse than none; **the shul asked for the rest**, a
+  switch called Taanis over one message a year being a switch over nothing. When a fast gets a sheet
+  of its own, its message reads the other two lines off it the way צום גדליה does.
+  **יום כפור and תשעה באב are not there**: neither runs that schedule and the calendar leaves them
+  out of the same list for the same reason (`specialDaysInWeek`).
   **The morning is called what the sheet calls it, סליחות**, asked for: the congregation's own
   "what is on next" card reads that same block and says סליחות, and the board, the phone and the
   message have to say one word. The label is read off the block's heading rather than typed into

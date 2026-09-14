@@ -138,14 +138,8 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
   if (!lines) return null;
 
   const read = lines.map((line) => (line.length ? { line, times: shReadTimes(line) } : { line, times: null }));
-  const cols = Math.max(0, ...read.map((r) => (r.times ? r.times.length : 0)));
-  if (cols < 2 || cols > SH_MAX) return null; // one time a line has nothing to line up
-  /* Every row of times has to hold the same number of them, or a single one: the lone 8:40 that
-     ends the ר"ח block is a line of its own and is centred under the rows above it. A block with
-     three times on one line and four on the next is left alone entirely rather than laid out
-     half one way and half the other, which is what a value one browser still holds does
-     ("7:00, 7:20*, 7:35" over "6:40, 7:00*, 7:15,7:35**") and which came out as a mess. */
-  if (read.some((r) => r.times && r.times.length !== cols && r.times.length !== 1)) return null;
+  const most = Math.max(0, ...read.map((r) => (r.times ? r.times.length : 0)));
+  if (most < 2 || most > SH_MAX) return null; // one time a line has nothing to line up
 
   /* **Each paired row is its own five column grid**: time, asterisk, slash, time, asterisk.
      One grid over the whole block was the first cut and it could not hold both: a column is one
@@ -155,14 +149,33 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
      every row of a block still comes out the same width and lines up with the rest of it.
      The asterisk columns are always there, whether or not there is an asterisk to put in them, and
      that is the whole point of them: 8:20* and 8:00 leave the slash after them in exactly the same
-     place. The slash column is narrow and the gaps are zero, so the slash sits against its pair
-     rather than floating between them. What keeps it the same distance from the time on either
-     side is the column after it: it is one asterisk wider than a time needs and the time in it is
-     set to the right, so the width the asterisk column takes up in front of the slash is given
-     back behind it. Nothing here is spaced with typed spaces. */
-  const template = ['var(--sh-t)', 'var(--sh-star)',
-    ...Array.from({ length: cols - 1 },
-      () => ['var(--sh-slash)', 'calc(var(--sh-t) + var(--sh-star))', 'var(--sh-star)']).flat()].join(' ');
+     place. The slash column is narrow and the gaps are zero, so the slash sits against its pair.
+     What keeps it the same distance from the time on either side is the column after it: it is one
+     asterisk wider than a time needs and the time in it is set to the right, so the width the
+     asterisk column takes up in front of the slash is given back behind it. Nothing here is spaced
+     with typed spaces. */
+  /* **An asterisk column is as wide as the widest mark in that position, and no wider.** Two
+     asterisks are twice the ink of one, measured at 1.0em against 0.5em in the boards' serif, so a
+     column cut for one had 7:35** hanging half a character out of it and out of its row. Cutting
+     every column for two instead would push the whole pair apart to pay for a mark that is on one
+     line of the board. Asked per position: the שחרית block has single asterisks in front of its
+     slash and a double behind it, so only the last column is the wider one and the gap around the
+     slash stays narrow. A position with no mark at all still gets the narrow column, which is what
+     keeps the times under each other. */
+  const gridFor = (cols) => {
+    const widest = Array.from({ length: cols }, (_, i) => (
+      read.some((r) => r.times && r.times.length === cols && (r.times[i]?.mark || '').length > 1)
+        ? 'var(--sh-star2)' : 'var(--sh-star)'));
+    return {
+      template: ['var(--sh-t)', widest[0],
+        ...Array.from({ length: cols - 1 },
+          (_, i) => ['var(--sh-slash)', `calc(var(--sh-t) + ${widest[i]})`, widest[i + 1]]).flat()].join(' '),
+      /* The row is padded on the left by its last asterisk column, which puts the middle slash of
+         a row at the middle of the row's own box. Every row is centred in the panel, so that is
+         what puts the slash of the smaller ר"ח block under the slash of the larger everyday one. */
+      pad: widest[cols - 1],
+    };
+  };
 
   /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
      carrying one time, the blank line between the blocks) is a line of its own, centred under
@@ -174,10 +187,11 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
   for (const { line, times } of read) {
     if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }
     const big = line.every((p) => p.big) ? ' is-big' : '';
-    if (!times || times.length !== cols) {
+    if (!times || times.length < 2) {
       rows.push(`<div class="sh-wide${big}">${shPlainHtml(line)}</div>`);
       continue;
     }
+    const { template, pad } = gridFor(times.length);
     const cells = [];
     times.forEach((t, i) => {
       if (i) cells.push('<div class="sh-slash">/</div>');
@@ -185,7 +199,7 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
       cells.push(`<div class="sh-time">${time}</div>`);
       cells.push(`<div class="sh-mark">${shEsc(t.mark)}</div>`);
     });
-    rows.push(`<div class="sh-row is-times${big}" style="grid-template-columns: ${template}">${cells.join('')}</div>`);
+    rows.push(`<div class="sh-row is-times${big}" style="grid-template-columns: ${template}; padding-left: ${pad}">${cells.join('')}</div>`);
   }
   return `<div class="sh-sched">${rows.join('')}</div>`;
 }

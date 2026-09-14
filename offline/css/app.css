@@ -896,17 +896,17 @@ td.ruled .cell { background: var(--ruled); }
   /* The three widths, in em, so a row measures them in its own size. --sh-t is one time, measured
      rather than guessed: the ink of 7:00, 7:35, 8:20 and 6:40 is 1.833em in the boards' serif at
      both sizes, the figures being tabular, and a hundredth of an em is left over so nothing sits
-     on the edge of its column. The other two are deliberately narrow. */
-  --sh-t: 1.84em; --sh-star: 0.6em; --sh-slash: 0.42em;
+     on the edge of its column. An asterisk is 0.5em of ink and two are 1.0em, measured the same
+     way, and each column carries its mark's lead-in on top of that. The slash column is
+     deliberately narrow. */
+  --sh-t: 1.84em; --sh-star: 0.74em; --sh-star2: 1.24em; --sh-slash: 0.42em;
 }
 .sh-row.is-times {
   display: grid; column-gap: 0; align-items: baseline;
-  /* The row is padded on the left by exactly the trailing asterisk column, which puts the slash at
-     the middle of the row's own box. Every row is centred in the panel, so that is what puts the
-     slash of the smaller ר"ח block under the slash of the larger everyday one: the two blocks are
-     set in different sizes and nothing else about them can line up, but the slash between each
-     pair can, and measured without this it sat 1.7px across. */
-  padding-left: var(--sh-star);
+  /* The left padding is written on the row itself, out of the width of its own last asterisk
+     column, which puts the slash at the middle of the row's box: see shacharis-grid.js. Every row
+     is centred in the panel, so that is what puts the slash of the smaller ר"ח block under the
+     slash of the larger everyday one. Measured without it, the two sat 1.7px across. */
   /* Tabular figures, so 7:00 and 8:40 measure the same and a fixed column holds either exactly.
      Times New Roman and the shipped stand-ins all have them; asking for them by name costs
      nothing where they are already the default and saves the layout where they are not. */
@@ -919,7 +919,12 @@ td.ruled .cell { background: var(--ruled); }
    in front of it is the asterisk column, and behind it the same width falls out as the slack in
    front of a right-set time. */
 .sh-time { text-align: right; white-space: nowrap; }
-.sh-mark { text-align: left; }
+/* The mark is set from the left of its column with a lead-in in front of it, so an asterisk has
+   air between it and the digits rather than standing against the 0 of 8:20, which is what the
+   shul saw. The column is cut to hold the lead-in and the mark and nothing else. */
+.sh-mark { text-align: left; padding-left: 0.12em; }
+/* The asterisk column is the lead-in, the mark, and a little room after it: an asterisk with the
+   slash hard against it reads as one mark, which is what the first cut of this looked like. */
 .sh-slash { text-align: center; }
 /* The ר"ח ובה"ב heading, and a last line carrying one time where the rows above carry two. */
 .sh-wide { text-align: center; }

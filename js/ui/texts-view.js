@@ -25,7 +25,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName } from '../week-text.js';
-import { tzomGedaliaText } from '../taanis-text.js';
+import { tzomGedaliaText, chartFastText, fastsBetween } from '../taanis-text.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { weekdayChartFor } from '../sheets/rows.js';
@@ -430,30 +430,54 @@ function txRoshChodesh(state, settings, today, howMany = 1) {
   return out;
 }
 
-/** The צום גדליה message, off the sheet the shul hangs for that day.
+/** The fast day messages.
  *
- *  The only fast with a message here, and taanis-text.js says why: it is the only one with a
- *  sheet, and the other three fasts' מנחה and מעריב are on no board at all.
- *
- *  Its own kind, `taanis`, rather than folded in with the yom tov ones. A fast is not a yom tov,
+ *  Their own kind, `taanis`, rather than folded in with the yom tov ones. A fast is not a yom tov,
  *  and the switch that turns the ערב messages off should not take it with them.
  *
- *  The sheet's span is the one day, so the window puts the card up four days before it and takes
- *  it down when the day is over. The shul sends it the night before, which is inside that. */
-function txTaanis(year, settings, today) {
+ *  צום גדליה comes off the sheet the shul hangs for that day, whole. The other three come off the
+ *  chart: the ר"ח / בה"ב / תענית schedule is the morning those days daven, and their מנחה and
+ *  מעריב are on no board, so those two lines are left out (see taanis-text.js). The page carried
+ *  צום גדליה alone at first and the shul asked for the rest: a switch called Taanis over one
+ *  message a year is a switch over nothing.
+ *
+ *  Each is windowed on its own day, so a card is up for the four days in front of the fast and
+ *  gone once the day is over. The shul sends these the night before, which is inside that.
+ *
+ *  @param days - how far to walk for the chart fasts: a handful for the window, a year for the
+ *    year view, which is the same shape txRoshChodesh takes. */
+function txTaanis(year, settings, state, today, days) {
+  const out = [];
   const poster = buildTzomGedaliaPoster(year, settings);
-  if (!txInWindow(poster, today)) return null;
-  const text = tzomGedaliaText(poster);
-  if (!text) return null;
-  return {
-    id: `taanis-gedalia-${year}`,
-    kind: 'taanis',
-    // The day before, which is the day it goes out.
-    serial: poster.span.from - 1,
-    name: 'Tzom Gedalia',
-    when: hebrewYear(year),
-    text,
-  };
+  const gedalia = txInWindow(poster, today) ? tzomGedaliaText(poster) : '';
+  if (gedalia) {
+    out.push({
+      id: `taanis-gedalia-${year}`,
+      kind: 'taanis',
+      // The day before, which is the day it goes out.
+      serial: poster.span.from - 1,
+      name: 'Tzom Gedalia',
+      when: hebrewYear(year),
+      text: gedalia,
+    });
+  }
+  /* The chart's own second schedule, read from where the chart reads it: the raw cell in state
+     rather than the resolved settings, the same as ROSH CHODESH. */
+  const shacharisCell = state?.settings?.weekdayShacharisSpecial || '';
+  for (const fast of fastsBetween(today, today + days, settings)) {
+    if (!txDaysInWindow(fast.serial, fast.serial, today)) continue;
+    const text = chartFastText(fast.title, shacharisCell);
+    if (!text) continue;
+    out.push({
+      id: `taanis-${fast.serial}`,
+      kind: 'taanis',
+      serial: fast.serial - 1,
+      name: fast.title,
+      when: '',
+      text,
+    });
+  }
+  return out;
 }
 
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
@@ -579,7 +603,7 @@ export function renderTexts(container, state, settings, tables) {
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
       txErevShviiShelPesach(year, settings, today),
-      txTaanis(year, settings, today),
+      ...txTaanis(year, settings, state, today, txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS + 1),
       ...txNetz(year, settings, today),
     ]) {
       if (msg) out.push(msg);
