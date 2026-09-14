@@ -149,6 +149,14 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
   the small one, with every asterisk flush against its own time. Each row is padded on the left by
   one asterisk column so the slash sits at the middle of the row's box, which is what puts the two
   blocks' slashes on the same line (0.5px apart, the rest being the glyph's own ink).
+  **The gap in front of a slash is the asterisk column**, whether or not that row has an asterisk
+  in it, because an asterisk that takes no room is an asterisk that moves the slash on the row
+  below. So the width of the mark is the width of the gap, and **the mark is set at 0.78em of the
+  times**, which is the only lever there is: at the times' own size the gap measured 12.3px and the
+  shul said it was too much, and at 0.78em it is 10.6px with the asterisk still clear of the digits
+  (1.2px) and of the slash (2.6px). A reference mark set a little small is what a footnote does
+  anyway. Tighter than that means giving up the reserved column, and then a starred row pushes its
+  slash out of line with the row above, which is the thing this was built to fix.
   **An asterisk column is as wide as the widest mark in that position and no wider**, asked per
   position: two asterisks are twice the ink of one (1.0em against 0.5em, measured), so a column cut
   for one left 7:35** hanging out of its row, and cutting every column for two would push the pair
