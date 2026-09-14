@@ -63,12 +63,50 @@ const TISHA_BAV_RULE = {
  *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
  *  is matched is an append of nothing but the word itself, which is the rule that is now
  *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
- *  alone: quietly deleting that is worse than a duplicate they can see and remove. */
-const RETIRED_DRASHA_NAMES = ['שובה', 'Shuva', 'הגדול', 'Hagadol'];
+ *  alone: quietly deleting that is worse than a duplicate they can see and remove.
+ *
+ *  **The condition is not looked at.** It was: the rule had to name שובה or הגדול as a
+ *  special-Shabbos. The shul's own board still printed the second, wordless דרשה under the
+ *  computed one on שבת הגדול, so a rule was firing that this did not recognise, and a condition
+ *  can say the same Shabbos in more ways than a list can hold (the parsha name instead of the
+ *  special one, "שבת הגדול" rather than "הגדול", a stray space). What makes the rule redundant
+ *  is what it writes, not which week it writes it on: the word on its own says a דרשה is
+ *  happening and leaves its time to be typed in, and every one of those times is now computed.
+ *
+ *  The word is compared with the markup and the invisible characters taken off. A rule's text
+ *  is typed into a box and can arrive carrying an <u> from the editor, the isolate characters
+ *  a cell wraps Hebrew in (see util.js), a bidi mark from a keyboard, or an nbsp. None of them
+ *  change what the line says. */
+const DRASHA_WORD = 'דרשה';
+/** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
+const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
+const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
 function isRetiredDrashaRule(rule) {
-  return rule?.mode === 'append'
-    && String(rule.value || '').trim() === 'דרשה'
-    && (rule.condition?.specialParsha || []).some((p) => RETIRED_DRASHA_NAMES.includes(p));
+  return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
+}
+
+/** The same bare word, left behind in a cell somebody typed over rather than in a rule.
+ *
+ *  A per-cell override keeps the whole cell, so one made while the rule was still firing kept
+ *  a copy of what the rule had added, and deleting the rule does not reach it. Dropped only
+ *  where the same cell already prints a דרשה with a time on it, which is the computed line:
+ *  the word twice in one cell, once saying when and once saying nothing, is the thing the shul
+ *  asked to have off. A cell that carries the bare word and no computed line is left alone,
+ *  since there the word is all the cell says about the דרשה.
+ *
+ *  Only a trailing one, which is where an append puts it. The line break may be a newline or
+ *  markup: a typed cell is rich text and the browser's own editor writes a <div> or a <br>
+ *  rather than a newline (see lineBoxOf in ui/week-view.js). */
+const TRAILING_BARE_DRASHA = new RegExp(
+  `(?:\\n|<br\\s*/?>|<div[^>]*>|<p[^>]*>)[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]*${DRASHA_WORD}`
+  + '[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]*(?:</(?:div|p)>)?\\s*$',
+  'i'
+);
+const DRASHA_WITH_TIME = new RegExp(`${DRASHA_WORD}\\s*\\d{1,2}:\\d{2}`);
+function dropDuplicateDrasha(value) {
+  const text = String(value ?? '');
+  if (!DRASHA_WITH_TIME.test(plainText(text))) return text;
+  return text.replace(TRAILING_BARE_DRASHA, '');
 }
 
 /** The 8:40 put back on the end of the ר"ח / בה"ב / תענית שחרית, once.
@@ -107,6 +145,16 @@ function applySeeds(state) {
      duplicate. This runs every load and is cheap, and a rule it removes cannot come back,
      because nothing seeds one any more. See isRetiredDrashaRule for what it will not touch. */
   state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r));
+  /* And the same word where the rule had already been baked into a typed-over cell, which
+     deleting the rule does not reach. See dropDuplicateDrasha for what it will not touch. */
+  for (const sheet of Array.isArray(state.sheets) ? state.sheets : []) {
+    for (const week of Object.values(sheet?.overrides || {})) {
+      for (const [key, value] of Object.entries(week || {})) {
+        const fixed = dropDuplicateDrasha(value);
+        if (fixed !== value) week[key] = fixed;
+      }
+    }
+  }
   seeded.drashos = true;
   seeded.shuvaComputed = true;
   seeded.hagadolComputed = true;
