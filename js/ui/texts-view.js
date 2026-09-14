@@ -24,6 +24,10 @@ import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
+import { weekText } from '../week-text.js';
+import { buildWeekdayRow } from '../sheets/weekday.js';
+import { weekdayChartFor } from '../sheets/rows.js';
+import { mergeRow } from '../overrides.js';
 import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
@@ -117,6 +121,38 @@ function txWeekNow(state, settings, tables, today) {
   if (!serials.length) return null;
   const serial = currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   return txAgainst(state, weeks, serial);
+}
+
+/** The weekly message for one week, off the Weekday chart.
+ *
+ *  The Weekday chart is anchored on the Shabbos that ends the week, and covers the Sunday through
+ *  Friday in front of it, which is exactly the week this message is about. Its מנחה and מעריב are
+ *  built the way the chart builds them and then have any saved sheet's overrides laid over, so a
+ *  cell somebody corrected by hand reaches the message. שחרית is not part of that row: it is the
+ *  Settings schedule the chart prints as one merged cell.
+ *
+ *  Sent on the Sunday, which is six days before the Shabbos, and it stands until the Friday.
+ *
+ *  @param found - a week and a sheet, from txAgainst. */
+function txWeek(state, settings, found, english) {
+  const shabbos = found.week.serial;
+  const built = buildWeekdayRow(found.week, settings);
+  /* Overrides only where a saved Weekday chart actually covers this week. mergeRow wants a real
+     sheet to read them off and throws on null, and most weeks here have no saved chart at all:
+     this page computes its weeks rather than needing somebody to have generated one. */
+  const chart = weekdayChartFor(found.sheet?.id ? found.sheet : null, shabbos, state);
+  const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
+  const text = weekText(state?.settings?.weekdayShacharis || '', row, english);
+  if (!text) return null;
+  return {
+    id: `week-${shabbos}`,
+    kind: 'parsha',
+    // The Sunday it goes out on, not the Shabbos it runs up to.
+    serial: shabbos - 6,
+    name: 'Week',
+    when: english || '',
+    text,
+  };
 }
 
 /** How long before a yom tov its messages appear here.
@@ -461,6 +497,8 @@ export function renderTexts(container, state, settings, tables) {
       if (!found) continue;
       const { columns, row } = rowFor(found.week, found.sheet, state, settings);
       const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+      const week = txWeek(state, settings, found, english);
+      if (week) messages.push(week);
       messages.push({
         id: `erev-shabbos-${serial}`,
         kind: 'parsha',
@@ -472,6 +510,18 @@ export function renderTexts(container, state, settings, tables) {
       });
     }
   } else {
+    /* The weekly message, on its own window: it goes out on the Sunday and stands until the
+       Friday, where the Erev Shabbos one is the Friday's alone. Measured from the Sunday, so it
+       arrives the usual four days ahead of it and then stays up all week. */
+    const nearest = txWeekNow(state, settings, tables, today);
+    if (nearest) {
+      const english = erevParshaEnglish(nearest.week.parsha, tables?.parshaNames);
+      const sunday = nearest.week.serial - 6;
+      if (txDaysInWindow(sunday, nearest.week.serial - 1, today)) {
+        const week = txWeek(state, settings, nearest, english);
+        if (week) messages.push(week);
+      }
+    }
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
     messages.push(...yomTov());

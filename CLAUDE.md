@@ -480,6 +480,20 @@ and listed in `DIST_TREES`.
   line for line. A sheet that carries the same `calc` on several nights (פסח and סוכות both open
   every night of yom tov with a הדלקת נרות) is read with `ytFirst`, which takes the first, since
   the ערב block prints before the day blocks.
+- **The weekly message** (`js/week-text.js`) is the one that goes out on a Sunday for the week
+  ahead, "Week of P' Ki Seitzei", and it is **the Weekday chart's three columns**: שחרית out of
+  Settings, which is what the chart prints as its own merged cell, then the chart's מנחה column C
+  and מעריב column B. Overrides from a saved Weekday chart are laid over where one covers the week,
+  so a cell corrected by hand reaches the message; most weeks have none, since this page computes
+  its weeks. `mergeRow` throws on a null sheet, so the merge is guarded rather than always run.
+  Its window is its own: sent on the **Sunday**, six days before the Shabbos, and it stands until
+  the **Friday**, where the Erev Shabbos message is the Friday's alone. Its `kind` is `parsha`, so
+  the Parsha switch covers both.
+  Three things the sent messages have that no chart does, and which are therefore not built: a
+  **7:10 and an 8:10 בעזרת נשים** in the שחרית, and a **T"T beside the 10:20 מעריב**. Same answer as
+  the ROSH CHODESH line's own T"T and its 6:50 בעזרת נשים.
+  Measured across 97 weeks of both seasons and two years: every line of every message matches the
+  chart's own cell exactly, with no line differing.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
   schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
   line rather than carrying a time of its own.
