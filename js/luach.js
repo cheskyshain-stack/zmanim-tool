@@ -1022,7 +1022,21 @@ function wireNav(published) {
 
 
 (async () => {
-  const published = await loadPublished();
+  let published;
+  try {
+    published = await loadPublished();
+  } catch {
+    /* A filter or a sign-in page answered in place of the season. Said as what it is, because
+       the alternative is what this used to do: print "Nothing has been published yet", which
+       tells somebody the shul has not put its zmanim up when the shul has, and sends them to
+       ask the gabbai about a problem that is on their own phone. Content filters are common
+       here and this is the screen a good part of the kehilla would otherwise get. */
+    main.innerHTML = '<div class="luach-home"><p class="hint">This phone or its network is '
+      + 'blocking part of this site, so the zmanim cannot be read. The page itself is fine: '
+      + 'something in front of it is answering instead. A filter would need this address '
+      + 'allowed, or try a different connection.</p></div>';
+    return;
+  }
   if (!published) {
     main.innerHTML = '<div class="luach-home"><p class="hint">Nothing has been published yet.</p></div>';
     return;

@@ -96,9 +96,25 @@ export async function loadPublished() {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) return null;
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* **Not nothing published. Something answered instead of the site.**
+         This returned null here, and null is what the page prints "Nothing has been published
+         yet" for, so a filtered phone was told the shul had not put its zmanim up. It had. A
+         GenTech block page came back in place of this file and the site repeated it as though
+         it were the answer, which is the worst shape a failure can take: it names an innocent
+         cause, it blames the shul, and the person who sees it complains to a gabbai instead of
+         to whoever runs the filter. See data-loader.js, which had the same fault the same week.
+         Thrown rather than returned, so the caller has to decide what to say. */
+      throw new Error('blocked');
+    }
     return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
-  } catch {
+  } catch (err) {
+    if (err?.message === 'blocked') throw err;
+    // A network that would not carry the request at all. Same answer as no file: nothing to show.
     return null;
   }
 }
