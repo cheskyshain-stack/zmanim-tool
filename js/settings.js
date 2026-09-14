@@ -18,18 +18,25 @@ export const TIMEZONES = [
  *  alternate times underlined. Plain HTML because it's edited through a rich-text box
  *  (see ui/settings-view.js) and printed as-is.
  *
- *  Two to a line and slash separated, which the shul asked for: it is how מנחה and מעריב
- *  are written in the two columns beside it, so the chart reads one convention across
- *  rather than two, and two to a line keeps this column narrow enough to leave מעריב the
- *  room for six times. The slash carries a non-breaking space each side, the charts' own
- *  SLASH, so a narrow column never breaks a pair apart. */
-export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 / 7:20*\n<u>7:35</u> / 8:00\n8:20* / <u>8:40</u></span>';
+ *  **Three to a line, separated by a plain space**, which is what the shul settled on after
+ *  looking at the alternatives on a printed page. It was two to a line and slash separated for a
+ *  while, to read the way the מנחה and מעריב columns beside it do. Three to a line is narrower
+ *  (127.7px against 146.1px, measured) and the slashes were what made a three time line too wide
+ *  for the panel at all. The panel sets these in columns and **draws the separator the schedule
+ *  uses**, so with no slashes typed there are none printed: see ui/shacharis-grid.js. */
+export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
 
 /** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
  *  week card can show it only on weeks that actually have one of those days and name
  *  which it is (see ui/week-view.js). The printed chart still shows both together,
- *  since it covers a whole season at once. */
-export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>';
+ *  since it covers a whole season at once.
+ *
+ *  **Three then four**, asked for. The two orders take exactly the same room, measured: both print
+ *  the same seven times and the same marks, so the four time line is the same length wherever it
+ *  sits and the panel is as wide as that line either way (127.73px against 127.72px, and the same
+ *  height to the hundredth). The shul picked it on how it looks, the block finishing square with
+ *  the everyday one above it rather than on a short line. */
+export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -79,11 +86,12 @@ export const LEGACY_WEEKDAY_SHACHARIS = [
   '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
   '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  // Three times to a line, which is how this read until the shul asked for two: the comma
-  // version this program shipped, and the spaced version the shul's own board used and had
-  // in front of it, both of them the same six times in the same order.
+  // Three times to a line with commas, which is how this read for a while.
   '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>',
-  '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>',
+  // Two to a line and slash separated, the version before the present one. The spaced three to a
+  // line schedule that used to sit in this list is the default itself now, so it is not here: a
+  // value cannot be both the thing carried forward and the thing it is carried forward to.
+  '<span class="big">7:00 / 7:20*\n<u>7:35</u> / 8:00\n8:20* / <u>8:40</u></span>',
 ];
 
 /** And the same for the second schedule, which had no such list until the two of them were
@@ -92,7 +100,11 @@ export const LEGACY_WEEKDAY_SHACHARIS = [
  *  touched. */
 export const LEGACY_WEEKDAY_SHACHARIS_SPECIAL = [
   '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>',
+  // Four to a line then three, which is how this read before the shul asked for the other way
+  // round. The two take the same room; it is the look that decided it.
   '6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>',
+  // Two to a line and slash separated, the version before the present one.
+  '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>',
 ];
 
 /** The three-line version of the Weekday footer, carried forward to the two-line one the

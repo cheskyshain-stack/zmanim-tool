@@ -178,9 +178,19 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
      slash stays narrow. A position with no mark at all still gets the narrow column, which is what
      keeps the times under each other. */
   const gridFor = (cols, slashed) => {
-    const widest = Array.from({ length: cols }, (_, i) => (
-      read.some((r) => r.times && r.times.length === cols && (r.times[i]?.mark || '').length > 1)
-        ? 'var(--sh-star2)' : 'var(--sh-star)'));
+    /* **A column is reserved for an asterisk only where a row of this shape actually has one.**
+       Held open everywhere, it is a character of air between two times that never carry a mark,
+       and the shul saw that as too much space. Held open nowhere, a starred row pushes its
+       neighbours out of line with the row above, which is what this file exists to stop. Asked per
+       position, both are true at once: the שחרית block's stars are all in the same place on every
+       line, so the only reserved column is the one they are in and the block prints exactly as
+       though it were plain text with one space between the words. */
+    const widest = Array.from({ length: cols }, (_, i) => {
+      const marks = read.filter((r) => r.times && r.times.length === cols)
+        .map((r) => (r.times[i]?.mark || '').length);
+      if (marks.some((n) => n > 1)) return 'var(--sh-star2)';
+      return marks.some((n) => n > 0) ? 'var(--sh-star)' : '0px';
+    });
     /* **A row with no slashes is narrower, and has to be.** The column after a slash is one
        asterisk wider than a time needs, which is what gives the slash the same air on both sides;
        with no slash there is nothing to centre, and that width is a fifth of the row spent on
