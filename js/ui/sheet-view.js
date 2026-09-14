@@ -9,6 +9,7 @@ import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { announcedWeekCell } from '../announced.js';
+import { shacharisGridHtml } from './shacharis-grid.js';
 import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
@@ -533,9 +534,14 @@ ${special}` : '');
              syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
              rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
              the arithmetic. */
+          /* Set in columns where it can be, so the times stand under each other and the slashes
+             stop wandering from line to line. shacharisGridHtml hands back nothing at all when
+             what is in Settings is not a block of times, and then this prints the typing as it
+             always has. See ui/shacharis-grid.js. */
+          const laid = shacharisGridHtml(html) || html;
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
-            <div class="shacharis-panel"><div class="shacharis-panel-in">${html}</div></div></td>`;
+            <div class="shacharis-panel"><div class="shacharis-panel-in">${laid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a

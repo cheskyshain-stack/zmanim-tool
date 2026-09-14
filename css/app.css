@@ -876,6 +876,56 @@ td.ruled .cell { background: var(--ruled); }
   white-space: pre-line; line-height: 1.3; direction: ltr;
 }
 
+/* The schedule inside that panel, set in columns rather than as centred lines.
+   Asked for: centred lines are each their own width, so no two times stood under each other and
+   the slashes wandered from line to line. See ui/shacharis-grid.js, which reads whatever is in
+   Settings and hands the block back untouched when it is not a block of times.
+
+   **Each paired row is a five column grid**: time, asterisk, slash, time, asterisk. The two
+   asterisk columns are there whether or not there is an asterisk to go in them, which is what
+   stops 8:20* pushing its slash half a character past the slash above it. The column gaps are
+   zero and the slash column is narrow, so the slash sits against its pair. Nothing is spaced with
+   typed spaces.
+
+   A row is its own grid rather than every row sharing one, because the everyday block is set
+   larger than the ר"ח one: a shared column is one width for both, and the smaller block's digits
+   then stand off their own asterisk inside a column the larger block sized. Measured in the row's
+   own em, each block lines up with itself exactly and the two sit centred under each other. */
+.sh-sched {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  /* The three widths, in em, so a row measures them in its own size. --sh-t is one time, measured
+     rather than guessed: the ink of 7:00, 7:35, 8:20 and 6:40 is 1.833em in the boards' serif at
+     both sizes, the figures being tabular, and a hundredth of an em is left over so nothing sits
+     on the edge of its column. The other two are deliberately narrow. */
+  --sh-t: 1.84em; --sh-star: 0.6em; --sh-slash: 0.42em;
+}
+.sh-row.is-times {
+  display: grid; column-gap: 0; align-items: baseline;
+  /* The row is padded on the left by exactly the trailing asterisk column, which puts the slash at
+     the middle of the row's own box. Every row is centred in the panel, so that is what puts the
+     slash of the smaller ר"ח block under the slash of the larger everyday one: the two blocks are
+     set in different sizes and nothing else about them can line up, but the slash between each
+     pair can, and measured without this it sat 1.7px across. */
+  padding-left: var(--sh-star);
+  /* Tabular figures, so 7:00 and 8:40 measure the same and a fixed column holds either exactly.
+     Times New Roman and the shipped stand-ins all have them; asking for them by name costs
+     nothing where they are already the default and saves the layout where they are not. */
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.sh-row.is-big, .sh-wide.is-big { font-size: 1.3em; }
+/* Every time is set to the right of its column, so it is against its own asterisk column whether
+   or not there is an asterisk in it. The column after the slash is one asterisk wider than the
+   one before it, which is what gives the slash the same room on both sides: an asterisk's width
+   in front of it is the asterisk column, and behind it the same width falls out as the slack in
+   front of a right-set time. */
+.sh-time { text-align: right; white-space: nowrap; }
+.sh-mark { text-align: left; }
+.sh-slash { text-align: center; }
+/* The ר"ח ובה"ב heading, and a last line carrying one time where the rows above carry two. */
+.sh-wide { text-align: center; }
+/* The blank line between the two blocks, which a flex column would otherwise close up. */
+.sh-gap { height: 0.5em; }
+
 /* Settings' מנחה/מעריב option lists - one editable row per option (rich text, so an
    option can carry the underlining the printed board uses). */
 .opt-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }

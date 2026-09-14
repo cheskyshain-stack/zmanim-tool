@@ -133,6 +133,28 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
   `zoom: 1 !important` on `.pages` so neither can ever reach paper.
 - Fit to screen turns itself on automatically when a page does not fit the viewport,
   which in practice means phones.
+- **The שחרית panel's schedule is set in columns, one grid per row of times**
+  (`js/ui/shacharis-grid.js`). Asked for: centred lines are each their own width, so no two times
+  stood under each other and the slashes wandered. A paired row is five columns, time, asterisk,
+  slash, time, asterisk, with **zero column gaps and the asterisk columns always there whether or
+  not there is an asterisk**, which is what stops 8:20* pushing its slash past the slash above it.
+  A row is its own grid, not a row of one big grid: the everyday block is set 1.3x the ר"ח one, a
+  shared column is one width for both, and the smaller digits then stand off their own asterisk
+  inside a column the larger block sized. Measured in the row's own em nothing has to stretch.
+  `--sh-t` is one time, **measured rather than guessed**: 1.833em of ink in the boards' serif at
+  both sizes, the figures being tabular (`tabular-nums`, asked for by name so it holds in a font
+  where they are not the default). The column after the slash is one asterisk wider than the one
+  before it and every time is set to the right of its column, which is what gives the slash the
+  same air on both sides: measured 11.6 against 11.7 px in the big block and 8.9 against 9.0 in
+  the small one, with every asterisk flush against its own time. Each row is padded on the left by
+  one asterisk column so the slash sits at the middle of the row's box, which is what puts the two
+  blocks' slashes on the same line (0.5px apart, the rest being the glyph's own ink).
+  **It reads what is in Settings rather than being told it**, since that is hand-typed rich text
+  whose separators have been commas, spaces and slashes over the years. Markup it does not know,
+  or a block whose rows hold different numbers of times, and it hands the block back untouched to
+  print exactly as it did before: a wall chart is not the place to be clever with somebody's
+  typing. A line that is not a row of times (the ר"ח ובה"ב heading, the lone 8:40 that ends the
+  block) is centred under the rows, which is where the hand-made boards put it.
 
 ## Hebrew and bidirectional text
 

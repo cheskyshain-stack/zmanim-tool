@@ -7322,6 +7322,199 @@ function reselect(sel, node) {
   sel.addRange(r);
 }
 
+// ==== ui/shacharis-grid.js ====
+// The שחרית panel's schedule, set in columns instead of as centred lines.
+//
+// The panel is the one cell on the Weekday chart that is a block of times rather than a single
+// row of them, and it was centred line by line: every line was its own width, so the times sat at
+// a different place on each and the slashes between them wandered. The shul asked for the columns
+// to line up, which on a board people read a time off is worth having.
+//
+// What comes in is whatever is in Settings, rich text typed by hand (see ui/rich-text.js), so this
+// reads it rather than being told it:
+//
+//   <span class="big">7:00 / 7:20*
+//   <u>7:35</u> / 8:00
+//   8:20* / <u>8:40</u></span>
+//
+// and the ר"ח block underneath it, with a heading between. The separators have been commas, plain
+// spaces and slashes on the shul's own browsers over the years (see the LEGACY_ lists in
+// settings.js), the line breaks are newlines or the <br> and <div> the editor writes, and the only
+// markup that has ever been in it is <u> and <span class="big">.
+//
+// **Anything else and this does nothing at all.** A line that is not a row of times, or markup
+// this does not recognise, and the whole block is handed back exactly as it came in and prints the
+// way it printed yesterday. A wall chart is not the place to be clever with somebody's typing.
+//
+// Three kinds of row come out:
+//
+//   A row of times, laid on the grid: each time in its own column, each slash in a narrow one
+//   between them, and **each asterisk in a narrow column of its own** so that a 8:20* does not
+//   push its slash half a character to the right of the slash above it.
+//   A line that is not a full row of times (the ר"ח ובה"ב heading, or a last line carrying one
+//   time) spans the whole width and is centred, which is where the hand-made boards put it.
+//   A blank line is a gap of its own, so the two blocks stay apart.
+//
+// The underlines are the board's own meaning (בבית מדרש למטה) and are carried through onto the
+// time itself. The asterisks are not underlined, which is how they are written in Settings.
+
+/** A time and whatever asterisks are stuck to it. The same shape the message builders read
+ *  (erevTimes in erev-text.js, parseTimes in posters/slichos.js), written again here because this
+ *  reads a DOM rather than a string: the underline is an element around the digits, not a tag in
+ *  the text. */
+const SH_TIME = /(\d{1,2}:\d{2})(\*{0,2})/g;
+/** What may sit between two times without the line stopping being a row of times. */
+const SH_BETWEEN = /^[\s /,]*$/;
+/** The most times this will set in columns. Three is already a line no board here prints; past
+ *  that it is somebody using the cell for something else and the plain lines are safer. */
+const SH_MAX = 4;
+
+const shEsc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/** The markup this understands, and nothing else.
+ *
+ *  U and SPAN.big are the two the editor writes, BR and DIV are how it breaks a line, and B and I
+ *  are here because the toolbar can write them and they carry no meaning this needs to keep track
+ *  of: a line is still a line inside one. Anything else (a table, a font tag, a pasted colour)
+ *  means the block is not what this was written for. */
+const shKnown = (el) => {
+  const tag = el.tagName;
+  if (tag === 'U' || tag === 'BR' || tag === 'DIV' || tag === 'P' || tag === 'B' || tag === 'I') return true;
+  return tag === 'SPAN' && (el.className === '' || el.className === 'big');
+};
+
+/** The block read as lines, each a run of pieces that know whether they are underlined.
+ *
+ *  Null where anything unrecognised turns up, which is the signal to leave the block alone.
+ *  A newline inside a text node breaks a line as much as a <br> does: the panel is set with
+ *  white-space: pre-line, so that is what those newlines have always meant on the screen. */
+function shReadLines(root) {
+  const lines = [[]];
+  let ok = true;
+  const walk = (node, underlined, big) => {
+    if (!ok) return;
+    for (const child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const parts = String(child.nodeValue).split('\n');
+        parts.forEach((text, i) => {
+          if (i) lines.push([]);
+          if (text) lines[lines.length - 1].push({ text, underlined, big });
+        });
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      if (!shKnown(child)) { ok = false; return; }
+      if (child.tagName === 'BR') { lines.push([]); continue; }
+      const block = child.tagName === 'DIV' || child.tagName === 'P';
+      // A block starts a line of its own, unless the line it would start is already empty.
+      if (block && lines[lines.length - 1].length) lines.push([]);
+      walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'));
+      if (block) lines.push([]);
+    }
+  };
+  walk(root, false, false);
+  return ok ? lines : null;
+}
+
+/** One line read as times, or null when it is not a row of them.
+ *
+ *  The asterisks that follow a time can be written outside the underline and even in the piece
+ *  after it, which is how one of the shul's own browsers holds it ("<u>7:15,7:35</u>**"), so a
+ *  piece that is nothing but asterisks is given to the time in front of it. */
+function shReadTimes(line) {
+  const times = [];
+  let ok = true;
+  for (const piece of line) {
+    let last = 0;
+    SH_TIME.lastIndex = 0;
+    let m = SH_TIME.exec(piece.text);
+    while (m) {
+      const between = piece.text.slice(last, m.index);
+      if (!SH_BETWEEN.test(between)) {
+        // Stars belonging to the time before this one, and nothing else.
+        if (/^\*{1,2}$/.test(between.trim()) && times.length) times[times.length - 1].mark += between.trim();
+        else ok = false;
+      }
+      times.push({ text: m[1], mark: m[2], underlined: piece.underlined, big: piece.big });
+      last = m.index + m[0].length;
+      m = SH_TIME.exec(piece.text);
+    }
+    const tail = piece.text.slice(last);
+    if (/^\s*\*{1,2}\s*$/.test(tail) && times.length) times[times.length - 1].mark += tail.trim();
+    else if (!SH_BETWEEN.test(tail)) ok = false;
+  }
+  return ok && times.length ? times : null;
+}
+
+/** A line that is not a row of times, written back out with its underlines kept. */
+const shPlainHtml = (line) => line
+  .map((p) => (p.underlined ? `<u>${shEsc(p.text)}</u>` : shEsc(p.text)))
+  .join('');
+
+/** The schedule as a grid, or null to leave it exactly as it came in.
+ *
+ *  @param html - the Settings value, both blocks and the heading between them.
+ *  @param doc - the document to parse with, so this can be tested without one being global. */
+function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : document) {
+  if (!doc) return null;
+  const box = doc.createElement('div');
+  box.innerHTML = String(html ?? '');
+  const lines = shReadLines(box);
+  if (!lines) return null;
+
+  const read = lines.map((line) => (line.length ? { line, times: shReadTimes(line) } : { line, times: null }));
+  const cols = Math.max(0, ...read.map((r) => (r.times ? r.times.length : 0)));
+  if (cols < 2 || cols > SH_MAX) return null; // one time a line has nothing to line up
+  /* Every row of times has to hold the same number of them, or a single one: the lone 8:40 that
+     ends the ר"ח block is a line of its own and is centred under the rows above it. A block with
+     three times on one line and four on the next is left alone entirely rather than laid out
+     half one way and half the other, which is what a value one browser still holds does
+     ("7:00, 7:20*, 7:35" over "6:40, 7:00*, 7:15,7:35**") and which came out as a mess. */
+  if (read.some((r) => r.times && r.times.length !== cols && r.times.length !== 1)) return null;
+
+  /* **Each paired row is its own five column grid**: time, asterisk, slash, time, asterisk.
+     One grid over the whole block was the first cut and it could not hold both: a column is one
+     width for every row in it, the everyday block is set larger than the ר"ח one, and a column
+     sized by the larger digits leaves the smaller ones standing off their own asterisk. A row that
+     is its own grid is measured in its own em, so nothing has to stretch to fit a neighbour, and
+     every row of a block still comes out the same width and lines up with the rest of it.
+     The asterisk columns are always there, whether or not there is an asterisk to put in them, and
+     that is the whole point of them: 8:20* and 8:00 leave the slash after them in exactly the same
+     place. The slash column is narrow and the gaps are zero, so the slash sits against its pair
+     rather than floating between them. What keeps it the same distance from the time on either
+     side is the column after it: it is one asterisk wider than a time needs and the time in it is
+     set to the right, so the width the asterisk column takes up in front of the slash is given
+     back behind it. Nothing here is spaced with typed spaces. */
+  const template = ['var(--sh-t)', 'var(--sh-star)',
+    ...Array.from({ length: cols - 1 },
+      () => ['var(--sh-slash)', 'calc(var(--sh-t) + var(--sh-star))', 'var(--sh-star)']).flat()].join(' ');
+
+  /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
+     carrying one time, the blank line between the blocks) is a line of its own, centred under
+     them, which is where the boards the shul hangs put it.
+     is-big carries the size the everyday block is set in. It is on the block in Settings rather
+     than on any one line, so it is read off the pieces and put back on the row, and the row's own
+     em is what every width in its grid is then measured in. */
+  const rows = [];
+  for (const { line, times } of read) {
+    if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }
+    const big = line.every((p) => p.big) ? ' is-big' : '';
+    if (!times || times.length !== cols) {
+      rows.push(`<div class="sh-wide${big}">${shPlainHtml(line)}</div>`);
+      continue;
+    }
+    const cells = [];
+    times.forEach((t, i) => {
+      if (i) cells.push('<div class="sh-slash">/</div>');
+      const time = t.underlined ? `<u>${shEsc(t.text)}</u>` : shEsc(t.text);
+      cells.push(`<div class="sh-time">${time}</div>`);
+      cells.push(`<div class="sh-mark">${shEsc(t.mark)}</div>`);
+    });
+    rows.push(`<div class="sh-row is-times${big}" style="grid-template-columns: ${template}">${cells.join('')}</div>`);
+  }
+  return `<div class="sh-sched">${rows.join('')}</div>`;
+}
+
 // ==== ui/sheet-view.js ====
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -7843,9 +8036,14 @@ ${special}` : '');
              syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
              rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
              the arithmetic. */
+          /* Set in columns where it can be, so the times stand under each other and the slashes
+             stop wandering from line to line. shacharisGridHtml hands back nothing at all when
+             what is in Settings is not a block of times, and then this prints the typing as it
+             always has. See ui/shacharis-grid.js. */
+          const laid = shacharisGridHtml(html) || html;
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
-            <div class="shacharis-panel"><div class="shacharis-panel-in">${html}</div></div></td>`;
+            <div class="shacharis-panel"><div class="shacharis-panel-in">${laid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a
