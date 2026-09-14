@@ -13,6 +13,7 @@ import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
+import { installItemHtml, wireInstall } from './install.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
@@ -410,6 +411,9 @@ function homeHtml(published) {
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
+      <!-- Last on the menu and only where there is something to offer: see install.js. It is a
+           button rather than a link, since it opens Chrome's own dialog and goes nowhere. -->
+      ${installItemHtml()}
     </nav>
     ${rule()}
     ${footHtml(s)}
@@ -560,6 +564,11 @@ function renderHome(published) {
   // than waiting for the first tick, which may be an hour off.
   markNextInline(main);
   openTheDoor();
+  /* Chrome decides when to offer the install, and on a cold load that is usually a moment after
+     the menu is already on the screen, so the row asks to be drawn again when it arrives. Drawn
+     through renderHome rather than patched in, which is the same way the next-up card is redrawn:
+     one place that builds the menu. */
+  wireInstall(main, () => renderHome(published));
   startNextUp(published);
 }
 

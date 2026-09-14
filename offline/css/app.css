@@ -1996,6 +1996,23 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-item-title { flex: 1; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: 1.45rem; font-weight: 700; direction: ltr; text-align: left; }
 .luach-item-go { width: 19px; height: 19px; flex: none; color: var(--luach-ink); opacity: 0.55; }
 
+/* The install row, which is the same card as the four above it and has to be told so: a button
+   brings its own font, its own centring and a full-width stretch it does not want, and none of
+   that is inherited the way an <a> inherits it. It carries no chevron, because it opens a dialog
+   over this page rather than going anywhere.
+   A shade quieter than the four: it is an offer rather than one of the things the page is for. */
+.luach-install { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.luach-install .luach-item-title { font-size: 1.2rem; }
+.luach-install .luach-item-icon { opacity: 0.7; }
+/* An iPhone gets words rather than a dialog, since Safari has none to open. Not a button: there
+   is nothing to press, so it must not look pressable. */
+.luach-install-ios { cursor: default; }
+.luach-install-how {
+  display: block; margin-top: 0.15rem;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.92rem; font-weight: 400; opacity: 0.7;
+}
+
 /* --- The ways to give ----------------------------------------------------------------
    A donation portal rather than a stack of oversized cards. Everything here is set once
    and shared, so the cards keep the same corner, shadow, mark and title whatever they
