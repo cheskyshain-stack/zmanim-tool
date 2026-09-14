@@ -4,7 +4,7 @@
 // from are one shape:
 //
 //   Shiva Asar B'Tammuz
-//   Shacharis 6:40m, 6:45ns, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
+//   Shacharis 6:40m, 6:45ns, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d  (see the morning below)
 //   Mincha 1:40d, 1:45ns, 1:50m, 5:00d, 5:45d, 6:35d, 7:15d, 7:45m, 7:55ns
 //   Mariv 9:05m & ns, 9:20d
 //   Have an easy meaningful fast
@@ -33,24 +33,38 @@ import { erevWhereMark } from './erev-text.js';
  *  sent messages end on. */
 export const TN_TEXT = {
   title: 'Tzom Gedalia',
-  /* "Shacharis", which is what all three sent messages call it, though the sheet heads that
-     block סליחות: on a fast the shul opens earlier and says them, and the sheet is named for what
-     is davened at it. Nothing is being said twice here, the times are the sheet's own. */
-  shacharis: 'Shacharis',
   mincha: 'Mincha',
   maariv: 'Mariv',
   signoff: 'Have an easy meaningful fast!',
 };
 
+/** **The morning is called what the sheet calls it**, which is סליחות: on a fast the shul opens
+ *  earlier and says them, and the sheet is named for what is davened at it rather than for the
+ *  תפילה the סליחות are added to. The congregation's own "what is on next" card reads that same
+ *  block and says סליחות, and the shul asked for this to say it too.
+ *
+ *  So the label is taken off the block rather than typed here, and these are the two names that
+ *  block can carry, in the message's language. Written out rather than translated, because the
+ *  sheet is in Hebrew and the message is in English; anything else the sheet might one day head
+ *  it with falls back to Shacharis, which is what a morning is when nothing else is said of it.
+ *
+ *  The three sent fast messages all say "Shacharis" here. That is the one place this does not
+ *  follow them, asked for: they are for the three fasts with no sheet, and on the day this one is
+ *  about the board, the phone and the message now say the same word. */
+const TN_MORNING_NAMES = { 'סליחות': 'Selichos', 'שחרית': 'Shacharis' };
+const TN_MORNING_FALLBACK = 'Shacharis';
+
 /** A list of the sheet's times, each with the room it is in: underlined is d, one star en, two
  *  sh, unmarked m. The one definition every message on this page uses. */
 const tnList = (times) => (times || []).map((t) => t.text + erevWhereMark(t)).join(', ');
 
-/** One block of the sheet, by the rule behind it rather than by its heading, so rewording a
+/** One block of the sheet, found by the rule behind it rather than by its heading, so rewording a
  *  heading cannot quietly empty a line of the message. */
-const tnLine = (poster, calc) => {
-  const set = (poster?.sets || []).find((s) => s.calc === calc);
-  return tnList((set?.lines || [])[0]);
+const tnBlock = (poster, calc) => (poster?.sets || []).find((s) => s.calc === calc) || null;
+const tnLine = (poster, calc) => tnList((tnBlock(poster, calc)?.lines || [])[0]);
+const tnMorningLabel = (poster) => {
+  const head = String(tnBlock(poster, 'shacharis')?.head || '').trim();
+  return TN_MORNING_NAMES[head] || TN_MORNING_FALLBACK;
 };
 
 /** The message, off the צום גדליה sheet.
@@ -61,7 +75,7 @@ const tnLine = (poster, calc) => {
 export function tzomGedaliaText(poster) {
   if (!poster) return '';
   const rows = [
-    [TN_TEXT.shacharis, tnLine(poster, 'shacharis')],
+    [tnMorningLabel(poster), tnLine(poster, 'shacharis')],
     [TN_TEXT.mincha, tnLine(poster, 'mincha')],
     [TN_TEXT.maariv, tnLine(poster, 'maariv')],
   ].filter(([, times]) => times);

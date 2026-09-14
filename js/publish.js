@@ -8,6 +8,8 @@
 // A season is published once. The luach then advances by itself every week, because the
 // week it shows is worked out from today's date against the weeks in the file.
 
+import { isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
+
 /** What the luach needs, and nothing else.
  *
  *  The sheets are carried whole (weeks and overrides included) rather than as
@@ -59,6 +61,35 @@ export function downloadPublished(payload) {
   URL.revokeObjectURL(url);
 }
 
+/** The retired דרשה rules taken off a payload on its way in.
+ *
+ *  **A published file is a snapshot, and it goes on saying what it said the day it was written.**
+ *  The rules travel with it, so the two bare-word דרשה rules kept firing on the congregation's own
+ *  chart months after they were retired everywhere else: the admin's copy of them is taken off as
+ *  that browser loads (see applySeeds in storage.js), and nothing was taking them off this one. The
+ *  shul saw the second, wordless דרשה under the computed one on שבת הגדול, on the public board,
+ *  while the admin they had just been fixed in printed it correctly.
+ *
+ *  So the same retirement runs here, off the same definition, and a published file written before
+ *  it cannot put a retired rule back. Republishing writes the file without them in any case; this
+ *  is what makes the one already on the site right without anybody having to.
+ *
+ *  The overrides are cleaned the same way, for the cells the rule had already been typed into. */
+function withoutRetiredDrasha(data) {
+  if (!data) return data;
+  const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r));
+  const sheets = (data.sheets || []).map((sheet) => {
+    const overrides = {};
+    for (const [serial, week] of Object.entries(sheet.overrides || {})) {
+      overrides[serial] = Object.fromEntries(
+        Object.entries(week || {}).map(([key, value]) => [key, dropDuplicateDrasha(value)])
+      );
+    }
+    return { ...sheet, overrides };
+  });
+  return { ...data, rules, sheets };
+}
+
 /** Reads what is currently published, or null when nothing is. A 404 is the normal state
  *  before the first publish, not an error worth shouting about. */
 export async function loadPublished() {
@@ -66,7 +97,7 @@ export async function loadPublished() {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) return null;
     const data = await res.json();
-    return data && Array.isArray(data.sheets) && data.sheets.length ? data : null;
+    return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
   } catch {
     return null;
   }

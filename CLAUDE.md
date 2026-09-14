@@ -169,9 +169,20 @@ Export/Import in Settings moves it between devices.
   both afternoons are now computed by the chart instead (`DRASHA_NAMES` and
   `shabbosMinchaMenu` in `js/sheets/common.js`): the דרשה an hour before the מנחה that is 45
   minutes before שקיעה, its מנחה למטה half an hour before that, and no 5:30 / 6:00 / 6:30.
-  `isRetiredDrashaRule` in `js/storage.js` takes the old rules back off a browser that holds
+  `isRetiredDrashaRule` in **`js/rules.js`** takes the old rules back off a browser that holds
   one, matching on what a rule does rather than the id it was seeded with, since both were
-  hand-made on some browsers before they were ever seeded.
+  hand-made on some browsers before they were ever seeded, and on **what it writes rather than
+  which week it writes it on**: a condition can name שבת הגדול in more ways than a list can hold.
+  **There are two doors, and for months only one of them was watched.** `applySeeds` in
+  `js/storage.js` cleans localStorage, which is the admin; the congregation's site reads none of
+  it. It reads `data/published.json`, **which carries a copy of the rules**, so the retired ones
+  went on firing on the public board long after the admin was right, and the shul saw the second
+  wordless דרשה on שבת הגדול on the site while the admin printed it correctly. `loadPublished` in
+  `js/publish.js` now runs the same retirement off the same definition, so a file published before
+  it cannot put a rule back, and the rules were taken out of the published file itself so the
+  board on the site was right without anybody having to republish. Anything a published file
+  carries is a snapshot of the day it was written: when a rule or a default is retired, ask
+  whether that file is still saying the old thing.
 - When a shipped default's wording changes, add the old value to a `LEGACY_*` list in
   `js/settings.js` and carry it forward in `normalizeSettings`. That upgrades installs
   that never edited it, while leaving anything hand-typed alone. See
@@ -521,9 +532,13 @@ and listed in `DIST_TREES`.
   the chart's own list ends) and מעריב is at the end of the fast. A message missing two of its three
   lines, or carrying times this program made up, are both worse than no message. When the shul hangs
   a sheet for one of the others, its message reads off that sheet the way this one does.
-  The three sent fast messages all say "Shacharis" where the sheet heads that block סליחות: the
-  wording is theirs, the times are the sheet's. שקיעה is on the sheet and in none of the three, so
-  it is not in the message either.
+  **The morning is called what the sheet calls it, סליחות**, asked for: the congregation's own
+  "what is on next" card reads that same block and says סליחות, and the board, the phone and the
+  message have to say one word. The label is read off the block's heading rather than typed into
+  the message, and the two names that block can carry are spelled in English there. This is the one
+  place the message does not follow the three sent ones, which say "Shacharis": those are for the
+  three fasts with no sheet. שקיעה is on the sheet and in none of the three, so it is not in the
+  message either.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
   schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
   line rather than carrying a time of its own.

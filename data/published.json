@@ -52,40 +52,6 @@
       ],
       "mode": "append",
       "value": "ט באב"
-    },
-    {
-      "id": "rule-shabbos-hagadol",
-      "name": "שבת הגדול: דרשה",
-      "enabled": true,
-      "condition": {
-        "specialParsha": [
-          "הגדול",
-          "Hagadol"
-        ]
-      },
-      "columnKeys": [
-        "kayitz:C",
-        "choref:C"
-      ],
-      "mode": "append",
-      "value": "דרשה"
-    },
-    {
-      "id": "rule-shabbos-shuva",
-      "name": "שבת שובה: דרשה",
-      "enabled": true,
-      "condition": {
-        "specialParsha": [
-          "שובה",
-          "Shuva"
-        ]
-      },
-      "columnKeys": [
-        "kayitz:C",
-        "choref:C"
-      ],
-      "mode": "append",
-      "value": "דרשה"
     }
   ],
   "sheets": [
