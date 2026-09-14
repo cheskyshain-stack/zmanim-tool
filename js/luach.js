@@ -186,8 +186,36 @@ const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
  *  rather than inside it, which is what used to make the footer a different shape on the two
  *  pages. It matters again the moment a second line comes back. */
 const footHtml = (s) => `<div class="luach-footer">
-      <p class="luach-foot">${escAttr(s.footerAddress)}</p>
+      <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
+
+/** The address, cut so that where it takes two lines the break falls between the shul's name
+ *  and its street address.
+ *
+ *  It is one line at 600px and up and two below that, which is every phone. Left to the
+ *  browser the break went wherever the last word fitted, which on a 375px phone was
+ *  "Bais Medrash of Lakewood Commons 44 / Coles Way Lakewood, NJ 08701": the street number
+ *  stranded at the end of the name, reading as though the shul were on 44. The shul asked for
+ *  the name on one line and the address on the other, which is how anybody would write it out.
+ *
+ *  **Cut in front of the first word that begins with a digit**, which for a street address is
+ *  its house number. Read off the string rather than stored as two fields, because this is one
+ *  line somebody types in Settings and it is not worth two boxes; and a value with no such
+ *  word (a shul with no number in its address, a line typed some other way) is handed back
+ *  whole and wraps as it always did, rather than being cut somewhere that makes no sense.
+ *
+ *  The two halves are inline-block, not flex items. Inline-block gives the same thing a flex
+ *  row would, the second half moving to a line of its own rather than breaking mid-address,
+ *  and keeps two things flex would take away: the space between them is still a real space in
+ *  the markup, so copying the address off the page still gets one, and a half too wide for the
+ *  screen wraps inside itself instead of running off the side. */
+function footAddressHtml(value) {
+  const text = String(value ?? '');
+  const at = text.search(/\s\d/);
+  const part = (s) => `<span class="luach-foot-part">${escAttr(s)}</span>`;
+  if (at < 0) return part(text);
+  return `${part(text.slice(0, at))} ${part(text.slice(at + 1))}`;
+}
 
 const DONATE = {
   name: 'Donate',

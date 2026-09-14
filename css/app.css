@@ -2438,6 +2438,11 @@ body.is-luach main.is-give { padding-bottom: 0.5rem; }
   margin: 0; font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.05rem; line-height: 1.5; color: var(--luach-ink);
 }
+/* The shul's name and its street address, each a piece that moves to the next line whole.
+   The address is one line at 600px and up and two on every phone, and the break used to fall
+   wherever the last word fitted, stranding the house number on the end of the name. See
+   footAddressHtml in js/luach.js for what is cut and why it is inline-block rather than flex. */
+.luach-foot-part { display: inline-block; }
 /* .luach-foot-tax was here: the tax ID on its own line under the address, on every page.
    It has moved into the 501(c)(3) sentence on the donation page, where the number sits with
    the words that say what it is, so the rule went with it rather than being left behind for
