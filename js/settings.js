@@ -14,9 +14,23 @@ export const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
+/* The Weekday chart's שחרית schedules and its footer note are **the program's, not a setting**.
+   They were three fields in a "Weekday chart defaults" panel in Settings, and the shul asked for
+   that panel gone and these made part of the system. They are one fixed thing the shul davens,
+   not a preference: the same two schedules are printed on the wall chart, named on the week card
+   and the One sheet, read into the ROSH CHODESH and fast messages, and picked apart for "what is
+   on next". Every one of those has to be saying the same times, and a field that can be typed
+   over in one browser is a way for them to come apart.
+
+   They are read straight from here rather than out of state.settings, which matters twice over:
+   the congregation's site takes its settings from data/published.json, a snapshot of whatever was
+   in the admin the day it was written, so a value read from there could be years old; and a
+   browser holding an old hand-typed copy in localStorage cannot outvote the program. The three
+   keys are taken back out of saved settings as they load (see normalizeSettings in storage.js),
+   so nothing carries a stale copy forward in a backup either. */
+
 /** The everyday שחרית schedule as it appears on the shul's printed board, with the
- *  alternate times underlined. Plain HTML because it's edited through a rich-text box
- *  (see ui/settings-view.js) and printed as-is.
+ *  alternate times underlined. Written as HTML because that is what the chart prints.
  *
  *  **Three to a line, separated by a plain space**, which is what the shul settled on after
  *  looking at the alternatives on a printed page. It was two to a line and slash separated for a
@@ -24,7 +38,7 @@ export const TIMEZONES = [
  *  (127.7px against 146.1px, measured) and the slashes were what made a three time line too wide
  *  for the panel at all. The panel sets these in columns and **draws the separator the schedule
  *  uses**, so with no slashes typed there are none printed: see ui/shacharis-grid.js. */
-export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
+export const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
 
 /** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
  *  week card can show it only on weeks that actually have one of those days and name
@@ -36,7 +50,15 @@ export const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</
  *  sits and the panel is as wide as that line either way (127.73px against 127.72px, and the same
  *  height to the hundredth). The shul picked it on how it looks, the block finishing square with
  *  the everyday one above it rather than on a short line. */
-export const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
+export const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
+
+/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
+ *
+ *  It says what the marks on the times above it mean, so it belongs with the schedules and not
+ *  with the shul's own footer: the stars are written by the schedules and read by every screen
+ *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
+ *  one of them would be the board explaining its own marks wrongly. */
+export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -63,60 +85,14 @@ export function specialShacharisHeading(kinds) {
 }
 
 
-/** Cuts a saved value that still holds both schedules in one field into the two the
- *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
- *  no heading to split at, in which case the whole value stays as the everyday one. */
-export function splitCombinedShacharis(html) {
-  const text = String(html ?? '');
-  const at = text.search(/<u>\s*ר["״]ח/);
-  if (at < 0) return null;
-  // The heading itself is generated now, not stored, so it is dropped here.
-  const special = text.slice(at).replace(/^<u>[^<]*<\/u>/, '');
-  const trim = (s) => s.replace(/^(?:\s|<br>)+/, '').replace(/(?:\s|<br>)+$/, '');
-  return { regular: trim(text.slice(0, at)), special: trim(special) };
-}
+/* The three LEGACY_WEEKDAY_ lists are gone, and splitCombinedShacharis with them. They carried a
+   never-edited old schedule in somebody's browser forward to the current one, and there is nothing
+   left in a browser to carry: the program's copy is the only copy. */
 
-/** Earlier shipped versions of the above, before the everyday times were set bigger (and
- *  before the field became rich text at all). A saved value still matching one of these
- *  verbatim was never actually edited by hand - it's just an old default sitting in
- *  localStorage - so storage.js quietly upgrades it rather than leaving the schedule
- *  stuck looking the way it did two versions ago. Anything else is left strictly alone. */
-export const LEGACY_WEEKDAY_SHACHARIS = [
-  '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
-  '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  // Three times to a line with commas, which is how this read for a while.
-  '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>',
-  // Two to a line and slash separated, the version before the present one. The spaced three to a
-  // line schedule that used to sit in this list is the default itself now, so it is not here: a
-  // value cannot be both the thing carried forward and the thing it is carried forward to.
-  '<span class="big">7:00 / 7:20*\n<u>7:35</u> / 8:00\n8:20* / <u>8:40</u></span>',
-];
-
-/** And the same for the second schedule, which had no such list until the two of them were
- *  rearranged together. Both of the versions that have been shipped or published, so a
- *  browser holding either is carried forward and a browser holding anything else is not
- *  touched. */
-export const LEGACY_WEEKDAY_SHACHARIS_SPECIAL = [
-  '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>',
-  // Four to a line then three, which is how this read before the shul asked for the other way
-  // round. The two take the same room; it is the look that decided it.
-  '6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>',
-  // Two to a line and slash separated, the version before the present one.
-  '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>',
-];
-
-/** The three-line version of the Weekday footer, carried forward to the two-line one the
- *  same way as LEGACY_WEEKDAY_SHACHARIS: an install that never edited it should not stay
- *  on wording that has since changed. Anything typed by hand is left alone. */
-export const LEGACY_WEEKDAY_FOOTER = [
-  'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
-  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים\n**באולם השמחות',
-  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
-];
-
-/** The footer address without the "of", carried forward the same way as the two above.
+/** The footer address without the "of". A saved value still matching one of these verbatim was
+ *  never actually edited by hand, it is just an old default sitting in localStorage, so storage.js
+ *  quietly carries it forward rather than leaving the line reading the way it did two versions ago.
+ *  Anything else is left strictly alone.
  *
  *  The shul's name was written both ways across the site: the footer said "Bais Medrash
  *  Lakewood Commons" while the donation page, the page title and the domain all say "Bais
@@ -140,7 +116,7 @@ export const DEFAULT_ACCENT_COLOR = '#c9ced5';
 export const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
- *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
+ *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
 export const LEGACY_ACCENT_COLORS = ['#54595f'];
 
@@ -159,17 +135,10 @@ export const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
-  // field: those times differ every week, so every cell starts empty and is typed in on
-  // the sheet. The keys are kept so older saved backups still load cleanly.
-  // Shacharis is one fixed schedule printed identically on every week's row -
-  // stored as real HTML (not plain text) since it's edited via a rich-text box in
-  // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
-  weekdayDefaultMincha: '',
-  weekdayDefaultMaariv: '',
-  weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
-  weekdayShacharisSpecial: DEFAULT_WEEKDAY_SHACHARIS_SPECIAL,
-  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*',
+  /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
+     WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight
+     from the program by everything that prints them. מנחה and מעריב were never settings either:
+     those times differ every week, so every cell starts empty and is typed in on the sheet. */
   locationName: 'Lakewood',
   latitude: 40.068,
   longitude: -74.205,

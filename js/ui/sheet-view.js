@@ -1,4 +1,7 @@
-import { resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR } from '../settings.js';
+import {
+  resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR,
+  WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
+} from '../settings.js';
 import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
@@ -452,7 +455,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
-  const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
+  const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
   const isWeekday = effectiveSeason === 'weekday';
 
@@ -464,12 +467,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
 
-  // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
-  // one shul-wide value straight from Settings, not per-week: instead of repeating it
-  // in every row (which would make a multi-line schedule absurdly tall over many
-  // weeks), it prints once on a panel laid over the whole column, matching how it looks
-  // in the original printed chart. It's sourced live from Settings with no per-cell
-  // override - change it in Settings and it updates everywhere at once.
+  // On the Weekday chart, שחרית is one schedule for all days, not per-week: instead of
+  // repeating it in every row (which would make a multi-line schedule absurdly tall over
+  // many weeks), it prints once on a panel laid over the whole column, matching how it
+  // looks in the original printed chart. It comes off the program's own WEEKDAY_SHACHARIS
+  // with no per-cell override, which is what puts the same list on every chart at once.
   /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
      than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
      hair shorter than a row (the collapsed border between two rows is not part of it, see
@@ -502,8 +504,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
            it. These are real rows now, so the band and the rule under each of them are the
            row's own and cannot drift from the rest of the chart, and the schedule is said
            once on a panel over the top rather than repeated down the column.
-           Stored as real HTML straight from Settings' rich-text editor (see
-           settings-view.js), so it prints out as-is instead of through nl2br/esc. */
+           Written as real HTML in settings.js, so it prints out as-is instead of through
+           nl2br/esc. */
         if (isWeekday && c.key === 'E') {
           // Every row but the one the panel hangs from is an empty cell carrying nothing
           // but its own row.
@@ -519,9 +521,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              season split over two pages says on each what that page is about. */
           const heading = specialShacharisHeading(
             specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
-          const special = heading ? state.settings.weekdayShacharisSpecial : '';
+          const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
           const html =
-            (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
+            WEEKDAY_SHACHARIS +
             (special ? `
 
 <u>${escText(heading)}</u>
@@ -536,8 +538,8 @@ ${special}` : '');
              the arithmetic. */
           /* Set in columns where it can be, so the times stand under each other and the slashes
              stop wandering from line to line. shacharisGridHtml hands back nothing at all when
-             what is in Settings is not a block of times, and then this prints the typing as it
-             always has. See ui/shacharis-grid.js. */
+             what it is given is not a block of times, and then this prints it as written. See
+             ui/shacharis-grid.js. */
           const laid = shacharisGridHtml(html) || html;
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">

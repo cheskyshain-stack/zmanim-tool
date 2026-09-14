@@ -564,9 +564,9 @@ export function buildSukkosPoster(year, settings) {
      box on the יום כיפור sheet has already said so: its שחרית runs from after יו"כ to סוכות.
      "What is on next" hands a whole day over to a sheet or to the charts and not half of each,
      so a day the sheet speaks for has to be the whole day. Left out, ערב סוכות came back with
-     an afternoon and no morning at all. Taken from Settings, the same call the after יו"כ box
-     makes, so the card and that box cannot say different things. */
-  M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(settings), MORNING);
+     an afternoon and no morning at all. Read off the everyday schedule, the same call the
+     after יו"כ box makes, so the card and that box cannot say different things. */
+  M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(), MORNING);
 
   // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
   const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });

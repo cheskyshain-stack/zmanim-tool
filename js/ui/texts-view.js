@@ -38,6 +38,7 @@ import { buildPesachPoster } from '../posters/pesach.js';
 import { buildSukkosPoster } from '../posters/sukkos.js';
 import { nextRoshChodesh, roshChodeshText, roshChodeshMonthName } from '../rosh-chodesh-text.js';
 import { hebrewYear, dateFromHebrew } from '../hebrew-calendar.js';
+import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -194,7 +195,7 @@ function txWeek(state, settings, tables, entry) {
      weeks no Shabbos sheet has. */
   const chart = weekdayChartFor(null, shabbos, state);
   const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
-  const text = weekText(state?.settings?.weekdayShacharis || '', row, name, shabbos, settings);
+  const text = weekText(WEEKDAY_SHACHARIS, row, name, shabbos, settings);
   if (!text) return null;
   return {
     id: `week-${shabbos}`,
@@ -403,12 +404,13 @@ function txErevShviiShelPesach(rhYear, settings, today) {
  *  twelve of them a year is enough to be worth turning off on its own.
  *
  *  @param howMany - 1 for the window, which only ever shows the one coming. */
-function txRoshChodesh(state, settings, today, howMany = 1) {
+function txRoshChodesh(settings, today, howMany = 1) {
   const out = [];
   let from = today;
-  /* The chart's own ר"ח schedule, read from where the chart reads it: the raw cell in state, not
-     the resolved settings, which is the same source upcoming.js uses for the same list. */
-  const shacharisCell = state?.settings?.weekdayShacharisSpecial || '';
+  /* The chart's own ר"ח schedule, read from where the chart reads it: the program's copy of the
+     second schedule, which is the same source upcoming.js and the wall chart use for the same
+     list. See WEEKDAY_SHACHARIS_SPECIAL in settings.js. */
+  const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
   for (let i = 0; i < howMany; i += 1) {
     const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
     if (!rc) break;
@@ -446,7 +448,7 @@ function txRoshChodesh(state, settings, today, howMany = 1) {
  *
  *  @param days - how far to walk for the chart fasts: a handful for the window, a year for the
  *    year view, which is the same shape txRoshChodesh takes. */
-function txTaanis(year, settings, state, today, days) {
+function txTaanis(year, settings, today, days) {
   const out = [];
   const poster = buildTzomGedaliaPoster(year, settings);
   const gedalia = txInWindow(poster, today) ? tzomGedaliaText(poster) : '';
@@ -461,9 +463,9 @@ function txTaanis(year, settings, state, today, days) {
       text: gedalia,
     });
   }
-  /* The chart's own second schedule, read from where the chart reads it: the raw cell in state
-     rather than the resolved settings, the same as ROSH CHODESH. */
-  const shacharisCell = state?.settings?.weekdayShacharisSpecial || '';
+  /* The chart's own second schedule, read from where the chart reads it, the same as
+     ROSH CHODESH. */
+  const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
   for (const fast of fastsBetween(today, today + days, settings)) {
     if (!txDaysInWindow(fast.serial, fast.serial, today)) continue;
     const text = chartFastText(fast.title, shacharisCell);
@@ -603,7 +605,7 @@ export function renderTexts(container, state, settings, tables) {
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
       txErevShviiShelPesach(year, settings, today),
-      ...txTaanis(year, settings, state, today, txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS + 1),
+      ...txTaanis(year, settings, today, txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS + 1),
       ...txNetz(year, settings, today),
     ]) {
       if (msg) out.push(msg);
@@ -628,7 +630,7 @@ export function renderTexts(container, state, settings, tables) {
   if (txAll) {
     messages.push(...yomTov());
     // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
-    messages.push(...txRoshChodesh(state, settings, today, 14));
+    messages.push(...txRoshChodesh(settings, today, 14));
     // Everything still to come: the year view relaxes only how far ahead, never the near end.
     messages.push(...weekly(Infinity, TX_WEEK_TO));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
@@ -654,7 +656,7 @@ export function renderTexts(container, state, settings, tables) {
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
     messages.push(...yomTov());
-    messages.push(...txRoshChodesh(state, settings, today, 1));
+    messages.push(...txRoshChodesh(settings, today, 1));
   }
 
   /* Everything in date order, which is the order they get sent in and the only order somebody

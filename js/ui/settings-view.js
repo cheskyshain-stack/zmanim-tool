@@ -1,8 +1,20 @@
+// The Settings screen.
+//
+// **There is no "Weekday chart defaults" panel and there should not be one again.** It held the
+// two שחרית schedules and the Weekday chart's footer note as three editable fields, and the shul
+// asked for them taken out and made part of the program. They are WEEKDAY_SHACHARIS,
+// WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js now, read straight from there
+// by the chart, the week card, the One sheet, "what is on next" and the messages page alike.
+//
+// The reason is that they are not a preference. Those seven times are printed on the wall, named
+// on the phone and written into the messages the shul sends out, and each of those readers has to
+// be saying the same thing: a field that can be typed over in one browser is a way for the paper
+// and the message to come apart, with nobody able to see which of them was edited. Changing the
+// schedule is changing the program, and a change made here would have to be published to reach
+// the congregation's page anyway. See the block comment over the two constants.
 import { TIMEZONES } from '../settings.js';
 import { exportStateToFile, importStateFromText, isSheetFile, importSheetFromText } from '../storage.js';
 import { renderImageCropper } from './image-crop.js';
-import { normalizeRichText } from '../format.js';
-import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { getPublishToken, setPublishToken } from '../publish.js';
 import { renderRules } from './rules-view.js';
 import { escAttr } from '../util.js';
@@ -30,21 +42,6 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
         <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${escAttr(s.headerRabbiLine)}</textarea></label>
         <label>Footer note<textarea name="footerNote" rows="2">${escAttr(s.footerNote)}</textarea></label>
         <label>Footer address<input name="footerAddress" value="${escAttr(s.footerAddress)}"></label>
-      </div>
-      </details>
-      <details class="panel">
-        <summary>Weekday chart defaults</summary>
-        <div class="panel-body">
-        <p class="hint">מנחה and מעריב on the Weekday chart start blank, because those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">This box, and every cell on a sheet, takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
-        ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
-        <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
-        <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
-        <p class="hint">The printed chart puts this under a heading naming only the ones that actually fall in it, so a season with no בה"ב does not say בה"ב, and a season with none of the three leaves this schedule off altogether. The week card names the day itself.</p>
-        <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
-        <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
-        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
       <details class="panel">
@@ -178,35 +175,6 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
   // you add or edit a rule, which leaves the rest of Settings untouched.
   renderRules(container.querySelector('#rules-host'), state, onRulesChange);
 
-  const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
-  const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');
-
-  // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
-  // was last focused - tracked on focusin because the toolbar buttons deliberately don't
-  // take focus (see wireRichTextToolbar).
-  let lastRichField = shacharisEditor;
-  container.addEventListener('focusin', (e) => {
-    if (e.target.classList?.contains('richtext-field')) lastRichField = e.target;
-  });
-  wireRichTextToolbar(container, () => lastRichField);
-
-  // Shorthand times settle when you leave a box, and Ctrl/Cmd+U underlines, in every one
-  // of these boxes - including option rows added after this point, hence the delegation.
-  container.addEventListener(
-    'blur',
-    (e) => {
-      if (e.target.classList?.contains('richtext-field')) applyTimeShorthand(e.target);
-    },
-    true // blur doesn't bubble; capture is how a delegated listener sees it
-  );
-  container.addEventListener('keydown', (e) => {
-    if (e.target.classList?.contains('richtext-field') && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-      e.preventDefault();
-      document.execCommand('underline');
-    }
-  });
-
-
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -217,9 +185,6 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
-      weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
-      weekdayShacharisSpecial: normalizeRichText(shacharisSpecialEditor.innerHTML),
-      weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
       longitude: Number(fd.get('longitude')),

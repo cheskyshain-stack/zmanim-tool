@@ -75,10 +75,9 @@ export function normalizeTimeList(text) {
     .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
 }
 
-/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
- *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
- *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
- *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+/** Light contenteditable HTML cleanup for the app's rich-text fields, which are the sheet's
+ *  own cells (ui/sheet-view.js), so a trivial click-in/click-out does not register as a
+ *  change: trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
  *  &nbsp; to a plain space. */
 export function normalizeRichText(html) {
   return html

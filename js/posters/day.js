@@ -185,8 +185,8 @@ export function specialShacharis(serial, settings) {
  *  which is specialMinyanim above and is what the two days of ר"ה and יו"כ are.
  *
  *  Only the lines that are really drawn count: the ר"ח and בה"ב days are covered only where
- *  there is a second list in Settings to print. That test lives here rather than in the two
- *  views, so what is counted and what is drawn cannot come apart.
+ *  there is a second list to print. That test lives here rather than in the two views, so what
+ *  is counted and what is drawn cannot come apart.
  *
  *  Once the season has said anything at all about a week, it says all of it. The first day of
  *  סליחות has none in the morning and davens the ordinary list, so its line reads the same as

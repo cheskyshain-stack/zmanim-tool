@@ -5,7 +5,7 @@
 //
 //   ROSH CHODESH Nissan Shacharis 6:40m, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
 //
-// **Every time in it comes off the wall chart**, settings.weekdayShacharisSpecial, which is the
+// **Every time in it comes off the wall chart**, WEEKDAY_SHACHARIS_SPECIAL, which is the
 // second schedule the chart prints on a ר"ח, a בה"ב and a תענית. Nothing here computes a time and
 // nothing here keeps its own copy of one. That is the rule the whole messages page runs on, and
 // this file broke it twice before the shul caught both:
@@ -46,16 +46,16 @@ export const RC_TEXT = {
 
 /** The מנינים, read off the wall chart's own ר"ח schedule.
  *
- *  **`settings.weekdayShacharisSpecial`, which is the cell the chart prints on a ר"ח, a בה"ב and a
- *  תענית.** This carried its own copy of that list for a while and it should not have. The shul
+ *  **`WEEKDAY_SHACHARIS_SPECIAL` in settings.js, which is the cell the chart prints on a ר"ח, a
+ *  בה"ב and a תענית.** This carried its own copy of that list for a while and it should not have. The shul
  *  caught it on one time: the copy had a 6:50 בעזרת נשים that the chart has not got, so the message
  *  was announcing a מנין the board does not show. A second copy of a schedule is a schedule that
  *  will disagree with the board the first time somebody edits one of them, and the board is the one
  *  people daven from.
  *
  *  So the letters come off the chart's own marks rather than being typed beside the times:
- *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Edit the schedule
- *  in Settings and this message follows it, which is the whole point.
+ *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Change that one
+ *  schedule and this message follows it, which is the whole point.
  *
  *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
  *  not one to send, so the caller drops the card rather than sending the heading on its own. */
@@ -104,7 +104,7 @@ export function nextRoshChodesh(from, useGregorianBefore1582 = false) {
 /** The message.
  *
  *  @param rc - straight from nextRoshChodesh.
- *  @param shacharisCell - the chart's own ר"ח schedule, settings.weekdayShacharisSpecial. */
+ *  @param shacharisCell - the chart's own ר"ח schedule, WEEKDAY_SHACHARIS_SPECIAL. */
 export function roshChodeshText(rc, shacharisCell) {
   if (!rc) return '';
   const name = roshChodeshMonthName(rc.month);

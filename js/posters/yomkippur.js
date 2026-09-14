@@ -21,6 +21,7 @@ import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { openingMincha } from './early-mincha.js';
 import { SLASH, NBSP } from '../util.js';
+import { WEEKDAY_SHACHARIS } from '../settings.js';
 
 /** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
  *  of times: after מעריב, or at half past ten. */
@@ -93,7 +94,7 @@ export const YK_TEXT = {
  *  The stored value is rich text: a wrapper span, a line break between the two halves, and
  *  the times separated by spaces rather than commas. All three are flattened to the comma
  *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
-/** The everyday שחרית out of Settings, as times.
+/** The everyday שחרית off the wall chart, as times. See WEEKDAY_SHACHARIS in settings.js.
  *
  *  Exported because the סוכות sheet needs it too: ערב סוכות's own morning is an ordinary one
  *  and is on the box this sheet carries rather than on that one.
@@ -103,8 +104,8 @@ export const YK_TEXT = {
  *  variant picked). Two functions of one name are fine across modules and fatal in the offline
  *  copy, which flattens every module into one scope: whichever is written second wins, and
  *  every call to the other one silently gets it. That is exactly what had happened here. */
-export function everydayShacharis(settings) {
-  const html = String(settings.weekdayShacharis || '')
+export function everydayShacharis() {
+  const html = String(WEEKDAY_SHACHARIS)
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
     /* The slashes between a pair of times, which are separators and not times. The field used
@@ -236,7 +237,7 @@ const AFTER_MAARIV_REST = [
 export function afterSchedule(earliestShkia, latestMinchaGedola, settings, { lastFifteen = false } = {}) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
   return {
-    shacharis: everydayShacharis(settings),
+    shacharis: everydayShacharis(),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
     mincha: afterMincha(earliestShkia, latestMinchaGedola, { lastFifteen })
       .map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
@@ -360,7 +361,7 @@ export function buildYomKippurPoster(year, settings) {
   const nextMorning = {
     calc: 'nextMorning',
     label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
-    times: fiveEarlier(everydayShacharis(settings)),
+    times: fiveEarlier(everydayShacharis()),
   };
 
   // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.

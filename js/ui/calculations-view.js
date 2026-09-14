@@ -176,9 +176,9 @@ const WEEKDAY_RULES = {
   },
   E: {
     plain:
-      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding whatever is typed into Settings, so the daily schedule is written once rather than computed.',
+      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding the schedule the shul davens every morning, so the daily list is part of the program rather than computed.',
     exact:
-      'Taken from the שחרית field in Settings, rendered as the small markup subset that field stores. A week carrying a fast or a Rosh Chodesh uses the second field instead.',
+      'Not calculated. It is the everyday שחרית the program carries, printed as written. A week carrying a fast or a Rosh Chodesh prints the second schedule under it as well.',
   },
 };
 
@@ -424,11 +424,11 @@ const POSTER_SHEETS = [
       },
       nextMorning: {
         plain: 'The morning after יום כיפור, which is the everyday שחרית run five minutes early. The heading names the day.',
-        exact: 'Every time in the שחרית schedule from Settings, each less 5 minutes. The day name comes from the calendar, so the heading is right whichever day the 11th of תשרי falls on.',
+        exact: 'Every time in the everyday שחרית schedule, each less 5 minutes. The day name comes from the calendar, so the heading is right whichever day the 11th of תשרי falls on.',
       },
       afterShacharis: {
-        plain: 'The box at the foot: the schedule from the morning after יום כיפור until סוכות. שחרית is the everyday one out of Settings, unchanged.',
-        exact: 'Taken straight from the שחרית field in Settings, so this sheet and the boards cannot drift apart.',
+        plain: 'The box at the foot: the schedule from the morning after יום כיפור until סוכות. שחרית is the everyday one, unchanged.',
+        exact: 'Not calculated. The everyday שחרית as the boards print it, read from the one place it is written, so this sheet and the boards cannot drift apart.',
       },
       afterMincha: {
         plain: 'That schedule\'s מנחה. Four fixed times, then one every 20 minutes from 4:40 for as long as a מנין still lands a quarter of an hour before שקיעה, and sometimes one more squeezed in behind them. The first of the four is held to מנחה גדולה.',
@@ -638,8 +638,8 @@ const POSTER_SHEETS = [
         exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5: down rather than up, because a quarter of an hour before the earliest שקיעה is the latest that מנין may be. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them a מנין goes back in 20 minutes before the last, or 15 where 20 would crowd the one in front. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       afterShacharis: {
-        plain: 'The everyday morning the shul goes back to once שמחת תורה is over, straight out of Settings.',
-        exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, so a change in Settings reaches all three at once.',
+        plain: 'The everyday morning the shul goes back to once שמחת תורה is over, exactly as the boards print it.',
+        exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, all three reading the one place it is written.',
       },
       afterMincha: {
         plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40, and last a מנין a quarter of an hour before שקיעה on a round five.',
@@ -673,8 +673,8 @@ const POSTER_SHEETS = [
         exact: 'שקיעה of the day the search is on plus 50 minutes. That is 13 ניסן normally, and 12 ניסן in a year where ערב פסח is Shabbos, the search being brought forward to the Thursday night. The 10:30 is announced and does not move.',
       },
       erevShacharis: {
-        plain: 'The morning of ערב פסח, which is the everyday שחרית out of Settings.',
-        exact: 'Not calculated. The same list the boards print, so a change in Settings reaches the board and this sheet at once.',
+        plain: 'The morning of ערב פסח, which is the everyday שחרית the boards print.',
+        exact: 'Not calculated. The same list the boards print, read from the one place it is written, so the board and this sheet cannot drift apart.',
       },
       achila: {
         plain: 'סוף זמן אכילת חמץ, the end of the fourth hour on the מגן אברהם\'s day.',

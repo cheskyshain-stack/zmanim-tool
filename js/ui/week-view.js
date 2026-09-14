@@ -8,7 +8,7 @@
 // override already in a sheet shows up here with no extra work, and the two can never
 // drift apart.
 
-import { resolveSettings, SEASON_LABELS } from '../settings.js';
+import { resolveSettings, SEASON_LABELS, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
@@ -1193,8 +1193,7 @@ function weekCardsHtml(showing, index, state, settings) {
     /* The week's mornings, and whether the everyday שחרית is one of them. Worked out in
        posters/day.js, which the One sheet asks the same question of: the two draw this block
        and were deciding separately what was on it. */
-    const mornings = weekdayMornings(showing, settings,
-      state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
+    const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
       // The everyday שחרית comes off a week where every morning already has a line of its
@@ -1209,7 +1208,7 @@ function weekCardsHtml(showing, index, state, settings) {
       // weekNl2br has to turn into real <u> elements.
       .map((c) =>
         c.key === 'E'
-          ? line(c.header, htmlLines(state.settings.weekdayShacharis), true, false, '', true)
+          ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
           : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
@@ -1262,7 +1261,7 @@ function weekCardsHtml(showing, index, state, settings) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
       if (mornings.others) {
-        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
+        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: WEEKDAY_SHACHARIS_SPECIAL });
       }
       parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }
@@ -1778,7 +1777,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   );
 }
 
-/** Rich text from Settings, kept as HTML but with its own outer whitespace trimmed. */
+/** A schedule written as HTML, kept as HTML but with its own outer whitespace trimmed. */
 function htmlLines(html) {
   return String(html ?? '').trim();
 }

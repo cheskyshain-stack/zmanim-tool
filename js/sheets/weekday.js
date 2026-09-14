@@ -17,7 +17,7 @@
 // on the ערב שבת schedule over on the שבת chart, and Shabbos has its own.
 //
 // שחרית is deliberately not built here. It's one fixed schedule identical every week,
-// printed once as a merged cell straight from Settings (see ui/sheet-view.js).
+// printed once as a merged cell out of WEEKDAY_SHACHARIS (see ui/sheet-view.js).
 //
 // How a printed time says where that מנין davens (the same symbols the chart's own footer
 // explains):

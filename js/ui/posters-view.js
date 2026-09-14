@@ -1354,7 +1354,7 @@ function renderAfterYomKippurPoster(poster, settings) {
 
 /** The צום גדליה sheet: the same heading-per-תפילה blocks as the sheet above, but the times
  *  are given in the lines the poster hands over rather than halved, because the morning's
- *  two lines are the two the shul typed in Settings and the afternoon is one line of five.
+ *  two lines are the two the sheet carries and the afternoon is one line of five.
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */

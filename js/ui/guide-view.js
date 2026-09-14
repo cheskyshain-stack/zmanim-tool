@@ -94,7 +94,8 @@ export function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>Settings</summary>
       <div class="panel-body">
-        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and the daily שחרית schedule printed on the Weekday chart. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
+        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and what prints at the head and foot of every page. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
+        <p>The daily שחרית schedule on the Weekday chart is not here. It is part of the program, so the board, the week card, "what is on next" and the messages page all print the one list and cannot come to disagree. Changing it is a change to the program.</p>
       </div>
     </details>
 

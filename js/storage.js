@@ -3,14 +3,9 @@
 // this is the single-browser "local app" model the user chose over a hosted backend.
 import {
   DEFAULT_SETTINGS,
-  DEFAULT_WEEKDAY_SHACHARIS,
-  LEGACY_WEEKDAY_SHACHARIS,
-  LEGACY_WEEKDAY_SHACHARIS_SPECIAL,
-  LEGACY_WEEKDAY_FOOTER,
   LEGACY_FOOTER_ADDRESS,
   DEFAULT_ACCENT_COLOR,
   LEGACY_ACCENT_COLORS,
-  splitCombinedShacharis,
 } from './settings.js';
 import { dateFromSerial } from './zmanim/solar.js';
 /* The retired דרשה rules live with the rule engine rather than here, because this is not the only
@@ -48,36 +43,12 @@ const TISHA_BAV_RULE = {
   value: 'ט באב',
 };
 
-/** The 8:40 put back on the end of the ר"ח / בה"ב / תענית שחרית, once.
- *
- *  It came off for a day: the list looked like an everyday one with an extra מנין on it, and
- *  the shul asked for it off and then asked for it back. Taking it off could not be a LEGACY_
- *  list, which is how a changed default normally reaches an install that never edited it (see
- *  settings.js), because the shul's own board writes its times with spaces where the default
- *  writes commas; so it was a seed, and putting it back is the same seed in reverse.
- *
- *  An exact table rather than a rule, because this has to undo one specific change and nothing
- *  else. Two values could have been left by it: the shipped default of that day, and the one
- *  the shul's own browser held. Each goes back to what it was, separators and all. A schedule
- *  that still has its 8:40, or that has been edited since, matches neither and is left alone.
- */
-const RESTORE_840 = new Map([
-  ['6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*',
-    '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>'],
-  ['6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20*',
-    '6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>'],
-]);
+/* The seed that put the 8:40 back on the end of the ר"ח / בה"ב / תענית שחרית is gone with the
+   setting it edited. That schedule is WEEKDAY_SHACHARIS_SPECIAL in settings.js now and no browser
+   holds a copy of it to be corrected. */
 
 function applySeeds(state) {
   const seeded = state.seeded || {};
-  /* The 8:40 back on the ר"ח / בה"ב / תענית שחרית, on a browser that took the version which
-     removed it. Once, and recorded, the same as every other seed on this list, so a shul that
-     takes it off itself keeps it off. See RESTORE_840. */
-  if (!seeded.special840Back) {
-    const saved = state.settings?.weekdayShacharisSpecial;
-    if (RESTORE_840.has(saved)) state.settings.weekdayShacharisSpecial = RESTORE_840.get(saved);
-    seeded.special840Back = true;
-  }
   /* Both bare-word דרשה rules off, on any browser still holding one. Not guarded by a flag
      that can be satisfied once: the שובה pass ran under seeded.shuvaComputed and matched on
      the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
@@ -124,28 +95,27 @@ function applySeeds(state) {
 // app's built-in defaults for the rest of the session.
 function normalizeSettings(raw) {
   const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
-  // See LEGACY_WEEKDAY_SHACHARIS: carry a never-edited old default forward to the
-  // current one, so an existing install doesn't stay stuck on an outdated schedule.
-  if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
-  if (LEGACY_WEEKDAY_SHACHARIS_SPECIAL.includes(merged.weekdayShacharisSpecial)) {
-    merged.weekdayShacharisSpecial = DEFAULT_SETTINGS.weekdayShacharisSpecial;
-  }
-  if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
   if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
-  // שחרית used to be one field holding both schedules. Anything saved back then is cut
-  // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
-  // already set. Only when the saved value still carries that heading: a value already
-  // split has none, and is left alone.
-  if (raw?.weekdayShacharisSpecial === undefined) {
-    const parts = splitCombinedShacharis(merged.weekdayShacharis);
-    if (parts) {
-      merged.weekdayShacharis = parts.regular;
-      merged.weekdayShacharisSpecial = parts.special;
-    }
-  }
+  for (const key of RETIRED_SETTINGS) delete merged[key];
   return merged;
 }
+
+/** Settings that are the program's now and not the shul's, dropped as they load.
+ *
+ *  The two Weekday שחרית schedules and the chart's footer note were three fields in Settings;
+ *  they are WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js
+ *  now, and everything that prints them reads them from there. The old keys are taken out rather
+ *  than left sitting in localStorage: nothing reads them, so a copy left behind would be a stale
+ *  schedule travelling in every backup and every published file, looking authoritative and being
+ *  read by nothing. The מנחה and מעריב keys were always blank and go with them. */
+const RETIRED_SETTINGS = [
+  'weekdayShacharis',
+  'weekdayShacharisSpecial',
+  'weekdayFooterNote',
+  'weekdayDefaultMincha',
+  'weekdayDefaultMaariv',
+];
 
 const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
 

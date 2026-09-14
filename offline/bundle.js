@@ -557,9 +557,23 @@ const TIMEZONES = [
   { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
 ];
 
+/* The Weekday chart's שחרית schedules and its footer note are **the program's, not a setting**.
+   They were three fields in a "Weekday chart defaults" panel in Settings, and the shul asked for
+   that panel gone and these made part of the system. They are one fixed thing the shul davens,
+   not a preference: the same two schedules are printed on the wall chart, named on the week card
+   and the One sheet, read into the ROSH CHODESH and fast messages, and picked apart for "what is
+   on next". Every one of those has to be saying the same times, and a field that can be typed
+   over in one browser is a way for them to come apart.
+
+   They are read straight from here rather than out of state.settings, which matters twice over:
+   the congregation's site takes its settings from data/published.json, a snapshot of whatever was
+   in the admin the day it was written, so a value read from there could be years old; and a
+   browser holding an old hand-typed copy in localStorage cannot outvote the program. The three
+   keys are taken back out of saved settings as they load (see normalizeSettings in storage.js),
+   so nothing carries a stale copy forward in a backup either. */
+
 /** The everyday שחרית schedule as it appears on the shul's printed board, with the
- *  alternate times underlined. Plain HTML because it's edited through a rich-text box
- *  (see ui/settings-view.js) and printed as-is.
+ *  alternate times underlined. Written as HTML because that is what the chart prints.
  *
  *  **Three to a line, separated by a plain space**, which is what the shul settled on after
  *  looking at the alternatives on a printed page. It was two to a line and slash separated for a
@@ -567,7 +581,7 @@ const TIMEZONES = [
  *  (127.7px against 146.1px, measured) and the slashes were what made a three time line too wide
  *  for the panel at all. The panel sets these in columns and **draws the separator the schedule
  *  uses**, so with no slashes typed there are none printed: see ui/shacharis-grid.js. */
-const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
+const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
 
 /** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
  *  week card can show it only on weeks that actually have one of those days and name
@@ -579,7 +593,15 @@ const DEFAULT_WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:0
  *  sits and the panel is as wide as that line either way (127.73px against 127.72px, and the same
  *  height to the hundredth). The shul picked it on how it looks, the block finishing square with
  *  the everyday one above it rather than on a short line. */
-const DEFAULT_WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
+const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
+
+/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
+ *
+ *  It says what the marks on the times above it mean, so it belongs with the schedules and not
+ *  with the shul's own footer: the stars are written by the schedules and read by every screen
+ *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
+ *  one of them would be the board explaining its own marks wrongly. */
+const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -606,60 +628,14 @@ function specialShacharisHeading(kinds) {
 }
 
 
-/** Cuts a saved value that still holds both schedules in one field into the two the
- *  app now keeps separately, splitting at the ר"ח heading. Returns null when there is
- *  no heading to split at, in which case the whole value stays as the everyday one. */
-function splitCombinedShacharis(html) {
-  const text = String(html ?? '');
-  const at = text.search(/<u>\s*ר["״]ח/);
-  if (at < 0) return null;
-  // The heading itself is generated now, not stored, so it is dropped here.
-  const special = text.slice(at).replace(/^<u>[^<]*<\/u>/, '');
-  const trim = (s) => s.replace(/^(?:\s|<br>)+/, '').replace(/(?:\s|<br>)+$/, '');
-  return { regular: trim(text.slice(0, at)), special: trim(special) };
-}
+/* The three LEGACY_WEEKDAY_ lists are gone, and splitCombinedShacharis with them. They carried a
+   never-edited old schedule in somebody's browser forward to the current one, and there is nothing
+   left in a browser to carry: the program's copy is the only copy. */
 
-/** Earlier shipped versions of the above, before the everyday times were set bigger (and
- *  before the field became rich text at all). A saved value still matching one of these
- *  verbatim was never actually edited by hand - it's just an old default sitting in
- *  localStorage - so storage.js quietly upgrades it rather than leaving the schedule
- *  stuck looking the way it did two versions ago. Anything else is left strictly alone. */
-const LEGACY_WEEKDAY_SHACHARIS = [
-  '7:00, 7:20*, 7:35\n8:00, 8:20*, 8:40\n\nר"ח בה"ב ותעני"צ\n6:40, 7:00*, 7:15,7:35**\n8:00, 8:20*, 8:40',
-  '7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  '<span style="font-size:1.3em">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  '<span class="big">7:00, 7:20*, <u>7:35</u><br>8:00, 8:20*, <u>8:40</u></span><br><br><u>ר"ח בה"ב ותעני"צ</u><br>6:40, 7:00*, <u>7:15,7:35</u>**<br>8:00, 8:20*, <u>8:40</u>',
-  // Three times to a line with commas, which is how this read for a while.
-  '<span class="big">7:00, 7:20*, <u>7:35</u>\n8:00, 8:20*, <u>8:40</u></span>',
-  // Two to a line and slash separated, the version before the present one. The spaced three to a
-  // line schedule that used to sit in this list is the default itself now, so it is not here: a
-  // value cannot be both the thing carried forward and the thing it is carried forward to.
-  '<span class="big">7:00 / 7:20*\n<u>7:35</u> / 8:00\n8:20* / <u>8:40</u></span>',
-];
-
-/** And the same for the second schedule, which had no such list until the two of them were
- *  rearranged together. Both of the versions that have been shipped or published, so a
- *  browser holding either is carried forward and a browser holding anything else is not
- *  touched. */
-const LEGACY_WEEKDAY_SHACHARIS_SPECIAL = [
-  '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>',
-  // Four to a line then three, which is how this read before the shul asked for the other way
-  // round. The two take the same room; it is the look that decided it.
-  '6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>',
-  // Two to a line and slash separated, the version before the present one.
-  '6:40 / 7:00*\n<u>7:15</u> / 7:35**\n8:00 / 8:20*\n<u>8:40</u>',
-];
-
-/** The three-line version of the Weekday footer, carried forward to the two-line one the
- *  same way as LEGACY_WEEKDAY_SHACHARIS: an install that never edited it should not stay
- *  on wording that has since changed. Anything typed by hand is left alone. */
-const LEGACY_WEEKDAY_FOOTER = [
-  'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים*\nבאולם השמחות**',
-  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים\n**באולם השמחות',
-  'All underlined מנינים will be בבית מדרש למטה\n*בעזרת נשים **באולם השמחות',
-];
-
-/** The footer address without the "of", carried forward the same way as the two above.
+/** The footer address without the "of". A saved value still matching one of these verbatim was
+ *  never actually edited by hand, it is just an old default sitting in localStorage, so storage.js
+ *  quietly carries it forward rather than leaving the line reading the way it did two versions ago.
+ *  Anything else is left strictly alone.
  *
  *  The shul's name was written both ways across the site: the footer said "Bais Medrash
  *  Lakewood Commons" while the donation page, the page title and the domain all say "Bais
@@ -683,7 +659,7 @@ const DEFAULT_ACCENT_COLOR = '#c9ced5';
 const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
 
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
- *  LEGACY_WEEKDAY_SHACHARIS: a sheet still holding one of these was never given a colour
+ *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
 const LEGACY_ACCENT_COLORS = ['#54595f'];
 
@@ -702,17 +678,10 @@ const DEFAULT_SETTINGS = {
   // rounding disclaimer, etc.) plus the shul's address.
   footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  // Weekday chart defaults. מנחה/מעריב are intentionally blank and have no Settings
-  // field: those times differ every week, so every cell starts empty and is typed in on
-  // the sheet. The keys are kept so older saved backups still load cleanly.
-  // Shacharis is one fixed schedule printed identically on every week's row -
-  // stored as real HTML (not plain text) since it's edited via a rich-text box in
-  // Settings that supports the same Ctrl/Cmd+U underlining as sheet cells.
-  weekdayDefaultMincha: '',
-  weekdayDefaultMaariv: '',
-  weekdayShacharis: DEFAULT_WEEKDAY_SHACHARIS,
-  weekdayShacharisSpecial: DEFAULT_WEEKDAY_SHACHARIS_SPECIAL,
-  weekdayFooterNote: 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*',
+  /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
+     WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight
+     from the program by everything that prints them. מנחה and מעריב were never settings either:
+     those times differ every week, so every cell starts empty and is typed in on the sheet. */
   locationName: 'Lakewood',
   latitude: 40.068,
   longitude: -74.205,
@@ -781,36 +750,12 @@ const TISHA_BAV_RULE = {
   value: 'ט באב',
 };
 
-/** The 8:40 put back on the end of the ר"ח / בה"ב / תענית שחרית, once.
- *
- *  It came off for a day: the list looked like an everyday one with an extra מנין on it, and
- *  the shul asked for it off and then asked for it back. Taking it off could not be a LEGACY_
- *  list, which is how a changed default normally reaches an install that never edited it (see
- *  settings.js), because the shul's own board writes its times with spaces where the default
- *  writes commas; so it was a seed, and putting it back is the same seed in reverse.
- *
- *  An exact table rather than a rule, because this has to undo one specific change and nothing
- *  else. Two values could have been left by it: the shipped default of that day, and the one
- *  the shul's own browser held. Each goes back to what it was, separators and all. A schedule
- *  that still has its 8:40, or that has been edited since, matches neither and is left alone.
- */
-const RESTORE_840 = new Map([
-  ['6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*',
-    '6:40, 7:00*, <u>7:15</u>, 7:35**\n8:00, 8:20*, <u>8:40</u>'],
-  ['6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20*',
-    '6:40 7:00* <u>7:15</u> 7:35**\n8:00 8:20* <u>8:40</u>'],
-]);
+/* The seed that put the 8:40 back on the end of the ר"ח / בה"ב / תענית שחרית is gone with the
+   setting it edited. That schedule is WEEKDAY_SHACHARIS_SPECIAL in settings.js now and no browser
+   holds a copy of it to be corrected. */
 
 function applySeeds(state) {
   const seeded = state.seeded || {};
-  /* The 8:40 back on the ר"ח / בה"ב / תענית שחרית, on a browser that took the version which
-     removed it. Once, and recorded, the same as every other seed on this list, so a shul that
-     takes it off itself keeps it off. See RESTORE_840. */
-  if (!seeded.special840Back) {
-    const saved = state.settings?.weekdayShacharisSpecial;
-    if (RESTORE_840.has(saved)) state.settings.weekdayShacharisSpecial = RESTORE_840.get(saved);
-    seeded.special840Back = true;
-  }
   /* Both bare-word דרשה rules off, on any browser still holding one. Not guarded by a flag
      that can be satisfied once: the שובה pass ran under seeded.shuvaComputed and matched on
      the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
@@ -857,28 +802,27 @@ function applySeeds(state) {
 // app's built-in defaults for the rest of the session.
 function normalizeSettings(raw) {
   const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
-  // See LEGACY_WEEKDAY_SHACHARIS: carry a never-edited old default forward to the
-  // current one, so an existing install doesn't stay stuck on an outdated schedule.
-  if (LEGACY_WEEKDAY_SHACHARIS.includes(merged.weekdayShacharis)) merged.weekdayShacharis = DEFAULT_WEEKDAY_SHACHARIS;
-  if (LEGACY_WEEKDAY_SHACHARIS_SPECIAL.includes(merged.weekdayShacharisSpecial)) {
-    merged.weekdayShacharisSpecial = DEFAULT_SETTINGS.weekdayShacharisSpecial;
-  }
-  if (LEGACY_WEEKDAY_FOOTER.includes(merged.weekdayFooterNote)) merged.weekdayFooterNote = DEFAULT_SETTINGS.weekdayFooterNote;
   if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
-  // שחרית used to be one field holding both schedules. Anything saved back then is cut
-  // in two here, at its own ר"ח heading, so nobody has to retype a schedule they had
-  // already set. Only when the saved value still carries that heading: a value already
-  // split has none, and is left alone.
-  if (raw?.weekdayShacharisSpecial === undefined) {
-    const parts = splitCombinedShacharis(merged.weekdayShacharis);
-    if (parts) {
-      merged.weekdayShacharis = parts.regular;
-      merged.weekdayShacharisSpecial = parts.special;
-    }
-  }
+  for (const key of RETIRED_SETTINGS) delete merged[key];
   return merged;
 }
+
+/** Settings that are the program's now and not the shul's, dropped as they load.
+ *
+ *  The two Weekday שחרית schedules and the chart's footer note were three fields in Settings;
+ *  they are WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js
+ *  now, and everything that prints them reads them from there. The old keys are taken out rather
+ *  than left sitting in localStorage: nothing reads them, so a copy left behind would be a stale
+ *  schedule travelling in every backup and every published file, looking authoritative and being
+ *  read by nothing. The מנחה and מעריב keys were always blank and go with them. */
+const RETIRED_SETTINGS = [
+  'weekdayShacharis',
+  'weekdayShacharisSpecial',
+  'weekdayFooterNote',
+  'weekdayDefaultMincha',
+  'weekdayDefaultMaariv',
+];
 
 const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
 
@@ -1071,10 +1015,9 @@ function normalizeTimeList(text) {
     .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
 }
 
-/** Light contenteditable HTML cleanup, shared by every rich-text field in the app
- *  (sheet cells in ui/sheet-view.js, the shacharis schedule editor in
- *  ui/settings-view.js) so a trivial click-in/click-out does not register as a change:
- *  trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+/** Light contenteditable HTML cleanup for the app's rich-text fields, which are the sheet's
+ *  own cells (ui/sheet-view.js), so a trivial click-in/click-out does not register as a
+ *  change: trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
  *  &nbsp; to a plain space. */
 function normalizeRichText(html) {
   return html
@@ -2327,6 +2270,7 @@ function openingMincha(minchaGedola, next) {
 
 
 
+
 /** The & that joins the two ways of taking קידוש לבנה, spaced the way SLASH spaces a pair
  *  of times: after מעריב, or at half past ten. */
 const YK_AMP = `${NBSP}&${NBSP}`;
@@ -2398,7 +2342,7 @@ const YK_TEXT = {
  *  The stored value is rich text: a wrapper span, a line break between the two halves, and
  *  the times separated by spaces rather than commas. All three are flattened to the comma
  *  separated list parseTimes reads, the <u> that marks a למטה מנין left alone. */
-/** The everyday שחרית out of Settings, as times.
+/** The everyday שחרית off the wall chart, as times. See WEEKDAY_SHACHARIS in settings.js.
  *
  *  Exported because the סוכות sheet needs it too: ערב סוכות's own morning is an ordinary one
  *  and is on the box this sheet carries rather than on that one.
@@ -2408,8 +2352,8 @@ const YK_TEXT = {
  *  variant picked). Two functions of one name are fine across modules and fatal in the offline
  *  copy, which flattens every module into one scope: whichever is written second wins, and
  *  every call to the other one silently gets it. That is exactly what had happened here. */
-function everydayShacharis(settings) {
-  const html = String(settings.weekdayShacharis || '')
+function everydayShacharis() {
+  const html = String(WEEKDAY_SHACHARIS)
     .replace(/<span[^>]*>|<\/span>/g, '')
     .replace(/<br\s*\/?>/g, ' ')
     /* The slashes between a pair of times, which are separators and not times. The field used
@@ -2541,7 +2485,7 @@ const AFTER_MAARIV_REST = [
 function afterSchedule(earliestShkia, latestMinchaGedola, settings, { lastFifteen = false } = {}) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
   return {
-    shacharis: everydayShacharis(settings),
+    shacharis: everydayShacharis(),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
     mincha: afterMincha(earliestShkia, latestMinchaGedola, { lastFifteen })
       .map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
@@ -2665,7 +2609,7 @@ function buildYomKippurPoster(year, settings) {
   const nextMorning = {
     calc: 'nextMorning',
     label: `${YK_TEXT.nextMorning} ${YK_DAY_LETTERS[excelWeekday(dayAfter)]}`,
-    times: fiveEarlier(everydayShacharis(settings)),
+    times: fiveEarlier(everydayShacharis()),
   };
 
   // The box: the days between יו"כ and סוכות, the same schedule the sheet of its own gives.
@@ -3353,7 +3297,7 @@ function buildPesachPoster(year, settings) {
       at: on,
       heading: heading(PS_TEXT.erev, PS_EREV),
       lines: [
-        line(PS_TEXT.shacharis, everydayShacharis(settings), { calc: 'erevShacharis' }),
+        line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
         line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
         line(PS_TEXT.biur, [tm(alos + 5 * hour)], { calc: 'biur' }),
         // The afternoon is the ערב יום טוב run, and on a year where ערב פסח is Shabbos there is
@@ -3362,7 +3306,7 @@ function buildPesachPoster(year, settings) {
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
       ].filter(Boolean),
     });
-    M.list(on, PS_TEXT.shacharis, everydayShacharis(settings), MORNING);
+    M.list(on, PS_TEXT.shacharis, everydayShacharis(), MORNING);
     if (!erevShabbos) M.list(on, PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), AFTERNOON);
   }
 
@@ -4484,9 +4428,9 @@ function buildSukkosPoster(year, settings) {
      box on the יום כיפור sheet has already said so: its שחרית runs from after יו"כ to סוכות.
      "What is on next" hands a whole day over to a sheet or to the charts and not half of each,
      so a day the sheet speaks for has to be the whole day. Left out, ערב סוכות came back with
-     an afternoon and no morning at all. Taken from Settings, the same call the after יו"כ box
-     makes, so the card and that box cannot say different things. */
-  M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(settings), MORNING);
+     an afternoon and no morning at all. Read off the everyday schedule, the same call the
+     after יו"כ box makes, so the card and that box cannot say different things. */
+  M.list(day(SK_EREV), SK_TEXT.shacharis, everydayShacharis(), MORNING);
 
   // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
   const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });
@@ -5143,7 +5087,7 @@ function buildVasikinPoster(year, settings, which = 'rh') {
 // on the ערב שבת schedule over on the שבת chart, and Shabbos has its own.
 //
 // שחרית is deliberately not built here. It's one fixed schedule identical every week,
-// printed once as a merged cell straight from Settings (see ui/sheet-view.js).
+// printed once as a merged cell out of WEEKDAY_SHACHARIS (see ui/sheet-view.js).
 //
 // How a printed time says where that מנין davens (the same symbols the chart's own footer
 // explains):
@@ -7109,8 +7053,9 @@ function splitWeeksIntoPages(weeks, sizes) {
 }
 
 // ==== ui/rich-text.js ====
-// Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
-// (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
+// Shared formatting toolbar for the app's contenteditable fields, which is the sheet's own
+// cells (ui/sheet-view.js). Settings had two such boxes for the Weekday שחרית schedules and no
+// longer does: those are the program's now, see the note at the top of ui/settings-view.js.
 // Underline goes through execCommand, which already handles the add/remove toggle and
 // partial selections correctly; text size is a plain <span class="big"> wrap, so what's
 // stored stays readable HTML rather than the <font size> tags execCommand would emit.
@@ -7342,8 +7287,8 @@ function reselect(sel, node) {
 // a different place on each and the slashes between them wandered. The shul asked for the columns
 // to line up, which on a board people read a time off is worth having.
 //
-// What comes in is whatever is in Settings, rich text typed by hand (see ui/rich-text.js), so this
-// reads it rather than being told it:
+// What comes in is whatever the schedule is written as (WEEKDAY_SHACHARIS in settings.js, or a
+// cell typed by hand), so this reads it rather than being told it:
 //
 //   <span class="big">7:00 / 7:20*
 //   <u>7:35</u> / 8:00
@@ -7368,7 +7313,7 @@ function reselect(sel, node) {
 //   A blank line is a gap of its own, so the two blocks stay apart.
 //
 // The underlines are the board's own meaning (בבית מדרש למטה) and are carried through onto the
-// time itself. The asterisks are not underlined, which is how they are written in Settings.
+// time itself. The asterisks are not underlined, which is how the schedule is written.
 
 /** A time and whatever asterisks are stuck to it. The same shape the message builders read
  *  (erevTimes in erev-text.js, parseTimes in posters/slichos.js), written again here because this
@@ -7552,9 +7497,9 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
   /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
      carrying one time, the blank line between the blocks) is a line of its own, centred under
      them, which is where the boards the shul hangs put it.
-     is-big carries the size the everyday block is set in. It is on the block in Settings rather
-     than on any one line, so it is read off the pieces and put back on the row, and the row's own
-     em is what every width in its grid is then measured in. */
+     is-big carries the size the everyday block is set in. It wraps the whole block rather than
+     any one line, so it is read off the pieces and put back on the row, and the row's own em is
+     what every width in its grid is then measured in. */
   const rows = [];
   for (const { line, times, slashed } of read) {
     if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }
@@ -8016,7 +7961,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
-  const footerNote = sheet.season === 'weekday' ? state.settings.weekdayFooterNote : state.settings.footerNote;
+  const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
   const isWeekday = effectiveSeason === 'weekday';
 
@@ -8028,12 +7973,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
 
-  // On the Weekday chart, שחרית ("1 schedule for all days" - see settings-view.js) is
-  // one shul-wide value straight from Settings, not per-week: instead of repeating it
-  // in every row (which would make a multi-line schedule absurdly tall over many
-  // weeks), it prints once on a panel laid over the whole column, matching how it looks
-  // in the original printed chart. It's sourced live from Settings with no per-cell
-  // override - change it in Settings and it updates everywhere at once.
+  // On the Weekday chart, שחרית is one schedule for all days, not per-week: instead of
+  // repeating it in every row (which would make a multi-line schedule absurdly tall over
+  // many weeks), it prints once on a panel laid over the whole column, matching how it
+  // looks in the original printed chart. It comes off the program's own WEEKDAY_SHACHARIS
+  // with no per-cell override, which is what puts the same list on every chart at once.
   /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
      than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
      hair shorter than a row (the collapsed border between two rows is not part of it, see
@@ -8066,8 +8010,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
            it. These are real rows now, so the band and the rule under each of them are the
            row's own and cannot drift from the rest of the chart, and the schedule is said
            once on a panel over the top rather than repeated down the column.
-           Stored as real HTML straight from Settings' rich-text editor (see
-           settings-view.js), so it prints out as-is instead of through nl2br/esc. */
+           Written as real HTML in settings.js, so it prints out as-is instead of through
+           nl2br/esc. */
         if (isWeekday && c.key === 'E') {
           // Every row but the one the panel hangs from is an empty cell carrying nothing
           // but its own row.
@@ -8083,9 +8027,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              season split over two pages says on each what that page is about. */
           const heading = specialShacharisHeading(
             specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
-          const special = heading ? state.settings.weekdayShacharisSpecial : '';
+          const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
           const html =
-            (state.settings.weekdayShacharis || escText('(set שחרית schedule in Settings)')) +
+            WEEKDAY_SHACHARIS +
             (special ? `
 
 <u>${escText(heading)}</u>
@@ -8100,8 +8044,8 @@ ${special}` : '');
              the arithmetic. */
           /* Set in columns where it can be, so the times stand under each other and the slashes
              stop wandering from line to line. shacharisGridHtml hands back nothing at all when
-             what is in Settings is not a block of times, and then this prints the typing as it
-             always has. See ui/shacharis-grid.js. */
+             what it is given is not a block of times, and then this prints it as written. See
+             ui/shacharis-grid.js. */
           const laid = shacharisGridHtml(html) || html;
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
@@ -9670,7 +9614,7 @@ function renderAfterYomKippurPoster(poster, settings) {
 
 /** The צום גדליה sheet: the same heading-per-תפילה blocks as the sheet above, but the times
  *  are given in the lines the poster hands over rather than halved, because the morning's
- *  two lines are the two the shul typed in Settings and the afternoon is one line of five.
+ *  two lines are the two the sheet carries and the afternoon is one line of five.
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
@@ -11296,8 +11240,8 @@ function specialShacharis(serial, settings) {
  *  which is specialMinyanim above and is what the two days of ר"ה and יו"כ are.
  *
  *  Only the lines that are really drawn count: the ר"ח and בה"ב days are covered only where
- *  there is a second list in Settings to print. That test lives here rather than in the two
- *  views, so what is counted and what is drawn cannot come apart.
+ *  there is a second list to print. That test lives here rather than in the two views, so what
+ *  is counted and what is drawn cannot come apart.
  *
  *  Once the season has said anything at all about a week, it says all of it. The first day of
  *  סליחות has none in the morning and davens the ordinary list, so its line reads the same as
@@ -11353,6 +11297,7 @@ function weekdayMornings(shabbosSerial, settings, everyday, special) {
 // over, so computing it again here would quietly disagree with the board on the weeks
 // where any of that made a difference. On the days a sheet on the wall speaks for, it is
 // read off that sheet instead, for the same reason again: see candleLightingForDay.
+
 
 
 
@@ -11462,18 +11407,18 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
   return out;
 }
 
-/** The שחרית schedule for one weekday, out of Settings.
+/** The שחרית schedule for one weekday, off the wall chart.
  *
- *  It is rich text rather than a computed column, and on a ר"ח, בה"ב or תענית the shul
- *  runs a second, earlier schedule, which the card prints as its own line. Whichever one
- *  applies to this particular day is the one to read. */
-function weekdayShacharis(serial, state, settings) {
+ *  It is the program's own, not a computed column, and on a ר"ח, בה"ב or תענית the shul runs a
+ *  second, earlier schedule, which the card prints as its own line. Whichever one applies to this
+ *  particular day is the one to read. See WEEKDAY_SHACHARIS in settings.js. */
+function weekdayShacharis(serial, settings) {
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
-  const text = (special && state.settings.weekdayShacharisSpecial) || state.settings.weekdayShacharis || '';
-  // Written in Settings as HTML, where an underline is a real <u> rather than the
-  // sentinel a computed cell carries, so it is turned back into the sentinel form
-  // parseCell reads before the times are picked out of it.
+  const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
+  // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
+  // carries, so it is turned back into the sentinel form parseCell reads before the times are
+  // picked out of it.
   const marked = String(text)
     .replace(/<u\b[^>]*>/gi, UL_START)
     .replace(/<\/u>/gi, UL_END)
@@ -11555,15 +11500,15 @@ function minyanimForDay(serial, state, settings) {
     // Thursday's last מעריב the card jumped straight to "מנחה ערב שבת 1:35, tomorrow",
     // with the whole of Friday שחרית missing.
     //
-    // Adding it is not an assumption about the schedule. שחרית is one fixed list out of
-    // Settings, the same every weekday, which is exactly why the chart prints it once as
-    // a merged cell rather than working it out day by day.
+    // Adding it is not an assumption about the schedule. שחרית is one fixed list, the same
+    // every weekday, which is exactly why the chart prints it once as a merged cell rather
+    // than working it out day by day.
     if (dow === FRIDAY) {
       const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-      // Through the סליחות season the morning is the sheet's, not Settings': see below.
+      // Through the סליחות season the morning is the sheet's, not the chart's: see below.
       const morning = specialShacharis(serial, settings);
       if (morning.length) out.push(...morning);
-      else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
+      else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name });
     }
   } else {
     // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
@@ -11590,7 +11535,7 @@ function minyanimForDay(serial, state, settings) {
     const shacharisName = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
     const morning = specialShacharis(serial, settings);
     if (morning.length) out.push(...morning);
-    else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
+    else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;
@@ -11929,9 +11874,9 @@ const WEEKDAY_RULES = {
   },
   E: {
     plain:
-      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding whatever is typed into Settings, so the daily schedule is written once rather than computed.',
+      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding the schedule the shul davens every morning, so the daily list is part of the program rather than computed.',
     exact:
-      'Taken from the שחרית field in Settings, rendered as the small markup subset that field stores. A week carrying a fast or a Rosh Chodesh uses the second field instead.',
+      'Not calculated. It is the everyday שחרית the program carries, printed as written. A week carrying a fast or a Rosh Chodesh prints the second schedule under it as well.',
   },
 };
 
@@ -12177,11 +12122,11 @@ const POSTER_SHEETS = [
       },
       nextMorning: {
         plain: 'The morning after יום כיפור, which is the everyday שחרית run five minutes early. The heading names the day.',
-        exact: 'Every time in the שחרית schedule from Settings, each less 5 minutes. The day name comes from the calendar, so the heading is right whichever day the 11th of תשרי falls on.',
+        exact: 'Every time in the everyday שחרית schedule, each less 5 minutes. The day name comes from the calendar, so the heading is right whichever day the 11th of תשרי falls on.',
       },
       afterShacharis: {
-        plain: 'The box at the foot: the schedule from the morning after יום כיפור until סוכות. שחרית is the everyday one out of Settings, unchanged.',
-        exact: 'Taken straight from the שחרית field in Settings, so this sheet and the boards cannot drift apart.',
+        plain: 'The box at the foot: the schedule from the morning after יום כיפור until סוכות. שחרית is the everyday one, unchanged.',
+        exact: 'Not calculated. The everyday שחרית as the boards print it, read from the one place it is written, so this sheet and the boards cannot drift apart.',
       },
       afterMincha: {
         plain: 'That schedule\'s מנחה. Four fixed times, then one every 20 minutes from 4:40 for as long as a מנין still lands a quarter of an hour before שקיעה, and sometimes one more squeezed in behind them. The first of the four is held to מנחה גדולה.',
@@ -12391,8 +12336,8 @@ const POSTER_SHEETS = [
         exact: 'The 1:15 moves to 1:20, or comes off, the same way every early מנחה on this sheet does, worked against the latest מנחה גדולה of the days one printed list has to hold for. The last is the earliest שקיעה of the חול המועד days that keep the everyday schedule, less 15 minutes, taken down to the last 5: down rather than up, because a quarter of an hour before the earliest שקיעה is the latest that מנין may be. A twenty minute step landing within a quarter of an hour of it is not printed, and where dropping it leaves more than twenty minutes with nothing in them a מנין goes back in 20 minutes before the last, or 15 where 20 would crowd the one in front. Everything from 5:00, and the 1:15 and 1:35, are למטה. The days counted are 17 to 21 תשרי less Shabbos and less the Friday, which run on schedules of their own.',
       },
       afterShacharis: {
-        plain: 'The everyday morning the shul goes back to once שמחת תורה is over, straight out of Settings.',
-        exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, so a change in Settings reaches all three at once.',
+        plain: 'The everyday morning the shul goes back to once שמחת תורה is over, exactly as the boards print it.',
+        exact: 'Not calculated. It is the same list the boards print and the same one the schedule after יום כיפור gives, all three reading the one place it is written.',
       },
       afterMincha: {
         plain: 'The afternoon of the week after סוכות: 1:15, 1:35, 1:50 and 4:15, then every twenty minutes from 4:40, and last a מנין a quarter of an hour before שקיעה on a round five.',
@@ -12426,8 +12371,8 @@ const POSTER_SHEETS = [
         exact: 'שקיעה of the day the search is on plus 50 minutes. That is 13 ניסן normally, and 12 ניסן in a year where ערב פסח is Shabbos, the search being brought forward to the Thursday night. The 10:30 is announced and does not move.',
       },
       erevShacharis: {
-        plain: 'The morning of ערב פסח, which is the everyday שחרית out of Settings.',
-        exact: 'Not calculated. The same list the boards print, so a change in Settings reaches the board and this sheet at once.',
+        plain: 'The morning of ערב פסח, which is the everyday שחרית the boards print.',
+        exact: 'Not calculated. The same list the boards print, read from the one place it is written, so the board and this sheet cannot drift apart.',
       },
       achila: {
         plain: 'סוף זמן אכילת חמץ, the end of the fourth hour on the מגן אברהם\'s day.',
@@ -13932,7 +13877,8 @@ function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>Settings</summary>
       <div class="panel-body">
-        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and the daily שחרית schedule printed on the Weekday chart. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
+        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and what prints at the head and foot of every page. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
+        <p>The daily שחרית schedule on the Weekday chart is not here. It is part of the program, so the board, the week card, "what is on next" and the messages page all print the one list and cannot come to disagree. Changing it is a change to the program.</p>
       </div>
     </details>
 
@@ -15085,6 +15031,27 @@ function conditionSummary(condition) {
 }
 
 // ==== ui/settings-view.js ====
+// The Settings screen.
+//
+// **There is no "Weekday chart defaults" panel and there should not be one again.** It held the
+// two שחרית schedules and the Weekday chart's footer note as three editable fields, and the shul
+// asked for them taken out and made part of the program. They are WEEKDAY_SHACHARIS,
+// WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js now, read straight from there
+// by the chart, the week card, the One sheet, "what is on next" and the messages page alike.
+//
+// The reason is that they are not a preference. Those seven times are printed on the wall, named
+// on the phone and written into the messages the shul sends out, and each of those readers has to
+// be saying the same thing: a field that can be typed over in one browser is a way for the paper
+// and the message to come apart, with nobody able to see which of them was edited. Changing the
+// schedule is changing the program, and a change made here would have to be published to reach
+// the congregation's page anyway. See the block comment over the two constants.
+
+
+
+
+
+
+
 function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
   container.innerHTML = `
@@ -15107,21 +15074,6 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
         <label>Header rabbi line (opposite side of the logo)<textarea name="headerRabbiLine" rows="2">${escAttr(s.headerRabbiLine)}</textarea></label>
         <label>Footer note<textarea name="footerNote" rows="2">${escAttr(s.footerNote)}</textarea></label>
         <label>Footer address<input name="footerAddress" value="${escAttr(s.footerAddress)}"></label>
-      </div>
-      </details>
-      <details class="panel">
-        <summary>Weekday chart defaults</summary>
-        <div class="panel-body">
-        <p class="hint">מנחה and מעריב on the Weekday chart start blank, because those times differ every week, so you type them straight into the cells on the sheet. שחרית is one fixed schedule printed the same on every week's row. The footer note below replaces the regular one above, only on the Weekday chart.</p>
-        <p class="hint">This box, and every cell on a sheet, takes times as shorthand: type <strong>1220 130</strong> and it becomes <strong>12:20/1:30</strong> when you click away. Select text first to use the buttons below on it.</p>
-        ${richTextToolbarHtml('Selected text:')}
-        <div class="rt-field-label">שחרית schedule (every ordinary week)</div>
-        <div id="weekday-shacharis-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharis}</div>
-        <div class="rt-field-label">שחרית on ר"ח / בה"ב / תענית</div>
-        <p class="hint">The printed chart puts this under a heading naming only the ones that actually fall in it, so a season with no בה"ב does not say בה"ב, and a season with none of the three leaves this schedule off altogether. The week card names the day itself.</p>
-        <div id="weekday-shacharis-special-editor" class="cell richtext-field" contenteditable="true" dir="ltr">${s.weekdayShacharisSpecial}</div>
-        <p class="hint">The printed chart shows both schedules together, with the ר"ח בה"ב ותענ"צ heading between them, exactly as before. Keeping them apart lets This week show the second one only on the weeks that actually have one of those days, and name which it is.</p>
-        <label>Weekday chart footer note<textarea name="weekdayFooterNote" rows="3">${escAttr(s.weekdayFooterNote)}</textarea></label>
       </div>
       </details>
       <details class="panel">
@@ -15255,35 +15207,6 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
   // you add or edit a rule, which leaves the rest of Settings untouched.
   renderRules(container.querySelector('#rules-host'), state, onRulesChange);
 
-  const shacharisEditor = container.querySelector('#weekday-shacharis-editor');
-  const shacharisSpecialEditor = container.querySelector('#weekday-shacharis-special-editor');
-
-  // One toolbar serves every rich-text box in the Weekday fieldset, acting on whichever
-  // was last focused - tracked on focusin because the toolbar buttons deliberately don't
-  // take focus (see wireRichTextToolbar).
-  let lastRichField = shacharisEditor;
-  container.addEventListener('focusin', (e) => {
-    if (e.target.classList?.contains('richtext-field')) lastRichField = e.target;
-  });
-  wireRichTextToolbar(container, () => lastRichField);
-
-  // Shorthand times settle when you leave a box, and Ctrl/Cmd+U underlines, in every one
-  // of these boxes - including option rows added after this point, hence the delegation.
-  container.addEventListener(
-    'blur',
-    (e) => {
-      if (e.target.classList?.contains('richtext-field')) applyTimeShorthand(e.target);
-    },
-    true // blur doesn't bubble; capture is how a delegated listener sees it
-  );
-  container.addEventListener('keydown', (e) => {
-    if (e.target.classList?.contains('richtext-field') && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-      e.preventDefault();
-      document.execCommand('underline');
-    }
-  });
-
-
   container.querySelector('#settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -15294,9 +15217,6 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
       headerRabbiLine: fd.get('headerRabbiLine'),
       footerNote: fd.get('footerNote'),
       footerAddress: fd.get('footerAddress'),
-      weekdayShacharis: normalizeRichText(shacharisEditor.innerHTML),
-      weekdayShacharisSpecial: normalizeRichText(shacharisSpecialEditor.innerHTML),
-      weekdayFooterNote: fd.get('weekdayFooterNote'),
       locationName: fd.get('locationName'),
       latitude: Number(fd.get('latitude')),
       longitude: Number(fd.get('longitude')),
@@ -16023,6 +15943,7 @@ function renderTraffic(container) {
 
 
 
+
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
 const SHEET_FONT = 'Times New Roman';
@@ -16108,7 +16029,7 @@ function cellSource(value) {
      *
      * Only between two times. A space or a comma with a word on either side of it is left
      * where it is, so a דרשה or a ט באב note is untouched, and so is "פלג 5:44". Nothing is
-     * changed in Settings or on the charts, which keep what was typed into them. */
+     * changed on the charts themselves, which keep what was written for them. */
     .replace(
       new RegExp(`([\\d*]${UL_END}?)(?:[ \\t]*,[ \\t]*|[ \\t]+)(?=[\\d${UL_START}])`, 'g'),
       `$1${SOFT_SLASH}`
@@ -16209,15 +16130,14 @@ function weekSpecialShacharis(showing, state, settings) {
   /* Which mornings the week has is worked out in posters/day.js, so this sheet and the card
      cannot come to different answers about it. The order and the labels are this sheet's:
      the season first here, where the card puts a fast ahead of it. */
-  const mornings = weekdayMornings(showing, settings,
-    state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
+  const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
   const out = [];
   for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
   for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
   if (mornings.others) {
     out.push({
       label: mornings.others.map((d) => name(d)).join(' · '),
-      html: state.settings.weekdayShacharisSpecial,
+      html: WEEKDAY_SHACHARIS_SPECIAL,
       days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
     });
   }
@@ -16266,7 +16186,7 @@ function sheetSections(showing, index, state, settings, withChol) {
     // see weekdayMornings in posters/day.js.
     const mornings = weekSpecialShacharis(showing, state, settings);
     out.push([SHEET_TEXT.chol, [
-      mornings.everydayStands ? chol('שחרית', state.settings.weekdayShacharis) : '',
+      mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
       chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing)),
@@ -17661,8 +17581,7 @@ function weekCardsHtml(showing, index, state, settings) {
     /* The week's mornings, and whether the everyday שחרית is one of them. Worked out in
        posters/day.js, which the One sheet asks the same question of: the two draw this block
        and were deciding separately what was on it. */
-    const mornings = weekdayMornings(showing, settings,
-      state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
+    const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
     const parts = [...WEEKDAY_COLUMNS]
       .reverse()
       // The everyday שחרית comes off a week where every morning already has a line of its
@@ -17677,7 +17596,7 @@ function weekCardsHtml(showing, index, state, settings) {
       // weekNl2br has to turn into real <u> elements.
       .map((c) =>
         c.key === 'E'
-          ? line(c.header, htmlLines(state.settings.weekdayShacharis), true, false, '', true)
+          ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
           : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
@@ -17730,7 +17649,7 @@ function weekCardsHtml(showing, index, state, settings) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
       if (mornings.others) {
-        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: state.settings.weekdayShacharisSpecial });
+        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: WEEKDAY_SHACHARIS_SPECIAL });
       }
       parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }
@@ -18246,7 +18165,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   );
 }
 
-/** Rich text from Settings, kept as HTML but with its own outer whitespace trimmed. */
+/** A schedule written as HTML, kept as HTML but with its own outer whitespace trimmed. */
 function htmlLines(html) {
   return String(html ?? '').trim();
 }

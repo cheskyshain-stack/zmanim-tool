@@ -5,8 +5,8 @@
 // a different place on each and the slashes between them wandered. The shul asked for the columns
 // to line up, which on a board people read a time off is worth having.
 //
-// What comes in is whatever is in Settings, rich text typed by hand (see ui/rich-text.js), so this
-// reads it rather than being told it:
+// What comes in is whatever the schedule is written as (WEEKDAY_SHACHARIS in settings.js, or a
+// cell typed by hand), so this reads it rather than being told it:
 //
 //   <span class="big">7:00 / 7:20*
 //   <u>7:35</u> / 8:00
@@ -31,7 +31,7 @@
 //   A blank line is a gap of its own, so the two blocks stay apart.
 //
 // The underlines are the board's own meaning (בבית מדרש למטה) and are carried through onto the
-// time itself. The asterisks are not underlined, which is how they are written in Settings.
+// time itself. The asterisks are not underlined, which is how the schedule is written.
 
 /** A time and whatever asterisks are stuck to it. The same shape the message builders read
  *  (erevTimes in erev-text.js, parseTimes in posters/slichos.js), written again here because this
@@ -215,9 +215,9 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
   /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
      carrying one time, the blank line between the blocks) is a line of its own, centred under
      them, which is where the boards the shul hangs put it.
-     is-big carries the size the everyday block is set in. It is on the block in Settings rather
-     than on any one line, so it is read off the pieces and put back on the row, and the row's own
-     em is what every width in its grid is then measured in. */
+     is-big carries the size the everyday block is set in. It wraps the whole block rather than
+     any one line, so it is read off the pieces and put back on the row, and the row's own em is
+     what every width in its grid is then measured in. */
   const rows = [];
   for (const { line, times, slashed } of read) {
     if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }

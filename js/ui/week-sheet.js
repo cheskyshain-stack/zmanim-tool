@@ -35,6 +35,7 @@ import { TZG_TEXT } from '../posters/tzomgedalia.js';
 import { weekdayMornings } from '../posters/day.js';
 import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
+import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
@@ -121,7 +122,7 @@ function cellSource(value) {
      *
      * Only between two times. A space or a comma with a word on either side of it is left
      * where it is, so a דרשה or a ט באב note is untouched, and so is "פלג 5:44". Nothing is
-     * changed in Settings or on the charts, which keep what was typed into them. */
+     * changed on the charts themselves, which keep what was written for them. */
     .replace(
       new RegExp(`([\\d*]${UL_END}?)(?:[ \\t]*,[ \\t]*|[ \\t]+)(?=[\\d${UL_START}])`, 'g'),
       `$1${SOFT_SLASH}`
@@ -222,15 +223,14 @@ function weekSpecialShacharis(showing, state, settings) {
   /* Which mornings the week has is worked out in posters/day.js, so this sheet and the card
      cannot come to different answers about it. The order and the labels are this sheet's:
      the season first here, where the card puts a fast ahead of it. */
-  const mornings = weekdayMornings(showing, settings,
-    state.settings.weekdayShacharis, state.settings.weekdayShacharisSpecial);
+  const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
   const out = [];
   for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
   for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
   if (mornings.others) {
     out.push({
       label: mornings.others.map((d) => name(d)).join(' · '),
-      html: state.settings.weekdayShacharisSpecial,
+      html: WEEKDAY_SHACHARIS_SPECIAL,
       days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
     });
   }
@@ -279,7 +279,7 @@ function sheetSections(showing, index, state, settings, withChol) {
     // see weekdayMornings in posters/day.js.
     const mornings = weekSpecialShacharis(showing, state, settings);
     out.push([SHEET_TEXT.chol, [
-      mornings.everydayStands ? chol('שחרית', state.settings.weekdayShacharis) : '',
+      mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
       chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing)),

@@ -134,7 +134,7 @@ export function weekName(english, isParsha) {
 
 /** The message for one week.
  *
- *  @param shacharisCell - settings.weekdayShacharis, the chart's own merged שחרית cell.
+ *  @param shacharisCell - WEEKDAY_SHACHARIS, the chart's own merged שחרית cell.
  *  @param row - the Weekday chart's row for that week, overrides applied: C is מנחה, B is מעריב.
  *  @param name - "P' Ki Seitzei" or "Sukkos", from weekName.
  *  @param shabbosSerial - the Shabbos the week runs up to, which is what the chart anchors on.

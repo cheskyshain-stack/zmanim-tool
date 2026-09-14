@@ -274,11 +274,9 @@ main.is-wide { max-width: 78rem; }
 
 .rt-toolbar { display: inline-flex; align-items: center; gap: 0.25rem; margin: 0.3rem 0; vertical-align: middle; }
 .rt-label { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; margin-right: 0.15rem; }
-.rt-field-label { font-size: var(--fs-md); margin-bottom: 0.15rem; }
 /* [data-rt] rather than a bare `button` so these win over the broader
    `.form-grid button` / `.sheet-toolbar button` rules above, which the toolbar sits
-   inside of in both places it's used and which would otherwise size and color it as a
-   full-size action button. */
+   inside of and which would otherwise size and color it as a full-size action button. */
 .rt-toolbar button[data-rt] {
   min-width: 2rem; padding: 0.25rem 0.45rem; background: var(--surface); color: var(--ink);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;

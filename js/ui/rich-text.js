@@ -1,5 +1,6 @@
-// Shared formatting toolbar for the app's contenteditable fields - the sheet's own cells
-// (ui/sheet-view.js) and the שחרית schedule editor in Settings (ui/settings-view.js).
+// Shared formatting toolbar for the app's contenteditable fields, which is the sheet's own
+// cells (ui/sheet-view.js). Settings had two such boxes for the Weekday שחרית schedules and no
+// longer does: those are the program's now, see the note at the top of ui/settings-view.js.
 // Underline goes through execCommand, which already handles the add/remove toggle and
 // partial selections correctly; text size is a plain <span class="big"> wrap, so what's
 // stored stays readable HTML rather than the <font size> tags execCommand would emit.

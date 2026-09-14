@@ -314,7 +314,7 @@ export function buildPesachPoster(year, settings) {
       at: on,
       heading: heading(PS_TEXT.erev, PS_EREV),
       lines: [
-        line(PS_TEXT.shacharis, everydayShacharis(settings), { calc: 'erevShacharis' }),
+        line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
         line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
         line(PS_TEXT.biur, [tm(alos + 5 * hour)], { calc: 'biur' }),
         // The afternoon is the ערב יום טוב run, and on a year where ערב פסח is Shabbos there is
@@ -323,7 +323,7 @@ export function buildPesachPoster(year, settings) {
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
       ].filter(Boolean),
     });
-    M.list(on, PS_TEXT.shacharis, everydayShacharis(settings), MORNING);
+    M.list(on, PS_TEXT.shacharis, everydayShacharis(), MORNING);
     if (!erevShabbos) M.list(on, PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), AFTERNOON);
   }
 

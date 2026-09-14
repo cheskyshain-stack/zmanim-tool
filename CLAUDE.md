@@ -235,7 +235,25 @@ Export/Import in Settings moves it between devices.
 - When a shipped default's wording changes, add the old value to a `LEGACY_*` list in
   `js/settings.js` and carry it forward in `normalizeSettings`. That upgrades installs
   that never edited it, while leaving anything hand-typed alone. See
-  `LEGACY_WEEKDAY_SHACHARIS` and `LEGACY_WEEKDAY_FOOTER`.
+  `LEGACY_FOOTER_ADDRESS` and `LEGACY_ACCENT_COLORS`.
+- **The Weekday chart's two שחרית schedules and its footer note are not settings.** They are
+  `WEEKDAY_SHACHARIS`, `WEEKDAY_SHACHARIS_SPECIAL` and `WEEKDAY_FOOTER_NOTE` in
+  `js/settings.js`, read straight from there by the chart, the week card, the One sheet, the
+  יו"כ / סוכות / פסח posters, "what is on next" and every message that names a מנין. They were
+  three fields in a **Weekday chart defaults** panel in Settings and the shul asked for that
+  panel gone, so **do not put it back**: the note at the top of `js/ui/settings-view.js` says
+  why. Those seven times are on the wall, on the phone and in the messages that go out, and
+  each of those readers has to be saying the same thing, which a field one browser can type
+  over is a way to break.
+  The published file proved it. `data/published.json` carried its own copy of
+  `weekdayShacharis`, so **the congregation's `/chart/` page was printing the old two to a line
+  slash schedule while the admin printed the three to a line one**, and nobody would have seen
+  it without opening both. Same lesson as the retired rules above, and the same fix: read from
+  one place, and take the stale copy out of the published file. `RETIRED_SETTINGS` in
+  `js/storage.js` drops the three keys (and the two always-blank מנחה / מעריב ones) as settings
+  load, so nothing carries a copy forward in a backup either. The `LEGACY_WEEKDAY_*` lists,
+  `splitCombinedShacharis` and the `special840Back` seed went with them: there is no longer a
+  saved value to carry forward.
 
 ## Screen layout
 
@@ -446,7 +464,7 @@ and listed in `DIST_TREES`.
   lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
   is only times, so one carrying last year's looked exactly like one carrying this year's.
 - **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads its שחרית off the wall chart, from
-  `settings.weekdayShacharisSpecial`, the second schedule the chart prints on a ר"ח, a בה"ב and a
+  `WEEKDAY_SHACHARIS_SPECIAL`, the second schedule the chart prints on a ר"ח, a בה"ב and a
   תענית. The letters come off that cell's own marks (`erevWhereMark`), so editing the schedule in
   Settings moves the message with it. No times of its own: it broke that rule twice and the shul
   caught both.
@@ -544,9 +562,9 @@ and listed in `DIST_TREES`.
   every night of yom tov with a הדלקת נרות) is read with `ytFirst`, which takes the first, since
   the ערב block prints before the day blocks.
 - **The weekly message** (`js/week-text.js`) is the one that goes out on a Sunday for the week
-  ahead, "Week of P' Ki Seitzei", and it is **the Weekday chart's three columns**: שחרית out of
-  Settings, which is what the chart prints as its own merged cell, then the chart's מנחה column C
-  and מעריב column B. Overrides from a saved Weekday chart are laid over where one covers the week,
+  ahead, "Week of P' Ki Seitzei", and it is **the Weekday chart's three columns**: שחרית off
+  `WEEKDAY_SHACHARIS`, which is what the chart prints as its own merged cell, then the chart's
+  מנחה column C and מעריב column B. Overrides from a saved Weekday chart are laid over where one covers the week,
   so a cell corrected by hand reaches the message; most weeks have none, since this page computes
   its weeks. `mergeRow` throws on a null sheet, so the merge is guarded rather than always run.
   **Its weeks are the Weekday chart's own list** (`computeWeekdayWeeks`), not the Shabbos charts'.

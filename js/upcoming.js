@@ -28,6 +28,7 @@ import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
+import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from './settings.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -127,18 +128,18 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
   return out;
 }
 
-/** The שחרית schedule for one weekday, out of Settings.
+/** The שחרית schedule for one weekday, off the wall chart.
  *
- *  It is rich text rather than a computed column, and on a ר"ח, בה"ב or תענית the shul
- *  runs a second, earlier schedule, which the card prints as its own line. Whichever one
- *  applies to this particular day is the one to read. */
-function weekdayShacharis(serial, state, settings) {
+ *  It is the program's own, not a computed column, and on a ר"ח, בה"ב or תענית the shul runs a
+ *  second, earlier schedule, which the card prints as its own line. Whichever one applies to this
+ *  particular day is the one to read. See WEEKDAY_SHACHARIS in settings.js. */
+function weekdayShacharis(serial, settings) {
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
-  const text = (special && state.settings.weekdayShacharisSpecial) || state.settings.weekdayShacharis || '';
-  // Written in Settings as HTML, where an underline is a real <u> rather than the
-  // sentinel a computed cell carries, so it is turned back into the sentinel form
-  // parseCell reads before the times are picked out of it.
+  const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
+  // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
+  // carries, so it is turned back into the sentinel form parseCell reads before the times are
+  // picked out of it.
   const marked = String(text)
     .replace(/<u\b[^>]*>/gi, UL_START)
     .replace(/<\/u>/gi, UL_END)
@@ -220,15 +221,15 @@ export function minyanimForDay(serial, state, settings) {
     // Thursday's last מעריב the card jumped straight to "מנחה ערב שבת 1:35, tomorrow",
     // with the whole of Friday שחרית missing.
     //
-    // Adding it is not an assumption about the schedule. שחרית is one fixed list out of
-    // Settings, the same every weekday, which is exactly why the chart prints it once as
-    // a merged cell rather than working it out day by day.
+    // Adding it is not an assumption about the schedule. שחרית is one fixed list, the same
+    // every weekday, which is exactly why the chart prints it once as a merged cell rather
+    // than working it out day by day.
     if (dow === FRIDAY) {
       const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
-      // Through the סליחות season the morning is the sheet's, not Settings': see below.
+      // Through the סליחות season the morning is the sheet's, not the chart's: see below.
       const morning = specialShacharis(serial, settings);
       if (morning.length) out.push(...morning);
-      else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name });
+      else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name });
     }
   } else {
     // Sunday through Thursday, off the Weekday chart. Its מנחה and מעריב are computed and
@@ -255,7 +256,7 @@ export function minyanimForDay(serial, state, settings) {
     const shacharisName = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
     const morning = specialShacharis(serial, settings);
     if (morning.length) out.push(...morning);
-    else for (const t of weekdayShacharis(serial, state, settings)) out.push({ ...t, name: shacharisName });
+    else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;
