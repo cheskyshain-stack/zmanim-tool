@@ -4250,6 +4250,13 @@ body.is-locked { overflow: hidden; }
   filter: brightness(0.86);
 }
 .traffic-chart.is-pickable .traffic-bar:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+/* Why the chart's days are not the reader's days. Under the chart it is about rather than at the
+   foot of the tab, because that is where the two numbers stop agreeing: the shul read Today as
+   nothing and the bar over the same date as busy, which is a contradiction six panels above where
+   this used to be explained. Set close under the chart and away from the panel below it, so it
+   reads as a note on the chart rather than as the start of the next thing. */
+.traffic-utc-note { margin: 0.35rem 0 1.6rem; }
+
 /* The date field beside the ranges, and the way back out of a day. */
 .traffic-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
 .traffic-pick-label { color: var(--muted); font-size: var(--fs-sm); }

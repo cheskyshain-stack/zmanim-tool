@@ -134,23 +134,66 @@ function trafficDayLabel(iso) {
  *  Percentages of a fixed-height row rather than anything measured, so it is right at any
  *  width and on paper, and a day with nothing still shows its own label under an empty
  *  place rather than being missing from the row. */
-function trafficChart(byDay) {
+function trafficChart(byDay, utc = false) {
   if (!byDay.length) return '';
   const top = Math.max(...byDay.map((d) => d.visits), 1);
   /* Every bar is a button that opens its own day. Asked for: the chart already had a shape per
      day on it, so the day somebody wants to look into is the one they are already pointing at.
      A real <button> rather than a click handler on the div, so it is in the tab order and a
      screen reader is told it does something. The whole chart is no longer role="img" for the
-     same reason: a picture cannot have buttons in it. */
-  const bars = byDay.map((d) => `
-    <button type="button" class="traffic-bar" data-day="${trafficEsc(d.date)}"
-      title="${trafficEsc(trafficDayLabel(d.date))}: ${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views"
-      aria-label="${trafficEsc(trafficDayFull(d.date))}: ${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views. Open this day.">
-      <div class="traffic-bar-fill" style="height: ${Math.round((d.visits / top) * 100)}%"></div>
-      <span class="traffic-bar-day">${trafficEsc(trafficDayLabel(d.date))}</span>
-    </button>`).join('');
-  return `<div class="traffic-chart is-pickable"
-    aria-label="Visits a day, ${trafficEsc(trafficDayLabel(byDay[0].date))} to ${trafficEsc(trafficDayLabel(byDay[byDay.length - 1].date))}">${bars}</div>`;
+     same reason: a picture cannot have buttons in it.
+
+     **Except where these are UTC days, and then no bar opens anything.** A day view is always
+     the reader's own midnight to midnight, so the day behind a UTC bar is not the day clicking
+     it would have opened: the bar over today holds last night's visits and the day it opened
+     would not, and the screen would have answered two different numbers for one shape somebody
+     had just pointed at. The shul found the same disagreement between Today and this chart the
+     hard way (see trafficUtcNote), and a bar that cannot be honest about which day it is should
+     not invite the question. Rendered as plain shapes, which is what .traffic-bar already is on
+     the hours chart, so nothing about how it looks changes. */
+  const bars = byDay.map((d) => {
+    const fill = `<div class="traffic-bar-fill" style="height: ${Math.round((d.visits / top) * 100)}%"></div>
+      <span class="traffic-bar-day">${trafficEsc(trafficDayLabel(d.date))}</span>`;
+    const counts = `${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views`;
+    const title = `${trafficDayLabel(d.date)}${utc ? ' UTC' : ''}: ${counts}`;
+    return utc
+      ? `<div class="traffic-bar" title="${trafficEsc(title)}"
+          aria-label="${trafficEsc(trafficDayFull(d.date))}, counted in UTC: ${counts}.">${fill}</div>`
+      : `<button type="button" class="traffic-bar" data-day="${trafficEsc(d.date)}"
+          title="${trafficEsc(title)}"
+          aria-label="${trafficEsc(trafficDayFull(d.date))}: ${counts}. Open this day.">${fill}</button>`;
+  }).join('');
+  return `<div class="traffic-chart ${utc ? '' : 'is-pickable'}"
+    aria-label="Visits a day${utc ? ', counted in UTC' : ''}, ${trafficEsc(trafficDayLabel(byDay[0].date))} to ${trafficEsc(trafficDayLabel(byDay[byDay.length - 1].date))}">${bars}</div>`;
+}
+
+/** Why the chart's days are not the reader's days, said under the chart rather than at the foot.
+ *
+ *  **The shul reported this one as two screens that could not both be right**: Today said no
+ *  visits counted yet, and the seven day chart beside it drew a bar on the 14th, which was that
+ *  same day. Both numbers were correct and they were answers to different questions. Today is
+ *  counted from local midnight, and where Cloudflare's hourly figures do not reach back over the
+ *  whole range there is nothing to fold the older days with, so the chart falls back to
+ *  Cloudflare's own UTC days, each of which starts at 8pm the evening before in Lakewood. The bar
+ *  over today therefore held last night, and Today did not.
+ *
+ *  This was already said, at the very bottom of the tab, under six panels. That is not where the
+ *  contradiction is. It is said here, next to the chart it is about, and it names the consequence
+ *  rather than only the cause: a reader who has just seen the two numbers needs to be told they
+ *  do not disagree, not told how UTC works.
+ *
+ *  And it names the cure, because there is one and it is not on this screen: the Worker's archive
+ *  keeps the hours Cloudflare drops, and with it the fold reaches back over any range. */
+function trafficUtcNote(utc) {
+  if (!utc) return '';
+  return `<p class="hint traffic-utc-note">These days are counted in UTC, not on a Lakewood clock,
+    so each one begins at 8pm the evening before. <strong>The bar over today holds last night as
+    well, which is why Today can read lower than it.</strong> That is also why no bar here opens
+    its own day: a day view is always your own midnight to midnight, so it would not be the day
+    the bar is. The two totals above are still the whole period. This happens when Cloudflare's
+    hourly figures do not reach back over the period asked for, and those hours are the only way
+    to count these days locally. Switching the Worker's archive on keeps them, and then every
+    range is counted on a Lakewood clock.</p>`;
 }
 
 /** One row a page, not one row an address.
@@ -572,7 +615,7 @@ export function renderTraffic(container) {
       </div>
       ${trafficDay
         ? `<p class="traffic-oneday">${trafficEsc(trafficDayFull(trafficDay))}</p>`
-        : trafficChart(byDay)}
+        : trafficChart(byDay, daysAreUtc) + trafficUtcNote(daysAreUtc)}
       ${trafficPages(byPage)}
       ${trafficBreakdown('Phone or desktop', data.groups?.device, { name: trafficDeviceName, col: 'Device' })}
       ${trafficHours(data.groups?.hour)}
@@ -590,10 +633,6 @@ export function renderTraffic(container) {
             trafficEsc(Object.entries(data.dims).map(([k, v]) => `${k}=${v}`).join(', '))}</code></p>`
           : ''
       }
-      ${daysAreUtc ? `<p class="hint">Days here are counted in UTC, not on a Lakewood clock, so a
-        visit after about 8pm falls on the next day. That is what happens when Cloudflare's hourly
-        figures do not reach back over the whole period, which is the only way to count these days
-        properly. The totals are still the whole period.</p>` : ''}
       ${trafficArchiveNote(data)}
       <p class="hint traffic-foot">${trafficDay
         ? `Everything here is that one day, midnight to midnight on this device's clock. The Worker
@@ -601,8 +640,10 @@ export function renderTraffic(container) {
            day's own and not a longer period's.`
         : `The panels under the chart count the whole period Cloudflare was
       asked about, which begins at midnight UTC and so reaches a few hours further back than the
-      days above: on Today they take in the last of yesterday evening. Only the two figures at the
-      top and the chart are counted on a Lakewood clock.`} A visit is one person's stay; a page view
+      days above: on Today they take in the last of yesterday evening.${daysAreUtc
+        ? ' The two figures at the top are counted on a Lakewood clock; the days in the chart are'
+          + ' not, for the reason given under it.'
+        : ' Only the two figures at the top and the chart are counted on a Lakewood clock.'}`} A visit is one person's stay; a page view
       is each page they opened. Anyone reading with an ad blocker is not counted, so these are a
       floor rather than a headcount.${
         /* When these particular numbers were taken. Each range is its own question with its own
