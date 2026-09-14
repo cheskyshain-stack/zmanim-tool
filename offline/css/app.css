@@ -897,7 +897,7 @@ td.ruled .cell { background: var(--ruled); }
      on the edge of its column. An asterisk is 0.5em of ink and two are 1.0em, measured the same
      way, and each column carries its mark's lead-in on top of that. The slash column is
      deliberately narrow. */
-  --sh-t: 1.84em; --sh-star: 0.5em; --sh-star2: 1em; --sh-slash: 0.34em; --sh-space: 0.25em;
+  --sh-t: 1.84em; --sh-star: 0.5em; --sh-star2: 1em; --sh-slash: 0.34em; --sh-space: 0.5em;
 }
 .sh-row.is-times {
   display: grid; column-gap: 0; align-items: baseline;
@@ -922,11 +922,18 @@ td.ruled .cell { background: var(--ruled); }
    shul saw. The column is cut to hold the lead-in and the mark and nothing else. */
 .sh-mark { text-align: left; }
 /* The asterisk column is exactly the mark's own ink, so the mark sits against its time the way it
-   would in a line of typing, and --sh-space is one word space of this serif (measured at 0.25em).
-   A position no row marks gets no column at all (see shacharis-grid.js), which is what makes a
-   schedule whose stars all fall in the same place print as though it were plain text. Where they
-   do not fall in the same place, the column is held open on the rows without one and that width is
-   the price of the times underneath each other. */
+   would in a line of typing. A position no row marks gets no column at all (see
+   shacharis-grid.js), which is what keeps a schedule whose stars all fall in the same place from
+   paying for columns nothing goes in. Where they do not fall in the same place, the column is held
+   open on the rows without one and that width is the price of the times underneath each other.
+
+   **--sh-space is 0.5em, which is two word spaces of this serif rather than one.** At one word
+   space (0.25em) the gap measured 4.5px in the everyday block and 3.4px in the ר"ח one, and the
+   shul said the block was too cramped: a word space is what separates words in a sentence, and
+   these are seven separate מנינים read off a wall at a distance. At 0.5em it is 8.8px and 6.8px,
+   and the widest row is 138.1px inside the 156.1px the panel holds, so 18px is still spare for a
+   longer line somebody types one day. Four widths were put to the shul on a photograph of the real
+   panel, 0.25, 0.5, 0.7 and 0.85em, and this is the one picked. */
 .sh-slash { text-align: center; }
 /* The ר"ח ובה"ב heading, and a last line carrying one time where the rows above carry two. */
 .sh-wide { text-align: center; }
