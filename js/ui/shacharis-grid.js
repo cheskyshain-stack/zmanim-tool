@@ -91,7 +91,8 @@ function shReadLines(root) {
   return ok ? lines : null;
 }
 
-/** One line read as times, or null when it is not a row of them.
+/** One line read as its times and whether they are slash separated, or null when it is not a row
+ *  of times.
  *
  *  The asterisks that follow a time can be written outside the underline and even in the piece
  *  after it, which is how one of the shul's own browsers holds it ("<u>7:15,7:35</u>**"), so a
@@ -99,12 +100,18 @@ function shReadLines(root) {
 function shReadTimes(line) {
   const times = [];
   let ok = true;
+  /* Whether the schedule separates its times with a slash. **The board draws the separator the
+     schedule uses**: the shul writes "7:00 / 7:20*" on one and "7:00 7:20* 7:35" on another, and a
+     slash this code put in would be a mark on the paper nobody typed. Either way the times keep
+     their columns, which is the whole of what this file is for. */
+  let slashed = false;
   for (const piece of line) {
     let last = 0;
     SH_TIME.lastIndex = 0;
     let m = SH_TIME.exec(piece.text);
     while (m) {
       const between = piece.text.slice(last, m.index);
+      if (between.includes('/')) slashed = true;
       if (!SH_BETWEEN.test(between)) {
         // Stars belonging to the time before this one, and nothing else.
         if (/^\*{1,2}$/.test(between.trim()) && times.length) times[times.length - 1].mark += between.trim();
@@ -115,10 +122,15 @@ function shReadTimes(line) {
       m = SH_TIME.exec(piece.text);
     }
     const tail = piece.text.slice(last);
+    /* The slash can sit at the end of a piece as easily as inside one: "8:20* / " and then a
+       separate <u>8:40</u>, which is how the shipped schedule holds its third line. Asked of the
+       tail as well as of what falls between two times in a piece, or that line came out with no
+       slash on a board whose other two had one. */
+    if (tail.includes('/')) slashed = true;
     if (/^\s*\*{1,2}\s*$/.test(tail) && times.length) times[times.length - 1].mark += tail.trim();
     else if (!SH_BETWEEN.test(tail)) ok = false;
   }
-  return ok && times.length ? times : null;
+  return ok && times.length ? { times, slashed } : null;
 }
 
 /** A line that is not a row of times, written back out with its underlines kept. */
@@ -137,7 +149,10 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
   const lines = shReadLines(box);
   if (!lines) return null;
 
-  const read = lines.map((line) => (line.length ? { line, times: shReadTimes(line) } : { line, times: null }));
+  const read = lines.map((line) => {
+    const got = line.length ? shReadTimes(line) : null;
+    return { line, times: got?.times || null, slashed: Boolean(got?.slashed) };
+  });
   const most = Math.max(0, ...read.map((r) => (r.times ? r.times.length : 0)));
   if (most < 2 || most > SH_MAX) return null; // one time a line has nothing to line up
 
@@ -162,18 +177,28 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
      slash and a double behind it, so only the last column is the wider one and the gap around the
      slash stays narrow. A position with no mark at all still gets the narrow column, which is what
      keeps the times under each other. */
-  const gridFor = (cols) => {
+  const gridFor = (cols, slashed) => {
     const widest = Array.from({ length: cols }, (_, i) => (
       read.some((r) => r.times && r.times.length === cols && (r.times[i]?.mark || '').length > 1)
         ? 'var(--sh-star2)' : 'var(--sh-star)'));
+    /* **A row with no slashes is narrower, and has to be.** The column after a slash is one
+       asterisk wider than a time needs, which is what gives the slash the same air on both sides;
+       with no slash there is nothing to centre, and that width is a fifth of the row spent on
+       nothing. Measured on the shul's own no-slash layout: 184px a row against the 156px there is
+       room for inside the panel, and 141px once the mirror comes off. So a slashed row keeps it
+       and an unslashed one puts a plain space between the times instead. */
+    const between = slashed
+      ? (i) => ['var(--sh-slash)', `calc(var(--sh-t) + ${widest[i]})`, widest[i + 1]]
+      : (i) => ['var(--sh-space)', 'var(--sh-t)', widest[i + 1]];
     return {
       template: ['var(--sh-t)', widest[0],
-        ...Array.from({ length: cols - 1 },
-          (_, i) => ['var(--sh-slash)', `calc(var(--sh-t) + ${widest[i]})`, widest[i + 1]]).flat()].join(' '),
-      /* The row is padded on the left by its last asterisk column, which puts the middle slash of
-         a row at the middle of the row's own box. Every row is centred in the panel, so that is
-         what puts the slash of the smaller ר"ח block under the slash of the larger everyday one. */
-      pad: widest[cols - 1],
+        ...Array.from({ length: cols - 1 }, (_, i) => between(i)).flat()].join(' '),
+      /* A slashed row is padded on the left by its last asterisk column, which puts the middle
+         slash of a row at the middle of the row's own box. Every row is centred in the panel, so
+         that is what puts the slash of the smaller ר"ח block under the slash of the larger
+         everyday one. With no slash there is nothing to line up between the blocks and nothing to
+         pay for it with. */
+      pad: slashed ? widest[cols - 1] : '0',
     };
   };
 
@@ -184,17 +209,18 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
      than on any one line, so it is read off the pieces and put back on the row, and the row's own
      em is what every width in its grid is then measured in. */
   const rows = [];
-  for (const { line, times } of read) {
+  for (const { line, times, slashed } of read) {
     if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }
     const big = line.every((p) => p.big) ? ' is-big' : '';
     if (!times || times.length < 2) {
       rows.push(`<div class="sh-wide${big}">${shPlainHtml(line)}</div>`);
       continue;
     }
-    const { template, pad } = gridFor(times.length);
+    const { template, pad } = gridFor(times.length, slashed);
     const cells = [];
     times.forEach((t, i) => {
-      if (i) cells.push('<div class="sh-slash">/</div>');
+      // The separator the schedule itself uses: a slash, or nothing but the column it would sit in.
+      if (i) cells.push(`<div class="sh-slash">${slashed ? '/' : ''}</div>`);
       const time = t.underlined ? `<u>${shEsc(t.text)}</u>` : shEsc(t.text);
       cells.push(`<div class="sh-time">${time}</div>`);
       cells.push(`<div class="sh-mark">${shEsc(t.mark)}</div>`);

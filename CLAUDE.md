@@ -167,6 +167,15 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
   three to a line in Settings is all it takes to have it printed that way. Rows with the same count
   line up with each other; a row with more is wider and centred, the way the shul's own mock-up of
   it is.
+  **The board draws the separator the schedule uses.** The shul writes "7:00 / 7:20*" on one
+  version and "7:00 7:20* 7:35" on another, and a slash this code put in would be a mark on the
+  paper nobody typed. A row with no slashes is also narrower on purpose: the column after a slash
+  is one asterisk wider than a time needs, to give the slash equal air, and with no slash there is
+  nothing to centre. Measured on the shul's own no-slash layout, that mirror was 184px a row
+  against the 156px there is room for inside the panel, and 146px once it came off, so it fits with
+  the panel at the width it already has. A slash at the end of a piece counts as much as one
+  between two times in it: "8:20* / " then a separate `<u>8:40</u>` is how the shipped schedule
+  holds its third line, and asking only about the middle left that one row slashless.
   **It reads what is in Settings rather than being told it**, since that is hand-typed rich text
   whose separators have been commas, spaces and slashes over the years. Markup it does not know and
   it hands the block back untouched to print exactly as it did before: a wall chart is not the

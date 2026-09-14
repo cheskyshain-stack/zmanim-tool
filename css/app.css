@@ -899,7 +899,7 @@ td.ruled .cell { background: var(--ruled); }
      on the edge of its column. An asterisk is 0.5em of ink and two are 1.0em, measured the same
      way, and each column carries its mark's lead-in on top of that. The slash column is
      deliberately narrow. */
-  --sh-t: 1.84em; --sh-star: 0.58em; --sh-star2: 0.97em; --sh-slash: 0.34em;
+  --sh-t: 1.84em; --sh-star: 0.58em; --sh-star2: 0.97em; --sh-slash: 0.34em; --sh-space: 0.3em;
 }
 .sh-row.is-times {
   display: grid; column-gap: 0; align-items: baseline;
