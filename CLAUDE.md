@@ -374,12 +374,19 @@ and listed in `DIST_TREES`.
   "6:50m&ns, [Netz 7:15]" instead, where the bracket is real sunrise and the מנין is sunrise less
   twenty five minutes. That looks like a winter rule and is not one, since כסלו in the middle of
   that stretch uses the ordinary form. Three examples cannot say which months take it.
-- **The year view has three buttons, Parsha, Yom Tov and Rosh Chodesh**, and everything on it is in **date order**,
-  which is the order these get sent in. Independent toggles, both on to begin with, so the pair
-  reads as what is showing rather than as a choice between them; turning them all off says so. The
-  four day window has no buttons: it is a handful of cards and filtering that would be two buttons over
-  almost nothing. Each message carries the serial of the day it goes out, the ערב rather than the
-  day itself, which is what the sort runs on.
+- **The year view has three switches under "Include in messages", Parsha, Yom Tov and Rosh
+  Chodesh**, and everything on it is in **date order**, which is the order these get sent in. All on
+  to begin with, and turning them all off says so rather than looking broken.
+  They are **`switchHtml` from `js/ui/switch.js`**, the same control This week and the Posters bar
+  use, rather than a third kind of control invented for this page. Each kind is its own question
+  with a yes and a no, which is what these are: three things that can each be on or off, not one
+  choice between three. **Do not wrap each one in a row of its own**: `switchHtml` hands the
+  question and the track back as siblings so that a stack of them shares one grid and every track
+  lines up under the last, and a wrapper makes each its own cell and loses that. Measured: all
+  three tracks start at the same x.
+  The four day window has no switches: it is a handful of cards and filtering that would be three
+  controls over almost nothing. Each message carries the serial of the day it goes out, the ערב
+  rather than the day itself, which is what the sort runs on.
 - **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is
   הושענא רבה's, five blocks in, and every block before it carries the same three calcs (`ytBlock`).
   Its sent message carries **no sign-off**, where every other one ends on a fixed line, and that is

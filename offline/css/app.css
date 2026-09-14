@@ -4283,14 +4283,17 @@ body.is-locked { overflow: hidden; }
   background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   color: var(--muted); font-size: var(--fs-sm);
 }
-/* Parsha and Yom Tov, in the year view only. Two independent toggles, both on to begin with,
-   so the pair reads as what is showing rather than as a choice between them. Wraps rather than
-   shrinks on a phone, like every other row of buttons here. */
-.tx-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1.2rem; }
-.tx-filter {
-  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 0.35rem 0.9rem; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-sm);
+/* Which kinds the year view is showing. The program's own switch, the one This week and the
+   Posters bar use, rather than a third kind of control invented for this page.
+
+   Left aligned, where .week-switches centres itself: everything else on this page starts at the
+   same left edge, and a centred block of switches in the middle of it reads as though it had
+   come from somewhere else. justify-items: start so each track sits against its question rather
+   than being stretched across the column. */
+.tx-switches { margin: 0 0 1.3rem; }
+.tx-switches-head {
+  margin: 0; color: var(--muted); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: 0.02em;
 }
-.tx-filter:hover { background: var(--accent-soft); }
-.tx-filter.is-on { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
+.tx-kinds { justify-content: start; justify-items: start; margin-top: 0.45rem; }
+.tx-kinds .week-switch-label { text-align: start; }

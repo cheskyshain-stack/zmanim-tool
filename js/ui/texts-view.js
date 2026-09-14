@@ -21,6 +21,7 @@ import { weekIndex, rowFor } from '../sheets/rows.js';
 import { computeSeasonWeeks } from '../sheets/weeks.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
+import { switchHtml, wireSwitch } from './switch.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText } from '../erev-yomtov-text.js';
@@ -481,16 +482,28 @@ export function renderTexts(container, state, settings, tables) {
   messages.sort((a, b) => (a.serial ?? 0) - (b.serial ?? 0));
 
   const shown = txAll ? messages.filter((m) => txKinds[m.kind] !== false) : messages;
-  const kinds = Object.keys(TX_KIND_NAMES).map((k) => `
-    <button type="button" class="tx-filter ${txKinds[k] ? 'is-on' : ''}" data-kind="${k}"
-      aria-pressed="${txKinds[k] ? 'true' : 'false'}">${TX_KIND_NAMES[k]}</button>`).join('');
+  /* The program's own switch, the one This week and the Posters bar use, rather than a third
+     kind of control invented for this page. Each kind is its own question with a yes and a no,
+     which is what these are: three things that can each be on or off, not one choice between
+     three. Both answers stay on the screen with the chosen one filled in, so it reads as what
+     is showing rather than as a button whose next state you have to work out from its label. */
+  /* Not wrapped one to a row: switchHtml hands back the question and the track as siblings on
+     purpose, so that a stack of them shares one grid and every track lines up under the last.
+     A wrapper round each would make each one its own cell and lose that. See switch.js. */
+  const kinds = Object.keys(TX_KIND_NAMES).map((k) => switchHtml(`tx-kind-${k}`, TX_KIND_NAMES[k], [
+    { value: 'on', label: 'On', on: txKinds[k] !== false },
+    { value: 'off', label: 'Off', on: txKinds[k] === false },
+  ])).join('');
 
   container.innerHTML = `
     <div class="tx-page">
       <h1 class="tx-title" title="Triple click to show the whole year">Messages</h1>
       ${txAll ? `<p class="tx-all">Showing everything for the year ahead, in date order. Triple
         click the heading again for the next ${TX_AHEAD_DAYS} days only.</p>
-        <div class="tx-filters">${kinds}</div>` : ''}
+        <div class="tx-switches">
+          <p class="tx-switches-head">Include in messages</p>
+          <div class="week-switches tx-kinds">${kinds}</div>
+        </div>` : ''}
       <p class="tx-hint">Every time here is read off the shul's own boards and sheets, so this
       and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
       are for this visit only: reload and the times come back fresh, which is the way round that
@@ -498,15 +511,14 @@ export function renderTexts(container, state, settings, tables) {
 
       ${shown.map(txCard).join('')}
       ${shown.length ? '' : `<div class="panel"><p>${txAll
-        ? 'Both kinds are switched off, so there is nothing to show.'
+        ? 'Every kind is switched off, so there is nothing to show.'
         : `Nothing to send just now. Yom tov messages appear ${TX_AHEAD_DAYS} days before the yom
            tov and stay up until it is over.`}</p></div>`}
     </div>`;
 
-  for (const btn of container.querySelectorAll('.tx-filter')) {
-    btn.addEventListener('click', () => {
-      const k = btn.dataset.kind;
-      txKinds[k] = !txKinds[k];
+  for (const k of Object.keys(TX_KIND_NAMES)) {
+    wireSwitch(container, `tx-kind-${k}`, (value) => {
+      txKinds[k] = value === 'on';
       renderTexts(container, state, settings, tables);
     });
   }
