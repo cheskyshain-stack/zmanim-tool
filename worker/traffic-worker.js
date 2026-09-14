@@ -54,6 +54,10 @@
    Not a security boundary (see the note above); it is here so that a page on some other
    site cannot quietly read this in a visitor's browser and pass it off as its own. */
 const ALLOWED = [
+  'https://baismedrashoflakewoodcommons.org',
+  // The address the site was on before it moved to the shul's own domain. Kept so the admin
+  // still answers while DNS is settling and on any browser holding the old link. It can come
+  // out once nobody is opening that one.
   'https://lczmanim.cjaffa.com',
   'http://localhost',
   'http://127.0.0.1',
@@ -95,8 +99,16 @@ const MAX_DAYS = 800;
 const SITE_TOKEN = 'e96217102b81416db30f31a0c105fece';
 
 /** The host the congregation's pages are served from. The other way of saying which site, used
- *  where the site tag cannot be had. Same value as SITE_URL's host in build-offline.py. */
-const SITE_HOST = 'lczmanim.cjaffa.com';
+ *  where the site tag cannot be had. Same value as SITE_URL's host in build-offline.py.
+ *
+ *  **This is one host, and the site has had two.** Everything Cloudflare recorded before the move
+ *  to the shul's own domain was recorded against lczmanim.cjaffa.com and is not in this query.
+ *  Narrowing by the site's tag would have spanned both, since it is one Web Analytics site either
+ *  way and the beacon token did not change, but that listing is refused for this token (see
+ *  siteTagFor), so the host is what there is. The store is what carries history across a change
+ *  like this: days already collected into it keep their figures whatever the site is called
+ *  afterwards, which is one more reason to have the namespace bound before anything moves. */
+const SITE_HOST = 'baismedrashoflakewoodcommons.org';
 
 /** The account the site sits in.
  *

@@ -1,4 +1,4 @@
-// The congregation's site, which is the front door: lczmanim.cjaffa.com. The admin app
+// The congregation's site, which is the front door: baismedrashoflakewoodcommons.org. The admin app
 // lives at /admin and none of it is loaded here.
 //
 // Everything shown comes from /data/published.json, because a visitor's browser has none

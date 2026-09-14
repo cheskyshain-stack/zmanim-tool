@@ -814,7 +814,7 @@ function publishPanelHtml(sheet, state, open = false) {
   return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
-      <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
+      <p class="hint">The congregation's page is <strong>baismedrashoflakewoodcommons.org</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
       ${
         hasToken
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}

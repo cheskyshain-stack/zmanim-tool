@@ -130,7 +130,7 @@ SECTIONS = [
     (
         "The luach for the congregation",
         """
-        <p><b>lczmanim.cjaffa.com</b> shows one week at a time to anyone who opens it, with
+        <p><b>baismedrashoflakewoodcommons.org</b> shows one week at a time to anyone who opens it, with
         no login and nothing to install, and moves to the next week by itself once Shabbos is
         over.</p>
         <p>It cannot read what is saved here, because it is not on this computer. It reads a

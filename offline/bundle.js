@@ -14021,7 +14021,7 @@ function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>The luach for the congregation</summary>
       <div class="panel-body">
-        <p><strong>lczmanim.cjaffa.com/?luach</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
+        <p><strong>baismedrashoflakewoodcommons.org/week/</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
         <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
         <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish for the congregation</em>, and press the button. A minute later the congregation's page is showing it. Publish once per season, and again whenever you change a time so they see the correction.</p>
         <p>Publishing needs a one-time setup: a token that allows the site to be written to. <strong>Settings → Publishing</strong> has step-by-step instructions for making one, and until it is set the publish button explains that rather than appearing broken.</p>
@@ -15314,7 +15314,7 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
       <details class="panel">
         <summary>Publishing</summary>
         <div class="panel-body">
-        <p class="hint">Publishing puts the season on the congregation's page at <strong>lczmanim.cjaffa.com</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
+        <p class="hint">Publishing puts the season on the congregation's page at <strong>baismedrashoflakewoodcommons.org</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
         <details class="panel">
           <summary>How to make the token</summary>
           <div class="panel-body">
@@ -15758,11 +15758,13 @@ const trafficDeviceName = (k) => TRAFFIC_DEVICES[String(k).toLowerCase()] || k |
  *  typed in, opened from a home screen, or followed from a link in an app that sends no
  *  referrer, which for this site means WhatsApp and email. That is the common case here and
  *  deserves a name rather than a blank. */
-const SITE_HOST_NAME = 'lczmanim.cjaffa.com';
+/** Both of the site's hosts: the shul's own domain, and the one it was on before the move.
+ *  A referer recorded before then carries the old name and is still this same site. */
+const SITE_HOST_NAMES = ['baismedrashoflakewoodcommons.org', 'lczmanim.cjaffa.com'];
 function trafficRefererName(host) {
   const h = String(host || '').trim();
   if (!h || h === 'null' || h === '(none)') return 'Typed in, or a link in an app';
-  if (h === SITE_HOST_NAME) return 'Another page on this site';
+  if (SITE_HOST_NAMES.includes(h)) return 'Another page on this site';
   return h;
 }
 
@@ -17505,7 +17507,7 @@ function publishPanelHtml(sheet, state, open = false) {
   return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
     <summary>Publish for the congregation</summary>
     <div class="panel-body">
-      <p class="hint">The congregation's page is <strong>lczmanim.cjaffa.com</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
+      <p class="hint">The congregation's page is <strong>baismedrashoflakewoodcommons.org</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
       ${
         hasToken
           ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
