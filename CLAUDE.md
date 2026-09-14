@@ -414,16 +414,28 @@ and listed in `DIST_TREES`.
   the Mincha menu, an optional `ERUV TAVSHILIN`, Hadlakas Neiros, an evening Mincha (כל נדרי on
   יו"כ), an optional Ravs Drasha, then a sign-off that is fixed words per yom tov. Build a new one
   off a real sent message, not off a guess.
-- **`ERUV TAVSHILIN` goes in when ANY day of yom tov is a Friday**, first day or second, between
-  the Mincha menu and Hadlakas Neiros, in capitals on its own line. Said by the shul in those
+- **`ERUV TAVSHILIN` is read off the sheet's own heading**, not worked out again. The סוכות, פסח
+  and ראש השנה sheets print the note over the day it is made for, so the message asks the heading
+  (`ytEruv(block, word)`). Asking the calendar a second time got the right answer from the wrong
+  place: the paper and the message could have disagreed and neither would have known.
+  **The rule is that any day of yom tov is a Friday**, first or last, said by the shul in those
   words after this was first written as "the last day", which is the same answer for a yom tov
-  running Thursday into Friday and the wrong one for a yom tov running Friday into Shabbos.
-  Asked of the date rather than the name: two sent messages make it look like a פסח and שבועות
-  thing, but ראש השנה falls Thursday and Friday often enough (5789, 5792, 5795, 5796, 5798, 5799
-  in the next fifteen). יום כיפור never falls on a Friday, so it never asks.
-  **The days are handed to `ytEruv`, never taken off a sheet's span**: פסח's span runs from
-  bedikas chometz to the last day with חול המועד in the middle, and a Friday in חול המועד is an
-  ordinary Friday.
+  running Thursday into Friday and the wrong one for one running Friday into Shabbos.
+  **Asking the sheets put two real holes in the printed paper right.** They tested the day after
+  the last day, so **שביעי של פסח printed no note in תשפ"ט, תשצ"ב, תשצ"ו and תשצ"ט**, the years
+  פסח opens on Shabbos and שביעי is therefore the Friday. And the **ראש השנה sheet had never
+  printed one at all**, though its יום ב' is a Friday in תשפ"ה, תשפ"ט, תשצ"ב, תשצ"ה, תשצ"ו, תשצ"ח
+  and תשצ"ט. Both are fixed in the builders (`eiruvOn` in each), which is where it belongs: the
+  note is on the paper the shul hangs as well as in the message.
+  1 תשרי, 15 ניסן and 15 תשרי can never be a Friday, so the first days always turn on the second
+  day; the test is written the general way regardless, so the next reader is not left working out
+  which of the two rules a given line is.
+  In סוכות, `day2Friday` is a **different question** that used to be an alias of the עירוב one:
+  whether יום ב' itself runs into Shabbos, which decides that its afternoon belongs to both days.
+  The two agree only because 15 תשרי is never a Friday. Asked on its own now.
+  Measured across תשפ"ה to תש"ף: sheet, message and the rule agree on every occasion of every year.
+  The poster stays 816x1056 with nothing overflowing, checked with the longest heading the new rule
+  can produce.
 - **The room letters are the sheet's marks**: underlined is `d`, one star is `en`, two stars is
   `sh`, unmarked is `m`. Confirmed against the shul's ערב יום כיפור message, which is
   `YK_TEXT.erevShacharis` mark for mark. The sent ערב סוכות message leaves the letter off its

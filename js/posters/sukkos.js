@@ -537,14 +537,27 @@ export function buildSukkosPoster(year, settings) {
     return [name, ...notes].join(SK_TEXT.daySep);
   };
 
-  /* An עירוב תבשילין is made when a יום טוב runs into Shabbos, which is to say when the day
-     after the second day of יום טוב is Shabbos. Both of the years that print it, תשפ"ה and one
-     other, have יום א' on a Wednesday. */
-  const eiruvDay1 = excelWeekday(day(SK_DAY2 + 1)) === SK_SHABBOS;
-  const eiruvShmini = excelWeekday(day(SK_SIMCHAS + 1)) === SK_SHABBOS;
-  // The same fact said the other way round, and the one the blocks below need: an עירוב is
-  // made because יום ב' runs straight into Shabbos, so that afternoon belongs to both days.
-  const day2Friday = eiruvDay1;
+  /** Whether an עירוב תבשילין is made before this yom tov.
+   *
+   *  **When any of its days is a Friday**, first or last, because that is the day Shabbos gets
+   *  cooked for. This asked whether the day after the last one was Shabbos, which is the same answer
+   *  for a yom tov running Thursday into Friday and the wrong one for a yom tov running Friday into
+   *  Shabbos. The shul said it in those words: "eiruv tavshilin is when yomtov is on Friday,
+   *  regardless if its 1st day or 2nd day of yom tov".
+   *
+   *  It mattered on this sheet. In a year where פסח opens on Shabbos, שביעי is the Friday and אחרון
+   *  the Shabbos, so the day after אחרון is a Sunday and the old test said no: תשפ"ט, תשצ"ב, תשצ"ו
+   *  and תשצ"ט all printed שביעי with no עירוב over it. The first days happen never to show the
+   *  difference, since 15 ניסן and 15 תשרי can never fall on a Friday, and they are written the same
+   *  way regardless so that the next reader is not left working out which of the two rules this is. */
+  const eiruvOn = (...ns) => ns.some((n) => excelWeekday(day(n)) === SK_FRIDAY);
+  const eiruvDay1 = eiruvOn(SK_DAY1, SK_DAY2);
+  const eiruvShmini = eiruvOn(SK_SHMINI, SK_SIMCHAS);
+  /* A different question that used to be written as the same one: whether יום ב' itself runs
+     straight into Shabbos, which is what decides that its afternoon belongs to both days. It was
+     an alias of eiruvDay1, and the two agree only because 15 תשרי is never a Friday. Asked on its
+     own now, so that neither can quietly change the other. */
+  const day2Friday = excelWeekday(day(SK_DAY2)) === SK_FRIDAY;
 
   /* ערב סוכות's own morning, which is not on this sheet and is on the card all the same.
      The sheet opens at that afternoon's מנחה, because the morning is an ordinary one and the

@@ -41,7 +41,6 @@ import { PS_TEXT } from './posters/pesach.js';
 import { SK_TEXT } from './posters/sukkos.js';
 import { parseTimes } from './posters/slichos.js';
 import { erevWhereMark } from './erev-text.js';
-import { excelWeekday, dateFromHebrew } from './hebrew-calendar.js';
 
 /** The room the ותיקין מנין davens in, said the way the message says it.
  *
@@ -100,26 +99,23 @@ const YT_SIGN_OFF_RH = 'KESIVA VACHASIMA TOVA!';
  *  "Selichos 7:00m, 7:20en, 7:35d, 8:00sh, 8:20m" is YK_TEXT.erevShacharis mark for mark. */
 const ytWhere = (t) => erevWhereMark(t);
 
-/** Whether this yom tov wants an עירוב תבשילין line.
+/** Whether this yom tov wants an עירוב תבשילין line, **read off the sheet**.
  *
- *  **When any day of yom tov is a Friday**, first day or second, because that is the day Shabbos
- *  gets cooked for. Corrected by the shul: this asked whether the *last* day was a Friday, which
- *  is the same answer whenever yom tov runs Thursday into Friday, and the wrong one for a yom tov
- *  that runs Friday into Shabbos. There the Friday is the first day, the last day is Shabbos, and
- *  the עירוב is needed just as much.
+ *  The sheets print the note in the heading over the day it is made for, so the message asks the
+ *  heading rather than asking the calendar a second time. That is the rule the shul gave for this
+ *  whole page: everything comes from the boards and the sheets, and nothing here works a fact out
+ *  on its own. This used to ask whether any day of yom tov was a Friday, which got the right answer
+ *  and got it from the wrong place: the paper and the message could have disagreed and neither
+ *  would have known.
  *
- *  ראש השנה happens not to show the difference, since it can fall on a Monday, Tuesday, Thursday
- *  or Saturday and never on a Friday, so its Friday is always the second day. פסח and שבועות do
- *  show it, which is why this is written the general way now rather than when those messages get
- *  built.
+ *  Asking that put the sheets right first. They tested the day after the last day, which is the
+ *  same answer for a yom tov running Thursday into Friday and the wrong one for one running Friday
+ *  into Shabbos, so שביעי של פסח printed no note in תשפ"ט, תשצ"ב, תשצ"ו and תשצ"ט, and the ראש
+ *  השנה sheet had never printed one at all. Both are fixed in the builders, which is where such a
+ *  thing belongs: the note is now on the paper the shul hangs as well as in the message.
  *
- *  The days are handed in rather than taken off the sheet's span, because a span is not a list of
- *  yom tov days: פסח's runs from bedikas chometz to the last day and has חול המועד in the middle,
- *  and a Friday in חול המועד is an ordinary Friday. Each message names its own days, which is the
- *  one place that knows them.
- *
- *  יום כיפור never falls on a Friday, so it does not ask. */
-const ytEruv = (daySerials) => (daySerials || []).some((s) => excelWeekday(s) === 6);
+ *  @param block - the sheet block whose heading covers the day. */
+const ytEruv = (block, word) => String(block?.heading || '').includes(word);
 const YT_ERUV_LINE = 'ERUV TAVSHILIN';
 
 /** A row of מנינים, each with the room it is in. */
@@ -173,7 +169,8 @@ export function erevRoshHashanaText(poster) {
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   // ראש השנה is its two days, which are the day before the sheet's last and that last day.
-  if (ytEruv([poster?.span?.to - 1, poster?.span?.to])) lines.push(YT_ERUV_LINE);
+  // Off the sheet's own heading, whichever of the two days carries the note.
+  if ((poster?.blocks || []).some((b) => ytEruv(b, RH_TEXT.eiruv))) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -281,10 +278,8 @@ export function erevPesachText(poster) {
   const mincha = ytFirst(poster, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  const year = poster?.hebrewYear;
-  if (year && ytEruv([dateFromHebrew(15, 1, year), dateFromHebrew(16, 1, year)])) {
-    lines.push(YT_ERUV_LINE);
-  }
+  // The first days' note sits over the פסח sheet's יום א' block.
+  if (ytEruv(ytBlock(poster, PS_TEXT.day1), PS_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -337,10 +332,8 @@ export function erevSukkosText(poster) {
   const mincha = ytFirst(poster, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  const year = poster?.hebrewYear;
-  if (year && ytEruv([dateFromHebrew(15, 7, year), dateFromHebrew(16, 7, year)])) {
-    lines.push(YT_ERUV_LINE);
-  }
+  // The first days' note sits over the סוכות sheet's יום א' block, which is this message's own.
+  if (ytEruv(ytBlock(poster, SK_TEXT.day1), SK_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -391,10 +384,7 @@ export function erevShminiAtzeresText(poster) {
   const mincha = ytLine(block, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  const year = poster?.hebrewYear;
-  if (year && ytEruv([dateFromHebrew(22, 7, year), dateFromHebrew(23, 7, year)])) {
-    lines.push(YT_ERUV_LINE);
-  }
+  if (ytEruv(block, SK_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -486,10 +476,7 @@ export function erevShviiShelPesachText(poster) {
 
   lines.push(...ytEarlyLines(block));
 
-  const year = poster?.hebrewYear;
-  if (year && ytEruv([dateFromHebrew(21, 1, year), dateFromHebrew(22, 1, year)])) {
-    lines.push(YT_ERUV_LINE);
-  }
+  if (ytEruv(block, PS_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);

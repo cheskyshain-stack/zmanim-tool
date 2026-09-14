@@ -21,6 +21,7 @@ import { twoReckonings, nineHours } from './reckonings.js';
 
 const RH_MIN = 1 / 1440;
 const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
+const RH_FRIDAY = 6;
 
 /** ר"ה of a Hebrew year as an Excel serial, the same call the סליחות poster makes. */
 const rhSerial = (year) => roshHashana(year - 3761);
@@ -57,6 +58,7 @@ export const RH_TEXT = {
   // Joined to the day with a dot rather than wrapped in brackets: the heading is underlined,
   // and the underline running under a bracket reads as though it is cutting through it.
   daySep: ' · ',
+  eiruv: 'עירוב תבשילין',
   day: ["יום א'", "יום ב'"],
   candles: 'הדלקת נרות',
   shkia: 'שקיעה',
@@ -82,6 +84,13 @@ export function buildRoshHashanaPoster(year, settings) {
   const erev = dateFromSerial(rh - 1);
   const days = [dateFromSerial(rh), dateFromSerial(rh + 1)];
   const shabbosDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_SHABBOS);
+  /* An עירוב תבשילין is made when a day of יום טוב is a Friday, which for ראש השנה is יום ב':
+     1 תשרי falls on a Monday, Tuesday, Thursday or Saturday and never on a Friday, so the Friday
+     is always the second day. It happens in תשפ"ה, תשפ"ט, תשצ"ב, תשצ"ה, תשצ"ו, תשצ"ח and תשצ"ט.
+     This sheet printed nothing at all before, where the סוכות and פסח sheets have always put the
+     note over the day. The shul's message for those years says ERUV TAVSHILIN, so the sheet should
+     say it too, and now the message reads it off here rather than working the weekday out again. */
+  const eiruvDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_FRIDAY);
 
   // `calc` names the rule behind the line, for the Calculations page. A label cannot do
   // it: מנחה, שקיעה and מעריב each appear more than once on this sheet with a different
@@ -198,7 +207,11 @@ export function buildRoshHashanaPoster(year, settings) {
     }
 
     return {
-      heading: RH_TEXT.day[i] + (isShabbos ? RH_TEXT.daySep + RH_TEXT.shabbos : ''),
+      heading: [RH_TEXT.day[i],
+        ...(isShabbos ? [RH_TEXT.shabbos] : []),
+        // Over the day the עירוב is made for, which is the Friday itself, the way the סוכות and
+        // פסח sheets put it over theirs.
+        ...(i === eiruvDay ? [RH_TEXT.eiruv] : [])].join(RH_TEXT.daySep),
       isShabbos,
       lines,
     };
