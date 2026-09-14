@@ -298,33 +298,6 @@ The token is a Worker secret instead, and the admin asks the Worker.
   Playwright with `page.route`. Four states are worth covering: not set up, numbers, nobody has
   visited yet, and the Worker refusing.
 
-## "Install this app" on the congregation's menu
-
-`js/install.js`, the last row of the menu, and the only thing on the site that asks to be put on
-a home screen. The manifest work was already done and Chrome agrees: `Page.getInstallabilityErrors`
-answers with an empty list and `beforeinstallprompt` fires. What was missing was anybody being
-asked.
-
-- **Chrome's own bar cannot be summoned.** The one that drops from the address bar is Chrome's,
-  shown on its own engagement heuristic, and no page can ask for it. A page can only catch the
-  event, keep it, and call `prompt()`, which opens the same dialog. Both ways in end there.
-- The **row** is the reliable one: a tap is a user gesture and Chrome has never refused `prompt()`
-  inside one. It is drawn only where there is something to offer, and never once the page is
-  running installed (`display-mode: standalone`, or `navigator.standalone` on an iPhone).
-- The **one automatic ask**, `INSTALL_ASK_ONCE`, fires on a device that has not been asked before
-  (`zmanim-install-asked`, per device and per browser like the analytics opt out). Chrome may
-  refuse a `prompt()` with no gesture behind it and the rule has moved between versions: measured
-  here it went through on desktop Chromium, and **a phone refusing it costs nothing**, since the
-  row is still on the menu. Set the constant to false to have the row alone.
-- The event is caught at module load, not when the menu is drawn: Chrome fires it once, often a
-  moment after the first paint, so `wireInstall` takes a redraw to call when it arrives.
-- **An iPhone gets words rather than a dialog.** Safari implements none of this, so the row says
-  to tap Share then Add to Home Screen, which is the only way onto an iPhone's home screen.
-- The admin and the messages page have none of it: those addresses are handed to one or two
-  people, and the congregation's board is what the neighbourhood opens.
-- Measure it the way it was measured here: a **persistent profile** (in incognito the only answer
-  is `in-incognito`), CDP `Page.getInstallabilityErrors`, and a UA override for the iPhone half.
-
 ## הדלקת נרות on the congregation's home page
 
 The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
