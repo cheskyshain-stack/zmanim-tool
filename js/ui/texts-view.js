@@ -18,13 +18,15 @@
 // was built for, which is the opposite of the point of giving them their own address.
 
 import { weekIndex, rowFor } from '../sheets/rows.js';
-import { computeSeasonWeeks } from '../sheets/weeks.js';
-import { hebrewDateExtended } from '../hebrew-calendar.js';
+import { computeSeasonWeeks, computeWeekdayWeeks } from '../sheets/weeks.js';
+import { hebrewDateExtended, hasParsha, hasYomTov } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { weekText } from '../week-text.js';
+import { weekText, weekName } from '../week-text.js';
+import { tzomGedaliaText } from '../taanis-text.js';
+import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
@@ -123,37 +125,100 @@ function txWeekNow(state, settings, tables, today) {
   return txAgainst(state, weeks, serial);
 }
 
+/** The weeks the **Weekday** chart has, which is not the same list as the Shabbos charts'.
+ *
+ *  The weekly message is the weekday schedule, so its weeks are the weekday chart's own. The
+ *  difference is the whole of what the shul asked for here: a week whose Shabbos is yom tov has
+ *  no parsha and so is not a row on a Shabbos chart at all, but its Sunday through Thursday are
+ *  ordinary days the shul davens and the Weekday chart prints them. Read off the Shabbos list,
+ *  the week of סוכות and the week of פסח had no message at all.
+ *
+ *  Built the same way as txSeasonWeeks, four candidate seasons and whichever holds the week
+ *  wins, for the same reason: this page must never need somebody to have generated a chart. */
+function txWeekdayWeeks(settings, tables, today, years = 2) {
+  const weeks = new Map();
+  const year = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+  const pairs = [['kayitz', year - 1], ['choref', year], ['kayitz', year], ['choref', year + 1]];
+  if (years > 1) pairs.push(['kayitz', year + 1], ['choref', year + 2]);
+  for (const [season, y] of pairs) {
+    let built = [];
+    try {
+      built = computeWeekdayWeeks(season, y, settings, tables)?.weeks || [];
+    } catch {
+      built = [];
+    }
+    for (const week of built) if (!weeks.has(week.serial)) weeks.set(week.serial, { week, season });
+  }
+  return weeks;
+}
+
+/** What a week is called in the message: "P' Ki Seitzei", or the yom tov in it.
+ *
+ *  The Weekday chart labels a week with its parsha where it has one and with the yom tov's own
+ *  name where it has not, and the message says what the chart says. Asked of the calendar in
+ *  English rather than translated out of the week's own label, since that label is in whichever
+ *  language the boards are set in and these messages are written in English. */
+function txWeekName(week, settings, tables) {
+  const parsha = hasParsha(week.serial, settings, tables);
+  if (parsha) return weekName(erevParshaEnglish(parsha, tables?.parshaNames), true);
+  /* The plain name of the yom tov, the same way the chart's own week list arrives at the label it
+     prints: a Shabbos in the middle of one is still that yom tov's week. הושענא רבה is named for
+     the סוכות it ends rather than for itself, which is what holidayNameFor in sheets/weeks.js
+     does. */
+  const raw = hasYomTov(week.serial, { ...settings, english: true }, tables?.specialDays);
+  const yomTov = /^Hoshana Rabbah$/.test(raw) ? 'Succos' : raw.replace(/^Chol Hamoed /, '').trim();
+  return weekName(yomTov || week.parsha, false);
+}
+
 /** The weekly message for one week, off the Weekday chart.
  *
  *  The Weekday chart is anchored on the Shabbos that ends the week, and covers the Sunday through
  *  Friday in front of it, which is exactly the week this message is about. Its מנחה and מעריב are
  *  built the way the chart builds them and then have any saved sheet's overrides laid over, so a
- *  cell somebody corrected by hand reaches the message. שחרית is not part of that row: it is the
- *  Settings schedule the chart prints as one merged cell.
+ *  cell somebody corrected by hand reaches the message. The morning is not part of that row: it
+ *  is the Settings schedule the chart prints as one merged cell, or the סליחות season's own lists
+ *  where the week is in one (see wkMornings in week-text.js).
  *
- *  Sent on the Sunday, which is six days before the Shabbos, and it stands until the Friday.
+ *  Sent on the Sunday, which is six days before the Shabbos. See TX_WEEK_FROM for how long it
+ *  stands.
  *
- *  @param found - a week and a sheet, from txAgainst. */
-function txWeek(state, settings, found, english) {
-  const shabbos = found.week.serial;
-  const built = buildWeekdayRow(found.week, settings);
+ *  @param entry - a week and its season, from txWeekdayWeeks. */
+function txWeek(state, settings, tables, entry) {
+  const shabbos = entry.week.serial;
+  const name = txWeekName(entry.week, settings, tables);
+  const built = buildWeekdayRow(entry.week, settings);
   /* Overrides only where a saved Weekday chart actually covers this week. mergeRow wants a real
      sheet to read them off and throws on null, and most weeks here have no saved chart at all:
-     this page computes its weeks rather than needing somebody to have generated one. */
-  const chart = weekdayChartFor(found.sheet?.id ? found.sheet : null, shabbos, state);
+     this page computes its weeks rather than needing somebody to have generated one. Found by the
+     week itself rather than through a Shabbos sheet, since half the point of this list is the
+     weeks no Shabbos sheet has. */
+  const chart = weekdayChartFor(null, shabbos, state);
   const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
-  const text = weekText(state?.settings?.weekdayShacharis || '', row, english);
+  const text = weekText(state?.settings?.weekdayShacharis || '', row, name, shabbos, settings);
   if (!text) return null;
   return {
     id: `week-${shabbos}`,
-    kind: 'parsha',
+    kind: 'week',
     // The Sunday it goes out on, not the Shabbos it runs up to.
     serial: shabbos - 6,
     name: 'Week',
-    when: english || '',
+    when: name,
     text,
   };
 }
+
+/** How long the weekly message stands, counted back from the Shabbos that ends the week.
+ *
+ *  **It comes down after Thursday**, asked for: from the Friday the Erev Shabbos message is the
+ *  one being sent, and a week's times that have nearly run out are a card in the way. It goes up
+ *  on the Friday before, so that whoever sends it on the Sunday has it in front of them from
+ *  motzei Shabbos, which is when some of the sent ones went out.
+ *
+ *  The two ends meet: a week comes down on its Thursday and the next one goes up on the Friday.
+ *  So there is exactly one weekly message on the page on any day, which is what makes it readable
+ *  beside the others. Its own window rather than the four day one for that reason. */
+const TX_WEEK_FROM = 8;
+const TX_WEEK_TO = 2;
 
 /** How long before a yom tov its messages appear here.
  *
@@ -365,6 +430,32 @@ function txRoshChodesh(state, settings, today, howMany = 1) {
   return out;
 }
 
+/** The צום גדליה message, off the sheet the shul hangs for that day.
+ *
+ *  The only fast with a message here, and taanis-text.js says why: it is the only one with a
+ *  sheet, and the other three fasts' מנחה and מעריב are on no board at all.
+ *
+ *  Its own kind, `taanis`, rather than folded in with the yom tov ones. A fast is not a yom tov,
+ *  and the switch that turns the ערב messages off should not take it with them.
+ *
+ *  The sheet's span is the one day, so the window puts the card up four days before it and takes
+ *  it down when the day is over. The shul sends it the night before, which is inside that. */
+function txTaanis(year, settings, today) {
+  const poster = buildTzomGedaliaPoster(year, settings);
+  if (!txInWindow(poster, today)) return null;
+  const text = tzomGedaliaText(poster);
+  if (!text) return null;
+  return {
+    id: `taanis-gedalia-${year}`,
+    kind: 'taanis',
+    // The day before, which is the day it goes out.
+    serial: poster.span.from - 1,
+    name: 'Tzom Gedalia',
+    when: hebrewYear(year),
+    text,
+  };
+}
+
 /** The ותיקין announcements, one for each of the two occasions the sheet covers.
  *
  *  Built separately rather than from the two-in-one sheet, because the message is per occasion:
@@ -456,9 +547,18 @@ function txCard(msg) {
  *
  *  Only the year view has them. The four day window is a handful of cards and filtering that
  *  would be two buttons over almost nothing. */
-const txKinds = { parsha: true, yomtov: true, roshchodesh: true };
+const txKinds = { parsha: true, week: true, yomtov: true, taanis: true, roshchodesh: true };
 
-const TX_KIND_NAMES = { parsha: 'Parsha', yomtov: 'Yom Tov', roshchodesh: 'Rosh Chodesh' };
+/** The weekly message is its own switch rather than part of Parsha, asked for: it is the week's
+ *  own schedule and the Erev Shabbos one is Friday's, they are checked for different things, and
+ *  fifty of each on one screen is a hundred cards. Same for the fast, which is not a yom tov. */
+const TX_KIND_NAMES = {
+  parsha: 'Erev Shabbos',
+  week: 'Weekday',
+  yomtov: 'Yom Tov',
+  taanis: 'Taanis',
+  roshchodesh: 'Rosh Chodesh',
+};
 
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
@@ -479,9 +579,24 @@ export function renderTexts(container, state, settings, tables) {
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
       txErevShviiShelPesach(year, settings, today),
+      txTaanis(year, settings, today),
       ...txNetz(year, settings, today),
     ]) {
       if (msg) out.push(msg);
+    }
+    return out;
+  };
+
+  /* The weekly messages, off the Weekday chart's own week list. Both views walk the same list and
+     differ only in the window, the same way the yom tov ones do. */
+  const weekly = (from, to) => {
+    const out = [];
+    const weeks = txWeekdayWeeks(settings, tables, today, txAll ? 2 : 1);
+    for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
+      if (serial - to < today || serial - from > today) continue;
+      if (txAll && serial - today > TX_ALL_DAYS) continue;
+      const week = txWeek(state, settings, tables, weeks.get(serial));
+      if (week) out.push(week);
     }
     return out;
   };
@@ -490,6 +605,8 @@ export function renderTexts(container, state, settings, tables) {
     messages.push(...yomTov());
     // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
     messages.push(...txRoshChodesh(state, settings, today, 14));
+    // Everything still to come: the year view relaxes only how far ahead, never the near end.
+    messages.push(...weekly(Infinity, TX_WEEK_TO));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
       if (serial < today || serial - today > TX_ALL_DAYS) continue;
@@ -497,8 +614,6 @@ export function renderTexts(container, state, settings, tables) {
       if (!found) continue;
       const { columns, row } = rowFor(found.week, found.sheet, state, settings);
       const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
-      const week = txWeek(state, settings, found, english);
-      if (week) messages.push(week);
       messages.push({
         id: `erev-shabbos-${serial}`,
         kind: 'parsha',
@@ -510,18 +625,8 @@ export function renderTexts(container, state, settings, tables) {
       });
     }
   } else {
-    /* The weekly message, on its own window: it goes out on the Sunday and stands until the
-       Friday, where the Erev Shabbos one is the Friday's alone. Measured from the Sunday, so it
-       arrives the usual four days ahead of it and then stays up all week. */
-    const nearest = txWeekNow(state, settings, tables, today);
-    if (nearest) {
-      const english = erevParshaEnglish(nearest.week.parsha, tables?.parshaNames);
-      const sunday = nearest.week.serial - 6;
-      if (txDaysInWindow(sunday, nearest.week.serial - 1, today)) {
-        const week = txWeek(state, settings, nearest, english);
-        if (week) messages.push(week);
-      }
-    }
+    // The Friday before through the Thursday: see TX_WEEK_FROM.
+    messages.push(...weekly(TX_WEEK_FROM, TX_WEEK_TO));
     const shabbos = txErevShabbos(state, settings, tables, today);
     if (shabbos) messages.push(shabbos);
     messages.push(...yomTov());

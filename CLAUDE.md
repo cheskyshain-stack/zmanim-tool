@@ -403,17 +403,20 @@ and listed in `DIST_TREES`.
   One thing deliberately not built: three of the seventeen, in חשון, טבת and שבט, open
   "6:50m&ns, [Netz 7:15]" instead, where the bracket is sunrise and the מנין is sunrise less twenty
   five minutes. Neither number is on a chart, so neither is built.
-- **The year view has three switches under "Include in messages", Parsha, Yom Tov and Rosh
-  Chodesh**, and everything on it is in **date order**, which is the order these get sent in. All on
-  to begin with, and turning them all off says so rather than looking broken.
+- **The year view has five switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
+  Taanis and Rosh Chodesh**, and everything on it is in **date order**, which is the order these get
+  sent in. All on to begin with, and turning them all off says so rather than looking broken.
+  The weekly message is its own switch rather than part of Erev Shabbos, asked for: they are the
+  week's schedule and Friday's, they are checked for different things, and fifty of each on one
+  screen is a hundred cards. Same for the fast, which is not a yom tov.
   They are **`switchHtml` from `js/ui/switch.js`**, the same control This week and the Posters bar
   use, rather than a third kind of control invented for this page. Each kind is its own question
-  with a yes and a no, which is what these are: three things that can each be on or off, not one
-  choice between three. **Do not wrap each one in a row of its own**: `switchHtml` hands the
+  with a yes and a no, which is what these are: five things that can each be on or off, not one
+  choice between five. **Do not wrap each one in a row of its own**: `switchHtml` hands the
   question and the track back as siblings so that a stack of them shares one grid and every track
   lines up under the last, and a wrapper makes each its own cell and loses that. Measured: all
-  three tracks start at the same x.
-  The four day window has no switches: it is a handful of cards and filtering that would be three
+  five tracks start at the same x, at 900px and at 375px.
+  The four day window has no switches: it is a handful of cards and filtering that would be five
   controls over almost nothing. Each message carries the serial of the day it goes out, the ערב
   rather than the day itself, which is what the sort runs on.
 - **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is
@@ -486,14 +489,41 @@ and listed in `DIST_TREES`.
   and מעריב column B. Overrides from a saved Weekday chart are laid over where one covers the week,
   so a cell corrected by hand reaches the message; most weeks have none, since this page computes
   its weeks. `mergeRow` throws on a null sheet, so the merge is guarded rather than always run.
-  Its window is its own: sent on the **Sunday**, six days before the Shabbos, and it stands until
-  the **Friday**, where the Erev Shabbos message is the Friday's alone. Its `kind` is `parsha`, so
-  the Parsha switch covers both.
+  **Its weeks are the Weekday chart's own list** (`computeWeekdayWeeks`), not the Shabbos charts'.
+  That is the difference between a week having a message and not: a week whose Shabbos is yom tov
+  has no parsha and so is no row on a Shabbos chart, while its Sunday through Thursday are ordinary
+  days the shul davens and the Weekday chart prints. Read off the Shabbos list, **the week of
+  סוכות, of פסח, of שבועות and of ראש השנה had no message at all**, which the shul reported. Those
+  weeks are named for the yom tov in them, the way the chart's own row is: "Week of Sukkos", and
+  the "P'" goes in front of a parsha only.
+  **The morning is not always the everyday שחרית**, and the shul asked why the message still said
+  it was. Through the סליחות season the shul opens earlier and on the סליחות sheet's own lists, so
+  `wkMornings` asks `weekdayMornings` in `posters/day.js`, which is the same question the week card
+  and the week's One sheet ask: one line per schedule naming its days, and the everyday line under
+  them only where some morning is still running it. Three views, one answer.
+  Its window is its own: it goes up on the **Friday before** and comes down after the **Thursday**,
+  asked for, since from the Friday the Erev Shabbos message is the one being sent. The two ends
+  meet, so there is exactly one weekly message on the page on any day: measured over 400 days, 391
+  with exactly one, 9 with none (the weeks inside סוכות and פסח, which have no weekday row at all)
+  and 2 with two, where the short run-up week before פסח starts before the week in front of it ends.
   Three things the sent messages have that no chart does, and which are therefore not built: a
   **7:10 and an 8:10 בעזרת נשים** in the שחרית, and a **T"T beside the 10:20 מעריב**. Same answer as
   the ROSH CHODESH line's own T"T and its 6:50 בעזרת נשים.
-  Measured across 97 weeks of both seasons and two years: every line of every message matches the
-  chart's own cell exactly, with no line differing.
+  Measured against the shul's own sent messages: the week of ראש השנה תשפ"ז is their Selichos line
+  time for time, 6:35 on the two קריאת התורה mornings and 6:40 on the rest, which is what their
+  "6:40(m&t6:35)" says; the week of שבועות is their שחרית time for time. Where a מנחה or מעריב
+  differs from what they sent (6:55 against their 7:00 that week), the chart is what is kept.
+- **The fast day message** (`js/taanis-text.js`) is **צום גדליה only, and that is the whole of what
+  the boards can answer**. Its sheet (`posters/tzomgedalia.js`) carries all three schedules, so the
+  message is the sheet's own שחרית, מנחה and מעריב with the sign-off the sent ones end on. The other
+  three public fasts have no sheet: their morning is the ר"ח / בה"ב / תענית list out of Settings,
+  but a fast afternoon is not the everyday one (the sent תענית אסתר runs 4:45, 5:10 and 5:15 after
+  the chart's own list ends) and מעריב is at the end of the fast. A message missing two of its three
+  lines, or carrying times this program made up, are both worse than no message. When the shul hangs
+  a sheet for one of the others, its message reads off that sheet the way this one does.
+  The three sent fast messages all say "Shacharis" where the sheet heads that block סליחות: the
+  wording is theirs, the times are the sheet's. שקיעה is on the sheet and in none of the three, so
+  it is not in the message either.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
   schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
   line rather than carrying a time of its own.
