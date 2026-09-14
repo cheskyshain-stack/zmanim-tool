@@ -4400,3 +4400,15 @@ body.is-locked { overflow: hidden; }
 }
 .tx-kinds { justify-content: start; justify-items: start; margin-top: 0.45rem; }
 .tx-kinds .week-switch-label { text-align: start; }
+
+/* The text of a message, put on the screen for copying by hand, where the browser would let the
+   page do neither kind of copy. See ui/copy.js: this is what a reader gets instead of the words
+   "Copy failed" and nothing to show for them. Full width and a real textarea, so a long press
+   selects it the way a phone expects. */
+.copy-fallback { margin: 0.5rem 0; }
+.copy-fallback .hint { margin: 0 0 0.3rem; }
+.copy-fallback-text {
+  width: 100%; box-sizing: border-box; font: inherit; line-height: 1.4;
+  padding: 0.5rem; border: 1px solid var(--line, #ccd3da); border-radius: 6px;
+  background: #fff; color: inherit; resize: vertical;
+}

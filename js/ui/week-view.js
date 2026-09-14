@@ -29,6 +29,7 @@ import { announcedWeekCell } from '../announced.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { loadTables } from '../data-loader.js';
+import { wireCopyButton } from './copy.js';
 import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { weekEndsMins } from '../upcoming.js';
 import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
@@ -1541,40 +1542,16 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
      call, so this is a promise that has already settled by the time anyone can press the
      button, and the await costs nothing.
 
-     The clipboard is asked for twice over: navigator.clipboard is refused outside a secure
-     context and on some older phones, and a message nobody can paste is no use, so the old
-     hidden-textarea route is kept behind it. The result is said on the button rather than
-     in an alert, the way the PDF button does it. */
-  const copyBtn = container.querySelector('#week-copy-btn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      const said = copyBtn.textContent;
-      try {
-        const { week: w, sheet: s } = index.get(showing);
-        if (!s) throw new Error('this week has no שבת row');
-        const { columns, row } = rowFor(w, s, state, settings);
-        const tables = await loadTables();
-        const text = erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-        else {
-          const box = document.createElement('textarea');
-          box.value = text;
-          box.setAttribute('readonly', '');
-          box.style.position = 'fixed';
-          box.style.opacity = '0';
-          document.body.appendChild(box);
-          box.select();
-          document.execCommand('copy');
-          box.remove();
-        }
-        copyBtn.textContent = 'Copied';
-      } catch (err) {
-        console.error('copy failed', err);
-        copyBtn.textContent = 'Copy failed';
-      }
-      setTimeout(() => { copyBtn.textContent = said; }, 2000);
-    });
-  }
+     The copying itself is wireCopyButton, which tries both routes and, where a browser will
+     let the page do neither, puts the text on the screen to be copied by hand. This is the
+     button somebody on the congregation's own page pressed and was told "Copy failed". */
+  wireCopyButton(container.querySelector('#week-copy-btn'), async () => {
+    const { week: w, sheet: s } = index.get(showing);
+    if (!s) throw new Error('this week has no שבת row');
+    const { columns, row } = rowFor(w, s, state, settings);
+    const tables = await loadTables();
+    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+  });
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
   // one of these at the right size either, and a PDF states the paper in the file rather

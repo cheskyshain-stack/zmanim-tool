@@ -13,6 +13,7 @@ import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
+import { wireCopyButton } from './ui/copy.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
@@ -789,35 +790,12 @@ function donateWayHtml(way) {
 
 /** Put a card's detail on the clipboard, since the app it is wanted in is a tap away.
  *
- *  Asked for twice over, the same as the week card's Copy text button: navigator.clipboard
- *  is refused outside a secure context and on some older phones, so the old hidden textarea
- *  is kept behind it. The result is said on the button rather than in an alert, and the
- *  value stays selectable text either way, so a phone that can do neither is not stuck. */
+ *  See ui/copy.js for the two routes and for what happens when a browser allows neither. The
+ *  value beside the button is selectable text in the page regardless, so this one was never
+ *  the dead end the message buttons were. */
 function wireDonateCopy(root) {
   for (const btn of root.querySelectorAll('.luach-copy-btn')) {
-    btn.addEventListener('click', async () => {
-      const said = btn.textContent;
-      const text = btn.dataset.copy || '';
-      try {
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-        else {
-          const box = document.createElement('textarea');
-          box.value = text;
-          box.setAttribute('readonly', '');
-          box.style.position = 'fixed';
-          box.style.opacity = '0';
-          document.body.appendChild(box);
-          box.select();
-          document.execCommand('copy');
-          box.remove();
-        }
-        btn.textContent = 'Copied';
-      } catch (err) {
-        console.error('copy failed', err);
-        btn.textContent = 'Copy failed';
-      }
-      setTimeout(() => { btn.textContent = said; }, 2000);
-    });
+    wireCopyButton(btn, () => btn.dataset.copy || '');
   }
 }
 

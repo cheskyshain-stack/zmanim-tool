@@ -15,6 +15,7 @@
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
 import { resolveSettings } from '../settings.js';
+import { wireCopyButton } from './copy.js';
 import { buildShuvaPoster, buildShuvaFromCalendar, shuvaWeekOf, shuvaSheetsFor, shabbosShuvaSerial, SHUVA_TEXT } from '../posters/shuva.js';
 import { buildSlichosPoster, parseTimes, SLICHOS_TEXT, SLICHOS_ELSEWHERE, SLICHOS_MOVED }
   from '../posters/slichos.js';
@@ -2755,36 +2756,14 @@ export function renderPosters(container, state, routeChanged, tables) {
     setPrintPage('letter portrait');
     wirePrintButton(container);
 
-    /* The erev message onto the clipboard, for the sheets that have one.
-       The clipboard is asked for twice over, the same as the week card's own copy button:
-       navigator.clipboard is refused outside a secure context and on some older phones, and a
-       message nobody can paste is no use, so the old hidden-textarea route is kept behind it.
-       What happened is said on the button rather than in an alert. */
-    const copyBtn = container.querySelector('#poster-copy-btn');
-    if (copyBtn && poster.erevText) {
-      copyBtn.addEventListener('click', async () => {
-        const said = copyBtn.textContent;
-        try {
-          const text = poster.erevText(built);
-          if (!text) throw new Error('this sheet built no message');
-          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-          else {
-            const box = document.createElement('textarea');
-            box.value = text;
-            box.setAttribute('readonly', '');
-            box.style.position = 'fixed';
-            box.style.opacity = '0';
-            document.body.appendChild(box);
-            box.select();
-            document.execCommand('copy');
-            box.remove();
-          }
-          copyBtn.textContent = 'Copied';
-        } catch (err) {
-          console.error('copy failed', err);
-          copyBtn.textContent = 'Copy failed';
-        }
-        setTimeout(() => { copyBtn.textContent = said; }, 2000);
+    /* The erev message onto the clipboard, for the sheets that have one. See ui/copy.js:
+       both routes are tried, and where a browser lets the page do neither the text goes on
+       the screen to be copied by hand. */
+    if (poster.erevText) {
+      wireCopyButton(container.querySelector('#poster-copy-btn'), () => {
+        const text = poster.erevText(built);
+        if (!text) throw new Error('this sheet built no message');
+        return text;
       });
     }
     // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which

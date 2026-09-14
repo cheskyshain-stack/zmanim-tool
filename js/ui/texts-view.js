@@ -22,6 +22,7 @@ import { computeSeasonWeeks, computeWeekdayWeeks } from '../sheets/weeks.js';
 import { hebrewDateExtended, hasParsha, hasYomTov } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
+import { wireCopyButton } from './copy.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName } from '../week-text.js';
@@ -730,34 +731,11 @@ export function renderTexts(container, state, settings, tables) {
     box.addEventListener('input', () => fit(box));
   });
 
-  /* The clipboard is asked for twice over, the same as everywhere else in this program:
-     navigator.clipboard is refused outside a secure context and on some older phones, and a
-     message nobody can paste is no use. What happened is said on the button. */
+  /* See ui/copy.js: both routes are tried, and where a browser lets the page do neither the
+     text goes on the screen to be copied by hand. */
   container.querySelectorAll('.tx-copy').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const said = btn.textContent;
-      // What is in the box now, not what was built into it: the whole point of the box being
-      // editable is that a line somebody added goes out with the message.
-      const text = btn.closest('.tx-card')?.querySelector('.tx-body')?.value || '';
-      try {
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-        else {
-          const box = document.createElement('textarea');
-          box.value = text;
-          box.setAttribute('readonly', '');
-          box.style.position = 'fixed';
-          box.style.opacity = '0';
-          document.body.appendChild(box);
-          box.select();
-          document.execCommand('copy');
-          box.remove();
-        }
-        btn.textContent = 'Copied';
-      } catch (err) {
-        console.error('copy failed', err);
-        btn.textContent = 'Copy failed';
-      }
-      setTimeout(() => { btn.textContent = said; }, 2000);
-    });
+    // What is in the box now, not what was built into it: the whole point of the box being
+    // editable is that a line somebody added goes out with the message.
+    wireCopyButton(btn, () => btn.closest('.tx-card')?.querySelector('.tx-body')?.value || '');
   });
 }

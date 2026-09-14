@@ -6747,6 +6747,115 @@ function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
   return posterFromCell(week, row.C);
 }
 
+// ==== ui/copy.js ====
+// Putting a message on the clipboard, in the four places this program offers to.
+//
+// **The fallback was behind the wrong test.** Every one of those four asked
+// `navigator.clipboard?.writeText` and used the old hidden-textarea route only when that was
+// **missing**. That is not how this fails in the field. The API is present almost everywhere
+// now, and what it does instead is **be there and refuse**: an in-app browser, a page served
+// over plain http, an Android webview, a permissions policy. Then `await` rejects, the catch
+// fires, and the fallback that was written for exactly this moment is never reached, because
+// the property it was guarding on existed.
+//
+// So the fallback goes behind the failure rather than behind the feature check. Somebody on the
+// congregation's own week page pressed Copy text and got "Copy failed", which is how this was
+// found.
+//
+// **And "Copy failed" on its own is not an answer.** The person wanted the message; being told
+// the copying did not work leaves them holding nothing, on a phone, with no way to get at what
+// they came for. So when both routes fail the text is put on the screen in a box, already
+// selected, for them to copy by hand. A browser that will not let a page touch the clipboard
+// will still let a person select text, and that is the one thing that always works.
+
+/** The two ways of copying, tried in order. Never throws; answers whether it worked.
+ *
+ *  The old route is not a relic. `document.execCommand('copy')` is deprecated and still the
+ *  thing that works in the places the modern API is refused, which are exactly the places this
+ *  shul's congregation reads the site from: a link opened inside WhatsApp. */
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Present and refused, which is the common case. Fall through and try the other way.
+  }
+  try {
+    const box = document.createElement('textarea');
+    box.value = text;
+    box.setAttribute('readonly', '');
+    /* Off the screen but not display:none and not hidden: a box the browser does not lay out
+       cannot be selected, and a selection is what execCommand copies. Fixed rather than
+       absolute so that adding it cannot scroll the page under whoever pressed the button. */
+    box.style.position = 'fixed';
+    box.style.top = '0';
+    box.style.opacity = '0';
+    box.style.pointerEvents = 'none';
+    document.body.appendChild(box);
+    box.select();
+    box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
+    const ok = document.execCommand('copy');
+    box.remove();
+    if (ok) return true;
+  } catch {
+    // Nothing left to try. The caller shows the text instead.
+  }
+  return false;
+}
+
+/** A button that copies, says so on itself, and hands the text over when it cannot.
+ *
+ *  `getText` is called on the press rather than when this is wired, because every one of these
+ *  builds its message out of the week being looked at, which changes under the button.
+ *
+ *  It can also throw, and that is a different failure worth telling apart on the screen: the
+ *  message could not be built at all, as against built and not copyable. */
+function wireCopyButton(btn, getText) {
+  if (!btn) return;
+  const said = btn.textContent;
+  let box = null;
+  btn.addEventListener('click', async () => {
+    box?.remove();
+    box = null;
+    let text;
+    try {
+      text = await getText();
+    } catch (err) {
+      console.error('copy: could not build the text', err);
+      btn.textContent = 'Nothing to copy';
+      setTimeout(() => { btn.textContent = said; }, 2000);
+      return;
+    }
+    if (await copyToClipboard(text)) {
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = said; }, 2000);
+      return;
+    }
+    /* Neither route worked, so the reader gets the text itself. Put after the button, selected,
+       with one line saying why it is there. Not an alert: an alert cannot be scrolled and a
+       message is several lines long. */
+    box = document.createElement('div');
+    box.className = 'copy-fallback';
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = 'This browser will not let the page copy for you. The message is here to '
+      + 'copy by hand, and it is already selected.';
+    const area = document.createElement('textarea');
+    area.className = 'copy-fallback-text';
+    area.readOnly = true;
+    area.rows = Math.min(12, String(text).split('\n').length + 1);
+    area.value = text;
+    box.append(note, area);
+    btn.insertAdjacentElement('afterend', box);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, String(text).length);
+    btn.textContent = said;
+  });
+}
+
 // ==== ui/own-view.js ====
 // The editor for a sheet the shul writes itself. See posters/own.js for what a sheet is.
 //
@@ -8276,6 +8385,7 @@ function wireSwitch(root, name, apply) {
 // A poster is a real 8.5in by 11in page in the document, the same way a chart page is, so
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
+
 
 
 
@@ -11015,36 +11125,14 @@ function renderPosters(container, state, routeChanged, tables) {
     setPrintPage('letter portrait');
     wirePrintButton(container);
 
-    /* The erev message onto the clipboard, for the sheets that have one.
-       The clipboard is asked for twice over, the same as the week card's own copy button:
-       navigator.clipboard is refused outside a secure context and on some older phones, and a
-       message nobody can paste is no use, so the old hidden-textarea route is kept behind it.
-       What happened is said on the button rather than in an alert. */
-    const copyBtn = container.querySelector('#poster-copy-btn');
-    if (copyBtn && poster.erevText) {
-      copyBtn.addEventListener('click', async () => {
-        const said = copyBtn.textContent;
-        try {
-          const text = poster.erevText(built);
-          if (!text) throw new Error('this sheet built no message');
-          if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-          else {
-            const box = document.createElement('textarea');
-            box.value = text;
-            box.setAttribute('readonly', '');
-            box.style.position = 'fixed';
-            box.style.opacity = '0';
-            document.body.appendChild(box);
-            box.select();
-            document.execCommand('copy');
-            box.remove();
-          }
-          copyBtn.textContent = 'Copied';
-        } catch (err) {
-          console.error('copy failed', err);
-          copyBtn.textContent = 'Copy failed';
-        }
-        setTimeout(() => { copyBtn.textContent = said; }, 2000);
+    /* The erev message onto the clipboard, for the sheets that have one. See ui/copy.js:
+       both routes are tried, and where a browser lets the page do neither the text goes on
+       the screen to be copied by hand. */
+    if (poster.erevText) {
+      wireCopyButton(container.querySelector('#poster-copy-btn'), () => {
+        const text = poster.erevText(built);
+        if (!text) throw new Error('this sheet built no message');
+        return text;
       });
     }
     // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
@@ -16527,6 +16615,7 @@ function fitWeekSheet(container) {
 
 
 
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -18033,40 +18122,16 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
      call, so this is a promise that has already settled by the time anyone can press the
      button, and the await costs nothing.
 
-     The clipboard is asked for twice over: navigator.clipboard is refused outside a secure
-     context and on some older phones, and a message nobody can paste is no use, so the old
-     hidden-textarea route is kept behind it. The result is said on the button rather than
-     in an alert, the way the PDF button does it. */
-  const copyBtn = container.querySelector('#week-copy-btn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      const said = copyBtn.textContent;
-      try {
-        const { week: w, sheet: s } = index.get(showing);
-        if (!s) throw new Error('this week has no שבת row');
-        const { columns, row } = rowFor(w, s, state, settings);
-        const tables = await loadTables();
-        const text = erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-        else {
-          const box = document.createElement('textarea');
-          box.value = text;
-          box.setAttribute('readonly', '');
-          box.style.position = 'fixed';
-          box.style.opacity = '0';
-          document.body.appendChild(box);
-          box.select();
-          document.execCommand('copy');
-          box.remove();
-        }
-        copyBtn.textContent = 'Copied';
-      } catch (err) {
-        console.error('copy failed', err);
-        copyBtn.textContent = 'Copy failed';
-      }
-      setTimeout(() => { copyBtn.textContent = said; }, 2000);
-    });
-  }
+     The copying itself is wireCopyButton, which tries both routes and, where a browser will
+     let the page do neither, puts the text on the screen to be copied by hand. This is the
+     button somebody on the congregation's own page pressed and was told "Copy failed". */
+  wireCopyButton(container.querySelector('#week-copy-btn'), async () => {
+    const { week: w, sheet: s } = index.get(showing);
+    if (!s) throw new Error('this week has no שבת row');
+    const { columns, row } = rowFor(w, s, state, settings);
+    const tables = await loadTables();
+    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+  });
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
   // one of these at the right size either, and a PDF states the paper in the file rather
