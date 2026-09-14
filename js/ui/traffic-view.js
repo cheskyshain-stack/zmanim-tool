@@ -184,16 +184,27 @@ function trafficChart(byDay, utc = false) {
  *
  *  And it names the cure, because there is one and it is not on this screen: the Worker's archive
  *  keeps the hours Cloudflare drops, and with it the fold reaches back over any range. */
-function trafficUtcNote(utc) {
+function trafficUtcNote(utc, data) {
   if (!utc) return '';
+  /* Why it happened, which is a different sentence depending on whether anything is being kept.
+     With no record it is Cloudflare's hourly detail running out, and the answer is to start
+     keeping one. With a record it is a day in the range from before the record began, and the
+     answer is only time. Naming the wrong one would send somebody to switch on something that is
+     already on. */
+  const why = data?.store
+    ? `This range reaches back past the record, which begins
+       ${trafficEsc(trafficDayLabel(data.store.from || ''))}. A day from before then has a total
+       but no hours under it, and the hours are the only way to count a day on a local clock, so
+       the whole chart falls back rather than mixing two kinds of day in one row of bars.`
+    : `This happens when Cloudflare's hourly figures do not reach back over the period asked for,
+       and those hours are the only way to count these days locally. Binding a KV namespace called
+       <code>ARCHIVE</code> to the Worker starts keeping them, and then every range is counted on a
+       Lakewood clock.`;
   return `<p class="hint traffic-utc-note">These days are counted in UTC, not on a Lakewood clock,
     so each one begins at 8pm the evening before. <strong>The bar over today holds last night as
     well, which is why Today can read lower than it.</strong> That is also why no bar here opens
     its own day: a day view is always your own midnight to midnight, so it would not be the day
-    the bar is. The two totals above are still the whole period. This happens when Cloudflare's
-    hourly figures do not reach back over the period asked for, and those hours are the only way
-    to count these days locally. Switching the Worker's archive on keeps them, and then every
-    range is counted on a Lakewood clock.</p>`;
+    the bar is. The two totals above are still the whole period. ${why}</p>`;
 }
 
 /** One row a page, not one row an address.
@@ -345,24 +356,35 @@ function trafficCalendarDays(wanted, utc = false) {
   return out;
 }
 
-/** How far past the start of the range the first hourly bucket may sit and the hours still be
- *  taken as covering it.
+/** Whether the hourly figures account for every day that has traffic in it.
  *
- *  A day with nothing in it has no rows, so the earliest row is not the same thing as how far back
- *  the hourly figures reach, and a quiet morning at the start of the range would read as a gap. A
- *  whole day of slack is enough for that and nowhere near enough to hide the real case, which is
- *  hourly detail that stops after a day or two while thirty were asked for. That case was on the
- *  shul's screen: every range, Today and 7 days and 30 days alike, was drawing one bar, because one
- *  day was all the hourly rows there were. A month cannot read lower than a day, and it did. */
-const TRAFFIC_HOUR_SLACK_MS = 24 * 3600 * 1000;
+ *  This is the test that decides whether the days can be counted on a Lakewood clock at all, and
+ *  it used to be a guess: how far back the earliest hourly row sat, with a day of slack for a
+ *  quiet morning. A guess was needed because a day with nothing in it has no rows, so the earliest
+ *  row is not the same thing as how far back the hours reach.
+ *
+ *  There is an exact test and this is it: **no day may carry a total while carrying no hours.**
+ *  A day the hourly rows do not mention, but which the day totals say had visits, is a day that
+ *  cannot be folded onto a local clock, and one such day is enough to make the whole chart a
+ *  mixture. Every other day, quiet or busy, folds correctly whether or not it has rows.
+ *
+ *  The guess was not merely inelegant, it was wrong in the direction that matters now the Worker
+ *  keeps a record. Asked for three months with a record thirty days deep, the earliest hour was
+ *  two months past the start of the range, so the old test said "not covered" and threw the whole
+ *  chart onto UTC days, when in fact every day with anything in it had its hours and folded
+ *  exactly. The screen gave up local days precisely because it had been given more history. */
+function trafficHoursCover(rows, byDay) {
+  if (!rows.length) return !(byDay || []).some((d) => d.visits || d.views);
+  // Both sides as UTC dates, which is what a day total is. Taking the hour's local date instead
+  // would let a UTC day at the very edge of the record be called covered when it has no hours.
+  const firstHourDay = rows.map((r) => String(r.key).slice(0, 10)).reduce((a, b) => (a < b ? a : b));
+  return !(byDay || []).some((d) => (d.visits || d.views) && d.date < firstHourDay);
+}
 
 function trafficLocalDays(data, wanted) {
-  const rows = data.groups?.hour?.rows || [];
-  const stamps = rows.map((r) => new Date(r.key).getTime()).filter((t) => !Number.isNaN(t));
+  const rows = (data.groups?.hour?.rows || []).filter((r) => !Number.isNaN(new Date(r.key).getTime()));
   const want = trafficCalendarDays(wanted);
-  const now = new Date();
-  const startsAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (wanted - 1)).getTime();
-  const covered = stamps.length > 0 && Math.min(...stamps) - startsAt <= TRAFFIC_HOUR_SLACK_MS;
+  const covered = trafficHoursCover(rows, data.byDay);
 
   if (!covered) {
     /* Cloudflare's own UTC days, laid onto the calendar so the chart is consecutive days and the
@@ -454,22 +476,60 @@ function trafficWeekdays(byDay) {
  *
  *  Only shown while it is off, or while it is on and still shallow. Once there is more history
  *  than the range being looked at, it is just working and needs no announcement. */
+/** How old the record may be before the screen stops taking it on trust.
+ *
+ *  The collection runs once a day, so a day and a bit is late rather than merely recent. This is
+ *  the number that matters most on this tab, because **a collector that has stopped does not look
+ *  broken, it looks like a quiet week**: the figures are all still there, all still drawn, and all
+ *  wrong in the one direction nobody checks. Every other failure here announces itself. */
+const TRAFFIC_STALE_MS = 26 * 3600 * 1000;
+
+/** What is being kept, how far back, and when it was last added to.
+ *
+ *  The shul asked for the whole tab to work this way, in these words: collect everything from
+ *  Cloudflare on a schedule, and let the screen be a view onto what was collected rather than a
+ *  question put to Cloudflare every time a button is pressed. That is what the Worker does now,
+ *  and this line is the part of it the reader has to be able to see. */
 function trafficArchiveNote(data) {
   if (data.archive === 'off') {
-    return `<p class="hint">Nothing is being kept: Cloudflare forgets after about a month, and no
-      archive is set up on the Worker, so the longer ranges will stay short. See the archive note
+    return `<p class="hint">Nothing is being collected, so this is reading Cloudflare live and can
+      only ever reach back the month Cloudflare keeps. Bind a KV namespace called
+      <code>ARCHIVE</code> to the Worker and it starts keeping the shul's own record. See the note
       at the top of <code>worker/traffic-worker.js</code>.</p>`;
   }
   if (data.archive === 'unreadable') {
-    return `<p class="hint traffic-panel-error">The Worker has an archive bound but could not read
-      it, so nothing is being kept.</p>`;
+    return `<p class="hint traffic-panel-error">The Worker has a store bound but could not read it,
+      so this is reading Cloudflare live and nothing is being kept.</p>`;
   }
-  if (data.archive === 'on' && data.archiveDays && data.archiveDays < (data.days || 0)) {
-    return `<p class="hint">Keeping the shul's own copy, ${trafficNum(data.archiveDays)}
-      ${data.archiveDays === 1 ? 'day' : 'days'} of it so far. Cloudflare forgets after about a
-      month; from here on this does not.</p>`;
+  const store = data.store;
+  if (!store) return '';
+
+  const age = store.filledAt ? Date.now() - new Date(store.filledAt).getTime() : null;
+  const stale = age !== null && age > TRAFFIC_STALE_MS;
+  const lines = [];
+  if (stale) {
+    /* Loud, and a panel rather than a hint. Everything on the screen above it is drawn from a
+       record that stopped being written, which is the one failure on this tab that looks exactly
+       like success. */
+    lines.push(`<p class="traffic-panel-error"><strong>The record has not been added to since
+      ${trafficEsc(trafficDayFull(String(store.filledAt).slice(0, 10)))}.</strong> Everything above
+      is what was collected up to then, so a quiet few days here may be a collector that stopped
+      rather than a quiet few days. The daily trigger on the Worker is what fills it: Settings,
+      Triggers, Cron Triggers.</p>`);
   }
-  return '';
+  if (store.held < store.asked) {
+    lines.push(`<p class="hint">The record holds ${trafficNum(store.held)} of the
+      ${trafficNum(store.asked)} days in this range so far. It fills a little on every opening of
+      this tab and the rest on the daily run, and Cloudflare can only be asked back about a month,
+      so this is as far back as it will ever reach for days before it started.</p>`);
+  }
+  if (!stale && store.from && store.days) {
+    lines.push(`<p class="hint">Read out of the shul's own record, ${trafficNum(store.days)}
+      ${store.days === 1 ? 'day' : 'days'} of it, from
+      ${trafficEsc(trafficDayLabel(store.from))}. Cloudflare forgets after about a month; from here
+      on this does not.</p>`);
+  }
+  return lines.join('');
 }
 
 /** What is on the screen while there is no Worker to ask. Not an error: nothing is wrong,
@@ -615,7 +675,7 @@ export function renderTraffic(container) {
       </div>
       ${trafficDay
         ? `<p class="traffic-oneday">${trafficEsc(trafficDayFull(trafficDay))}</p>`
-        : trafficChart(byDay, daysAreUtc) + trafficUtcNote(daysAreUtc)}
+        : trafficChart(byDay, daysAreUtc) + trafficUtcNote(daysAreUtc, data)}
       ${trafficPages(byPage)}
       ${trafficBreakdown('Phone or desktop', data.groups?.device, { name: trafficDeviceName, col: 'Device' })}
       ${trafficHours(data.groups?.hour)}
@@ -635,12 +695,15 @@ export function renderTraffic(container) {
       }
       ${trafficArchiveNote(data)}
       <p class="hint traffic-foot">${trafficDay
-        ? `Everything here is that one day, midnight to midnight on this device's clock. The Worker
-           was asked for exactly those two moments, so the pages, the devices and the rest are the
-           day's own and not a longer period's.`
-        : `The panels under the chart count the whole period Cloudflare was
-      asked about, which begins at midnight UTC and so reaches a few hours further back than the
-      days above: on Today they take in the last of yesterday evening.${daysAreUtc
+        ? `The two figures and the hours are that one day, midnight to midnight on this device's
+           clock.${data.store ? ` The panels under them are the UTC day of the same date, which runs
+           from 8pm the evening before: a local day straddles two UTC days, and the record keeps
+           those breakdowns a day at a time.` : ` The Worker was asked for exactly those two
+           moments, so the pages, the devices and the rest are the day's own.`}`
+        : `${data.store ? `The panels under the chart count whole UTC days, so they reach back to
+      8pm the evening before the first day above.` : `The panels under the chart count the whole
+      period Cloudflare was asked about, which begins at midnight UTC and so reaches a few hours
+      further back than the days above: on Today they take in the last of yesterday evening.`}${daysAreUtc
         ? ' The two figures at the top are counted on a Lakewood clock; the days in the chart are'
           + ' not, for the reason given under it.'
         : ' Only the two figures at the top and the chart are counted on a Lakewood clock.'}`} A visit is one person's stay; a page view

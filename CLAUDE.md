@@ -325,6 +325,19 @@ The token is a Worker secret instead, and the admin asks the Worker.
   86400000, so the day a clock changes is one whole day rather than 23 or 25 hours of one and an
   hour of its neighbour. The timezone is the reason this is worked out in the browser at all: the
   Worker does not know where its reader is standing.
+- **Whether the hours cover a range is an exact test, not a guess** (`trafficHoursCover`): no day
+  may carry a day total while carrying no hours. It used to be how far back the earliest hourly row
+  sat, with a day of slack, and that was wrong in the direction that matters once the Worker keeps
+  a record: asked for three months with thirty days stored, the earliest hour was two months past
+  the start of the range, so the old test threw the whole chart onto UTC days when every day that
+  had anything in it folded exactly. The screen gave up local days precisely because it had been
+  given more history.
+- **While the days are UTC, no bar opens its own day, and the reason is said under the chart**
+  (`trafficUtcNote`), not at the foot under six panels, which is where it used to be and is not
+  where the contradiction is. A day view is always the reader's own midnight to midnight, so the
+  day behind a UTC bar is not the day clicking it would open: a bar reading 6 would open a day
+  reading 0. The note names the consequence (the bar over today holds last night) and the cure,
+  and the cure differs depending on whether a record is being kept at all.
 - **The Worker has to be deployed again for the day view to work**, and an older one fails in the
   one way that looks like success: it ignores `since` and `until` and answers about its own range,
   which would put a week's pages under one day's date. So the Worker returns `window: 'exact'` when
@@ -338,18 +351,34 @@ The token is a Worker secret instead, and the admin asks the Worker.
   so. Over a **day** there is nothing to fold or trim and the foot says that instead.
 - Cloudflare keeps about a month, so a day older than that reads as nothing unless the Worker's
   archive was running by then. The empty state for a day says so, and says when the archive is off.
-- **Cloudflare keeps about a month, so the Worker keeps the shul's own copy.** An optional KV
-  namespace bound as `ARCHIVE` holds one entry: UTC date to two arrays of 24 hours (visits and
-  page views), plus that day's pages, devices, systems and referrers. Hours rather than day
-  totals, because the screen folds them into Lakewood days and that fold needs the hour. Nothing
-  is asked of Cloudflare past `LIVE_DAYS` (30), because past that it answers zero rather than
-  answering no, and a live zero written over a real figure turns a missing answer into a wrong
-  one. Cloudflare wins for the days it still has, so a day stored while it was still filling in
-  gets corrected rather than frozen. A daily Cron Trigger folds in yesterday and the day before,
-  one whole UTC day at a time, so the record has no holes in the stretches nobody was looking.
+- **Cloudflare is collected from, not read from.** Asked for by the shul in those terms, after
+  they caught the screen contradicting itself: Today said no visits yet and the seven day chart
+  drew a bar on that same day. Two questions to Cloudflare, answered on two different clocks.
+  The shape is **collector, store, reader**:
+  **Collect.** A daily Cron Trigger (`0 6 * * *`) pulls every day Cloudflare still has that the
+  store has not got, plus the last `CRON_REFRESH` (3) whether or not it has them, one whole UTC
+  day at a time. Opening the tab collects **today and nothing else**, today being the only day
+  whose figures still move, plus at most `READ_BACKFILL_MAX` (6) gaps so a cold store fills as it
+  is read without making a reader wait on thirty days of requests.
+  **Store.** KV bound as `ARCHIVE`, **one key a month** (`m:2026-09`), each holding its days as 24
+  hours of visits and page views plus that day's pages, devices, browsers, systems and referrers.
+  Hours because the screen folds them into Lakewood days and that fold needs the hour. A month a
+  key because a write then touches one small value: today is rewritten on every tab open and the
+  history is never touched. It was one key for everything, which had to be rewritten whole every
+  time and let two writers drop each other's work across the entire record. An `index` key carries
+  what the store covers and **when it was last written**, which the screen prints: a collector that
+  has stopped does not look broken, it looks like a quiet week.
+  **Read.** Every figure is a slice of the store, so no two periods can be answered on different
+  footings and a day older than Cloudflare's month is as answerable as yesterday. Nothing is ever
+  asked of Cloudflare past `LIVE_DAYS` (30): past that it answers zero rather than answering no.
   **The binding and the cron are both optional and the Worker deploys and runs without either**,
-  saying on screen which it is. Two writers can race and the loser's day is dropped; it comes
-  back on the next write while Cloudflare still holds the month.
+  falling back to asking Cloudflare live (`liveOnly`) and saying `archive: 'off'` on screen.
+  The record starts when the collecting starts: the first run backfills the thirty days Cloudflare
+  still has and no more, so a full year is real a year from now. Say that rather than let it be
+  discovered.
+  Test it with `worker-test.mjs` in the scratchpad pattern: the real Worker module imported into
+  Node with `fetch`, `caches` and the KV namespace stubbed, and a fake month of traffic behind it.
+  That is the only way anything here gets measured, since this container cannot reach Cloudflare.
 - The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
   the tab is the deploying instructions**, not an error.
 - `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
