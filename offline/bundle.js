@@ -15033,6 +15033,48 @@ let trafficDays = 7;
  *  here once it is older than the Worker's own cache: past that, wait for the real answer rather
  *  than paint a figure that might contradict the one already on screen. */
 const TRAFFIC_KEEP_MS = 45000;
+
+/** One day, or nothing. While this is set the whole tab is about that day.
+ *
+ *  The reason it exists: every panel under the chart is a Cloudflare aggregate over the window
+ *  the Worker was asked about, so over a range they describe the range and there was no way to
+ *  ask "what was opened on Tuesday". Asked for. Now the browser sends the two instants that
+ *  bound one day on this device's clock and every panel in the answer is about that day.
+ *
+ *  A local date string, "2026-09-14", which is what an <input type="date"> speaks and what the
+ *  chart's own bars carry. Not stored: it is how you are looking at this now, the same as the
+ *  range beside it. */
+let trafficDay = null;
+
+/** The two instants that bound one local day, as the Worker wants them.
+ *
+ *  Local midnight to the next local midnight, built with new Date(y, m - 1, d + 1) rather than by
+ *  adding 86400000, so the day a clock changes is still one whole day and not 23 or 25 hours of
+ *  one and an hour of its neighbour. This is the whole point of the browser working it out rather
+ *  than the Worker: the Worker does not know which timezone its reader is standing in. */
+function trafficDayWindow(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return {
+    since: new Date(y, m - 1, d).toISOString(),
+    until: new Date(y, m - 1, d + 1).toISOString(),
+  };
+}
+
+/** Today on this device's clock, as an <input type="date"> writes it. */
+function trafficToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/** A local date string as a person reads it. */
+function trafficDayFull(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if (!y) return iso;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  });
+}
 const trafficSeen = new Map();
 
 const trafficEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -15084,12 +15126,19 @@ function trafficDayLabel(iso) {
 function trafficChart(byDay) {
   if (!byDay.length) return '';
   const top = Math.max(...byDay.map((d) => d.visits), 1);
+  /* Every bar is a button that opens its own day. Asked for: the chart already had a shape per
+     day on it, so the day somebody wants to look into is the one they are already pointing at.
+     A real <button> rather than a click handler on the div, so it is in the tab order and a
+     screen reader is told it does something. The whole chart is no longer role="img" for the
+     same reason: a picture cannot have buttons in it. */
   const bars = byDay.map((d) => `
-    <div class="traffic-bar" title="${trafficEsc(trafficDayLabel(d.date))}: ${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views">
+    <button type="button" class="traffic-bar" data-day="${trafficEsc(d.date)}"
+      title="${trafficEsc(trafficDayLabel(d.date))}: ${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views"
+      aria-label="${trafficEsc(trafficDayFull(d.date))}: ${trafficNum(d.visits)} visits, ${trafficNum(d.views)} page views. Open this day.">
       <div class="traffic-bar-fill" style="height: ${Math.round((d.visits / top) * 100)}%"></div>
       <span class="traffic-bar-day">${trafficEsc(trafficDayLabel(d.date))}</span>
-    </div>`).join('');
-  return `<div class="traffic-chart" role="img"
+    </button>`).join('');
+  return `<div class="traffic-chart is-pickable"
     aria-label="Visits a day, ${trafficEsc(trafficDayLabel(byDay[0].date))} to ${trafficEsc(trafficDayLabel(byDay[byDay.length - 1].date))}">${bars}</div>`;
 }
 
@@ -15422,28 +15471,80 @@ function renderTraffic(container) {
     nothing about a person: it can say how many and which pages, and it cannot say who.</p>
     ${TRAFFIC_API ? `
       <div class="traffic-ranges">${range}</div>
+      <div class="traffic-pick">
+        <label class="traffic-pick-label" for="traffic-date">Or one day</label>
+        <input type="date" id="traffic-date" class="traffic-date"
+          max="${trafficEsc(trafficToday())}" value="${trafficEsc(trafficDay || '')}">
+        ${trafficDay ? '<button type="button" class="traffic-range" id="traffic-day-clear">Back to the range</button>' : ''}
+      </div>
       <div id="traffic-body" class="traffic-body"><p class="hint">Asking Cloudflare...</p></div>
     ` : trafficSetup()}`;
 
   if (!TRAFFIC_API) return;
 
   const body = container.querySelector('#traffic-body');
-  container.querySelectorAll('.traffic-range').forEach((btn) => {
+  container.querySelectorAll('.traffic-range[data-days]').forEach((btn) => {
     btn.addEventListener('click', () => {
       trafficDays = Number(btn.dataset.days);
+      // Choosing a range is how you leave a single day, as well as how you change the range.
+      trafficDay = null;
       renderTraffic(container);
     });
   });
+  container.querySelector('#traffic-date')?.addEventListener('change', (e) => {
+    trafficDay = e.target.value || null;
+    renderTraffic(container);
+  });
+  container.querySelector('#traffic-day-clear')?.addEventListener('click', () => {
+    trafficDay = null;
+    renderTraffic(container);
+  });
+
+  /* The chart is redrawn on every answer, so its buttons are bound after each draw rather than
+     once: a listener put on the old row would be sitting on nodes nobody can see any more. */
+  const wireBars = () => {
+    body.querySelectorAll('.traffic-bar[data-day]').forEach((bar) => {
+      bar.addEventListener('click', () => {
+        trafficDay = bar.dataset.day;
+        renderTraffic(container);
+      });
+    });
+  };
 
   const show = (data) => {
-    const { days: byDay, utc: daysAreUtc } = trafficLocalDays(data, trafficDays);
+    /* A Worker that did not understand the window is the one failure that looks like a success:
+       an older deploy ignores since and until and answers about its own range, so the screen
+       would put a whole week's pages under one day's date and nothing would say so. Checked
+       before anything is drawn. */
+    if (trafficDay && data.window !== 'exact') {
+      body.innerHTML = `<div class="panel traffic-error">
+        <h3>The Worker cannot answer for one day yet</h3>
+        <p>It answered about its own range instead of the day asked for, which means the copy
+        running at <code>${trafficEsc(TRAFFIC_API)}</code> is an older one.</p>
+        <p class="hint">Deploy <code>worker/traffic-worker.js</code> again from this repository and
+        this will work. Nothing else on this tab is affected: the ranges above still read
+        correctly.</p></div>`;
+      return;
+    }
+    /* Over a day, the answer is already only that day: the Worker was asked for exactly the two
+       instants that bound it, so everything in it, panels included, is about that day and there
+       is nothing to fold or trim. Over a range the days are still rebuilt from the hourly buckets
+       on a Lakewood clock. */
+    const { days: byDay, utc: daysAreUtc } = trafficDay
+      ? { days: data.byDay || [], utc: false }
+      : trafficLocalDays(data, trafficDays);
     const byPage = data.byPage || [];
     const visits = byDay.reduce((n, d) => n + d.visits, 0);
     const views = byDay.reduce((n, d) => n + d.views, 0);
     /* Nothing at all is its own answer, and a likely one on a site that has just started
        counting: it is not a fault and should not read as one. */
     if (!visits && !views) {
-      body.innerHTML = `<div class="panel"><p>No visits counted in this period yet.</p>
+      body.innerHTML = `<div class="panel"><p>${trafficDay
+        ? `Nothing counted on ${trafficEsc(trafficDayFull(trafficDay))}.`
+        : 'No visits counted in this period yet.'}</p>
+        ${trafficDay ? `<p class="hint">Cloudflare keeps about a month. A day older than that reads
+        as nothing unless the Worker's own archive was running by then.${
+          data.archive === 'off' ? ' It is not switched on.' : ''}</p>` : ''}
         <p class="hint">Counting started when the beacon went on the site. If you have
         opened the site yourself since then and it is not here, that is the opt-out doing
         its job: this device asked not to be counted.</p>
@@ -15458,11 +15559,13 @@ function renderTraffic(container) {
         <div class="traffic-total"><span class="traffic-total-n">${trafficNum(visits)}</span><span class="traffic-total-w">visits</span></div>
         <div class="traffic-total"><span class="traffic-total-n">${trafficNum(views)}</span><span class="traffic-total-w">page views</span></div>
       </div>
-      ${trafficChart(byDay)}
+      ${trafficDay
+        ? `<p class="traffic-oneday">${trafficEsc(trafficDayFull(trafficDay))}</p>`
+        : trafficChart(byDay)}
       ${trafficPages(byPage)}
       ${trafficBreakdown('Phone or desktop', data.groups?.device, { name: trafficDeviceName, col: 'Device' })}
       ${trafficHours(data.groups?.hour)}
-      ${trafficWeekdays(byDay)}
+      ${trafficDay ? '' : trafficWeekdays(byDay)}
       ${trafficBreakdown('How people arrive', data.groups?.referer, { name: trafficRefererName, col: 'Came from' })}
       ${trafficBreakdown('Browser', data.groups?.browser, { col: 'Browser' })}
       ${trafficBreakdown('Operating system', data.groups?.os, { col: 'System' })}
@@ -15481,10 +15584,14 @@ function renderTraffic(container) {
         figures do not reach back over the whole period, which is the only way to count these days
         properly. The totals are still the whole period.</p>` : ''}
       ${trafficArchiveNote(data)}
-      <p class="hint traffic-foot">The panels under the chart count the whole period Cloudflare was
+      <p class="hint traffic-foot">${trafficDay
+        ? `Everything here is that one day, midnight to midnight on this device's clock. The Worker
+           was asked for exactly those two moments, so the pages, the devices and the rest are the
+           day's own and not a longer period's.`
+        : `The panels under the chart count the whole period Cloudflare was
       asked about, which begins at midnight UTC and so reaches a few hours further back than the
       days above: on Today they take in the last of yesterday evening. Only the two figures at the
-      top and the chart are counted on a Lakewood clock. A visit is one person's stay; a page view
+      top and the chart are counted on a Lakewood clock.`} A visit is one person's stay; a page view
       is each page they opened. Anyone reading with an ad blocker is not counted, so these are a
       floor rather than a headcount.${
         /* When these particular numbers were taken. Each range is its own question with its own
@@ -15492,20 +15599,30 @@ function renderTraffic(container) {
            is what makes that readable rather than a contradiction. */
         data.fetchedAt ? ` Counted as of ${trafficEsc(trafficClock(data.fetchedAt))}.` : ''
       }${data.cached ? ' (from the last look, not asked again)' : ''}</p>`;
+    wireBars();
   };
 
-  const seen = trafficSeen.get(trafficDays);
+  /* What to ask for. Over a day it is the two instants that bound it on this clock, and the
+     answer is then about that day and nothing else. Over a range it is one day more than is shown:
+     the hourly buckets get folded back into local days, and the oldest local day would otherwise
+     be missing its first few hours, a UTC midnight being 8pm the evening before in Lakewood. The
+     extra is trimmed off in trafficLocalDays. */
+  const span = trafficDay ? trafficDayWindow(trafficDay) : null;
+  const url = span
+    ? `${TRAFFIC_API}?days=1&since=${encodeURIComponent(span.since)}&until=${encodeURIComponent(span.until)}`
+    : `${TRAFFIC_API}?days=${trafficDays + 1}`;
+  // Kept per question, and a day is its own question, so a day and a range cannot serve each
+  // other's answer out of the same slot.
+  const cacheKey = trafficDay ? `day:${trafficDay}` : trafficDays;
+
+  const seen = trafficSeen.get(cacheKey);
   if (seen && Date.now() - seen.at < TRAFFIC_KEEP_MS) show(seen.data);
 
-  /* One day more than is shown. The hourly buckets get folded back into local days, and the
-     oldest local day would otherwise be missing its first few hours: a UTC-midnight boundary is
-     8pm the evening before in Lakewood. Asking for the extra day makes every day drawn a whole
-     one, and the extra is trimmed off in trafficLocalDays. */
-  fetch(`${TRAFFIC_API}?days=${trafficDays + 1}`, { headers: { accept: 'application/json' } })
+  fetch(url, { headers: { accept: 'application/json' } })
     .then(async (res) => {
       const data = await res.json().catch(() => ({ error: `Cloudflare's Worker answered ${res.status} and not in JSON.` }));
       if (!res.ok || data.error) throw new Error(data.error || `The Worker answered ${res.status}.`);
-      trafficSeen.set(trafficDays, { at: Date.now(), data });
+      trafficSeen.set(cacheKey, { at: Date.now(), data });
       show(data);
     })
     .catch((err) => {

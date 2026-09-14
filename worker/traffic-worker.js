@@ -77,7 +77,7 @@ const CACHE_SECONDS = 45;
  *
  *  **Change this on any deploy that changes the shape of the reply.** A date and a letter is
  *  enough; nothing reads it but the cache. */
-const BUILD = '2026-09-11b';
+const BUILD = '2026-09-14a';
 
 /** The most days that can be asked for at once, so a mistyped range cannot ask for something
  *  absurd. Cloudflare itself is never asked past LIVE_DAYS; everything beyond that is the
@@ -357,6 +357,35 @@ function json(body, status, origin) {
  *
  *  Whole days rather than a rolling window, so the last bucket is today so far and the ones
  *  before it are whole days that will not change under the reader. */
+/** One window, given by the caller as two instants, or nothing.
+ *
+ *  The ranges above are whole UTC days, which is the wrong shape for "what happened on Tuesday":
+ *  Lakewood's Tuesday starts at 04:00 or 05:00 UTC, so a UTC day holds the last of Monday evening
+ *  and none of Tuesday evening. The admin knows which timezone its reader is standing in and the
+ *  Worker does not, so the browser works the two instants out and sends them, and every panel in
+ *  the answer is then about that one day rather than about a UTC day that overlaps it.
+ *
+ *  Refused rather than guessed at if either instant will not parse, if they are the wrong way
+ *  round, or if the span is longer than MAX_WINDOW_DAYS: a mistyped parameter should come back as
+ *  an error and not as an answer about some other stretch of time. */
+const MAX_WINDOW_DAYS = 40;
+function askedWindow(params) {
+  const rawSince = params.get('since');
+  const rawUntil = params.get('until');
+  if (!rawSince && !rawUntil) return null;
+  const since = new Date(rawSince);
+  const until = new Date(rawUntil);
+  if (Number.isNaN(since.getTime()) || Number.isNaN(until.getTime())) {
+    return { error: 'since and until must both be times this Worker can read, like 2026-09-14T04:00:00.000Z.' };
+  }
+  const span = until.getTime() - since.getTime();
+  if (span <= 0) return { error: 'until has to be after since.' };
+  if (span > MAX_WINDOW_DAYS * 86400000) {
+    return { error: `since and until are more than ${MAX_WINDOW_DAYS} days apart.` };
+  }
+  return { since: since.toISOString(), until: until.toISOString() };
+}
+
 function dayRange(days) {
   const until = new Date();
   const since = new Date(until.getTime() - (days - 1) * 86400000);
@@ -611,10 +640,15 @@ export default {
     const url = new URL(request.url);
     const asked = Number(url.searchParams.get('days'));
     const days = Number.isFinite(asked) && asked >= 1 ? Math.min(Math.round(asked), MAX_DAYS) : 30;
+    const span = askedWindow(url.searchParams);
+    if (span?.error) return json({ error: span.error }, 400, origin);
 
-    // Cached on the range asked for rather than on the whole URL, so two tabs asking the
-    // same question share one answer and a stray parameter cannot slip past the cache.
-    const key = new Request(`${url.origin}/traffic?v=${BUILD}&days=${days}`, { method: 'GET' });
+    // Cached on the question asked rather than on the whole URL, so two tabs asking the same
+    // thing share one answer and a stray parameter cannot slip past the cache. The window is
+    // part of the question, so it is part of the key.
+    const key = new Request(`${url.origin}/traffic?v=${BUILD}&days=${days}`
+      + (span ? `&since=${encodeURIComponent(span.since)}&until=${encodeURIComponent(span.until)}` : ''),
+      { method: 'GET' });
     const cache = caches.default;
     const hit = await cache.match(key);
     if (hit) {
@@ -627,7 +661,7 @@ export default {
        turn a missing answer into a wrong one. The older days come from the archive. */
     let out;
     try {
-      out = await gather(env, Math.min(days, LIVE_DAYS));
+      out = span ? await gather(env, days, span) : await gather(env, Math.min(days, LIVE_DAYS));
     } catch (e) {
       return json({ error: e.message }, 502, origin);
     }
@@ -640,9 +674,15 @@ export default {
     }
 
     // What was asked for, not what Cloudflare was asked for, since the archive covers the rest.
-    const wanted = dayRange(days);
+    const wanted = span || dayRange(days);
     out.days = days;
     out.since = wanted.since;
+    out.until = wanted.until;
+    /* Said out loud so the admin can tell a Worker that understood the window from one that did
+       not. An older deploy ignores since and until and answers about its own range instead, which
+       is a wrong answer wearing the shape of a right one: the screen checks for this and says the
+       Worker needs deploying rather than drawing another day's numbers under today's date. */
+    out.window = span ? 'exact' : 'days';
 
     const store = await readArchive(env);
     out.archive = env.ARCHIVE ? (store ? 'on' : 'unreadable') : 'off';

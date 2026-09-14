@@ -236,11 +236,30 @@ The token is a Worker secret instead, and the admin asks the Worker.
   than Today**, which is an impossible number rather than a stale one. The shul reported both. The
   days now come from the calendar and the hourly rows are used only where they actually cover the
   period asked for (`TRAFFIC_HOUR_SLACK_MS`, one day of slack for a quiet morning at the start).
-- The panels under the chart (pages, device, hours, referrers, browser, system) are Cloudflare's own
-  aggregates over the window the Worker was asked about, which starts at midnight UTC and takes in
-  one extra day, so they reach a few hours further back than the chart. Only the two headline
-  figures and the chart are on a Lakewood clock. The foot of the tab says so. Narrowing the panels
-  properly means the browser sending the Worker explicit instants rather than a day count.
+- **Any one day can be opened on its own, and then every panel is that day's.** Asked for: the
+  panels are Cloudflare aggregates over the window the Worker was asked about, so over a range they
+  describe the range, and there was no way to ask what was opened on a Tuesday. The browser now
+  works out the two instants that bound one day **on the reader's own clock** and sends them as
+  `since` and `until`; the Worker answers about exactly that window, so the pages, devices, hours,
+  referrers, browser and system are the day's own. Reached two ways: a date field beside the range
+  buttons, and **every bar of the day chart is a real `<button>` that opens its own day**.
+  `trafficDayWindow` builds the window with `new Date(y, m - 1, d + 1)` rather than by adding
+  86400000, so the day a clock changes is one whole day rather than 23 or 25 hours of one and an
+  hour of its neighbour. The timezone is the reason this is worked out in the browser at all: the
+  Worker does not know where its reader is standing.
+- **The Worker has to be deployed again for the day view to work**, and an older one fails in the
+  one way that looks like success: it ignores `since` and `until` and answers about its own range,
+  which would put a week's pages under one day's date. So the Worker returns `window: 'exact'` when
+  it honoured the two instants, and the tab refuses to draw a day without it, saying the copy
+  running is older instead. `askedWindow` in the Worker refuses a window it cannot parse, one the
+  wrong way round, or one longer than `MAX_WINDOW_DAYS` (40), rather than answering about some
+  other stretch of time.
+- Over a **range**, the panels are still the whole window Cloudflare was asked about, which starts
+  at midnight UTC and takes in one extra day, so they reach a few hours further back than the chart.
+  Only the two headline figures and the chart are on a Lakewood clock, and the foot of the tab says
+  so. Over a **day** there is nothing to fold or trim and the foot says that instead.
+- Cloudflare keeps about a month, so a day older than that reads as nothing unless the Worker's
+  archive was running by then. The empty state for a day says so, and says when the archive is off.
 - **Cloudflare keeps about a month, so the Worker keeps the shul's own copy.** An optional KV
   namespace bound as `ARCHIVE` holds one entry: UTC date to two arrays of 24 hours (visits and
   page views), plus that day's pages, devices, systems and referrers. Hours rather than day
