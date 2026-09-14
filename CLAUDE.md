@@ -537,8 +537,12 @@ and listed in `DIST_TREES`.
   message have to say one word. The label is read off the block's heading rather than typed into
   the message, and the two names that block can carry are spelled in English there. This is the one
   place the message does not follow the three sent ones, which say "Shacharis": those are for the
-  three fasts with no sheet. שקיעה is on the sheet and in none of the three, so it is not in the
-  message either.
+  three fasts with no sheet.
+  **שקיעה is on it, asked for on every fast message**, between מנחה and מעריב where the sheet sets
+  it, and it is the one line here that none of the three sent fast messages carries. Read off the
+  sheet's own note rather than worked out again, and written without a room letter, for the reason
+  חצות and הדלקת נרות carry none: a letter says which בית מדרש a מנין is in, and a זמן is not one.
+  "Shkia" is the shul's own English for it, from their Shabbos message of 1 August 2025.
 - **שבועות has no computed sheet**, so its message cannot be built yet. The shul is building that
   schedule, and the Rav's drasha will be on it, so the message reads it off there like every other
   line rather than carrying a time of its own.

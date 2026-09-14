@@ -34,6 +34,9 @@ import { erevWhereMark } from './erev-text.js';
 export const TN_TEXT = {
   title: 'Tzom Gedalia',
   mincha: 'Mincha',
+  /* שקיעה, which the shul writes "Shkia" in English: their own Shabbos message of 1 August 2025
+     reads "Shkia 8:09". The word is theirs, the time is the sheet's. */
+  shkia: 'Shkia',
   maariv: 'Mariv',
   signoff: 'Have an easy meaningful fast!',
 };
@@ -67,16 +70,29 @@ const tnMorningLabel = (poster) => {
   return TN_MORNING_NAMES[head] || TN_MORNING_FALLBACK;
 };
 
+/** The שקיעה the sheet prints, which is a זמן rather than a block of מנינים: on the sheet it is a
+ *  note standing on its own between מנחה and מעריב, the name and the time together. Read out of the
+ *  same block, so the paper and the message cannot name two different minutes.
+ *
+ *  It carries no room letter, for the reason no letter is written beside חצות or הדלקת נרות: a
+ *  letter says which בית מדרש a מנין is in, and this is not one. */
+const tnShkia = (poster) => String(tnBlock(poster, 'shkia')?.note?.text || '').trim();
+
 /** The message, off the צום גדליה sheet.
  *
- *  שקיעה is on the sheet, between מנחה and מעריב, and is not in the message: none of the three
- *  sent fast messages carries it. A line the sheet has not got is left out rather than invented,
- *  and a sheet with none of the three is not a message. */
+ *  Four lines and a sign-off: the morning, מנחה, שקיעה and מעריב, in the order the sheet sets them.
+ *  **שקיעה is on it because the shul asked for it on every fast message**, and it is the one line
+ *  here none of the three sent fast messages carries. It belongs: the end of the fast is reckoned
+ *  from it, and whoever is looking at the message wants to know when to daven מנחה by.
+ *
+ *  A line the sheet has not got is left out rather than invented, and a sheet with none of them is
+ *  not a message. */
 export function tzomGedaliaText(poster) {
   if (!poster) return '';
   const rows = [
     [tnMorningLabel(poster), tnLine(poster, 'shacharis')],
     [TN_TEXT.mincha, tnLine(poster, 'mincha')],
+    [TN_TEXT.shkia, tnShkia(poster)],
     [TN_TEXT.maariv, tnLine(poster, 'maariv')],
   ].filter(([, times]) => times);
   if (!rows.length) return '';
