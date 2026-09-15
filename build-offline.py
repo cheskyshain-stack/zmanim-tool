@@ -145,10 +145,10 @@ ROUTES = {
         ),
     },
     "donate": {
-        "title": "Donate",
+        "title": "Donate to Support Our Shul",
         "description": (
-            "Ways to give to Bais Medrash of Lakewood Commons, 44 Coles Way, Lakewood NJ: "
-            "credit card, ACH, Zelle and The Donors' Fund. Tax ID 26-4527675."
+            "Donate to Bais Medrash of Lakewood Commons (Kahal Lev Menachem) in Lakewood, NJ. "
+            "Support our shul by credit card, ACH, Zelle or The Donors' Fund."
         ),
         "heading": "Donate",
         "blurb": (
