@@ -550,7 +550,7 @@ class SettingsScreen(Screen):
 
         publishing = QGroupBox("Publishing")
         publish_layout = QVBoxLayout(publishing)
-        where = QLabel("The congregation's page is <b>lczmanim.cjaffa.com</b>. It shows one week at a time and moves "
+        where = QLabel("The congregation's page is <b>baismedrashoflakewoodcommons.org</b>. It shows one week at a time and moves "
                        "on by itself once Shabbos is over, for the whole season. Publishing a season leaves any other "
                        "published season in place, so קיץ and חורף can both be live; publishing the same season again "
                        "replaces it, which is how a correction reaches the congregation.")
@@ -717,7 +717,7 @@ class SettingsScreen(Screen):
         the congregation sees a change, and that should be a decision rather than a side
         effect of editing a cell."""
         asked = QMessageBox.question(self, "Publish this season?",
-                                     f"Put {sheet_name(sheet)} on lczmanim.cjaffa.com for the congregation to read? "
+                                     f"Put {sheet_name(sheet)} on baismedrashoflakewoodcommons.org for the congregation to read? "
                                      "Any other season already published stays where it is.")
         if asked != QMessageBox.Yes:
             return

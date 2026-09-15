@@ -88,7 +88,7 @@ drawn. The text stays sharp at any scale, and the map of where the cells landed 
 from the same painting run as the picture, so a click lands on the cell under it whatever
 the page has been scaled to.
 
-**Publishing** puts a season on lczmanim.cjaffa.com. The congregation's page is a static
+**Publishing** puts a season on baismedrashoflakewoodcommons.org. The congregation's page is a static
 site, so publishing means committing one file to the repository behind it,
 `data/published.json`, through GitHub's own API: one HTTPS call, no backend, and nothing
 installed beyond this program. Publishing a season leaves every other published season

@@ -6,7 +6,9 @@ Lakewood NJ). Three charts: שבת קיץ, שבת חורף, and a Weekday chart.
 truth for every calculation. If a number looks wrong, the workbook decides, not a zmanim
 library.
 
-Live at https://lczmanim.cjaffa.com (GitHub Pages from `main`, CNAME in the repo).
+Live at https://baismedrashoflakewoodcommons.org (GitHub Pages from `main`, CNAME in the repo).
+It was on lczmanim.cjaffa.com until the shul took a domain of its own. The address is written
+in `SITE_URL` in `build-offline.py` and in `CNAME`, and everything else is stamped from there.
 Read `README.md` for how a user runs it. This file is about changing it.
 
 ## Ground rules
@@ -36,7 +38,7 @@ Every change follows this, in order:
 4. `git add -A && git commit && git pull origin main --no-edit && git push origin main`
 5. Poll the live site until the change is actually there. The workflow builds and then
    deploys, so give it about two minutes:
-   `curl -s "https://lczmanim.cjaffa.com/?b=$(date +%s)" | grep -o 'app.css?v=[0-9a-f]*'`
+   `curl -s "https://baismedrashoflakewoodcommons.org/?b=$(date +%s)" | grep -o 'app.css?v=[0-9a-f]*'`
    and compare against the local `index.html`. Do not tell the user it is live until the
    hash matches.
 
@@ -79,7 +81,7 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   admin's unlock, and it is lost when site data is cleared. A browser that refuses localStorage
   is counted rather than broken.
   Measure this the way it was measured the first time, since the beacon is not reachable from a
-  container: run Chromium with `--host-resolver-rules=MAP lczmanim.cjaffa.com 127.0.0.1:<port>`
+  container: run Chromium with `--host-resolver-rules=MAP baismedrashoflakewoodcommons.org 127.0.0.1:<port>`
   and watch whether the page asks for `static.cloudflareinsights.com` at all.
 - Writes `week/`, `chart/` and `donate/` out of `index.html`, and `sitemap.xml` with them.
   Those three folders and the sitemap are **build output**: do not hand-edit them, the same

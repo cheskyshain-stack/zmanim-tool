@@ -83,7 +83,7 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
       <details class="panel">
         <summary>Publishing</summary>
         <div class="panel-body">
-        <p class="hint">Publishing puts the season on the congregation's page at <strong>lczmanim.cjaffa.com</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
+        <p class="hint">Publishing puts the season on the congregation's page at <strong>baismedrashoflakewoodcommons.org</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
         <details class="panel">
           <summary>How to make the token</summary>
           <div class="panel-body">

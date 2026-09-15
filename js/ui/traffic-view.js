@@ -304,11 +304,13 @@ const trafficDeviceName = (k) => TRAFFIC_DEVICES[String(k).toLowerCase()] || k |
  *  typed in, opened from a home screen, or followed from a link in an app that sends no
  *  referrer, which for this site means WhatsApp and email. That is the common case here and
  *  deserves a name rather than a blank. */
-const SITE_HOST_NAME = 'lczmanim.cjaffa.com';
+/** Both of the site's hosts: the shul's own domain, and the one it was on before the move.
+ *  A referer recorded before then carries the old name and is still this same site. */
+const SITE_HOST_NAMES = ['baismedrashoflakewoodcommons.org', 'lczmanim.cjaffa.com'];
 function trafficRefererName(host) {
   const h = String(host || '').trim();
   if (!h || h === 'null' || h === '(none)') return 'Typed in, or a link in an app';
-  if (h === SITE_HOST_NAME) return 'Another page on this site';
+  if (SITE_HOST_NAMES.includes(h)) return 'Another page on this site';
   return h;
 }
 

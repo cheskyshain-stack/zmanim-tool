@@ -25,8 +25,8 @@
  *      Bindings, add a KV binding called exactly ARCHIVE pointing at it. This is where the
  *      shul's own record of its own numbers lives, and without it the tab is back to asking
  *      Cloudflare live and to the month Cloudflare keeps. Optional, but it is the whole point.
- *   5. Settings, Triggers, Cron Triggers, add `0 6 * * *`, which is a little after 1am in
- *      Lakewood. That is the daily collection. Optional too: without it the record still fills
+ *   5. Settings, Triggers, Cron Triggers, add `0 4,5 * * *`, which checks both possible UTC hours for midnight in
+ *      Lakewood. The scheduled handler runs collection only at Eastern midnight. That is the daily collection. Optional too: without it the record still fills
  *      from whoever opens the tab, but only over the days somebody happened to look at.
  *   6. Give the Worker's address to whoever is editing the admin, and it goes in
  *      TRAFFIC_API in js/ui/traffic-view.js.
@@ -54,6 +54,10 @@
    Not a security boundary (see the note above); it is here so that a page on some other
    site cannot quietly read this in a visitor's browser and pass it off as its own. */
 const ALLOWED = [
+  'https://baismedrashoflakewoodcommons.org',
+  // The address the site was on before it moved to the shul's own domain. Kept so the admin
+  // still answers while DNS is settling and on any browser holding the old link. It can come
+  // out once nobody is opening that one.
   'https://lczmanim.cjaffa.com',
   'http://localhost',
   'http://127.0.0.1',
@@ -95,8 +99,16 @@ const MAX_DAYS = 800;
 const SITE_TOKEN = 'e96217102b81416db30f31a0c105fece';
 
 /** The host the congregation's pages are served from. The other way of saying which site, used
- *  where the site tag cannot be had. Same value as SITE_URL's host in build-offline.py. */
-const SITE_HOST = 'lczmanim.cjaffa.com';
+ *  where the site tag cannot be had. Same value as SITE_URL's host in build-offline.py.
+ *
+ *  **This is one host, and the site has had two.** Everything Cloudflare recorded before the move
+ *  to the shul's own domain was recorded against lczmanim.cjaffa.com and is not in this query.
+ *  Narrowing by the site's tag would have spanned both, since it is one Web Analytics site either
+ *  way and the beacon token did not change, but that listing is refused for this token (see
+ *  siteTagFor), so the host is what there is. The store is what carries history across a change
+ *  like this: days already collected into it keep their figures whatever the site is called
+ *  afterwards, which is one more reason to have the namespace bound before anything moves. */
+const SITE_HOST = 'baismedrashoflakewoodcommons.org';
 
 /** The account the site sits in.
  *
@@ -758,12 +770,18 @@ export default {
    *  One whole UTC day at a time, because a day is the only range whose pages and devices can
    *  honestly be filed against a date, and because the store is keyed by day.
    *
-   *  Set it up under the Worker's Settings, Triggers, Cron Triggers: `0 6 * * *` is a little after
-   *  1am in Lakewood, which is a quiet hour and safely inside the finished UTC day. **Without the
+   *  Set it up under the Worker's Settings, Triggers, Cron Triggers: `0 4,5 * * *` checks both possible
+   *  UTC hours for Eastern midnight; the handler collects only at local midnight. **Without the
    *  cron the store still fills**, since opening the tab collects today and backfills what is
    *  missing, but only for the days somebody happened to be looking. */
   async scheduled(event, env, ctx) {
     if (!env.ARCHIVE || !env.CF_API_TOKEN) return;
+    // Cloudflare cron uses UTC. Run at both possible Eastern midnights and
+    // collect only at local midnight, so daylight saving changes need no manual edits.
+    const hour = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23',
+    }).format(new Date(event.scheduledTime));
+    if (hour !== '00') return;
     ctx.waitUntil(collect(env, CRON_MAX_DAYS));
   },
 
