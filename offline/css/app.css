@@ -4412,3 +4412,25 @@ body.is-locked { overflow: hidden; }
   padding: 0.5rem; border: 1px solid var(--line, #ccd3da); border-radius: 6px;
   background: #fff; color: inherit; resize: vertical;
 }
+
+/* The blocked screen: what happened, and the request to send about it. See ui/blocked.js.
+   Deliberately plain, because it has to read the same on the congregation's cream pages and in
+   the admin, and because whoever is looking at it is already having a bad minute. */
+.blocked { max-width: 34rem; margin: 0 auto; text-align: left; }
+.blocked-lead { font-weight: 600; margin: 0 0 0.6rem; }
+.blocked .hint { margin: 0 0 0.5rem; }
+.blocked-text {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 0.95rem; line-height: 1.45;
+  padding: 0.6rem; border: 1px solid rgba(38, 50, 62, 0.22); border-radius: 8px;
+  background: #fff; color: inherit; resize: vertical;
+  /* pre-wrap, not pre: the line breaks in the message are kept, and a line longer than a phone
+     is wide still wraps rather than running off the side where it cannot be read. Copying is
+     unaffected either way, since a textarea's soft wrapping puts no newlines into the value. */
+  white-space: pre-wrap;
+}
+.blocked-copy {
+  margin-top: 0.6rem; padding: 0.6rem 1.1rem; font: inherit; font-weight: 600;
+  border: 1px solid rgba(38, 50, 62, 0.22); border-radius: 8px; background: #fff;
+  color: inherit; cursor: pointer;
+}
+.blocked-copy:hover { background: rgba(38, 50, 62, 0.05); }

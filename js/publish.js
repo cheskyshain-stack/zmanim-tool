@@ -109,7 +109,9 @@ export async function loadPublished() {
          cause, it blames the shul, and the person who sees it complains to a gabbai instead of
          to whoever runs the filter. See data-loader.js, which had the same fault the same week.
          Thrown rather than returned, so the caller has to decide what to say. */
-      throw new Error('blocked');
+      const blocked = new Error('blocked');
+      blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
+      throw blocked;
     }
     return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
   } catch (err) {

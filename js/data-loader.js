@@ -1,3 +1,4 @@
+import { showBlocked } from './ui/blocked.js';
 // Loads the ported Hebrew-calendar lookup tables (data/*.json - exact copies of the
 // workbook's PARSHA_TABLE_CHUTZ / PARSHA_TABLE_EY / PARSHA_NAMES_TABLE / SPECIAL_DAYS_TABLE).
 //
@@ -53,12 +54,17 @@ async function loadOne(path) {
     const type = (res.headers.get('content-type') || 'no content type').split(';')[0].trim();
     const head = text.trim().slice(0, 80).replace(/\s+/g, ' ');
     const page = /^<(?:!doctype|html|head|meta|script)/i.test(text.trim());
-    return Promise.reject(new Error(
+    const err = new Error(
       `${path} answered with ${type}, not the data${page
-        ? '. Something on this network is answering for the site, which is usually a wifi sign-in '
-          + 'page or a phone network getting in the way'
+        ? '. Something on this network is answering for the site, which is usually a content '
+          + 'filter or a wifi sign-in page getting in the way'
         : ''}: "${head}"`,
-    ));
+    );
+    /* Which address was refused, carried on the error rather than only written into its
+       sentence, so the blocked screen can put it in the request the reader sends to whoever
+       runs the filter. See ui/blocked.js. */
+    if (page) err.blockedUrl = new URL(path, location.origin).href;
+    return Promise.reject(err);
   }
 }
 
@@ -99,8 +105,16 @@ export function dataErrorMessage(err) {
  *
  *  A function rather than a line of innerHTML at each call site, so that the string which quotes
  *  whatever answered instead of the data cannot be handed to an HTML parser by somebody writing
- *  the next page. */
+ *  the next page.
+ *
+ *  Where a filter is what answered, the reader gets the blocked screen instead: the same account
+ *  of what happened, plus the request to send about it and the address to ask for. Being told
+ *  what is wrong and being able to do something about it are different things. */
 export function showDataError(host, err) {
+  if (err?.blockedUrl) {
+    showBlocked(host, { blockedUrl: err.blockedUrl, what: 'This site cannot be read here.' });
+    return;
+  }
   const p = document.createElement('p');
   p.className = 'error';
   p.textContent = dataErrorMessage(err);

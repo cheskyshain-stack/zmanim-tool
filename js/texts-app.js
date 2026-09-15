@@ -27,12 +27,19 @@ function start() {
      had fetched everything perfectly well, and the real message ("built is not iterable") was
      only visible by reading the sentence to the end. A screen that names the wrong cause is
      worse than one that says nothing, because it sends whoever is looking somewhere else. */
+  /* Whether the loader already put its own screen up, tracked rather than sniffed for.
+     This asked `main.querySelector('.error')`, which is a question about how the first screen
+     happens to be marked up, and it broke the moment a filter got its own screen with a
+     different class: the page drew the blocked notice and then wrote "Could not build the
+     messages" over the top of it. A boolean cannot come apart from what it is describing. */
+  let reported = false;
   loadTables()
     .catch((err) => {
       /* This is the page that got the bad message: somebody opening it on a phone was told
          "Unexpected token '<'" and nothing else. Set as text, not as markup, since what it
          quotes came off the network. See dataErrorMessage. */
       showDataError(main, err);
+      reported = true;
       throw err;
     })
     .then((tables) => {
@@ -40,7 +47,7 @@ function start() {
       renderTexts(main, state, resolveSettings(state.settings), tables);
     })
     .catch((err) => {
-      if (main.querySelector('.error')) return; // the loader already said its piece
+      if (reported) return; // the loader already said its piece
       console.error('messages page', err);
       main.innerHTML = `<p class="error">Could not build the messages: ${err.message}</p>`;
     });

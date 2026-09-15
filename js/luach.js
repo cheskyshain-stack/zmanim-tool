@@ -14,6 +14,7 @@ import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { wireCopyButton } from './ui/copy.js';
+import { showBlocked } from './ui/blocked.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
@@ -1025,16 +1026,20 @@ function wireNav(published) {
   let published;
   try {
     published = await loadPublished();
-  } catch {
+  } catch (err) {
     /* A filter or a sign-in page answered in place of the season. Said as what it is, because
        the alternative is what this used to do: print "Nothing has been published yet", which
        tells somebody the shul has not put its zmanim up when the shul has, and sends them to
        ask the gabbai about a problem that is on their own phone. Content filters are common
-       here and this is the screen a good part of the kehilla would otherwise get. */
-    main.innerHTML = '<div class="luach-home"><p class="hint">This phone or its network is '
-      + 'blocking part of this site, so the zmanim cannot be read. The page itself is fine: '
-      + 'something in front of it is answering instead. A filter would need this address '
-      + 'allowed, or try a different connection.</p></div>';
+       here and this is the screen a good part of the kehilla would otherwise get, so it also
+       hands them the request to send and the address to ask for. See ui/blocked.js. */
+    const home = document.createElement('div');
+    home.className = 'luach-home';
+    main.replaceChildren(home);
+    showBlocked(home, {
+      blockedUrl: err?.blockedUrl,
+      what: 'The zmanim cannot be read on this phone.',
+    });
     return;
   }
   if (!published) {

@@ -379,6 +379,208 @@ function announcedNow() {
   return live().map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
 }
 
+// ==== ui/copy.js ====
+// Putting a message on the clipboard, in the four places this program offers to.
+//
+// **The fallback was behind the wrong test.** Every one of those four asked
+// `navigator.clipboard?.writeText` and used the old hidden-textarea route only when that was
+// **missing**. That is not how this fails in the field. The API is present almost everywhere
+// now, and what it does instead is **be there and refuse**: an in-app browser, a page served
+// over plain http, an Android webview, a permissions policy. Then `await` rejects, the catch
+// fires, and the fallback that was written for exactly this moment is never reached, because
+// the property it was guarding on existed.
+//
+// So the fallback goes behind the failure rather than behind the feature check. Somebody on the
+// congregation's own week page pressed Copy text and got "Copy failed", which is how this was
+// found.
+//
+// **And "Copy failed" on its own is not an answer.** The person wanted the message; being told
+// the copying did not work leaves them holding nothing, on a phone, with no way to get at what
+// they came for. So when both routes fail the text is put on the screen in a box, already
+// selected, for them to copy by hand. A browser that will not let a page touch the clipboard
+// will still let a person select text, and that is the one thing that always works.
+
+/** The two ways of copying, tried in order. Never throws; answers whether it worked.
+ *
+ *  The old route is not a relic. `document.execCommand('copy')` is deprecated and still the
+ *  thing that works in the places the modern API is refused, which are exactly the places this
+ *  shul's congregation reads the site from: a link opened inside WhatsApp. */
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Present and refused, which is the common case. Fall through and try the other way.
+  }
+  try {
+    const box = document.createElement('textarea');
+    box.value = text;
+    box.setAttribute('readonly', '');
+    /* Off the screen but not display:none and not hidden: a box the browser does not lay out
+       cannot be selected, and a selection is what execCommand copies. Fixed rather than
+       absolute so that adding it cannot scroll the page under whoever pressed the button. */
+    box.style.position = 'fixed';
+    box.style.top = '0';
+    box.style.opacity = '0';
+    box.style.pointerEvents = 'none';
+    document.body.appendChild(box);
+    box.select();
+    box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
+    const ok = document.execCommand('copy');
+    box.remove();
+    if (ok) return true;
+  } catch {
+    // Nothing left to try. The caller shows the text instead.
+  }
+  return false;
+}
+
+/** A button that copies, says so on itself, and hands the text over when it cannot.
+ *
+ *  `getText` is called on the press rather than when this is wired, because every one of these
+ *  builds its message out of the week being looked at, which changes under the button.
+ *
+ *  It can also throw, and that is a different failure worth telling apart on the screen: the
+ *  message could not be built at all, as against built and not copyable. */
+function wireCopyButton(btn, getText) {
+  if (!btn) return;
+  const said = btn.textContent;
+  let box = null;
+  btn.addEventListener('click', async () => {
+    box?.remove();
+    box = null;
+    let text;
+    try {
+      text = await getText();
+    } catch (err) {
+      console.error('copy: could not build the text', err);
+      btn.textContent = 'Nothing to copy';
+      setTimeout(() => { btn.textContent = said; }, 2000);
+      return;
+    }
+    if (await copyToClipboard(text)) {
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = said; }, 2000);
+      return;
+    }
+    /* Neither route worked, so the reader gets the text itself. Put after the button, selected,
+       with one line saying why it is there. Not an alert: an alert cannot be scrolled and a
+       message is several lines long. */
+    box = document.createElement('div');
+    box.className = 'copy-fallback';
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = 'This browser will not let the page copy for you. The message is here to '
+      + 'copy by hand, and it is already selected.';
+    const area = document.createElement('textarea');
+    area.className = 'copy-fallback-text';
+    area.readOnly = true;
+    area.rows = Math.min(12, String(text).split('\n').length + 1);
+    area.value = text;
+    box.append(note, area);
+    btn.insertAdjacentElement('afterend', box);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, String(text).length);
+    btn.textContent = said;
+  });
+}
+
+// ==== ui/blocked.js ====
+// What a reader sees when a content filter answers in place of this site, and the thing that
+// gets them out of it.
+//
+// Asked for by the shul, and it is the right ask. The screen already said whose fault it was
+// not, which stopped a filtered congregant going to a gabbai about the shul's site being empty.
+// But it left them with a problem and no move: "a filter would need this address allowed" is
+// true and is not something most people know how to act on.
+//
+// So the screen writes the request for them. It names the site, it names **the exact address
+// that was blocked**, which the error already carries, and it is sitting in a box with a Copy
+// button under it, ready to send to whoever runs the filter. That turns everybody who hits this
+// into somebody who can get it fixed, which is worth more than any number of whitelist requests
+// sent from this end: filters are a personal choice here, one household at a time, and the
+// person standing in front of the block page is the only one who knows which filter it is.
+//
+// The address is read off `location` rather than written down, so this keeps naming the right
+// site the day it moves to the shul's own domain, and keeps naming the right file whichever of
+// them the filter happened to catch.
+
+/** Who the site belongs to, for the request. Written here rather than read from the published
+ *  settings, because the settings are in the file the filter just blocked. */
+const SHUL = 'Bais Medrash of Lakewood Commons, 44 Coles Way, Lakewood NJ 08701';
+
+/** The message to send to a filter company, naming this site and the address that was refused.
+ *
+ *  Short on purpose. It is going to be pasted into a form or a text message from a phone, by
+ *  somebody who only wants the zmanim, and a page of explanation is a page they will not send. */
+function whitelistRequest(blockedUrl) {
+  return [
+    'Please allow this website on my filter:',
+    '',
+    `    ${location.origin}`,
+    '',
+    `It is the zmanim and davening times for ${SHUL}.`,
+    '',
+    'The page opens but the times do not show, because this address is being blocked:',
+    '',
+    `    ${blockedUrl || `${location.origin}/data/`}`,
+    '',
+    'Please allow the whole site, including every file under it.',
+  ].join('\n');
+}
+
+/** The blocked screen, whole: what happened, and the request to send about it.
+ *
+ *  `what` is the one sentence that differs between the congregation's pages, where the zmanim
+ *  are what cannot be read, and the admin, where it is the calendar tables. */
+function showBlocked(host, { blockedUrl, what }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'blocked';
+
+  const lead = document.createElement('p');
+  lead.className = 'blocked-lead';
+  lead.textContent = `${what} The page itself is fine. Something on this phone or its network, `
+    + 'usually a content filter, is answering instead of the site.';
+
+  const ask = document.createElement('p');
+  ask.className = 'hint';
+  ask.textContent = 'To fix it, send this to whoever runs the filter. It names the site and the '
+    + 'exact address being blocked.';
+
+  const text = whitelistRequest(blockedUrl);
+  const box = document.createElement('textarea');
+  box.className = 'blocked-text';
+  box.readOnly = true;
+  box.rows = 1;
+  box.value = text;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'blocked-copy';
+  btn.textContent = 'Copy this message';
+
+  wrap.append(lead, ask, box, btn);
+  host.replaceChildren(wrap);
+  /* Sized to what it actually holds, once it is in the page and has a width.
+     Counting the lines in the string and setting `rows` to that was wrong on a phone: the lines
+     wrap, so the box was several rows shorter than its contents and the end of the message was
+     cut off inside it. The point of showing the message is that it can be read. Re-measured on
+     a resize, since turning a phone sideways rewraps every line in it. */
+  const fit = () => {
+    box.style.height = 'auto';
+    box.style.height = `${box.scrollHeight}px`;
+  };
+  fit();
+  window.addEventListener('resize', fit);
+  // The same copy button the rest of the program uses, which matters more here than anywhere:
+  // a phone that will not let the page reach the clipboard puts the text on the screen instead,
+  // and this screen is already the one for a phone that is refusing things.
+  wireCopyButton(btn, () => text);
+}
+
 // ==== data-loader.js (replaced: inlined data, no fetch) ====
 // --- inlined data/*.json (offline build: fetch() of local files is blocked under file://) ---
 const __TABLE_parshaChutz = {"headers": ["23P", "25P", "34P", "54P", "55P", "73P", "75P", "23M", "25M", "34M", "53M", "55M", "73M", "75M"], "rows": [[52, 52, 52, 53, 53, " ", " ", 52, 52, 52, 53, 53, " ", " "], [53, 53, 53, " ", " ", 53, 53, 53, 53, 53, " ", " ", 53, 53], [" ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " "], [1, 1, 1, 1, 1, " ", " ", 1, 1, 1, 1, 1, " ", " "], [2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 1, 1], [3, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 3, 2, 2], [4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3], [5, 5, 5, 5, 5, 4, 4, 5, 5, 5, 5, 5, 4, 4], [6, 6, 6, 6, 6, 5, 5, 6, 6, 6, 6, 6, 5, 5], [7, 7, 7, 7, 7, 6, 6, 7, 7, 7, 7, 7, 6, 6], [8, 8, 8, 8, 8, 7, 7, 8, 8, 8, 8, 8, 7, 7], [9, 9, 9, 9, 9, 8, 8, 9, 9, 9, 9, 9, 8, 8], [10, 10, 10, 10, 10, 9, 9, 10, 10, 10, 10, 10, 9, 9], [11, 11, 11, 11, 11, 10, 10, 11, 11, 11, 11, 11, 10, 10], [12, 12, 12, 12, 12, 11, 11, 12, 12, 12, 12, 12, 11, 11], [13, 13, 13, 13, 13, 12, 12, 13, 13, 13, 13, 13, 12, 12], [14, 14, 14, 14, 14, 13, 13, 14, 14, 14, 14, 14, 13, 13], [15, 15, 15, 15, 15, 14, 14, 15, 15, 15, 15, 15, 14, 14], [16, 16, 16, 16, 16, 15, 15, 16, 16, 16, 16, 16, 15, 15], [17, 17, 17, 17, 17, 16, 16, 17, 17, 17, 17, 17, 16, 16], [18, 18, 18, 18, 18, 17, 17, 18, 18, 18, 18, 18, 17, 17], [19, 19, 19, 19, 19, 18, 18, 19, 19, 19, 19, 19, 18, 18], [20, 20, 20, 20, 20, 19, 19, 20, 20, 20, 20, 20, 19, 19], [21, 21, 21, 21, 21, 20, 20, 21, 21, 21, 21, 21, 20, 20], [54, 54, 54, 54, 22, 21, 21, 22, 22, 22, 22, 22, 21, 21], [24, 24, 24, 24, 23, 54, 54, 23, 23, 23, 23, 23, 22, 22], [25, 25, 25, 25, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23], [" ", " ", " ", " ", 25, 25, 25, 25, 25, 25, 25, 25, 24, 24], [26, 26, 26, " ", " ", " ", " ", 26, 26, 26, 26, 26, 25, 25], [55, 55, 55, 26, 26, 26, 26, 27, 27, 27, 27, 27, 26, 26], [56, 56, 56, 55, 55, 55, 55, 28, 28, 28, 28, 28, 27, 27], [31, 31, 31, 56, 56, 56, 56, " ", " ", " ", 29, 29, 28, 28], [57, 57, 57, 31, 31, 31, 31, 29, " ", " ", " ", " ", " ", " "], [34, 34, 34, 57, 57, 57, 57, 30, 29, 29, 30, 30, 29, 29], [35, " ", " ", 34, 34, 34, 34, 31, 30, 30, 31, 31, 30, 30], [36, 35, 35, 35, 35, 35, 35, 32, 31, 31, 32, 32, 31, 31], [37, 36, 36, 36, 36, 36, 36, 33, 32, 32, 33, 33, 32, 32], [38, 37, 37, 37, 37, 37, 37, 34, 33, 33, 34, 34, 33, 33], [39, 38, 38, 38, 38, 38, 38, " ", 34, 34, 35, 35, 34, 34], [40, 58, 58, 39, 39, 39, 39, 35, 35, 35, 36, 36, 35, " "], [41, 41, 41, 40, 40, 40, 40, 36, 36, 36, 37, 37, 36, 35], [59, 59, 59, 41, 41, 41, 41, 37, 37, 37, 38, 38, 37, 36], [44, 44, 44, 59, 59, 59, 59, 38, 38, 38, 39, 39, 38, 37], [45, 45, 45, 44, 44, 44, 44, 58, 39, 39, 40, 40, 39, 38], [46, 46, 46, 45, 45, 45, 45, 41, 40, 40, 41, 41, 40, 58], [47, 47, 47, 46, 46, 46, 46, 59, 41, 41, 42, 42, 41, 41], [48, 48, 48, 47, 47, 47, 47, 44, 59, 59, 43, 43, 59, 59], [49, 49, 49, 48, 48, 48, 48, 45, 44, 44, 44, 44, 44, 44], [50, 50, 50, 49, 49, 49, 49, 46, 45, 45, 45, 45, 45, 45], [60, 60, 60, 50, 50, 50, 50, 47, 46, 46, 46, 46, 46, 46], [" ", " ", " ", 51, 51, 51, 60, 48, 47, 47, 47, 47, 47, 47], [" ", " ", " ", " ", " ", " ", " ", 49, 48, 48, 48, 48, 48, 48], [" ", " ", " ", " ", " ", " ", " ", 50, 49, 49, 49, 49, 49, 49], [" ", " ", " ", " ", " ", " ", " ", 60, 50, 50, 50, 50, 50, 50], [" ", " ", " ", " ", " ", " ", " ", " ", 51, 51, 51, 60, 60, 60]]};
@@ -6745,115 +6947,6 @@ function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
   };
   const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
   return posterFromCell(week, row.C);
-}
-
-// ==== ui/copy.js ====
-// Putting a message on the clipboard, in the four places this program offers to.
-//
-// **The fallback was behind the wrong test.** Every one of those four asked
-// `navigator.clipboard?.writeText` and used the old hidden-textarea route only when that was
-// **missing**. That is not how this fails in the field. The API is present almost everywhere
-// now, and what it does instead is **be there and refuse**: an in-app browser, a page served
-// over plain http, an Android webview, a permissions policy. Then `await` rejects, the catch
-// fires, and the fallback that was written for exactly this moment is never reached, because
-// the property it was guarding on existed.
-//
-// So the fallback goes behind the failure rather than behind the feature check. Somebody on the
-// congregation's own week page pressed Copy text and got "Copy failed", which is how this was
-// found.
-//
-// **And "Copy failed" on its own is not an answer.** The person wanted the message; being told
-// the copying did not work leaves them holding nothing, on a phone, with no way to get at what
-// they came for. So when both routes fail the text is put on the screen in a box, already
-// selected, for them to copy by hand. A browser that will not let a page touch the clipboard
-// will still let a person select text, and that is the one thing that always works.
-
-/** The two ways of copying, tried in order. Never throws; answers whether it worked.
- *
- *  The old route is not a relic. `document.execCommand('copy')` is deprecated and still the
- *  thing that works in the places the modern API is refused, which are exactly the places this
- *  shul's congregation reads the site from: a link opened inside WhatsApp. */
-async function copyToClipboard(text) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // Present and refused, which is the common case. Fall through and try the other way.
-  }
-  try {
-    const box = document.createElement('textarea');
-    box.value = text;
-    box.setAttribute('readonly', '');
-    /* Off the screen but not display:none and not hidden: a box the browser does not lay out
-       cannot be selected, and a selection is what execCommand copies. Fixed rather than
-       absolute so that adding it cannot scroll the page under whoever pressed the button. */
-    box.style.position = 'fixed';
-    box.style.top = '0';
-    box.style.opacity = '0';
-    box.style.pointerEvents = 'none';
-    document.body.appendChild(box);
-    box.select();
-    box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
-    const ok = document.execCommand('copy');
-    box.remove();
-    if (ok) return true;
-  } catch {
-    // Nothing left to try. The caller shows the text instead.
-  }
-  return false;
-}
-
-/** A button that copies, says so on itself, and hands the text over when it cannot.
- *
- *  `getText` is called on the press rather than when this is wired, because every one of these
- *  builds its message out of the week being looked at, which changes under the button.
- *
- *  It can also throw, and that is a different failure worth telling apart on the screen: the
- *  message could not be built at all, as against built and not copyable. */
-function wireCopyButton(btn, getText) {
-  if (!btn) return;
-  const said = btn.textContent;
-  let box = null;
-  btn.addEventListener('click', async () => {
-    box?.remove();
-    box = null;
-    let text;
-    try {
-      text = await getText();
-    } catch (err) {
-      console.error('copy: could not build the text', err);
-      btn.textContent = 'Nothing to copy';
-      setTimeout(() => { btn.textContent = said; }, 2000);
-      return;
-    }
-    if (await copyToClipboard(text)) {
-      btn.textContent = 'Copied';
-      setTimeout(() => { btn.textContent = said; }, 2000);
-      return;
-    }
-    /* Neither route worked, so the reader gets the text itself. Put after the button, selected,
-       with one line saying why it is there. Not an alert: an alert cannot be scrolled and a
-       message is several lines long. */
-    box = document.createElement('div');
-    box.className = 'copy-fallback';
-    const note = document.createElement('p');
-    note.className = 'hint';
-    note.textContent = 'This browser will not let the page copy for you. The message is here to '
-      + 'copy by hand, and it is already selected.';
-    const area = document.createElement('textarea');
-    area.className = 'copy-fallback-text';
-    area.readOnly = true;
-    area.rows = Math.min(12, String(text).split('\n').length + 1);
-    area.value = text;
-    box.append(note, area);
-    btn.insertAdjacentElement('afterend', box);
-    area.focus();
-    area.select();
-    area.setSelectionRange(0, String(text).length);
-    btn.textContent = said;
-  });
 }
 
 // ==== ui/own-view.js ====
@@ -14454,7 +14547,9 @@ async function loadPublished() {
          cause, it blames the shul, and the person who sees it complains to a gabbai instead of
          to whoever runs the filter. See data-loader.js, which had the same fault the same week.
          Thrown rather than returned, so the caller has to decide what to say. */
-      throw new Error('blocked');
+      const blocked = new Error('blocked');
+      blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
+      throw blocked;
     }
     return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
   } catch (err) {
