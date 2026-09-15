@@ -1,3 +1,14 @@
+# Bais Medrash of Lakewood Commons
+
+Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
+
+Visit the [shul website](https://baismedrashoflakewoodcommons.org/) for current zmanim and minyan schedules.
+
+- [This week](https://baismedrashoflakewoodcommons.org/week/)
+- [Seasonal zmanim chart](https://baismedrashoflakewoodcommons.org/chart/)
+- [Shabbos and Yom Tov schedules](https://baismedrashoflakewoodcommons.org/schedules/)
+- [Donate](https://baismedrashoflakewoodcommons.org/donate/)
+
 # Zmanim Sheet Generator
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
