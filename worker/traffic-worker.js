@@ -25,8 +25,8 @@
  *      Bindings, add a KV binding called exactly ARCHIVE pointing at it. This is where the
  *      shul's own record of its own numbers lives, and without it the tab is back to asking
  *      Cloudflare live and to the month Cloudflare keeps. Optional, but it is the whole point.
- *   5. Settings, Triggers, Cron Triggers, add `0 6 * * *`, which is a little after 1am in
- *      Lakewood. That is the daily collection. Optional too: without it the record still fills
+ *   5. Settings, Triggers, Cron Triggers, add `0 4,5 * * *`, which checks both possible UTC hours for midnight in
+ *      Lakewood. The scheduled handler runs collection only at Eastern midnight. That is the daily collection. Optional too: without it the record still fills
  *      from whoever opens the tab, but only over the days somebody happened to look at.
  *   6. Give the Worker's address to whoever is editing the admin, and it goes in
  *      TRAFFIC_API in js/ui/traffic-view.js.
@@ -770,12 +770,18 @@ export default {
    *  One whole UTC day at a time, because a day is the only range whose pages and devices can
    *  honestly be filed against a date, and because the store is keyed by day.
    *
-   *  Set it up under the Worker's Settings, Triggers, Cron Triggers: `0 6 * * *` is a little after
-   *  1am in Lakewood, which is a quiet hour and safely inside the finished UTC day. **Without the
+   *  Set it up under the Worker's Settings, Triggers, Cron Triggers: `0 4,5 * * *` checks both possible
+   *  UTC hours for Eastern midnight; the handler collects only at local midnight. **Without the
    *  cron the store still fills**, since opening the tab collects today and backfills what is
    *  missing, but only for the days somebody happened to be looking. */
   async scheduled(event, env, ctx) {
     if (!env.ARCHIVE || !env.CF_API_TOKEN) return;
+    // Cloudflare cron uses UTC. Run at both possible Eastern midnights and
+    // collect only at local midnight, so daylight saving changes need no manual edits.
+    const hour = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23',
+    }).format(new Date(event.scheduledTime));
+    if (hour !== '00') return;
     ctx.waitUntil(collect(env, CRON_MAX_DAYS));
   },
 
