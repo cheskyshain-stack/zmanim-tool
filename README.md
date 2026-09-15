@@ -4,6 +4,15 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 [Support the shul and donate](https://baismedrashoflakewoodcommons.org/donate/).
 
+## Development
+
+A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
+ported from `Lakewood Commons Zmanim tables.xlsx`.
+
+## Running it
+
+**Easiest way:** double-click `Start.bat` in this folder. It starts a local server
+in its own window and opens the app in your default browser. Leave that window open
 while you use the app; closing it stops the server. Next time, just double-click
 `Start.bat` again.
 
