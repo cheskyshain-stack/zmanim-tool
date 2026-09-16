@@ -292,7 +292,8 @@ const DONATE = {
       // words are about spending an account they have rather than opening one here.
       title: 'DAF',
       blurb: 'Donor-Advised Fund',
-      icon: 'swirl',
+      icon: 'shul',
+      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://www.pledgercharitable.org/home","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://ojcfund.org/","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://matbia.org/","logo":"https://matbia.org/images/Matbia-logo.svg"}],
       how: 'Open your DAF provider and search for Bais Medrash of Lakewood Commons using our Tax ID. Confirm the charity name before recommending your grant.',
       copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },
@@ -771,6 +772,8 @@ function donateWayHtml(way) {
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
   const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${escAttr(p.name)} ↗</span></a>`).join('');
+  const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
@@ -790,7 +793,7 @@ function donateWayHtml(way) {
       </div>
       ${giveIcon('chev', 'luach-give-chev')}
     </summary>
-    <div class="luach-give-open">${how}${copy}${soon}${accounts}</div>
+    <div class="luach-give-open">${how}${copy}${providerGrid}${soon}${accounts}</div>
   </details>`;
 }
 
