@@ -4494,3 +4494,9 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
  .luach-approved-name text { font-size:36.8px; }
  .luach-masthead .luach-place { font-size:1.1rem !important; }
 }
+
+/* Receive the hidden admin gesture in the solid navy area only. */
+@media screen {
+ body.is-luach .luach-bar::before { content:""; position:absolute; inset:0 0 var(--luach-arc); pointer-events:auto; touch-action:pan-y; }
+ body.is-luach .luach-bar a, body.is-luach .luach-bar button { position:relative; z-index:1; }
+}
