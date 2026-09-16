@@ -4,7 +4,7 @@
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { inPlagWindow, fridayMainMinchaMenu, shabbosMinchaMenu, shacharisLine, candleLightingCell } from './common.js';
+import { inPlagWindow, fridayMainMinchaMenu, tishaBavMaariv, shabbosMinchaMenu, shacharisLine, candleLightingCell } from './common.js';
 import { textjoin, SLASH } from '../util.js';
 
 export function buildChorefRow(week, settings) {
@@ -13,7 +13,7 @@ export function buildChorefRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const B = tishaBavMaariv(shabbos, settings) ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
   const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
@@ -46,3 +46,4 @@ export const CHOREF_COLUMNS = [
   { key: 'H', header: 'הדלקת\nנרות' },
   { key: 'I', header: 'מנחה\nערב שבת' },
 ];
+
