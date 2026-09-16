@@ -4538,3 +4538,14 @@ body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-
 }
 body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-go,a.luach-back,a.luach-bar-give):active :is(svg,.luach-item-go,.luach-item-icon,.luach-about-chevron) { color:var(--luach-gold); opacity:1; }
 body.is-luach #main :is(button,summary,a) { -webkit-tap-highlight-color:transparent; }
+
+/* Keep pressed surfaces inside their existing rounded outlines. */
+body.is-luach #main .luach-give-card > summary { border-radius:16px; border-bottom:1px solid transparent; }
+body.is-luach #main .luach-give-card[open] > summary { border-radius:16px 16px 0 0; border-bottom-color:rgba(184,143,58,.42); }
+body.is-luach #main .luach-give-card:has(> summary:active) { background-color:#fff; }
+body.is-luach #main .panel > summary { border-radius:inherit; }
+body.is-luach #main .panel[open] > summary { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-go,a.luach-fund-row,a.luach-daf-provider,a.luach-back,a.luach-bar-give):active { transform:none; }
+body.is-luach #main .luach-zmanim-group:has(> summary:active) { transform:none; }
+body.is-luach #main a.luach-fund-row:active { background:var(--luach-navy);color:var(--luach-cream);border-color:var(--luach-gold);box-shadow:inset 0 2px 6px rgba(0,0,0,.3); }
+body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-body,.luach-give-title,.luach-account-title,.luach-account-blurb,.luach-fund-action) { color:var(--luach-cream);opacity:1; }
