@@ -253,7 +253,7 @@ const DONATE = {
       icon: 'card',
       accounts: [
         {
-          title: 'Give to the Shul',
+          title: 'Bais Medrash',
           blurb: 'Support the many needs of our shul and community.',
           href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
           funds: [
