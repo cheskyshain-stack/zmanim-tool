@@ -1,3 +1,9 @@
+import { loadTables } from './data-loader.js';
+import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
+import { computeSeasonWeeks, computeWeekdayWeeks } from './sheets/weeks.js';
+import { defaultPageSizes, alignPageSizesTo } from './pagination.js';
+import { hebrewDateExtended } from './hebrew-calendar.js';
+import { excelSerial } from './zmanim/solar.js';
 // Publishing a season for the congregation.
 //
 // Everything in this app lives in one browser's localStorage, so a visitor's browser has
@@ -8,7 +14,7 @@
 // A season is published once. The luach then advances by itself every week, because the
 // week it shows is worked out from today's date against the weeks in the file.
 
-import { isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
+import { isRetiredTishaBavRule, isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
 
 /** What the luach needs, and nothing else.
  *
@@ -77,7 +83,7 @@ export function downloadPublished(payload) {
  *  The overrides are cleaned the same way, for the cells the rule had already been typed into. */
 function withoutRetiredDrasha(data) {
   if (!data) return data;
-  const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r));
+  const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r) && !isRetiredTishaBavRule(r));
   const sheets = (data.sheets || []).map((sheet) => {
     const overrides = {};
     for (const [serial, week] of Object.entries(sheet.overrides || {})) {
@@ -92,7 +98,7 @@ function withoutRetiredDrasha(data) {
 
 /** Reads what is currently published, or null when nothing is. A 404 is the normal state
  *  before the first publish, not an error worth shouting about. */
-export async function loadPublished() {
+export async function loadPublished({ automatic = false } = {}) {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) return null;
@@ -113,7 +119,9 @@ export async function loadPublished() {
       blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
       throw blocked;
     }
-    return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
+    if (!data || !Array.isArray(data.sheets)) return null;
+    const clean = withoutRetiredDrasha(data);
+    return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
   } catch (err) {
     if (err?.message === 'blocked') throw err;
     // A network that would not carry the request at all. Same answer as no file: nothing to show.
@@ -237,7 +245,7 @@ export async function publishToSite(payload, token) {
     s.season === 'weekday' ? !replacedIds.has(s.linkedSheetId) : !incomingSeasons.some((i) => sameSeason(i, s))
   );
 
-  const merged = { ...payload, sheets: [...keep, ...payload.sheets] };
+  const merged = { ...data, ...payload, sheets: [...keep, ...payload.sheets] };
   const label = incomingSeasons[0];
   await commit(JSON.stringify(merged, null, 2), sha, `Publish ${label?.season || 'season'} ${label?.hebrewYear || ''}`, token);
   return data ? 'updated' : 'created';
@@ -252,3 +260,46 @@ export async function unpublishFromSite(sheet, token) {
   await commit(JSON.stringify({ ...data, sheets: remaining }, null, 2), sha, `Unpublish ${sheet.season} ${sheet.hebrewYear}`, token);
   return remaining.length;
 }
+
+/** Regenerate previous, current and upcoming seasons from shared formulas.
+ * Previously published sheets supply page splits only; times are always recalculated. */
+export function buildAutomaticCharts(config, tables, now = new Date()) {
+  const settings = { ...DEFAULT_SETTINGS, ...config.settings,
+    sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
+  const resolved = resolveSettings(settings);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: settings.timezoneId || 'America/New_York',
+    year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now);
+  const part = type => Number(parts.find(p => p.type === type).value);
+  const today = excelSerial(new Date(Date.UTC(part('year'), part('month') - 1, part('day'))));
+  const year = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+  const seasons = [];
+  for (let y = year - 1; y <= year + 1; y++) for (const season of ['choref', 'kayitz']) {
+    seasons.push({ season, year: y, ...computeSeasonWeeks(season, y, resolved, tables) });
+  }
+  seasons.sort((a, b) => a.startSerial - b.startSerial);
+  let at = seasons.findIndex(s => s.startSerial <= today && today < s.endSerial);
+  if (at < 0) at = seasons.findIndex(s => s.endSerial > today);
+  const selected = seasons.slice(Math.max(0, at - 1), at + 2);
+  const sheets = [];
+  for (const s of selected) {
+    const old = (config.sheets || []).filter(x => x.season === s.season && x.hebrewYear === s.year)
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
+    const key = s.season + '-' + s.year;
+    const custom = config.chartLayouts?.[key];
+    const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
+      sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
+    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
+    const id = 'auto-' + key;
+    const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
+      style: { ...settings.sheetStyle }, automatic: true };
+    sheets.push({ ...base, id, season: s.season, weeks: s.weeks, pageSizes: sizes,
+      overrides: {} });
+    sheets.push({ ...base, id: id + '-weekday', season: 'weekday', linkedSeason: s.season,
+      linkedSheetId: id, weeks: weekdayWeeks, pageSizes: alignPageSizesTo(s.weeks, sizes, weekdayWeeks),
+      overrides: {} });
+  }
+  return { ...config, settings, sheets, automaticCharts: true };
+}
+
+
