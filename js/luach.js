@@ -37,14 +37,14 @@ const ICON_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none"
   <circle cx="12" cy="12" r="9.1"/><path d="M12 6.6v5.7l3.6 2.1"/>
 </svg>`;
 const ICON_HEART = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
+  <path d="M4 10h16v11H4zM8 7h8M12 3v4M8 15h8"/><path d="M9 4l3 3 3-3"/>
 </svg>`;
 /* The same heart as the menu's, at the size the navy bar wants. Its own string rather than
    the menu's with a second class on it: that one is sized and stroked for a card two thirds
    of an inch tall, and reusing it here meant overriding both in CSS to undo what the class
    is for. aria-hidden, since the word beside it says it. */
 const ICON_HEART_SMALL = `<svg class="luach-bar-give-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>
+  <path d="M4 10h16v11H4zM8 7h8M12 3v4M8 15h8"/><path d="M9 4l3 3 3-3"/>
 </svg>`;
 /* Special Schedules: a sheet of paper with a star over it. Drawn in the same weight and on
    the same 24 grid as the clock and the calendar, so the menu reads as one set. */
@@ -91,7 +91,7 @@ const GIVE_ICONS = {
      is what a payment mark is for. It fills the box top to bottom, so the size that suits
      the line icons leaves it looking shrunken. See .luach-give-mark-svg.is-brand. */
   zelle: '<path fill="currentColor" stroke="none" d="M13.559 24h-2.841a.483.483 0 0 1-.483-.483v-2.765H5.638a.667.667 0 0 1-.666-.666v-2.234a.67.67 0 0 1 .142-.412l8.139-10.382h-7.25a.667.667 0 0 1-.667-.667V3.914c0-.367.299-.666.666-.666h4.23V.483c0-.266.217-.483.483-.483h2.841c.266 0 .483.217.483.483v2.765h4.323c.367 0 .666.299.666.666v2.137a.67.67 0 0 1-.141.41l-8.19 10.481h7.665c.367 0 .666.299.666.666v2.477a.667.667 0 0 1-.666.667h-4.32v2.765a.483.483 0 0 1-.483.483Z"/>',
-  heart: '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>',
+  heart: '<path d="M4 10h16v11H4zM8 7h8M12 3v4M8 15h8"/><path d="M9 4l3 3 3-3"/>',
   building: '<path d="M5 21V5.4A1.4 1.4 0 0 1 6.4 4h11.2A1.4 1.4 0 0 1 19 5.4V21"/><path d="M3.2 21h17.6"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01"/><path d="M10.3 21v-4.2h3.4V21"/>',
   hand: '<path d="M3.4 13.6l3-1.2a3 3 0 0 1 2.2 0l2.6 1a2.4 2.4 0 0 0 .9.2h2.3a1.5 1.5 0 0 1 0 3h-3.6"/><path d="M3.4 13.6V20m0-1.4l4.2 1.6a3 3 0 0 0 1.8.1l8.2-2.2a1.9 1.9 0 0 0 1.4-1.8"/><path d="M14.6 9.6s-2.9-1.7-2.9-3.6a1.7 1.7 0 0 1 2.9-1.1 1.7 1.7 0 0 1 2.9 1.1c0 1.9-2.9 3.6-2.9 3.6z"/>',
   book: '<path d="M12 6.6C10.4 5.3 8.4 4.7 5 4.7A1 1 0 0 0 4 5.7v11.1a1 1 0 0 0 1 1c3.4 0 5.4.6 7 1.9 1.6-1.3 3.6-1.9 7-1.9a1 1 0 0 0 1-1V5.7a1 1 0 0 0-1-1c-3.4 0-5.4.6-7 1.9z"/><path d="M12 6.6V19.7"/>',
@@ -290,10 +290,10 @@ const DONATE = {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
       // already in their own Donors' Fund account gives to the shul out of it, so the
       // words are about spending an account they have rather than opening one here.
-      title: 'The Donors\u2019 Fund',
-      blurb: 'Donate using funds from your Donors\u2019 Fund account.',
+      title: 'DAF',
+      blurb: 'Donor-Advised Fund',
       icon: 'swirl',
-      how: 'Search using our Tax ID.',
+      how: 'Open your DAF provider and search for Bais Medrash of Lakewood Commons using our Tax ID. Confirm the charity name before recommending your grant.',
       copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },
   ],
@@ -428,6 +428,9 @@ function homeHtml(published) {
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
+      <details class="luach-zmanim-group">
+        <summary class="luach-item">${ICON_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}</summary>
+        <div class="luach-zmanim-options">
       <a class="luach-item" href="/week/">
         ${ICON_CLOCK}<span class="luach-item-title">${escAttr(PAGE_NAMES.week)}</span>${CHEVRON}
       </a>
@@ -437,6 +440,8 @@ function homeHtml(published) {
       ${schedulesNow(published).length ? `<a class="luach-item" href="/schedules/">
         ${ICON_SHEET}<span class="luach-item-title">${escAttr(PAGE_NAMES.schedules)}</span>${CHEVRON}
       </a>` : ''}
+        </div>
+      </details>
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
