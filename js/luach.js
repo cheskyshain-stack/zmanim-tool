@@ -291,7 +291,7 @@ const DONATE = {
       // already in their own Donors' Fund account gives to the shul out of it, so the
       // words are about spending an account they have rather than opening one here.
       title: 'DAF',
-      blurb: 'Donor-Advised Fund',
+      blurb: 'Donor Advised Fund',
       icon: 'shul',
       providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://www.pledgercharitable.org/home","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://ojcfund.org/","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://matbia.org/","logo":"https://matbia.org/images/Matbia-logo.svg"}],
       how: 'Open your DAF provider and search for Bais Medrash of Lakewood Commons using our Tax ID. Confirm the charity name before recommending your grant.',
