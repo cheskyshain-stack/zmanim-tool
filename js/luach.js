@@ -226,6 +226,12 @@ function updateFootDots() {
     const address = dot.parentElement;
     const name = address.previousElementSibling;
     if (!name) return;
+    const parent = address.parentElement;
+    const style = getComputedStyle(parent);
+    const available = parent.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0);
+    const fontSize = parseFloat(getComputedStyle(address).fontSize);
+    const fits = name.getBoundingClientRect().width + address.getBoundingClientRect().width + fontSize * 1.2 <= available;
+    address.style.marginLeft = fits ? '0.85em' : '0';
     const a = address.getBoundingClientRect();
     const n = name.getBoundingClientRect();
     const gap = a.left - n.right;
