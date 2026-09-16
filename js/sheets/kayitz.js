@@ -5,7 +5,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { T, inPlagWindow, fridayMainMinchaMenu, shabbosMinchaMenu, shacharisLine, candleLightingCell } from './common.js';
+import { T, inPlagWindow, fridayMainMinchaMenu, tishaBavMaariv, shabbosMinchaMenu, shacharisLine, candleLightingCell } from './common.js';
 import { SLASH } from '../util.js';
 
 /** AND(dayOfYear>16, dayOfYear<65): roughly the Sefirah stretch (after Pesach, before
@@ -54,7 +54,7 @@ export function buildKayitzRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const B = tishaBavMaariv(shabbos, settings) ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
   const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
@@ -98,3 +98,4 @@ export const KAYITZ_COLUMNS = [
   { key: 'K', header: 'מנחה\nפלג גר"א' },
   { key: 'L', header: 'מנחה\nערב שבת' },
 ];
+
