@@ -484,7 +484,7 @@ function homeHtml(published) {
 .luach-about[open] .luach-about-chevron{transform:rotate(180deg)}
 .luach-about-body{text-align:center;padding:.4rem 1.25rem 1.5rem;font-size:1.05rem;line-height:1.65}
 .luach-about-body p{margin:0 0 1rem}
-.luach-contact-email{color:inherit;white-space:nowrap;font-size:min(1em,3.05vw)}
+.luach-contact-email{color:inherit;white-space:nowrap;display:inline-block;font-size:1em;max-width:100%}
 @media(max-width:600px){.luach-about-body:has(.luach-contact-email){padding-left:.65rem;padding-right:.65rem}}
 @supports (interpolate-size:allow-keywords){.luach-about{interpolate-size:allow-keywords}.luach-about::details-content{height:0;overflow:clip;transition:height .3s ease,content-visibility .3s allow-discrete}.luach-about[open]::details-content{height:auto}}
 @media(prefers-reduced-motion:reduce){.luach-about::details-content,.luach-about-chevron{transition:none}}
@@ -638,6 +638,7 @@ function renderHome(published) {
   // The pages behind it are as tall as the board on them and must not be stretched.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  fitContactEmail();
   // The card is drawn here as well as by the ticker, so the row is asked here too rather
   // than waiting for the first tick, which may be an hour off.
   markNextInline(main);
@@ -1107,4 +1108,29 @@ function wireNav(published) {
 
 
 
+
+
+/** Fit the email to its available line, capped at the surrounding text size. */
+let contactEmailObserver;
+function fitContactEmail() {
+  contactEmailObserver?.disconnect();
+  const email = main.querySelector('.luach-contact-email');
+  if (!email) return;
+  const paragraph = email.parentElement;
+  const fit = () => {
+    if (!email.isConnected || !paragraph.clientWidth) return;
+    const maximum = parseFloat(getComputedStyle(paragraph).fontSize);
+    email.style.fontSize = maximum + 'px';
+    const available = paragraph.clientWidth;
+    const range = document.createRange();
+    range.selectNodeContents(email);
+    const natural = range.getBoundingClientRect().width;
+    if (natural > available) email.style.fontSize = (maximum * (available - 1) / natural) + 'px';
+  };
+  contactEmailObserver = new ResizeObserver(fit);
+  contactEmailObserver.observe(paragraph);
+  email.closest('details')?.addEventListener('toggle', fit);
+  document.fonts.ready.then(fit);
+  fit();
+}
 
