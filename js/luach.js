@@ -741,7 +741,7 @@ function renderChartPage(published) {
   // confine: the congregation is shown the chart that is up now and no other. Three taps
   // on the chart itself opens the rest, which is also what lets the week view out of the
   // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
-  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: false });
+  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
 }
 
 /** The ways to give, one card each.
@@ -1096,5 +1096,6 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
 
 
