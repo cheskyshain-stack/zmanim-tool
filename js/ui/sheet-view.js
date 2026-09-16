@@ -170,14 +170,6 @@ export function renderSheet(container, state, sheet, onChange) {
         anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
       }</span>
     </div>
-    <details class="panel no-print">
-      <summary>Which pages to print or save</summary>
-      <div class="panel-body">
-        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF. Excluded pages stay on screen, dimmed, so you can still read them.</p>
-        <div class="page-picker" id="page-picker"></div>
-        <div class="actions"><button type="button" id="pages-all">Include all</button></div>
-      </div>
-    </details>
     <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
         <div class="style-toolbar">
@@ -264,10 +256,8 @@ export function renderSheet(container, state, sheet, onChange) {
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
 
-  // Both of these need the pages in the document: the picker to count them, and the row
-  // sync to measure them (heights read 0 on a detached element).
+  // Row heights need the pages in the document to be measured.
   syncHeaderRowHeight(pagesEl);
-  buildPagePicker(container);
   autoFit(container);
 
 
@@ -334,24 +324,6 @@ export function renderSheet(container, state, sheet, onChange) {
 /** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
  *  print.css drops from the output - the page stays visible on screen (dimmed) so you
  *  can still see what you left out. */
-function buildPagePicker(container) {
-  const picker = container.querySelector('#page-picker');
-  if (!picker) return;
-  const pages = [...container.querySelectorAll('#pages > .page')];
-  picker.innerHTML = pages
-    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${escText(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
-    .join('');
-  picker.querySelectorAll('input').forEach((cb) => {
-    cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
-  });
-  container.querySelector('#pages-all').addEventListener('click', () => {
-    picker.querySelectorAll('input').forEach((cb) => {
-      cb.checked = true;
-      pages[Number(cb.dataset.i)].classList.remove('page-excluded');
-    });
-  });
-}
-
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
 
 
