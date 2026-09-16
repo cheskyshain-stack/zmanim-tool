@@ -596,10 +596,10 @@ function splitBuild(season) {
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
-  // Keep the four Tisha B'Av labels and times aligned in two shared columns.
-  const evening = String(str).match(/^שקיעה (\d{1,2}:\d{2})\nדרשה (\d{1,2}:\d{2})\nזמן 72 (\d{1,2}:\d{2})\nמעריב (\d{1,2}:\d{2})$/);
+  // Keep the three Tisha B'Av labels and times aligned in two shared columns.
+  const evening = String(str).match(/^דרשה (\d{1,2}:\d{2})\nזמן 72 (\d{1,2}:\d{2})\nמעריב (\d{1,2}:\d{2})$/);
   if (evening) {
-    const labels = ['שקיעה', 'דרשה', 'זמן 72', 'מעריב'];
+    const labels = ['דרשה', 'זמן 72', 'מעריב'];
     return '<span class="tisha-evening-grid" dir="rtl" style="display:inline-grid;grid-template-columns:max-content max-content;column-gap:0.45em;text-align:right;white-space:nowrap;line-height:1.2">' +
       labels.map((label, i) => '<span>' + label + '</span><span dir="ltr" style="text-align:right;font-variant-numeric:tabular-nums">' + evening[i + 1] + '</span>').join('') + '</span>';
   }
