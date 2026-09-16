@@ -484,12 +484,14 @@ function homeHtml(published) {
 .luach-about[open] .luach-about-chevron{transform:rotate(180deg)}
 .luach-about-body{text-align:center;padding:.4rem 1.25rem 1.5rem;font-size:1.05rem;line-height:1.65}
 .luach-about-body p{margin:0 0 1rem}
+.luach-contact-email{color:inherit;white-space:nowrap;font-size:min(1em,3.05vw)}
+@media(max-width:600px){.luach-about-body:has(.luach-contact-email){padding-left:.65rem;padding-right:.65rem}}
 @supports (interpolate-size:allow-keywords){.luach-about{interpolate-size:allow-keywords}.luach-about::details-content{height:0;overflow:clip;transition:height .3s ease,content-visibility .3s allow-discrete}.luach-about[open]::details-content{height:auto}}
 @media(prefers-reduced-motion:reduce){.luach-about::details-content,.luach-about-chevron{transition:none}}
 </style>
 <details class="luach-about">
 <summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>Contact us</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
-<div class="luach-about-body"><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" style="color:inherit;overflow-wrap:anywhere">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
+<div class="luach-about-body"><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
 </details>
     ${rule()}
     ${footHtml(s)}
@@ -1100,6 +1102,7 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
 
 
 
