@@ -91,6 +91,12 @@ export const DRASHA_WORD = 'דרשה';
 /** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
 const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
 const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
+export function isRetiredTishaBavRule(rule) {
+  return rule?.id === 'rule-tisha-bav' ||
+    (rule?.mode === 'append' && plainText(rule.value).replace(/['"׳״\\s]/g, '') === 'טבאב' &&
+      rule.condition?.hebrewDate?.some(date => date === '5-8' || date === '5-9'));
+}
+
 export function isRetiredDrashaRule(rule) {
   return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
 }
@@ -133,7 +139,7 @@ export function dropDuplicateDrasha(value) {
 export function applyRules(row, week, rules, season, appliedColumns) {
   let out = row;
   for (const rule of rules) {
-    if (!rule.enabled) continue;
+    if (!rule.enabled || isRetiredTishaBavRule(rule)) continue;
     if (!conditionMatches(rule.condition, week)) continue;
     for (const col of targetColumnsForSeason(rule, season)) {
       if (!(col in out)) continue;
@@ -144,3 +150,4 @@ export function applyRules(row, week, rules, season, appliedColumns) {
   }
   return out;
 }
+
