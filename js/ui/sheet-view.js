@@ -18,7 +18,7 @@ import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 
-let chartLayoutOpen = false;
+let chartSideBySide = false;
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
@@ -165,8 +165,11 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
-      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
+      ${companion ? switchHtml('chart-view', 'View', [
+        { value: 'shabbos', label: 'Shabbos', on: !chartSideBySide && sheet.season !== 'weekday' },
+        { value: 'weekday', label: 'Weekday', on: !chartSideBySide && sheet.season === 'weekday' },
+        { value: 'both', label: 'Side by side', on: chartSideBySide },
+      ]) : ''}
       <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
@@ -181,8 +184,7 @@ export function renderSheet(container, state, sheet, onChange) {
         <div class="actions"><button type="button" id="pages-all">Include all</button></div>
       </div>
     </details>
-    <details id="chart-layout-panel" class="panel no-print" ${chartLayoutOpen ? 'open' : ''}>
-      <summary>Layout &amp; style: font, sizes, padding, ink</summary>
+    <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
         <div class="style-toolbar">
           <label>Font
@@ -210,19 +212,24 @@ export function renderSheet(container, state, sheet, onChange) {
           <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view. The picture stays in colour.</p>
         </div>
       </div>
-    </details>
-    <div id="sheet-stack">
+    </div>
+    <style>@media screen { #sheet-stack:not(.is-side-by-side) .chart-secondary { display: none; } }</style>
+    <div id="sheet-stack" class="${chartSideBySide && companion ? 'is-side-by-side' : ''}">
       <div id="pages" class="pages"></div>
     </div>
   `;
-  container.querySelector('#chart-layout-panel').addEventListener('toggle', e => { chartLayoutOpen = e.currentTarget.open; });
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
-  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
-    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
-    e.target.classList.toggle('is-active', on);
-    if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
+  if (companion) wireSwitch(container, 'chart-view', value => {
+    chartSideBySide = value === 'both';
+    const wantsWeekday = value === 'weekday';
+    if (!chartSideBySide && wantsWeekday !== (sheet.season === 'weekday')) {
+      onChange({ openSheetId: companion.id });
+      return;
+    }
+    container.querySelector('#sheet-stack').classList.toggle('is-side-by-side', chartSideBySide);
+    syncHeaderRowHeight(container.querySelector('#pages'));
+    if (fitOn) applyFit(container, true);
   });
 
   // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
@@ -276,6 +283,7 @@ export function renderSheet(container, state, sheet, onChange) {
   // Both of these need the pages in the document: the picker to count them, and the row
   // sync to measure them (heights read 0 on a detached element).
   syncHeaderRowHeight(pagesEl);
+  companionPages.forEach(page => page.classList.add('chart-secondary'));
   buildPagePicker(container);
   autoFit(container);
 
@@ -459,6 +467,7 @@ function applyStyle(target, style, ink = style.ink) {
  *  every applyStyle(), since the font/size controls invalidate the measurements. */
 function syncHeaderRowHeight(pagesEl) {
   pagesEl.querySelectorAll('table').forEach((table) => {
+    if (!table.getBoundingClientRect().height) return;
     const headRow = table.querySelector('thead tr');
     const bodyRows = [...table.querySelectorAll('tbody tr')];
     if (!headRow || !bodyRows.length) return;
