@@ -252,6 +252,8 @@ const DONATE = {
       blurb: 'Give securely online using your credit or debit card, or via ACH.',
       icon: 'card',
       accounts: [
+        { title: 'Neileich', href: 'https://www.neileich.org/', cta: 'Open Neileich' },
+        { title: 'Keren Zichron Zechariah', href: 'https://secure.cardknox.com/kerenzichronzechariah', cta: 'Donate' },
         {
           title: 'Give to the Shul',
           blurb: 'Support the many needs of our shul and community.',
