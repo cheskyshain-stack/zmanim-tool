@@ -1,7 +1,7 @@
 import { newId } from '../storage.js';
 import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
-import { escText } from '../util.js';
+import { escText, escAttr } from '../util.js';
 
 /** @param {string|null} editingRuleId  id to edit, or 'new' for a blank Add form.
  *  Null (the default) shows just the list - most visits here are to glance at the
@@ -24,13 +24,13 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
     <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${escText(editing.name)}` : source ? `Duplicate of ${escText(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escAttr(editing.name) : source ? escAttr(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
         <label><input type="checkbox" name="always" ${prefill?.condition?.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escAttr((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escAttr((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escAttr((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -62,13 +62,13 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
     ? state.rules
         .map(
           (r) => `
-      <div class="rule-row" data-id="${r.id}">
+      <div class="rule-row" data-id="${escAttr(r.id)}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
           <strong>${escText(r.name)}</strong>
           <div class="hint">columns ${columnsOf(r)
             .map((c) => `<code><bdi>${escText(prettyColumn(c))}</bdi></code>`)
-            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
+            .join(' ')} · ${escText(conditionSummary(r.condition))} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
         </div>
         <div class="rule-actions">
           <button class="rule-edit" title="Edit this rule">Edit</button>

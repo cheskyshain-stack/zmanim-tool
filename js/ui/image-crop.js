@@ -1,3 +1,4 @@
+import { safeHeaderImage } from '../security.js';
 // Basic pan-&-zoom image cropper for the header photo. No external library (this is a
 // static, build-step-free app) - just a fixed-aspect viewport, a drag-to-reposition
 // image, and a zoom slider, rendered onto a canvas at a fixed output size on save.
@@ -18,7 +19,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
   container.innerHTML = `
     <div class="crop-tool">
       <div class="crop-current-row">
-        <img class="crop-current" src="${currentDataUrl || '/assets/logo-building-icon.png'}" alt="Current header photo">
+        <img class="crop-current" src="${safeHeaderImage(currentDataUrl)}" alt="Current header photo">
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>

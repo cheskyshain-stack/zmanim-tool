@@ -4465,6 +4465,10 @@ body.is-locked { overflow: hidden; }
 
 /* One animated schedule drawer, matching the donation drawers. */
 .luach-zmanim-group { background:#fff; border-radius:18px; box-shadow:0 3px 12px rgba(18,39,79,.09); overflow:hidden; }
+.luach-zmanim-group { transition:transform .18s ease,box-shadow .18s ease; }
+body.is-luach .luach-zmanim-group:has(> summary:hover) { transform:translateY(-2px); box-shadow:0 10px 26px rgba(18,39,79,.15),0 2px 4px rgba(18,39,79,.08); }
+body.is-luach .luach-zmanim-group > summary:hover { box-shadow:none; }
+@media(prefers-reduced-motion:reduce) { .luach-zmanim-group { transition:none; } }
 .luach-zmanim-group > summary { cursor:pointer; list-style:none; box-shadow:none; }
 .luach-zmanim-group > summary::-webkit-details-marker { display:none; }
 body.is-luach .luach-zmanim-group > summary:hover { transform:none; }
@@ -4503,3 +4507,62 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
  body.is-luach .luach-bar::before { content:""; position:absolute; inset:0 0 var(--luach-arc); pointer-events:auto; touch-action:pan-y; }
  body.is-luach .luach-bar a, body.is-luach .luach-bar button { position:relative; z-index:1; }
 }
+
+/* Compact donation choices. */
+.luach-fund-row, .luach-give-go.luach-fund-row {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  width:100%; box-sizing:border-box; margin:0; padding:1rem;
+  border:1px solid #ded4bd; border-radius:12px; background:#fff;
+  color:var(--luach-ink); text-decoration:none; box-shadow:none;
+}
+.luach-fund-row:hover, .luach-give-go.luach-fund-row:hover { background:#fffdf7; border-color:#a78239; }
+.luach-fund-row:focus-visible, .luach-fund-purposes summary:focus-visible { outline:2px solid #a78239; outline-offset:3px; }
+.luach-fund-action { flex-shrink:0; font-size:.85rem; font-weight:600; color:#866522; }
+.luach-fund-purposes { margin:.6rem .25rem 0; font-size:.85rem; }
+.luach-fund-purposes summary { cursor:pointer; color:var(--luach-ink); padding:.35rem 0; }
+.luach-fund-purposes ul { display:flex; flex-wrap:wrap; gap:.45rem; padding:0; list-style:none; margin:.6rem 0; }
+.luach-fund-purposes li { padding:.3rem .6rem; background:rgba(209,173,95,.12); border-radius:6px; }
+.luach-daf-providers { gap:.5rem; margin:.75rem 0 0; }
+.luach-daf-provider { min-height:72px; padding:.5rem; }
+@media (max-width:400px) {
+  .luach-fund-row, .luach-give-go.luach-fund-row { gap:.6rem; padding:.8rem; }
+  .luach-fund-row .luach-account-title { font-size:.95rem; }
+  .luach-fund-action { font-size:.78rem; }
+}
+
+
+/* One pressed palette for public site controls. */
+body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-go,a.luach-daf-provider,a.luach-back,a.luach-bar-give):active {
+ background:var(--luach-navy); color:var(--luach-cream); border-color:var(--luach-gold);
+ box-shadow:inset 0 2px 6px rgba(0,0,0,.3); -webkit-tap-highlight-color:transparent;
+}
+body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-go,a.luach-back,a.luach-bar-give):active :is(svg,.luach-item-go,.luach-item-icon,.luach-about-chevron) { color:var(--luach-gold); opacity:1; }
+body.is-luach #main :is(button,summary,a) { -webkit-tap-highlight-color:transparent; }
+
+/* Keep pressed surfaces inside their existing rounded outlines. */
+body.is-luach #main .luach-give-card > summary { border-radius:16px; border-bottom:1px solid transparent; }
+body.is-luach #main .luach-give-card[open] > summary { border-radius:16px 16px 0 0; border-bottom-color:rgba(184,143,58,.42); }
+body.is-luach #main .luach-give-card:has(> summary:active) { background-color:#fff; }
+body.is-luach #main .panel > summary { border-radius:inherit; }
+body.is-luach #main .panel[open] > summary { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+body.is-luach #main :is(button:not(:disabled),summary,a.luach-item,a.luach-give-go,a.luach-fund-row,a.luach-daf-provider,a.luach-back,a.luach-bar-give):active { transform:none; }
+body.is-luach #main .luach-zmanim-group:has(> summary:active) { transform:none; }
+body.is-luach #main a.luach-fund-row:active { background:var(--luach-navy);color:var(--luach-cream);border-color:var(--luach-gold);box-shadow:inset 0 2px 6px rgba(0,0,0,.3); }
+body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-body,.luach-give-title,.luach-account-title,.luach-account-blurb,.luach-fund-action) { color:var(--luach-cream);opacity:1; }
+
+/* Admin navigation grouped by task, with secondary tools inside their section. */
+#nav .admin-nav-group { display:flex; flex-direction:column; gap:.15rem; margin:0 0 .7rem; }
+#nav .admin-nav-label { margin:.2rem .75rem .3rem; color:rgba(255,255,255,.58); font-size:.65rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+#nav a.nav-btn { text-decoration:none; }
+#nav .admin-site-link { margin-top:.3rem; border-top:1px solid rgba(255,255,255,.13); border-radius:0; padding-top:.85rem; }
+.sidebar { overflow-y:auto; }
+.admin-section-tabs { flex-wrap:wrap; margin-bottom:1.2rem; }
+@media screen and (max-width:900px) {
+ #nav { width:100%; }
+ #nav .admin-nav-group { flex:1 1 100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; margin-bottom:.4rem; }
+ #nav .admin-nav-label { grid-column:1 / -1; }
+ #nav .nav-btn { min-width:0; height:auto; white-space:normal; }
+ #nav .admin-site-link { width:100%; }
+}
+
+

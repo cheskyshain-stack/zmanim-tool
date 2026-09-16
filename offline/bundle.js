@@ -594,654 +594,6 @@ async function loadTables() {
   return cached;
 }
 
-// ==== rules.js ====
-// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
-// HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides - that's
-// the intended distinction between rules (recurring, reapplies every year) and
-// overrides (tied to one generated sheet instance).
-//
-// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
-// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
-// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
-// touching the wrong column on the other sheet.
-//
-// A condition can combine any of:
-//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
-//   parsha:        [names]      - matches week.parsha
-//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
-//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
-//                                 (month 5 = Av). Recurs every year, unlike dateISO.
-//   always:        true         - matches every week (for a blanket override)
-//
-// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
-// isn't stored on saved sheets, so it's computed at render time and works for sheets
-// generated before hebrewDate conditions existed.
-function conditionMatches(condition, week) {
-  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
-  // import need not: an older export, or a file edited by hand, and reading .always off
-  // undefined threw and took down every screen that draws a sheet.
-  if (!condition) return false;
-  if (condition.always) return true;
-  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
-  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  // The date is guarded for the same reason: a week whose date will not parse would throw
-  // here rather than simply not matching. storage.js repairs those on the way in, so this
-  // is the second line rather than the first.
-  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
-    ? week.date.toISOString().slice(0, 10) : null;
-  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
-  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
-  return false;
-}
-
-/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
- *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
- *  compatibility with data saved before that format existed, bare keys ("L") and the
- *  older singular columnKey field (applied to any sheet). */
-function targetColumnsForSeason(rule, season) {
-  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-  return raw
-    .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
-      const [entrySeason, key] = entry.split(':');
-      return entrySeason === season ? key : null;
-    })
-    .filter(Boolean);
-}
-
-/** The דרשה rules, both of which have now been retired.
- *
- *  There were two, שבת שובה and שבת הגדול, and each appended the bare word "דרשה" and nothing
- *  else. That said a דרשה was happening and left its time to be typed into the cell by hand
- *  every year. Both afternoons are now worked out in the sheet itself: the דרשה an hour before
- *  the מנחה that is 45 minutes before שקיעה, its מנחה למטה half an hour before that, and the
- *  standing 5:30, 6:00 and 6:30 left off, since the מנחה למטה is what happens instead of them.
- *  See DRASHA_NAMES and shabbosMinchaMenu in sheets/common.js.
- *
- *  שובה went first and הגדול followed once the שובה cell had been printing for a season. So
- *  nothing is seeded here any more, and what is left is taking the old ones back off the
- *  browsers that were given them: left in place, either would sit a second, wordless "דרשה"
- *  underneath the computed one.
- *
- *  Matched on what the rule does rather than on the id it was seeded with. Both of these were
- *  hand-made before they were ever seeded, so on the browser they were made in they carry their
- *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
- *  is matched is an append of nothing but the word itself, which is the rule that is now
- *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
- *  alone: quietly deleting that is worse than a duplicate they can see and remove.
- *
- *  **The condition is not looked at.** It was: the rule had to name שובה or הגדול as a
- *  special-Shabbos. The shul's own board still printed the second, wordless דרשה under the
- *  computed one on שבת הגדול, so a rule was firing that this did not recognise, and a condition
- *  can say the same Shabbos in more ways than a list can hold (the parsha name instead of the
- *  special one, "שבת הגדול" rather than "הגדול", a stray space). What makes the rule redundant
- *  is what it writes, not which week it writes it on: the word on its own says a דרשה is
- *  happening and leaves its time to be typed in, and every one of those times is now computed.
- *
- *  The word is compared with the markup and the invisible characters taken off. A rule's text
- *  is typed into a box and can arrive carrying an <u> from the editor, the isolate characters
- *  a cell wraps Hebrew in (see util.js), a bidi mark from a keyboard, or an nbsp. None of them
- *  change what the line says. */
-const DRASHA_WORD = 'דרשה';
-/** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
-const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
-const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
-function isRetiredDrashaRule(rule) {
-  return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
-}
-
-/** The same bare word, left behind in a cell somebody typed over rather than in a rule.
- *
- *  A per-cell override keeps the whole cell, so one made while the rule was still firing kept
- *  a copy of what the rule had added, and deleting the rule does not reach it. Dropped only
- *  where the same cell already prints a דרשה with a time on it, which is the computed line:
- *  the word twice in one cell, once saying when and once saying nothing, is the thing the shul
- *  asked to have off. A cell that carries the bare word and no computed line is left alone,
- *  since there the word is all the cell says about the דרשה.
- *
- *  Only a trailing one, which is where an append puts it. The line break may be a newline or
- *  markup: a typed cell is rich text and the browser's own editor writes a <div> or a <br>
- *  rather than a newline (see lineBoxOf in ui/week-view.js). */
-/** What a line can carry either side of the word without saying anything else: whitespace, the
- *  invisible marks, an opening or closing tag, and the <br> a browser's own editor writes at the
- *  end of a box it made. A line of nothing but those and the word is a line that says the word. */
-const OPENERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<[a-z][^>]*>)';
-const CLOSERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<br\\s*/?>|</[a-z][^>]*>)';
-const TRAILING_BARE_DRASHA = new RegExp(
-  `(?:\\n|<br\\s*/?>|<div[^>]*>|<p[^>]*>)${OPENERS}*${DRASHA_WORD}${CLOSERS}*$`,
-  'i'
-);
-const DRASHA_WITH_TIME = new RegExp(`${DRASHA_WORD}\\s*\\d{1,2}:\\d{2}`);
-function dropDuplicateDrasha(value) {
-  const text = String(value ?? '');
-  if (!DRASHA_WITH_TIME.test(plainText(text))) return text;
-  return text.replace(TRAILING_BARE_DRASHA, '');
-}
-
-/** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
- *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
- *
- *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
- *  'append' adds rule.value as an extra line onto whatever the cell already computed
- *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
-function applyRules(row, week, rules, season, appliedColumns) {
-  let out = row;
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    if (!conditionMatches(rule.condition, week)) continue;
-    for (const col of targetColumnsForSeason(rule, season)) {
-      if (!(col in out)) continue;
-      if (out === row) out = { ...row };
-      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
-      if (appliedColumns) appliedColumns.add(col);
-    }
-  }
-  return out;
-}
-
-// ==== settings.js ====
-// Settings model, mirroring the workbook's SETTINGS sheet. Stored in a clean,
-// serializable "raw" shape; resolveSettings() expands it into the shape the
-// zmanim/hebrew-calendar engine expects (timezone object, english/inIsrael flags).
-
-const TIMEZONES = [
-  { id: 'America/New_York', label: 'America/New_York (Eastern)', utcOffset: -5, dstOffset: 1, rule: 'us' },
-  { id: 'America/Chicago', label: 'America/Chicago (Central)', utcOffset: -6, dstOffset: 1, rule: 'us' },
-  { id: 'America/Denver', label: 'America/Denver (Mountain)', utcOffset: -7, dstOffset: 1, rule: 'us' },
-  { id: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)', utcOffset: -8, dstOffset: 1, rule: 'us' },
-  { id: 'America/Anchorage', label: 'America/Anchorage', utcOffset: -9, dstOffset: 1, rule: 'us' },
-  { id: 'Pacific/Honolulu', label: 'Pacific/Honolulu (no DST)', utcOffset: -10, dstOffset: 0, rule: 'none' },
-  { id: 'Asia/Jerusalem', label: 'Asia/Jerusalem (DST not modeled, matches source workbook)', utcOffset: 2, dstOffset: 0, rule: 'none' },
-  { id: 'Europe/London', label: 'Europe/London (DST not modeled, matches source workbook)', utcOffset: 0, dstOffset: 0, rule: 'none' },
-  { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
-];
-
-/* The Weekday chart's שחרית schedules and its footer note are **the program's, not a setting**.
-   They were three fields in a "Weekday chart defaults" panel in Settings, and the shul asked for
-   that panel gone and these made part of the system. They are one fixed thing the shul davens,
-   not a preference: the same two schedules are printed on the wall chart, named on the week card
-   and the One sheet, read into the ROSH CHODESH and fast messages, and picked apart for "what is
-   on next". Every one of those has to be saying the same times, and a field that can be typed
-   over in one browser is a way for them to come apart.
-
-   They are read straight from here rather than out of state.settings, which matters twice over:
-   the congregation's site takes its settings from data/published.json, a snapshot of whatever was
-   in the admin the day it was written, so a value read from there could be years old; and a
-   browser holding an old hand-typed copy in localStorage cannot outvote the program. The three
-   keys are taken back out of saved settings as they load (see normalizeSettings in storage.js),
-   so nothing carries a stale copy forward in a backup either. */
-
-/** The everyday שחרית schedule as it appears on the shul's printed board, with the
- *  alternate times underlined. Written as HTML because that is what the chart prints.
- *
- *  **Three to a line, separated by a plain space**, which is what the shul settled on after
- *  looking at the alternatives on a printed page. It was two to a line and slash separated for a
- *  while, to read the way the מנחה and מעריב columns beside it do. Three to a line is narrower
- *  (127.7px against 146.1px, measured) and the slashes were what made a three time line too wide
- *  for the panel at all. The panel sets these in columns and **draws the separator the schedule
- *  uses**, so with no slashes typed there are none printed: see ui/shacharis-grid.js. */
-const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
-
-/** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
- *  week card can show it only on weeks that actually have one of those days and name
- *  which it is (see ui/week-view.js). The printed chart still shows both together,
- *  since it covers a whole season at once.
- *
- *  **Three then four**, asked for. The two orders take exactly the same room, measured: both print
- *  the same seven times and the same marks, so the four time line is the same length wherever it
- *  sits and the panel is as wide as that line either way (127.73px against 127.72px, and the same
- *  height to the hundredth). The shul picked it on how it looks, the block finishing square with
- *  the everyday one above it rather than on a short line. */
-const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
-
-/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
- *
- *  It says what the marks on the times above it mean, so it belongs with the schedules and not
- *  with the shul's own footer: the stars are written by the schedules and read by every screen
- *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
- *  one of them would be the board explaining its own marks wrongly. */
-const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
-
-/** The heading printed above the second schedule on the wall chart, and the three pieces it
- *  is built out of.
- *
- *  All three of them where all three are on the chart, and only the ones that are otherwise:
- *  the shul asked for that, and it is the honest thing to print. בה"ב is two weeks of the year
- *  and a whole season can pass with no weekday תענית, so a heading naming all three was
- *  naming days that are not on the paper. Which of them a chart holds is
- *  specialShacharisKinds in hebrew-calendar.js.
- *
- *  Joined with a ו on the last, the way the full heading has always read: "ר"ח בה"ב ותענ"צ",
- *  "ר"ח ותענ"צ", "בה"ב". */
-const SPECIAL_SHACHARIS_PARTS = [
-  ['roshChodesh', 'ר"ח'],
-  ['behab', 'בה"ב'],
-  ['taanis', 'תענ"צ'],
-];
-
-function specialShacharisHeading(kinds) {
-  const parts = SPECIAL_SHACHARIS_PARTS.filter(([key]) => kinds?.[key]).map(([, word]) => word);
-  if (!parts.length) return '';
-  if (parts.length === 1) return parts[0];
-  return `${parts.slice(0, -1).join(' ')} ו${parts[parts.length - 1]}`;
-}
-
-
-/* The three LEGACY_WEEKDAY_ lists are gone, and splitCombinedShacharis with them. They carried a
-   never-edited old schedule in somebody's browser forward to the current one, and there is nothing
-   left in a browser to carry: the program's copy is the only copy. */
-
-/** The footer address without the "of". A saved value still matching one of these verbatim was
- *  never actually edited by hand, it is just an old default sitting in localStorage, so storage.js
- *  quietly carries it forward rather than leaving the line reading the way it did two versions ago.
- *  Anything else is left strictly alone.
- *
- *  The shul's name was written both ways across the site: the footer said "Bais Medrash
- *  Lakewood Commons" while the donation page, the page title and the domain all say "Bais
- *  Medrash of Lakewood Commons". One name, one spelling, and the one with the "of" is the
- *  one the shul goes by. An install that never edited this line is moved onto it; anything
- *  typed by hand stays exactly as typed. */
-const LEGACY_FOOTER_ADDRESS = [
-  'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-];
-
-/** The chart's header colour, which the parsha column is painted in too. Light gray with
- *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
- *  every page is a lot of toner, and the user asked for the light one. */
-const DEFAULT_ACCENT_COLOR = '#c9ced5';
-
-/** How each season is named in the interface. Defined once and imported, rather than
- *  written out in each screen that needs it: build-offline.py flattens every module into
- *  one plain script sharing a single scope, so two modules declaring the same top-level
- *  name is a SyntaxError there while being perfectly legal under ES modules - it breaks
- *  the USB copy while the site itself carries on working. */
-const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
-
-/** Accent colours that were once the shipped default. Same carry-forward treatment as
- *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
- *  by hand, so it follows the default instead of staying on the old one for ever. */
-const LEGACY_ACCENT_COLORS = ['#54595f'];
-
-const DEFAULT_SETTINGS = {
-  shulName: 'קהל לב מנחם',
-  // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
-  // actual logo, pulled straight from the workbook) plus this editable text -
-  // headerSubtitle under the logo, headerRabbiLine on the opposite side.
-  headerSubtitle: 'ליקוואוד קאמענס',
-  headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
-  // Custom header photo (top-left of the printed page), as a cropped data: URL saved
-  // via the image-crop tool in Settings - null means "use the bundled default",
-  // assets/logo-building-icon.png (see sheet-view.js).
-  headerIconImage: null,
-  // Printed footer: a note line (as in the workbook - underlined-minyan location,
-  // rounding disclaimer, etc.) plus the shul's address.
-  footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
-  footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
-  /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
-     WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight
-     from the program by everything that prints them. מנחה and מעריב were never settings either:
-     those times differ every week, so every cell starts empty and is typed in on the sheet. */
-  locationName: 'Lakewood',
-  latitude: 40.068,
-  longitude: -74.205,
-  elevation: 0,
-  timezoneId: 'America/New_York',
-  language: 'he', // 'he' | 'en'
-  horizon: 5 / 6,
-  candleLightingMinutes: 18,
-  ateretTorahTzaisOffset: 40,
-  useAstronomicalChatzos: true,
-  useElevation: false,
-  inIsrael: false,
-  useGregorianBefore1582: false,
-  // Last-used sheet display style (font/size/logo scale) - new sheets start with
-  // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
-};
-
-/** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
-function resolveSettings(raw) {
-  const tz = TIMEZONES.find((z) => z.id === raw.timezoneId) || TIMEZONES[0];
-  return {
-    ...raw,
-    timezone: tz,
-    english: raw.language === 'en',
-  };
-}
-
-// ==== storage.js ====
-// localStorage persistence + JSON export/import. Everything (settings, saved sheet
-// instances with their per-cell overrides, and rules) lives in one namespaced key -
-// this is the single-browser "local app" model the user chose over a hosted backend.
-
-
-/* The retired דרשה rules live with the rule engine rather than here, because this is not the only
-   door they come in through: the congregation's site reads data/published.json, which carries a
-   copy of the rules, and it has to retire the same ones. See isRetiredDrashaRule in rules.js. */
-
-const KEY = 'zmanim-app-state-v1';
-const SHEET_FILE_TYPE = 'zmanim-sheet';
-
-// No seed rules by default - add your own from the Rules tab (e.g. Shabbos Teshuva /
-// Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
-// ready to fill in the real wording/times.
-const SEED_RULES = [];
-
-/** ט' באב used to be hardcoded into the sheet builders. It's an ordinary rule now, so
- *  it can be seen, edited, disabled or deleted like any other - matching on the Hebrew
- *  date, which recurs every year, unlike a fixed Gregorian date.
- *
- *  It fires on the two Shabbosim where the fast begins מוצאי שבת. Weeks are anchored on
- *  their Shabbos, so that's the Shabbos of 8 Av (the fast is the next day, 9 Av on a
- *  Sunday) and the Shabbos of 9 Av (9 Av itself is Shabbos, so the fast is נדחה to
- *  Sunday, 10 Av). Checked against real years: 5805 is the 8 Av case, 5789/5792/5796/
- *  5799 the 9 Av one.
- *
- *  Installed once per browser and recorded in state.seeded, so deleting it sticks
- *  instead of having it reappear on the next load. */
-const TISHA_BAV_RULE = {
-  id: 'rule-tisha-bav',
-  name: 'ט באב: מוצאי שבת',
-  enabled: true,
-  condition: { hebrewDate: ['5-8', '5-9'] },
-  columnKeys: ['kayitz:B', 'kayitz:C', 'choref:B', 'choref:C'],
-  mode: 'append',
-  value: 'ט באב',
-};
-
-/* The seed that put the 8:40 back on the end of the ר"ח / בה"ב / תענית שחרית is gone with the
-   setting it edited. That schedule is WEEKDAY_SHACHARIS_SPECIAL in settings.js now and no browser
-   holds a copy of it to be corrected. */
-
-function applySeeds(state) {
-  const seeded = state.seeded || {};
-  /* Both bare-word דרשה rules off, on any browser still holding one. Not guarded by a flag
-     that can be satisfied once: the שובה pass ran under seeded.shuvaComputed and matched on
-     the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
-     duplicate. This runs every load and is cheap, and a rule it removes cannot come back,
-     because nothing seeds one any more. See isRetiredDrashaRule for what it will not touch. */
-  state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r));
-  /* And the same word where the rule had already been baked into a typed-over cell, which
-     deleting the rule does not reach. See dropDuplicateDrasha for what it will not touch. */
-  for (const sheet of Array.isArray(state.sheets) ? state.sheets : []) {
-    for (const week of Object.values(sheet?.overrides || {})) {
-      for (const [key, value] of Object.entries(week || {})) {
-        const fixed = dropDuplicateDrasha(value);
-        if (fixed !== value) week[key] = fixed;
-      }
-    }
-  }
-  seeded.drashos = true;
-  seeded.shuvaComputed = true;
-  seeded.hagadolComputed = true;
-  if (!seeded.tishaBav) {
-    if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
-    seeded.tishaBav = true;
-  }
-  // The first version of this rule only matched 9 Av, missing the years where 9 Av lands
-  // on a Sunday (the Shabbos before it is 8 Av). Widen a copy that still carries exactly
-  // the old condition - an untouched seed - and leave any hand-edited one alone.
-  const existing = state.rules.find((r) => r.id === TISHA_BAV_RULE.id);
-  if (existing && JSON.stringify(existing.condition) === JSON.stringify({ hebrewDate: ['5-9'] })) {
-    existing.condition = { hebrewDate: ['5-8', '5-9'] };
-  }
-  // Rule names written with an em dash, back when the seeds used one. Rewritten to a
-  // colon so no dash of that kind is left anywhere in the app, including names already
-  // saved in a browser.
-  for (const rule of state.rules) {
-    if (rule.name?.includes('—')) rule.name = rule.name.replace(/\s*—\s*/g, ': ');
-  }
-  state.seeded = seeded;
-  return state;
-}
-
-// Merges saved settings over the defaults, cloning nested objects (sheetStyle) so
-// nothing ever ends up sharing a reference with the DEFAULT_SETTINGS constant -
-// mutating state.settings.sheetStyle in place would otherwise silently corrupt the
-// app's built-in defaults for the rest of the session.
-function normalizeSettings(raw) {
-  const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
-  if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
-  if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
-  for (const key of RETIRED_SETTINGS) delete merged[key];
-  return merged;
-}
-
-/** Settings that are the program's now and not the shul's, dropped as they load.
- *
- *  The two Weekday שחרית schedules and the chart's footer note were three fields in Settings;
- *  they are WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js
- *  now, and everything that prints them reads them from there. The old keys are taken out rather
- *  than left sitting in localStorage: nothing reads them, so a copy left behind would be a stale
- *  schedule travelling in every backup and every published file, looking authoritative and being
- *  read by nothing. The מנחה and מעריב keys were always blank and go with them. */
-const RETIRED_SETTINGS = [
-  'weekdayShacharis',
-  'weekdayShacharisSpecial',
-  'weekdayFooterNote',
-  'weekdayDefaultMincha',
-  'weekdayDefaultMaariv',
-];
-
-const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
-
-/** The same carry-forward, for sheets already saved. A sheet keeps its own copy of the
- *  style, so changing the default alone would leave every existing chart on the old dark
- *  header while new ones came out light. Only the exact old default is moved; a colour
- *  picked by hand is left alone, as everywhere else. */
-function normalizeSheets(sheets) {
-  for (const sheet of Array.isArray(sheets) ? sheets : []) {
-    if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
-    /* A week whose date will not parse gets it back off its own serial.
-     *
-     * The serial is the week's key and everything is computed from it; the date beside it is
-     * the same day written the other way, for the screens that print it. An import carrying a
-     * date this browser cannot read (a truncated file, an export edited by hand) left every
-     * screen that prints one throwing: measured, This week came up empty with "Invalid time
-     * value" and no way back except clearing the browser. Repaired rather than dropped, since
-     * the week itself is perfectly good and the serial says which day it is. */
-    for (const week of Array.isArray(sheet?.weeks) ? sheet.weeks : []) {
-      if (!Number.isFinite(week?.serial)) continue;
-      if (Number.isNaN(new Date(week.date).getTime())) week.date = dateFromSerial(week.serial).toISOString();
-    }
-  }
-  return Array.isArray(sheets) ? sheets : [];
-}
-
-/** The sheets the shul has written itself (see posters/own.js), which live here with
- *  everything else and so travel with an export like everything else.
- *
- *  Anything without an id is dropped: a sheet is found by its id from the Posters tab's own
- *  address, and one without it could be picked but never come back to. */
-function normalizeOwn(own) {
-  return (Array.isArray(own) ? own : []).filter((s) => s && s.id).map((s) => ({
-    ...s,
-    blocks: (Array.isArray(s.blocks) ? s.blocks : []).map((b) => ({
-      ...b, rows: Array.isArray(b.rows) ? b.rows : [],
-    })),
-  }));
-}
-
-function defaultState() {
-  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {}, own: [] });
-}
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return applySeeds({
-      settings: normalizeSettings(parsed.settings),
-      sheets: normalizeSheets(parsed.sheets || []),
-      rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
-      seeded: parsed.seeded || {},
-      own: normalizeOwn(parsed.own),
-    });
-  } catch (e) {
-    console.error('Failed to load saved state, starting fresh.', e);
-    return defaultState();
-  }
-}
-
-function saveState(state) {
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
-
-function exportStateToFile(state) {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `zmanim-app-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** True for a single-sheet file rather than a whole-app backup.
- *
- *  Nothing writes these any more - Saved sheets used to have a "Save a copy" button that
- *  downloaded one, and folders inside the app replaced it. Import still recognises them
- *  so a file saved back then still opens. */
-function isSheetFile(text) {
-  try {
-    return JSON.parse(text)?.type === SHEET_FILE_TYPE;
-  } catch {
-    return false;
-  }
-}
-
-/** The sheet inside such a file, given a fresh id so importing the same copy twice (or
- *  onto the machine it came from) adds a second sheet instead of colliding with the
- *  original. Never locked on arrival - the lock belongs to the copy it came from. */
-function importSheetFromText(text) {
-  const { sheet } = JSON.parse(text);
-  if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');
-  return { ...sheet, id: newId('sheet'), locked: false, linkedSheetId: undefined };
-}
-
-function importStateFromText(text) {
-  const parsed = JSON.parse(text);
-  // `seeded` comes across too: without it, restoring a backup made after deliberately
-  // deleting a seeded rule would hand it straight back on the next load.
-  return applySeeds({
-    settings: normalizeSettings(parsed.settings),
-    sheets: normalizeSheets(parsed.sheets || []),
-    rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
-    seeded: parsed.seeded || {},
-  });
-}
-
-function newId(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ==== format.js ====
-// Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
-// CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
-// marks an "alternate" time on the printed sheet by underlining it).
-const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
-
-function ceilToMinute(dayFraction) {
-  return Math.ceil(dayFraction * 1440 - EPS) / 1440;
-}
-function floorToMinute(dayFraction) {
-  return Math.floor(dayFraction * 1440 + EPS) / 1440;
-}
-function roundToMinute(dayFraction) {
-  return Math.round(dayFraction * 1440) / 1440;
-}
-
-/** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
-function formatTime(dayFraction) {
-  const frac = ((dayFraction % 1) + 1) % 1;
-  const totalMinutes = Math.round(frac * 1440) % 1440;
-  const h24 = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h12}:${String(m).padStart(2, '0')}`;
-}
-
-// Sentinel markers wrapping "this should render underlined" spans (Private Use Area
-// code points, so they can never collide with real content). Kept as plain characters
-// through all the string-building/TEXTJOIN-style formula ports, then converted to real
-// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
-// HTML concerns.
-const UL_START = '';
-const UL_END = '';
-
-/** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
- *  string (both forms appear in the workbook's formulas) and marks it to render
- *  underlined - the printed sheet's way of flagging an "alternate" time. */
-function underlineTime(value) {
-  const text = typeof value === 'number' ? formatTime(value) : value;
-  return UL_START + ' ' + text + UL_END;
-}
-
-/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
- *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
- *  the caller can leave those digits untouched rather than mangle them. */
-function expandTimeDigits(digits) {
-  let hour, minute;
-  if (digits.length <= 2) {
-    hour = Number(digits);
-    minute = '00';
-  } else {
-    const split = digits.length === 3 ? 1 : 2;
-    hour = Number(digits.slice(0, split));
-    minute = digits.slice(split);
-  }
-  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
-  return `${hour}:${minute}`;
-}
-
-/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
- *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon -
- *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
-function normalizeTimeShorthand(text) {
-  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
-}
-
-/** normalizeTimeShorthand, with the spacing between times tidied to a single space.
- *
- *  It used to join them with "/", matching how the computed columns are written, but a
- *  typed מנחה or מעריב is a plain list of times and the slashes only made it noisier. Runs
- *  of whitespace *between two times* collapse to one space; whitespace anywhere else
- *  (inside a Hebrew word, say) is deliberately left alone. */
-function normalizeTimeList(text) {
-  return normalizeTimeShorthand(text)
-    .trim()
-    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
-}
-
-/** Light contenteditable HTML cleanup for the app's rich-text fields, which are the sheet's
- *  own cells (ui/sheet-view.js), so a trivial click-in/click-out does not register as a
- *  change: trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
- *  &nbsp; to a plain space. */
-function normalizeRichText(html) {
-  return html
-    .replace(/(<br\s*\/?>)+\s*$/i, '')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-}
-
-/** The room in a column heading, set a little smaller than the name of the מנין above it.
- *
- *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר\"נ)", and the bracketed half is
- *  not the name of the מנין but where it davens. At the same size the two read as one long
- *  title and the column is wider than it needs to be for the word that matters.
- *
- *  Applied to already escaped text, so the span it adds survives. The brackets themselves
- *  are never escaped and no entity contains one, so matching them here is safe. Both places
- *  a heading is drawn call this: the chart's own th and the week card's label, so the two
- *  cannot come to disagree about how a room looks. */
-function markHeaderRoom(escaped) {
-  return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
-}
-
 // ==== util.js ====
 // Small Excel-semantics helpers shared by the sheet column ports.
 
@@ -1782,6 +1134,1596 @@ function specialDaysInWeek(shabbosSerial, settings) {
   }));
 }
 
+// ==== pagination.js ====
+// Splits a generated week list across however many printable pages the user chooses
+// (3, 4, or any other count), by user-chosen per-page counts.
+function validatePageSizes(total, sizes) {
+  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
+  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
+  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
+  return null;
+}
+
+/** Even default split across `numPages` pages (earlier pages absorb the remainder one
+ *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
+function defaultPageSizes(total, numPages) {
+  const base = Math.floor(total / numPages);
+  const rem = total % numPages;
+  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
+ *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
+ *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
+ *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
+ *  the gap between two source pages lands on the earlier one, matching how the season
+ *  boundaries themselves are assigned in sheets/weeks.js. */
+function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
+  const cutoffs = []; // serial of the first source week on each page after the first
+  let idx = 0;
+  for (let i = 0; i < sourceSizes.length - 1; i++) {
+    idx += Number(sourceSizes[i]) || 0;
+    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
+  }
+  const counts = new Array(sourceSizes.length).fill(0);
+  for (const week of targetWeeks) {
+    let page = 0;
+    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
+    counts[page]++;
+  }
+  return counts;
+}
+
+function splitWeeksIntoPages(weeks, sizes) {
+  const pages = [];
+  let i = 0;
+  for (const size of sizes) {
+    pages.push(weeks.slice(i, i + size));
+    i += size;
+  }
+  return pages;
+}
+
+// ==== rules.js ====
+// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
+// HaGadol have a different Mincha time because of the drasha"). Applied to every
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
+// the intended distinction between rules (recurring, reapplies every year) and
+// overrides (tied to one generated sheet instance).
+//
+// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
+// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
+// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
+// touching the wrong column on the other sheet.
+//
+// A condition can combine any of:
+//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
+//   parsha:        [names]      - matches week.parsha
+//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
+//   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
+function conditionMatches(condition, week) {
+  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
+  // import need not: an older export, or a file edited by hand, and reading .always off
+  // undefined threw and took down every screen that draws a sheet.
+  if (!condition) return false;
+  if (condition.always) return true;
+  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
+  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
+  // The date is guarded for the same reason: a week whose date will not parse would throw
+  // here rather than simply not matching. storage.js repairs those on the way in, so this
+  // is the second line rather than the first.
+  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
+    ? week.date.toISOString().slice(0, 10) : null;
+  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
+  return false;
+}
+
+/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
+ *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
+ *  compatibility with data saved before that format existed, bare keys ("L") and the
+ *  older singular columnKey field (applied to any sheet). */
+function targetColumnsForSeason(rule, season) {
+  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+  return raw
+    .map((entry) => {
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
+      const [entrySeason, key] = entry.split(':');
+      return entrySeason === season ? key : null;
+    })
+    .filter(Boolean);
+}
+
+/** The דרשה rules, both of which have now been retired.
+ *
+ *  There were two, שבת שובה and שבת הגדול, and each appended the bare word "דרשה" and nothing
+ *  else. That said a דרשה was happening and left its time to be typed into the cell by hand
+ *  every year. Both afternoons are now worked out in the sheet itself: the דרשה an hour before
+ *  the מנחה that is 45 minutes before שקיעה, its מנחה למטה half an hour before that, and the
+ *  standing 5:30, 6:00 and 6:30 left off, since the מנחה למטה is what happens instead of them.
+ *  See DRASHA_NAMES and shabbosMinchaMenu in sheets/common.js.
+ *
+ *  שובה went first and הגדול followed once the שובה cell had been printing for a season. So
+ *  nothing is seeded here any more, and what is left is taking the old ones back off the
+ *  browsers that were given them: left in place, either would sit a second, wordless "דרשה"
+ *  underneath the computed one.
+ *
+ *  Matched on what the rule does rather than on the id it was seeded with. Both of these were
+ *  hand-made before they were ever seeded, so on the browser they were made in they carry their
+ *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
+ *  is matched is an append of nothing but the word itself, which is the rule that is now
+ *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
+ *  alone: quietly deleting that is worse than a duplicate they can see and remove.
+ *
+ *  **The condition is not looked at.** It was: the rule had to name שובה or הגדול as a
+ *  special-Shabbos. The shul's own board still printed the second, wordless דרשה under the
+ *  computed one on שבת הגדול, so a rule was firing that this did not recognise, and a condition
+ *  can say the same Shabbos in more ways than a list can hold (the parsha name instead of the
+ *  special one, "שבת הגדול" rather than "הגדול", a stray space). What makes the rule redundant
+ *  is what it writes, not which week it writes it on: the word on its own says a דרשה is
+ *  happening and leaves its time to be typed in, and every one of those times is now computed.
+ *
+ *  The word is compared with the markup and the invisible characters taken off. A rule's text
+ *  is typed into a box and can arrive carrying an <u> from the editor, the isolate characters
+ *  a cell wraps Hebrew in (see util.js), a bidi mark from a keyboard, or an nbsp. None of them
+ *  change what the line says. */
+const DRASHA_WORD = 'דרשה';
+/** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
+const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
+const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
+function isRetiredTishaBavRule(rule) {
+  return rule?.id === 'rule-tisha-bav' ||
+    (rule?.mode === 'append' && plainText(rule.value).replace(/['"׳״\\s]/g, '') === 'טבאב' &&
+      rule.condition?.hebrewDate?.some(date => date === '5-8' || date === '5-9'));
+}
+
+function isRetiredDrashaRule(rule) {
+  return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
+}
+
+/** The same bare word, left behind in a cell somebody typed over rather than in a rule.
+ *
+ *  A per-cell override keeps the whole cell, so one made while the rule was still firing kept
+ *  a copy of what the rule had added, and deleting the rule does not reach it. Dropped only
+ *  where the same cell already prints a דרשה with a time on it, which is the computed line:
+ *  the word twice in one cell, once saying when and once saying nothing, is the thing the shul
+ *  asked to have off. A cell that carries the bare word and no computed line is left alone,
+ *  since there the word is all the cell says about the דרשה.
+ *
+ *  Only a trailing one, which is where an append puts it. The line break may be a newline or
+ *  markup: a typed cell is rich text and the browser's own editor writes a <div> or a <br>
+ *  rather than a newline (see lineBoxOf in ui/week-view.js). */
+/** What a line can carry either side of the word without saying anything else: whitespace, the
+ *  invisible marks, an opening or closing tag, and the <br> a browser's own editor writes at the
+ *  end of a box it made. A line of nothing but those and the word is a line that says the word. */
+const OPENERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<[a-z][^>]*>)';
+const CLOSERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<br\\s*/?>|</[a-z][^>]*>)';
+const TRAILING_BARE_DRASHA = new RegExp(
+  `(?:\\n|<br\\s*/?>|<div[^>]*>|<p[^>]*>)${OPENERS}*${DRASHA_WORD}${CLOSERS}*$`,
+  'i'
+);
+const DRASHA_WITH_TIME = new RegExp(`${DRASHA_WORD}\\s*\\d{1,2}:\\d{2}`);
+function dropDuplicateDrasha(value) {
+  const text = String(value ?? '');
+  if (!DRASHA_WITH_TIME.test(plainText(text))) return text;
+  return text.replace(TRAILING_BARE_DRASHA, '');
+}
+
+/** Applies every enabled rule to a row of computed cell text, returning a new object
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
+function applyRules(row, week, rules, season, appliedColumns) {
+  let out = row;
+  for (const rule of rules) {
+    if (!rule.enabled || isRetiredTishaBavRule(rule)) continue;
+    if (!conditionMatches(rule.condition, week)) continue;
+    for (const col of targetColumnsForSeason(rule, season)) {
+      if (!(col in out)) continue;
+      if (out === row) out = { ...row };
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      if (appliedColumns) appliedColumns.add(col);
+    }
+  }
+  return out;
+}
+
+// ==== settings.js ====
+// Settings model, mirroring the workbook's SETTINGS sheet. Stored in a clean,
+// serializable "raw" shape; resolveSettings() expands it into the shape the
+// zmanim/hebrew-calendar engine expects (timezone object, english/inIsrael flags).
+
+const TIMEZONES = [
+  { id: 'America/New_York', label: 'America/New_York (Eastern)', utcOffset: -5, dstOffset: 1, rule: 'us' },
+  { id: 'America/Chicago', label: 'America/Chicago (Central)', utcOffset: -6, dstOffset: 1, rule: 'us' },
+  { id: 'America/Denver', label: 'America/Denver (Mountain)', utcOffset: -7, dstOffset: 1, rule: 'us' },
+  { id: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)', utcOffset: -8, dstOffset: 1, rule: 'us' },
+  { id: 'America/Anchorage', label: 'America/Anchorage', utcOffset: -9, dstOffset: 1, rule: 'us' },
+  { id: 'Pacific/Honolulu', label: 'Pacific/Honolulu (no DST)', utcOffset: -10, dstOffset: 0, rule: 'none' },
+  { id: 'Asia/Jerusalem', label: 'Asia/Jerusalem (DST not modeled, matches source workbook)', utcOffset: 2, dstOffset: 0, rule: 'none' },
+  { id: 'Europe/London', label: 'Europe/London (DST not modeled, matches source workbook)', utcOffset: 0, dstOffset: 0, rule: 'none' },
+  { id: 'UTC', label: 'UTC', utcOffset: 0, dstOffset: 0, rule: 'none' },
+];
+
+/* The Weekday chart's שחרית schedules and its footer note are **the program's, not a setting**.
+   They were three fields in a "Weekday chart defaults" panel in Settings, and the shul asked for
+   that panel gone and these made part of the system. They are one fixed thing the shul davens,
+   not a preference: the same two schedules are printed on the wall chart, named on the week card
+   and the One sheet, read into the ROSH CHODESH and fast messages, and picked apart for "what is
+   on next". Every one of those has to be saying the same times, and a field that can be typed
+   over in one browser is a way for them to come apart.
+
+   They are read straight from here rather than out of state.settings, which matters twice over:
+   the congregation's site takes its settings from data/published.json, a snapshot of whatever was
+   in the admin the day it was written, so a value read from there could be years old; and a
+   browser holding an old hand-typed copy in localStorage cannot outvote the program. The three
+   keys are taken back out of saved settings as they load (see normalizeSettings in storage.js),
+   so nothing carries a stale copy forward in a backup either. */
+
+/** The everyday שחרית schedule as it appears on the shul's printed board, with the
+ *  alternate times underlined. Written as HTML because that is what the chart prints.
+ *
+ *  **Three to a line, separated by a plain space**, which is what the shul settled on after
+ *  looking at the alternatives on a printed page. It was two to a line and slash separated for a
+ *  while, to read the way the מנחה and מעריב columns beside it do. Three to a line is narrower
+ *  (127.7px against 146.1px, measured) and the slashes were what made a three time line too wide
+ *  for the panel at all. The panel sets these in columns and **draws the separator the schedule
+ *  uses**, so with no slashes typed there are none printed: see ui/shacharis-grid.js. */
+const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* <u>8:40</u></span>';
+
+/** The second schedule, for ר"ח / בה"ב / תענית. Kept apart from the everyday one so the
+ *  week card can show it only on weeks that actually have one of those days and name
+ *  which it is (see ui/week-view.js). The printed chart still shows both together,
+ *  since it covers a whole season at once.
+ *
+ *  **Three then four**, asked for. The two orders take exactly the same room, measured: both print
+ *  the same seven times and the same marks, so the four time line is the same length wherever it
+ *  sits and the panel is as wide as that line either way (127.73px against 127.72px, and the same
+ *  height to the hundredth). The shul picked it on how it looks, the block finishing square with
+ *  the everyday one above it rather than on a short line. */
+const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
+
+/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
+ *
+ *  It says what the marks on the times above it mean, so it belongs with the schedules and not
+ *  with the shul's own footer: the stars are written by the schedules and read by every screen
+ *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
+ *  one of them would be the board explaining its own marks wrongly. */
+const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
+
+/** The heading printed above the second schedule on the wall chart, and the three pieces it
+ *  is built out of.
+ *
+ *  All three of them where all three are on the chart, and only the ones that are otherwise:
+ *  the shul asked for that, and it is the honest thing to print. בה"ב is two weeks of the year
+ *  and a whole season can pass with no weekday תענית, so a heading naming all three was
+ *  naming days that are not on the paper. Which of them a chart holds is
+ *  specialShacharisKinds in hebrew-calendar.js.
+ *
+ *  Joined with a ו on the last, the way the full heading has always read: "ר"ח בה"ב ותענ"צ",
+ *  "ר"ח ותענ"צ", "בה"ב". */
+const SPECIAL_SHACHARIS_PARTS = [
+  ['roshChodesh', 'ר"ח'],
+  ['behab', 'בה"ב'],
+  ['taanis', 'תענ"צ'],
+];
+
+function specialShacharisHeading(kinds) {
+  const parts = SPECIAL_SHACHARIS_PARTS.filter(([key]) => kinds?.[key]).map(([, word]) => word);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(' ')} ו${parts[parts.length - 1]}`;
+}
+
+
+/* The three LEGACY_WEEKDAY_ lists are gone, and splitCombinedShacharis with them. They carried a
+   never-edited old schedule in somebody's browser forward to the current one, and there is nothing
+   left in a browser to carry: the program's copy is the only copy. */
+
+/** The footer address without the "of". A saved value still matching one of these verbatim was
+ *  never actually edited by hand, it is just an old default sitting in localStorage, so storage.js
+ *  quietly carries it forward rather than leaving the line reading the way it did two versions ago.
+ *  Anything else is left strictly alone.
+ *
+ *  The shul's name was written both ways across the site: the footer said "Bais Medrash
+ *  Lakewood Commons" while the donation page, the page title and the domain all say "Bais
+ *  Medrash of Lakewood Commons". One name, one spelling, and the one with the "of" is the
+ *  one the shul goes by. An install that never edited this line is moved onto it; anything
+ *  typed by hand stays exactly as typed. */
+const LEGACY_FOOTER_ADDRESS = [
+  'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+];
+
+/** The chart's header colour, which the parsha column is painted in too. Light gray with
+ *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
+ *  every page is a lot of toner, and the user asked for the light one. */
+const DEFAULT_ACCENT_COLOR = '#c9ced5';
+
+/** How each season is named in the interface. Defined once and imported, rather than
+ *  written out in each screen that needs it: build-offline.py flattens every module into
+ *  one plain script sharing a single scope, so two modules declaring the same top-level
+ *  name is a SyntaxError there while being perfectly legal under ES modules - it breaks
+ *  the USB copy while the site itself carries on working. */
+const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', weekday: 'Weekday' };
+
+/** Accent colours that were once the shipped default. Same carry-forward treatment as
+ *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
+ *  by hand, so it follows the default instead of staying on the old one for ever. */
+const LEGACY_ACCENT_COLORS = ['#54595f'];
+
+const DEFAULT_SETTINGS = {
+  shulName: 'קהל לב מנחם',
+  // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
+  // actual logo, pulled straight from the workbook) plus this editable text -
+  // headerSubtitle under the logo, headerRabbiLine on the opposite side.
+  headerSubtitle: 'ליקוואוד קאמענס',
+  headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
+  // Custom header photo (top-left of the printed page), as a cropped data: URL saved
+  // via the image-crop tool in Settings - null means "use the bundled default",
+  // assets/logo-building-icon.png (see sheet-view.js).
+  headerIconImage: null,
+  // Printed footer: a note line (as in the workbook - underlined-minyan location,
+  // rounding disclaimer, etc.) plus the shul's address.
+  footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
+  footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
+  /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
+     WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight
+     from the program by everything that prints them. מנחה and מעריב were never settings either:
+     those times differ every week, so every cell starts empty and is typed in on the sheet. */
+  locationName: 'Lakewood',
+  latitude: 40.068,
+  longitude: -74.205,
+  elevation: 0,
+  timezoneId: 'America/New_York',
+  language: 'he', // 'he' | 'en'
+  horizon: 5 / 6,
+  candleLightingMinutes: 18,
+  ateretTorahTzaisOffset: 40,
+  useAstronomicalChatzos: true,
+  useElevation: false,
+  inIsrael: false,
+  useGregorianBefore1582: false,
+  // Last-used sheet display style (font/size/logo scale) - new sheets start with
+  // whatever was last set, instead of resetting to a hardcoded default every time.
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
+};
+
+/** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
+function resolveSettings(raw) {
+  const tz = TIMEZONES.find((z) => z.id === raw.timezoneId) || TIMEZONES[0];
+  return {
+    ...raw,
+    timezone: tz,
+    english: raw.language === 'en',
+  };
+}
+
+// ==== security-purify.js ====
+// Pinned upstream DOMPurify 3.4.15, wrapped for the offline module flattener.
+const richTextPurifier = (() => {
+const module = { exports: {} };
+const exports = module.exports;
+/*! @license DOMPurify 3.4.15 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.15/LICENSE */
+!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).DOMPurify=e()}(this,function(){"use strict";function t(t,e){(null==e||e>t.length)&&(e=t.length);for(var n=0,o=Array(e);n<e;n++)o[n]=t[n];return o}function e(e,n){return function(t){if(Array.isArray(t))return t}(e)||function(t,e){var n=null==t?null:"undefined"!=typeof Symbol&&t[Symbol.iterator]||t["@@iterator"];if(null!=n){var o,r,i,a,l=[],c=!0,s=!1;try{if(i=(n=n.call(t)).next,0===e);else for(;!(c=(o=i.call(n)).done)&&(l.push(o.value),l.length!==e);c=!0);}catch(t){s=!0,r=t}finally{try{if(!c&&null!=n.return&&(a=n.return(),Object(a)!==a))return}finally{if(s)throw r}}return l}}(e,n)||function(e,n){if(e){if("string"==typeof e)return t(e,n);var o={}.toString.call(e).slice(8,-1);return"Object"===o&&e.constructor&&(o=e.constructor.name),"Map"===o||"Set"===o?Array.from(e):"Arguments"===o||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(o)?t(e,n):void 0}}(e,n)||function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}const n=Object.entries,o=Object.setPrototypeOf,r=Object.isFrozen,i=Object.getPrototypeOf,a=Object.getOwnPropertyDescriptor;let l=Object.freeze,c=Object.seal,s=Object.create,u="undefined"!=typeof Reflect&&Reflect,f=u.apply,p=u.construct;l||(l=function(t){return t}),c||(c=function(t){return t}),f||(f=function(t,e){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return t.apply(e,o)}),p||(p=function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),o=1;o<e;o++)n[o-1]=arguments[o];return new t(...n)});const m=L(Array.prototype.forEach),d=L(Array.prototype.lastIndexOf),h=L(Array.prototype.pop),y=L(Array.prototype.push),g=L(Array.prototype.splice),b=Array.isArray,S=L(String.prototype.toLowerCase),T=L(String.prototype.toString),A=L(String.prototype.match),E=L(String.prototype.replace),w=L(String.prototype.indexOf),v=L(String.prototype.trim),O=L(Number.prototype.toString),N=L(Boolean.prototype.toString),x="undefined"==typeof BigInt?null:L(BigInt.prototype.toString),_="undefined"==typeof Symbol?null:L(Symbol.prototype.toString),D=L(Object.prototype.hasOwnProperty),R=L(Object.prototype.toString),k=L(RegExp.prototype.test),C=(I=TypeError,function(){for(var t=arguments.length,e=new Array(t),n=0;n<t;n++)e[n]=arguments[n];return p(I,e)});var I;function L(t){return function(e){e instanceof RegExp&&(e.lastIndex=0);for(var n=arguments.length,o=new Array(n>1?n-1:0),r=1;r<n;r++)o[r-1]=arguments[r];return f(t,e,o)}}function z(t,e){let n=arguments.length>2&&void 0!==arguments[2]?arguments[2]:S;if(o&&o(t,null),!b(e))return t;let i=e.length;for(;i--;){let o=e[i];if("string"==typeof o){const t=n(o);t!==o&&(r(e)||(e[i]=t),o=t)}t[o]=!0}return t}function M(t){for(let e=0;e<t.length;e++){D(t,e)||(t[e]=null)}return t}function P(t){const o=s(null);for(const i of n(t)){var r=e(i,2);const n=r[0],a=r[1];D(t,n)&&(b(a)?o[n]=M(a):a&&"object"==typeof a&&a.constructor===Object?o[n]=P(a):o[n]=a)}return o}function U(t,e){for(;null!==t;){const n=a(t,e);if(n){if(n.get)return L(n.get);if("function"==typeof n.value)return L(n.value)}t=i(t)}return function(){return null}}const F=l(["a","abbr","acronym","address","area","article","aside","audio","b","bdi","bdo","big","blink","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","content","data","datalist","dd","decorator","del","details","dfn","dialog","dir","div","dl","dt","element","em","fieldset","figcaption","figure","font","footer","form","h1","h2","h3","h4","h5","h6","head","header","hgroup","hr","html","i","img","input","ins","kbd","label","legend","li","main","map","mark","marquee","menu","menuitem","meter","nav","nobr","ol","optgroup","option","output","p","picture","pre","progress","q","rp","rt","ruby","s","samp","search","section","select","shadow","slot","small","source","spacer","span","strike","strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time","tr","track","tt","u","ul","var","video","wbr"]),H=l(["svg","a","altglyph","altglyphdef","altglyphitem","animatecolor","animatemotion","animatetransform","circle","clippath","defs","desc","ellipse","enterkeyhint","exportparts","filter","font","g","glyph","glyphref","hkern","image","inputmode","line","lineargradient","marker","mask","metadata","mpath","part","path","pattern","polygon","polyline","radialgradient","rect","stop","style","switch","symbol","text","textpath","title","tref","tspan","view","vkern"]),j=l(["feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feDistantLight","feDropShadow","feFlood","feFuncA","feFuncB","feFuncG","feFuncR","feGaussianBlur","feImage","feMerge","feMergeNode","feMorphology","feOffset","fePointLight","feSpecularLighting","feSpotLight","feTile","feTurbulence"]),B=l(["animate","color-profile","cursor","discard","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","foreignobject","hatch","hatchpath","mesh","meshgradient","meshpatch","meshrow","missing-glyph","script","set","solidcolor","unknown","use"]),W=l(["math","menclose","merror","mfenced","mfrac","mglyph","mi","mlabeledtr","mmultiscripts","mn","mo","mover","mpadded","mphantom","mroot","mrow","ms","mspace","msqrt","mstyle","msub","msup","msubsup","mtable","mtd","mtext","mtr","munder","munderover","mprescripts"]),Y=l(["maction","maligngroup","malignmark","mlongdiv","mscarries","mscarry","msgroup","mstack","msline","msrow","semantics","annotation","annotation-xml","mprescripts","none"]),G=l(["#text"]),q=l(["accept","action","align","alt","autocapitalize","autocomplete","autopictureinpicture","autoplay","background","bgcolor","border","capture","cellpadding","cellspacing","checked","cite","class","clear","color","cols","colspan","command","commandfor","controls","controlslist","coords","crossorigin","datetime","decoding","default","dir","disabled","disablepictureinpicture","disableremoteplayback","download","draggable","enctype","enterkeyhint","exportparts","face","for","headers","height","hidden","high","href","hreflang","id","inert","inputmode","integrity","ismap","kind","label","lang","list","loading","loop","low","max","maxlength","media","method","min","minlength","multiple","muted","name","nonce","noshade","novalidate","nowrap","open","optimum","part","pattern","placeholder","playsinline","popover","popovertarget","popovertargetaction","poster","preload","pubdate","radiogroup","readonly","rel","required","rev","reversed","role","rows","rowspan","spellcheck","scope","selected","shape","size","sizes","slot","span","srclang","start","src","srcset","step","style","summary","tabindex","title","translate","type","usemap","valign","value","width","wrap","xmlns"]),$=l(["accent-height","accumulate","additive","alignment-baseline","amplitude","ascent","attributename","attributetype","azimuth","basefrequency","baseline-shift","begin","bias","by","class","clip","clippathunits","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","cx","cy","d","dx","dy","diffuseconstant","direction","display","divisor","dominant-baseline","dur","edgemode","elevation","end","exponent","fill","fill-opacity","fill-rule","filter","filterunits","flood-color","flood-opacity","font-family","font-size","font-size-adjust","font-stretch","font-style","font-variant","font-weight","fx","fy","g1","g2","glyph-name","glyphref","gradientunits","gradienttransform","height","href","id","image-rendering","in","in2","intercept","k","k1","k2","k3","k4","kerning","keypoints","keysplines","keytimes","lang","lengthadjust","letter-spacing","kernelmatrix","kernelunitlength","lighting-color","local","marker-end","marker-mid","marker-start","markerheight","markerunits","markerwidth","maskcontentunits","maskunits","max","mask","mask-type","media","method","mode","min","name","numoctaves","offset","operator","opacity","order","orient","orientation","origin","overflow","paint-order","path","pathlength","patterncontentunits","patterntransform","patternunits","pointer-events","points","preservealpha","preserveaspectratio","primitiveunits","r","rx","ry","radius","refx","refy","repeatcount","repeatdur","restart","result","rotate","scale","seed","shape-rendering","slope","specularconstant","specularexponent","spreadmethod","startoffset","stddeviation","stitchtiles","stop-color","stop-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke","stroke-width","style","surfacescale","systemlanguage","tabindex","tablevalues","targetx","targety","transform","transform-origin","text-anchor","text-decoration","text-orientation","text-rendering","textlength","type","u1","u2","unicode","values","vector-effect","viewbox","visibility","version","vert-adv-y","vert-origin-x","vert-origin-y","width","word-spacing","wrap","writing-mode","xchannelselector","ychannelselector","x","x1","x2","xmlns","y","y1","y2","z","zoomandpan"]),X=l(["accent","accentunder","align","bevelled","close","columnalign","columnlines","columnspacing","columnspan","denomalign","depth","dir","display","displaystyle","encoding","fence","frame","height","href","id","largeop","length","linethickness","lquote","lspace","mathbackground","mathcolor","mathsize","mathvariant","maxsize","minsize","movablelimits","notation","numalign","open","rowalign","rowlines","rowspacing","rowspan","rspace","rquote","scriptlevel","scriptminsize","scriptsizemultiplier","selection","separator","separators","stretchy","subscriptshift","supscriptshift","symmetric","voffset","width","xmlns"]),K=l(["xlink:href","xml:id","xlink:title","xml:space","xmlns:xlink"]),V=c(/{{[\w\W]*|^[\w\W]*}}/g),Z=c(/<%[\w\W]*|^[\w\W]*%>/g),J=c(/\${[\w\W]*/g),Q=c(/^data-[\-\w.\u00B7-\uFFFF]+$/),tt=c(/^aria-[\-\w]+$/),et=c(/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i),nt=c(/^(?:\w+script|data):/i),ot=c(/[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g),rt=c(/^html$/i),it=c(/^[a-z][.\w]*(-[.\w]+)+$/i),at=c(/<[/\w!]/g),lt=c(/<[/\w]/g),ct=c(/<\/no(script|embed|frames)/i),st=c(/\/>/i),ut=1,ft=3,pt=7,mt=8,dt=9,ht=11,yt=["style","script","xmp","iframe","noembed","noframes","plaintext","noscript"],gt=l(z({},yt)),bt=function(){const t={};return m(yt,e=>{t[e]=c(new RegExp("</"+e+"(?=[\\t\\n\\f\\r />])","i"))}),l(t)}(),St=function(){return"undefined"==typeof window?null:window},Tt=function(t,e,n,o){return D(t,e)&&b(t[e])?z(o.base?P(o.base):{},t[e],o.transform):n},At=function(t,e,n){const o=D(t,e)?t[e]:void 0;return o&&"object"==typeof o?P(o):n()};var Et=function t(){let e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:St();const o=e=>t(e);if(o.version="3.4.15",o.removed=[],!e||!e.document||e.document.nodeType!==dt||!e.Element)return o.isSupported=!1,o;let r=e.document;const i=r,a=i.currentScript;e.DocumentFragment;const u=e.HTMLTemplateElement,f=e.Node,p=e.Element,I=e.NodeFilter,L=e.NamedNodeMap;void 0===L&&(e.NamedNodeMap||e.MozNamedAttrMap),e.HTMLFormElement;const M=e.DOMParser,yt=e.trustedTypes,Et=p.prototype,wt=U(Et,"cloneNode"),vt=U(Et,"remove"),Ot=U(Et,"removeAttributeNode"),Nt=U(Et,"nextSibling"),xt=U(Et,"childNodes"),_t=U(Et,"parentNode"),Dt=U(Et,"shadowRoot"),Rt=U(Et,"attributes"),kt=f&&f.prototype?U(f.prototype,"nodeType"):null,Ct=f&&f.prototype?U(f.prototype,"nodeName"):null,It=f&&f.prototype?U(f.prototype,"ownerDocument"):null,Lt=function(t){return kt?kt(t):t.nodeType},zt=function(t){return Ct?Ct(t):t.nodeName};if("function"==typeof u){const t=r.createElement("template");t.content&&t.content.ownerDocument&&(r=t.content.ownerDocument)}let Mt,Pt,Ut="",Ft=!1,Ht=0;const jt=function(){if(Ht>0)throw C('A configured TRUSTED_TYPES_POLICY callback (createHTML or createScriptURL) must not call DOMPurify.sanitize, as that causes infinite recursion. Do not pass a policy whose callbacks wrap DOMPurify as TRUSTED_TYPES_POLICY; see the "DOMPurify and Trusted Types" section of the README.')},Bt=function(t){jt(),Ht++;try{return Mt.createHTML(t)}finally{Ht--}},Wt=function(){return Ft||(Pt=function(t,e){if("object"!=typeof t||"function"!=typeof t.createPolicy)return null;let n=null;const o="data-tt-policy-suffix";e&&e.hasAttribute(o)&&(n=e.getAttribute(o));const r="dompurify"+(n?"#"+n:"");try{return t.createPolicy(r,{createHTML:t=>t,createScriptURL:t=>t})}catch(t){return console.warn("TrustedTypes policy "+r+" could not be created."),null}}(yt,a),Ft=!0),Pt},Yt=r,Gt=Yt.implementation,qt=Yt.createNodeIterator,$t=Yt.createDocumentFragment,Xt=Yt.getElementsByTagName,Kt=i.importNode;let Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]};o.isSupported="function"==typeof n&&"function"==typeof _t&&Gt&&void 0!==Gt.createHTMLDocument;const Zt=V,Jt=Z,Qt=J,te=Q,ee=tt,ne=nt,oe=ot,re=it;let ie=et,ae=null;const le=z({},[...F,...H,...j,...W,...G]);let ce=null;const se=z({},[...q,...$,...X,...K]);let ue=Object.seal(s(null,{tagNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},allowCustomizedBuiltInElements:{writable:!0,configurable:!1,enumerable:!0,value:!1}})),fe=null,pe=null;const me=Object.seal(s(null,{tagCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeCheck:{writable:!0,configurable:!1,enumerable:!0,value:null}}));let de=!0,he=!0,ye=!1,ge=!0,be=!1,Se=!0,Te=!1,Ae=!1,Ee=null,we=null,ve=!1,Oe=!1,Ne=!1,xe=!1,_e=!0,De=!1;const Re="user-content-";let ke=!0,Ce=!1,Ie={},Le=null;const ze=z({},["annotation-xml","audio","colgroup","desc","foreignobject","head","iframe","math","mi","mn","mo","ms","mtext","noembed","noframes","noscript","plaintext","script","selectedcontent","style","svg","template","thead","title","video","xmp"]);let Me=null;const Pe=z({},["audio","video","img","source","image","track"]);let Ue=null;const Fe=z({},["alt","class","for","id","label","name","pattern","placeholder","role","summary","title","value","style","xmlns"]),He="http://www.w3.org/1998/Math/MathML",je="http://www.w3.org/2000/svg",Be="http://www.w3.org/1999/xhtml";let We=Be,Ye=!1,Ge=null;const qe=z({},[He,je,Be],T),$e=l(["mi","mo","mn","ms","mtext"]);let Xe=z({},$e);const Ke=l(["annotation-xml"]);let Ve=z({},Ke);const Ze=z({},["title","style","font","a","script"]);let Je=null;const Qe=["application/xhtml+xml","text/html"];let tn=null,en=null;const nn=r.createElement("form"),on=function(t){return t instanceof RegExp||t instanceof Function},rn=function(){let t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{};if(en&&en===t)return;t&&"object"==typeof t||(t={}),t=P(t),Je=-1===Qe.indexOf(t.PARSER_MEDIA_TYPE)?"text/html":t.PARSER_MEDIA_TYPE,tn="application/xhtml+xml"===Je?T:S,ae=Tt(t,"ALLOWED_TAGS",le,{transform:tn}),ce=Tt(t,"ALLOWED_ATTR",se,{transform:tn}),Ge=Tt(t,"ALLOWED_NAMESPACES",qe,{transform:T}),Ue=Tt(t,"ADD_URI_SAFE_ATTR",Fe,{transform:tn,base:Fe}),Me=Tt(t,"ADD_DATA_URI_TAGS",Pe,{transform:tn,base:Pe}),Le=Tt(t,"FORBID_CONTENTS",ze,{transform:tn}),fe=Tt(t,"FORBID_TAGS",P({}),{transform:tn}),pe=Tt(t,"FORBID_ATTR",P({}),{transform:tn}),Ie=!!D(t,"USE_PROFILES")&&(t.USE_PROFILES&&"object"==typeof t.USE_PROFILES?P(t.USE_PROFILES):t.USE_PROFILES),de=!1!==t.ALLOW_ARIA_ATTR,he=!1!==t.ALLOW_DATA_ATTR,ye=t.ALLOW_UNKNOWN_PROTOCOLS||!1,ge=!1!==t.ALLOW_SELF_CLOSE_IN_ATTR,be=t.SAFE_FOR_TEMPLATES||!1,Se=!1!==t.SAFE_FOR_XML,Te=t.WHOLE_DOCUMENT||!1,Oe=t.RETURN_DOM||!1,Ne=t.RETURN_DOM_FRAGMENT||!1,xe=t.RETURN_TRUSTED_TYPE||!1,ve=t.FORCE_BODY||!1,_e=!1!==t.SANITIZE_DOM,De=t.SANITIZE_NAMED_PROPS||!1,ke=!1!==t.KEEP_CONTENT,Ce=t.IN_PLACE||!1,ie=function(t){try{return k(t,""),!0}catch(t){return!1}}(t.ALLOWED_URI_REGEXP)?t.ALLOWED_URI_REGEXP:et,We="string"==typeof t.NAMESPACE?t.NAMESPACE:Be,Xe=At(t,"MATHML_TEXT_INTEGRATION_POINTS",()=>z({},$e)),Ve=At(t,"HTML_INTEGRATION_POINTS",()=>z({},Ke));const e=At(t,"CUSTOM_ELEMENT_HANDLING",()=>s(null));if(ue=s(null),D(e,"tagNameCheck")&&on(e.tagNameCheck)&&(ue.tagNameCheck=e.tagNameCheck),D(e,"attributeNameCheck")&&on(e.attributeNameCheck)&&(ue.attributeNameCheck=e.attributeNameCheck),D(e,"allowCustomizedBuiltInElements")&&"boolean"==typeof e.allowCustomizedBuiltInElements&&(ue.allowCustomizedBuiltInElements=e.allowCustomizedBuiltInElements),c(ue),be&&(he=!1),Ne&&(Oe=!0),Ie&&(ae=z({},G),ce=s(null),!0===Ie.html&&(z(ae,F),z(ce,q)),!0===Ie.svg&&(z(ae,H),z(ce,$),z(ce,K)),!0===Ie.svgFilters&&(z(ae,j),z(ce,$),z(ce,K)),!0===Ie.mathMl&&(z(ae,W),z(ce,X),z(ce,K))),me.tagCheck=null,me.attributeCheck=null,D(t,"ADD_TAGS")&&("function"==typeof t.ADD_TAGS?me.tagCheck=t.ADD_TAGS:b(t.ADD_TAGS)&&(ae===le&&(ae=P(ae)),z(ae,t.ADD_TAGS,tn))),D(t,"ADD_ATTR")&&("function"==typeof t.ADD_ATTR?me.attributeCheck=t.ADD_ATTR:b(t.ADD_ATTR)&&(ce===se&&(ce=P(ce)),z(ce,t.ADD_ATTR,tn))),D(t,"ADD_FORBID_CONTENTS")&&b(t.ADD_FORBID_CONTENTS)&&(Le===ze&&(Le=P(Le)),z(Le,t.ADD_FORBID_CONTENTS,tn)),ke&&(ae["#text"]=!0),Te&&z(ae,["html","head","body"]),ae.table&&(z(ae,["tbody"]),delete fe.tbody),t.TRUSTED_TYPES_POLICY){if("function"!=typeof t.TRUSTED_TYPES_POLICY.createHTML)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createHTML" hook.');if("function"!=typeof t.TRUSTED_TYPES_POLICY.createScriptURL)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createScriptURL" hook.');const e=Mt;Mt=t.TRUSTED_TYPES_POLICY;try{Ut=Bt("")}catch(t){throw Mt=e,t}}else null===t.TRUSTED_TYPES_POLICY?(Mt=void 0,Ut=""):(void 0===Mt&&(Mt=Wt()),Mt&&"string"==typeof Ut&&(Ut=Bt("")));l&&l(t),en=t},an=z({},[...H,...j,...B]),ln=z({},[...W,...Y]),cn=function(t){let e=_t(t);e&&e.tagName||(e={namespaceURI:We,tagName:"template"});const n=S(t.tagName),o=S(e.tagName);return!!Ge[t.namespaceURI]&&(t.namespaceURI===je?function(t,e,n){return e.namespaceURI===Be?"svg"===t:e.namespaceURI===He?"svg"===t&&("annotation-xml"===n||Xe[n]):Boolean(an[t])}(n,e,o):t.namespaceURI===He?function(t,e,n){return e.namespaceURI===Be?"math"===t:e.namespaceURI===je?"math"===t&&Ve[n]:Boolean(ln[t])}(n,e,o):t.namespaceURI===Be?function(t,e,n){return!(e.namespaceURI===je&&!Ve[n])&&!(e.namespaceURI===He&&!Xe[n])&&!ln[t]&&(Ze[t]||!an[t])}(n,e,o):!("application/xhtml+xml"!==Je||!Ge[t.namespaceURI]))},sn=function(t){y(o.removed,{element:t});try{_t(t).removeChild(t)}catch(e){if(vt(t),!_t(t))throw C("a node selected for removal could not be detached from its tree and cannot be safely returned; refusing to sanitize in place")}},un=function(t,e,n){try{Ot(t,e)}catch(e){try{t.removeAttribute(n)}catch(t){}}},fn=function(t){dn(t);const e=xt(t);if(e){const t=[];m(e,e=>{y(t,e)}),m(t,t=>{try{vt(t)}catch(t){}})}const n=Rt(t);if(n)for(let e=n.length-1;e>=0;--e){const o=n[e],r=o&&o.name;"string"==typeof r&&un(t,o,r)}},pn=function(t,e,n){if(!n)try{n=e.getAttributeNode(t)}catch(t){n=null}y(o.removed,{attribute:n||null,from:e});try{n?Ot(e,n):e.removeAttribute(t)}catch(n){try{e.removeAttribute(t)}catch(t){}}if("is"===t)if(Oe||Ne)try{sn(e)}catch(t){}else try{e.setAttribute(t,"")}catch(t){}},mn=function(t){const e=Rt(t);if(e)for(let n=e.length-1;n>=0;--n){const o=e[n],r=o&&o.name;"string"!=typeof r||ce[tn(r)]||un(t,o,r)}},dn=function(t){const e=[t];for(;e.length>0;){const t=e.pop();Lt(t)===ut&&mn(t);const n=xt(t);if(n)for(let t=n.length-1;t>=0;--t)e.push(n[t])}},hn=function(t,e){return!!Se&&("patchsrc"===t||"for"===t&&"label"!==e&&"output"!==e)},yn=function(t){let e=null,n=null;if(ve)t="<remove></remove>"+t;else{const e=A(t,/^[\r\n\t ]+/);n=e&&e[0]}"application/xhtml+xml"===Je&&We===Be&&(t='<html xmlns="http://www.w3.org/1999/xhtml"><head></head><body>'+t+"</body></html>");const o=Mt?Bt(t):t;if(We===Be)try{e=(new M).parseFromString(o,Je)}catch(t){}if(!e||!e.documentElement){e=Gt.createDocument(We,"template",null);try{e.documentElement.innerHTML=Ye?Ut:o}catch(t){}}const i=e.body||e.documentElement;return t&&n&&i.insertBefore(r.createTextNode(n),i.childNodes[0]||null),We===Be?Xt.call(e,Te?"html":"body")[0]:Te?e.documentElement:i},gn=function(t){const e=It?It(t):t.ownerDocument;return qt.call(e||t,t,I.SHOW_ELEMENT|I.SHOW_COMMENT|I.SHOW_TEXT|I.SHOW_PROCESSING_INSTRUCTION|I.SHOW_CDATA_SECTION,null)},bn=function(t){return t=E(t,Zt," "),t=E(t,Jt," "),t=E(t,Qt," ")},Sn=function(t){var e;t.normalize();const n=It?It(t):t.ownerDocument,o=qt.call(n||t,t,I.SHOW_TEXT|I.SHOW_COMMENT|I.SHOW_CDATA_SECTION|I.SHOW_PROCESSING_INSTRUCTION,null);let r=o.nextNode();for(;r;)r.data=bn(r.data),r=o.nextNode();const i=null===(e=t.querySelectorAll)||void 0===e?void 0:e.call(t,"template");i&&m(i,t=>{An(t.content)&&Sn(t.content)})},Tn=function(t){const e=Ct?Ct(t):null;return"string"==typeof e&&("form"===tn(e)&&("string"!=typeof t.nodeName||"string"!=typeof t.textContent||"function"!=typeof t.removeChild||t.attributes!==Rt(t)||"function"!=typeof t.removeAttribute||"function"!=typeof t.removeAttributeNode||"function"!=typeof t.getAttributeNode||"function"!=typeof t.setAttribute||"string"!=typeof t.namespaceURI||"function"!=typeof t.insertBefore||"function"!=typeof t.hasChildNodes||t.nodeType!==kt(t)||t.childNodes!==xt(t)))},An=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return kt(t)===ht}catch(t){return!1}},En=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return"number"==typeof kt(t)}catch(t){return!1}};function wn(t,e,n){0!==t.length&&m(t,t=>{t.call(o,e,n,en)})}const vn=function(t,e){if(t instanceof RegExp)return k(t,e);if(t instanceof Function){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return Boolean(t(e,...o))}return!1},On=function(t,e,n,o){return 0===t.length?e:e===n||e===o?P(e):e},Nn=function(t,e){return t!==e&&null===_t(t)&&(Ce&&dn(t),!0)},xn=function(t,e){if(wn(Vt.beforeSanitizeElements,t,null),Nn(t,e))return!0;if(Tn(t))return sn(t),!0;const n=tn(zt(t));if(ae=On(Vt.uponSanitizeElement,ae,le,Ee),wn(Vt.uponSanitizeElement,t,{tagName:n,allowedTags:ae}),Nn(t,e))return!0;if(function(t,e){return!!(Se&&t.hasChildNodes()&&!En(t.firstElementChild)&&k(at,t.textContent)&&k(at,t.innerHTML))||!!(Se&&t.namespaceURI===Be&&gt[e]&&(En(t.firstElementChild)||"string"==typeof t.textContent&&k(bt[e],t.textContent)))||t.nodeType===pt||!(!Se||t.nodeType!==mt||!k(lt,t.data))}(t,n))return sn(t),!0;if(fe[n]||!(me.tagCheck instanceof Function&&me.tagCheck(n))&&!ae[n]){const o=function(t,e,n){if(!fe[e]&&Rn(e)&&vn(ue.tagNameCheck,e))return!1;if(ke&&!Le[e]){const e=_t(t),o=xt(t);if(o&&e)for(let r=o.length-1;r>=0;--r){const i=t===n?wt(o[r],!0):o[r];e.insertBefore(i,Nt(t))}}return sn(t),!0}(t,n,e);return!1===o&&wn(Vt.afterSanitizeElements,t,null),o}if(Lt(t)===ut&&!cn(t))return sn(t),!0;if(("noscript"===n||"noembed"===n||"noframes"===n)&&k(ct,t.innerHTML))return sn(t),!0;if(be&&t.nodeType===ft){const e=bn(t.textContent);t.textContent!==e&&(y(o.removed,{element:t.cloneNode()}),t.textContent=e)}return wn(Vt.afterSanitizeElements,t,null),!1},_n=function(t,e,n){if(pe[e])return!1;if(hn(e,t))return!1;if(_e&&("id"===e||"name"===e)&&(n in r||n in nn))return!1;const o=ce[e]||me.attributeCheck instanceof Function&&me.attributeCheck(e,t);return!(!he||!k(te,e))||(!(!de||!k(ee,e))||(o?!!Ue[e]||(!!k(ie,E(n,oe,""))||(!("src"!==e&&"xlink:href"!==e&&"href"!==e||"script"===t||0!==w(n,"data:")||!Me[t])||(!(!ye||k(ne,E(n,oe,"")))||!n))):Rn(t)&&vn(ue.tagNameCheck,t)&&vn(ue.attributeNameCheck,e,t)||"is"===e&&ue.allowCustomizedBuiltInElements&&vn(ue.tagNameCheck,n)))},Dn=z({},["annotation-xml","color-profile","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","missing-glyph"]),Rn=function(t){return!Dn[S(t)]&&k(re,t)},kn=function(t,e,n,o){if(Mt&&"object"==typeof yt&&"function"==typeof yt.getAttributeType&&!n)switch(yt.getAttributeType(t,e)){case"TrustedHTML":return Bt(o);case"TrustedScriptURL":return function(t){jt(),Ht++;try{return Mt.createScriptURL(t)}finally{Ht--}}(o)}return o},Cn=function(t,e,n,o){try{return n?t.setAttributeNS(n,e,o):t.setAttribute(e,o),!Tn(t)||(sn(t),!1)}catch(n){return pn(e,t),!1}},In=function(t){wn(Vt.beforeSanitizeAttributes,t,null);const e=t.attributes;if(!e||Tn(t))return;ce=On(Vt.uponSanitizeAttribute,ce,se,we);const n={attrName:"",attrValue:"",keepAttr:!0,allowedAttributes:ce,forceKeepAttr:void 0};let r=e.length;const i=tn(t.nodeName);for(;r--;){const a=e[r],l=a.name,c=a.namespaceURI,s=a.value,u=tn(l),f=s;let p="value"===l?f:v(f),m=!1;if(n.attrName=u,n.attrValue=p,n.keepAttr=!0,n.forceKeepAttr=void 0,wn(Vt.uponSanitizeAttribute,t,n),p=n.attrValue,!De||"id"!==u&&"name"!==u||0===w(p,Re)||(pn(l,t,a),p=Re+p,m=!0),Se&&k(/((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i,p))pn(l,t,a);else if("attributename"===u&&A(p,"href"))pn(l,t,a);else if(!n.forceKeepAttr)if(n.keepAttr)if(ge||!k(st,p))if(be&&(p=bn(p)),_n(i,u,p)){if(p=kn(i,u,c,p),p!==f){Cn(t,l,c,p)&&m&&h(o.removed)}}else pn(l,t,a);else pn(l,t,a);else pn(l,t,a)}wn(Vt.afterSanitizeAttributes,t,null)},Ln=function(t){let e=null;const n=gn(t);for(wn(Vt.beforeSanitizeShadowDOM,t,null);e=n.nextNode();)if(wn(Vt.uponSanitizeShadowNode,e,null),xn(e,t),In(e),An(e.content)&&Ln(e.content),Lt(e)===ut){const t=Dt(e);An(t)&&(zn(t),Ln(t))}wn(Vt.afterSanitizeShadowDOM,t,null)},zn=function(t){const e=[{node:t,shadow:null}];for(;e.length>0;){const t=e.pop();if(t.shadow){Ln(t.shadow);continue}const n=t.node,o=Lt(n)===ut,r=xt(n);if(r)for(let t=r.length-1;t>=0;--t)e.push({node:r[t],shadow:null});if(o){const t=Ct?Ct(n):null;if("string"==typeof t&&"template"===tn(t)){const t=n.content;An(t)&&e.push({node:t,shadow:null})}}if(o){const t=Dt(n);An(t)&&e.push({node:null,shadow:t},{node:t,shadow:null})}}};return o.sanitize=function(t){let e=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{},n=null,r=null,a=null,l=null;if(Ye=!t,Ye&&(t="\x3c!--\x3e"),"string"!=typeof t&&!En(t)&&"string"!=typeof(t=function(t){switch(typeof t){case"string":return t;case"number":return O(t);case"boolean":return N(t);case"bigint":return x?x(t):"0";case"symbol":return _?_(t):"Symbol()";case"undefined":default:return R(t);case"function":case"object":{if(null===t)return R(t);const e=t,n=U(e,"toString");if("function"==typeof n){const t=n(e);return"string"==typeof t?t:R(t)}return R(t)}}}(t)))throw C("dirty is not a string, aborting");if(!o.isSupported)return t;Ae?(ae=Ee,ce=we):rn(e),(Vt.uponSanitizeElement.length>0||Vt.uponSanitizeAttribute.length>0)&&(ae=P(ae)),Vt.uponSanitizeAttribute.length>0&&(ce=P(ce)),o.removed=[];const c=Ce&&"string"!=typeof t&&En(t);if(c){!function(t){if(!Se)return;const e=[t];for(;e.length>0;){const t=e.pop(),n=Lt(t);if(n===pt||n===mt&&k(lt,t.data)){try{vt(t)}catch(t){}continue}if(n===ut){const e=t,n=tn(zt(t));try{e.hasAttribute&&e.hasAttribute("patchsrc")&&e.removeAttribute("patchsrc"),e.hasAttribute&&e.hasAttribute("for")&&hn("for",n)&&e.removeAttribute("for")}catch(t){}}const o=xt(t);if(o)for(let t=o.length-1;t>=0;--t)e.push(o[t])}}(t);const e=zt(t);if("string"==typeof e){const n=tn(e);if(!ae[n]||fe[n])throw fn(t),C("root node is forbidden and cannot be sanitized in-place")}if(Tn(t))throw fn(t),C("root node is clobbered and cannot be sanitized in-place");try{zn(t)}catch(e){throw fn(t),e}}else if(En(t))n=yn("\x3c!----\x3e"),r=n.ownerDocument.importNode(t,!0),r.nodeType===ut&&"BODY"===r.nodeName||"HTML"===r.nodeName?n=r:n.appendChild(r),zn(n);else{if(!Oe&&!be&&!Te&&-1===t.indexOf("<"))return Mt&&xe?Bt(t):t;if(n=yn(t),!n)return Oe?null:xe?Ut:""}n&&ve&&sn(n.firstChild);const s=c?t:n;try{const t=gn(s);for(;a=t.nextNode();)xn(a,s),In(a),An(a.content)&&Ln(a.content)}catch(e){throw c&&(fn(t),m(o.removed,t=>{t.element&&dn(t.element)})),e}if(c)return m(o.removed,t=>{t.element&&dn(t.element)}),be&&Sn(t),t;if(Oe){if(be&&Sn(n),Ne)for(l=$t.call(n.ownerDocument);n.firstChild;)l.appendChild(n.firstChild);else l=n;return(ce.shadowroot||ce.shadowrootmode)&&(l=Kt.call(i,l,!0)),l}let u=Te?n.outerHTML:n.innerHTML;return Te&&ae["!doctype"]&&n.ownerDocument&&n.ownerDocument.doctype&&n.ownerDocument.doctype.name&&k(rt,n.ownerDocument.doctype.name)&&(u="<!DOCTYPE "+n.ownerDocument.doctype.name+">\n"+u),be&&(u=bn(u)),Mt&&xe?Bt(u):u},o.setConfig=function(){rn(arguments.length>0&&void 0!==arguments[0]?arguments[0]:{}),Ae=!0,Ee=ae,we=ce},o.clearConfig=function(){en=null,Ae=!1,Ee=null,we=null,Mt=Pt,Ut=""},o.isValidAttribute=function(t,e,n){en||rn({});const o=tn(t),r=tn(e);return _n(o,r,n)},o.addHook=function(t,e){"function"==typeof e&&D(Vt,t)&&y(Vt[t],e)},o.removeHook=function(t,e){if(D(Vt,t)){if(void 0!==e){const n=d(Vt[t],e);return-1===n?void 0:g(Vt[t],n,1)[0]}return h(Vt[t])}},o.removeHooks=function(t){D(Vt,t)&&(Vt[t]=[])},o.removeAllHooks=function(){Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]}},o}();return Et});
+
+return module.exports;
+})();
+
+// ==== security.js ====
+/** Saved cells allow text formatting, never executable markup, links or media. */
+function sanitizeRichText(value) {
+  const clean = richTextPurifier.sanitize(String(value ?? ''), {
+    ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 's', 'br', 'div', 'p', 'span', 'sub', 'sup', 'bdi'],
+    ALLOWED_ATTR: ['class', 'dir'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    RETURN_DOM_FRAGMENT: true,
+  });
+  // Only the editor's size class is meaningful in saved content. Arbitrary site
+  // classes could disguise imported content as an app control.
+  for (const node of clean.querySelectorAll('*')) {
+    if (node.hasAttribute('class')) {
+      if (node.classList.contains('big')) node.setAttribute('class', 'big');
+      else node.removeAttribute('class');
+    }
+    if (node.hasAttribute('dir') && !['ltr', 'rtl', 'auto'].includes(node.getAttribute('dir'))) node.removeAttribute('dir');
+  }
+  const host = document.createElement('div');
+  host.append(clean);
+  return host.innerHTML;
+}
+
+/** The cropper saves raster data URLs. No remote URLs or SVG from a backup. */
+function safeHeaderImage(value) {
+  return typeof value === 'string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(value)
+    ? value : 'assets/logo-building-icon.png';
+}
+
+function backupObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function backupError() {
+  throw new Error('This backup has invalid settings or schedule data. Your current data has not been replaced.');
+}
+
+function checkBackupTree(value, depth = 0) {
+  if (depth > 30) backupError();
+  if (!value || typeof value !== 'object') return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (['__proto__', 'prototype', 'constructor'].includes(key)) backupError();
+    checkBackupTree(entry, depth + 1);
+  }
+}
+
+function prepareSavedSheet(sheet) {
+  if (!backupObject(sheet) || !Array.isArray(sheet.weeks)) backupError();
+  checkBackupTree(sheet);
+  if (sheet.weeks.some(w => !backupObject(w) || !Number.isFinite(w.serial))) backupError();
+  if (sheet.columnWidths != null) {
+    if (!backupObject(sheet.columnWidths)) backupError();
+    for (const width of Object.values(sheet.columnWidths)) if (!Number.isFinite(width) || width < 0) backupError();
+  }
+  if (sheet.overrides != null) {
+    if (!backupObject(sheet.overrides)) backupError();
+    for (const cells of Object.values(sheet.overrides)) {
+      if (!backupObject(cells)) backupError();
+      for (const [key, value] of Object.entries(cells)) {
+        if (typeof value !== 'string') backupError();
+        cells[key] = sanitizeRichText(value);
+      }
+    }
+  }
+  return sheet;
+}
+
+/** Validate before the caller replaces any state. Also used for old local copies. */
+function prepareBackup(parsed) {
+  if (!backupObject(parsed) || !backupObject(parsed.settings) || !Array.isArray(parsed.sheets)) backupError();
+  checkBackupTree(parsed);
+  for (const [key, fallback] of Object.entries(DEFAULT_SETTINGS)) {
+    const value = parsed.settings[key];
+    if (value === undefined || fallback === null || typeof fallback === 'object') continue;
+    if (typeof value !== typeof fallback || (typeof value === 'number' && !Number.isFinite(value))) backupError();
+  }
+  if (parsed.settings.headerIconImage != null) {
+    const image = safeHeaderImage(parsed.settings.headerIconImage);
+    parsed.settings.headerIconImage = image.startsWith('data:') ? image : null;
+  }
+  for (const sheet of parsed.sheets) prepareSavedSheet(sheet);
+  if (parsed.rules != null) {
+    if (!Array.isArray(parsed.rules)) backupError();
+    for (const rule of parsed.rules) {
+      if (!backupObject(rule)) backupError();
+      for (const key of ['id', 'name', 'value']) if (typeof rule[key] !== 'string') backupError();
+      if (rule.columnKeys != null && (!Array.isArray(rule.columnKeys) || rule.columnKeys.some(k => typeof k !== 'string'))) backupError();
+      if (rule.condition != null) {
+        if (!backupObject(rule.condition)) backupError();
+        for (const key of ['parsha', 'specialParsha', 'dateISO', 'hebrewDate']) {
+          const value = rule.condition[key];
+          if (value != null && (!Array.isArray(value) || value.some(v => typeof v !== 'string'))) backupError();
+        }
+      }
+    }
+  }
+  if (parsed.own != null && !Array.isArray(parsed.own)) backupError();
+  if (parsed.seeded != null && !backupObject(parsed.seeded)) backupError();
+  return parsed;
+}
+
+// ==== format.js ====
+// Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
+// CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
+// marks an "alternate" time on the printed sheet by underlining it).
+
+const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
+
+function ceilToMinute(dayFraction) {
+  return Math.ceil(dayFraction * 1440 - EPS) / 1440;
+}
+function floorToMinute(dayFraction) {
+  return Math.floor(dayFraction * 1440 + EPS) / 1440;
+}
+function roundToMinute(dayFraction) {
+  return Math.round(dayFraction * 1440) / 1440;
+}
+
+/** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
+function formatTime(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const h24 = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')}`;
+}
+
+// Sentinel markers wrapping "this should render underlined" spans (Private Use Area
+// code points, so they can never collide with real content). Kept as plain characters
+// through all the string-building/TEXTJOIN-style formula ports, then converted to real
+// <u> elements at render time in ui/sheet-view.js. This keeps this module free of any
+// HTML concerns.
+const UL_START = '';
+const UL_END = '';
+
+/** UNDERLINE_TIME: accepts either a raw day-fraction or an already-formatted "h:mm"
+ *  string (both forms appear in the workbook's formulas) and marks it to render
+ *  underlined - the printed sheet's way of flagging an "alternate" time. */
+function underlineTime(value) {
+  const text = typeof value === 'number' ? formatTime(value) : value;
+  return UL_START + ' ' + text + UL_END;
+}
+
+/** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
+ *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
+ *  the caller can leave those digits untouched rather than mangle them. */
+function expandTimeDigits(digits) {
+  let hour, minute;
+  if (digits.length <= 2) {
+    hour = Number(digits);
+    minute = '00';
+  } else {
+    const split = digits.length === 3 ? 1 : 2;
+    hour = Number(digits.slice(0, split));
+    minute = digits.slice(split);
+  }
+  if (hour < 1 || hour > 12 || Number(minute) > 59) return null;
+  return `${hour}:${minute}`;
+}
+
+/** Expands bare digit runs into times so a schedule can be typed as "1220 130" instead
+ *  of "12:20/1:30". The lookarounds skip any digits already sitting next to a colon -
+ *  without them the "7" of an existing "7:15" would itself be expanded to "7:00". */
+function normalizeTimeShorthand(text) {
+  return text.replace(/(?<![\d:])\d{1,4}(?![\d:])/g, (m) => expandTimeDigits(m) ?? m);
+}
+
+/** normalizeTimeShorthand, with the spacing between times tidied to a single space.
+ *
+ *  It used to join them with "/", matching how the computed columns are written, but a
+ *  typed מנחה or מעריב is a plain list of times and the slashes only made it noisier. Runs
+ *  of whitespace *between two times* collapse to one space; whitespace anywhere else
+ *  (inside a Hebrew word, say) is deliberately left alone. */
+function normalizeTimeList(text) {
+  return normalizeTimeShorthand(text)
+    .trim()
+    .replace(/(\d{1,2}:\d{2}\*{0,3})\s+(?=\d{1,2}:\d{2})/g, '$1 ');
+}
+
+/** Light contenteditable HTML cleanup for the app's rich-text fields, which are the sheet's
+ *  own cells (ui/sheet-view.js), so a trivial click-in/click-out does not register as a
+ *  change: trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
+ *  &nbsp; to a plain space. */
+function normalizeRichText(html) {
+  return sanitizeRichText(html)
+    .replace(/(<br\s*\/?>)+\s*$/i, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+/** The room in a column heading, set a little smaller than the name of the מנין above it.
+ *
+ *  Two headings carry one, "מנחה (למטה)" and "מנחה (בעזר\"נ)", and the bracketed half is
+ *  not the name of the מנין but where it davens. At the same size the two read as one long
+ *  title and the column is wider than it needs to be for the word that matters.
+ *
+ *  Applied to already escaped text, so the span it adds survives. The brackets themselves
+ *  are never escaped and no entity contains one, so matching them here is safe. Both places
+ *  a heading is drawn call this: the chart's own th and the week card's label, so the two
+ *  cannot come to disagree about how a room looks. */
+function markHeaderRoom(escaped) {
+  return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
+}
+
+// ==== zmanim/zmanim.js ====
+// Named zman functions, ported 1:1 from the workbook's defined names.
+// Every function returns a fractional day (0-1) representing local time-of-day,
+// exactly like the Excel formulas do (add to a date's serial to get a date+time).
+
+const MIN = 1 / 1440; // one minute, as a fraction of a day
+
+// SUNRISE / SUNSET: horizon adjustable, elevation always applied (matches the workbook
+// note: "elevation used in this function will adjust even if the 'use elevation for
+// zmanim' setting is set to false").
+function sunrise(date, settings, horizonDeg = settings.horizon) {
+  return sunEvent(true, date, horizonDeg, settings, true);
+}
+function sunset(date, settings, horizonDeg = settings.horizon) {
+  return sunEvent(false, date, horizonDeg, settings, true);
+}
+// SUNRISE_elev / SUNSET_elev: fixed horizon from settings, elevation only if the
+// "use elevation for zmanim" toggle is on.
+function sunriseElev(date, settings) {
+  return sunEvent(true, date, settings.horizon, settings, settings.useElevation);
+}
+function sunsetElev(date, settings) {
+  return sunEvent(false, date, settings.horizon, settings, settings.useElevation);
+}
+
+// SOLAR_NOON (true solar noon / astronomical chatzos)
+function solarNoon(date, settings) {
+  const lon = settings.longitude / 360;
+  const serial = excelSerial(date);
+  const jDay = calcJD(serial);
+  const tNoon = calcJDToJCent(jDay - lon);
+  const eot1 = equationOfTime(tNoon);
+  const tNew = calcJDToJCent(jDay - lon - eot1);
+  const eot2 = equationOfTime(tNew);
+  const noonUTC = 0.5 - lon - eot2;
+  const { offsetHours } = timezoneOffset(dateFromSerial(serial + noonUTC), settings.timezone);
+  return noonUTC + offsetHours / 24;
+}
+
+/** calcDST_LOCAL: whether DST is in effect for the given calendar date under the
+ *  current settings' timezone. Exposed for the sheet formulas (they branch on it
+ *  directly, e.g. the Friday Mincha/Maariv column). */
+function dstLocal(date, settings) {
+  return timezoneOffset(date, settings.timezone).isDst;
+}
+
+// Alos / Misheyakir (degree-based, off plain SUNRISE)
+const alos16_1 = (date, settings) => sunrise(date, settings, 16.1);
+const misheyakir10_2 = (date, settings) => sunrise(date, settings, 10.2);
+
+// Tzais (minute/degree-based, off SUNSET/SUNSET_elev)
+const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN;
+const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
+const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
+const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
+
+// ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
+const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;
+
+/** Shared "proportional day" pattern behind MINCHA_GEDOLA/KETANA, PLAG_HAMINCHA,
+ *  SAMUCH_LEMINCHA_KETANA (subtractive, counted back from end of day):
+ *  __X(end_of_day, midday, start_of_day) in the workbook. */
+function fromEndOfDay(endOfDay, midday, startOfDay, fullDayFraction, halfDayFraction, useAstronomicalChatzos) {
+  return endOfDay - (useAstronomicalChatzos ? (endOfDay - midday) * halfDayFraction : (endOfDay - startOfDay) * fullDayFraction);
+}
+/** Same pattern for SOF_ZMAN_SHMA/TFILA (additive, counted forward from start of day). */
+function fromStartOfDay(startOfDay, midday, endOfDay, fullDayFraction, halfDayFraction, useAstronomicalChatzos) {
+  return startOfDay + (useAstronomicalChatzos ? (midday - startOfDay) * halfDayFraction : (endOfDay - startOfDay) * fullDayFraction);
+}
+
+function minchaGedola(date, settings) {
+  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 5.5 / 12, 5.5 / 6, settings.useAstronomicalChatzos);
+}
+function minchaGedola30MinAfterChatzos(date, settings) {
+  return solarNoon(date, settings) + 30 * MIN;
+}
+/** MINCHA_GEDOLA_LECHUMRA: __ZMAN_LECHUMRA(latest=TRUE, ...) i.e. the later of the two. */
+function minchaGedolaLechumra(date, settings) {
+  return Math.max(minchaGedola(date, settings), minchaGedola30MinAfterChatzos(date, settings));
+}
+function minchaKetana(date, settings) {
+  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 2.5 / 12, 2.5 / 6, settings.useAstronomicalChatzos);
+}
+function samuchLeminchaKetana(date, settings) {
+  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
+}
+function plagHamincha(date, settings) {
+  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 1.25 / 12, 1.25 / 6, settings.useAstronomicalChatzos);
+}
+/** __PLAG_HAMINCHA(end_of_day, <midday omitted>, start_of_day): used directly in the
+ *  sheets as __PLAG_HAMINCHA(TZAIS_72(date), , ALOS_16.1(date)) etc. When midday is
+ *  omitted the astronomical-chatzos toggle is irrelevant (workbook falls straight
+ *  through to the "full day" branch). */
+function plagHaminchaCustom(endOfDay, startOfDay) {
+  return endOfDay - (endOfDay - startOfDay) * (1.25 / 12);
+}
+
+function sofZmanShmaGRA(date, settings) {
+  return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
+}
+function sofZmanShmaMGA72(date, settings) {
+  return fromStartOfDay(alos72(date, settings), solarNoon(date, settings), tzais72(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
+}
+function sofZmanTfilaGRA(date, settings) {
+  return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
+}
+
+// ==== sheets/common.js ====
+// Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
+// "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
+
+
+
+
+const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
+
+/** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
+ *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
+ *  (Sukkos through the 1st Sunday of November), which is also nominally "DST active"
+ *  but must NOT count here: this same test is also the cutover point at which a שבת
+ *  חורף season needs its final page generated as an actual שבת קיץ chart instead (see
+ *  weeks.js's splitChorefAtSpringCutover) - that switch must only happen once, near
+ *  the season's end, not at Sukkos just because the clock happens to still read DST
+ *  there too. */
+function inSpringDstWindow(date, settings) {
+  return Z.dstLocal(date, settings) && date.getUTCMonth() + 1 < 6;
+}
+
+/** (spring DST window) OR (Hebrew day-of-year<192): the window in which the
+ *  Plag-Hamincha-based early minyanim are offered at all. The day-of-year branch
+ *  additionally covers שבת קיץ's own late-season stretch (Elul into Tishrei/Sukkos),
+ *  which has nothing to do with DST. */
+function inPlagWindow(serial, settings) {
+  const d = dateFromSerial(serial);
+  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
+  return inSpringDstWindow(d, settings) || doy < 192;
+}
+
+/** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
+ *  formula in both sheets. Printed across two lines, split as evenly as possible
+ *  (more options on the second line when the count is odd).
+ *
+ *  While the clocks are forward, nothing is offered before 1:35. That is the shul's rule
+ *  and it is a deliberate departure from the workbook, which does not have it.
+ *
+ *  It matters for one stretch: חורף opens at Sukkos but the clocks do not go back until
+ *  the start of November, so the first weeks of the winter schedule are still on DST.
+ *  Through those weeks Mincha Gedola Lechumra sits just under 1:20 (measured across the
+ *  5787 winter: 1:16, 1:15, 1:15, 1:15, 1:15 on the five Fridays from 2 October to 30
+ *  October) and the early minyan below fired on its own, putting a 1:15 in front of the
+ *  1:35 on a day nobody davens that early. From 6 November it is on standard time and the
+ *  whole early set is right again, and by late March, when the clocks go forward at the
+ *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
+ *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
+ *  nothing there changes either way. */
+function fridayMainMinchaMenu(fridayDate, settings) {
+  const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
+  const onStandardTime = !Z.dstLocal(fridayDate, settings);
+  const items = flattenNonEmpty([
+    onStandardTime ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
+    onStandardTime && mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
+    underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
+    '1:50',
+    '2:15',
+    '3:00',
+  ]);
+  return splitLinesInHalf(items);
+}
+
+/** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
+ *  Also printed across two lines, split the same way. */
+/** The names the calendar gives שבת שובה, in both languages, since a rule or a sheet may
+ *  carry either. See hebrewCalendar's hasSpecialParsha.
+ *
+ *  Exported because the poster asks the same question, and the offline build flattens every
+ *  module into one scope where a second const of this name is a hard error. One definition
+ *  of what this Shabbos is called. */
+const SHUVA_NAMES = ['שובה', 'Shuva'];
+
+/** The two Shabbosos the דרשה afternoon belongs to.
+ *
+ *  שבת הגדול keeps the same shape as שבת שובה, asked for once the שובה cell had been printing
+ *  for a season: an afternoon built around the דרשה rather than the standing 5:30, 6:00 and
+ *  6:30. Before this it was a rule that appended the bare word "דרשה" under the ordinary times,
+ *  which said one was happening and left the time to be typed in by hand each year.
+ *
+ *  Separate from SHUVA_NAMES rather than folded into it, because that list answers a different
+ *  question: the שבת שובה poster asks it to find its week, and it wants that Shabbos and not a
+ *  Shabbos that happens to be built the same way. */
+const DRASHA_NAMES = [...SHUVA_NAMES, 'הגדול', 'Hagadol'];
+
+/** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
+ *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */
+function roundTo5(dayFraction) {
+  return Math.round(dayFraction * 288) / 288; // 288 = 1440 minutes / 5
+}
+
+function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
+  const sunsetVal = Z.sunset(shabbosDate, settings);
+  const early = Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20';
+  // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
+  // ceilToMinute matches that.
+  const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
+  const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
+
+  /* שבת שובה and שבת הגדול: the דרשה, and the מנחה that goes with it.
+   *
+   * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
+   * itself, because that is the minyan the דרשה is timed against: an hour before it, to
+   * the nearest 5, and the מנחה למטה half an hour before that. So the whole afternoon
+   * moves with the season, as it should, and no one has to retype it each year.
+   *
+   * The afternoon minyanim the other weeks carry (5:30, 6:00, 6:30) are not here. The
+   * מנחה למטה is what happens instead of them on this Shabbos, which is what the sheet
+   * that was built by hand for 5786 says: 1:40 and 4:45, then the דרשה, then 6:14 and
+   * 6:29, with no 5:30.
+   *
+   * Underlined like the מנחה before it: both are downstairs, which is what the underline
+   * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
+   *
+   * The דרשה gets a line to itself, in the middle, and is not underlined. It is not a
+   * minyan: the underline on these boards means downstairs (see the footer, "All underlined
+   * מנינים will be בבית מדרש למטה"), and a speech is not somewhere to daven. The מנחה למטה
+   * above it is underlined, because that one is.
+   *
+   * Three lines where every other cell on the page is two. Making the other rows grow to
+   * match was tried and put back: syncHeaderRowHeight pins every row to an even share of
+   * the table, and flooring that share at the tallest row inflated page 1 from 816.95px to
+   * 988.47px, well past the 8.5in sheet. The comment in that function says as much, from an
+   * earlier attempt at the same thing. So this cell sits deeper than its neighbours exactly
+   * as the cell built by hand for 5786 does, which is what has been printing all along.
+   *
+   * Stored as "דרשה 5:15" and it reaches the paper as "5:15 דרשה", the time to the left of
+   * the word. That is not a fault and it is not worth trying to undo: read the way Hebrew
+   * is read, right to left, it says דרשה and then the time, and it is character for
+   * character what the cell built by hand for 5786 already puts on the board.
+   *
+   * The isolate around the pair is what stops it reaching anything else. It earned its
+   * place when the דרשה shared a line with the times: without it every number after the
+   * Hebrew word joined that word's run and the whole line reversed, measured on the chart
+   * as "6:29 / 6:14 / 5:15 דרשה". Alone on its own line there is nothing left to reverse,
+   * and it stays for the day somebody puts it back among the times. */
+  const drasha = DRASHA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
+  if (drasha !== null) {
+    return [
+      `${early}${SLASH}${underlineTime(drasha - 30 / 1440)}`,
+      isolate(`דרשה ${formatTime(drasha)}`),
+      `${formatTime(main)}${SLASH}${late}`,
+    ].join('\n');
+  }
+
+  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
+  const gates = [T(17, 30), T(18, 0), T(18, 30)];
+  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
+  const items = flattenNonEmpty([early, kept, formatTime(main), late]);
+  return splitLinesInHalf(items);
+}
+function floorMin(x) {
+  return Math.floor(x * 1440 + 1e-7) / 1440;
+}
+
+/** Fixed Shacharis line (קיץ column E / חורף column E) - identical, not date-dependent.
+ *  Uses NBSP around the "/" so it can never wrap onto a second line. */
+function shacharisLine() {
+  return `${underlineTime(T(7, 30))}${SLASH}8:15`;
+}
+
+/** Candle lighting + sunset (קיץ column H / חורף column H) - identical formula. */
+function candleLightingCell(fridayDate, settings) {
+  const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
+  return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
+}
+
+/** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) - Motzei
+ *  Shabbos's Maariv is really the start of Tisha B'Av. Flags it by appending "ט באב" to
+ *  the Mincha (C) and Motzei-Shabbos Maariv (B) cells, alongside whatever they already
+ *  computed - never replacing that content. Applies automatically to every week, not a
+ *  user-editable rule, since it's a fixed calendar fact rather than a shul preference. */
+function applyTishaBavNote(row, week, settings) {
+  const jdate = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  if (jdate.month !== 5 || jdate.dayOfMonth !== 9) return row; // month 5 = Av (Nissan=1..Adar=12 numbering)
+  const withNote = (text) => [text, 'ט באב'].filter(Boolean).join('\n');
+  return { ...row, B: withNote(row.B), C: withNote(row.C) };
+}
+
+/** Motzei Shabbos when Tisha B'Av begins that evening, including a postponed fast.
+ * Use actual sunset plus 72 minutes before rounding any displayed times. */
+function tishaBavMaariv(serial, settings) {
+  const shabbosDate = dateFromSerial(serial);
+  const hd = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (shabbosDate.getUTCDay() !== 6 || hd.month !== 5 || ![8, 9].includes(hd.dayOfMonth)) return null;
+  const sunset = Z.sunset(shabbosDate, settings);
+  const seventyTwo = sunset + 72 / 1440;
+  const downFive = value => Math.floor((value * 1440 + 1e-7) / 5) * 5 / 1440;
+  const drasha = downFive(seventyTwo - 35 / 1440);
+  const maariv = downFive(seventyTwo + 15 / 1440);
+  return [
+    'שקיעה ' + formatTime(ceilToMinute(sunset)),
+    'דרשה ' + formatTime(drasha),
+    'זמן 72 ' + formatTime(ceilToMinute(seventyTwo)),
+    'מעריב ' + formatTime(maariv),
+  ].join('\n');
+}
+
+// ==== sheets/weeks.js ====
+// Season-boundary + week-list logic: auto-computes which Shabbosim belong on a
+// Kayitz (summer) or Choref (winter) sheet for a given Hebrew year, mirroring the
+// workbook's own P5 formula (SEQUENCE + FILTER on HAS_PARSHA<>"") but without
+// requiring a manually-entered start date or week count.
+
+
+
+const MAX_WEEKS = 60; // safety cap, well above any real season's length
+
+/** Season(hebrewYear) date-range boundaries - Kayitz(Y): Pesach(Y) -> Sukkos(Y+1);
+ *  Choref(Y): Sukkos(Y) -> Pesach(Y), both within AM year Y. Factored out of
+ *  computeSeasonWeeks so the "which year is next" helpers below can use the same
+ *  boundaries without needing a parsha table. */
+function seasonStartSerial(season, hebrewYear) {
+  return season === 'kayitz' ? dateFromHebrew(15, 1, hebrewYear) : dateFromHebrew(15, 7, hebrewYear);
+}
+function seasonEndSerial(season, hebrewYear) {
+  return season === 'kayitz' ? dateFromHebrew(15, 7, hebrewYear + 1) : dateFromHebrew(15, 1, hebrewYear);
+}
+
+/**
+ * @param {'kayitz'|'choref'} season
+ * @param {number} hebrewYear AM year anchoring the season (see README for the exact
+ *   convention: Kayitz(Y) runs Pesach(Y) -> Sukkos(Y+1); Choref(Y) runs Sukkos(Y) -> Pesach(Y), both within AM year Y)
+ * @param {object} settings
+ * @param {object} tables {parshaChutz, parshaEY, parshaNames}
+ * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string}>}}
+ */
+function computeSeasonWeeks(season, hebrewYear, settings, tables) {
+  const startSerial = seasonStartSerial(season, hebrewYear);
+  const endSerial = seasonEndSerial(season, hebrewYear);
+
+  let d = Math.ceil(startSerial);
+  while (excelWeekday(d) !== 7) d++;
+
+  const weeks = [];
+  let guard = 0;
+  while (d <= endSerial && guard < MAX_WEEKS) {
+    const parsha = hasParsha(d, settings, tables);
+    if (parsha) {
+      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+    }
+    d += 7;
+    guard++;
+  }
+  return { startSerial, endSerial, weeks };
+}
+
+function isCholHamoedAnchor(day, settings, specialDaysTable) {
+  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(hasYomTov(day, settings, specialDaysTable));
+}
+
+function anyRegularDay(fromSerial, toSerial, settings, specialDaysTable) {
+  for (let day = fromSerial; day <= toSerial; day++) {
+    if (!isYomTovOrCholHamoed(day, settings, specialDaysTable)) return true;
+  }
+  return false;
+}
+
+/** "Chol Hamoed Pesach" / "חול המועד סוכות" / "Hoshana Rabbah" -> the plain holiday
+ *  name ("Pesach" / "סוכות" / "סוכות") - see the Chol Hamoed row below, which reuses
+ *  whatever this Shabbos's own hasYomTov() name is but without the "Chol Hamoed"/
+ *  "Hoshana Rabbah" framing, since the row is standing in for the holiday as a whole. */
+function holidayNameFor(day, settings, specialDaysTable) {
+  const name = hasYomTov(day, settings, specialDaysTable);
+  if (/^(Hoshana Rabbah|הושענה רבה)$/.test(name)) return /[֐-׿]/.test(name) ? 'סוכות' : 'Succos';
+  return name.replace(/^(Chol Hamoed |חול המועד )/, '');
+}
+
+/** Week list for a Weekday chart covering the same season date range as
+ *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
+ *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
+ *  a normal day - not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
+ *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
+ *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
+ *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
+ *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
+ *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
+ *  "ראש השנה") when there's no regular parsha to label the row with.
+ *
+ *  Season boundaries (Pesach/Sukkos) essentially never line up with the fixed 7-day
+ *  Saturday spacing this loop walks in, which leaves a "leftover" stretch of up to 6
+ *  regular days between the last Saturday-anchored week and the boundary itself (e.g.
+ *  the days between שבת הגדול and ליל פסח) - see the trailing-gap check after the main
+ *  loop, which folds that stretch onto *this* (the outgoing/earlier) season as one more
+ *  row, per "a week that falls between two charts belongs on the earlier one".
+ *
+ *  A Saturday that lands ON Chol Hamoed/Hoshana Rabbah (e.g. Shabbos Chol Hamoed Pesach)
+ *  is excluded from becoming its own row in the *incoming* season's own loop above (its
+ *  backward window would otherwise mix genuine pre-Yom-Tov regular days, already
+ *  claimed by the outgoing chart's trailing row, together with actual Chol Hamoed days)
+ *  - but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
+ *  the *outgoing* chart as one more row, labeled with the holiday's plain name (Pesach's
+ *  own Chol Hamoed row lands on the חורף chart; Sukkos's on the קיץ chart). */
+function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
+  const startSerial = seasonStartSerial(season, hebrewYear);
+  const endSerial = seasonEndSerial(season, hebrewYear);
+
+  let d = Math.ceil(startSerial);
+  while (excelWeekday(d) !== 7) d++;
+
+  const weeks = [];
+  let guard = 0;
+  while (d <= endSerial && guard < MAX_WEEKS) {
+    // d === startSerial: the season's own start boundary landed exactly on Shabbos
+    // (e.g. Sukkos falling on a Saturday) - its backward-attached weekdays are still
+    // within the *outgoing* season's territory, already covered by its own trailing-gap
+    // row below. Without this, both seasons would independently print an identical row.
+    const isOwnStartBoundary = d === startSerial;
+    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 1, settings, tables.specialDays)) {
+      const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
+      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+    }
+    d += 7;
+    guard++;
+  }
+
+  // Trailing gap: the regular days (if any) between the last Saturday-anchored week
+  // above and the season's own end boundary - see the function comment. Anchored at
+  // endSerial itself (not a real Shabbos, just a stand-in date/key for this row) and
+  // labeled with whatever Yom Tov starts there, same fallback as any other
+  // Yom-Tov-only row above. When the boundary itself was exactly Shabbos, the main loop
+  // already picked it up directly and this gap comes out empty - no double-counting.
+  const gapStart = d - 7 + 1;
+  const gapEnd = endSerial - 1;
+  if (gapStart <= gapEnd && anyRegularDay(gapStart, gapEnd, settings, tables.specialDays)) {
+    const parsha = hasParsha(endSerial, settings, tables) || hasYomTov(endSerial, settings, tables.specialDays);
+    weeks.push({ serial: endSerial, date: dateFromSerial(endSerial), parsha, specialParsha: hasSpecialParsha(endSerial, settings) });
+  }
+
+  // `d` is now the first Saturday *after* the boundary (Saturdays fall on the same
+  // fixed 7-day cadence no matter which season's math found them, so this is exactly
+  // the same date the incoming season's own loop would land on as its own first
+  // candidate) - see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
+  // there becomes a row here instead of there. It's folded into the trailing-gap row
+  // above rather than added separately whenever that row already carries the same
+  // holiday's name: the two stretches are the run-up to, and the middle of, one single
+  // Yom Tov, so the chart should carry one row for it, not a pair of identical ones.
+  const cholHamoedName = isCholHamoedAnchor(d, settings, tables.specialDays) ? holidayNameFor(d, settings, tables.specialDays) : '';
+  if (cholHamoedName && weeks[weeks.length - 1]?.parsha !== cholHamoedName) {
+    weeks.push({ serial: d, date: dateFromSerial(d), parsha: cholHamoedName, specialParsha: '' });
+  }
+
+  return { startSerial, endSerial, weeks };
+}
+
+/** Where a שבת חורף season's weeks cross the *spring* DST cutover (2nd Sunday of
+ *  March - not the fall one near Sukkos at the season's start). From that week on,
+ *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) -
+ *  the shul still davens on a "summer" schedule through Pesach once the clock springs
+ *  forward. Returns the index in `weeks` of the first week on/after the cutover
+ *  (weeks.length if the whole season is still before it - shouldn't happen in
+ *  practice, since Pesach always falls after the 2nd Sunday of March). */
+function splitChorefAtSpringCutover(weeks, settings) {
+  const idx = weeks.findIndex((w) => inSpringDstWindow(w.date, settings));
+  return idx === -1 ? weeks.length : idx;
+}
+
+/** The smallest hebrewYear for `season` whose date range hasn't already fully elapsed
+ *  (its end is still today or later) - i.e. the soonest occurrence of that season still
+ *  worth preparing a schedule for. Used to keep the Generate form's year field from
+ *  ever defaulting to an already-passed season. */
+function nextAvailableYearFor(season, settings) {
+  const today = excelSerial(new Date());
+  let y = hebrewDateExtended(today, settings.useGregorianBefore1582).year - 1; // step back one to not overshoot a season that started in a lower-numbered year
+  for (let i = 0; i < 6 && seasonEndSerial(season, y) < today; i++) y++;
+  return y;
+}
+
+/** Which season+year the Generate form should default to: the *next* season
+ *  chronologically after whichever one contains today - a schedule is always being
+ *  prepared ahead of time for the upcoming season, not the one currently in progress.
+ *  E.g. if today falls within a קיץ season, default to the חורף season right after it
+ *  (never the קיץ season itself, and never a season that's already over). */
+function defaultSeasonAndYear(settings) {
+  const today = excelSerial(new Date());
+  const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+  const sukkosY0 = dateFromHebrew(15, 7, y0);
+  const pesachY0 = dateFromHebrew(15, 1, y0);
+  const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
+
+  let currentSeason, currentYear;
+  if (today < sukkosY0) {
+    currentSeason = 'kayitz';
+    currentYear = y0 - 1; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
+  } else if (today < pesachY0) {
+    currentSeason = 'choref';
+    currentYear = y0;
+  } else if (today < sukkosY0plus1) {
+    currentSeason = 'kayitz';
+    currentYear = y0;
+  } else {
+    currentSeason = 'choref';
+    currentYear = y0 + 1;
+  }
+
+  return currentSeason === 'choref' ? { season: 'kayitz', hebrewYear: currentYear } : { season: 'choref', hebrewYear: currentYear + 1 };
+}
+
+// ==== publish.js ====
+// Publishing a season for the congregation.
+//
+// Everything in this app lives in one browser's localStorage, so a visitor's browser has
+// nothing to show. Publishing writes the season into a file that ships with the site, at
+// data/published.json, which the luach (index.html?luach) reads instead of
+// localStorage. That is the whole mechanism: no backend, no login, no database.
+//
+// A season is published once. The luach then advances by itself every week, because the
+// week it shows is worked out from today's date against the weeks in the file.
+
+
+/** What the luach needs, and nothing else.
+ *
+ *  The sheets are carried whole (weeks and overrides included) rather than as
+ *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
+ *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
+ *  Settings are trimmed to what the card actually prints: no location maths is redone on
+ *  the luach, but the header, footer and שחרית schedules are all read from here. */
+function buildPublishedPayload(state, sheets) {
+  return {
+    version: 1,
+    publishedAt: new Date().toISOString(),
+    settings: state.settings,
+    rules: state.rules,
+    sheets: sheets.map((s) => ({
+      id: s.id,
+      season: s.season,
+      hebrewYear: s.hebrewYear,
+      // Carried across because the luach sorts on it: where two published sheets both
+      // cover a week, the most recently generated one wins. Left out, every sheet sorted
+      // as undefined and the winner came down to the order they happened to be published
+      // in, which is not a rule anyone could predict.
+      createdAt: s.createdAt,
+      linkedSheetId: s.linkedSheetId,
+      weeks: s.weeks,
+      pageSizes: s.pageSizes,
+      overrides: s.overrides || {},
+    })),
+  };
+}
+
+/** The Shabbos sheets worth publishing, newest first, each with its weekday companion. */
+function publishableGroups(state) {
+  return state.sheets
+    .filter((s) => s.season !== 'weekday')
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((sheet) => ({
+      sheet,
+      weekday: state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null,
+    }));
+}
+
+function downloadPublished(payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'published.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** The retired דרשה rules taken off a payload on its way in.
+ *
+ *  **A published file is a snapshot, and it goes on saying what it said the day it was written.**
+ *  The rules travel with it, so the two bare-word דרשה rules kept firing on the congregation's own
+ *  chart months after they were retired everywhere else: the admin's copy of them is taken off as
+ *  that browser loads (see applySeeds in storage.js), and nothing was taking them off this one. The
+ *  shul saw the second, wordless דרשה under the computed one on שבת הגדול, on the public board,
+ *  while the admin they had just been fixed in printed it correctly.
+ *
+ *  So the same retirement runs here, off the same definition, and a published file written before
+ *  it cannot put a retired rule back. Republishing writes the file without them in any case; this
+ *  is what makes the one already on the site right without anybody having to.
+ *
+ *  The overrides are cleaned the same way, for the cells the rule had already been typed into. */
+function withoutRetiredDrasha(data) {
+  if (!data) return data;
+  const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r) && !isRetiredTishaBavRule(r));
+  const sheets = (data.sheets || []).map((sheet) => {
+    const overrides = {};
+    for (const [serial, week] of Object.entries(sheet.overrides || {})) {
+      overrides[serial] = Object.fromEntries(
+        Object.entries(week || {}).map(([key, value]) => [key, dropDuplicateDrasha(value)])
+      );
+    }
+    return { ...sheet, overrides };
+  });
+  return { ...data, rules, sheets };
+}
+
+/** Reads what is currently published, or null when nothing is. A 404 is the normal state
+ *  before the first publish, not an error worth shouting about. */
+async function loadPublished({ automatic = false } = {}) {
+  try {
+    const res = await fetch('/data/published.json', { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* **Not nothing published. Something answered instead of the site.**
+         This returned null here, and null is what the page prints "Nothing has been published
+         yet" for, so a filtered phone was told the shul had not put its zmanim up. It had. A
+         GenTech block page came back in place of this file and the site repeated it as though
+         it were the answer, which is the worst shape a failure can take: it names an innocent
+         cause, it blames the shul, and the person who sees it complains to a gabbai instead of
+         to whoever runs the filter. See data-loader.js, which had the same fault the same week.
+         Thrown rather than returned, so the caller has to decide what to say. */
+      const blocked = new Error('blocked');
+      blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
+      throw blocked;
+    }
+    if (!data || !Array.isArray(data.sheets)) return null;
+    const clean = withoutRetiredDrasha(data);
+    return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
+  } catch (err) {
+    if (err?.message === 'blocked') throw err;
+    // A network that would not carry the request at all. Same answer as no file: nothing to show.
+    return null;
+  }
+}
+
+// --- Publishing straight to the site ------------------------------------------------
+//
+// The site is static files in a GitHub repository, so "publish" means committing
+// data/published.json to that repository. A browser can do that through GitHub's own
+// API, which needs a token to prove it is allowed to.
+//
+// The token is kept under its own localStorage key rather than inside the app state, so
+// it can never ride along in an exported backup. A backup gets shared; a write token
+// must not.
+
+const REPO_OWNER = 'cheskyshain-stack';
+const REPO_NAME = 'zmanim-tool';
+const REPO_BRANCH = 'main';
+const PUBLISH_PATH = 'data/published.json';
+const TOKEN_KEY = 'zmanim-publish-token';
+
+function getPublishToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    // A browser that refuses storage has no token to give. The admin app is the only
+    // thing that asks, and it will say the token is missing rather than fall over.
+    return '';
+  }
+}
+
+function setPublishToken(token) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Nothing to do: publishing this session still works, the token just will not be
+    // remembered for the next one.
+  }
+}
+
+/** UTF-8 safe base64, which is what the API wants the file contents as. btoa alone
+ *  throws on any Hebrew character, and this file is full of them. */
+function toBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  // In chunks: apply() on a 100KB array overflows the argument limit.
+  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(binary);
+}
+
+async function api(path, token, options = {}) {
+  return fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${path}`, {
+    ...options,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(options.headers || {}),
+    },
+  });
+}
+
+/** Whatever is published right now, straight from the repository rather than from the
+ *  deployed site, so it is accurate the moment after a publish instead of a minute
+ *  later. Returns { data, sha } with data null when nothing is published yet. */
+async function fetchPublished(token) {
+  const res = await api(`contents/${PUBLISH_PATH}?ref=${REPO_BRANCH}`, token);
+  if (res.status === 404) return { data: null, sha: undefined };
+  if (res.status === 401) throw new Error('That token was refused. It may be wrong, expired, or revoked.');
+  if (res.status === 403) throw new Error('That token is not allowed to read this repository.');
+  if (!res.ok) throw new Error(`GitHub replied ${res.status} when reading what is published.`);
+  const body = await res.json();
+  // The API returns base64 wrapped across lines, which atob will not accept as-is.
+  const text = new TextDecoder().decode(Uint8Array.from(atob(body.content.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+  return { data: JSON.parse(text), sha: body.sha };
+}
+
+async function commit(json, sha, message, token) {
+  const res = await api(`contents/${PUBLISH_PATH}`, token, {
+    method: 'PUT',
+    body: JSON.stringify({ message, content: toBase64(json), branch: REPO_BRANCH, ...(sha ? { sha } : {}) }),
+  });
+  if (res.status === 401 || res.status === 403) throw new Error('That token is not allowed to write to this repository.');
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = (await res.json()).message || '';
+    } catch {
+      /* the body is not always JSON */
+    }
+    throw new Error(`GitHub refused the change (${res.status})${detail ? ': ' + detail : ''}.`);
+  }
+}
+
+/** Two sheets are the same season in the same year, and so replace each other. */
+const sameSeason = (a, b) => a.season === b.season && a.hebrewYear === b.hebrewYear;
+
+/** Publishes a season, keeping every other season already published.
+ *
+ *  A year needs both קיץ and חורף, so publishing one must not remove the other: this
+ *  replaces only the entry for the same season and year, which is what makes a corrected
+ *  chart supersede the one before it. Settings and rules come from this publish, since
+ *  they are shul-wide rather than per season. */
+async function publishToSite(payload, token) {
+  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
+  const { data, sha } = await fetchPublished(token);
+  const existing = data?.sheets || [];
+
+  // Only Shabbos sheets identify a season. Every weekday chart carries season 'weekday',
+  // so comparing those by season and year matched קיץ's weekday against חורף's and
+  // quietly deleted one: a weekday chart belongs to whichever Shabbos sheet it was
+  // generated with, and is replaced only when that sheet is.
+  const incomingSeasons = payload.sheets.filter((s) => s.season !== 'weekday');
+  const replacedIds = new Set(
+    existing.filter((s) => s.season !== 'weekday' && incomingSeasons.some((i) => sameSeason(i, s))).map((s) => s.id)
+  );
+  const keep = existing.filter((s) =>
+    s.season === 'weekday' ? !replacedIds.has(s.linkedSheetId) : !incomingSeasons.some((i) => sameSeason(i, s))
+  );
+
+  const merged = { ...data, ...payload, sheets: [...keep, ...payload.sheets] };
+  const label = incomingSeasons[0];
+  await commit(JSON.stringify(merged, null, 2), sha, `Publish ${label?.season || 'season'} ${label?.hebrewYear || ''}`, token);
+  return data ? 'updated' : 'created';
+}
+
+/** Takes one season back off the congregation's page, leaving the others published. */
+async function unpublishFromSite(sheet, token) {
+  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
+  const { data, sha } = await fetchPublished(token);
+  if (!data) throw new Error('Nothing is published.');
+  const remaining = data.sheets.filter((s) => !sameSeason(s, sheet) && !(s.season === 'weekday' && s.linkedSheetId === sheet.id));
+  await commit(JSON.stringify({ ...data, sheets: remaining }, null, 2), sha, `Unpublish ${sheet.season} ${sheet.hebrewYear}`, token);
+  return remaining.length;
+}
+
+/** Regenerate previous, current and upcoming seasons from shared formulas.
+ * Previously published sheets supply page splits only; times are always recalculated. */
+function buildAutomaticCharts(config, tables, now = new Date()) {
+  const settings = { ...DEFAULT_SETTINGS, ...config.settings,
+    sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
+  const resolved = resolveSettings(settings);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: settings.timezoneId || 'America/New_York',
+    year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now);
+  const part = type => Number(parts.find(p => p.type === type).value);
+  const today = excelSerial(new Date(Date.UTC(part('year'), part('month') - 1, part('day'))));
+  const year = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+  const seasons = [];
+  for (let y = year - 1; y <= year + 1; y++) for (const season of ['choref', 'kayitz']) {
+    seasons.push({ season, year: y, ...computeSeasonWeeks(season, y, resolved, tables) });
+  }
+  seasons.sort((a, b) => a.startSerial - b.startSerial);
+  let at = seasons.findIndex(s => s.startSerial <= today && today < s.endSerial);
+  if (at < 0) at = seasons.findIndex(s => s.endSerial > today);
+  const selected = seasons.slice(Math.max(0, at - 1), at + 2);
+  const sheets = [];
+  for (const s of selected) {
+    const old = (config.sheets || []).filter(x => x.season === s.season && x.hebrewYear === s.year)
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
+    const key = s.season + '-' + s.year;
+    const custom = config.chartLayouts?.[key];
+    const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
+      sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
+    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
+    const id = 'auto-' + key;
+    const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
+      style: { ...settings.sheetStyle }, automatic: true };
+    sheets.push({ ...base, id, season: s.season, weeks: s.weeks, pageSizes: sizes,
+      overrides: {} });
+    sheets.push({ ...base, id: id + '-weekday', season: 'weekday', linkedSeason: s.season,
+      linkedSheetId: id, weeks: weekdayWeeks, pageSizes: alignPageSizesTo(s.weeks, sizes, weekdayWeeks),
+      overrides: {} });
+  }
+  return { ...config, settings, sheets, automaticCharts: true };
+}
+
+// ==== storage.js ====
+// localStorage persistence + JSON export/import. Everything (settings, saved sheet
+// instances with their per-cell overrides, and rules) lives in one namespaced key -
+// this is the single-browser "local app" model the user chose over a hosted backend.
+
+
+/* The retired דרשה rules live with the rule engine rather than here, because this is not the only
+   door they come in through: the congregation's site reads data/published.json, which carries a
+   copy of the rules, and it has to retire the same ones. See isRetiredDrashaRule in rules.js. */
+
+
+const KEY = 'zmanim-app-state-v1';
+const SHEET_FILE_TYPE = 'zmanim-sheet';
+
+// No seed rules by default - add your own from the Rules tab (e.g. Shabbos Teshuva /
+// Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
+// ready to fill in the real wording/times.
+const SEED_RULES = [];
+
+/* The seed that put the 8:40 back on the end of the ר"ח / בה"ב / תענית שחרית is gone with the
+   setting it edited. That schedule is WEEKDAY_SHACHARIS_SPECIAL in settings.js now and no browser
+   holds a copy of it to be corrected. */
+
+function applySeeds(state) {
+  const seeded = state.seeded || {};
+  /* Both bare-word דרשה rules off, on any browser still holding one. Not guarded by a flag
+     that can be satisfied once: the שובה pass ran under seeded.shuvaComputed and matched on
+     the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
+     duplicate. This runs every load and is cheap, and a rule it removes cannot come back,
+     because nothing seeds one any more. See isRetiredDrashaRule for what it will not touch. */
+  state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r) && !isRetiredTishaBavRule(r));
+  /* And the same word where the rule had already been baked into a typed-over cell, which
+     deleting the rule does not reach. See dropDuplicateDrasha for what it will not touch. */
+  for (const sheet of Array.isArray(state.sheets) ? state.sheets : []) {
+    for (const week of Object.values(sheet?.overrides || {})) {
+      for (const [key, value] of Object.entries(week || {})) {
+        const fixed = dropDuplicateDrasha(value);
+        if (fixed !== value) week[key] = fixed;
+      }
+    }
+  }
+  seeded.drashos = true;
+  seeded.shuvaComputed = true;
+  seeded.hagadolComputed = true;
+  seeded.tishaBav = true; // The schedule is computed by the sheet builders now.
+  // Rule names written with an em dash, back when the seeds used one. Rewritten to a
+  // colon so no dash of that kind is left anywhere in the app, including names already
+  // saved in a browser.
+  for (const rule of state.rules) {
+    if (rule.name?.includes('—')) rule.name = rule.name.replace(/\s*—\s*/g, ': ');
+  }
+  state.seeded = seeded;
+  return state;
+}
+
+// Merges saved settings over the defaults, cloning nested objects (sheetStyle) so
+// nothing ever ends up sharing a reference with the DEFAULT_SETTINGS constant -
+// mutating state.settings.sheetStyle in place would otherwise silently corrupt the
+// app's built-in defaults for the rest of the session.
+function normalizeSettings(raw) {
+  const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
+  if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
+  if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
+  for (const key of RETIRED_SETTINGS) delete merged[key];
+  return merged;
+}
+
+/** Settings that are the program's now and not the shul's, dropped as they load.
+ *
+ *  The two Weekday שחרית schedules and the chart's footer note were three fields in Settings;
+ *  they are WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE in settings.js
+ *  now, and everything that prints them reads them from there. The old keys are taken out rather
+ *  than left sitting in localStorage: nothing reads them, so a copy left behind would be a stale
+ *  schedule travelling in every backup and every published file, looking authoritative and being
+ *  read by nothing. The מנחה and מעריב keys were always blank and go with them. */
+const RETIRED_SETTINGS = [
+  'weekdayShacharis',
+  'weekdayShacharisSpecial',
+  'weekdayFooterNote',
+  'weekdayDefaultMincha',
+  'weekdayDefaultMaariv',
+];
+
+const isLegacyAccent = (color) => LEGACY_ACCENT_COLORS.includes(String(color || '').toLowerCase());
+
+/** The same carry-forward, for sheets already saved. A sheet keeps its own copy of the
+ *  style, so changing the default alone would leave every existing chart on the old dark
+ *  header while new ones came out light. Only the exact old default is moved; a colour
+ *  picked by hand is left alone, as everywhere else. */
+function normalizeSheets(sheets) {
+  for (const sheet of Array.isArray(sheets) ? sheets : []) {
+    if (sheet?.style && isLegacyAccent(sheet.style.accentColor)) sheet.style.accentColor = DEFAULT_ACCENT_COLOR;
+    /* A week whose date will not parse gets it back off its own serial.
+     *
+     * The serial is the week's key and everything is computed from it; the date beside it is
+     * the same day written the other way, for the screens that print it. An import carrying a
+     * date this browser cannot read (a truncated file, an export edited by hand) left every
+     * screen that prints one throwing: measured, This week came up empty with "Invalid time
+     * value" and no way back except clearing the browser. Repaired rather than dropped, since
+     * the week itself is perfectly good and the serial says which day it is. */
+    for (const week of Array.isArray(sheet?.weeks) ? sheet.weeks : []) {
+      if (!Number.isFinite(week?.serial)) continue;
+      if (Number.isNaN(new Date(week.date).getTime())) week.date = dateFromSerial(week.serial).toISOString();
+    }
+  }
+  return Array.isArray(sheets) ? sheets : [];
+}
+
+/** The sheets the shul has written itself (see posters/own.js), which live here with
+ *  everything else and so travel with an export like everything else.
+ *
+ *  Anything without an id is dropped: a sheet is found by its id from the Posters tab's own
+ *  address, and one without it could be picked but never come back to. */
+function normalizeOwn(own) {
+  return (Array.isArray(own) ? own : []).filter((s) => s && s.id).map((s) => ({
+    ...s,
+    blocks: (Array.isArray(s.blocks) ? s.blocks : []).map((b) => ({
+      ...b, rows: Array.isArray(b.rows) ? b.rows : [],
+    })),
+  }));
+}
+
+function defaultState() {
+  return applySeeds({ settings: normalizeSettings({}), sheets: [], rules: SEED_RULES.map((r) => ({ ...r })), seeded: {}, own: [] });
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return defaultState();
+    const parsed = prepareBackup(JSON.parse(raw));
+    return applySeeds({
+      settings: normalizeSettings(parsed.settings),
+      sheets: normalizeSheets(parsed.sheets || []),
+      rules: parsed.rules && parsed.rules.length ? parsed.rules : SEED_RULES.map((r) => ({ ...r })),
+      seeded: parsed.seeded || {},
+      own: normalizeOwn(parsed.own),
+    });
+  } catch (e) {
+    console.error('Failed to load saved state, starting fresh.', e);
+    return defaultState();
+  }
+}
+
+function saveState(state) {
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+function exportStateToFile(state) {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `zmanim-app-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** True for a single-sheet file rather than a whole-app backup.
+ *
+ *  Nothing writes these any more - Saved sheets used to have a "Save a copy" button that
+ *  downloaded one, and folders inside the app replaced it. Import still recognises them
+ *  so a file saved back then still opens. */
+function isSheetFile(text) {
+  try {
+    return JSON.parse(text)?.type === SHEET_FILE_TYPE;
+  } catch {
+    return false;
+  }
+}
+
+/** The sheet inside such a file, given a fresh id so importing the same copy twice (or
+ *  onto the machine it came from) adds a second sheet instead of colliding with the
+ *  original. Never locked on arrival - the lock belongs to the copy it came from. */
+function importSheetFromText(text) {
+  const { sheet } = JSON.parse(text);
+  if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');
+  return { ...prepareSavedSheet(sheet), id: newId('sheet'), locked: false, linkedSheetId: undefined };
+}
+
+function importStateFromText(text) {
+  const parsed = prepareBackup(JSON.parse(text));
+  // `seeded` comes across too: without it, restoring a backup made after deliberately
+  // deleting a seeded rule would hand it straight back on the next load.
+  return applySeeds({
+    settings: normalizeSettings(parsed.settings),
+    sheets: normalizeSheets(parsed.sheets || []),
+    rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
+    seeded: parsed.seeded || {},
+    own: normalizeOwn(parsed.own),
+  });
+}
+
+function newId(prefix) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 // ==== posters/chart-cell.js ====
 // A wall chart's cell, read back as a poster's own times.
 //
@@ -1914,113 +2856,6 @@ function minyanList() {
       }
     },
   };
-}
-
-// ==== zmanim/zmanim.js ====
-// Named zman functions, ported 1:1 from the workbook's defined names.
-// Every function returns a fractional day (0-1) representing local time-of-day,
-// exactly like the Excel formulas do (add to a date's serial to get a date+time).
-
-const MIN = 1 / 1440; // one minute, as a fraction of a day
-
-// SUNRISE / SUNSET: horizon adjustable, elevation always applied (matches the workbook
-// note: "elevation used in this function will adjust even if the 'use elevation for
-// zmanim' setting is set to false").
-function sunrise(date, settings, horizonDeg = settings.horizon) {
-  return sunEvent(true, date, horizonDeg, settings, true);
-}
-function sunset(date, settings, horizonDeg = settings.horizon) {
-  return sunEvent(false, date, horizonDeg, settings, true);
-}
-// SUNRISE_elev / SUNSET_elev: fixed horizon from settings, elevation only if the
-// "use elevation for zmanim" toggle is on.
-function sunriseElev(date, settings) {
-  return sunEvent(true, date, settings.horizon, settings, settings.useElevation);
-}
-function sunsetElev(date, settings) {
-  return sunEvent(false, date, settings.horizon, settings, settings.useElevation);
-}
-
-// SOLAR_NOON (true solar noon / astronomical chatzos)
-function solarNoon(date, settings) {
-  const lon = settings.longitude / 360;
-  const serial = excelSerial(date);
-  const jDay = calcJD(serial);
-  const tNoon = calcJDToJCent(jDay - lon);
-  const eot1 = equationOfTime(tNoon);
-  const tNew = calcJDToJCent(jDay - lon - eot1);
-  const eot2 = equationOfTime(tNew);
-  const noonUTC = 0.5 - lon - eot2;
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial + noonUTC), settings.timezone);
-  return noonUTC + offsetHours / 24;
-}
-
-/** calcDST_LOCAL: whether DST is in effect for the given calendar date under the
- *  current settings' timezone. Exposed for the sheet formulas (they branch on it
- *  directly, e.g. the Friday Mincha/Maariv column). */
-function dstLocal(date, settings) {
-  return timezoneOffset(date, settings.timezone).isDst;
-}
-
-// Alos / Misheyakir (degree-based, off plain SUNRISE)
-const alos16_1 = (date, settings) => sunrise(date, settings, 16.1);
-const misheyakir10_2 = (date, settings) => sunrise(date, settings, 10.2);
-
-// Tzais (minute/degree-based, off SUNSET/SUNSET_elev)
-const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN;
-const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
-const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
-const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
-
-// ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
-const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;
-
-/** Shared "proportional day" pattern behind MINCHA_GEDOLA/KETANA, PLAG_HAMINCHA,
- *  SAMUCH_LEMINCHA_KETANA (subtractive, counted back from end of day):
- *  __X(end_of_day, midday, start_of_day) in the workbook. */
-function fromEndOfDay(endOfDay, midday, startOfDay, fullDayFraction, halfDayFraction, useAstronomicalChatzos) {
-  return endOfDay - (useAstronomicalChatzos ? (endOfDay - midday) * halfDayFraction : (endOfDay - startOfDay) * fullDayFraction);
-}
-/** Same pattern for SOF_ZMAN_SHMA/TFILA (additive, counted forward from start of day). */
-function fromStartOfDay(startOfDay, midday, endOfDay, fullDayFraction, halfDayFraction, useAstronomicalChatzos) {
-  return startOfDay + (useAstronomicalChatzos ? (midday - startOfDay) * halfDayFraction : (endOfDay - startOfDay) * fullDayFraction);
-}
-
-function minchaGedola(date, settings) {
-  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 5.5 / 12, 5.5 / 6, settings.useAstronomicalChatzos);
-}
-function minchaGedola30MinAfterChatzos(date, settings) {
-  return solarNoon(date, settings) + 30 * MIN;
-}
-/** MINCHA_GEDOLA_LECHUMRA: __ZMAN_LECHUMRA(latest=TRUE, ...) i.e. the later of the two. */
-function minchaGedolaLechumra(date, settings) {
-  return Math.max(minchaGedola(date, settings), minchaGedola30MinAfterChatzos(date, settings));
-}
-function minchaKetana(date, settings) {
-  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 2.5 / 12, 2.5 / 6, settings.useAstronomicalChatzos);
-}
-function samuchLeminchaKetana(date, settings) {
-  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
-}
-function plagHamincha(date, settings) {
-  return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 1.25 / 12, 1.25 / 6, settings.useAstronomicalChatzos);
-}
-/** __PLAG_HAMINCHA(end_of_day, <midday omitted>, start_of_day): used directly in the
- *  sheets as __PLAG_HAMINCHA(TZAIS_72(date), , ALOS_16.1(date)) etc. When midday is
- *  omitted the astronomical-chatzos toggle is irrelevant (workbook falls straight
- *  through to the "full day" branch). */
-function plagHaminchaCustom(endOfDay, startOfDay) {
-  return endOfDay - (endOfDay - startOfDay) * (1.25 / 12);
-}
-
-function sofZmanShmaGRA(date, settings) {
-  return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
-}
-function sofZmanShmaMGA72(date, settings) {
-  return fromStartOfDay(alos72(date, settings), solarNoon(date, settings), tzais72(date, settings), 1 / 4, 1 / 2, settings.useAstronomicalChatzos);
-}
-function sofZmanTfilaGRA(date, settings) {
-  return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
 }
 
 // ==== posters/reckonings.js ====
@@ -2906,184 +3741,6 @@ function buildYomKippurPoster(year, settings) {
   };
 }
 
-// ==== sheets/common.js ====
-// Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
-// "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
-
-
-
-
-const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
-
-/** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
- *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
- *  (Sukkos through the 1st Sunday of November), which is also nominally "DST active"
- *  but must NOT count here: this same test is also the cutover point at which a שבת
- *  חורף season needs its final page generated as an actual שבת קיץ chart instead (see
- *  weeks.js's splitChorefAtSpringCutover) - that switch must only happen once, near
- *  the season's end, not at Sukkos just because the clock happens to still read DST
- *  there too. */
-function inSpringDstWindow(date, settings) {
-  return Z.dstLocal(date, settings) && date.getUTCMonth() + 1 < 6;
-}
-
-/** (spring DST window) OR (Hebrew day-of-year<192): the window in which the
- *  Plag-Hamincha-based early minyanim are offered at all. The day-of-year branch
- *  additionally covers שבת קיץ's own late-season stretch (Elul into Tishrei/Sukkos),
- *  which has nothing to do with DST. */
-function inPlagWindow(serial, settings) {
-  const d = dateFromSerial(serial);
-  const doy = hebrewDateExtended(serial, settings.useGregorianBefore1582).dayOfYear;
-  return inSpringDstWindow(d, settings) || doy < 192;
-}
-
-/** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
- *  formula in both sheets. Printed across two lines, split as evenly as possible
- *  (more options on the second line when the count is odd).
- *
- *  While the clocks are forward, nothing is offered before 1:35. That is the shul's rule
- *  and it is a deliberate departure from the workbook, which does not have it.
- *
- *  It matters for one stretch: חורף opens at Sukkos but the clocks do not go back until
- *  the start of November, so the first weeks of the winter schedule are still on DST.
- *  Through those weeks Mincha Gedola Lechumra sits just under 1:20 (measured across the
- *  5787 winter: 1:16, 1:15, 1:15, 1:15, 1:15 on the five Fridays from 2 October to 30
- *  October) and the early minyan below fired on its own, putting a 1:15 in front of the
- *  1:35 on a day nobody davens that early. From 6 November it is on standard time and the
- *  whole early set is right again, and by late March, when the clocks go forward at the
- *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
- *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
- *  nothing there changes either way. */
-function fridayMainMinchaMenu(fridayDate, settings) {
-  const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
-  const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const items = flattenNonEmpty([
-    onStandardTime ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
-    onStandardTime && mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
-    underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
-    '1:50',
-    '2:15',
-    '3:00',
-  ]);
-  return splitLinesInHalf(items);
-}
-
-/** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
- *  Also printed across two lines, split the same way. */
-/** The names the calendar gives שבת שובה, in both languages, since a rule or a sheet may
- *  carry either. See hebrewCalendar's hasSpecialParsha.
- *
- *  Exported because the poster asks the same question, and the offline build flattens every
- *  module into one scope where a second const of this name is a hard error. One definition
- *  of what this Shabbos is called. */
-const SHUVA_NAMES = ['שובה', 'Shuva'];
-
-/** The two Shabbosos the דרשה afternoon belongs to.
- *
- *  שבת הגדול keeps the same shape as שבת שובה, asked for once the שובה cell had been printing
- *  for a season: an afternoon built around the דרשה rather than the standing 5:30, 6:00 and
- *  6:30. Before this it was a rule that appended the bare word "דרשה" under the ordinary times,
- *  which said one was happening and left the time to be typed in by hand each year.
- *
- *  Separate from SHUVA_NAMES rather than folded into it, because that list answers a different
- *  question: the שבת שובה poster asks it to find its week, and it wants that Shabbos and not a
- *  Shabbos that happens to be built the same way. */
-const DRASHA_NAMES = [...SHUVA_NAMES, 'הגדול', 'Hagadol'];
-
-/** To the nearest 5 minutes. The דרשה is announced to the shul rather than derived from a
- *  zman, so it is said as a round time: 5:14 is not a time anybody is told to come at. */
-function roundTo5(dayFraction) {
-  return Math.round(dayFraction * 288) / 288; // 288 = 1440 minutes / 5
-}
-
-function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
-  const sunsetVal = Z.sunset(shabbosDate, settings);
-  const early = Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20';
-  // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
-  // ceilToMinute matches that.
-  const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
-  const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
-
-  /* שבת שובה and שבת הגדול: the דרשה, and the מנחה that goes with it.
-   *
-   * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
-   * itself, because that is the minyan the דרשה is timed against: an hour before it, to
-   * the nearest 5, and the מנחה למטה half an hour before that. So the whole afternoon
-   * moves with the season, as it should, and no one has to retype it each year.
-   *
-   * The afternoon minyanim the other weeks carry (5:30, 6:00, 6:30) are not here. The
-   * מנחה למטה is what happens instead of them on this Shabbos, which is what the sheet
-   * that was built by hand for 5786 says: 1:40 and 4:45, then the דרשה, then 6:14 and
-   * 6:29, with no 5:30.
-   *
-   * Underlined like the מנחה before it: both are downstairs, which is what the underline
-   * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
-   *
-   * The דרשה gets a line to itself, in the middle, and is not underlined. It is not a
-   * minyan: the underline on these boards means downstairs (see the footer, "All underlined
-   * מנינים will be בבית מדרש למטה"), and a speech is not somewhere to daven. The מנחה למטה
-   * above it is underlined, because that one is.
-   *
-   * Three lines where every other cell on the page is two. Making the other rows grow to
-   * match was tried and put back: syncHeaderRowHeight pins every row to an even share of
-   * the table, and flooring that share at the tallest row inflated page 1 from 816.95px to
-   * 988.47px, well past the 8.5in sheet. The comment in that function says as much, from an
-   * earlier attempt at the same thing. So this cell sits deeper than its neighbours exactly
-   * as the cell built by hand for 5786 does, which is what has been printing all along.
-   *
-   * Stored as "דרשה 5:15" and it reaches the paper as "5:15 דרשה", the time to the left of
-   * the word. That is not a fault and it is not worth trying to undo: read the way Hebrew
-   * is read, right to left, it says דרשה and then the time, and it is character for
-   * character what the cell built by hand for 5786 already puts on the board.
-   *
-   * The isolate around the pair is what stops it reaching anything else. It earned its
-   * place when the דרשה shared a line with the times: without it every number after the
-   * Hebrew word joined that word's run and the whole line reversed, measured on the chart
-   * as "6:29 / 6:14 / 5:15 דרשה". Alone on its own line there is nothing left to reverse,
-   * and it stays for the day somebody puts it back among the times. */
-  const drasha = DRASHA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
-  if (drasha !== null) {
-    return [
-      `${early}${SLASH}${underlineTime(drasha - 30 / 1440)}`,
-      isolate(`דרשה ${formatTime(drasha)}`),
-      `${formatTime(main)}${SLASH}${late}`,
-    ].join('\n');
-  }
-
-  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
-  const gates = [T(17, 30), T(18, 0), T(18, 30)];
-  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
-  const items = flattenNonEmpty([early, kept, formatTime(main), late]);
-  return splitLinesInHalf(items);
-}
-function floorMin(x) {
-  return Math.floor(x * 1440 + 1e-7) / 1440;
-}
-
-/** Fixed Shacharis line (קיץ column E / חורף column E) - identical, not date-dependent.
- *  Uses NBSP around the "/" so it can never wrap onto a second line. */
-function shacharisLine() {
-  return `${underlineTime(T(7, 30))}${SLASH}8:15`;
-}
-
-/** Candle lighting + sunset (קיץ column H / חורף column H) - identical formula. */
-function candleLightingCell(fridayDate, settings) {
-  const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
-  return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
-}
-
-/** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) - Motzei
- *  Shabbos's Maariv is really the start of Tisha B'Av. Flags it by appending "ט באב" to
- *  the Mincha (C) and Motzei-Shabbos Maariv (B) cells, alongside whatever they already
- *  computed - never replacing that content. Applies automatically to every week, not a
- *  user-editable rule, since it's a fixed calendar fact rather than a shul preference. */
-function applyTishaBavNote(row, week, settings) {
-  const jdate = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
-  if (jdate.month !== 5 || jdate.dayOfMonth !== 9) return row; // month 5 = Av (Nissan=1..Adar=12 numbering)
-  const withNote = (text) => [text, 'ט באב'].filter(Boolean).join('\n');
-  return { ...row, B: withNote(row.B), C: withNote(row.C) };
-}
-
 // ==== sheets/kayitz.js ====
 // שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
 // SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
@@ -3139,8 +3796,9 @@ function buildKayitzRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
+  const tishaEvening = tishaBavMaariv(shabbos, settings)?.split('\n');
+  const B = tishaEvening?.slice(1).join('\n') ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 
@@ -4031,8 +4689,9 @@ function buildChorefRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
-  const B = `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
+  const tishaEvening = tishaBavMaariv(shabbos, settings)?.split('\n');
+  const B = tishaEvening?.slice(1).join('\n') ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 
@@ -6660,13 +7319,14 @@ function buildSlichosTzomPoster(year, settings) {
 // ==== overrides.js ====
 // Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
 // which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
+
 function getOverride(sheet, weekSerial, columnKey) {
   return sheet.overrides?.[weekSerial]?.[columnKey];
 }
 function setOverride(sheet, weekSerial, columnKey, value) {
   if (!sheet.overrides) sheet.overrides = {};
   if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
-  sheet.overrides[weekSerial][columnKey] = value;
+  sheet.overrides[weekSerial][columnKey] = sanitizeRichText(value);
 }
 function clearOverride(sheet, weekSerial, columnKey) {
   if (sheet.overrides?.[weekSerial]) {
@@ -6682,7 +7342,7 @@ function mergeRow(computedRow, sheet, weekSerial) {
   const weekOverrides = sheet.overrides?.[weekSerial];
   if (weekOverrides) {
     for (const [key, value] of Object.entries(weekOverrides)) {
-      row[key] = value;
+      row[key] = sanitizeRichText(value);
       overriddenKeys.add(key);
     }
   }
@@ -6977,12 +7637,12 @@ function newOwnSheet(group) {
 function wordPicker(cls, value, words, placeholder) {
   const known = words.includes(value);
   return `<span class="own-word">
-      <select class="${cls}-pick" aria-label="${escText(placeholder)}">
-        ${words.map((w) => `<option value="${escText(w)}" ${known && w === value ? 'selected' : ''}>${escText(w)}</option>`).join('')}
+      <select class="${cls}-pick" aria-label="${escAttr(placeholder)}">
+        ${words.map((w) => `<option value="${escAttr(w)}" ${known && w === value ? 'selected' : ''}>${escAttr(w)}</option>`).join('')}
         <option value="" ${known ? '' : 'selected'}>Something else…</option>
       </select>
-      <input class="${cls}-text" value="${escText(value)}" placeholder="${escText(placeholder)}"
-        ${known ? 'hidden' : ''} aria-label="${escText(placeholder)}">
+      <input class="${cls}-text" value="${escAttr(value)}" placeholder="${escAttr(placeholder)}"
+        ${known ? 'hidden' : ''} aria-label="${escAttr(placeholder)}">
     </span>`;
 }
 
@@ -6995,7 +7655,7 @@ function rowHtml(row, bi, ri) {
         <option value="typed" ${zman ? '' : 'selected'}>Times I type</option>
         <option value="zman" ${zman ? 'selected' : ''}>Off a זמן</option>
       </select>
-      <input class="own-text" value="${escText(row.text || '')}" ${zman ? 'hidden' : ''}
+      <input class="own-text" value="${escAttr(row.text || '')}" ${zman ? 'hidden' : ''}
         placeholder="7:00, 7:20*, &lt;u&gt;7:35&lt;/u&gt;" aria-label="The times">
       <span class="own-rule" ${zman ? '' : 'hidden'}>
         <input class="own-offset" type="number" step="1" value="${Number(row.offset) || 0}" aria-label="Minutes">
@@ -7004,10 +7664,10 @@ function rowHtml(row, bi, ri) {
           <option value="after" ${(Number(row.offset) || 0) > 0 ? 'selected' : ''}>minutes after</option>
         </select>
         <select class="own-zman" aria-label="Which זמן">
-          ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escText(z.label)}</option>`).join('')}
+          ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escAttr(z.label)}</option>`).join('')}
         </select>
         <select class="own-round" aria-label="Rounding">
-          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escText(r.label)}</option>`).join('')}
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escAttr(r.label)}</option>`).join('')}
         </select>
       </span>
       <button type="button" class="own-del-row" title="Take this line off">&times;</button>
@@ -7026,7 +7686,7 @@ function blockHtml(block, bi) {
               `<option value="${d}" ${Number(block.day) === d ? 'selected' : ''}>${d}</option>`).join('')}
           </select>
           <select class="own-month" aria-label="Month">
-            ${OWN_MONTHS.map((m) => `<option value="${m.value}" ${Number(block.month) === m.value ? 'selected' : ''}>${escText(m.name)}</option>`).join('')}
+            ${OWN_MONTHS.map((m) => `<option value="${m.value}" ${Number(block.month) === m.value ? 'selected' : ''}>${escAttr(m.name)}</option>`).join('')}
           </select>
         </span>
         <button type="button" class="own-del-block" title="Take this block off">Remove block</button>
@@ -7050,9 +7710,9 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
       <summary>Writing this sheet</summary>
       <p class="hint">A block is a day and its lines. The day is a Hebrew date, so the sheet is for the occasion and not for one year: step the year above and every block moves with it. A line's times are either typed the way a chart writes them (commas between מנינים, <code>*</code> for בעזרת נשים, <code>&lt;u&gt;</code> for למטה) or hung off a זמן, which is worked out from the same calculations the boards use.</p>
       <div class="own-top">
-        <label>What the sheet is called<input class="own-name" value="${escText(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
+        <label>What the sheet is called<input class="own-name" value="${escAttr(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
         <label>Where it sits in the year<select class="own-group">
-          ${occasions.map((o) => `<option value="${escText(o)}" ${sheet.group === o ? 'selected' : ''}>${escText(o)}</option>`).join('')}
+          ${occasions.map((o) => `<option value="${escAttr(o)}" ${sheet.group === o ? 'selected' : ''}>${escAttr(o)}</option>`).join('')}
         </select></label>
       </div>
       <div class="own-blocks">${(sheet.blocks || []).map(blockHtml).join('')}</div>
@@ -7202,56 +7862,6 @@ function setPrintPage(size) {
   // Only when it changes: rewriting a style element invalidates styles for the whole
   // document, and these render functions run on every arrow press.
   if (el.textContent !== css) el.textContent = css;
-}
-
-// ==== pagination.js ====
-// Splits a generated week list across however many printable pages the user chooses
-// (3, 4, or any other count), by user-chosen per-page counts.
-function validatePageSizes(total, sizes) {
-  const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
-  if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
-  if (sizes.some((s) => Number(s) < 0)) return 'Page sizes cannot be negative.';
-  return null;
-}
-
-/** Even default split across `numPages` pages (earlier pages absorb the remainder one
- *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
-function defaultPageSizes(total, numPages) {
-  const base = Math.floor(total / numPages);
-  const rem = total % numPages;
-  return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
-}
-
-/** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
- *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
- *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
- *  Weekday one also carries Yom Tov weeks that have no parsha). A target week falling in
- *  the gap between two source pages lands on the earlier one, matching how the season
- *  boundaries themselves are assigned in sheets/weeks.js. */
-function alignPageSizesTo(sourceWeeks, sourceSizes, targetWeeks) {
-  const cutoffs = []; // serial of the first source week on each page after the first
-  let idx = 0;
-  for (let i = 0; i < sourceSizes.length - 1; i++) {
-    idx += Number(sourceSizes[i]) || 0;
-    cutoffs.push(sourceWeeks[idx] ? sourceWeeks[idx].serial : Infinity);
-  }
-  const counts = new Array(sourceSizes.length).fill(0);
-  for (const week of targetWeeks) {
-    let page = 0;
-    while (page < cutoffs.length && week.serial >= cutoffs[page]) page++;
-    counts[page]++;
-  }
-  return counts;
-}
-
-function splitWeeksIntoPages(weeks, sizes) {
-  const pages = [];
-  let i = 0;
-  for (const size of sizes) {
-    pages.push(weeks.slice(i, i + size));
-    i += size;
-  }
-  return pages;
 }
 
 // ==== ui/rich-text.js ====
@@ -7724,7 +8334,92 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
   return `<div class="sh-sched">${rows.join('')}</div>`;
 }
 
+// ==== ui/switch.js ====
+// A setting with two answers, as a switch.
+//
+// Lived in ui/week-view.js while This week was the only screen with one. The Posters bar
+// wants the same control now, so it moved here rather than being written twice: two
+// switches that look alike and behave differently is worse than either of them.
+//
+// The classes are still .week-switch-*, which is where they were first written and where
+// their CSS still lives in app.css. Renaming them would touch the congregation site's
+// overrides as well, for nothing a reader of either file would gain.
+
+/** A setting with two answers, as a switch: both sides on the screen, the chosen one
+ *  filled in and the fill sliding across when the other is pressed.
+ *
+ *  A dropdown hides one of two answers behind a tap, and on a phone opening it throws the
+ *  system picker up over the page; a button that toggles hides the other answer behind its
+ *  own label, so you have to work out what it will become from what it currently says. A
+ *  switch shows both and the state at the same time.
+ *
+ *  Real radio buttons under the labels, not two <button>s keeping track between them. That
+ *  is what a browser already understands as "one of these": the arrow keys move between the
+ *  two, a screen reader says "1 of 2", and the checked one is the browser's own state
+ *  rather than a class this code has to remember to take off the other one.
+ *
+ *  Each side is one word where it can be. The label carries the question and the sides
+ *  answer it, so the two read as one sentence: writing the whole thing out on both sides
+ *  ("שבת, then weekday") is what the dropdown did, and side by side that is the same words
+ *  twice. Hebrew goes in a <bdi>: it sits in an otherwise-LTR line and would otherwise be
+ *  reordered against what is around it.
+ *
+ *  `name` is the radio group's name and the stem of every id, so two switches on one page
+ *  cannot capture each other's presses.
+ *
+ *  Two sides or three. Three is for a question whose answers are one axis rather than a
+ *  yes and a no: the Posters bar asks for one sheet, a sheet each, or all on one, which is
+ *  three points on how much goes on how much paper and not two questions stacked. */
+function switchHtml(name, question, sides) {
+  const side = ({ value, label, on }) => `
+    <input type="radio" name="${name}" id="${name}-${value}" value="${value}"
+      class="week-switch-radio"${on ? ' checked' : ''}>
+    <label class="week-switch-side" for="${name}-${value}">${label}</label>`;
+  // The question and the switch are siblings rather than the switch being wrapped in a row
+  // of its own, so that switches stacked in a panel can share one grid and line their
+  // tracks up with each other. aria-labelledby does not care how they are nested.
+  // is-three or is-four when there are more than two answers, which is all the thumb needs to
+  // know: how much of the track it covers, and how many places it has to stop. Counted rather
+  // than assumed, because it read `sides.length > 2 ? ' is-three'` while three was the most
+  // there were, and the first four-way switch got a thumb a third of the track wide that could
+  // not reach its fourth side. Nothing asks four questions at the moment; the counting stays
+  // right so that the next one that does is not the thing that finds this out again.
+  const many = sides.length > 3 ? ' is-four' : sides.length > 2 ? ' is-three' : '';
+  return `<span class="week-switch-label" id="${name}-label">${question}</span>
+    <div class="week-switch${many}" role="radiogroup" aria-labelledby="${name}-label">
+      ${sides.map(side).join('')}
+      <span class="week-switch-thumb" aria-hidden="true"></span>
+    </div>`;
+}
+
+/** Listen to one switch inside `root`, by the name it was built with.
+ *
+ *  On the group rather than on each radio, so a redraw that rebuilds the sides does not
+ *  leave a listener behind on a node nobody can see any more. */
+function wireSwitch(root, name, apply) {
+  root.querySelector(`.week-switch[aria-labelledby="${name}-label"]`)
+    ?.addEventListener('change', (e) => {
+      if (!e.target.matches('.week-switch-radio')) return;
+      apply(e.target.value);
+    });
+}
+
 // ==== ui/sheet-view.js ====
+const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
+const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
+const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
+  ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
+function chartMarginControl(key, label, value, original) {
+  const steps = Array.from({ length: 13 }, (_, i) => (15 + i * 5) / 100);
+  return `<div class="poster-year"><span class="poster-year-label" id="${key}-label">${label}</span>
+    <div class="poster-year-step">
+      <button type="button" id="${key}-less" aria-label="Decrease ${label}" ${value <= CHART_PAD_MIN ? 'disabled' : ''}>&minus;</button>
+      <select id="${key}" aria-labelledby="${key}-label">${steps.map(v => `<option value="${v}" ${Math.abs(v-value)<0.001?'selected':''}>${v.toFixed(2)}in</option>`).join('')}</select>
+      <button type="button" id="${key}-more" aria-label="Increase ${label}" ${value >= CHART_PAD_MAX ? 'disabled' : ''}>+</button>
+      <button type="button" id="${key}-original" class="poster-year-reset" ${Math.abs(value-original)<0.001?'disabled':''}>Original</button>
+    </div></div>`;
+}
+
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
  *  cutover (2nd Sunday of March - not the fall one near Sukkos) prints as a real שבת
@@ -7741,7 +8436,6 @@ function columnsAndBuilderFor(effectiveSeason) {
   return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
 }
 
-const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Times New Roman', 'Arial', 'Segoe UI'];
 
 /** Which shipped webfont stands in for each choice when the real one isn't installed.
  *
@@ -7809,7 +8503,7 @@ function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false }
     const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly });
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
-    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
+    applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
     if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
@@ -7846,7 +8540,6 @@ function renderSheet(container, state, sheet, onChange) {
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
-  const hist = getHistory(sheet.id);
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
   setPrintPage('letter landscape');
@@ -7854,89 +8547,27 @@ function renderSheet(container, state, sheet, onChange) {
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
-      <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
-      <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      ${companion ? `<button id="companion-btn">${sheet.season === 'weekday' ? '→ View שבת sheet' : '→ View Weekday chart'}</button>` : ''}
-      ${companion ? '<button id="side-by-side-btn" type="button" title="Show both charts beside each other, scaled down">⇄ Side by side</button>' : ''}
-      <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
-      ${richTextToolbarHtml('In the cell you\'re editing:')}
-      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
-        anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
-      }</span>
     </div>
-    <details class="panel no-print">
-      <summary>Which pages to print or save</summary>
+    <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
-        <p class="hint">Everything is included by default. Untick a page to leave it out of the next print or PDF. Excluded pages stay on screen, dimmed, so you can still read them.</p>
-        <div class="page-picker" id="page-picker"></div>
-        <div class="actions"><button type="button" id="pages-all">Include all</button></div>
-      </div>
-    </details>
-    <details class="panel no-print">
-      <summary>Layout &amp; style: font, sizes, colour</summary>
-      <div class="panel-body">
-        <div class="style-toolbar">
-          <label>Font
-            <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
-          </label>
-          <label>Text size
-            <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
-            <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
-          </label>
-          <label>Logo size
-            <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
-          </label>
-          <label>Page color
-            <input id="style-color" type="color" value="${sheet.style.accentColor}">
-          </label>
-          <button id="style-reset" type="button">Reset style</button>
+        <div class="poster-bar">
+          ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
+          ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
+          <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
+            { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
+            { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
+          ])}</div>
+          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view. The picture stays in colour.</p>
         </div>
       </div>
-    </details>
+    </div>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
-  container.querySelector('#side-by-side-btn')?.addEventListener('click', (e) => {
-    const on = container.querySelector('#sheet-stack').classList.toggle('is-side-by-side');
-    e.target.classList.toggle('is-active', on);
-    if (fitOn) applyFit(container, true); // the scale to fit changes when two pages share the row
-  });
 
-  // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
-  // ever be read a column at a time by scrolling sideways. Fitting scales it down until
-  // a whole page is on screen at once: too small to edit in, but the point is seeing the
-  // page. It starts on whenever the page doesn't fit, which in practice means phones.
-  const fitBtn = container.querySelector('#fit-btn');
-  fitBtn.addEventListener('click', () => setFit(container, !fitOn));
-
-
-  // The formatting buttons act on whichever cell was last being edited. Tracked on
-  // focusin rather than read from document.activeElement at click time because the
-  // buttons deliberately don't take focus (see wireRichTextToolbar) - but a click
-  // elsewhere on the page in between should still leave them pointing at that cell.
-  let lastFocusedCell = null;
-  container.addEventListener('focusin', (e) => {
-    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
-  });
-  wireRichTextToolbar(container, () => lastFocusedCell);
-  container.querySelector('#undo-btn').addEventListener('click', () => {
-    const action = hist.undo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.before);
-    hist.redo.push(action);
-    onChange({ save: true }); // app.js re-renders the whole sheet view on save
-  });
-  container.querySelector('#redo-btn').addEventListener('click', () => {
-    const action = hist.redo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.after);
-    hist.undo.push(action);
-    onChange({ save: true });
-  });
 
   // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
   // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
@@ -7947,82 +8578,48 @@ function renderSheet(container, state, sheet, onChange) {
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
   const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
-  const primaryPages = buildPagesFor(sheet);
-  const companionPages = buildPagesFor(companion);
+  const shabbosFirst = sheet.season === 'weekday' && companion;
+  const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
+  const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
     if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
 
-  // Both of these need the pages in the document: the picker to count them, and the row
-  // sync to measure them (heights read 0 on a detached element).
+  // Row heights need the pages in the document to be measured.
   syncHeaderRowHeight(pagesEl);
-  buildPagePicker(container);
   autoFit(container);
 
 
   const restyleOwnPages = () => {
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
     syncHeaderRowHeight(pagesEl);
   };
 
-  const fontSel = container.querySelector('#style-font');
-  const sizeInput = container.querySelector('#style-size');
-  const sizeLabel = container.querySelector('#style-size-label');
-  const headerInput = container.querySelector('#style-header');
   // Persists sheet.style as the app's "last used" style too, so the next *newly
   // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
   const commit = () => {
     state.settings.sheetStyle = { ...sheet.style };
     onChange({ save: true });
   };
-  fontSel.addEventListener('change', () => {
-    sheet.style.fontFamily = fontSel.value;
+  for (const [key, field, original] of [['chart-pad-y', 'paddingY', 0.35], ['chart-pad-x', 'paddingX', 0.5]]) {
+    const select = container.querySelector('#' + key);
+    const change = value => {
+      sheet.style[field] = Math.round(chartPad(value, original) * 100) / 100;
+      restyleOwnPages();
+      commit();
+    };
+    select.addEventListener('change', () => change(select.value));
+    container.querySelector('#' + key + '-less').addEventListener('click', () => change(Number(select.value) - 0.05));
+    container.querySelector('#' + key + '-more').addEventListener('click', () => change(Number(select.value) + 0.05));
+    container.querySelector('#' + key + '-original').addEventListener('click', () => change(original));
+  }
+  wireSwitch(container, 'chart-ink', value => {
+    state.settings.chartInk = value === 'mono' ? 'mono' : 'colour';
     restyleOwnPages();
     commit();
   });
-  sizeInput.addEventListener('input', () => {
-    sheet.style.fontSizePt = Number(sizeInput.value);
-    sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
-    restyleOwnPages();
-  });
-  sizeInput.addEventListener('change', commit);
-  headerInput.addEventListener('input', () => {
-    sheet.style.headerScale = Number(headerInput.value);
-    restyleOwnPages();
-  });
-  headerInput.addEventListener('change', commit);
-  const colorInput = container.querySelector('#style-color');
-  colorInput.addEventListener('input', () => {
-    sheet.style.accentColor = colorInput.value;
-    restyleOwnPages();
-  });
-  colorInput.addEventListener('change', commit);
-  container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
-    commit(); // app.js re-renders the whole sheet view on save
-  });
-}
 
-/** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
- *  print.css drops from the output - the page stays visible on screen (dimmed) so you
- *  can still see what you left out. */
-function buildPagePicker(container) {
-  const picker = container.querySelector('#page-picker');
-  if (!picker) return;
-  const pages = [...container.querySelectorAll('#pages > .page')];
-  picker.innerHTML = pages
-    .map((p, i) => `<label class="page-chip"><input type="checkbox" checked data-i="${i}"> <bdi>${escText(p.dataset.sheetLabel)}</bdi> · page ${Number(p.dataset.pageIndex) + 1}</label>`)
-    .join('');
-  picker.querySelectorAll('input').forEach((cb) => {
-    cb.addEventListener('change', () => pages[Number(cb.dataset.i)].classList.toggle('page-excluded', !cb.checked));
-  });
-  container.querySelector('#pages-all').addEventListener('click', () => {
-    picker.querySelectorAll('input').forEach((cb) => {
-      cb.checked = true;
-      pages[Number(cb.dataset.i)].classList.remove('page-excluded');
-    });
-  });
 }
 
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
@@ -8093,7 +8690,13 @@ function headerInkFor(color) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
 }
 
-function applyStyle(target, style) {
+function applyStyle(target, style, ink = style.ink) {
+  target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
+  // Filter the chart sections separately so the building picture keeps its colour.
+  target.style.filter = '';
+  target.querySelectorAll('table, .header-center, .header-rabbi, .page-footer').forEach(el => {
+    el.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+  });
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
@@ -8117,6 +8720,7 @@ function applyStyle(target, style) {
  *  every applyStyle(), since the font/size controls invalidate the measurements. */
 function syncHeaderRowHeight(pagesEl) {
   pagesEl.querySelectorAll('table').forEach((table) => {
+    if (!table.getBoundingClientRect().height) return;
     const headRow = table.querySelector('thead tr');
     const bodyRows = [...table.querySelectorAll('tbody tr')];
     if (!headRow || !bodyRows.length) return;
@@ -8168,7 +8772,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const isWeekday = effectiveSeason === 'weekday';
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
-  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${sheet.columnWidths[key]}px"` : ''}>`).join('') + '</colgroup>';
+  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${Number(sheet.columnWidths[key]) || 0}px"` : ''}>`).join('') + '</colgroup>';
 
   const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
@@ -8261,7 +8865,7 @@ ${special}` : '');
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           const value = announced ? announcedWeekCell(row[c.key] ?? '', c.key, week.serial) : row[c.key] ?? '';
           const html = overriddenKeys.has(c.key) ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -8270,7 +8874,7 @@ ${special}` : '');
         // data-season records which season this *page* rendered as, so a later edit
         // (see the blur handler below) recomputes its "did this really change?"
         // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${week.serial}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -8281,7 +8885,7 @@ ${special}` : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
-      const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${sheet.columnWidths.parsha}px"` : '';
+      const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
       const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${nl2br(parshaCell)}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
@@ -8291,9 +8895,9 @@ ${special}` : '');
   page.innerHTML = `
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${state.settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage)}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="assets/logo-text.png" alt="${escText(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
+          <img class="header-logo" src="assets/logo-text.png" alt="${escAttr(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
           ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}
         </div>
         <div class="header-rabbi"${hebrewLang(state.settings.headerRabbiLine)}>${nl2br(escText(state.settings.headerRabbiLine))}</div>
@@ -8379,6 +8983,14 @@ function splitBuild(season) {
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
 function nl2br(str) {
+  // Keep the three Tisha B'Av labels and times aligned in two shared columns.
+  const evening = String(str).match(/^דרשה (\d{1,2}:\d{2})\nזמן 72 (\d{1,2}:\d{2})\nמעריב (\d{1,2}:\d{2})$/);
+  if (evening) {
+    const labels = ['דרשה', 'זמן 72', 'מעריב'];
+    return '<span class="tisha-evening-grid" dir="rtl" style="display:inline-grid;grid-template-columns:max-content max-content;column-gap:0.45em;text-align:right;white-space:nowrap;line-height:1.2">' +
+      labels.map((label, i) => '<span>' + label + '</span><span dir="ltr" style="text-align:right;font-variant-numeric:tabular-nums">' + evening[i + 1] + '</span>').join('') + '</span>';
+  }
+
   // underlineTime writes its value as "<u> 6:42</u>". The space was meant as a lead-in
   // that would not show on a centred chart cell, and it does show: a cell holding several
   // times leaves 13.7px in front of an underlined one against 10.36px in front of a plain
@@ -8389,76 +9001,6 @@ function nl2br(str) {
   const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
-}
-
-// ==== ui/switch.js ====
-// A setting with two answers, as a switch.
-//
-// Lived in ui/week-view.js while This week was the only screen with one. The Posters bar
-// wants the same control now, so it moved here rather than being written twice: two
-// switches that look alike and behave differently is worse than either of them.
-//
-// The classes are still .week-switch-*, which is where they were first written and where
-// their CSS still lives in app.css. Renaming them would touch the congregation site's
-// overrides as well, for nothing a reader of either file would gain.
-
-/** A setting with two answers, as a switch: both sides on the screen, the chosen one
- *  filled in and the fill sliding across when the other is pressed.
- *
- *  A dropdown hides one of two answers behind a tap, and on a phone opening it throws the
- *  system picker up over the page; a button that toggles hides the other answer behind its
- *  own label, so you have to work out what it will become from what it currently says. A
- *  switch shows both and the state at the same time.
- *
- *  Real radio buttons under the labels, not two <button>s keeping track between them. That
- *  is what a browser already understands as "one of these": the arrow keys move between the
- *  two, a screen reader says "1 of 2", and the checked one is the browser's own state
- *  rather than a class this code has to remember to take off the other one.
- *
- *  Each side is one word where it can be. The label carries the question and the sides
- *  answer it, so the two read as one sentence: writing the whole thing out on both sides
- *  ("שבת, then weekday") is what the dropdown did, and side by side that is the same words
- *  twice. Hebrew goes in a <bdi>: it sits in an otherwise-LTR line and would otherwise be
- *  reordered against what is around it.
- *
- *  `name` is the radio group's name and the stem of every id, so two switches on one page
- *  cannot capture each other's presses.
- *
- *  Two sides or three. Three is for a question whose answers are one axis rather than a
- *  yes and a no: the Posters bar asks for one sheet, a sheet each, or all on one, which is
- *  three points on how much goes on how much paper and not two questions stacked. */
-function switchHtml(name, question, sides) {
-  const side = ({ value, label, on }) => `
-    <input type="radio" name="${name}" id="${name}-${value}" value="${value}"
-      class="week-switch-radio"${on ? ' checked' : ''}>
-    <label class="week-switch-side" for="${name}-${value}">${label}</label>`;
-  // The question and the switch are siblings rather than the switch being wrapped in a row
-  // of its own, so that switches stacked in a panel can share one grid and line their
-  // tracks up with each other. aria-labelledby does not care how they are nested.
-  // is-three or is-four when there are more than two answers, which is all the thumb needs to
-  // know: how much of the track it covers, and how many places it has to stop. Counted rather
-  // than assumed, because it read `sides.length > 2 ? ' is-three'` while three was the most
-  // there were, and the first four-way switch got a thumb a third of the track wide that could
-  // not reach its fourth side. Nothing asks four questions at the moment; the counting stays
-  // right so that the next one that does is not the thing that finds this out again.
-  const many = sides.length > 3 ? ' is-four' : sides.length > 2 ? ' is-three' : '';
-  return `<span class="week-switch-label" id="${name}-label">${question}</span>
-    <div class="week-switch${many}" role="radiogroup" aria-labelledby="${name}-label">
-      ${sides.map(side).join('')}
-      <span class="week-switch-thumb" aria-hidden="true"></span>
-    </div>`;
-}
-
-/** Listen to one switch inside `root`, by the name it was built with.
- *
- *  On the group rather than on each radio, so a redraw that rebuilds the sides does not
- *  leave a listener behind on a node nobody can see any more. */
-function wireSwitch(root, name, apply) {
-  root.querySelector(`.week-switch[aria-labelledby="${name}-label"]`)
-    ?.addEventListener('change', (e) => {
-      if (!e.target.matches('.week-switch-radio')) return;
-      apply(e.target.value);
-    });
 }
 
 // ==== ui/posters-view.js ====
@@ -9331,7 +9873,7 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
      Out of Settings, so a shul that has cropped its own photo in has it here as well, and
      alt="" because the name beside it already says what it is. */
   const icon = onepage
-    ? `<img class="header-icon" src="${escAttr(settings.headerIconImage || 'assets/logo-building-icon.png')}" alt="">`
+    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">`
     : '';
   const head = chartHead
     /* The wall chart's header, copied: the same markup and the same classes, so the two are
@@ -10976,7 +11518,7 @@ function renderPosters(container, state, routeChanged, tables) {
       ])}</div>`}
       ${!empty && !showAll ? `<label>Which sheet
         <select id="poster-pick">
-          ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
+          ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
       <!-- The margin, built like the year and the yom tov beside it: a step either side of a
@@ -13430,206 +13972,6 @@ function chartEsc(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ==== sheets/weeks.js ====
-// Season-boundary + week-list logic: auto-computes which Shabbosim belong on a
-// Kayitz (summer) or Choref (winter) sheet for a given Hebrew year, mirroring the
-// workbook's own P5 formula (SEQUENCE + FILTER on HAS_PARSHA<>"") but without
-// requiring a manually-entered start date or week count.
-
-
-
-const MAX_WEEKS = 60; // safety cap, well above any real season's length
-
-/** Season(hebrewYear) date-range boundaries - Kayitz(Y): Pesach(Y) -> Sukkos(Y+1);
- *  Choref(Y): Sukkos(Y) -> Pesach(Y), both within AM year Y. Factored out of
- *  computeSeasonWeeks so the "which year is next" helpers below can use the same
- *  boundaries without needing a parsha table. */
-function seasonStartSerial(season, hebrewYear) {
-  return season === 'kayitz' ? dateFromHebrew(15, 1, hebrewYear) : dateFromHebrew(15, 7, hebrewYear);
-}
-function seasonEndSerial(season, hebrewYear) {
-  return season === 'kayitz' ? dateFromHebrew(15, 7, hebrewYear + 1) : dateFromHebrew(15, 1, hebrewYear);
-}
-
-/**
- * @param {'kayitz'|'choref'} season
- * @param {number} hebrewYear AM year anchoring the season (see README for the exact
- *   convention: Kayitz(Y) runs Pesach(Y) -> Sukkos(Y+1); Choref(Y) runs Sukkos(Y) -> Pesach(Y), both within AM year Y)
- * @param {object} settings
- * @param {object} tables {parshaChutz, parshaEY, parshaNames}
- * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string}>}}
- */
-function computeSeasonWeeks(season, hebrewYear, settings, tables) {
-  const startSerial = seasonStartSerial(season, hebrewYear);
-  const endSerial = seasonEndSerial(season, hebrewYear);
-
-  let d = Math.ceil(startSerial);
-  while (excelWeekday(d) !== 7) d++;
-
-  const weeks = [];
-  let guard = 0;
-  while (d <= endSerial && guard < MAX_WEEKS) {
-    const parsha = hasParsha(d, settings, tables);
-    if (parsha) {
-      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
-    }
-    d += 7;
-    guard++;
-  }
-  return { startSerial, endSerial, weeks };
-}
-
-function isCholHamoedAnchor(day, settings, specialDaysTable) {
-  return /Chol Hamoed|חול המועד|Hoshana Rabbah|הושענה רבה/.test(hasYomTov(day, settings, specialDaysTable));
-}
-
-function anyRegularDay(fromSerial, toSerial, settings, specialDaysTable) {
-  for (let day = fromSerial; day <= toSerial; day++) {
-    if (!isYomTovOrCholHamoed(day, settings, specialDaysTable)) return true;
-  }
-  return false;
-}
-
-/** "Chol Hamoed Pesach" / "חול המועד סוכות" / "Hoshana Rabbah" -> the plain holiday
- *  name ("Pesach" / "סוכות" / "סוכות") - see the Chol Hamoed row below, which reuses
- *  whatever this Shabbos's own hasYomTov() name is but without the "Chol Hamoed"/
- *  "Hoshana Rabbah" framing, since the row is standing in for the holiday as a whole. */
-function holidayNameFor(day, settings, specialDaysTable) {
-  const name = hasYomTov(day, settings, specialDaysTable);
-  if (/^(Hoshana Rabbah|הושענה רבה)$/.test(name)) return /[֐-׿]/.test(name) ? 'סוכות' : 'Succos';
-  return name.replace(/^(Chol Hamoed |חול המועד )/, '');
-}
-
-/** Week list for a Weekday chart covering the same season date range as
- *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
- *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
- *  a normal day - not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
- *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
- *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
- *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
- *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
- *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
- *  "ראש השנה") when there's no regular parsha to label the row with.
- *
- *  Season boundaries (Pesach/Sukkos) essentially never line up with the fixed 7-day
- *  Saturday spacing this loop walks in, which leaves a "leftover" stretch of up to 6
- *  regular days between the last Saturday-anchored week and the boundary itself (e.g.
- *  the days between שבת הגדול and ליל פסח) - see the trailing-gap check after the main
- *  loop, which folds that stretch onto *this* (the outgoing/earlier) season as one more
- *  row, per "a week that falls between two charts belongs on the earlier one".
- *
- *  A Saturday that lands ON Chol Hamoed/Hoshana Rabbah (e.g. Shabbos Chol Hamoed Pesach)
- *  is excluded from becoming its own row in the *incoming* season's own loop above (its
- *  backward window would otherwise mix genuine pre-Yom-Tov regular days, already
- *  claimed by the outgoing chart's trailing row, together with actual Chol Hamoed days)
- *  - but it isn't dropped: the trailing-Chol-Hamoed check right after also folds it onto
- *  the *outgoing* chart as one more row, labeled with the holiday's plain name (Pesach's
- *  own Chol Hamoed row lands on the חורף chart; Sukkos's on the קיץ chart). */
-function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
-  const startSerial = seasonStartSerial(season, hebrewYear);
-  const endSerial = seasonEndSerial(season, hebrewYear);
-
-  let d = Math.ceil(startSerial);
-  while (excelWeekday(d) !== 7) d++;
-
-  const weeks = [];
-  let guard = 0;
-  while (d <= endSerial && guard < MAX_WEEKS) {
-    // d === startSerial: the season's own start boundary landed exactly on Shabbos
-    // (e.g. Sukkos falling on a Saturday) - its backward-attached weekdays are still
-    // within the *outgoing* season's territory, already covered by its own trailing-gap
-    // row below. Without this, both seasons would independently print an identical row.
-    const isOwnStartBoundary = d === startSerial;
-    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 1, settings, tables.specialDays)) {
-      const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
-      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
-    }
-    d += 7;
-    guard++;
-  }
-
-  // Trailing gap: the regular days (if any) between the last Saturday-anchored week
-  // above and the season's own end boundary - see the function comment. Anchored at
-  // endSerial itself (not a real Shabbos, just a stand-in date/key for this row) and
-  // labeled with whatever Yom Tov starts there, same fallback as any other
-  // Yom-Tov-only row above. When the boundary itself was exactly Shabbos, the main loop
-  // already picked it up directly and this gap comes out empty - no double-counting.
-  const gapStart = d - 7 + 1;
-  const gapEnd = endSerial - 1;
-  if (gapStart <= gapEnd && anyRegularDay(gapStart, gapEnd, settings, tables.specialDays)) {
-    const parsha = hasParsha(endSerial, settings, tables) || hasYomTov(endSerial, settings, tables.specialDays);
-    weeks.push({ serial: endSerial, date: dateFromSerial(endSerial), parsha, specialParsha: hasSpecialParsha(endSerial, settings) });
-  }
-
-  // `d` is now the first Saturday *after* the boundary (Saturdays fall on the same
-  // fixed 7-day cadence no matter which season's math found them, so this is exactly
-  // the same date the incoming season's own loop would land on as its own first
-  // candidate) - see the function comment for why a Chol-Hamoed/Hoshana-Rabbah Shabbos
-  // there becomes a row here instead of there. It's folded into the trailing-gap row
-  // above rather than added separately whenever that row already carries the same
-  // holiday's name: the two stretches are the run-up to, and the middle of, one single
-  // Yom Tov, so the chart should carry one row for it, not a pair of identical ones.
-  const cholHamoedName = isCholHamoedAnchor(d, settings, tables.specialDays) ? holidayNameFor(d, settings, tables.specialDays) : '';
-  if (cholHamoedName && weeks[weeks.length - 1]?.parsha !== cholHamoedName) {
-    weeks.push({ serial: d, date: dateFromSerial(d), parsha: cholHamoedName, specialParsha: '' });
-  }
-
-  return { startSerial, endSerial, weeks };
-}
-
-/** Where a שבת חורף season's weeks cross the *spring* DST cutover (2nd Sunday of
- *  March - not the fall one near Sukkos at the season's start). From that week on,
- *  the season needs an actual שבת קיץ chart (not just a couple of extra columns) -
- *  the shul still davens on a "summer" schedule through Pesach once the clock springs
- *  forward. Returns the index in `weeks` of the first week on/after the cutover
- *  (weeks.length if the whole season is still before it - shouldn't happen in
- *  practice, since Pesach always falls after the 2nd Sunday of March). */
-function splitChorefAtSpringCutover(weeks, settings) {
-  const idx = weeks.findIndex((w) => inSpringDstWindow(w.date, settings));
-  return idx === -1 ? weeks.length : idx;
-}
-
-/** The smallest hebrewYear for `season` whose date range hasn't already fully elapsed
- *  (its end is still today or later) - i.e. the soonest occurrence of that season still
- *  worth preparing a schedule for. Used to keep the Generate form's year field from
- *  ever defaulting to an already-passed season. */
-function nextAvailableYearFor(season, settings) {
-  const today = excelSerial(new Date());
-  let y = hebrewDateExtended(today, settings.useGregorianBefore1582).year - 1; // step back one to not overshoot a season that started in a lower-numbered year
-  for (let i = 0; i < 6 && seasonEndSerial(season, y) < today; i++) y++;
-  return y;
-}
-
-/** Which season+year the Generate form should default to: the *next* season
- *  chronologically after whichever one contains today - a schedule is always being
- *  prepared ahead of time for the upcoming season, not the one currently in progress.
- *  E.g. if today falls within a קיץ season, default to the חורף season right after it
- *  (never the קיץ season itself, and never a season that's already over). */
-function defaultSeasonAndYear(settings) {
-  const today = excelSerial(new Date());
-  const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
-  const sukkosY0 = dateFromHebrew(15, 7, y0);
-  const pesachY0 = dateFromHebrew(15, 1, y0);
-  const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
-
-  let currentSeason, currentYear;
-  if (today < sukkosY0) {
-    currentSeason = 'kayitz';
-    currentYear = y0 - 1; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
-  } else if (today < pesachY0) {
-    currentSeason = 'choref';
-    currentYear = y0;
-  } else if (today < sukkosY0plus1) {
-    currentSeason = 'kayitz';
-    currentYear = y0;
-  } else {
-    currentSeason = 'choref';
-    currentYear = y0 + 1;
-  }
-
-  return currentSeason === 'choref' ? { season: 'kayitz', hebrewYear: currentYear } : { season: 'choref', hebrewYear: currentYear + 1 };
-}
-
 // ==== ui/generate-view.js ====
 function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
@@ -13642,8 +13984,8 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
   // empty page with a stray year field marooned on the right.
   container.innerHTML = `
     <div class="gen-column">
-    <h2>Generate a sheet</h2>
-    <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
+    <h2>Print a season chart</h2>
+    <p class="hint">The site generates charts automatically with three pages per season. Use this screen to adjust rows per page for a local print copy.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
@@ -13814,7 +14156,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
           <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}</li>`).join('')}</ol>
         </details>
       </fieldset>
-      <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Open charts</button></div>
     </form>
   `;
 
@@ -13962,125 +14304,67 @@ function fmtDate(date) {
 }
 
 // ==== ui/guide-view.js ====
-// The "what is this and how do I use it" page, written for someone opening the site for
-// the first time with no idea what it does. Lives inside the app rather than in a README
-// so it travels with the offline/USB copy and is there at the moment it's needed.
-
-/** @param {(tab: string) => void} onOpenTab  jumps to another screen from a link here. */
+/** Help for the current automatic schedule workflow. */
 function renderGuide(container, onOpenTab) {
   container.innerHTML = `
-    <h2>Guide</h2>
-    <p class="hint">What this site is, and how to get a printed board out of it.</p>
-
-    <div class="guide-lede">
-      <p>This generates the printed <strong>zmanim boards</strong> for קהל לב מנחם: the שבת קיץ and שבת חורף charts and the matching Weekday chart. Every time in them is calculated for the shul's exact location, so a new year's board takes a minute instead of an afternoon of editing last year's.</p>
-      <p>Everything happens in this browser. There's no login and nothing to install, and no one else sees what you do here.</p>
-    </div>
-
+    <h2>Help &amp; Instructions</h2>
+    <p class="hint">Find schedules, prepare printed charts, and manage your local copies.</p>
     <details class="panel" open>
-      <summary>Make your first board in 3 steps</summary>
+      <summary>Automatic schedules</summary>
       <div class="panel-body">
-        <ol class="guide-steps">
-          <li>
-            <strong>Generate → pick the season and year.</strong>
-            <span class="hint">שבת קיץ runs Pesach → Sukkos, שבת חורף runs Sukkos → Pesach. The year and season start on whichever one is coming up next, so usually you can just press Continue. The app works out which Shabbosim belong to that season by itself, skipping the ones with no parsha.</span>
-          </li>
-          <li>
-            <strong>Choose how the weeks split across pages.</strong>
-            <span class="hint">It tells you how many weeks the season has and suggests an even split. Change the number on any page and the rest adjust. A Weekday chart is generated alongside, covering the same weeks.</span>
-          </li>
-          <li>
-            <strong>Press Generate.</strong>
-            <span class="hint">The finished board opens straight away, and is saved automatically, so you never have to remember to save.</span>
-          </li>
-        </ol>
+        <p>The congregation website generates its seasonal charts automatically. There is no seasonal sending or publishing step.</p>
+        <p><strong>Weekly Schedule</strong> shows one week at a time. <strong>Season Charts → View Charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
+        <p>Each season uses three Shabbos pages and three matching weekday pages. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Working on a board</summary>
+      <summary>Print a chart with your own page splits</summary>
       <div class="panel-body">
-        <p><strong>Any cell can be edited.</strong> Click it and type. Typing <code>300</code> becomes <code>3:00</code>, so you can enter a whole row of times as bare numbers and let it space them out. Edits stick to that one board and never touch next year's.</p>
-        <p><strong>Formatting.</strong> Select text inside a cell, then use the buttons in the toolbar: <u>U</u> underlines (that's how the board marks a minyan that's downstairs), A+ and A− change its size. Keyboard: <kbd>Ctrl</kbd>+<kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>&gt;</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>&lt;</kbd>.</p>
-        <p><strong>Undo / Redo</strong> covers cell edits, for as long as the board stays open.</p>
-        <p><strong>Layout &amp; style</strong> changes the font, the text size, the logo size and the heading colour for the whole board.</p>
-        <p><strong>Side by side</strong> shows the Shabbos and Weekday charts next to each other, shrunk, to compare them. <strong>Fit to screen</strong> scales a page down until it fits across the screen. It turns itself on automatically on a phone, where a full-width page otherwise can't be seen at all.</p>
+        <ol>
+          <li>Open <strong>Season Charts → Print Layout</strong>.</li>
+          <li>Choose the season and Hebrew year, then continue.</li>
+          <li>Adjust the number of weeks on each page and open the charts.</li>
+          <li>Use <strong>Print / Save as PDF</strong>.</li>
+        </ol>
+        <p>Your page splits and cell edits are saved on this device. They do not change the automatic public charts.</p>
       </div>
     </details>
-
     <details class="panel">
       <summary>Printing and PDFs</summary>
       <div class="panel-body">
-        <p><strong>Print / Save as PDF</strong> opens your browser's print dialog. Saving a PDF is the same button: choose "Save as PDF" as the destination instead of a printer.</p>
-        <p>Set the paper to <strong>Letter, landscape</strong>, and turn on <strong>background graphics</strong> so the shaded header row prints.</p>
-        <p>The Shabbos and Weekday pages come out interleaved (שבת, its Weekday chart, שבת, its Weekday chart), so the pair for a run of weeks stays together.</p>
-        <p>Under <strong>Which pages to print or save</strong> you can untick individual pages. Unticked pages stay on screen, dimmed, and are left out of the print.</p>
+        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. For season charts, use Letter paper in landscape and enable background graphics.</p>
+        <p>Shabbos pages print first in each pair, followed by the matching weekday page. Padding changes the space around the chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>The luach for the congregation</summary>
+      <summary>Saved copies</summary>
       <div class="panel-body">
-        <p><strong>baismedrashoflakewoodcommons.org/week/</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
-        <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
-        <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish for the congregation</em>, and press the button. A minute later the congregation's page is showing it. Publish once per season, and again whenever you change a time so they see the correction.</p>
-        <p>Publishing needs a one-time setup: a token that allows the site to be written to. <strong>Settings → Publishing</strong> has step-by-step instructions for making one, and until it is set the publish button explains that rather than appearing broken.</p>
-        <p>Publishing a season leaves any other published season in place, so קיץ and חורף can both be live and the changeover between them happens on its own. A new year's chart does not remove last year's. Each published season also has an <strong>Unpublish</strong> button, and <strong>Saved sheets</strong> marks which sheet the congregation is currently looking at.</p>
+        <p>Open <strong>Season Charts → Saved Copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
+        <p>You can edit cells, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Sending a chart to someone else</summary>
+      <summary>Special schedules and messages</summary>
       <div class="panel-body">
-        <p>Send a PDF. Press <strong>Print / Save as PDF</strong> and choose Save as PDF as the destination instead of a printer.</p>
-        <p>Whoever receives it can open and print it without this site, an account, or an internet connection, which matters on a computer where the browser is blocked but a PDF reader isn't.</p>
+        <p><strong>Special Schedules</strong> contains the Yom Tov and fast day posters, plus the option to write a sheet of your own.</p>
+        <p><strong>Messages</strong> opens the separate page for preparing and copying schedule messages.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Rules: the difference between a one-off and every year</summary>
+      <summary>Settings and backups</summary>
       <div class="panel-body">
-        <p>Editing a cell changes <em>that board</em>. A <strong>rule</strong> changes <em>every board you generate from now on</em>, which is what you want for something that comes back every year.</p>
-        <p>Three are built in: שבת הגדול and שבת שובה add "דרשה" to the Mincha column, and ט באב marks the Shabbos when the fast starts מוצאי שבת. A rule can match on a special-Shabbos name (שובה, הגדול), a parsha name, a Hebrew date (recurring every year), or every week.</p>
-        <p>One rule can cover both charts at once: tick the matching column on קיץ and on חורף. Rules can be switched off without deleting them, and <strong>Duplicate</strong> starts a new one from an existing one.</p>
-        <p>Cells a rule has touched show a light yellow background on the board.</p>
+        <p><strong>Settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
+        <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Settings → Backup</strong> to export a backup or import one on another device.</p>
+        <p><strong>How Times Are Calculated</strong> explains the formulas used by the charts and special schedules.</p>
       </div>
     </details>
-
-    <details class="panel">
-      <summary>Saved sheets</summary>
-      <div class="panel-body">
-        <p>Every board you generate is saved here automatically. A Shabbos board and the Weekday chart made with it are one entry. Open either from the same row.</p>
-        <p><strong>Lock</strong> protects a board from being deleted until you unlock it. <strong>Folders</strong> are for keeping the list tidy: a folder appears as soon as you put something in it and disappears when the last thing leaves.</p>
-      </div>
-    </details>
-
-    <details class="panel">
-      <summary>Settings</summary>
-      <div class="panel-body">
-        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and what prints at the head and foot of every page. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
-        <p>The daily שחרית schedule on the Weekday chart is not here. It is part of the program, so the board, the week card, "what is on next" and the messages page all print the one list and cannot come to disagree. Changing it is a change to the program.</p>
-      </div>
-    </details>
-
-    <details class="panel">
-      <summary>Where your work is kept (read this one)</summary>
-      <div class="panel-body">
-        <p>Boards, rules and settings are stored <strong>in this browser on this device</strong>. That means:</p>
-        <ul>
-          <li>Your phone and your computer each have their own boards. They don't sync.</li>
-          <li>Clearing the browser's site data erases them.</li>
-          <li>Nobody else visiting the site sees your work, and you don't see theirs.</li>
-        </ul>
-        <p>To move everything between devices, or to keep a backup: <strong>Settings → Backup → Export</strong> writes one file, and <strong>Import</strong> reads it back on the other device.</p>
-        <p><strong>Offline:</strong> the site also ships as a folder you can copy to a USB stick and open on a computer with no internet. Open <code>index.html</code> inside it and it behaves exactly the same.</p>
-      </div>
-    </details>
-
-    <div class="actions"><button type="button" id="guide-start" class="btn-primary">Make a board →</button></div>
+    <div class="actions">
+      <button type="button" id="guide-start" class="btn-primary">Open Season Charts</button>
+      <button type="button" id="guide-program">Get the Program</button>
+    </div>
   `;
-
-  container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
+  container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('charts'));
+  container.querySelector('#guide-program').addEventListener('click', () => onOpenTab('program'));
 }
 
 // ==== ui/lock.js ====
@@ -14436,261 +14720,6 @@ function renderProgram(container, platform = detectPlatform()) {
   `;
 }
 
-// ==== publish.js ====
-// Publishing a season for the congregation.
-//
-// Everything in this app lives in one browser's localStorage, so a visitor's browser has
-// nothing to show. Publishing writes the season into a file that ships with the site, at
-// data/published.json, which the luach (index.html?luach) reads instead of
-// localStorage. That is the whole mechanism: no backend, no login, no database.
-//
-// A season is published once. The luach then advances by itself every week, because the
-// week it shows is worked out from today's date against the weeks in the file.
-
-
-/** What the luach needs, and nothing else.
- *
- *  The sheets are carried whole (weeks and overrides included) rather than as
- *  pre-rendered times, so the luach runs the same code the app does and a manual edit or
- *  a rule shows up there exactly as it does here. Rules travel too, for the same reason.
- *  Settings are trimmed to what the card actually prints: no location maths is redone on
- *  the luach, but the header, footer and שחרית schedules are all read from here. */
-function buildPublishedPayload(state, sheets) {
-  return {
-    version: 1,
-    publishedAt: new Date().toISOString(),
-    settings: state.settings,
-    rules: state.rules,
-    sheets: sheets.map((s) => ({
-      id: s.id,
-      season: s.season,
-      hebrewYear: s.hebrewYear,
-      // Carried across because the luach sorts on it: where two published sheets both
-      // cover a week, the most recently generated one wins. Left out, every sheet sorted
-      // as undefined and the winner came down to the order they happened to be published
-      // in, which is not a rule anyone could predict.
-      createdAt: s.createdAt,
-      linkedSheetId: s.linkedSheetId,
-      weeks: s.weeks,
-      pageSizes: s.pageSizes,
-      overrides: s.overrides || {},
-    })),
-  };
-}
-
-/** The Shabbos sheets worth publishing, newest first, each with its weekday companion. */
-function publishableGroups(state) {
-  return state.sheets
-    .filter((s) => s.season !== 'weekday')
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .map((sheet) => ({
-      sheet,
-      weekday: state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null,
-    }));
-}
-
-function downloadPublished(payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'published.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** The retired דרשה rules taken off a payload on its way in.
- *
- *  **A published file is a snapshot, and it goes on saying what it said the day it was written.**
- *  The rules travel with it, so the two bare-word דרשה rules kept firing on the congregation's own
- *  chart months after they were retired everywhere else: the admin's copy of them is taken off as
- *  that browser loads (see applySeeds in storage.js), and nothing was taking them off this one. The
- *  shul saw the second, wordless דרשה under the computed one on שבת הגדול, on the public board,
- *  while the admin they had just been fixed in printed it correctly.
- *
- *  So the same retirement runs here, off the same definition, and a published file written before
- *  it cannot put a retired rule back. Republishing writes the file without them in any case; this
- *  is what makes the one already on the site right without anybody having to.
- *
- *  The overrides are cleaned the same way, for the cells the rule had already been typed into. */
-function withoutRetiredDrasha(data) {
-  if (!data) return data;
-  const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r));
-  const sheets = (data.sheets || []).map((sheet) => {
-    const overrides = {};
-    for (const [serial, week] of Object.entries(sheet.overrides || {})) {
-      overrides[serial] = Object.fromEntries(
-        Object.entries(week || {}).map(([key, value]) => [key, dropDuplicateDrasha(value)])
-      );
-    }
-    return { ...sheet, overrides };
-  });
-  return { ...data, rules, sheets };
-}
-
-/** Reads what is currently published, or null when nothing is. A 404 is the normal state
- *  before the first publish, not an error worth shouting about. */
-async function loadPublished() {
-  try {
-    const res = await fetch('/data/published.json', { cache: 'no-cache' });
-    if (!res.ok) return null;
-    const text = await res.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      /* **Not nothing published. Something answered instead of the site.**
-         This returned null here, and null is what the page prints "Nothing has been published
-         yet" for, so a filtered phone was told the shul had not put its zmanim up. It had. A
-         GenTech block page came back in place of this file and the site repeated it as though
-         it were the answer, which is the worst shape a failure can take: it names an innocent
-         cause, it blames the shul, and the person who sees it complains to a gabbai instead of
-         to whoever runs the filter. See data-loader.js, which had the same fault the same week.
-         Thrown rather than returned, so the caller has to decide what to say. */
-      const blocked = new Error('blocked');
-      blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
-      throw blocked;
-    }
-    return data && Array.isArray(data.sheets) && data.sheets.length ? withoutRetiredDrasha(data) : null;
-  } catch (err) {
-    if (err?.message === 'blocked') throw err;
-    // A network that would not carry the request at all. Same answer as no file: nothing to show.
-    return null;
-  }
-}
-
-// --- Publishing straight to the site ------------------------------------------------
-//
-// The site is static files in a GitHub repository, so "publish" means committing
-// data/published.json to that repository. A browser can do that through GitHub's own
-// API, which needs a token to prove it is allowed to.
-//
-// The token is kept under its own localStorage key rather than inside the app state, so
-// it can never ride along in an exported backup. A backup gets shared; a write token
-// must not.
-
-const REPO_OWNER = 'cheskyshain-stack';
-const REPO_NAME = 'zmanim-tool';
-const REPO_BRANCH = 'main';
-const PUBLISH_PATH = 'data/published.json';
-const TOKEN_KEY = 'zmanim-publish-token';
-
-function getPublishToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || '';
-  } catch {
-    // A browser that refuses storage has no token to give. The admin app is the only
-    // thing that asks, and it will say the token is missing rather than fall over.
-    return '';
-  }
-}
-
-function setPublishToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Nothing to do: publishing this session still works, the token just will not be
-    // remembered for the next one.
-  }
-}
-
-/** UTF-8 safe base64, which is what the API wants the file contents as. btoa alone
- *  throws on any Hebrew character, and this file is full of them. */
-function toBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  // In chunks: apply() on a 100KB array overflows the argument limit.
-  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  return btoa(binary);
-}
-
-async function api(path, token, options = {}) {
-  return fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${path}`, {
-    ...options,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(options.headers || {}),
-    },
-  });
-}
-
-/** Whatever is published right now, straight from the repository rather than from the
- *  deployed site, so it is accurate the moment after a publish instead of a minute
- *  later. Returns { data, sha } with data null when nothing is published yet. */
-async function fetchPublished(token) {
-  const res = await api(`contents/${PUBLISH_PATH}?ref=${REPO_BRANCH}`, token);
-  if (res.status === 404) return { data: null, sha: undefined };
-  if (res.status === 401) throw new Error('That token was refused. It may be wrong, expired, or revoked.');
-  if (res.status === 403) throw new Error('That token is not allowed to read this repository.');
-  if (!res.ok) throw new Error(`GitHub replied ${res.status} when reading what is published.`);
-  const body = await res.json();
-  // The API returns base64 wrapped across lines, which atob will not accept as-is.
-  const text = new TextDecoder().decode(Uint8Array.from(atob(body.content.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
-  return { data: JSON.parse(text), sha: body.sha };
-}
-
-async function commit(json, sha, message, token) {
-  const res = await api(`contents/${PUBLISH_PATH}`, token, {
-    method: 'PUT',
-    body: JSON.stringify({ message, content: toBase64(json), branch: REPO_BRANCH, ...(sha ? { sha } : {}) }),
-  });
-  if (res.status === 401 || res.status === 403) throw new Error('That token is not allowed to write to this repository.');
-  if (!res.ok) {
-    let detail = '';
-    try {
-      detail = (await res.json()).message || '';
-    } catch {
-      /* the body is not always JSON */
-    }
-    throw new Error(`GitHub refused the change (${res.status})${detail ? ': ' + detail : ''}.`);
-  }
-}
-
-/** Two sheets are the same season in the same year, and so replace each other. */
-const sameSeason = (a, b) => a.season === b.season && a.hebrewYear === b.hebrewYear;
-
-/** Publishes a season, keeping every other season already published.
- *
- *  A year needs both קיץ and חורף, so publishing one must not remove the other: this
- *  replaces only the entry for the same season and year, which is what makes a corrected
- *  chart supersede the one before it. Settings and rules come from this publish, since
- *  they are shul-wide rather than per season. */
-async function publishToSite(payload, token) {
-  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
-  const { data, sha } = await fetchPublished(token);
-  const existing = data?.sheets || [];
-
-  // Only Shabbos sheets identify a season. Every weekday chart carries season 'weekday',
-  // so comparing those by season and year matched קיץ's weekday against חורף's and
-  // quietly deleted one: a weekday chart belongs to whichever Shabbos sheet it was
-  // generated with, and is replaced only when that sheet is.
-  const incomingSeasons = payload.sheets.filter((s) => s.season !== 'weekday');
-  const replacedIds = new Set(
-    existing.filter((s) => s.season !== 'weekday' && incomingSeasons.some((i) => sameSeason(i, s))).map((s) => s.id)
-  );
-  const keep = existing.filter((s) =>
-    s.season === 'weekday' ? !replacedIds.has(s.linkedSheetId) : !incomingSeasons.some((i) => sameSeason(i, s))
-  );
-
-  const merged = { ...payload, sheets: [...keep, ...payload.sheets] };
-  const label = incomingSeasons[0];
-  await commit(JSON.stringify(merged, null, 2), sha, `Publish ${label?.season || 'season'} ${label?.hebrewYear || ''}`, token);
-  return data ? 'updated' : 'created';
-}
-
-/** Takes one season back off the congregation's page, leaving the others published. */
-async function unpublishFromSite(sheet, token) {
-  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
-  const { data, sha } = await fetchPublished(token);
-  if (!data) throw new Error('Nothing is published.');
-  const remaining = data.sheets.filter((s) => !sameSeason(s, sheet) && !(s.season === 'weekday' && s.linkedSheetId === sheet.id));
-  await commit(JSON.stringify({ ...data, sheets: remaining }, null, 2), sha, `Unpublish ${sheet.season} ${sheet.hebrewYear}`, token);
-  return remaining.length;
-}
-
 // ==== ui/saved-sheets-view.js ====
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
@@ -14732,11 +14761,11 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
       .sort((a, b) => String(b.primary.createdAt).localeCompare(String(a.primary.createdAt)))
       .map(
         ({ primary: s, companion }) => `
-        <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABELS[s.season] || s.season}${
+        <tr data-id="${escAttr(s.id)}">
+          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${escAttr(SEASON_LABELS[s.season] || s.season)}${
             companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
-          }<span class="live-chip" data-live-for="${s.id}" hidden>Live</span></td>
-          <td data-label="Hebrew year">${s.hebrewYear}</td>
+          }<span class="live-chip" data-live-for="${escAttr(s.id)}" hidden>Live</span></td>
+          <td data-label="Hebrew year">${escAttr(s.hebrewYear)}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
           <td data-label="Created">${created(s.createdAt)}</td>
           <td data-label="Folder">
@@ -14914,7 +14943,7 @@ function renderImageCropper(container, currentDataUrl, onSave) {
   container.innerHTML = `
     <div class="crop-tool">
       <div class="crop-current-row">
-        <img class="crop-current" src="${currentDataUrl || 'assets/logo-building-icon.png'}" alt="Current header photo">
+        <img class="crop-current" src="${safeHeaderImage(currentDataUrl)}" alt="Current header photo">
         <div>
           <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
@@ -15069,13 +15098,13 @@ function renderRules(container, state, onChange, editingRuleId = null) {
     <div class="actions" id="rule-add-row" ${formOpen ? 'hidden' : ''}><button type="button" id="rule-add" class="btn-primary">+ Add a rule</button></div>
     <h3 id="rule-form-title" ${formOpen ? '' : 'hidden'}>${editing ? `Editing: ${escText(editing.name)}` : source ? `Duplicate of ${escText(source.name)}` : 'Add a rule'}</h3>
     <form id="rule-form" class="form-grid" ${formOpen ? '' : 'hidden'}>
-      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escText(editing.name) : source ? escText(source.name + ' (copy)') : ''}"></label>
+      <label>Name<input name="name" required placeholder="e.g. שבת נחמו: מנחה" value="${editing ? escAttr(editing.name) : source ? escAttr(source.name + ' (copy)') : ''}"></label>
       <fieldset>
         <legend>When does this apply?</legend>
         <label><input type="checkbox" name="always" ${prefill?.condition?.always ? 'checked' : ''}> Always (every week)</label>
-        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escText((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
-        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escText((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
-        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escText((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
+        <label>Special-Shabbos name(s), comma-separated<input name="specialParsha" placeholder="e.g. שובה, הגדול" value="${prefill ? escAttr((prefill.condition?.specialParsha || []).join(', ')) : ''}"></label>
+        <label>Or parsha name(s), comma-separated<input name="parsha" placeholder="optional" value="${prefill ? escAttr((prefill.condition?.parsha || []).join(', ')) : ''}"></label>
+        <label>Or Hebrew date(s), comma-separated <span class="hint">(month-day, counting Nisan as 1; e.g. 5-9 is ט׳ באב. Recurs every year.)</span><input name="hebrewDate" placeholder="e.g. 5-9" value="${prefill ? escAttr((prefill.condition?.hebrewDate || []).join(', ')) : ''}"></label>
       </fieldset>
       <fieldset>
         <legend>Which cell(s) to replace</legend>
@@ -15107,13 +15136,13 @@ function renderRules(container, state, onChange, editingRuleId = null) {
     ? state.rules
         .map(
           (r) => `
-      <div class="rule-row" data-id="${r.id}">
+      <div class="rule-row" data-id="${escAttr(r.id)}">
         <label><input type="checkbox" class="rule-enabled" ${r.enabled ? 'checked' : ''}></label>
         <div class="rule-summary">
           <strong>${escText(r.name)}</strong>
           <div class="hint">columns ${columnsOf(r)
             .map((c) => `<code><bdi>${escText(prettyColumn(c))}</bdi></code>`)
-            .join(' ')} · ${conditionSummary(r.condition)} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
+            .join(' ')} · ${escText(conditionSummary(r.condition))} → ${r.mode === 'replace' ? 'replace with' : 'add'} "${escText(r.value)}"</div>
         </div>
         <div class="rule-actions">
           <button class="rule-edit" title="Edit this rule">Edit</button>
@@ -15279,9 +15308,9 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
         <summary>Location</summary>
         <div class="panel-body">
         <label>Location name<input name="locationName" value="${escAttr(s.locationName)}"></label>
-        <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
-        <label>Longitude<input name="longitude" type="number" step="any" value="${s.longitude}"></label>
-        <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${s.elevation}"></label>
+        <label>Latitude<input name="latitude" type="number" step="any" value="${escAttr(s.latitude)}"></label>
+        <label>Longitude<input name="longitude" type="number" step="any" value="${escAttr(s.longitude)}"></label>
+        <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${escAttr(s.elevation)}"></label>
         <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${escAttr(tz.label)}</option>`).join('')}</select></label>
       </div>
       </details>
@@ -15300,9 +15329,9 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
       <details class="panel">
         <summary>Advanced zmanim settings (leave alone unless you know what you're doing)</summary>
         <div class="panel-body">
-        <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${s.horizon}"></label>
-        <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${s.candleLightingMinutes}"></label>
-        <label>Ateret Torah Tzais offset (minutes)<input name="ateretTorahTzaisOffset" type="number" step="any" value="${s.ateretTorahTzaisOffset}"></label>
+        <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${escAttr(s.horizon)}"></label>
+        <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${escAttr(s.candleLightingMinutes)}"></label>
+        <label>Ateret Torah Tzais offset (minutes)<input name="ateretTorahTzaisOffset" type="number" step="any" value="${escAttr(s.ateretTorahTzaisOffset)}"></label>
         <label><input type="checkbox" name="useAstronomicalChatzos" ${s.useAstronomicalChatzos ? 'checked' : ''}> Use astronomical chatzos for zmanim</label>
         <label><input type="checkbox" name="useElevation" ${s.useElevation ? 'checked' : ''}> Use elevation for zmanim calculation</label>
         <label><input type="checkbox" name="useGregorianBefore1582" ${s.useGregorianBefore1582 ? 'checked' : ''}> Use Gregorian dates before Oct 15, 1582</label>
@@ -16530,7 +16559,7 @@ function weekSheetHtml(showing, index, state, settings, title, { withChol = true
       style="--poster-font-family: ${escAttr(fontStackFor(SHEET_FONT))}">
     <div class="page-header" dir="ltr">
       <div class="header-row">
-        <img class="header-icon" src="${escAttr(settings.headerIconImage || 'assets/logo-building-icon.png')}" alt="">
+        <img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">
         <div class="header-center">
           <img class="header-logo" src="assets/logo-text.png"
                alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
@@ -17500,7 +17529,7 @@ function publishPanelHtml(sheet, state, open = false) {
       (g) =>
         `<div class="published-row">
           <span><bdi${hebrewLang(label(g.sheet))}>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
-          <button type="button" class="btn-primary publish-btn" data-id="${g.sheet.id}">Publish</button>
+          <button type="button" class="btn-primary publish-btn" data-id="${escAttr(g.sheet.id)}">Publish</button>
         </div>`
     )
     .join('');
@@ -17533,9 +17562,9 @@ function cardHtml(title, linesHtml, settings, kind = '') {
   return `<section class="week-card${kind ? ' ' + kind : ''}">
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${settings.headerIconImage || 'assets/logo-building-icon.png'}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(settings.headerIconImage)}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="assets/logo-text.png" alt="${weekEsc(settings.shulName)}"${hebrewLang(settings.shulName)}>
+          <img class="header-logo" src="assets/logo-text.png" alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
           ${settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${weekEsc(settings.headerSubtitle)}</div>` : ''}
         </div>
         <div class="header-rabbi"${hebrewLang(settings.headerRabbiLine)}>${weekNl2br(settings.headerRabbiLine)}</div>
@@ -18401,8 +18430,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         live
           .map(
             (s) => `<div class="published-row">
-              <span><bdi lang="he">${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${s.hebrewYear} <span class="hint">(${s.weeks.length} weeks)</span></span>
-              <button type="button" class="btn-danger unpublish-btn" data-season="${s.season}" data-year="${s.hebrewYear}" data-id="${s.id}">Unpublish</button>
+              <span><bdi lang="he">${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${escAttr(s.hebrewYear)} <span class="hint">(${s.weeks.length} weeks)</span></span>
+              <button type="button" class="btn-danger unpublish-btn" data-season="${escAttr(s.season)}" data-year="${escAttr(s.hebrewYear)}" data-id="${escAttr(s.id)}">Unpublish</button>
             </div>`
           )
           .join('');
@@ -18449,7 +18478,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
 
 /** A schedule written as HTML, kept as HTML but with its own outer whitespace trimmed. */
 function htmlLines(html) {
-  return String(html ?? '').trim();
+  return sanitizeRichText(html).trim();
 }
 
 /** Escapes the text, then turns the UL_START/UL_END sentinels the formula ports leave
@@ -18485,7 +18514,7 @@ const Z = { sunrise, sunset, sunriseElev, sunsetElev, solarNoon, dstLocal, minch
 // ==== app.js ====
 const state = loadState();
 let tables = null;
-let currentTab = 'generate';
+let currentTab = 'charts';
 let currentSheetId = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
@@ -18522,10 +18551,10 @@ const nav = document.getElementById('nav');
 // the things you set once. Rules is no longer among them - it is the first panel inside
 // Settings, being something configured rather than a place you go. Generate leading also
 // matches where the app opens.
-const tabs = ['generate', 'week', 'posters', 'saved', 'settings', 'traffic', 'calc', 'program', 'guide'];
+const tabs = ['week', 'charts', 'generate', 'saved', 'posters', 'settings', 'traffic', 'calc', 'program', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { generate: 'Generate', settings: 'Settings', saved: 'Saved sheets', traffic: 'Traffic', calc: 'Calculations', program: 'Get the program', guide: 'Guide', week: 'This week', posters: 'Posters' };
+const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings: 'Settings', saved: 'Saved Copies', traffic: 'Visitor Statistics', calc: 'How Times Are Calculated', program: 'Get the Program', guide: 'Help & Instructions', week: 'Weekly Schedule', posters: 'Special Schedules' };
 
 /* --- The screen you are on, in the address ------------------------------------------
    Without this the tab was a variable that started at Generate and was never written
@@ -18616,83 +18645,43 @@ function persist() {
   saveState(state);
 }
 
+function openTab(tab) {
+  currentTab = tab;
+  currentSheetId = null;
+  writeRoute();
+  render();
+}
+
 function renderNav() {
-  nav.innerHTML = tabs
-    .map((t) => `<button class="nav-btn ${t === currentTab && !currentSheetId ? 'active' : ''}" data-tab="${t}">${icon(t)}<span>${tabLabels[t]}</span></button>`)
-    .join('')
-    /* Messages is a link out, not a tab. It opens /texts/, which is its own small program: the
-       chat messages, and nothing else on it. That page carries no way back here on purpose, so
-       the address can be handed to whoever sends them without handing them the whole generator
-       as well. A link rather than a nav button because it leaves this page, and the browser's
-       own back is the way back rather than anything drawn. See js/ui/texts-view.js. */
-    + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`
-    /* And the way out to the congregation's own site, which is the other half of this program
-       and had no door from this side at all: the only way across was typing the address. It sits
-       beside Messages because the two are the same kind of thing, a link that leaves this page,
-       and the browser's own back is the way home from either.
-       The congregation's site does not get a matching link back, and should not: it is the page
-       the whole neighbourhood opens, and the admin is where the shul's boards are changed. */
-    + `<a class="nav-btn" href="/">${icon('site')}<span>Congregation site</span></a>`;
-  /* Buttons only. The two links above are drawn to match them and carry the same class, and
-     querying on the class alone put a click handler on both: `btn.dataset.tab` is undefined
-     there, so the handler set the current tab to nothing and redrew the page underneath the
-     navigation that was already happening. It only ever looked fine because the browser won
-     the race. */
-  nav.querySelectorAll('button.nav-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      currentTab = btn.dataset.tab;
-      currentSheetId = null;
-      writeRoute();
-      render();
-    });
-  });
+  const active = currentSheetId || ['generate', 'saved'].includes(currentTab) ? 'charts'
+    : currentTab === 'program' ? 'guide' : currentTab;
+  const button = t => `<button class="nav-btn ${active === t ? 'active' : ''}" ${active === t ? 'aria-current="page"' : ''} data-tab="${t}">${icon(t === 'charts' ? 'generate' : t)}<span>${tabLabels[t]}</span></button>`;
+  const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
+  nav.innerHTML = group('Schedules', ['week', 'charts', 'posters'].map(button).join('')
+      + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
+    + group('Management', ['traffic', 'settings'].map(button).join(''))
+    + group('Help', ['calc', 'guide'].map(button).join(''))
+    + `<a class="nav-btn admin-site-link" href="/">${icon('site')}<span>View Website</span></a>`;
+  nav.querySelectorAll('button[data-tab]').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.tab)));
+}
+
+function addSectionTabs(items) {
+  const bar = document.createElement('div');
+  bar.className = 'pane-switch no-print admin-section-tabs';
+  bar.setAttribute('aria-label', 'Section navigation');
+  bar.innerHTML = items.map(t => `<button type="button" class="pane-btn ${currentTab === t ? 'is-on' : ''}" ${currentTab === t ? 'aria-current="page"' : ''} data-section="${t}">${t === 'charts' ? 'View Charts' : tabLabels[t]}</button>`).join('');
+  bar.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.section)));
+  main.prepend(bar);
 }
 
 /** This week: the heading, the two buttons that choose what it shows, and whichever of
  *  the two is chosen. The same pair the congregation's site puts on its menu, so the two
  *  screens hold the same things in the same order. */
 function renderWeekTab(showPublish) {
-  const panes = [
-    { key: 'week', label: 'Weekly Zmanim' },
-    { key: 'chart', label: 'Zmanim Chart' },
-  ];
-  main.innerHTML = `
-    <h2 class="no-print">This week</h2>
-    <p class="hint no-print">Everything the congregation can see: the week's two pages, and the wall chart.</p>
-    <div class="pane-switch no-print" role="tablist">
-      ${panes
-        .map(
-          (p) =>
-            `<button type="button" role="tab" aria-selected="${p.key === weekPane}" class="pane-btn ${
-              p.key === weekPane ? 'is-on' : ''
-            }" data-pane="${p.key}">${p.label}</button>`
-        )
-        .join('')}
-    </div>
-    <div id="week-pane"></div>`;
-  main.querySelectorAll('.pane-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (btn.dataset.pane === weekPane) return;
-      weekPane = btn.dataset.pane;
-      render();
-    });
-  });
-
-  const host = main.querySelector('#week-pane');
-  if (weekPane === 'chart') {
-    renderChartBrowser(host, state, { empty: 'Generate a שבת sheet and its chart shows up here.' });
-    return;
-  }
-  renderWeek(
-    host,
-    state,
-    (serial) => {
-      weekSerial = serial;
-      render();
-    },
-    weekSerial,
-    { openPublish: showPublish, heading: false }
-  );
+  main.innerHTML = '<h2 class="no-print">Weekly Schedule</h2><div id="week-pane"></div>';
+  renderWeek(main.querySelector('#week-pane'), buildAutomaticCharts(state, tables),
+    serial => { weekSerial = serial; render(); }, weekSerial, { heading: false });
+  main.querySelector('#publish-panel')?.remove();
 }
 
 /* The screen the last paint drew, so a redraw that stays on the same screen can put the page
@@ -18768,6 +18757,9 @@ function paint() {
       // moment it is added or edited, with no Save button to press.
       () => persist()
     );
+  } else if (currentTab === 'charts') {
+    main.innerHTML = '<h2 class="no-print">Season Charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print Layout for your own page splits, or Saved Copies to reopen a local chart.</p><div id="season-chart-view"></div>';
+    renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), { confine: false });
   } else if (currentTab === 'generate') {
     renderGenerate(
       main,
@@ -18779,7 +18771,7 @@ function paint() {
         currentSheetId = sheet.id;
         render();
         const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id);
-        toast(weekday ? 'Saved to Saved sheets, with its Weekday chart.' : 'Saved to Saved sheets.');
+        toast(weekday ? 'Saved in Season Charts → Saved Copies, with its weekday chart.' : 'Saved in Season Charts → Saved Copies.');
       },
       (tab) => {
         currentTab = tab;
@@ -18795,8 +18787,7 @@ function paint() {
     renderWeekTab(showPublish);
   } else if (currentTab === 'calc') {
     renderCalculations(main, state, (tab) => {
-      currentTab = tab;
-      render();
+      openTab(tab);
     });
   } else if (currentTab === 'traffic') {
     renderTraffic(main);
@@ -18806,8 +18797,7 @@ function paint() {
     renderProgram(main);
   } else if (currentTab === 'guide') {
     renderGuide(main, (tab) => {
-      currentTab = tab;
-      render();
+      openTab(tab);
     });
   } else if (currentTab === 'saved') {
     renderSavedSheets(
@@ -18838,6 +18828,22 @@ function paint() {
       }
     );
   }
+  if (['charts', 'generate', 'saved'].includes(currentTab)) {
+    addSectionTabs(['charts', 'generate', 'saved']);
+    if (currentTab === 'saved') {
+      const heading = main.querySelector('h2');
+      if (heading) heading.textContent = 'Saved Copies';
+      main.querySelectorAll('button').forEach(btn => {
+        if (btn.textContent.trim().startsWith('Publishing')) btn.remove();
+      });
+    }
+  }
+  if (['guide', 'program'].includes(currentTab)) addSectionTabs(['guide', 'program']);
+  if (['posters', 'traffic', 'calc'].includes(currentTab)) {
+    const heading = main.querySelector('h2');
+    if (heading) heading.textContent = tabLabels[currentTab];
+  }
+
 }
 
 

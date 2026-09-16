@@ -1,3 +1,4 @@
+import { safeHeaderImage } from '../security.js';
 // One week on one sheet, set the way the yomim noraim sheet is set.
 //
 // The two cards are the week as the boards have always had it: a שבת chart and a חול chart,
@@ -318,7 +319,7 @@ export function weekSheetHtml(showing, index, state, settings, title, { withChol
       style="--poster-font-family: ${escAttr(fontStackFor(SHEET_FONT))}">
     <div class="page-header" dir="ltr">
       <div class="header-row">
-        <img class="header-icon" src="${escAttr(settings.headerIconImage || '/assets/logo-building-icon.png')}" alt="">
+        <img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">
         <div class="header-center">
           <img class="header-logo" src="/assets/logo-text.png"
                alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>

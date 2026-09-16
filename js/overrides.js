@@ -1,12 +1,14 @@
 // Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
 // which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
+import { sanitizeRichText } from './security.js';
+
 export function getOverride(sheet, weekSerial, columnKey) {
   return sheet.overrides?.[weekSerial]?.[columnKey];
 }
 export function setOverride(sheet, weekSerial, columnKey, value) {
   if (!sheet.overrides) sheet.overrides = {};
   if (!sheet.overrides[weekSerial]) sheet.overrides[weekSerial] = {};
-  sheet.overrides[weekSerial][columnKey] = value;
+  sheet.overrides[weekSerial][columnKey] = sanitizeRichText(value);
 }
 export function clearOverride(sheet, weekSerial, columnKey) {
   if (sheet.overrides?.[weekSerial]) {
@@ -22,7 +24,7 @@ export function mergeRow(computedRow, sheet, weekSerial) {
   const weekOverrides = sheet.overrides?.[weekSerial];
   if (weekOverrides) {
     for (const [key, value] of Object.entries(weekOverrides)) {
-      row[key] = value;
+      row[key] = sanitizeRichText(value);
       overriddenKeys.add(key);
     }
   }

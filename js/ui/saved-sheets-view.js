@@ -42,11 +42,11 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange, 
       .sort((a, b) => String(b.primary.createdAt).localeCompare(String(a.primary.createdAt)))
       .map(
         ({ primary: s, companion }) => `
-        <tr data-id="${s.id}">
-          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${SEASON_LABELS[s.season] || s.season}${
+        <tr data-id="${escAttr(s.id)}">
+          <td data-label="Sheet">${s.locked ? '<span class="lock-mark" title="Locked">🔒</span> ' : ''}${escAttr(SEASON_LABELS[s.season] || s.season)}${
             companion ? ' <span class="pair-chip" title="Generated together; opening one gets you to the other">+ Weekday</span>' : ''
-          }<span class="live-chip" data-live-for="${s.id}" hidden>Live</span></td>
-          <td data-label="Hebrew year">${s.hebrewYear}</td>
+          }<span class="live-chip" data-live-for="${escAttr(s.id)}" hidden>Live</span></td>
+          <td data-label="Hebrew year">${escAttr(s.hebrewYear)}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
           <td data-label="Created">${created(s.createdAt)}</td>
           <td data-label="Folder">

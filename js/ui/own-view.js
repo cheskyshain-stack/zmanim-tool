@@ -9,7 +9,7 @@
 // the paper underneath: the chart on screen is the sheet as it will print, at every keystroke,
 // so there is nothing to preview and nothing to save.
 import { newId } from '../storage.js';
-import { escText } from '../util.js';
+import { escAttr } from '../util.js';
 import {
   OWN_MONTHS, OWN_ZMANIM, OWN_ROUNDING, OWN_LABELS, OWN_HEADINGS,
   ownBlankBlock, ownBlankRow, ownRuleText,
@@ -29,12 +29,12 @@ export function newOwnSheet(group) {
 function wordPicker(cls, value, words, placeholder) {
   const known = words.includes(value);
   return `<span class="own-word">
-      <select class="${cls}-pick" aria-label="${escText(placeholder)}">
-        ${words.map((w) => `<option value="${escText(w)}" ${known && w === value ? 'selected' : ''}>${escText(w)}</option>`).join('')}
+      <select class="${cls}-pick" aria-label="${escAttr(placeholder)}">
+        ${words.map((w) => `<option value="${escAttr(w)}" ${known && w === value ? 'selected' : ''}>${escAttr(w)}</option>`).join('')}
         <option value="" ${known ? '' : 'selected'}>Something else…</option>
       </select>
-      <input class="${cls}-text" value="${escText(value)}" placeholder="${escText(placeholder)}"
-        ${known ? 'hidden' : ''} aria-label="${escText(placeholder)}">
+      <input class="${cls}-text" value="${escAttr(value)}" placeholder="${escAttr(placeholder)}"
+        ${known ? 'hidden' : ''} aria-label="${escAttr(placeholder)}">
     </span>`;
 }
 
@@ -47,7 +47,7 @@ function rowHtml(row, bi, ri) {
         <option value="typed" ${zman ? '' : 'selected'}>Times I type</option>
         <option value="zman" ${zman ? 'selected' : ''}>Off a זמן</option>
       </select>
-      <input class="own-text" value="${escText(row.text || '')}" ${zman ? 'hidden' : ''}
+      <input class="own-text" value="${escAttr(row.text || '')}" ${zman ? 'hidden' : ''}
         placeholder="7:00, 7:20*, &lt;u&gt;7:35&lt;/u&gt;" aria-label="The times">
       <span class="own-rule" ${zman ? '' : 'hidden'}>
         <input class="own-offset" type="number" step="1" value="${Number(row.offset) || 0}" aria-label="Minutes">
@@ -56,10 +56,10 @@ function rowHtml(row, bi, ri) {
           <option value="after" ${(Number(row.offset) || 0) > 0 ? 'selected' : ''}>minutes after</option>
         </select>
         <select class="own-zman" aria-label="Which זמן">
-          ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escText(z.label)}</option>`).join('')}
+          ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escAttr(z.label)}</option>`).join('')}
         </select>
         <select class="own-round" aria-label="Rounding">
-          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escText(r.label)}</option>`).join('')}
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escAttr(r.label)}</option>`).join('')}
         </select>
       </span>
       <button type="button" class="own-del-row" title="Take this line off">&times;</button>
@@ -78,7 +78,7 @@ function blockHtml(block, bi) {
               `<option value="${d}" ${Number(block.day) === d ? 'selected' : ''}>${d}</option>`).join('')}
           </select>
           <select class="own-month" aria-label="Month">
-            ${OWN_MONTHS.map((m) => `<option value="${m.value}" ${Number(block.month) === m.value ? 'selected' : ''}>${escText(m.name)}</option>`).join('')}
+            ${OWN_MONTHS.map((m) => `<option value="${m.value}" ${Number(block.month) === m.value ? 'selected' : ''}>${escAttr(m.name)}</option>`).join('')}
           </select>
         </span>
         <button type="button" class="own-del-block" title="Take this block off">Remove block</button>
@@ -102,9 +102,9 @@ export function renderOwnEditor(container, sheet, occasions, { onChange, onDelet
       <summary>Writing this sheet</summary>
       <p class="hint">A block is a day and its lines. The day is a Hebrew date, so the sheet is for the occasion and not for one year: step the year above and every block moves with it. A line's times are either typed the way a chart writes them (commas between מנינים, <code>*</code> for בעזרת נשים, <code>&lt;u&gt;</code> for למטה) or hung off a זמן, which is worked out from the same calculations the boards use.</p>
       <div class="own-top">
-        <label>What the sheet is called<input class="own-name" value="${escText(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
+        <label>What the sheet is called<input class="own-name" value="${escAttr(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
         <label>Where it sits in the year<select class="own-group">
-          ${occasions.map((o) => `<option value="${escText(o)}" ${sheet.group === o ? 'selected' : ''}>${escText(o)}</option>`).join('')}
+          ${occasions.map((o) => `<option value="${escAttr(o)}" ${sheet.group === o ? 'selected' : ''}>${escAttr(o)}</option>`).join('')}
         </select></label>
       </div>
       <div class="own-blocks">${(sheet.blocks || []).map(blockHtml).join('')}</div>

@@ -1,3 +1,4 @@
+import { safeHeaderImage, sanitizeRichText } from '../security.js';
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
 // right and its time on the left, running top to bottom.
@@ -21,7 +22,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInW
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
@@ -807,7 +808,7 @@ function publishPanelHtml(sheet, state, open = false) {
       (g) =>
         `<div class="published-row">
           <span><bdi${hebrewLang(label(g.sheet))}>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
-          <button type="button" class="btn-primary publish-btn" data-id="${g.sheet.id}">Publish</button>
+          <button type="button" class="btn-primary publish-btn" data-id="${escAttr(g.sheet.id)}">Publish</button>
         </div>`
     )
     .join('');
@@ -840,9 +841,9 @@ function cardHtml(title, linesHtml, settings, kind = '') {
   return `<section class="week-card${kind ? ' ' + kind : ''}">
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${settings.headerIconImage || '/assets/logo-building-icon.png'}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(settings.headerIconImage)}" alt="">
         <div class="header-center">
-          <img class="header-logo" src="/assets/logo-text.png" alt="${weekEsc(settings.shulName)}"${hebrewLang(settings.shulName)}>
+          <img class="header-logo" src="/assets/logo-text.png" alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)}>
           ${settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(settings.headerSubtitle)}>${weekEsc(settings.headerSubtitle)}</div>` : ''}
         </div>
         <div class="header-rabbi"${hebrewLang(settings.headerRabbiLine)}>${weekNl2br(settings.headerRabbiLine)}</div>
@@ -1708,8 +1709,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         live
           .map(
             (s) => `<div class="published-row">
-              <span><bdi lang="he">${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${s.hebrewYear} <span class="hint">(${s.weeks.length} weeks)</span></span>
-              <button type="button" class="btn-danger unpublish-btn" data-season="${s.season}" data-year="${s.hebrewYear}" data-id="${s.id}">Unpublish</button>
+              <span><bdi lang="he">${weekEsc(s.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi> ${escAttr(s.hebrewYear)} <span class="hint">(${s.weeks.length} weeks)</span></span>
+              <button type="button" class="btn-danger unpublish-btn" data-season="${escAttr(s.season)}" data-year="${escAttr(s.hebrewYear)}" data-id="${escAttr(s.id)}">Unpublish</button>
             </div>`
           )
           .join('');
@@ -1756,7 +1757,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
 
 /** A schedule written as HTML, kept as HTML but with its own outer whitespace trimmed. */
 function htmlLines(html) {
-  return String(html ?? '').trim();
+  return sanitizeRichText(html).trim();
 }
 
 /** Escapes the text, then turns the UL_START/UL_END sentinels the formula ports leave

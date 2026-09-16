@@ -16,8 +16,15 @@
      confuse somebody after the zmanim. robots.txt asks crawlers not to visit; this tag is
      what covers the case where one arrives anyway, through a link rather than the root. -->
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="css/app.css?v=c2b44a38">
-<link rel="stylesheet" href="css/print.css?v=a7172773" media="print">
+<link rel="stylesheet" href="css/app.css?v=3b84b7fa">
+<link rel="stylesheet" href="css/print.css?v=cd556ac7" media="print">
+<style>
+/* Keep installed-app controls outside the phone's status bar and cutout. */
+@media screen {
+  .app-shell { padding-top: env(safe-area-inset-top, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html { background: #101c36; }
+}
+</style>
 </head>
 <body>
 <div class="app-shell">

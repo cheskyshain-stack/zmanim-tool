@@ -48,9 +48,9 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
         <summary>Location</summary>
         <div class="panel-body">
         <label>Location name<input name="locationName" value="${escAttr(s.locationName)}"></label>
-        <label>Latitude<input name="latitude" type="number" step="any" value="${s.latitude}"></label>
-        <label>Longitude<input name="longitude" type="number" step="any" value="${s.longitude}"></label>
-        <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${s.elevation}"></label>
+        <label>Latitude<input name="latitude" type="number" step="any" value="${escAttr(s.latitude)}"></label>
+        <label>Longitude<input name="longitude" type="number" step="any" value="${escAttr(s.longitude)}"></label>
+        <label>Elevation (meters)<input name="elevation" type="number" step="any" value="${escAttr(s.elevation)}"></label>
         <label>Timezone<select name="timezoneId">${TIMEZONES.map((tz) => `<option value="${tz.id}" ${tz.id === s.timezoneId ? 'selected' : ''}>${escAttr(tz.label)}</option>`).join('')}</select></label>
       </div>
       </details>
@@ -69,9 +69,9 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
       <details class="panel">
         <summary>Advanced zmanim settings (leave alone unless you know what you're doing)</summary>
         <div class="panel-body">
-        <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${s.horizon}"></label>
-        <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${s.candleLightingMinutes}"></label>
-        <label>Ateret Torah Tzais offset (minutes)<input name="ateretTorahTzaisOffset" type="number" step="any" value="${s.ateretTorahTzaisOffset}"></label>
+        <label>Horizon (degrees)<input name="horizon" type="number" step="any" value="${escAttr(s.horizon)}"></label>
+        <label>Candle lighting (minutes before sunset)<input name="candleLightingMinutes" type="number" step="any" value="${escAttr(s.candleLightingMinutes)}"></label>
+        <label>Ateret Torah Tzais offset (minutes)<input name="ateretTorahTzaisOffset" type="number" step="any" value="${escAttr(s.ateretTorahTzaisOffset)}"></label>
         <label><input type="checkbox" name="useAstronomicalChatzos" ${s.useAstronomicalChatzos ? 'checked' : ''}> Use astronomical chatzos for zmanim</label>
         <label><input type="checkbox" name="useElevation" ${s.useElevation ? 'checked' : ''}> Use elevation for zmanim calculation</label>
         <label><input type="checkbox" name="useGregorianBefore1582" ${s.useGregorianBefore1582 ? 'checked' : ''}> Use Gregorian dates before Oct 15, 1582</label>

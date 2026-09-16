@@ -1,3 +1,4 @@
+import { safeHeaderImage } from '../security.js';
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
 // Two so far, שבת שובה and סליחות, and the tab is shaped for the others to follow rather
@@ -869,7 +870,7 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
      Out of Settings, so a shul that has cropped its own photo in has it here as well, and
      alt="" because the name beside it already says what it is. */
   const icon = onepage
-    ? `<img class="header-icon" src="${escAttr(settings.headerIconImage || '/assets/logo-building-icon.png')}" alt="">`
+    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">`
     : '';
   const head = chartHead
     /* The wall chart's header, copied: the same markup and the same classes, so the two are
@@ -2514,7 +2515,7 @@ export function renderPosters(container, state, routeChanged, tables) {
       ])}</div>`}
       ${!empty && !showAll ? `<label>Which sheet
         <select id="poster-pick">
-          ${items.map((p) => `<option value="${p.key}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
+          ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>
       </label>` : ''}
       <!-- The margin, built like the year and the yom tov beside it: a step either side of a

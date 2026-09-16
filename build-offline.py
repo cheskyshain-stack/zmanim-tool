@@ -953,7 +953,8 @@ def write_dist():
         if f.suffix == ".css":
             found = _css_comment_spans(text)
         elif f.suffix == ".js":
-            found = _js_comment_spans(text) or HTML_COMMENT_IN_JS.findall(text)
+            found = [(a, b) for a, b in _js_comment_spans(text)
+                     if not _keep_comment(text[a:b])] or HTML_COMMENT_IN_JS.findall(text)
         else:
             found = re.findall(r"<!--(?!\[if).*?-->", text, re.S)
         if found:

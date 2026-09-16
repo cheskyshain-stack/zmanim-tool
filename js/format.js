@@ -1,6 +1,8 @@
 // Time-formatting helpers ported from the workbook's TEXT(...,"h:mm"), ROUNDUP/ROUNDDOWN/
 // CEILING(...,1/1440) minute-rounding idioms, and the UNDERLINE_TIME function (which
 // marks an "alternate" time on the printed sheet by underlining it).
+import { sanitizeRichText } from './security.js';
+
 const EPS = 1e-7; // guards against floating point noise landing just the wrong side of a minute
 
 export function ceilToMinute(dayFraction) {
@@ -80,7 +82,7 @@ export function normalizeTimeList(text) {
  *  change: trims a trailing <br> (left behind by pressing Enter at the end) and normalizes
  *  &nbsp; to a plain space. */
 export function normalizeRichText(html) {
-  return html
+  return sanitizeRichText(html)
     .replace(/(<br\s*\/?>)+\s*$/i, '')
     .replace(/&nbsp;/g, ' ')
     .trim();

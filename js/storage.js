@@ -13,6 +13,8 @@ import { dateFromSerial } from './zmanim/solar.js';
    copy of the rules, and it has to retire the same ones. See isRetiredDrashaRule in rules.js. */
 import { isRetiredTishaBavRule, isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
 
+import { prepareBackup, prepareSavedSheet } from './security.js';
+
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
 
@@ -132,7 +134,7 @@ export function loadState() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
+    const parsed = prepareBackup(JSON.parse(raw));
     return applySeeds({
       settings: normalizeSettings(parsed.settings),
       sheets: normalizeSheets(parsed.sheets || []),
@@ -179,11 +181,11 @@ export function isSheetFile(text) {
 export function importSheetFromText(text) {
   const { sheet } = JSON.parse(text);
   if (!sheet || !Array.isArray(sheet.weeks)) throw new Error('That file does not contain a sheet.');
-  return { ...sheet, id: newId('sheet'), locked: false, linkedSheetId: undefined };
+  return { ...prepareSavedSheet(sheet), id: newId('sheet'), locked: false, linkedSheetId: undefined };
 }
 
 export function importStateFromText(text) {
-  const parsed = JSON.parse(text);
+  const parsed = prepareBackup(JSON.parse(text));
   // `seeded` comes across too: without it, restoring a backup made after deliberately
   // deleting a seeded rule would hand it straight back on the next load.
   return applySeeds({
@@ -191,6 +193,7 @@ export function importStateFromText(text) {
     sheets: normalizeSheets(parsed.sheets || []),
     rules: parsed.rules || SEED_RULES.map((r) => ({ ...r })),
     seeded: parsed.seeded || {},
+    own: normalizeOwn(parsed.own),
   });
 }
 
