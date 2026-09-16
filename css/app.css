@@ -4485,7 +4485,10 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
 .luach-daf-providers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; margin:1rem 0; }
 .luach-daf-provider { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.55rem; min-height:95px; padding:.8rem; border:1px solid #ded4bd; border-radius:12px; background:#fff; color:var(--luach-ink); text-decoration:none; font-size:.9rem; }
 .luach-daf-provider:hover { border-color:#a78239; background:#fffdf7; }
-.luach-daf-provider img { width:110px; height:40px; object-fit:contain; }
+/* The alt text is what the tile shows when a provider's logo does not arrive, so it is set
+   to read as a label rather than as a stranded line: centred in the box the logo would have
+   filled, and small enough that the longest of the four names sits on two lines inside 40px. */
+.luach-daf-provider img { width:110px; height:40px; object-fit:contain; text-align:center; font-size:.82rem; line-height:1.2; color:var(--luach-ink); }
 @media (prefers-reduced-motion:reduce) { .luach-zmanim-group::details-content,.luach-zmanim-options { transition:none; } }
 
 

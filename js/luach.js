@@ -772,7 +772,14 @@ function donateWayHtml(way) {
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
   const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" aria-label="${escAttr(p.name)}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
+  /* The four logos are the providers' own files on the providers' own servers, so the one
+     thing that cannot be assumed is that they arrive: a filter that blocks one of those
+     four hosts, a provider that moves its artwork, a phone on a bad signal. The label was
+     taken off these tiles once the logos were drawing them, and with alt="" a tile that
+     loses its picture is an empty box with nothing in it to click with confidence. This is
+     the shul's donation page, so the name is the alt text: the logo when it comes, the
+     provider's name when it does not, and never a blank tile. */
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
   const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
