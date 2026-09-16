@@ -97,8 +97,8 @@
      wipe the dark header row, the tinted parsha column and the striped body rows - the
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  /* Keep the approved dark shadow visible on printed monochrome charts. */
-  .shacharis-panel { box-shadow: 4px 5px 3px rgba(0, 0, 0, 0.45); }
+  /* Retain the original soft panel shadow when printing. */
+  .shacharis-panel { box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13); }
 }
 
 /* --- The week cards on paper -------------------------------------------------------
