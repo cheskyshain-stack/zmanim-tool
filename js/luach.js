@@ -471,6 +471,7 @@ function homeHtml(published) {
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
+    <p class="luach-intro" style="max-width:40rem;margin:1.5rem auto;text-align:center;font-size:1rem;line-height:1.6">Support Bais Medrash of Lakewood Commons, also known as Kahal Lev Menachem and Lakewood Commons Shul, at 44 Coles Way in Lakewood, NJ.</p>
     ${rule()}
     ${footHtml(s)}
   </div>`;
