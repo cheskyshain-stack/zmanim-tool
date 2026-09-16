@@ -423,8 +423,8 @@ function homeHtml(published) {
            a setting, the same as the thanks line on the donation page: this repository is
            this shul's, and a second place to type the name is a second place for it to end
            up written differently. -->
-      <h1 class="luach-masthead-name"><img class="luach-logo" src="/assets/logo-text-navy.png" alt="${escAttr(s.shulName)}"${hebrewLang(s.shulName)}><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${escAttr(s.headerSubtitle)}</p>` : ''}
+      <h1 class="luach-masthead-name"><span class="luach-approved-name" lang="he" dir="rtl" style="display:block;font-family:Frank Ruhl Libre,David,serif;font-weight:800;font-size:clamp(1.35rem,5.5vw,2.6rem);line-height:1.3">בית מדרש ד'ליקוואוד קאמענס</span><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
+      ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
     </header>
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
@@ -914,8 +914,8 @@ function renderDonatePage(published) {
              already carries this page's h1 and names it "Donate". Two h1s on one page is
              one too many, and the shul's name is the site's mark rather than the title of
              what is on the page. The alt text still says whose site it is. -->
-        <img class="luach-logo" src="/assets/logo-text-navy.png" alt="${escAttr(s.shulName)}"${hebrewLang(s.shulName)}>
-        ${s.headerSubtitle ? `${rule()}<p class="luach-place"${hebrewLang(s.headerSubtitle)}>${escAttr(s.headerSubtitle)}</p>` : ''}
+        <span class="luach-approved-name" lang="he" dir="rtl" style="display:block;font-family:Frank Ruhl Libre,David,serif;font-weight:800;font-size:clamp(1.35rem,5.5vw,2.6rem);line-height:1.3">בית מדרש ד'ליקוואוד קאמענס</span>
+        ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
       </header>
       <header class="luach-give-head-block">
         <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
