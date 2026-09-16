@@ -488,8 +488,8 @@ function homeHtml(published) {
 @media(prefers-reduced-motion:reduce){.luach-about::details-content,.luach-about-chevron{transition:none}}
 </style>
 <details class="luach-about">
-<summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>About our shul</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
-<div class="luach-about-body"><p><strong>Bais Medrash of Lakewood Commons</strong><br>Also known as Kahal Lev Menachem<br>44 Coles Way, Lakewood, NJ 08701</p><p>Support our shul and community.</p></div>
+<summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>Contact us</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
+<div class="luach-about-body"><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" style="color:inherit;overflow-wrap:anywhere">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
 </details>
     ${rule()}
     ${footHtml(s)}
@@ -1100,6 +1100,7 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
 
 
 
