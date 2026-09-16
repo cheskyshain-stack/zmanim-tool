@@ -423,7 +423,7 @@ function homeHtml(published) {
            a setting, the same as the thanks line on the donation page: this repository is
            this shul's, and a second place to type the name is a second place for it to end
            up written differently. -->
-      <h1 class="luach-masthead-name"><span class="luach-approved-name" lang="he" dir="rtl" style="display:block;font-family:Frank Ruhl Libre,David,serif;font-weight:800;color:#12274f;font-size:clamp(1.2rem,4.6vw,2rem);line-height:1.4">בית מדרש דליקוואוד קאמענס</span><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
+      <h1 class="luach-masthead-name"><svg class="luach-approved-name" viewBox="0 0 600 90" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
       ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
     </header>
     <div class="luach-home">
@@ -914,7 +914,7 @@ function renderDonatePage(published) {
              already carries this page's h1 and names it "Donate". Two h1s on one page is
              one too many, and the shul's name is the site's mark rather than the title of
              what is on the page. The alt text still says whose site it is. -->
-        <span class="luach-approved-name" lang="he" dir="rtl" style="display:block;font-family:Frank Ruhl Libre,David,serif;font-weight:800;color:#12274f;font-size:clamp(1.2rem,4.6vw,2rem);line-height:1.4">בית מדרש דליקוואוד קאמענס</span>
+        <svg class="luach-approved-name" viewBox="0 0 600 90" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg>
         ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
       </header>
       <header class="luach-give-head-block">
