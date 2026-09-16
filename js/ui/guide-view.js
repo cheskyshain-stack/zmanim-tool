@@ -1,120 +1,63 @@
-// The "what is this and how do I use it" page, written for someone opening the site for
-// the first time with no idea what it does. Lives inside the app rather than in a README
-// so it travels with the offline/USB copy and is there at the moment it's needed.
-
-/** @param {(tab: string) => void} onOpenTab  jumps to another screen from a link here. */
+/** Help for the current automatic schedule workflow. */
 export function renderGuide(container, onOpenTab) {
   container.innerHTML = `
-    <h2>Guide</h2>
-    <p class="hint">What this site is, and how to get a printed board out of it.</p>
-
-    <div class="guide-lede">
-      <p>This generates the printed <strong>zmanim boards</strong> for קהל לב מנחם: the שבת קיץ and שבת חורף charts and the matching Weekday chart. Every time in them is calculated for the shul's exact location, so a new year's board takes a minute instead of an afternoon of editing last year's.</p>
-      <p>Everything happens in this browser. There's no login and nothing to install, and no one else sees what you do here.</p>
-    </div>
-
+    <h2>Help &amp; Instructions</h2>
+    <p class="hint">Find schedules, prepare printed charts, and manage your local copies.</p>
     <details class="panel" open>
-      <summary>Make your first board in 3 steps</summary>
+      <summary>Automatic schedules</summary>
       <div class="panel-body">
-        <ol class="guide-steps">
-          <li>
-            <strong>Generate → pick the season and year.</strong>
-            <span class="hint">שבת קיץ runs Pesach → Sukkos, שבת חורף runs Sukkos → Pesach. The year and season start on whichever one is coming up next, so usually you can just press Continue. The app works out which Shabbosim belong to that season by itself, skipping the ones with no parsha.</span>
-          </li>
-          <li>
-            <strong>Choose how the weeks split across pages.</strong>
-            <span class="hint">It tells you how many weeks the season has and suggests an even split. Change the number on any page and the rest adjust. A Weekday chart is generated alongside, covering the same weeks.</span>
-          </li>
-          <li>
-            <strong>Press Generate.</strong>
-            <span class="hint">The finished board opens straight away, and is saved automatically, so you never have to remember to save.</span>
-          </li>
-        </ol>
+        <p>The congregation website generates its seasonal charts automatically. There is no seasonal sending or publishing step.</p>
+        <p><strong>Weekly Schedule</strong> shows one week at a time. <strong>Season Charts → View Charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
+        <p>Each season uses three Shabbos pages and three matching weekday pages. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Working on a board</summary>
+      <summary>Print a chart with your own page splits</summary>
       <div class="panel-body">
-        <p><strong>Any cell can be edited.</strong> Click it and type. Typing <code>300</code> becomes <code>3:00</code>, so you can enter a whole row of times as bare numbers and let it space them out. Edits stick to that one board and never touch next year's.</p>
-        <p><strong>Formatting.</strong> Select text inside a cell, then use the buttons in the toolbar: <u>U</u> underlines (that's how the board marks a minyan that's downstairs), A+ and A− change its size. Keyboard: <kbd>Ctrl</kbd>+<kbd>U</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>&gt;</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>&lt;</kbd>.</p>
-        <p><strong>Undo / Redo</strong> covers cell edits, for as long as the board stays open.</p>
-        <p><strong>Layout &amp; style</strong> changes the font, the text size, the logo size and the heading colour for the whole board.</p>
-        <p><strong>Side by side</strong> shows the Shabbos and Weekday charts next to each other, shrunk, to compare them. <strong>Fit to screen</strong> scales a page down until it fits across the screen. It turns itself on automatically on a phone, where a full-width page otherwise can't be seen at all.</p>
+        <ol>
+          <li>Open <strong>Season Charts → Print Layout</strong>.</li>
+          <li>Choose the season and Hebrew year, then continue.</li>
+          <li>Adjust the number of weeks on each page and open the charts.</li>
+          <li>Use <strong>Print / Save as PDF</strong>.</li>
+        </ol>
+        <p>Your page splits and cell edits are saved on this device. They do not change the automatic public charts.</p>
       </div>
     </details>
-
     <details class="panel">
       <summary>Printing and PDFs</summary>
       <div class="panel-body">
-        <p><strong>Print / Save as PDF</strong> opens your browser's print dialog. Saving a PDF is the same button: choose "Save as PDF" as the destination instead of a printer.</p>
-        <p>Set the paper to <strong>Letter, landscape</strong>, and turn on <strong>background graphics</strong> so the shaded header row prints.</p>
-        <p>The Shabbos and Weekday pages come out interleaved (שבת, its Weekday chart, שבת, its Weekday chart), so the pair for a run of weeks stays together.</p>
-        <p>Under <strong>Which pages to print or save</strong> you can untick individual pages. Unticked pages stay on screen, dimmed, and are left out of the print.</p>
+        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. For season charts, use Letter paper in landscape and enable background graphics.</p>
+        <p>Shabbos pages print first in each pair, followed by the matching weekday page. Padding changes the space around the chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>The luach for the congregation</summary>
+      <summary>Saved copies</summary>
       <div class="panel-body">
-        <p><strong>baismedrashoflakewoodcommons.org/week/</strong> shows one week at a time to anyone who opens it. No login, nothing to install, and it moves to the next week by itself once Shabbos is over. Previous and next week are there too.</p>
-        <p>It does not read your saved sheets, because a visitor's browser has none of them. It reads a published copy of the season, so it only shows what you have published.</p>
-        <p><strong>To publish:</strong> open <strong>This week</strong>, expand <em>Publish for the congregation</em>, and press the button. A minute later the congregation's page is showing it. Publish once per season, and again whenever you change a time so they see the correction.</p>
-        <p>Publishing needs a one-time setup: a token that allows the site to be written to. <strong>Settings → Publishing</strong> has step-by-step instructions for making one, and until it is set the publish button explains that rather than appearing broken.</p>
-        <p>Publishing a season leaves any other published season in place, so קיץ and חורף can both be live and the changeover between them happens on its own. A new year's chart does not remove last year's. Each published season also has an <strong>Unpublish</strong> button, and <strong>Saved sheets</strong> marks which sheet the congregation is currently looking at.</p>
+        <p>Open <strong>Season Charts → Saved Copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
+        <p>You can edit cells, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Sending a chart to someone else</summary>
+      <summary>Special schedules and messages</summary>
       <div class="panel-body">
-        <p>Send a PDF. Press <strong>Print / Save as PDF</strong> and choose Save as PDF as the destination instead of a printer.</p>
-        <p>Whoever receives it can open and print it without this site, an account, or an internet connection, which matters on a computer where the browser is blocked but a PDF reader isn't.</p>
+        <p><strong>Special Schedules</strong> contains the Yom Tov and fast day posters, plus the option to write a sheet of your own.</p>
+        <p><strong>Messages</strong> opens the separate page for preparing and copying schedule messages.</p>
       </div>
     </details>
-
     <details class="panel">
-      <summary>Rules: the difference between a one-off and every year</summary>
+      <summary>Settings and backups</summary>
       <div class="panel-body">
-        <p>Editing a cell changes <em>that board</em>. A <strong>rule</strong> changes <em>every board you generate from now on</em>, which is what you want for something that comes back every year.</p>
-        <p>Three are built in: שבת הגדול and שבת שובה add "דרשה" to the Mincha column, and ט באב marks the Shabbos when the fast starts מוצאי שבת. A rule can match on a special-Shabbos name (שובה, הגדול), a parsha name, a Hebrew date (recurring every year), or every week.</p>
-        <p>One rule can cover both charts at once: tick the matching column on קיץ and on חורף. Rules can be switched off without deleting them, and <strong>Duplicate</strong> starts a new one from an existing one.</p>
-        <p>Cells a rule has touched show a light yellow background on the board.</p>
+        <p><strong>Settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
+        <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Settings → Backup</strong> to export a backup or import one on another device.</p>
+        <p><strong>How Times Are Calculated</strong> explains the formulas used by the charts and special schedules.</p>
       </div>
     </details>
-
-    <details class="panel">
-      <summary>Saved sheets</summary>
-      <div class="panel-body">
-        <p>Every board you generate is saved here automatically. A Shabbos board and the Weekday chart made with it are one entry. Open either from the same row.</p>
-        <p><strong>Lock</strong> protects a board from being deleted until you unlock it. <strong>Folders</strong> are for keeping the list tidy: a folder appears as soon as you put something in it and disappears when the last thing leaves.</p>
-      </div>
-    </details>
-
-    <details class="panel">
-      <summary>Settings</summary>
-      <div class="panel-body">
-        <p>The shul's location, elevation, timezone and the offsets the calculations use (candle lighting, the various Tzais and Plag opinions), plus the shul name, the rabbi's line and what prints at the head and foot of every page. It's already set up for 44 Coles Way, so you shouldn't need to touch it unless something moves.</p>
-        <p>The daily שחרית schedule on the Weekday chart is not here. It is part of the program, so the board, the week card, "what is on next" and the messages page all print the one list and cannot come to disagree. Changing it is a change to the program.</p>
-      </div>
-    </details>
-
-    <details class="panel">
-      <summary>Where your work is kept (read this one)</summary>
-      <div class="panel-body">
-        <p>Boards, rules and settings are stored <strong>in this browser on this device</strong>. That means:</p>
-        <ul>
-          <li>Your phone and your computer each have their own boards. They don't sync.</li>
-          <li>Clearing the browser's site data erases them.</li>
-          <li>Nobody else visiting the site sees your work, and you don't see theirs.</li>
-        </ul>
-        <p>To move everything between devices, or to keep a backup: <strong>Settings → Backup → Export</strong> writes one file, and <strong>Import</strong> reads it back on the other device.</p>
-        <p><strong>Offline:</strong> the site also ships as a folder you can copy to a USB stick and open on a computer with no internet. Open <code>index.html</code> inside it and it behaves exactly the same.</p>
-      </div>
-    </details>
-
-    <div class="actions"><button type="button" id="guide-start" class="btn-primary">Make a board →</button></div>
+    <div class="actions">
+      <button type="button" id="guide-start" class="btn-primary">Open Season Charts</button>
+      <button type="button" id="guide-program">Get the Program</button>
+    </div>
   `;
-
-  container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('generate'));
+  container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('charts'));
+  container.querySelector('#guide-program').addEventListener('click', () => onOpenTab('program'));
 }
+
