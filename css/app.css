@@ -4456,3 +4456,9 @@ body.is-locked { overflow: hidden; }
   body.is-luach .luach-cap-photo { top: 10px; height: 38px; width: auto; }
   body.is-luach .luach-bar::after { pointer-events: none; }
 }
+
+/* Paint only the navy side of the curve so its transparent lower area cannot hide scrolling text. */
+@media screen {
+ body.is-luach .luach-bar { background: linear-gradient(180deg,var(--luach-navy-deep),var(--luach-navy)) top / 100% calc(100% - var(--luach-arc)) no-repeat; }
+ body.is-luach .luach-bar::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6 L100 -24 L0 -24 Z' fill='%23162a43'/%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6' fill='none' stroke='%23d1ad5f' stroke-width='2' vector-effect='non-scaling-stroke' stroke-linecap='square'/%3E%3C/svg%3E"); }
+}
