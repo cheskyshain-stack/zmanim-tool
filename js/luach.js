@@ -481,14 +481,12 @@ function homeHtml(published) {
 .luach-about[open] .luach-about-chevron{transform:rotate(180deg)}
 .luach-about-body{text-align:center;padding:.4rem 1.25rem 1.5rem;font-size:1.05rem;line-height:1.65}
 .luach-about-body p{margin:0 0 1rem}
-.luach-about-give{display:inline-block;padding:.55rem 2.25rem;border-radius:14px;background:#12274f;color:#fff;text-decoration:none;font-size:1.25rem;font-weight:bold}
-.luach-about-give:focus-visible{outline:3px solid #b49c61;outline-offset:3px}
 @supports (interpolate-size:allow-keywords){.luach-about{interpolate-size:allow-keywords}.luach-about::details-content{height:0;overflow:clip;transition:height .3s ease,content-visibility .3s allow-discrete}.luach-about[open]::details-content{height:auto}}
 @media(prefers-reduced-motion:reduce){.luach-about::details-content,.luach-about-chevron{transition:none}}
 </style>
 <details class="luach-about">
 <summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>About our shul</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
-<div class="luach-about-body"><p><strong>Bais Medrash of Lakewood Commons</strong><br>Also known as Kahal Lev Menachem<br>44 Coles Way, Lakewood, NJ 08701</p><p>Support our shul and community.</p><a class="luach-about-give" href="/donate/">Donate</a></div>
+<div class="luach-about-body"><p><strong>Bais Medrash of Lakewood Commons</strong><br>Also known as Kahal Lev Menachem<br>44 Coles Way, Lakewood, NJ 08701</p><p>Support our shul and community.</p></div>
 </details>
     ${rule()}
     ${footHtml(s)}
