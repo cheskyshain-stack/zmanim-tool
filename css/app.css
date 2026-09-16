@@ -1704,7 +1704,7 @@ body.is-luach main.is-give { min-height: 100vh; min-height: 100dvh; display: fle
 .luach-bar::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -2px; z-index: 0;
   height: calc(var(--luach-arc) + 2px);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6 L100 24 L0 24 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6' fill='none' stroke='%23d1ad5f' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6 L100 24 L0 24 Z' fill='%23f9f6ef'/%3E%3Cpath d='M0 10.6 Q50 -8.6 100 10.6' fill='none' stroke='%23d1ad5f' stroke-width='2' vector-effect='non-scaling-stroke' stroke-linecap='square'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
 /* Above the arc, or the parchment dome would be painted over the words. */
 .luach-back, .luach-bar-title { position: relative; z-index: 1; }
@@ -4434,3 +4434,17 @@ body.is-locked { overflow: hidden; }
   color: inherit; cursor: pointer;
 }
 .blocked-copy:hover { background: rgba(38, 50, 62, 0.05); }
+
+/* Shared stationary congregation header. Screen-only to preserve printed boards. */
+@media screen {
+  html { scrollbar-gutter: stable; }
+  body.is-luach { --luach-cap-height: calc(3.5rem + var(--luach-arc)); }
+  body.is-luach main { padding-top: calc(var(--luach-cap-height) + 1.6rem); }
+  body.is-luach .luach-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    box-sizing: border-box; height: var(--luach-cap-height); min-height: 0;
+    margin: 0; padding: 0.85rem 1.25rem calc(var(--luach-arc) + 0.7rem);
+    flex-wrap: nowrap;
+  }
+  body.is-luach .luach-bar-plain { padding: 0; }
+}
