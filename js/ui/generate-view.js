@@ -15,8 +15,8 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
   // empty page with a stray year field marooned on the right.
   container.innerHTML = `
     <div class="gen-column">
-    <h2>Generate a sheet</h2>
-    <p class="hint">Pick the season and year, then choose how the weeks split across printable pages.</p>
+    <h2>Print a season chart</h2>
+    <p class="hint">The site generates charts automatically with three pages per season. Use this screen to adjust rows per page for a local print copy.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
@@ -187,7 +187,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
           <ol class="week-list">${weekdayWeeks.map((w) => `<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}</li>`).join('')}</ol>
         </details>
       </fieldset>
-      <div class="actions"><button type="submit" class="btn-primary">Generate sheet</button></div>
+      <div class="actions"><button type="submit" class="btn-primary">Open charts</button></div>
     </form>
   `;
 
@@ -333,4 +333,5 @@ function wireSteppers(root) {
 function fmtDate(date) {
   return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 }
+
 
