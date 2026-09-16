@@ -19,6 +19,7 @@ import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 
 let chartLayoutOpen = false;
+const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
   ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
@@ -117,7 +118,7 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
     const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly });
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
-    applyStyle(el, sheet.style); // variables only - row heights need the page in the document
+    applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
     if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
@@ -203,10 +204,10 @@ export function renderSheet(container, state, sheet, onChange) {
           ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
           ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
           <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
-            { value: 'colour', label: 'Colour', on: sheet.style.ink !== 'mono' },
-            { value: 'mono', label: 'Black and white', on: sheet.style.ink === 'mono' },
+            { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
+            { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
           ])}</div>
-          <p class="hint">Changes apply to this chart and its print preview. The paired chart keeps its own settings.</p>
+          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view.</p>
         </div>
       </div>
     </details>
@@ -280,7 +281,7 @@ export function renderSheet(container, state, sheet, onChange) {
 
 
   const restyleOwnPages = () => {
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style));
+    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
     syncHeaderRowHeight(pagesEl);
   };
 
@@ -323,7 +324,7 @@ export function renderSheet(container, state, sheet, onChange) {
     container.querySelector('#' + key + '-original').addEventListener('click', () => change(original));
   }
   wireSwitch(container, 'chart-ink', value => {
-    sheet.style.ink = value === 'mono' ? 'mono' : 'colour';
+    state.settings.chartInk = value === 'mono' ? 'mono' : 'colour';
     restyleOwnPages();
     commit();
   });
@@ -428,9 +429,9 @@ function headerInkFor(color) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
 }
 
-function applyStyle(target, style) {
+function applyStyle(target, style, ink = style.ink) {
   target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
-  target.style.filter = style.ink === 'mono' ? 'grayscale(1)' : '';
+  target.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
