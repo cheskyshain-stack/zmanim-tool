@@ -49,7 +49,6 @@ function columnsAndBuilderFor(effectiveSeason) {
   return effectiveSeason === 'kayitz' ? { columns: KAYITZ_COLUMNS, buildRow: buildKayitzRow } : { columns: CHOREF_COLUMNS, buildRow: buildChorefRow };
 }
 
-const FONT_CHOICES = ['David', 'David Libre', 'Guttman Yad', 'Frank Ruehl', 'Times New Roman', 'Arial', 'Segoe UI'];
 
 /** Which shipped webfont stands in for each choice when the real one isn't installed.
  *
@@ -172,23 +171,7 @@ export function renderSheet(container, state, sheet, onChange) {
     </div>
     <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
-        <div class="style-toolbar">
-          <label>Font
-            <select id="style-font">${FONT_CHOICES.map((f) => `<option value="${f}" ${f === sheet.style.fontFamily ? 'selected' : ''}>${f}</option>`).join('')}</select>
-          </label>
-          <label>Text size
-            <input id="style-size" type="range" min="6" max="18" step="0.5" value="${sheet.style.fontSizePt}">
-            <span id="style-size-label">${sheet.style.fontSizePt}pt</span>
-          </label>
-          <label>Logo size
-            <input id="style-header" type="range" min="0.6" max="1.6" step="0.1" value="${sheet.style.headerScale}">
-          </label>
-          <label>Page color
-            <input id="style-color" type="color" value="${sheet.style.accentColor}">
-          </label>
-          <button id="style-reset" type="button">Reset style</button>
-        </div>
-        <div class="poster-bar" style="margin-top:1rem">
+        <div class="poster-bar">
           ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
           ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
           <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
@@ -266,32 +249,12 @@ export function renderSheet(container, state, sheet, onChange) {
     syncHeaderRowHeight(pagesEl);
   };
 
-  const fontSel = container.querySelector('#style-font');
-  const sizeInput = container.querySelector('#style-size');
-  const sizeLabel = container.querySelector('#style-size-label');
-  const headerInput = container.querySelector('#style-header');
   // Persists sheet.style as the app's "last used" style too, so the next *newly
   // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
   const commit = () => {
     state.settings.sheetStyle = { ...sheet.style };
     onChange({ save: true });
   };
-  fontSel.addEventListener('change', () => {
-    sheet.style.fontFamily = fontSel.value;
-    restyleOwnPages();
-    commit();
-  });
-  sizeInput.addEventListener('input', () => {
-    sheet.style.fontSizePt = Number(sizeInput.value);
-    sizeLabel.textContent = sheet.style.fontSizePt + 'pt';
-    restyleOwnPages();
-  });
-  sizeInput.addEventListener('change', commit);
-  headerInput.addEventListener('input', () => {
-    sheet.style.headerScale = Number(headerInput.value);
-    restyleOwnPages();
-  });
-  headerInput.addEventListener('change', commit);
   for (const [key, field, original] of [['chart-pad-y', 'paddingY', 0.35], ['chart-pad-x', 'paddingX', 0.5]]) {
     const select = container.querySelector('#' + key);
     const change = value => {
@@ -309,21 +272,9 @@ export function renderSheet(container, state, sheet, onChange) {
     restyleOwnPages();
     commit();
   });
-  const colorInput = container.querySelector('#style-color');
-  colorInput.addEventListener('input', () => {
-    sheet.style.accentColor = colorInput.value;
-    restyleOwnPages();
-  });
-  colorInput.addEventListener('change', commit);
-  container.querySelector('#style-reset').addEventListener('click', () => {
-    sheet.style = { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR };
-    commit(); // app.js re-renders the whole sheet view on save
-  });
+
 }
 
-/** Tick-list of every rendered page. Unticking marks the page .page-excluded, which
- *  print.css drops from the output - the page stays visible on screen (dimmed) so you
- *  can still see what you left out. */
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
 
 
