@@ -294,7 +294,7 @@ const DONATE = {
       blurb: 'Donor Advised Fund',
       icon: 'shul',
       providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://www.pledgercharitable.org/home","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://ojcfund.org/","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://matbia.org/","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: 'Open your DAF provider and search for Bais Medrash of Lakewood Commons using our Tax ID. Confirm the charity name before recommending your grant.',
+      how: 'Choose your DAF provider and find Bais Medrash of Lakewood Commons using Tax ID 26-4527675.',
       copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },
   ],
@@ -732,23 +732,18 @@ function renderChartPage(published) {
  *  through separate merchant pages and a donor has to land on the right one. */
 function donateAccountHtml(acc) {
   const funds = acc.funds || [];
-  const chip = (f) =>
-    `<li class="luach-chip">${f.icon ? giveIcon(f.icon, 'luach-chip-icon') : ''}<span>${escAttr(f.label)}</span></li>`;
-  /* Every fund on one line, and the line scrolls sideways where it does not fit. No fold
-     and no More: the list is a glance at what is behind the link, and a glance should not
-     need a press. What is cut off at the edge is the cue that there is more of it, which is
-     how a row of anything scrollable says so. */
-  const chips = funds.length
-    ? `<ul class="luach-chips" tabindex="0" role="list" aria-label="${escAttr(acc.title)} funds">${funds.map(chip).join('')}</ul>`
-    : '';
+  const purposes = funds.length ? `<details class="luach-fund-purposes">
+    <summary>What can I donate toward?</summary>
+    <ul>${funds.map(f => `<li>${escAttr(f.label)}</li>`).join('')}</ul>
+  </details>` : '';
+  const external = acc.href === 'https://www.neileich.org/';
   return `<div class="luach-give-account">
-    <h4 class="luach-account-title">${escAttr(acc.title)}</h4>
-    ${acc.blurb ? `<p class="luach-account-blurb">${escAttr(acc.blurb)}</p>` : ''}
-    ${chips}
-    <a class="luach-give-go" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
-      ${escAttr(acc.cta || DONATE.name)} <span aria-hidden="true">&rarr;</span>
+    <a class="luach-fund-row${external ? '' : ' luach-give-go'}" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
+      <span class="luach-account-title">${escAttr(acc.title)}</span>
+      <span class="luach-fund-action">${external ? 'Visit Neileich' : 'Donate'} <span aria-hidden="true">&rarr;</span></span>
     </a>
-    <div class="luach-give-frame" hidden></div>
+    ${purposes}
+    ${external ? '' : '<div class="luach-give-frame" hidden></div>'}
   </div>`;
 }
 
@@ -928,7 +923,7 @@ function renderDonatePage(published) {
         <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
         <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
-      ${DONATE.ways.map(donateWayHtml).join('')}
+      ${DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value).map(donateWayHtml).join('')}
       <p class="luach-give-legal">${DONATE.legal}</p>
       ${rule()}
       ${footHtml(s)}
@@ -1067,3 +1062,4 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
