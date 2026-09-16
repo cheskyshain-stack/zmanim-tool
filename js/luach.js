@@ -293,7 +293,7 @@ const DONATE = {
       title: 'DAF',
       blurb: 'Donor Advised Fund',
       icon: 'shul',
-      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://www.pledgercharitable.org/home","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://ojcfund.org/","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://matbia.org/","logo":"https://matbia.org/images/Matbia-logo.svg"}],
+      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://portal.ojcfund.org/Account/Login","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
       how: 'Choose your DAF provider and find Bais Medrash of Lakewood Commons using Tax ID 26-4527675.',
       copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },
