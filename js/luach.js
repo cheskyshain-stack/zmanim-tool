@@ -254,7 +254,7 @@ const DONATE = {
       accounts: [
         {
           title: 'Bais Medrash',
-          blurb: 'Support the many needs of our shul and community.',
+
           href: 'https://secure.cardknox.com/bmoflakewoodcommons1',
           funds: [
             { label: 'Aliyos', icon: 'book' },
