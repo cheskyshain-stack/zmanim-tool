@@ -4448,3 +4448,11 @@ body.is-locked { overflow: hidden; }
   }
   body.is-luach .luach-bar-plain { padding: 0; }
 }
+
+@media screen {
+  html:has(body.is-luach) { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: 110px; }
+  body.is-luach .luach-bar { pointer-events: none; touch-action: pan-y; }
+  body.is-luach .luach-bar a, body.is-luach .luach-bar button { pointer-events: auto; }
+  body.is-luach .luach-cap-photo { top: 10px; height: 38px; width: auto; }
+  body.is-luach .luach-bar::after { pointer-events: none; }
+}
