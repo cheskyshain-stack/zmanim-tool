@@ -18,6 +18,7 @@ import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 
+let chartLayoutOpen = false;
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
   ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
@@ -179,7 +180,7 @@ export function renderSheet(container, state, sheet, onChange) {
         <div class="actions"><button type="button" id="pages-all">Include all</button></div>
       </div>
     </details>
-    <details class="panel no-print">
+    <details id="chart-layout-panel" class="panel no-print" ${chartLayoutOpen ? 'open' : ''}>
       <summary>Layout &amp; style: font, sizes, padding, ink</summary>
       <div class="panel-body">
         <div class="style-toolbar">
@@ -213,6 +214,7 @@ export function renderSheet(container, state, sheet, onChange) {
       <div id="pages" class="pages"></div>
     </div>
   `;
+  container.querySelector('#chart-layout-panel').addEventListener('toggle', e => { chartLayoutOpen = e.currentTarget.open; });
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
   container.querySelector('#companion-btn')?.addEventListener('click', () => onChange({ openSheetId: companion.id }));
