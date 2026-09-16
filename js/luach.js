@@ -272,9 +272,7 @@ const DONATE = {
         },
         {
           title: 'Eiruv / Building Fund',
-          blurb: 'Help build for the future of our community.',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
-          funds: [{ label: 'Building Fund', icon: 'building' }, { label: 'Eiruv', icon: 'crane' }],
         },
         { title: 'Neileich', href: 'https://www.neileich.org/', cta: 'Open Neileich' },
         { title: 'Keren Zichron Zechariah', href: 'https://secure.cardknox.com/kerenzichronzechariah', cta: 'Donate' },
