@@ -772,7 +772,7 @@ function donateWayHtml(way) {
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
   const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${escAttr(p.name)} ↗</span></a>`).join('');
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" aria-label="${escAttr(p.name)}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
   const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
