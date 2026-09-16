@@ -54,8 +54,9 @@ export function buildKayitzRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
-  const B = tishaBavMaariv(shabbos, settings) ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha);
+  const tishaEvening = tishaBavMaariv(shabbos, settings)?.split('\n');
+  const B = tishaEvening?.slice(1).join('\n') ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
   const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
   const E = shacharisLine();
 
