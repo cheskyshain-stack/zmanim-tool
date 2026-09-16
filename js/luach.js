@@ -216,8 +216,26 @@ function footAddressHtml(value) {
   const at = text.search(/\s\d/);
   const part = (s) => `<span class="luach-foot-part">${escAttr(s)}</span>`;
   if (at < 0) return part(text);
-  return `${part(text.slice(0, at))} ${part(text.slice(at + 1))}`;
+  return `${part(text.slice(0, at))} <span class="luach-foot-part" style="position:relative"><span class="luach-foot-dot" aria-hidden="true" style="position:absolute;right:100%;top:0;text-align:center;visibility:hidden">·</span>${escAttr(text.slice(at + 1))}</span>`;
 }
+
+
+// Show the separator only while the name and address share a rendered line.
+function updateFootDots() {
+  main.querySelectorAll('.luach-foot-dot').forEach(dot => {
+    const address = dot.parentElement;
+    const name = address.previousElementSibling;
+    if (!name) return;
+    const a = address.getBoundingClientRect();
+    const n = name.getBoundingClientRect();
+    const gap = a.left - n.right;
+    dot.style.width = Math.max(0, gap) + 'px';
+    dot.style.visibility = Math.abs(a.top - n.top) < 2 && gap > 0 ? 'visible' : 'hidden';
+  });
+}
+new ResizeObserver(updateFootDots).observe(main);
+new MutationObserver(updateFootDots).observe(main, { childList: true, subtree: true });
+document.fonts.ready.then(updateFootDots);
 
 const DONATE = {
   name: 'Donate',
