@@ -16,6 +16,21 @@ import { shacharisGridHtml } from './shacharis-grid.js';
 import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
+import { switchHtml, wireSwitch } from './switch.js';
+
+const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
+const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
+  ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
+function chartMarginControl(key, label, value, original) {
+  const steps = Array.from({ length: 13 }, (_, i) => (15 + i * 5) / 100);
+  return `<div class="poster-year"><span class="poster-year-label" id="${key}-label">${label}</span>
+    <div class="poster-year-step">
+      <button type="button" id="${key}-less" aria-label="Decrease ${label}" ${value <= CHART_PAD_MIN ? 'disabled' : ''}>&minus;</button>
+      <select id="${key}" aria-labelledby="${key}-label">${steps.map(v => `<option value="${v}" ${Math.abs(v-value)<0.001?'selected':''}>${v.toFixed(2)}in</option>`).join('')}</select>
+      <button type="button" id="${key}-more" aria-label="Increase ${label}" ${value >= CHART_PAD_MAX ? 'disabled' : ''}>+</button>
+      <button type="button" id="${key}-original" class="poster-year-reset" ${Math.abs(value-original)<0.001?'disabled':''}>Original</button>
+    </div></div>`;
+}
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
@@ -165,7 +180,7 @@ export function renderSheet(container, state, sheet, onChange) {
       </div>
     </details>
     <details class="panel no-print">
-      <summary>Layout &amp; style: font, sizes, colour</summary>
+      <summary>Layout &amp; style: font, sizes, padding, ink</summary>
       <div class="panel-body">
         <div class="style-toolbar">
           <label>Font
@@ -182,6 +197,15 @@ export function renderSheet(container, state, sheet, onChange) {
             <input id="style-color" type="color" value="${sheet.style.accentColor}">
           </label>
           <button id="style-reset" type="button">Reset style</button>
+        </div>
+        <div class="poster-bar" style="margin-top:1rem">
+          ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
+          ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
+          <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
+            { value: 'colour', label: 'Colour', on: sheet.style.ink !== 'mono' },
+            { value: 'mono', label: 'Black and white', on: sheet.style.ink === 'mono' },
+          ])}</div>
+          <p class="hint">Changes apply to this chart and its print preview. The paired chart keeps its own settings.</p>
         </div>
       </div>
     </details>
@@ -284,6 +308,23 @@ export function renderSheet(container, state, sheet, onChange) {
     restyleOwnPages();
   });
   headerInput.addEventListener('change', commit);
+  for (const [key, field, original] of [['chart-pad-y', 'paddingY', 0.35], ['chart-pad-x', 'paddingX', 0.5]]) {
+    const select = container.querySelector('#' + key);
+    const change = value => {
+      sheet.style[field] = Math.round(chartPad(value, original) * 100) / 100;
+      restyleOwnPages();
+      commit();
+    };
+    select.addEventListener('change', () => change(select.value));
+    container.querySelector('#' + key + '-less').addEventListener('click', () => change(Number(select.value) - 0.05));
+    container.querySelector('#' + key + '-more').addEventListener('click', () => change(Number(select.value) + 0.05));
+    container.querySelector('#' + key + '-original').addEventListener('click', () => change(original));
+  }
+  wireSwitch(container, 'chart-ink', value => {
+    sheet.style.ink = value === 'mono' ? 'mono' : 'colour';
+    restyleOwnPages();
+    commit();
+  });
   const colorInput = container.querySelector('#style-color');
   colorInput.addEventListener('input', () => {
     sheet.style.accentColor = colorInput.value;
@@ -386,6 +427,8 @@ function headerInkFor(color) {
 }
 
 function applyStyle(target, style) {
+  target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
+  target.style.filter = style.ink === 'mono' ? 'grayscale(1)' : '';
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
@@ -682,3 +725,4 @@ function nl2br(str) {
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
   return escaped.replace(/\n/g, '<br>');
 }
+
