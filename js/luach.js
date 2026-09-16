@@ -731,18 +731,12 @@ function renderChartPage(published) {
  *  the button that opens it. Two of them, because the shul and the building fund bill
  *  through separate merchant pages and a donor has to land on the right one. */
 function donateAccountHtml(acc) {
-  const funds = acc.funds || [];
-  const purposes = funds.length ? `<details class="luach-fund-purposes">
-    <summary>What can I donate toward?</summary>
-    <ul>${funds.map(f => `<li>${escAttr(f.label)}</li>`).join('')}</ul>
-  </details>` : '';
   const external = acc.href === 'https://www.neileich.org/';
   return `<div class="luach-give-account">
     <a class="luach-fund-row${external ? '' : ' luach-give-go'}" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
       <span class="luach-fund-action">${external ? 'Visit Neileich' : 'Donate'} <span aria-hidden="true">&rarr;</span></span>
     </a>
-    ${purposes}
     ${external ? '' : '<div class="luach-give-frame" hidden></div>'}
   </div>`;
 }
