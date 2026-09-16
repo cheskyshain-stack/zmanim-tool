@@ -18,7 +18,6 @@ import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 
-let chartSideBySide = false;
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
@@ -165,11 +164,6 @@ export function renderSheet(container, state, sheet, onChange) {
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
       <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
       <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      ${companion ? switchHtml('chart-view', 'View', [
-        { value: 'shabbos', label: 'Shabbos', on: !chartSideBySide && sheet.season !== 'weekday' },
-        { value: 'weekday', label: 'Weekday', on: !chartSideBySide && sheet.season === 'weekday' },
-        { value: 'both', label: 'Side by side', on: chartSideBySide },
-      ]) : ''}
       <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
       ${richTextToolbarHtml('In the cell you\'re editing:')}
       <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
@@ -213,24 +207,13 @@ export function renderSheet(container, state, sheet, onChange) {
         </div>
       </div>
     </div>
-    <style>@media screen { #sheet-stack:not(.is-side-by-side) .chart-secondary { display: none; } }</style>
-    <div id="sheet-stack" class="${chartSideBySide && companion ? 'is-side-by-side' : ''}">
+    <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
   `;
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  if (companion) wireSwitch(container, 'chart-view', value => {
-    chartSideBySide = value === 'both';
-    const wantsWeekday = value === 'weekday';
-    if (!chartSideBySide && wantsWeekday !== (sheet.season === 'weekday')) {
-      onChange({ openSheetId: companion.id });
-      return;
-    }
-    container.querySelector('#sheet-stack').classList.toggle('is-side-by-side', chartSideBySide);
-    syncHeaderRowHeight(container.querySelector('#pages'));
-    if (fitOn) applyFit(container, true);
-  });
+
 
   // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
   // ever be read a column at a time by scrolling sideways. Fitting scales it down until
@@ -273,8 +256,9 @@ export function renderSheet(container, state, sheet, onChange) {
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
   const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
-  const primaryPages = buildPagesFor(sheet);
-  const companionPages = buildPagesFor(companion);
+  const shabbosFirst = sheet.season === 'weekday' && companion;
+  const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
+  const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
     if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
@@ -283,7 +267,6 @@ export function renderSheet(container, state, sheet, onChange) {
   // Both of these need the pages in the document: the picker to count them, and the row
   // sync to measure them (heights read 0 on a detached element).
   syncHeaderRowHeight(pagesEl);
-  companionPages.forEach(page => page.classList.add('chart-secondary'));
   buildPagePicker(container);
   autoFit(container);
 
