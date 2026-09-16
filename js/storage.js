@@ -11,7 +11,7 @@ import { dateFromSerial } from './zmanim/solar.js';
 /* The retired דרשה rules live with the rule engine rather than here, because this is not the only
    door they come in through: the congregation's site reads data/published.json, which carries a
    copy of the rules, and it has to retire the same ones. See isRetiredDrashaRule in rules.js. */
-import { isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
+import { isRetiredTishaBavRule, isRetiredDrashaRule, dropDuplicateDrasha } from './rules.js';
 
 const KEY = 'zmanim-app-state-v1';
 const SHEET_FILE_TYPE = 'zmanim-sheet';
@@ -20,28 +20,6 @@ const SHEET_FILE_TYPE = 'zmanim-sheet';
 // Shabbos HaGadol having a different Mincha because of the drasha) whenever you're
 // ready to fill in the real wording/times.
 const SEED_RULES = [];
-
-/** ט' באב used to be hardcoded into the sheet builders. It's an ordinary rule now, so
- *  it can be seen, edited, disabled or deleted like any other - matching on the Hebrew
- *  date, which recurs every year, unlike a fixed Gregorian date.
- *
- *  It fires on the two Shabbosim where the fast begins מוצאי שבת. Weeks are anchored on
- *  their Shabbos, so that's the Shabbos of 8 Av (the fast is the next day, 9 Av on a
- *  Sunday) and the Shabbos of 9 Av (9 Av itself is Shabbos, so the fast is נדחה to
- *  Sunday, 10 Av). Checked against real years: 5805 is the 8 Av case, 5789/5792/5796/
- *  5799 the 9 Av one.
- *
- *  Installed once per browser and recorded in state.seeded, so deleting it sticks
- *  instead of having it reappear on the next load. */
-const TISHA_BAV_RULE = {
-  id: 'rule-tisha-bav',
-  name: 'ט באב: מוצאי שבת',
-  enabled: true,
-  condition: { hebrewDate: ['5-8', '5-9'] },
-  columnKeys: ['kayitz:B', 'kayitz:C', 'choref:B', 'choref:C'],
-  mode: 'append',
-  value: 'ט באב',
-};
 
 /* The seed that put the 8:40 back on the end of the ר"ח / בה"ב / תענית שחרית is gone with the
    setting it edited. That schedule is WEEKDAY_SHACHARIS_SPECIAL in settings.js now and no browser
@@ -54,7 +32,7 @@ function applySeeds(state) {
      the seeded id, so a browser carrying a hand-made שובה rule was marked done and kept its
      duplicate. This runs every load and is cheap, and a rule it removes cannot come back,
      because nothing seeds one any more. See isRetiredDrashaRule for what it will not touch. */
-  state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r));
+  state.rules = state.rules.filter((r) => !isRetiredDrashaRule(r) && !isRetiredTishaBavRule(r));
   /* And the same word where the rule had already been baked into a typed-over cell, which
      deleting the rule does not reach. See dropDuplicateDrasha for what it will not touch. */
   for (const sheet of Array.isArray(state.sheets) ? state.sheets : []) {
@@ -68,17 +46,7 @@ function applySeeds(state) {
   seeded.drashos = true;
   seeded.shuvaComputed = true;
   seeded.hagadolComputed = true;
-  if (!seeded.tishaBav) {
-    if (!state.rules.some((r) => r.id === TISHA_BAV_RULE.id)) state.rules.push({ ...TISHA_BAV_RULE });
-    seeded.tishaBav = true;
-  }
-  // The first version of this rule only matched 9 Av, missing the years where 9 Av lands
-  // on a Sunday (the Shabbos before it is 8 Av). Widen a copy that still carries exactly
-  // the old condition - an untouched seed - and leave any hand-edited one alone.
-  const existing = state.rules.find((r) => r.id === TISHA_BAV_RULE.id);
-  if (existing && JSON.stringify(existing.condition) === JSON.stringify({ hebrewDate: ['5-9'] })) {
-    existing.condition = { hebrewDate: ['5-8', '5-9'] };
-  }
+  seeded.tishaBav = true; // The schedule is computed by the sheet builders now.
   // Rule names written with an em dash, back when the seeds used one. Rewritten to a
   // colon so no dash of that kind is left anywhere in the app, including names already
   // saved in a browser.
@@ -229,3 +197,4 @@ export function importStateFromText(text) {
 export function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
