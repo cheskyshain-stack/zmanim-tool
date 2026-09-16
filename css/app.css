@@ -4488,6 +4488,3 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
 .luach-daf-provider img { width:110px; height:40px; object-fit:contain; }
 @media (prefers-reduced-motion:reduce) { .luach-zmanim-group::details-content,.luach-zmanim-options { transition:none; } }
 
-/* Center a single upcoming minyan without stretching it across the desktop menu.
-   Paired candle-lighting cards retain their existing responsive layout. */
-.luach-next:has(> .luach-next-box:only-child) { width:100%; max-width:28rem; margin-inline:auto; box-sizing:border-box; }
