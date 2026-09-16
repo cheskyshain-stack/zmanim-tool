@@ -2354,139 +2354,37 @@ async function loadPublished({ automatic = false } = {}) {
   }
 }
 
-// --- Publishing straight to the site ------------------------------------------------
-//
-// The site is static files in a GitHub repository, so "publish" means committing
-// data/published.json to that repository. A browser can do that through GitHub's own
-// API, which needs a token to prove it is allowed to.
-//
-// The token is kept under its own localStorage key rather than inside the app state, so
-// it can never ride along in an exported backup. A backup gets shared; a write token
-// must not.
+// Automatic charts do not need a repository credential in the browser.
+// Delete legacy copies without ever reading or copying their contents.
+function clearLegacyPublishToken() {
+  for (const name of ['localStorage', 'sessionStorage']) {
+    try { globalThis[name].removeItem('zmanim-publish-token'); } catch { /* Storage may be disabled. */ }
+  }
+}
+clearLegacyPublishToken();
 
-const REPO_OWNER = 'cheskyshain-stack';
-const REPO_NAME = 'zmanim-tool';
-const REPO_BRANCH = 'main';
-const PUBLISH_PATH = 'data/published.json';
-const TOKEN_KEY = 'zmanim-publish-token';
-
+// Compatibility for older local screens. Publishing controls remain unavailable.
 function getPublishToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || '';
-  } catch {
-    // A browser that refuses storage has no token to give. The admin app is the only
-    // thing that asks, and it will say the token is missing rather than fall over.
-    return '';
-  }
+  clearLegacyPublishToken();
+  return '';
 }
 
-function setPublishToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token.trim());
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Nothing to do: publishing this session still works, the token just will not be
-    // remembered for the next one.
-  }
+async function fetchPublished() {
+  const res = await fetch('/data/published.json', { cache: 'no-cache' });
+  if (res.status === 404) return { data: null };
+  if (!res.ok) throw new Error('The shared schedule settings could not be loaded.');
+  return { data: await res.json() };
 }
 
-/** UTF-8 safe base64, which is what the API wants the file contents as. btoa alone
- *  throws on any Hebrew character, and this file is full of them. */
-function toBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  // In chunks: apply() on a 100KB array overflows the argument limit.
-  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  return btoa(binary);
+async function publishToSite() {
+  throw new Error('Charts update automatically. Shared website settings are managed through the site repository.');
 }
 
-async function api(path, token, options = {}) {
-  return fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${path}`, {
-    ...options,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(options.headers || {}),
-    },
-  });
+async function unpublishFromSite() {
+  throw new Error('Automatic charts cannot be removed through browser publishing.');
 }
 
-/** Whatever is published right now, straight from the repository rather than from the
- *  deployed site, so it is accurate the moment after a publish instead of a minute
- *  later. Returns { data, sha } with data null when nothing is published yet. */
-async function fetchPublished(token) {
-  const res = await api(`contents/${PUBLISH_PATH}?ref=${REPO_BRANCH}`, token);
-  if (res.status === 404) return { data: null, sha: undefined };
-  if (res.status === 401) throw new Error('That token was refused. It may be wrong, expired, or revoked.');
-  if (res.status === 403) throw new Error('That token is not allowed to read this repository.');
-  if (!res.ok) throw new Error(`GitHub replied ${res.status} when reading what is published.`);
-  const body = await res.json();
-  // The API returns base64 wrapped across lines, which atob will not accept as-is.
-  const text = new TextDecoder().decode(Uint8Array.from(atob(body.content.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
-  return { data: JSON.parse(text), sha: body.sha };
-}
-
-async function commit(json, sha, message, token) {
-  const res = await api(`contents/${PUBLISH_PATH}`, token, {
-    method: 'PUT',
-    body: JSON.stringify({ message, content: toBase64(json), branch: REPO_BRANCH, ...(sha ? { sha } : {}) }),
-  });
-  if (res.status === 401 || res.status === 403) throw new Error('That token is not allowed to write to this repository.');
-  if (!res.ok) {
-    let detail = '';
-    try {
-      detail = (await res.json()).message || '';
-    } catch {
-      /* the body is not always JSON */
-    }
-    throw new Error(`GitHub refused the change (${res.status})${detail ? ': ' + detail : ''}.`);
-  }
-}
-
-/** Two sheets are the same season in the same year, and so replace each other. */
-const sameSeason = (a, b) => a.season === b.season && a.hebrewYear === b.hebrewYear;
-
-/** Publishes a season, keeping every other season already published.
- *
- *  A year needs both קיץ and חורף, so publishing one must not remove the other: this
- *  replaces only the entry for the same season and year, which is what makes a corrected
- *  chart supersede the one before it. Settings and rules come from this publish, since
- *  they are shul-wide rather than per season. */
-async function publishToSite(payload, token) {
-  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
-  const { data, sha } = await fetchPublished(token);
-  const existing = data?.sheets || [];
-
-  // Only Shabbos sheets identify a season. Every weekday chart carries season 'weekday',
-  // so comparing those by season and year matched קיץ's weekday against חורף's and
-  // quietly deleted one: a weekday chart belongs to whichever Shabbos sheet it was
-  // generated with, and is replaced only when that sheet is.
-  const incomingSeasons = payload.sheets.filter((s) => s.season !== 'weekday');
-  const replacedIds = new Set(
-    existing.filter((s) => s.season !== 'weekday' && incomingSeasons.some((i) => sameSeason(i, s))).map((s) => s.id)
-  );
-  const keep = existing.filter((s) =>
-    s.season === 'weekday' ? !replacedIds.has(s.linkedSheetId) : !incomingSeasons.some((i) => sameSeason(i, s))
-  );
-
-  const merged = { ...data, ...payload, sheets: [...keep, ...payload.sheets] };
-  const label = incomingSeasons[0];
-  await commit(JSON.stringify(merged, null, 2), sha, `Publish ${label?.season || 'season'} ${label?.hebrewYear || ''}`, token);
-  return data ? 'updated' : 'created';
-}
-
-/** Takes one season back off the congregation's page, leaving the others published. */
-async function unpublishFromSite(sheet, token) {
-  if (!token) throw new Error('No publishing token set. Add one in Settings, under Publishing.');
-  const { data, sha } = await fetchPublished(token);
-  if (!data) throw new Error('Nothing is published.');
-  const remaining = data.sheets.filter((s) => !sameSeason(s, sheet) && !(s.season === 'weekday' && s.linkedSheetId === sheet.id));
-  await commit(JSON.stringify({ ...data, sheets: remaining }, null, 2), sha, `Unpublish ${sheet.season} ${sheet.hebrewYear}`, token);
-  return remaining.length;
-}
-
-/** Regenerate previous, current and upcoming seasons from shared formulas.
+/** Regenerate three Hebrew years before and after the current year from shared formulas.
  * Previously published sheets supply page splits only; times are always recalculated. */
 function buildAutomaticCharts(config, tables, now = new Date()) {
   const settings = { ...DEFAULT_SETTINGS, ...config.settings,
@@ -2498,15 +2396,12 @@ function buildAutomaticCharts(config, tables, now = new Date()) {
   const today = excelSerial(new Date(Date.UTC(part('year'), part('month') - 1, part('day'))));
   const year = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
   const seasons = [];
-  for (let y = year - 1; y <= year + 1; y++) for (const season of ['choref', 'kayitz']) {
+  for (let y = year - 3; y <= year + 3; y++) for (const season of ['choref', 'kayitz']) {
     seasons.push({ season, year: y, ...computeSeasonWeeks(season, y, resolved, tables) });
   }
   seasons.sort((a, b) => a.startSerial - b.startSerial);
-  let at = seasons.findIndex(s => s.startSerial <= today && today < s.endSerial);
-  if (at < 0) at = seasons.findIndex(s => s.endSerial > today);
-  const selected = seasons.slice(Math.max(0, at - 1), at + 2);
   const sheets = [];
-  for (const s of selected) {
+  for (const s of seasons) {
     const old = (config.sheets || []).filter(x => x.season === s.season && x.hebrewYear === s.year)
       .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
     const key = s.season + '-' + s.year;
@@ -14801,7 +14696,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
       // publishing panel, which is the place that shows what the congregation is looking
       // at right now and can take a season back down - and the place that tells you about
       // the token when there is no token, which is why it shows either way.
-      onOpenPublish
+      onOpenPublish && getPublishToken()
         ? `<div class="actions"><button type="button" id="saved-publishing">Publishing${getPublishToken() ? '' : ' (no token set)'}</button></div>`
         : ''
     }
@@ -15339,48 +15234,11 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
       </details>
       <div class="actions"><button type="submit" class="btn-primary">Save settings</button></div>
     </form>
-    <form class="form-grid" id="settings-publish" onsubmit="return false">
-      <details class="panel">
-        <summary>Publishing</summary>
-        <div class="panel-body">
-        <p class="hint">Publishing puts the season on the congregation's page at <strong>baismedrashoflakewoodcommons.org</strong>. It writes one file into the site, and GitHub needs a token to allow that.</p>
-        <details class="panel">
-          <summary>How to make the token</summary>
-          <div class="panel-body">
-            <ol class="guide-steps">
-              <li>Sign in to <strong>github.com</strong>.</li>
-              <li>Click your <strong>profile picture</strong>, top right, then <strong>Settings</strong>.</li>
-              <li>Scroll to the very bottom of the left sidebar: <strong>Developer settings</strong>.</li>
-              <li><strong>Personal access tokens</strong>, then <strong>Fine-grained tokens</strong>.</li>
-              <li><strong>Generate new token</strong>.</li>
-              <li>Name it anything, for example <code>zmanim publish</code>, and pick an expiry.
-                <span class="hint">When it expires, publishing stops until you make a new one and paste it here. A year is reasonable.</span>
-              </li>
-              <li>Under <strong>Repository access</strong>, choose <strong>Only select repositories</strong> and pick <strong>zmanim-tool</strong>.</li>
-              <li>Under <strong>Permissions</strong>, click <strong>+ Add permissions</strong>.
-                <span class="hint">This is the step that is easy to miss: the list starts empty and says "No repository permissions added yet".</span>
-              </li>
-              <li>Search for <strong>Contents</strong>, tick it, and add it.</li>
-              <li>Its dropdown will say <em>Read-only</em>. Change it to <strong>Read and write</strong>.
-                <span class="hint">Metadata adds itself as Read-only. Leave it, it is required.</span>
-              </li>
-              <li><strong>Generate token</strong> at the bottom, and copy it straight away.
-                <span class="hint">It starts with <code>github_pat_</code> and GitHub never shows it again.</span>
-              </li>
-              <li>Paste it below and press <strong>Save token</strong>.</li>
-            </ol>
-            <p class="hint">To check it worked, open <strong>This week</strong> and expand <em>Publish for the congregation</em>. A good token shows the publish button and, underneath, what is currently published. A bad one says so in plain words rather than failing quietly: "not allowed to write to this repository" means Contents was left on Read-only.</p>
-          </div>
-        </details>
-        <p class="hint">The token is stored in this browser only, and deliberately kept out of the backup file, so exporting a backup never carries it. Anyone using this computer could take it and change the site, so do not set it on a shared machine. You can revoke it on GitHub at any time.</p>
-        <label>Publishing token<input type="password" id="publish-token" autocomplete="off" placeholder="${getPublishToken() ? '' : 'github_pat_...'}" value="${escAttr(getPublishToken())}"></label>
-        <div class="backup-row">
-          <button type="button" id="save-token-btn" class="btn-primary">Save token</button>
-          <button type="button" id="clear-token-btn" class="btn-danger">Remove token</button>
-        </div>
-      </div>
-      </details>
-    </form>
+    <section class="panel">
+      <h3>Automatic charts</h3>
+      <p class="hint">The website creates its charts automatically. No publishing key is needed or saved here. Changes to shared website settings are managed through the site repository.</p>
+      <p class="hint">If you previously created a GitHub key for this website, revoke it in <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">GitHub token settings</a>. Removing the browser copy does not revoke the key itself.</p>
+    </section>
     <form class="form-grid" id="settings-backup" onsubmit="return false">
       <details class="panel">
         <summary>Backup</summary>
@@ -15396,15 +15254,7 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
     </form>
   `;
 
-  container.querySelector('#save-token-btn').addEventListener('click', () => {
-    setPublishToken(container.querySelector('#publish-token').value);
-    showToast(getPublishToken() ? 'Publishing token saved' : 'Publishing token removed');
-  });
-  container.querySelector('#clear-token-btn').addEventListener('click', () => {
-    setPublishToken('');
-    container.querySelector('#publish-token').value = '';
-    showToast('Publishing token removed');
-  });
+  clearLegacyPublishToken();
 
   container.querySelector('#export-btn').addEventListener('click', () => exportStateToFile(state));
   container.querySelector('#import-input').addEventListener('change', async (e) => {
@@ -17516,42 +17366,8 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
  *  changes hands. Deliberately a button rather than something automatic, because
  *  publishing is the moment the congregation sees a change and that should be a
  *  decision, not a side effect of editing a cell. */
-function publishPanelHtml(sheet, state, open = false) {
-  const hasToken = Boolean(getPublishToken());
-  const groups = publishableGroups(state);
-  const label = (s) => SEASON_LABELS[s.season] || s.season;
-  // A row here is a season that exists to be published. With only one generated there is
-  // only one row, which reads as "there is no way to publish a second chart" - so say
-  // where the second one comes from instead of leaving an empty space to interpret.
-  const missing = ['kayitz', 'choref'].filter((season) => !groups.some((g) => g.sheet.season === season));
-  const rows = groups
-    .map(
-      (g) =>
-        `<div class="published-row">
-          <span><bdi${hebrewLang(label(g.sheet))}>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
-          <button type="button" class="btn-primary publish-btn" data-id="${escAttr(g.sheet.id)}">Publish</button>
-        </div>`
-    )
-    .join('');
-  return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
-    <summary>Publish for the congregation</summary>
-    <div class="panel-body">
-      <p class="hint">The congregation's page is <strong>baismedrashoflakewoodcommons.org</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
-      ${
-        hasToken
-          ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
-             ${
-               groups.length && missing.length
-                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi${hebrewLang(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi${hebrewLang(SEASON_LABELS[missing[0]])}>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
-                 : ''
-             }
-             <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
-             <div id="publish-status" class="hint"></div>
-             <div id="published-list"></div>`
-          : '<p class="error">No publishing token set. Add one in Settings, under Publishing, and this becomes a single button.</p>'
-      }
-    </div>
-  </details>`;
+function publishPanelHtml() {
+  return '';
 }
 
 function cardHtml(title, linesHtml, settings, kind = '') {

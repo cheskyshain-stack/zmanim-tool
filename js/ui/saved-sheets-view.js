@@ -82,7 +82,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange, 
       // publishing panel, which is the place that shows what the congregation is looking
       // at right now and can take a season back down - and the place that tells you about
       // the token when there is no token, which is why it shows either way.
-      onOpenPublish
+      onOpenPublish && getPublishToken()
         ? `<div class="actions"><button type="button" id="saved-publishing">Publishing${getPublishToken() ? '' : ' (no token set)'}</button></div>`
         : ''
     }

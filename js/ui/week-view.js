@@ -795,42 +795,8 @@ function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
  *  changes hands. Deliberately a button rather than something automatic, because
  *  publishing is the moment the congregation sees a change and that should be a
  *  decision, not a side effect of editing a cell. */
-function publishPanelHtml(sheet, state, open = false) {
-  const hasToken = Boolean(getPublishToken());
-  const groups = publishableGroups(state);
-  const label = (s) => SEASON_LABELS[s.season] || s.season;
-  // A row here is a season that exists to be published. With only one generated there is
-  // only one row, which reads as "there is no way to publish a second chart" - so say
-  // where the second one comes from instead of leaving an empty space to interpret.
-  const missing = ['kayitz', 'choref'].filter((season) => !groups.some((g) => g.sheet.season === season));
-  const rows = groups
-    .map(
-      (g) =>
-        `<div class="published-row">
-          <span><bdi${hebrewLang(label(g.sheet))}>${weekEsc(label(g.sheet))}</bdi> ${g.sheet.hebrewYear} <span class="hint">(${g.sheet.weeks.length} weeks${g.sheet.id === sheet?.id ? ', the week you are on' : ''})</span></span>
-          <button type="button" class="btn-primary publish-btn" data-id="${escAttr(g.sheet.id)}">Publish</button>
-        </div>`
-    )
-    .join('');
-  return `<details class="panel no-print" id="publish-panel" ${open ? 'open' : ''}>
-    <summary>Publish for the congregation</summary>
-    <div class="panel-body">
-      <p class="hint">The congregation's page is <strong>baismedrashoflakewoodcommons.org</strong>. It shows one week at a time and moves on by itself once Shabbos is over, for the whole season.</p>
-      ${
-        hasToken
-          ? `${rows || '<p class="hint">No season has been generated yet.</p>'}
-             ${
-               groups.length && missing.length
-                 ? `<p class="hint">Only ${missing.length === 1 ? `<bdi${hebrewLang(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}>${weekEsc(SEASON_LABELS[missing[0] === 'kayitz' ? 'choref' : 'kayitz'])}</bdi> is here` : 'these are here'}. A second chart gets its own row: generate <bdi${hebrewLang(SEASON_LABELS[missing[0]])}>${weekEsc(SEASON_LABELS[missing[0]])}</bdi> on the Generate tab and it turns up above, with its own Publish button.</p>`
-                 : ''
-             }
-             <p class="hint">Publishing a season leaves any other published season in place, so קיץ and חורף can both be live. Publishing the same season again replaces it, which is how a correction reaches the congregation.</p>
-             <div id="publish-status" class="hint"></div>
-             <div id="published-list"></div>`
-          : '<p class="error">No publishing token set. Add one in Settings, under Publishing, and this becomes a single button.</p>'
-      }
-    </div>
-  </details>`;
+function publishPanelHtml() {
+  return '';
 }
 
 function cardHtml(title, linesHtml, settings, kind = '') {

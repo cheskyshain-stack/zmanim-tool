@@ -26,21 +26,38 @@ const server = http.createServer((req, res) => {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(origin + '/security-test');
     const results = await page.evaluate(async () => {
+      localStorage.setItem('zmanim-publish-token','fake-test-key');
+      sessionStorage.setItem('zmanim-publish-token','fake-test-key');
       const {importStateFromText, importSheetFromText, loadState} = await import('/js/storage.js');
       const {sanitizeRichText, safeHeaderImage} = await import('/js/security.js');
       const {renderRules} = await import('/js/ui/rules-view.js');
       const {renderOwnEditor} = await import('/js/ui/own-view.js');
       const {renderSavedSheets} = await import('/js/ui/saved-sheets-view.js');
       const {buildSheetPages} = await import('/js/ui/sheet-view.js');
-      const {buildAutomaticCharts} = await import('/js/publish.js');
+      const {buildAutomaticCharts,getPublishToken,publishToSite,unpublishFromSite} = await import('/js/publish.js');
+      const {renderSettings} = await import('/js/ui/settings-view.js');
+      const {renderChartBrowser} = await import('/js/ui/chart-view.js');
       const {loadTables} = await import('/js/data-loader.js');
       const {mergeRow} = await import('/js/overrides.js');
       const check = (ok, message) => {if (!ok) throw Error(message);};
+      check(localStorage.getItem('zmanim-publish-token')===null && sessionStorage.getItem('zmanim-publish-token')===null,'legacy key remains');
+      check(getPublishToken()==='','browser publishing credential exposed');
+      const originalFetch=window.fetch;
+      let requests=0;
+      window.fetch=()=>{requests++;throw Error('Unexpected network request');};
+      for (const action of [publishToSite,unpublishFromSite]) {
+        let blocked=false;try {await action({},'fake-test-key');}catch {blocked=true;}
+        check(blocked,'legacy publishing still enabled');
+      }
+      window.fetch=originalFetch;
+      check(requests===0,'legacy publishing sent a request');
       const host = document.getElementById('host');
       const attack = '<img src="data:image/png;base64,AA==" onerror="document.documentElement.dataset.pwned=1">';
       const attr = '\" onpointerover=\"document.documentElement.dataset.pwned=1\" data-test=\"';
       const base = {settings:{}, sheets:[], rules:[{id:attr,name:attr,enabled:true,condition:{parsha:[attack]},columnKeys:['kayitz:B'],mode:'append',value:'7:30'}]};
       const state = importStateFromText(JSON.stringify(base));
+      renderSettings(host,state,()=>{},()=>{});
+      check(!host.querySelector('#publish-token,#save-token-btn'),'credential form remains');
       renderRules(host,state,()=>{});
       check(!host.querySelector('img,[onpointerover]'), 'rule injection');
       check(host.textContent.includes(attack),'rule text was lost');
@@ -76,6 +93,22 @@ const server = http.createServer((req, res) => {
       check(loadState().sheets[0].overrides['46000'].B===formatted,'existing backup not cleaned');
       host.replaceChildren();
       const charts = buildAutomaticCharts({settings:state.settings,rules:[],sheets:[]},await loadTables(),new Date('2026-09-16T12:00:00Z'));
+      const years=[...new Set(charts.sheets.map(s=>s.hebrewYear))].sort();
+      check(years.length===7 && years[0]===5784 && years[6]===5790,'seven-year range incorrect');
+      check(charts.sheets.length===28 && charts.sheets.every(s=>s.weeks.length>0),'seasons missing');
+      renderChartBrowser(host,charts,{confine:false});
+      const currentLabel=host.querySelector('.week-nav-when').textContent;
+      let steps=0;
+      while (!host.querySelector('.chart-prev').disabled && steps++<50) host.querySelector('.chart-prev').click();
+      check(host.querySelector('.chart-prev').disabled,'past boundary missing');
+      const firstLabel=host.querySelector('.week-nav-when').textContent.trim();
+      steps=0;
+      while (!host.querySelector('.chart-next').disabled && steps++<50) host.querySelector('.chart-next').click();
+      check(steps===41 && host.querySelector('.chart-next').disabled,'chart navigation incomplete');
+      const lastLabel=host.querySelector('.week-nav-when').textContent.trim();
+      host.querySelector('.chart-today').click();
+      check(host.querySelector('.week-nav-when').textContent===currentLabel,'Today did not return to current chart');
+      host.replaceChildren();
       const pair = charts.sheets.slice(2,4);
       const restored = importStateFromText(JSON.stringify({...charts,sheets:pair}));
       check(restored.sheets.length===2,'generated charts lost on restore');
@@ -91,7 +124,7 @@ const server = http.createServer((req, res) => {
       await document.fonts.ready;
       const dimensions=pages.map(p=>({width:p.getBoundingClientRect().width,height:p.getBoundingClientRect().height}));
       check(dimensions.every(d=>d.width>0&&d.height>0),'charts not visible');
-      return {checks:'rules, attributes, rich text, malformed backups, custom posters, single sheets, stored backups, generated charts',pages:pages.length,dimensions,marker:document.documentElement.dataset.pwned||null};
+      return {checks:'import security, retired browser publishing, seven-year chart navigation, six-page printing',years,firstLabel,lastLabel,pages:pages.length,dimensions,marker:document.documentElement.dataset.pwned||null};
     });
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(()=>document.documentElement.dataset.pwned||null),null);
