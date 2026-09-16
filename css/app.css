@@ -4503,3 +4503,26 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
  body.is-luach .luach-bar::before { content:""; position:absolute; inset:0 0 var(--luach-arc); pointer-events:auto; touch-action:pan-y; }
  body.is-luach .luach-bar a, body.is-luach .luach-bar button { position:relative; z-index:1; }
 }
+
+/* Compact donation choices. */
+.luach-fund-row, .luach-give-go.luach-fund-row {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  width:100%; box-sizing:border-box; margin:0; padding:1rem;
+  border:1px solid #ded4bd; border-radius:12px; background:#fff;
+  color:var(--luach-ink); text-decoration:none; box-shadow:none;
+}
+.luach-fund-row:hover, .luach-give-go.luach-fund-row:hover { background:#fffdf7; border-color:#a78239; }
+.luach-fund-row:focus-visible, .luach-fund-purposes summary:focus-visible { outline:2px solid #a78239; outline-offset:3px; }
+.luach-fund-action { flex-shrink:0; font-size:.85rem; font-weight:600; color:#866522; }
+.luach-fund-purposes { margin:.6rem .25rem 0; font-size:.85rem; }
+.luach-fund-purposes summary { cursor:pointer; color:var(--luach-ink); padding:.35rem 0; }
+.luach-fund-purposes ul { display:flex; flex-wrap:wrap; gap:.45rem; padding:0; list-style:none; margin:.6rem 0; }
+.luach-fund-purposes li { padding:.3rem .6rem; background:rgba(209,173,95,.12); border-radius:6px; }
+.luach-daf-providers { gap:.5rem; margin:.75rem 0 0; }
+.luach-daf-provider { min-height:72px; padding:.5rem; }
+@media (max-width:400px) {
+  .luach-fund-row, .luach-give-go.luach-fund-row { gap:.6rem; padding:.8rem; }
+  .luach-fund-row .luach-account-title { font-size:.95rem; }
+  .luach-fund-action { font-size:.78rem; }
+}
+
