@@ -148,12 +148,12 @@ ROUTES = {
         "title": "Donate to Support Our Shul",
         "description": (
             "Donate to Bais Medrash of Lakewood Commons (Kahal Lev Menachem) in Lakewood, NJ. "
-            "Support our shul by credit card, ACH, Zelle or The Donors' Fund."
+            "Support our shul by credit card, ACH or donor advised fund (DAF)."
         ),
         "heading": "Donate",
         "blurb": (
-            "Ways to support Bais Medrash of Lakewood Commons: by card or ACH, by Zelle, or "
-            "through The Donors' Fund. Tax ID 26-4527675."
+            "Ways to support Bais Medrash of Lakewood Commons: by card, ACH or donor advised fund. "
+            "DAF providers include The Donors Fund, Pledger, OJC and Matbia. Tax ID 26-4527675."
         ),
     },
 }
@@ -694,6 +694,8 @@ def write_route_pages():
     src = (ROOT / "index.html").read_text(encoding="utf-8")
     for name, meta in ROUTES.items():
         html = src
+        if name != "donate":
+            html = html.replace("</head>", '<meta name="robots" content="noindex, follow">\n</head>')
         # Down one folder: every path that was relative to the root has to say so.
         html = re.sub(r'(href|src)="(css/|js/|vendor/)', r'\1="/\2', html)
         full_title = f"{meta['title']} &middot; Bais Medrash of Lakewood Commons"
@@ -816,7 +818,7 @@ def write_sitemap():
     added without turning up here.
     """
     entries = "".join(
-        f"  <url><loc>{SITE_URL}/{name}/</loc></url>\n" for name in ROUTES
+        f"  <url><loc>{SITE_URL}/{name}/</loc></url>\n" for name in ROUTES if name == "donate"
     )
     (ROOT / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
