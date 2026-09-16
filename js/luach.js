@@ -1,9 +1,8 @@
 // The congregation's site, which is the front door: baismedrashoflakewoodcommons.org. The admin app
 // lives at /admin and none of it is loaded here.
 //
-// Everything shown comes from /data/published.json, because a visitor's browser has none
-// of the admin app's saved sheets. Until a season is published there is nothing to show,
-// which the page says plainly rather than looking broken.
+// Shared settings come from /data/published.json. Seasonal charts are recalculated
+// automatically from the same formulas as the admin app.
 //
 // Each of the three pages has an address of its own: /week/, /chart/, /donate/. They are
 // real files, written by build-offline.py out of this page, which is what a static host
@@ -742,7 +741,7 @@ function renderChartPage(published) {
   // confine: the congregation is shown the chart that is up now and no other. Three taps
   // on the chart itself opens the rest, which is also what lets the week view out of the
   // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
-  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
+  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: false });
 }
 
 /** The ways to give, one card each.
@@ -1070,7 +1069,7 @@ function wireNav(published) {
 (async () => {
   let published;
   try {
-    published = await loadPublished();
+    published = await loadPublished({ automatic: true });
   } catch (err) {
     /* A filter or a sign-in page answered in place of the season. Said as what it is, because
        the alternative is what this used to do: print "Nothing has been published yet", which
@@ -1097,4 +1096,5 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
 
