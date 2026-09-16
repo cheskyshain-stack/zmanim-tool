@@ -207,7 +207,7 @@ export function renderSheet(container, state, sheet, onChange) {
             { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
             { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
           ])}</div>
-          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view.</p>
+          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view. The picture stays in colour.</p>
         </div>
       </div>
     </details>
@@ -431,7 +431,11 @@ function headerInkFor(color) {
 
 function applyStyle(target, style, ink = style.ink) {
   target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
-  target.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+  // Filter the chart sections separately so the building picture keeps its colour.
+  target.style.filter = '';
+  target.querySelectorAll('table, .header-center, .header-rabbi, .page-footer').forEach(el => {
+    el.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+  });
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
