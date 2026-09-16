@@ -271,7 +271,7 @@ const DONATE = {
           ],
         },
         {
-          title: 'Building Fund',
+          title: 'Eiruv / Building Fund',
           blurb: 'Help build for the future of our community.',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
           funds: [{ label: 'Building Fund', icon: 'building' }, { label: 'Eiruv', icon: 'crane' }],
