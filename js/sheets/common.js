@@ -176,3 +176,23 @@ export function applyTishaBavNote(row, week, settings) {
   const withNote = (text) => [text, 'ט באב'].filter(Boolean).join('\n');
   return { ...row, B: withNote(row.B), C: withNote(row.C) };
 }
+
+/** Motzei Shabbos when Tisha B'Av begins that evening, including a postponed fast.
+ * Use actual sunset plus 72 minutes before rounding any displayed times. */
+export function tishaBavMaariv(serial, settings) {
+  const shabbosDate = dateFromSerial(serial);
+  const hd = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (shabbosDate.getUTCDay() !== 6 || hd.month !== 5 || ![8, 9].includes(hd.dayOfMonth)) return null;
+  const sunset = Z.sunset(shabbosDate, settings);
+  const seventyTwo = sunset + 72 / 1440;
+  const downFive = value => Math.floor((value * 1440 + 1e-7) / 5) * 5 / 1440;
+  const drasha = downFive(seventyTwo - 35 / 1440);
+  const maariv = downFive(seventyTwo + 15 / 1440);
+  return [
+    'שקיעה ' + formatTime(ceilToMinute(sunset)),
+    'דרשה ' + formatTime(drasha),
+    'זמן 72 ' + formatTime(ceilToMinute(seventyTwo)),
+    'מעריב ' + formatTime(maariv),
+  ].join('\n');
+}
+
