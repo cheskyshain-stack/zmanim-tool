@@ -14,7 +14,7 @@ import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.
 import { announcedWeekCell } from '../announced.js';
 import { shacharisGridHtml } from './shacharis-grid.js';
 import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
-import { richTextToolbarHtml, wireRichTextToolbar, applyTimeShorthand } from './rich-text.js';
+import { applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 
@@ -153,7 +153,6 @@ export function renderSheet(container, state, sheet, onChange) {
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
-  const hist = getHistory(sheet.id);
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
   setPrintPage('letter landscape');
@@ -161,13 +160,6 @@ export function renderSheet(container, state, sheet, onChange) {
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
-      <button id="undo-btn" title="Undo last cell edit" ${hist.undo.length ? '' : 'disabled'}>&#8630; Undo</button>
-      <button id="redo-btn" title="Redo" ${hist.redo.length ? '' : 'disabled'}>&#8631; Redo</button>
-      <button id="fit-btn" type="button" title="Scale the chart down until a whole page fits across the screen">&#9974; Fit to screen</button>
-      ${richTextToolbarHtml('In the cell you\'re editing:')}
-      <span class="hint">Click a cell to edit it, then select text and use the buttons above to underline it or change its size. Rule-affected cells show a light yellow background.${
-        anyKayitzPage ? ' Pages holding a week past the spring DST cutover print as a full שבת קיץ chart.' : ''
-      }</span>
     </div>
     <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
@@ -189,38 +181,6 @@ export function renderSheet(container, state, sheet, onChange) {
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
 
-
-  // A page is a landscape letter sheet - about 1056px across - so on a phone it can only
-  // ever be read a column at a time by scrolling sideways. Fitting scales it down until
-  // a whole page is on screen at once: too small to edit in, but the point is seeing the
-  // page. It starts on whenever the page doesn't fit, which in practice means phones.
-  const fitBtn = container.querySelector('#fit-btn');
-  fitBtn.addEventListener('click', () => setFit(container, !fitOn));
-
-
-  // The formatting buttons act on whichever cell was last being edited. Tracked on
-  // focusin rather than read from document.activeElement at click time because the
-  // buttons deliberately don't take focus (see wireRichTextToolbar) - but a click
-  // elsewhere on the page in between should still leave them pointing at that cell.
-  let lastFocusedCell = null;
-  container.addEventListener('focusin', (e) => {
-    if (e.target.classList?.contains('cell')) lastFocusedCell = e.target;
-  });
-  wireRichTextToolbar(container, () => lastFocusedCell);
-  container.querySelector('#undo-btn').addEventListener('click', () => {
-    const action = hist.undo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.before);
-    hist.redo.push(action);
-    onChange({ save: true }); // app.js re-renders the whole sheet view on save
-  });
-  container.querySelector('#redo-btn').addEventListener('click', () => {
-    const action = hist.redo.pop();
-    if (!action) return;
-    applyOverrideValue(sheet, action.serial, action.col, action.after);
-    hist.undo.push(action);
-    onChange({ save: true });
-  });
 
   // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
   // שבת page 2, Weekday page 2… The two are already page-aligned (see alignPageSizesTo),
