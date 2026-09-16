@@ -294,6 +294,10 @@ const DONATE = {
           ],
         },
         {
+          title: 'Ravs Fund',
+          href: 'https://secure.cardknox.com/ravsfundtzorcheishchuna',
+        },
+        {
           title: 'Eiruv / Building Fund',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
         },
@@ -1096,6 +1100,7 @@ function wireNav(published) {
   // click handler above never sees those.
   window.addEventListener('hashchange', () => route(published));
 })();
+
 
 
 
