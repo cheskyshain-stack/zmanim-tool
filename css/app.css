@@ -4756,3 +4756,6 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .week-pair .week-card.is-weekday-card .week-time { font-size:20px; line-height:1.5; }
 .week-pair .week-pair-legend { font-size:11px; margin-top:10px; padding-top:0; }
 .week-pair > .week-foot { font-size:12px; padding-top:6px; }
+
+.luach-home-email { text-align:center; margin:.5rem auto 1.5rem; width:100%; max-width:100%; font-size:1.05rem; color:#12274f; }
+.luach-contact-email { color:inherit; white-space:nowrap; display:inline-block; max-width:100%; text-underline-offset:3px; }

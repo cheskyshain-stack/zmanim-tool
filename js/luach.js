@@ -476,27 +476,9 @@ function homeHtml(published) {
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
     </nav>
-    <style>
-.luach-about{margin:1.25rem 0 0;border:1px solid #cbb57d;border-radius:20px;color:#12274f;font-family:Georgia,'Times New Roman',serif;overflow:hidden}
-.luach-about>summary{display:flex;align-items:center;gap:1rem;list-style:none;cursor:pointer;padding:1.1rem 1.4rem;font-size:1.35rem;line-height:1.3}
-.luach-about>summary::-webkit-details-marker{display:none}
-.luach-about>summary:focus-visible{outline:3px solid #12274f;outline-offset:-5px;border-radius:18px}
-.luach-about-icon{width:1.6rem;height:1.6rem;flex:none}
-.luach-about-chevron{width:1.2rem;height:1.2rem;margin-left:auto;transition:transform .25s ease;color:#6a7891}
-.luach-about[open] .luach-about-chevron{transform:rotate(180deg)}
-.luach-about-body{text-align:center;padding:.4rem 1.25rem 1.5rem;font-size:1.05rem;line-height:1.65}
-.luach-about-body p{margin:0 0 1rem}
-.luach-contact-email{color:inherit;white-space:nowrap;display:inline-block;font-size:1em;max-width:100%}
-@media(max-width:600px){.luach-about-body:has(.luach-contact-email){padding-left:.65rem;padding-right:.65rem}}
-@supports (interpolate-size:allow-keywords){.luach-about{interpolate-size:allow-keywords}.luach-about::details-content{height:0;overflow:clip;transition:height .3s ease,content-visibility .3s allow-discrete}.luach-about[open]::details-content{height:auto}}
-@media(prefers-reduced-motion:reduce){.luach-about::details-content,.luach-about-chevron{transition:none}}
-</style>
-<details class="luach-about">
-<summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>Contact us</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
-<div class="luach-about-body"><p><strong>Lakewood Commons Shul</strong><br>Bais Medrash of Lakewood Commons<br>Also known as Kahal Lev Menachem</p><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
-</details>
     ${rule()}
     ${footHtml(s)}
+    <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p>
   </div>`;
 }
 
