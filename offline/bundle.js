@@ -9615,7 +9615,7 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  That is the right way round here rather than a shortcut: the chart is what the board says,
  *  hand edits and all, and the congregation should be reading the same times as the sheet on
  *  the wall. */
-function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = 3 } = {}) {
+function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = 10 } = {}) {
   const next = nextYomimNoraim();
   const out = [];
   for (const year of [next - 1, next]) {

@@ -688,7 +688,7 @@ function renderWeekPage(published) {
 /** The sheets the shul has up right now, or an empty list.
  *
  *  Asked in two places, the menu and the page itself, so it is one call here rather than the
- *  same three lines twice. A sheet is current from three days before the first date on it
+ *  same three lines twice. A sheet is current from ten days before the first date on it
  *  through the end of the last, which is currentOnePageSheets' own rule.
  *
  *  One sheet an occasion, the whole yom tov on a page, rather than the run of separate
