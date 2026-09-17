@@ -493,7 +493,7 @@ function homeHtml(published) {
 </style>
 <details class="luach-about">
 <summary><svg class="luach-about-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg><span>Contact us</span><svg class="luach-about-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></summary>
-<div class="luach-about-body"><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
+<div class="luach-about-body"><p><strong>Lakewood Commons Shul</strong><br>Bais Medrash of Lakewood Commons<br>Also known as Kahal Lev Menachem</p><p><strong>Email</strong><br><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p><p><strong>Address</strong><br>44 Coles Way<br>Lakewood, NJ 08701</p></div>
 </details>
     ${rule()}
     ${footHtml(s)}
@@ -1017,7 +1017,7 @@ function whereAmI() {
 }
 
 const PAGE_TITLE = {
-  '': 'Bais Medrash of Lakewood Commons · Support Our Shul',
+  '': 'Lakewood Commons Shul · Bais Medrash of Lakewood Commons',
   week: 'Weekly Zmanim · Bais Medrash of Lakewood Commons',
   chart: 'Zmanim Chart · Bais Medrash of Lakewood Commons',
   schedules: 'Special Schedules · Bais Medrash of Lakewood Commons',
