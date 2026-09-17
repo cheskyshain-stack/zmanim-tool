@@ -72,7 +72,13 @@ const check=await page.evaluate(async()=>{
 await page.reload();await page.locator('.weekly-reader').waitFor();
 await page.locator('.reader-options summary').click();
 for(const id of ['reader-next','reader-prev','reader-today']){await page.locator('#'+id).click();if(!await page.locator('.reader-options').evaluate(e=>e.open))throw Error('Options closed');}
-await page.locator('.reader-agenda-day').evaluateAll(es=>es.forEach(e=>e.open=true));
+const drawers=page.locator('.reader-agenda-day');
+await drawers.nth(1).locator('summary').click();
+await page.waitForTimeout(400);
+if(await page.locator('.reader-agenda-day[open]').count()!==1 || !await drawers.nth(1).evaluate(e=>e.open))throw Error('Multiple weekly drawers open');
+await drawers.nth(2).locator('summary').click();
+await page.waitForTimeout(400);
+if(await page.locator('.reader-agenda-day[open]').count()!==1 || !await drawers.nth(2).evaluate(e=>e.open))throw Error('Previous drawer did not close');
 for(const width of [320,393,768,1280]){
  await page.setViewportSize({width,height:900});
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow '+width);
