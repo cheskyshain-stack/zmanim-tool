@@ -4628,3 +4628,16 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 @media(min-width:760px) { .weekly-reader:has(.reader-agenda-day) { max-width:760px; } }
 .reader-agenda-subheading { margin:18px 0 4px; font-size:1rem; color:#142640; }
 .reader-agenda-subheading:first-child { margin-top:4px; }
+
+/* Animate weekly drawers while respecting reduced-motion preferences. */
+@supports (interpolate-size:allow-keywords) {
+  .reader-agenda-day, .reader-options { interpolate-size:allow-keywords; }
+  .reader-agenda-day::details-content, .reader-options::details-content {
+    block-size:0; overflow:clip;
+    transition:block-size .32s ease,content-visibility .32s allow-discrete;
+  }
+  .reader-agenda-day[open]::details-content, .reader-options[open]::details-content { block-size:auto; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .reader-agenda-day::details-content, .reader-options::details-content, .reader-agenda-chevron { transition:none; }
+}
