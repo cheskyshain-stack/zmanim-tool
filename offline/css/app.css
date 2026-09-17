@@ -4655,3 +4655,10 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
   position:absolute; left:16px; right:16px; bottom:14px;
   text-align:center; margin:0;
 }
+
+.reader-agenda-day > summary > span:first-child { flex:1; text-align:center; }
+.reader-agenda-day > summary { padding-left:44px; padding-right:44px; }
+.reader-agenda-chevron { position:absolute; right:16px; top:19px; }
+.reader-next-badge { position:absolute; right:16px; bottom:12px; }
+.reader-agenda-day > summary:has(.reader-next-badge) { padding-bottom:65px; }
+.reader-agenda-day > summary:has(.reader-next-badge) > span:first-child > small { bottom:39px; }
