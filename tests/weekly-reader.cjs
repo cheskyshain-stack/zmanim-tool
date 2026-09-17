@@ -73,6 +73,7 @@ const server=http.createServer((req,res)=>{
   });
   await page.evaluate(()=>document.fonts.ready);
   await page.locator('.reader-agenda-day').evaluateAll(es=>es.forEach(e=>e.open=true));
+  await page.waitForTimeout(400);
   const widths=[];
   for(const width of [320,393,480,1280]){
    await page.setViewportSize({width,height:900});
