@@ -16787,7 +16787,7 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}</span><span class="reader-room-mark">${star}</span><small class="reader-period">${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span><small class="reader-period">${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 function readerEventGroups(events) {
