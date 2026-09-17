@@ -4759,3 +4759,12 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 
 .luach-home-email { text-align:center; margin:.5rem auto 1.5rem; width:100%; max-width:100%; font-size:1.05rem; color:#12274f; }
 .luach-contact-email { color:inherit; white-space:nowrap; display:inline-block; max-width:100%; text-underline-offset:3px; }
+
+/* The next-minyan badge shares the date line without shifting the centered date. */
+.reader-agenda-day > summary,
+.reader-agenda-day > summary:has(.reader-next-badge) { display:block; padding:16px; }
+.reader-agenda-day > summary > span:first-child { display:block; margin:0 28px; }
+.reader-date-line { display:grid; grid-template-columns:minmax(78px,1fr) minmax(0,2fr) minmax(78px,1fr); align-items:center; margin-top:6px; gap:4px; }
+.reader-date-line > small { grid-column:2; text-align:center; margin:0!important; }
+.reader-date-line:not(:has(.reader-next-badge)) > small { grid-column:1 / -1; }
+.reader-date-line .reader-next-badge { position:static; grid-column:1; grid-row:1; margin:0; justify-self:start; padding:4px 5px; white-space:nowrap; font-size:.65rem; }
