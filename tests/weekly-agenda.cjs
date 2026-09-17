@@ -31,7 +31,7 @@ const check=await page.evaluate(async()=>{
  const shabbos=agenda.sections.find(s=>s.title==='Shabbos');
  if(!shabbos.events[0].earlyShabbos && !shabbos.events[0].name.includes('הדלקת'))throw Error('Shabbos must start with early Mincha or candle lighting');
  if(agenda.sections.find(s=>s.title==='Erev Shabbos').events.some(e=>e.earlyShabbos))throw Error('Early mincha left in Erev Shabbos');
- if(events.some(e=>e.serial<serial-3 || (e.serial===serial-3 && e.mins<840)))throw Error('Past time remains');
+ if(events.some(e=>e.serial<serial-3))throw Error('Past day remains');
  if(events.filter(e=>e.next).length!==1)throw Error('Next marker');
  const future=weeklyAgenda(weeklyReaderData(serial+7,index,state,settings),serial+7,state,settings,new Date('2026-09-16T18:00:00Z'));
  if(future.sections.some(s=>s.events.some(e=>e.next)))throw Error('Future week has next marker');
@@ -58,6 +58,11 @@ const check=await page.evaluate(async()=>{
  const atFive=weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:05:00Z')).sections.flatMap(s=>s.events);
  if(atFive.length!==1 || !atFive[0].started || atFive[0].next)throw Error('Five minute retention');
  if(weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:06:00Z')).sections.length)throw Error('Started minyan remains too long');
+ const categorySample={regular:[{serial:serial-3,events:[{name:'שחרית',mins:420},{name:'שחרית',mins:600},{name:'מנחה',mins:800}]}],special:[],shabbos:[]};
+ const kept=weeklyAgenda(categorySample,serial,state,settings,new Date('2026-09-16T13:00:00Z')).sections.flatMap(s=>s.events);
+ if(kept.length!==3 || kept[0].started || !kept[1].next)throw Error('Keep full active category without false just-started label');
+ const ended=weeklyAgenda(categorySample,serial,state,settings,new Date('2026-09-16T14:06:00Z')).sections.flatMap(s=>s.events);
+ if(ended.length!==1 || ended[0].name!=='מנחה')throw Error('Category must expire together');
  const extended=weeklyAgendaData(serial+7,index,state,settings);
  if(!extended.special.some(d=>d.serial===serial+8))throw Error('Second day of Yom Tov missing across week');
  const following=weeklyAgendaData(serial+14,index,state,settings);

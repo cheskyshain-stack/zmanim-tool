@@ -66,8 +66,15 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
   // come from the chart, including its drasha and other non-minyan times.
   events.push(...agendaChartEvents(data.shabbos, showing));
   const unique = new Set();
-  const remaining = events.map(e=>({...e,auxiliary:e.auxiliary || /קידוש לבנה|דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
-    .filter(e=>(e.serial-clock.serial)*1440+e.mins-clock.mins >= (e.auxiliary ? 0 : -5))
+  const normalized = events.map(e=>({...e,auxiliary:e.auxiliary || /קידוש לבנה|דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}));
+  const delta = e => (e.serial-clock.serial)*1440+e.mins-clock.mins;
+  const categoryKey = e => JSON.stringify([
+    agendaSection(e,e.serial,settings).key,
+    e.serial - (e.mins < 180 && /מעריב/.test(e.name) ? 1 : 0), e.name,
+  ]);
+  const activeCategories = new Set(normalized.filter(e=>!e.auxiliary && delta(e)>=-5).map(categoryKey));
+  const remaining = normalized
+    .filter(e=>e.auxiliary ? delta(e)>=0 : activeCategories.has(categoryKey(e)))
     .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})
     .sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
   const isCurrentWeek = clock.serial >= showing - 6 && clock.serial <= showing;
@@ -77,7 +84,7 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
     const info=agendaSection(event,event.serial,settings);
     let section=sections.find(s=>s.key===info.key);
     if(!section){section={...info,events:[]};sections.push(section);}
-    section.events.push({...event,next:event===first,started:(event.serial-clock.serial)*1440+event.mins-clock.mins<0});
+    section.events.push({...event,next:event===first,started:delta(event)<0 && delta(event)>=-5});
   }
   return {sections,notices};
 }
