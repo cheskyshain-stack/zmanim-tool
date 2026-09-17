@@ -18043,7 +18043,7 @@ function decorateCards(root) {
     // than stacked in a column, and there is no column for a colon to line up in. Left on,
     // the padding that squares up 7:00 under 10:00 came out as a gap in front of one time
     // in the middle of a line and nowhere else.
-    if (!acrossCard && cells.some((el) => hasTwoDigitHourAtLineStart(el)) && !cardShouldStandFlush(cells)) {
+    if (!acrossCard && !card.classList.contains('is-shabbos-print') && cells.some((el) => hasTwoDigitHourAtLineStart(el)) && !cardShouldStandFlush(cells)) {
       cells.forEach((el) => alignColons(el));
     }
     cells.forEach((el) => hangTimeMarkers(el));
