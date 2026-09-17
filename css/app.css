@@ -4703,3 +4703,15 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .week-card.is-shabbos-print .week-line:first-child { border-top:1px solid #aaa; }
 .week-card.is-shabbos-print .week-label { font-size:15pt; }
 .week-card.is-shabbos-print .week-time { font-size:17pt; }
+
+/* Weekday printout uses the same ruled list as Shabbos. */
+.week-card.is-weekday-card .week-lines-inner { max-width:calc(7.28in / var(--fit-width,1)); }
+.week-card.is-weekday-card .week-line {
+  display:grid; grid-template-columns:70% 26%; gap:4%; background:transparent;
+  border-radius:0; border-bottom:1px solid #aaa; margin:0; padding:30px 12px;
+  min-height:210px; align-items:center; box-sizing:border-box;
+}
+.week-card.is-weekday-card .week-line:first-child { border-top:1px solid #aaa; }
+.week-card.is-weekday-card .week-label { font-size:21pt; text-align:right; margin:0; }
+.week-card.is-weekday-card .week-time { font-size:23pt; text-align:left; line-height:1.65; text-wrap:initial; }
+.week-card.is-weekday-card .week-time .big { font-size:inherit; }

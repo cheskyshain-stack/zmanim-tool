@@ -18033,7 +18033,13 @@ function decorateCards(root) {
     // Last, so the marks are already in their spans: the separator carries no time and
     // the pass that finds them would not look at it either way, but a step that rewrites
     // the line is easier to reason about at the end than in the middle.
-    if (acrossCard) cells.forEach((el) => runTimesAcross(el));
+    if (acrossCard) cells.forEach((el) => {
+      runTimesAcross(el);
+      if (!el.classList.contains('is-authored')) capTimesPerLine(el, 3);
+      el.querySelectorAll('.week-sep').forEach((sep) => {
+        if (!sep.textContent.trim()) sep.remove();
+      });
+    });
     // After the marks exist, so the key can be built from what is really on the card.
     fillLegend(card);
   });
