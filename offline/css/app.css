@@ -4621,7 +4621,7 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-next-badge + .reader-agenda-chevron { margin-left:0; }
 .reader-agenda-rows { padding:0 16px 10px; }
 .reader-agenda-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(75px,.55fr); gap:12px; align-items:baseline; border-top:1px solid #eee9de; padding:12px 0; }
-.reader-agenda-label { grid-column:2; grid-row:1; text-align:right; font-size:1.05rem; }
+.reader-agenda-label { grid-column:2; grid-row:1; text-align:right; font-size:1.05rem; font-weight:700; color:#142640; }
 .reader-agenda-label small { display:block; font:400 .75rem/1.4 Arial,sans-serif; color:#586474; }
 .reader-agenda-row .reader-times { grid-column:1; grid-row:1; gap:6px 12px; }
 .reader-next-time { background:#f5eedc; outline:1px solid #c4af73; border-radius:5px; padding:0 4px; }

@@ -16588,6 +16588,7 @@ function agendaDayKind(serial, settings) {
 function agendaSection(event, serial, settings) {
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
+  if (/הדלקת/.test(event.name) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
@@ -16644,6 +16645,9 @@ function weeklyAgenda(data, showing, state, settings, now = new Date()) {
     let section=sections.find(s=>s.key===info.key);
     if(!section){section={...info,events:[]};sections.push(section);}
     section.events.push({...event,next:event===first});
+  }
+  for (const section of sections) {
+    if (section.key.startsWith('holy-')) section.events.sort((a,b)=>Number(/הדלקת/.test(b.name))-Number(/הדלקת/.test(a.name)));
   }
   return {sections,notices};
 }
