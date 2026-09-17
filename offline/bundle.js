@@ -16571,6 +16571,83 @@ function fitWeekSheet(container) {
   }
 }
 
+// ==== ui/weekly-agenda.js ====
+function agendaDayKind(serial, settings) {
+  const h = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const d = h.dayOfMonth, m = h.month;
+  let holy = '';
+  if (m === 7) holy = d <= 2 ? 'Rosh Hashana' : d === 10 ? 'Yom Kippur' : [15,16].includes(d) ? 'Sukkos' : d === 22 ? 'Shemini Atzeres' : d === 23 ? 'Simchas Torah' : '';
+  if (m === 1 && [15,16,21,22].includes(d)) holy = 'Pesach';
+  if (m === 3 && [6,7].includes(d)) holy = 'Shavuos';
+  const chol = (m === 7 && d >= 17 && d <= 21) || (m === 1 && d >= 17 && d <= 20);
+  const shabbos = excelWeekday(serial) === 7;
+  return { holy: shabbos ? (holy ? `Shabbos / ${holy}` : chol ? 'Shabbos Chol Hamoed' : 'Shabbos') : holy,
+    chol, label: chol ? `Chol Hamoed ${m === 7 ? 'Sukkos' : 'Pesach'}` : '' };
+}
+
+function agendaSection(event, serial, settings) {
+  const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
+  const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
+  if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
+  if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
+  if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
+  if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
+  return { key: `day-${serial}`, title: here.label || dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}), serial };
+}
+
+function agendaChartEvents(rows, showing) {
+  const out = [];
+  for (const row of rows) {
+    const serial = showing - (row.friday ? 1 : 0);
+    const plain = String(row.value).replace(/<u\b[^>]*>/gi, UL_START).replace(/<\/u>/gi, UL_END)
+      .replace(/<br\s*\/?>|<\/div>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ');
+    for (const line of plain.split('\n')) {
+      const named = line.match(/דרשה|שקיעה|פלג[^\d]*/)?.[0]?.trim();
+      const name = named || (row.header || row.title).split('\n').map(s=>s.trim()).filter(s=>s && !s.startsWith('פלג') && !s.startsWith('(')).join(' ');
+      const morning = /שחרית|קר.*ש/.test(row.title);
+      const auxiliary = /דרשה|שקיעה|פלג|הדלקת|קר.*ש/.test(name);
+      const re = new RegExp(`(${UL_START}?)\\s*(\\d{1,2}):(\\d{2})(\\*{0,2})(${UL_END}?)`, 'g');
+      for (const match of line.matchAll(re)) {
+        const h = +match[2], m = +match[3];
+        if (h < 1 || h > 12 || m > 59) continue;
+        const mins = ((h % 12) + (morning ? 0 : 12))*60 + m;
+        const place = match[4] === '**' ? 'באולם השמחות' : match[4] === '*' ? 'בעזר״נ' : match[1] || match[5] ? 'למטה' : /בעזר/.test(row.title) ? 'בעזר״נ' : /למטה/.test(row.title) ? 'למטה' : '';
+        out.push({serial,mins,name,place:auxiliary?'':place,auxiliary});
+      }
+    }
+  }
+  return out;
+}
+
+function weeklyAgenda(data, showing, state, settings, now = new Date()) {
+  const clock = shulNow(now, settings), events = [], notices = [];
+  for (const day of data.regular) {
+    for (const e of day.events) events.push({...e,serial:day.serial});
+  }
+  for (const day of data.special) {
+    for (const e of day.events) events.push({...e,serial:day.serial});
+    if (day.candles) events.push({...day.candles,serial:day.serial,auxiliary:true});
+    if (day.unconfirmed && day.serial >= clock.serial) notices.push(day);
+  }
+  // Ordinary Friday morning comes from the regular list; afternoon and Shabbos
+  // come from the chart, including its drasha and other non-minyan times.
+  events.push(...agendaChartEvents(data.shabbos, showing));
+  const unique = new Set();
+  const remaining = events.map(e=>({...e,serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
+    .filter(e=>e.serial>clock.serial || (e.serial===clock.serial && e.mins>=clock.mins))
+    .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})
+    .sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
+  const first = remaining.find(e=>!e.auxiliary);
+  const sections=[];
+  for(const event of remaining) {
+    const info=agendaSection(event,event.serial,settings);
+    let section=sections.find(s=>s.key===info.key);
+    if(!section){section={...info,events:[]};sections.push(section);}
+    section.events.push({...event,next:event===first});
+  }
+  return {sections,notices};
+}
+
 // ==== ui/weekly-reader.js ====
 const readerEventKey = e => JSON.stringify([e.name, e.mins, e.place || '']);
 const readerCategory = e => e.name.includes('מנחה') ? 'mincha' : e.name.includes('מעריב') ? 'maariv' : e.mins < 720 ? 'morning' : 'other';
@@ -16693,7 +16770,7 @@ function weeklyReaderData(showing, index, state, settings) {
       if (specialSerials.has(serial)) continue;
       const value = built.row[c.key];
       if (value == null || value === '') continue;
-      shabbos.push({ title: c.header.replace(/\n/g,' '), value, html: built.overriddenKeys.has(c.key),
+      shabbos.push({ title: c.header.replace(/\n/g,' '), header: c.header, value, html: built.overriddenKeys.has(c.key),
         friday: fridayKeys.has(c.key) });
     }
   }
@@ -16706,7 +16783,7 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}</span>`;
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}</span>`;
 }
 
 function readerEventGroups(events) {
@@ -16748,21 +16825,33 @@ function remainingReaderDays(data, showing, settings, now = new Date()) {
 }
 
 function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
-  const data = remainingReaderDays(weeklyReaderData(showing,index,state,settings), showing, settings, now);
+  const data = weeklyReaderData(showing,index,state,settings);
+  const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);
-  const date = dateFromSerial(showing).toLocaleDateString('en-US',{timeZone:'UTC',month:'long',day:'numeric',year:'numeric'});
-  const regular = ['morning','mincha','maariv','other'].map(c=>readerScheduleHtml(groupReaderSchedules(data.regular,c),c)).join('');
-  const shabbos = data.shabbos.length ? `<section class="reader-card reader-shabbos"><h3>Shabbos</h3>${data.shabbos.map(r=>`<div class="reader-shabbos-row"><span lang="he">${escAttr(r.title)}</span><div dir="ltr">${readerCellHtml(r)}</div></div>`).join('')}</section>` : '';
+  const date = dateFromSerial(showing).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'});
+  const sectionHtml = agenda.sections.map((section,i)=>{
+    const rows=[];
+    for(const event of section.events){
+      let row=rows[rows.length-1];
+      if (row && (row.name!==event.name || row.serial!==event.serial)) row=null;
+      if(!row){row={name:event.name,serial:event.serial,events:[]};rows.push(row);}
+      row.events.push(event);
+    }
+    const hasNext=section.events.some(e=>e.next);
+    const dates=[...new Set(section.events.map(e=>e.serial))].map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
+    return `<details class="reader-agenda-day" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
+      <summary><span><strong>${escAttr(section.title)}</strong><small>${escAttr(dates)}</small></span>${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="reader-agenda-rows">${rows.map(row=>`<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${section.events.some(e=>e.serial!==row.serial)?`<small>${row.serial<section.serial?'Evening':'Day'}</small>`:''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+    </details>`;
+  }).join('');
   container.innerHTML=`<div class="weekly-reader">
-    <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week ending Shabbos, ${escAttr(date)}</p></header>
+    <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>${showing - shulNow(now,settings).serial < 7 ? 'From now through Shabbos' : 'Week ending Shabbos'}, ${escAttr(date)}</p></header>
     <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
-      </div></details>
-    ${!Object.values(data).some(rows=>rows.length)?'<p class="reader-note">All dates in this week have passed. Select Today to see the current week.</p>':''}
-    <div class="reader-columns reader-regular">${regular}</div>
-    ${data.night.map(n=>`<section class="reader-card"><h3>${escAttr(n.label)} after midnight</h3>${readerEventGroups(n.events)}</section>`).join('')}
-    ${data.special.length?`<h3 class="reader-section-title">Special days this week</h3><div class="reader-columns">${data.special.map(d=>`<section class="reader-card reader-special"><p class="reader-days">${escAttr(d.label)} · ${d.date.toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'})}</p><h3 lang="he">${escAttr(d.title)}</h3>${d.unconfirmed?'<p>Check with the shul for this day’s full schedule.</p>':readerEventGroups(d.events)}${d.candles?`<div class="reader-special-row"><h4 lang="he">הדלקת נרות</h4>${readerTimeHtml(d.candles)}</div>`:''}</section>`).join('')}</div><p class="reader-note">For additional zmanim and notices, see <a href="/schedules/">Special schedules</a>.</p>`:''}
-    ${shabbos}
+    </div></details>
+    ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
+    ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
+    <p class="reader-note">For additional zmanim and notices, see <a href="/schedules/">Special schedules</a>.</p>
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
@@ -18070,7 +18159,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  const showing = serials.includes(serial) ? serial : luach ? serials[0] : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones

@@ -659,6 +659,8 @@ function renderWeekPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
   const draw = () => {
+    clearTimeout(nextUpTimer);
+    const expanded = new Map([...main.querySelectorAll('[data-agenda-key]')].map(el=>[el.dataset.agendaKey,el.open]));
     const optionsOpen = main.querySelector('.reader-options')?.open || false;
     main.className = '';
     main.innerHTML = backBar('week') + '<div id="week-host"></div>';
@@ -675,6 +677,10 @@ function renderWeekPage(published) {
     );
     const options = main.querySelector('.reader-options');
     if (options) options.open = optionsOpen;
+    for (const el of main.querySelectorAll('[data-agenda-key]')) {
+      if (expanded.has(el.dataset.agendaKey)) el.open = expanded.get(el.dataset.agendaKey);
+    }
+    nextUpTimer = setTimeout(draw, 60000 - Date.now() % 60000 + 50);
   };
   draw();
 }

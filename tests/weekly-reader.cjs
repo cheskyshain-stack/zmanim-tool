@@ -68,16 +68,17 @@ const server=http.createServer((req,res)=>{
    const draw=s=>renderWeeklyReader(host,{showing:s??serial,index,state,settings,serials,onSerialChange:draw,now:new Date('2026-09-16T12:00:00Z'),title:'פרשת האזינו · שובה'});
    draw(serial);
    check(!host.querySelector('#reader-print'),'print button remains');
-   check(host.querySelectorAll('.reader-shabbos').length===1 && host.querySelector('.reader-shabbos h3').textContent==='Shabbos','Shabbos should be one section');
+   check(host.querySelectorAll('[data-agenda-key="holy-'+serial+'"]').length===1,'Shabbos should be one section');
    return {checkedPosterDays:checked,morningChanges:morning[1].change};
   });
   await page.evaluate(()=>document.fonts.ready);
+  await page.locator('.reader-agenda-day').evaluateAll(es=>es.forEach(e=>e.open=true));
   const widths=[];
   for(const width of [320,393,480,1280]){
    await page.setViewportSize({width,height:900});
    const sizes=await page.evaluate(()=>({screen:innerWidth,body:document.documentElement.scrollWidth,reader:document.querySelector('.weekly-reader').getBoundingClientRect().width,smallest:Math.min(...[...document.querySelectorAll('.reader-time')].map(e=>parseFloat(getComputedStyle(e).fontSize)))}));
    assert.ok(sizes.body<=width+1,`horizontal overflow at ${width}: ${sizes.body}`);widths.push(sizes);
-   assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.reader-shabbos-row')].every(r=>r.firstElementChild.getBoundingClientRect().left>r.lastElementChild.getBoundingClientRect().left)),'Shabbos labels not on right');
+   assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.reader-agenda-row')].every(r=>r.firstElementChild.getBoundingClientRect().left>r.lastElementChild.getBoundingClientRect().left)),'Shabbos labels not on right');
    if(width===393||width===1280)await page.screenshot({path:path.resolve(__dirname,`../../weekly-${width}.png`),fullPage:true});
   }
   await page.locator('.reader-options summary').click();

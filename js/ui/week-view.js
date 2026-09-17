@@ -1301,7 +1301,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  const showing = serials.includes(serial) ? serial : luach ? serials[0] : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones
