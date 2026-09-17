@@ -14409,13 +14409,9 @@ function renderLock(container, onOpen) {
     dotsBox.setAttribute('aria-label', `${pin.length} of 4 digits entered`);
   };
   const wrong = () => {
-    panel.classList.add('is-wrong');
-    setTimeout(() => {
-      panel.classList.remove('is-wrong');
-      pin = '';
-      paint();
-      checking = false;
-    }, 500);
+    // Replace this visit so Back does not return to the same PIN attempt.
+    closeLock();
+    window.location.replace('/');
   };
   const done = () => {
     /* A moment of "yes" before the program appears, because four dots going out and a whole
