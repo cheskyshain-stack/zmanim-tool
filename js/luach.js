@@ -368,8 +368,8 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
  *
  *  aria-live, so that when the card redraws itself on the timer a screen reader is told
  *  what changed instead of the page silently becoming something else. */
-// Temporarily hidden at the shul's request. Keep candle lighting available.
-const SHOW_NEXT_MINYAN = false;
+// Homepage minyan visibility, independent of candle lighting.
+const SHOW_NEXT_MINYAN = true;
 function nextUpState(published, settings) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   const now = new Date();
