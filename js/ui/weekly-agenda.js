@@ -25,7 +25,7 @@ export function agendaSection(event, serial, settings) {
   if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
-  return { key: `day-${serial}`, title: here.label || dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}), serial };
+  return { key: `day-${serial}`, title: [dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}),here.label].filter(Boolean).join(' '), serial };
 }
 
 function agendaChartEvents(rows, showing) {

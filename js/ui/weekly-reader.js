@@ -241,7 +241,9 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
       displaySections.push(combined);
     }
     const repeated=agenda.sections.filter(s=>s.title===section.title).length>1;
-    const subtitle=section.title+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
+    const dayName=dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'});
+    const sectionName=section.key.startsWith('holy-') && !section.title.includes('Shabbos') ? `${dayName} ${section.title}` : section.title;
+    const subtitle=sectionName+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
     combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   const sectionHtml = displaySections.map((section,i)=>{

@@ -16595,7 +16595,7 @@ function agendaSection(event, serial, settings) {
   if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
-  return { key: `day-${serial}`, title: here.label || dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}), serial };
+  return { key: `day-${serial}`, title: [dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}),here.label].filter(Boolean).join(' '), serial };
 }
 
 function agendaChartEvents(rows, showing) {
@@ -16885,7 +16885,9 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
       displaySections.push(combined);
     }
     const repeated=agenda.sections.filter(s=>s.title===section.title).length>1;
-    const subtitle=section.title+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
+    const dayName=dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'});
+    const sectionName=section.key.startsWith('holy-') && !section.title.includes('Shabbos') ? `${dayName} ${section.title}` : section.title;
+    const subtitle=sectionName+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
     combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   const sectionHtml = displaySections.map((section,i)=>{

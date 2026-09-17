@@ -50,7 +50,7 @@ const check=await page.evaluate(async()=>{
  const k=agendaDayKind(d,settings),n=agendaDayKind(d+1,settings);
  if(n.holy && phase('מעריב',d)!==n.holy)throw Error('Yom tov night');
  if(k.holy&&!n.holy&&phase('מעריב',d)!=='Motzaei '+k.holy)throw Error('Yom tov end');
- if(k.chol&&!k.holy&&!phase('שחרית',d).startsWith('Chol Hamoed'))throw Error('Chol hamoed');
+ if(k.chol&&!k.holy&&!phase('שחרית',d).includes('Chol Hamoed'))throw Error('Chol hamoed');
  }
  }
  if(agendaSection({name:'מעריב',mins:0},serial-1,settings).title!=='Thursday')throw Error('Midnight Maariv pulled into Shabbos');
