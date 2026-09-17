@@ -18101,7 +18101,9 @@ function weekCardsHtml(showing, index, state, settings) {
       const parts=String(value).split('\n');
       const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
       if(!html && c.header.includes('פלג') && parts.length>1) {
-        add(c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' '),parts[0],c.key);
+        const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ').replace(/\s*\((?:למטה|בעזר["״]נ)\)/g,'');
+        const minchaTime = /בעזר["״]נ/.test(c.header) && !parts[0].includes('*') ? parts[0] + '*' : parts[0];
+        add(minchaLabel,minchaTime,c.key);
         add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''),c.key);
       } else if(!html && c.key==='H' && parts.length>1) {
         add('הדלקת נרות',parts[0]);
