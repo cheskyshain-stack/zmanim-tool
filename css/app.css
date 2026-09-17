@@ -4662,3 +4662,18 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-next-badge { position:absolute; right:16px; bottom:12px; }
 .reader-agenda-day > summary:has(.reader-next-badge) { padding-bottom:65px; }
 .reader-agenda-day > summary:has(.reader-next-badge) > span:first-child > small { bottom:39px; }
+
+/* Stable time columns and fixed places for room marks and AM/PM. */
+.reader-agenda-row { grid-template-columns:minmax(0,1fr) 5rem; }
+.reader-agenda-row .reader-times { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; max-width:320px; }
+.reader-agenda-row .reader-time { display:grid; grid-template-columns:4.25ch .65em max-content; column-gap:1px; justify-content:start; align-items:baseline; font-variant-numeric:tabular-nums; }
+.reader-digits { text-align:left; }
+.reader-room-mark { font-size:.75em; align-self:start; line-height:1.5; }
+.reader-time > small:not(.reader-period) { grid-column:1 / -1; white-space:normal; }
+.reader-next-time { padding:0; outline:none; box-shadow:0 0 0 3px #f5eedc,0 0 0 4px #c4af73; }
+@media(max-width:360px) {
+  .reader-agenda-row { grid-template-columns:minmax(0,1fr) 4rem; gap:8px; }
+  .reader-agenda-row .reader-times { column-gap:8px; }
+  .reader-agenda-row .reader-time { font-size:1rem; }
+  .reader-agenda-row .reader-time small { font-size:.58rem; }
+}
