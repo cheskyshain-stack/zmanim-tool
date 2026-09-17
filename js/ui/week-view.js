@@ -1094,7 +1094,7 @@ function decorateCards(root) {
     // bottom: seven comes out 1, 2, 2, 2.
     const acrossCard = card.classList.contains('is-weekday-card');
     const perLine = acrossCard ? 1 : 2;
-    card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
+    if (!card.classList.contains('is-shabbos-print')) card.querySelectorAll('.week-time:not(.is-authored)').forEach((el) => capTimesPerLine(el, perLine));
     const cells = [...card.querySelectorAll('.week-time')];
     cells.forEach((el) => trimSpaceAtLineStart(el));
     // One colon axis for the whole card rather than one per row, except where a single long
@@ -1147,9 +1147,28 @@ function weekCardsHtml(showing, index, state, settings) {
   const shabbos = sheet ? rowFor(week, sheet, state, settings) : null;
   // Printed order, right to left, so the card lists the minyanim in the same sequence
   // the wall chart does.
-  const shabbosLines = shabbos
-    ? [...shabbos.columns].reverse().map((c) => line(c.header, shabbos.row[c.key], shabbos.overriddenKeys.has(c.key))).join('')
-    : '';
+  const printRows = [];
+  if (shabbos) {
+    const fridayKeys = new Set(shabbos.season === 'kayitz' ? ['L','K','J','I','H','G','F'] : ['I','H','G','F']);
+    for (const c of [...shabbos.columns].reverse()) {
+      const value=shabbos.row[c.key], html=shabbos.overriddenKeys.has(c.key);
+      if(value==null || value==='')continue;
+      const parts=String(value).split('\n');
+      const add=(label,text)=>printRows.push({label,text,html,friday:fridayKeys.has(c.key)});
+      if(!html && c.header.includes('פלג') && parts.length>1) {
+        add(c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' '),parts[0]);
+        add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''));
+      } else if(!html && c.key==='H' && parts.length>1) {
+        add('הדלקת נרות',parts[0]);
+        for(const part of parts.slice(1))add('שקיעה',part.replace(/שקיעה\s*/g,''));
+      } else if(!html && parts.some(x=>x.includes('דרשה'))) {
+        for(const part of parts)add(part.includes('דרשה')?'דרשה':c.header,part.replace(/דרשה\s*/g,''));
+      } else add(c.key==='B'?'מעריב מוצאי שבת':c.header,value);
+    }
+  }
+  const firstTime = r => {const m=String(r.text).replace(/<[^>]*>/g,'').match(/(\d{1,2}):(\d{2})/);return m ? (+m[1]%12)*60 + +m[2] : 9999;};
+  const orderedRows=[...printRows.filter(r=>r.friday).sort((a,b)=>firstTime(a)-firstTime(b)),...printRows.filter(r=>!r.friday)];
+  const shabbosLines=orderedRows.map(r=>line(r.label,r.text,r.html)).join('');
 
   const weekday = weekdayChartFor(sheet, showing, state);
   const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);
@@ -1239,7 +1258,7 @@ function weekCardsHtml(showing, index, state, settings) {
 
   const cardTitle = weekTitle(showing, index, state, settings);
 
-  const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings) : '';
+  const shabbosCard = shabbosLines ? cardHtml(cardTitle, shabbosLines, state.settings, 'is-shabbos-print') : '';
   const weekdayCard = weekdayLines ? cardHtml('זמני חול · ' + cardTitle, weekdayLines, state.settings, 'is-weekday-card') : '';
   // The two are ordered the same way on screen as on paper, here rather than only in the
   // print run: this page's whole bargain is that what you see is what comes out, so an

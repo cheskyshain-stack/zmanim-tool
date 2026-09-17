@@ -4693,3 +4693,13 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 @media(min-width:600px) {
   .reader-agenda-row .reader-times { display:flex; flex-wrap:wrap; max-width:none; gap:8px 16px; }
 }
+
+/* Weekly Shabbos printout: one uniform list, with a separate row for each zman. */
+.week-card.is-shabbos-print .week-lines-inner { max-width:calc(7.28in / var(--fit-width,1)); }
+.week-card.is-shabbos-print .week-line {
+  grid-template-columns:56% 40%; gap:4%; background:transparent; border-radius:0;
+  border-bottom:1px solid #aaa; margin:0; padding:.095in .12in;
+}
+.week-card.is-shabbos-print .week-line:first-child { border-top:1px solid #aaa; }
+.week-card.is-shabbos-print .week-label { font-size:15pt; }
+.week-card.is-shabbos-print .week-time { font-size:17pt; }
