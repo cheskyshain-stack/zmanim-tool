@@ -2326,7 +2326,7 @@ function withoutRetiredDrasha(data) {
 async function loadPublished({ automatic = false } = {}) {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error('Schedule download failed: ' + res.status);
     const text = await res.text();
     let data;
     try {
@@ -2344,13 +2344,12 @@ async function loadPublished({ automatic = false } = {}) {
       blocked.blockedUrl = new URL('/data/published.json', location.origin).href;
       throw blocked;
     }
-    if (!data || !Array.isArray(data.sheets)) return null;
+    if (!data || !Array.isArray(data.sheets)) throw new Error('Invalid schedule data');
     const clean = withoutRetiredDrasha(data);
     return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
   } catch (err) {
     if (err?.message === 'blocked') throw err;
-    // A network that would not carry the request at all. Same answer as no file: nothing to show.
-    return null;
+    throw err;
   }
 }
 

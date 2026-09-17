@@ -1087,25 +1087,27 @@ function wireNav(published) {
 (async () => {
   let published;
   try {
-    published = await loadPublished({ automatic: true });
+    for (let attempt=0; attempt<2; attempt++) {
+      try { published = await loadPublished({ automatic: true }); break; }
+      catch (err) {
+        if (attempt || err?.blockedUrl || err?.message==='blocked') throw err;
+        await new Promise(resolve=>setTimeout(resolve,700));
+      }
+    }
   } catch (err) {
-    /* A filter or a sign-in page answered in place of the season. Said as what it is, because
-       the alternative is what this used to do: print "Nothing has been published yet", which
-       tells somebody the shul has not put its zmanim up when the shul has, and sends them to
-       ask the gabbai about a problem that is on their own phone. Content filters are common
-       here and this is the screen a good part of the kehilla would otherwise get, so it also
-       hands them the request to send and the address to ask for. See ui/blocked.js. */
     const home = document.createElement('div');
     home.className = 'luach-home';
     main.replaceChildren(home);
-    showBlocked(home, {
-      blockedUrl: err?.blockedUrl,
-      what: 'The zmanim cannot be read on this phone.',
-    });
-    return;
-  }
-  if (!published) {
-    main.innerHTML = '<div class="luach-home"><p class="hint">Nothing has been published yet.</p></div>';
+    if (err?.blockedUrl || err?.message==='blocked') {
+      showBlocked(home, { blockedUrl:err?.blockedUrl, what:'The schedule data could not be read on this phone.' });
+    } else {
+      home.innerHTML='<h2>The schedule could not load</h2><p>Please try again. If it still does not load, try another internet connection.</p>';
+    }
+    const retry=document.createElement('button');
+    retry.className='luach-item';
+    retry.textContent='Try again';
+    retry.addEventListener('click',()=>location.reload());
+    home.append(retry);
     return;
   }
   wireNav(published);
