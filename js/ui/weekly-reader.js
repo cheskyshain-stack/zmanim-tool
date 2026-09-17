@@ -189,19 +189,29 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
   const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);
   const date = dateFromSerial(showing).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'});
-  const sectionHtml = agenda.sections.map((section,i)=>{
+  const displaySections = [];
+  for (const section of agenda.sections) {
+    if (!section.title.includes('Shabbos')) { displaySections.push(section); continue; }
+    let combined = displaySections.find(s=>s.key===`holy-${showing}` && s.combined);
+    if (!combined) {
+      combined={key:`holy-${showing}`,title:'Shabbos',serial:showing,events:[],combined:true};
+      displaySections.push(combined);
+    }
+    combined.events.push(...section.events.map(e=>({...e,sectionTitle:section.title})));
+  }
+  const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
     for(const event of section.events){
       let row=rows[rows.length-1];
-      if (row && (row.name!==event.name || row.serial!==event.serial)) row=null;
-      if(!row){row={name:event.name,serial:event.serial,events:[]};rows.push(row);}
+      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle)) row=null;
+      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,events:[]};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
     const dates=[...new Set(section.events.map(e=>e.serial))].map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong><small>${escAttr(dates)}</small></span>${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map(row=>`<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${section.events.some(e=>e.serial!==row.serial)?`<small>${row.serial<section.serial?'Evening':'Day'}</small>`:''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${section.events.some(e=>e.serial!==row.serial)?`<small>${row.serial<section.serial?'Evening':'Day'}</small>`:''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
   container.innerHTML=`<div class="weekly-reader">
