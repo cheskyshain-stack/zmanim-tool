@@ -19,7 +19,7 @@ const server=http.createServer((req,res)=>{
   await page.goto(origin+'/week/?count=off');
   await page.locator('.weekly-reader').waitFor();
   const result=await page.evaluate(async()=>{
-   const {weeklyReaderData,groupReaderSchedules,renderWeeklyReader,readerWeekIndex}=await import('/js/ui/weekly-reader.js');
+   const {weeklyReaderData,groupReaderSchedules,renderWeeklyReader,readerWeekIndex,remainingReaderDays}=await import('/js/ui/weekly-reader.js');
    const {buildAutomaticCharts}=await import('/js/publish.js');
    const {loadTables}=await import('/js/data-loader.js');
    const {resolveSettings}=await import('/js/settings.js');
@@ -36,6 +36,13 @@ const server=http.createServer((req,res)=>{
    const settings=resolveSettings(state.settings),index=readerWeekIndex(state),serials=[...index.keys()].sort((a,b)=>a-b);
    const serial=excelSerial(new Date('2026-09-19T00:00:00Z'));
    const model=weeklyReaderData(serial,index,state,settings);
+   const afterMidnight=remainingReaderDays(model,serial,settings,new Date('2026-09-16T04:00:00Z'));
+   check(afterMidnight.regular.map(d=>d.label).join(',')==='Wednesday,Thursday,Friday','past weekdays remain');
+   check(afterMidnight.special.length===0,'past special days remain');
+   const beforeMidnight=remainingReaderDays(model,serial,settings,new Date('2026-09-16T03:59:59Z'));
+   check(beforeMidnight.regular[0].label==='Tuesday','Lakewood midnight boundary incorrect');
+   const saturday=remainingReaderDays(model,serial,settings,new Date('2026-09-19T12:00:00Z'));
+   check(saturday.regular.length===0 && saturday.shabbos.every(r=>!r.friday),'Friday remains on Shabbos');
    const morning=groupReaderSchedules(model.regular,'morning');
    check(morning.length===2,'Selichos schedules not grouped');
    check(morning[0].days.join(',')==='Tuesday,Wednesday,Friday','baseline day labels');
@@ -58,8 +65,10 @@ const server=http.createServer((req,res)=>{
     }
    }
    const host=document.querySelector('#week-host');
-   const draw=s=>renderWeeklyReader(host,{showing:s??serial,index,state,settings,serials,onSerialChange:draw,title:'פרשת האזינו · שובה'});
+   const draw=s=>renderWeeklyReader(host,{showing:s??serial,index,state,settings,serials,onSerialChange:draw,now:new Date('2026-09-16T12:00:00Z'),title:'פרשת האזינו · שובה'});
    draw(serial);
+   check(!host.querySelector('#reader-print'),'print button remains');
+   check(host.querySelectorAll('.reader-shabbos').length===1 && host.querySelector('.reader-shabbos h3').textContent==='Shabbos','Shabbos should be one section');
    return {checkedPosterDays:checked,morningChanges:morning[1].change};
   });
   await page.evaluate(()=>document.fonts.ready);
@@ -68,6 +77,7 @@ const server=http.createServer((req,res)=>{
    await page.setViewportSize({width,height:900});
    const sizes=await page.evaluate(()=>({screen:innerWidth,body:document.documentElement.scrollWidth,reader:document.querySelector('.weekly-reader').getBoundingClientRect().width,smallest:Math.min(...[...document.querySelectorAll('.reader-time')].map(e=>parseFloat(getComputedStyle(e).fontSize)))}));
    assert.ok(sizes.body<=width+1,`horizontal overflow at ${width}: ${sizes.body}`);widths.push(sizes);
+   assert.ok(await page.evaluate(()=>[...document.querySelectorAll('.reader-shabbos-row')].every(r=>r.firstElementChild.getBoundingClientRect().left>r.lastElementChild.getBoundingClientRect().left)),'Shabbos labels not on right');
    if(width===393||width===1280)await page.screenshot({path:path.resolve(__dirname,`../../weekly-${width}.png`),fullPage:true});
   }
   await page.locator('.reader-options summary').click();

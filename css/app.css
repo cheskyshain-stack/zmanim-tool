@@ -4593,9 +4593,10 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-special-row + .reader-special-row { border-top: 1px solid #eee9de; margin-top: 13px; padding-top: 12px; }
 .reader-special-row h4 { margin: 0 0 7px; font-size: 1.08rem; }
 .reader-section-title { margin: 28px 0 13px; font: 600 1.05rem/1.4 Arial,sans-serif; }
-.reader-shabbos-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.1fr); align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid #eee9de; }
-.reader-shabbos-row > span { font-size: 1.03rem; line-height: 1.45; }
-.reader-shabbos-row > div { text-align: right; font: 700 1.15rem/1.5 Georgia,'Times New Roman',serif; overflow-wrap: anywhere; }
+.reader-shabbos-row { display: grid; direction: rtl; grid-template-columns: minmax(0,1fr) minmax(0,1.1fr); align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid #eee9de; }
+.reader-shabbos-row > span { text-align: right; font-size: 1.03rem; line-height: 1.45; }
+.reader-shabbos-row > div { text-align: left; font: 700 1.15rem/1.5 Georgia,'Times New Roman',serif; overflow-wrap: anywhere; }
+.reader-shabbos { margin-top: 24px; }
 .reader-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 15px; margin: 23px 0 0; font: 400 .78rem/1.5 Arial,sans-serif; color: #586474; }
 @media (min-width: 760px) { .reader-columns { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; } }
 @media print {

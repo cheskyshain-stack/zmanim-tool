@@ -3,11 +3,10 @@ import { specialMinyanim } from '../posters/day.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { hebrewDateExtended, hasTaanis, hasRoshChodesh, excelWeekday } from '../hebrew-calendar.js';
 import { rowFor, weekIndex } from '../sheets/rows.js';
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { escAttr, DAY_NAMES } from '../util.js';
 import { UL_START, UL_END } from '../format.js';
 import { sanitizeRichText } from '../security.js';
-import { setPrintPage } from './print-page.js';
 
 const readerEventKey = e => JSON.stringify([e.name, e.mins, e.place || '']);
 const readerCategory = e => e.name.includes('מנחה') ? 'mincha' : e.name.includes('מעריב') ? 'maariv' : e.mins < 720 ? 'morning' : 'other';
@@ -117,7 +116,7 @@ export function weeklyReaderData(showing, index, state, settings) {
       special.push({serial,label,date,title:readerDayTitle(serial,settings),events:[],unconfirmed:true});
       continue;
     }
-    if (overnight.length) night.push({ label, events: overnight });
+    if (overnight.length) night.push({ serial, label, events: overnight });
     // Friday afternoon/evening belongs to the Erev Shabbos section below.
     regular.push({ serial, label, events: offset === 1 ? events.filter(e => readerCategory(e)==='morning') : events });
   }
@@ -171,29 +170,35 @@ function readerCellHtml(row) {
     .split(UL_START).join('<u>').split(UL_END).join('</u>').replace(/\n/g,'<br>');
 }
 
-export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title }) {
-  setPrintPage('letter portrait');
-  const data = weeklyReaderData(showing,index,state,settings);
+export function remainingReaderDays(data, showing, settings, now = new Date()) {
+  const today = shulNow(now, settings).serial;
+  return {
+    regular: data.regular.filter(d => d.serial >= today),
+    special: data.special.filter(d => d.serial >= today),
+    night: data.night.filter(d => d.serial >= today),
+    shabbos: data.shabbos.filter(d => showing - (d.friday ? 1 : 0) >= today),
+  };
+}
+
+export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
+  const data = remainingReaderDays(weeklyReaderData(showing,index,state,settings), showing, settings, now);
   const at = serials.indexOf(showing);
   const date = dateFromSerial(showing).toLocaleDateString('en-US',{timeZone:'UTC',month:'long',day:'numeric',year:'numeric'});
   const regular = ['morning','mincha','maariv','other'].map(c=>readerScheduleHtml(groupReaderSchedules(data.regular,c),c)).join('');
-  const shabbos = [true,false].map(friday=>{
-    const rows=data.shabbos.filter(r=>r.friday===friday);
-    return rows.length ? `<section class="reader-card"><h3>${friday?'Friday evening':'Shabbos'}</h3>${rows.map(r=>`<div class="reader-shabbos-row"><span lang="he">${escAttr(r.title)}</span><div dir="ltr">${readerCellHtml(r)}</div></div>`).join('')}</section>` : '';
-  }).join('');
+  const shabbos = data.shabbos.length ? `<section class="reader-card reader-shabbos"><h3>Shabbos</h3>${data.shabbos.map(r=>`<div class="reader-shabbos-row"><span lang="he">${escAttr(r.title)}</span><div dir="ltr">${readerCellHtml(r)}</div></div>`).join('')}</section>` : '';
   container.innerHTML=`<div class="weekly-reader">
     <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week ending Shabbos, ${escAttr(date)}</p></header>
     <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
-      <button id="reader-print">Print this week</button></div></details>
+      </div></details>
+    ${!Object.values(data).some(rows=>rows.length)?'<p class="reader-note">All dates in this week have passed. Select Today to see the current week.</p>':''}
     <div class="reader-columns reader-regular">${regular}</div>
     ${data.night.map(n=>`<section class="reader-card"><h3>${escAttr(n.label)} after midnight</h3>${readerEventGroups(n.events)}</section>`).join('')}
     ${data.special.length?`<h3 class="reader-section-title">Special days this week</h3><div class="reader-columns">${data.special.map(d=>`<section class="reader-card reader-special"><p class="reader-days">${escAttr(d.label)} · ${d.date.toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'})}</p><h3 lang="he">${escAttr(d.title)}</h3>${d.unconfirmed?'<p>Check with the shul for this day’s full schedule.</p>':readerEventGroups(d.events)}${d.candles?`<div class="reader-special-row"><h4 lang="he">הדלקת נרות</h4>${readerTimeHtml(d.candles)}</div>`:''}</section>`).join('')}</div><p class="reader-note">For additional zmanim and notices, see <a href="/schedules/">Special schedules</a>.</p>`:''}
-    ${shabbos?`<h3 class="reader-section-title">Friday evening &amp; Shabbos</h3><div class="reader-columns">${shabbos}</div>`:''}
+    ${shabbos}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
   container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
-  container.querySelector('#reader-print').addEventListener('click',()=>{setPrintPage('letter portrait');window.print();});
 }
