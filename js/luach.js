@@ -659,6 +659,7 @@ function renderWeekPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   let serial = null;
   const draw = () => {
+    const optionsOpen = main.querySelector('.reader-options')?.open || false;
     main.className = '';
     main.innerHTML = backBar('week') + '<div id="week-host"></div>';
     openTheDoor();
@@ -672,6 +673,8 @@ function renderWeekPage(published) {
       serial,
       { luach: true }
     );
+    const options = main.querySelector('.reader-options');
+    if (options) options.open = optionsOpen;
   };
   draw();
 }

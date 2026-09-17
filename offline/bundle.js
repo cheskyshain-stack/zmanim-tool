@@ -16730,8 +16730,11 @@ function readerScheduleHtml(groups, category) {
 }
 
 function readerCellHtml(row) {
-  return row.html ? sanitizeRichText(row.value) : escAttr(row.value)
+  const html = row.html ? sanitizeRichText(row.value) : escAttr(row.value)
     .split(UL_START).join('<u>').split(UL_END).join('</u>').replace(/\n/g,'<br>');
+  // Chart alignment spaces must not extend the weekly reader's room markings.
+  return html.replace(/<u>((?:\s|&nbsp;)*)/g, '$1<u>')
+    .replace(/((?:\s|&nbsp;)*)<\/u>/g, '</u>$1');
 }
 
 function remainingReaderDays(data, showing, settings, now = new Date()) {
