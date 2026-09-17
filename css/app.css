@@ -4717,5 +4717,6 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .week-card.is-weekday-card .week-time .big { font-size:inherit; }
 
 .week-card:is(.is-shabbos-print,.is-weekday-card) .week-lines-inner {
-  width:calc(100% / var(--fit-width,1)); max-width:none;
+  width:calc(6.4in / var(--fit-width,1)); max-width:none; margin-inline:auto;
 }
+

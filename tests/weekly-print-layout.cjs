@@ -43,14 +43,16 @@ const server=http.createServer((req,res)=>{
    const printed=await page.locator('.is-shabbos-print').evaluate(card=>{
     const box=card.querySelector('.week-lines').getBoundingClientRect();
     const inner=card.querySelector('.week-lines-inner').getBoundingClientRect();
-    return {width:inner.width * (parseFloat(getComputedStyle(card.querySelector('.week-lines-inner')).zoom)||1),expectedWidth:box.width,fits:inner.bottom<=box.bottom+2,underlines:card.querySelectorAll('u').length};
+    return {width:inner.width,expectedWidth:6.4 * 96,fits:inner.bottom<=box.bottom+2,underlines:card.querySelectorAll('u').length};
    });
-   assert(printed.fits,'Printed rows must fit');assert(Math.abs(printed.width-printed.expectedWidth)<1, 'Full printable width'); console.log('Verified width', printed.width); assert(printed.underlines>0,'Keep minyan underlines');
+   assert(printed.fits,'Printed rows must fit');assert(Math.abs(printed.width-printed.expectedWidth)<1, 'Matching moderate print width'); console.log('Verified width', printed.width); assert(printed.underlines>0,'Keep minyan underlines');
    console.log(JSON.stringify({date,...result}));
    await page.locator('.is-shabbos-print').screenshot({path:path.resolve(__dirname,`../../print-${date}.png`)});
    await page.emulateMedia({media:'screen'});
   }
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+
+
 
 
