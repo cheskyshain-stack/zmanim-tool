@@ -1,4 +1,5 @@
 import { safeHeaderImage, sanitizeRichText } from '../security.js';
+import { renderWeeklyReader, readerWeekIndex } from './weekly-reader.js';
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
 // right and its time on the left, running top to bottom.
@@ -1286,7 +1287,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // so the title and the buttons that swap them belong to the screen, not to this half.
   const heading = !luach && opts.heading !== false;
   const settings = resolveSettings(state.settings);
-  const index = weekIndex(state);
+  const index = luach ? readerWeekIndex(state) : weekIndex(state);
   const allSerials = [...index.keys()].sort((a, b) => a - b);
   let serials = allSerials;
 
@@ -1312,6 +1313,11 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const held = luach && !navUnlocked();
   if (held) serials = chartStretchSerials(showing, index, state) || serials;
   const at = serials.indexOf(showing);
+  if (luach) {
+    renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange,
+      title: index.get(showing).week.parsha ? weekTitle(showing, index) : 'זמני השבוע' });
+    return;
+  }
   const { sheet } = index.get(showing);
   const week = index.get(showing).week;
   const cardsHtml = weekCardsHtml(showing, index, state, settings);
