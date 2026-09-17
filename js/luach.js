@@ -320,7 +320,16 @@ const DONATE = {
       title: 'DAF',
       blurb: 'Donor Advised Fund',
       icon: 'shul',
-      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC","url":"https://portal.ojcfund.org/Account/Login","logo":"https://ojcfund.org/wp-content/uploads/2024/08/log.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
+      /* Three of the four logos are the provider's own file on the provider's own server.
+         OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
+         on the tile visibly soft, which the user saw on a phone. So that one is ours:
+         assets/daf-ojc.png, built from the artwork the user supplied. The tile draws it
+         about 105 x 40, so it is shipped 330 wide, a little over 3x for a phone. See the
+         note on .luach-daf-provider img in app.css for how it was made.
+         The other three stay remote until there is artwork to replace them with, and the
+         alt text below is what a tile shows when any of them does not arrive. Each url is
+         the provider's own sign-in, since a donor here already has an account to spend. */
+      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
       how: 'Choose your DAF provider and find Bais Medrash of Lakewood Commons using Tax ID 26-4527675.',
       copy: { label: 'Tax ID', value: SHUL_TAX_ID },
     },

@@ -4491,7 +4491,23 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
 .luach-daf-provider:hover { border-color:#a78239; background:#fffdf7; }
 /* The alt text is what the tile shows when a provider's logo does not arrive, so it is set
    to read as a label rather than as a stranded line: centred in the box the logo would have
-   filled, and small enough that the longest of the four names sits on two lines inside 40px. */
+   filled, and small enough that the longest of the four names sits on two lines inside 40px.
+
+   The box is 110x40 and object-fit keeps each logo whole inside it, so a logo squatter than
+   11:4 is drawn at the full 40px high and a wider one is drawn at the full 110px across.
+   OJC's is the squat one and is therefore the tallest of the four on the card. That is the
+   artwork, not a bug, and it is left alone: the other three are the providers' own files on
+   the providers' own servers and cannot be measured against from here.
+
+   assets/daf-ojc.png is the one logo this site serves itself, because the file OJC's own
+   site links is a small bitmap and the tile drew it visibly soft on a phone. Built from the
+   artwork the user supplied: cropped to the ink, then every pixel read as white mixed with
+   one of the two brand colours (#0E8CFC and #152A59) and written back as that colour with
+   the mix as its alpha, which is what turns the white page behind it into transparency
+   without leaving a halo. Resampled once to 330 wide, a little over 3x what the tile draws,
+   with alpha snapped at both ends and stepped in eighths in between, and the colour zeroed
+   where it is fully clear. That last part is only about weight: it takes the file from 42KB
+   to 21KB and changes nothing on screen. */
 .luach-daf-provider img { width:110px; height:40px; object-fit:contain; text-align:center; font-size:.82rem; line-height:1.2; color:var(--luach-ink); }
 @media (prefers-reduced-motion:reduce) { .luach-zmanim-group::details-content,.luach-zmanim-options { transition:none; } }
 
