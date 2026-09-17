@@ -4727,3 +4727,28 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .week-card.is-shabbos-print .week-mincha-plag .week-line:last-child .week-label { font-size:12.75pt; }
 .week-card.is-shabbos-print .week-mincha-plag .week-line:last-child .week-time { font-size:14.45pt; }
 
+
+/* Combined weekly printout: Shabbos on the right, weekdays on the left. */
+.week-pair { width:11in; height:8.5in; padding:38px 48px 28px; }
+.week-pair-cols { gap:36px; }
+.week-pair .week-card.is-weekday-card { border-right:1px solid #bbb; padding-right:18px; }
+.week-pair .week-card .week-lines { margin-top:10px; }
+.week-pair .week-card .week-lines-inner { width:100%; max-width:none; }
+.week-pair .week-card .week-line {
+  display:grid; grid-template-columns:57% 39%; gap:4%; min-height:0;
+  background:transparent; border-radius:0; border-bottom:1px solid #bbb;
+  padding:6px 4px; margin:0; align-items:center;
+}
+.week-pair .week-card .week-label { font-size:16px; line-height:1.15; }
+.week-pair .week-card .week-time { font-size:18px; line-height:1.15; }
+.week-pair .week-card .week-days { font-size:13px; }
+.week-pair .week-card .time-mark { display:inline; width:auto; }
+.week-pair .week-card .week-mincha-plag .week-line { border:0; }
+.week-pair .week-card .week-mincha-plag .week-line:first-child { padding-bottom:1px; }
+.week-pair .week-card .week-mincha-plag .week-line:last-child { padding-top:0; padding-bottom:5px; }
+.week-pair .week-card .week-mincha-plag .week-line:last-child :is(.week-time,.week-label) { font-size:14px; }
+.week-pair .week-card.is-weekday-card .week-lines-inner { display:flex; flex-direction:column; min-height:100%; }
+.week-pair .week-card.is-weekday-card .week-line { flex:1; grid-template-columns:61% 35%; }
+.week-pair .week-card.is-weekday-card .week-time { font-size:20px; line-height:1.5; }
+.week-pair .week-pair-legend { font-size:11px; margin-top:10px; padding-top:0; }
+.week-pair > .week-foot { font-size:12px; padding-top:6px; }

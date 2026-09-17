@@ -944,7 +944,7 @@ function fitPairColumns(sheet) {
     const room = box.clientHeight;
     if (!room) return;
     let fits = 0.5;
-    let tooBig = growCapFor(card);
+    let tooBig = 1;
     for (let i = 0; i < 9; i++) {
       const mid = (fits + tooBig) / 2;
       card.style.setProperty('--fit-scale', mid.toFixed(3));
@@ -968,7 +968,7 @@ function fitPairColumns(sheet) {
  *  there is nothing to put beside it and the button is not offered. */
 function buildPairSheet(wrap) {
   const cards = [...wrap.querySelectorAll('.week-card')];
-  if (cards.length < 2) return false;
+  if (!cards.length) return false;
   const header = cards[0].querySelector('.page-header');
   const foot = cards[0].querySelector('.week-foot');
 
@@ -990,6 +990,7 @@ function buildPairSheet(wrap) {
 
   const cols = document.createElement('div');
   cols.className = 'week-pair-cols';
+  cards.sort((a,b) => Number(a.classList.contains('is-weekday-card')) - Number(b.classList.contains('is-weekday-card')));
   cards.forEach((card) => {
     // With the parsha said once above, each column only has to say which half it is.
     const title = card.querySelector('.week-title');
@@ -1020,7 +1021,7 @@ function buildPairSheet(wrap) {
   if (merged.length) {
     const legend = document.createElement('div');
     legend.className = 'week-legend week-pair-legend';
-    merged.forEach((el) => legend.appendChild(el));
+    merged.filter(el => !merged.some(other => other !== el && other.textContent.includes(el.textContent))).forEach((el) => legend.appendChild(el));
     sheet.appendChild(legend);
   }
 
@@ -1433,57 +1434,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
             sheet ? '<button type="button" class="copy-btn" id="week-copy-btn">Copy text</button>' : ''
           }</div>
           <div class="week-switches">
-            ${
-              // The two layouts. "Two charts" is the שבת chart and the חול chart, each its
-              // own page, which is the week as the boards have always had it; "One sheet"
-              // is the whole week in one list, set the way the yomim noraim sheet is set.
-              // Offered wherever there is a sheet to build: a week with one card still has
-              // both halves of the week to say, and the one-sheet version says them.
-              //
-              // The admin only. The congregation's page is the two charts and is not asked
-              // about it: somebody who came to find out what time מנחה is has no view about
-              // how the week should be laid out on paper, and a switch that changes what the
-              // page looks like is a switch that can leave it looking wrong. See layoutNow.
-              !luach && sheetAvailable
-                ? switchHtml('week-layout', 'Layout', [
-                  { value: 'charts', label: 'Two charts', on: weekLayout === 'charts' },
-                  { value: 'sheet', label: 'One sheet', on: weekLayout === 'sheet' },
-                  // The side beside it says sheet, so this reads as one sheet without חול
-                  // without having to say it, which it has no room to: three sides of a
-                  // switch get 86px of text each on a phone.
-                  { value: 'shabbos', label: 'Without <bdi lang="he">חול</bdi>', on: weekLayout === 'shabbos' },
-                ])
-                : ''
-            }
-            ${
-              // Both of these, or neither. Each is a question about two pages, and a week
-              // that has only one (a Shabbos that is Yom Tov comes through on its Weekday
-              // chart alone) has nothing to lay out beside anything and nothing to put
-              // first. "Which page first" used to show anyway and answered a question that
-              // week did not raise.
-              //
-              // Neither of them either while the week is on one sheet, which is the same
-              // rule again: one sheet is one page, so how many go on a sheet and which
-              // comes first are questions it does not raise.
-              cardCount > 1 && !onOneSheet
-                ? `${switchHtml('week-pages', 'Pages per sheet', [
-                    { value: 'one', label: 'One', on: !pairView },
-                    { value: 'two', label: 'Two', on: pairView },
-                  ])}
-                  ${
-                    // Which page first is the admin's too, and for a better reason than
-                    // tidiness: the answer the congregation wants is always the same one, so
-                    // asking is offering somebody the chance to get it wrong. The page leads
-                    // with the card whose times are next, weekday from Sunday and שבת from
-                    // Friday, worked out on every render off the shul's own clock. See
-                    // autoCardOrder, which has been what this switch defaults to all along.
-                    luach ? '' : switchHtml('week-order', 'Which page first', [
-                      { value: 'shabbos', label: '<bdi lang="he">שבת</bdi>', on: cardOrder(showing, state, settings) === 'shabbos' },
-                      { value: 'weekday', label: 'Weekday', on: cardOrder(showing, state, settings) === 'weekday' },
-                    ])
-                  }`
-                : ''
-            }
+            ${switchHtml('week-layout', 'Layout', [
+              { value: 'charts', label: 'Separate pages', on: !pairView },
+              { value: 'combined', label: 'Combined page', on: pairView },
+            ])}
           </div>
           <div class="week-nav-row week-nav-print">
             <button type="button" id="week-print-rest">Print every week to the end of the season</button>
@@ -1527,7 +1481,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   // Either the two pages as they are, or the pair of them rebuilt as one landscape sheet.
   // The sheet is a real thing on the screen from here on, not something assembled for the
   // length of a print run, so what goes to the printer is whatever is being looked at.
-  const onSheet = !onOneSheet && pairView && cardCount > 1 && buildPairSheet(wrap);
+  const onSheet = !onOneSheet && pairView && cardCount > 0 && buildPairSheet(wrap);
   if (onOneSheet) {
     // Scaled to the window first, then the type fitted inside that: see fitWeekSheet for why
     // round that way. The type is fitted again on every resize for the same reason, since a
@@ -1540,6 +1494,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       breakAtLineEnds(container, '.onepage-times');
     });
   } else if (onSheet) {
+    setPrintPage('letter landscape');
     // The columns are a different shape from the cards they came out of, so the times are
     // sized again for them. Before the sheet is scaled to the window, not after: a scale
     // on the sheet changes what the columns measure, and with it left on the same sheet
@@ -1633,9 +1588,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           ?.focus({ preventScroll: true });
       });
   };
-  onSwitch('week-layout', (value) => { weekLayout = value; });
-  onSwitch('week-pages', (value) => { pairView = value === 'two'; });
-  onSwitch('week-order', (value) => rememberCardOrder(value === 'weekday' ? 'weekday' : 'shabbos', showing, state, settings));
+  onSwitch('week-layout', (value) => { weekLayout = 'charts'; pairView = value === 'combined'; });
 
   // Every week from this one to the end of the season, in one run. Each week is built and
   // treated exactly as it is when it is on the screen on its own, so a printed run cannot
@@ -1677,7 +1630,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
       host.innerHTML = weekCardsHtml(serial, index, state, settings);
       decorateCards(host);
       fitLinesToPage(host);
-      if (pairView && host.querySelectorAll('.week-card').length > 1) {
+      if (pairView && host.querySelectorAll('.week-card').length > 0) {
         buildPairSheet(host);
         fitPairColumns(host.querySelector('.week-pair'));
       }
