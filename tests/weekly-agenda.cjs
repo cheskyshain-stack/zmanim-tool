@@ -16,7 +16,7 @@ const server=http.createServer((req,res)=>{
  const page=await context.newPage();await page.goto(origin+'/week/?count=off');await page.locator('.weekly-reader').waitFor();await page.evaluate(()=>document.fonts.ready);
 const check=await page.evaluate(async()=>{
  const {weeklyAgenda,agendaSection,agendaDayKind}=await import('/js/ui/weekly-agenda.js');
- const {weeklyReaderData,readerWeekIndex}=await import('/js/ui/weekly-reader.js');
+ const {weeklyReaderData,readerWeekIndex,renderWeeklyReader}=await import('/js/ui/weekly-reader.js');
  const {buildAutomaticCharts}=await import('/js/publish.js');
  const {loadTables}=await import('/js/data-loader.js');
  const {resolveSettings}=await import('/js/settings.js');
@@ -53,8 +53,19 @@ const check=await page.evaluate(async()=>{
  if(k.chol&&!k.holy&&!phase('שחרית',d).startsWith('Chol Hamoed'))throw Error('Chol hamoed');
  }
  }
+ if(agendaSection({name:'מעריב',mins:0},serial-1,settings).title!=='Thursday')throw Error('Midnight Maariv pulled into Shabbos');
+ const sample={regular:[{serial:serial-3,events:[{name:'שחרית',mins:600,place:''}]}],special:[],shabbos:[]};
+ const atFive=weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:05:00Z')).sections.flatMap(s=>s.events);
+ if(atFive.length!==1 || !atFive[0].started || atFive[0].next)throw Error('Five minute retention');
+ if(weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:06:00Z')).sections.length)throw Error('Started minyan remains too long');
+ const host=document.querySelector('#week-host');
+ renderWeeklyReader(host,{showing:serial+7,index,state,settings,serials:[...index.keys()],onSerialChange:()=>{},title:'Audit',now:new Date('2026-09-16T18:00:00Z')});
+ const titles=[...host.querySelectorAll('.reader-agenda-day > summary strong')].map(e=>e.textContent);
+ if(titles.indexOf('Friday')<0 || titles.indexOf('Friday')>titles.findIndex(t=>t.includes('Shabbos')))throw Error('Friday out of order: '+titles);
+ if(host.querySelector('.reader-next-badge'))throw Error('Future next badge');
  return {specialDays:days,sections:agenda.sections.map(s=>s.title)};
 });console.log(check);
+await page.reload();await page.locator('.weekly-reader').waitFor();
 await page.locator('.reader-options summary').click();
 for(const id of ['reader-next','reader-prev','reader-today']){await page.locator('#'+id).click();if(!await page.locator('.reader-options').evaluate(e=>e.open))throw Error('Options closed');}
 await page.locator('.reader-agenda-day').evaluateAll(es=>es.forEach(e=>e.open=true));

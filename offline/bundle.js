@@ -16586,11 +16586,13 @@ function agendaDayKind(serial, settings) {
 }
 
 function agendaSection(event, serial, settings) {
+  // A post-midnight Maariv belongs to the preceding evening, not tonight.
+  if (event.mins < 180 && /מעריב/.test(event.name)) serial--;
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
   if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
-  if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
+  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
   return { key: `day-${serial}`, title: here.label || dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}), serial };
@@ -16634,18 +16636,18 @@ function weeklyAgenda(data, showing, state, settings, now = new Date()) {
   // come from the chart, including its drasha and other non-minyan times.
   events.push(...agendaChartEvents(data.shabbos, showing));
   const unique = new Set();
-  const remaining = events.map(e=>({...e,serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
-    .filter(e=>e.serial>clock.serial || (e.serial===clock.serial && e.mins>=clock.mins))
+  const remaining = events.map(e=>({...e,auxiliary:e.auxiliary || /קידוש לבנה|דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
+    .filter(e=>(e.serial-clock.serial)*1440+e.mins-clock.mins >= (e.auxiliary ? 0 : -5))
     .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})
     .sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
   const isCurrentWeek = clock.serial >= showing - 6 && clock.serial <= showing;
-  const first = isCurrentWeek ? remaining.find(e=>!e.auxiliary) : null;
+  const first = isCurrentWeek ? remaining.find(e=>!e.auxiliary && (e.serial-clock.serial)*1440+e.mins-clock.mins>=0) : null;
   const sections=[];
   for(const event of remaining) {
     const info=agendaSection(event,event.serial,settings);
     let section=sections.find(s=>s.key===info.key);
     if(!section){section={...info,events:[]};sections.push(section);}
-    section.events.push({...event,next:event===first});
+    section.events.push({...event,next:event===first,started:(event.serial-clock.serial)*1440+event.mins-clock.mins<0});
   }
   return {sections,notices};
 }
@@ -16785,7 +16787,7 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}</span>`;
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 function readerEventGroups(events) {
@@ -16840,7 +16842,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     const titles=[];
     while (agendaDayKind(end,settings).holy) {
       const name=agendaDayKind(end,settings).holy;
-      if(!titles.includes(name)) titles.push(name);
+      for (const part of name.split(' / ')) if(!titles.includes(part)) titles.push(part);
       end++;
     }
     const key=`holy-${end-1}`;
@@ -16851,21 +16853,21 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     }
     const repeated=agenda.sections.filter(s=>s.title===section.title).length>1;
     const subtitle=section.title+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
-    combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle})));
+    combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
     for(const event of section.events){
       let row=rows[rows.length-1];
-      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle)) row=null;
-      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,events:[]};rows.push(row);}
+      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle || row.dayPart!==event.dayPart)) row=null;
+      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,events:[]};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
-    const dates=[...new Set(section.events.map(e=>e.serial))].map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
+    const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong><small>${escAttr(dates)}</small></span>${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${section.events.some(e=>e.serial!==row.serial)?`<small>${row.serial<section.serial?'Evening':'Day'}</small>`:''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?`<small>${row.dayPart}</small>`:row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
   container.innerHTML=`<div class="weekly-reader">

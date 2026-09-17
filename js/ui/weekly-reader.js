@@ -143,7 +143,7 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}</span>`;
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${marked}${star}<small>${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 function readerEventGroups(events) {
@@ -198,7 +198,7 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     const titles=[];
     while (agendaDayKind(end,settings).holy) {
       const name=agendaDayKind(end,settings).holy;
-      if(!titles.includes(name)) titles.push(name);
+      for (const part of name.split(' / ')) if(!titles.includes(part)) titles.push(part);
       end++;
     }
     const key=`holy-${end-1}`;
@@ -209,21 +209,21 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     }
     const repeated=agenda.sections.filter(s=>s.title===section.title).length>1;
     const subtitle=section.title+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
-    combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle})));
+    combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
     for(const event of section.events){
       let row=rows[rows.length-1];
-      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle)) row=null;
-      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,events:[]};rows.push(row);}
+      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle || row.dayPart!==event.dayPart)) row=null;
+      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,events:[]};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
-    const dates=[...new Set(section.events.map(e=>e.serial))].map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
+    const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong><small>${escAttr(dates)}</small></span>${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${section.events.some(e=>e.serial!==row.serial)?`<small>${row.serial<section.serial?'Evening':'Day'}</small>`:''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?`<small>${row.dayPart}</small>`:row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
   container.innerHTML=`<div class="weekly-reader">

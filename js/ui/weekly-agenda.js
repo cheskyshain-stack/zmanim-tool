@@ -16,11 +16,13 @@ export function agendaDayKind(serial, settings) {
 }
 
 export function agendaSection(event, serial, settings) {
+  // A post-midnight Maariv belongs to the preceding evening, not tonight.
+  if (event.mins < 180 && /מעריב/.test(event.name)) serial--;
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
   if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
-  if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
+  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
   return { key: `day-${serial}`, title: here.label || dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}), serial };
@@ -64,18 +66,18 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
   // come from the chart, including its drasha and other non-minyan times.
   events.push(...agendaChartEvents(data.shabbos, showing));
   const unique = new Set();
-  const remaining = events.map(e=>({...e,serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
-    .filter(e=>e.serial>clock.serial || (e.serial===clock.serial && e.mins>=clock.mins))
+  const remaining = events.map(e=>({...e,auxiliary:e.auxiliary || /קידוש לבנה|דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}))
+    .filter(e=>(e.serial-clock.serial)*1440+e.mins-clock.mins >= (e.auxiliary ? 0 : -5))
     .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})
     .sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
   const isCurrentWeek = clock.serial >= showing - 6 && clock.serial <= showing;
-  const first = isCurrentWeek ? remaining.find(e=>!e.auxiliary) : null;
+  const first = isCurrentWeek ? remaining.find(e=>!e.auxiliary && (e.serial-clock.serial)*1440+e.mins-clock.mins>=0) : null;
   const sections=[];
   for(const event of remaining) {
     const info=agendaSection(event,event.serial,settings);
     let section=sections.find(s=>s.key===info.key);
     if(!section){section={...info,events:[]};sections.push(section);}
-    section.events.push({...event,next:event===first});
+    section.events.push({...event,next:event===first,started:(event.serial-clock.serial)*1440+event.mins-clock.mins<0});
   }
   return {sections,notices};
 }
