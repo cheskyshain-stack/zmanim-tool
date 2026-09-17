@@ -18099,10 +18099,10 @@ function weekCardsHtml(showing, index, state, settings) {
       const value=shabbos.row[c.key], html=shabbos.overriddenKeys.has(c.key);
       if(value==null || value==='')continue;
       const parts=String(value).split('\n');
-      const add=(label,text)=>printRows.push({label,text,html,friday:fridayKeys.has(c.key)});
+      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
       if(!html && c.header.includes('פלג') && parts.length>1) {
-        add(c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' '),parts[0]);
-        add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''));
+        add(c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' '),parts[0],c.key);
+        add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''),c.key);
       } else if(!html && c.key==='H' && parts.length>1) {
         add('הדלקת נרות',parts[0]);
         for(const part of parts.slice(1))add('שקיעה',part.replace(/שקיעה\s*/g,''));
@@ -18113,7 +18113,14 @@ function weekCardsHtml(showing, index, state, settings) {
   }
   const firstTime = r => {const m=String(r.text).replace(/<[^>]*>/g,'').match(/(\d{1,2}):(\d{2})/);return m ? (+m[1]%12)*60 + +m[2] : 9999;};
   const orderedRows=[...printRows.filter(r=>r.friday).sort((a,b)=>firstTime(a)-firstTime(b)),...printRows.filter(r=>!r.friday)];
-  const shabbosLines=orderedRows.map(r=>line(r.label,r.text,r.html)).join('');
+  const shownPairs = new Set();
+  const shabbosLines=orderedRows.map(r=>{
+    if (!r.pair) return line(r.label,r.text,r.html);
+    if (shownPairs.has(r.pair)) return '';
+    shownPairs.add(r.pair);
+    const pair = printRows.filter(item=>item.pair===r.pair);
+    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html)).join('')}</div>`;
+  }).join('');
 
   const weekday = weekdayChartFor(sheet, showing, state);
   const weekdayWeek = weekday?.weeks.find((w) => w.serial === showing);

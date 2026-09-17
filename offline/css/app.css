@@ -4720,3 +4720,10 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
   width:calc(6.4in / var(--fit-width,1)); max-width:none; margin-inline:auto;
 }
 
+.week-card.is-shabbos-print .week-mincha-plag { break-inside:avoid; border-bottom:1px solid #aaa; }
+.week-card.is-shabbos-print .week-mincha-plag .week-line { border:0; }
+.week-card.is-shabbos-print .week-mincha-plag .week-line:first-child { padding-bottom:.025in; }
+.week-card.is-shabbos-print .week-mincha-plag .week-line:last-child { padding-top:0; }
+.week-card.is-shabbos-print .week-mincha-plag .week-line:last-child .week-label { font-size:12.75pt; }
+.week-card.is-shabbos-print .week-mincha-plag .week-line:last-child .week-time { font-size:14.45pt; }
+
