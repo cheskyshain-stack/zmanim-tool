@@ -33,6 +33,8 @@ const check=await page.evaluate(async()=>{
  if(agenda.sections.find(s=>s.title==='Erev Shabbos').events.some(e=>e.earlyShabbos))throw Error('Early mincha left in Erev Shabbos');
  if(events.some(e=>e.serial<serial-3 || (e.serial===serial-3 && e.mins<840)))throw Error('Past time remains');
  if(events.filter(e=>e.next).length!==1)throw Error('Next marker');
+ const future=weeklyAgenda(weeklyReaderData(serial+7,index,state,settings),serial+7,state,settings,new Date('2026-09-16T18:00:00Z'));
+ if(future.sections.some(s=>s.events.some(e=>e.next)))throw Error('Future week has next marker');
  const phase=(name,day)=>agendaSection({name},day,settings).title;
  if(phase('מנחה ערב שבת',serial-1)!=='Erev Shabbos')throw Error('Erev Shabbos');
  if(phase('מנחה מעריב',serial-1)!=='Shabbos')throw Error('Combined Friday');

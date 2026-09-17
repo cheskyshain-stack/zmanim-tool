@@ -16638,7 +16638,8 @@ function weeklyAgenda(data, showing, state, settings, now = new Date()) {
     .filter(e=>e.serial>clock.serial || (e.serial===clock.serial && e.mins>=clock.mins))
     .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})
     .sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
-  const first = remaining.find(e=>!e.auxiliary);
+  const isCurrentWeek = clock.serial >= showing - 6 && clock.serial <= showing;
+  const first = isCurrentWeek ? remaining.find(e=>!e.auxiliary) : null;
   const sections=[];
   for(const event of remaining) {
     const info=agendaSection(event,event.serial,settings);
