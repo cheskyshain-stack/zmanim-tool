@@ -18,7 +18,7 @@ export function agendaDayKind(serial, settings) {
 export function agendaSection(event, serial, settings) {
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
-  if (/הדלקת/.test(event.name) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
+  if ((event.earlyShabbos || /הדלקת/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
@@ -43,7 +43,7 @@ function agendaChartEvents(rows, showing) {
         if (h < 1 || h > 12 || m > 59) continue;
         const mins = ((h % 12) + (morning ? 0 : 12))*60 + m;
         const place = match[4] === '**' ? 'באולם השמחות' : match[4] === '*' ? 'בעזר״נ' : match[1] || match[5] ? 'למטה' : /בעזר/.test(row.title) ? 'בעזר״נ' : /למטה/.test(row.title) ? 'למטה' : '';
-        out.push({serial,mins,name,place:auxiliary?'':place,auxiliary});
+        out.push({serial,mins,name,place:auxiliary?'':place,auxiliary,earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
       }
     }
   }
@@ -75,9 +75,6 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
     let section=sections.find(s=>s.key===info.key);
     if(!section){section={...info,events:[]};sections.push(section);}
     section.events.push({...event,next:event===first});
-  }
-  for (const section of sections) {
-    if (section.key.startsWith('holy-')) section.events.sort((a,b)=>Number(/הדלקת/.test(b.name))-Number(/הדלקת/.test(a.name)));
   }
   return {sections,notices};
 }

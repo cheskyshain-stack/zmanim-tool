@@ -28,7 +28,8 @@ const check=await page.evaluate(async()=>{
  const agenda=weeklyAgenda(model,serial,state,settings,new Date('2026-09-16T18:00:00Z'));
  const events=agenda.sections.flatMap(s=>s.events);
  const shabbos=agenda.sections.find(s=>s.title==='Shabbos');
- if(!shabbos.events[0].name.includes('הדלקת'))throw Error('Shabbos must start with candle lighting');
+ if(!shabbos.events[0].earlyShabbos && !shabbos.events[0].name.includes('הדלקת'))throw Error('Shabbos must start with early Mincha or candle lighting');
+ if(agenda.sections.find(s=>s.title==='Erev Shabbos').events.some(e=>e.earlyShabbos))throw Error('Early mincha left in Erev Shabbos');
  if(events.some(e=>e.serial<serial-3 || (e.serial===serial-3 && e.mins<840)))throw Error('Past time remains');
  if(events.filter(e=>e.next).length!==1)throw Error('Next marker');
  const phase=(name,day)=>agendaSection({name},day,settings).title;
