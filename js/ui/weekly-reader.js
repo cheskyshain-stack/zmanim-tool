@@ -237,14 +237,18 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     const key=`holy-${end-1}`;
     let combined = displaySections.find(s=>s.key===key && s.combined);
     if (!combined) {
-      combined={key,title:titles.join(' / '),serial:end-1,events:[],combined:true};
+      combined={key,title:titles.join(' / '),serial:end-1,events:[],combined:true,dayTitles:[]};
       displaySections.push(combined);
     }
     const repeated=agenda.sections.filter(s=>s.title===section.title).length>1;
     const dayName=dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'});
     const sectionName=section.key.startsWith('holy-') && !section.title.includes('Shabbos') ? `${dayName} ${section.title}` : section.title;
+    if(section.key.startsWith('holy-') && !combined.dayTitles.includes(sectionName)) combined.dayTitles.push(sectionName);
     const subtitle=sectionName+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
     combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
+  }
+  for(const section of displaySections) {
+    if(section.combined && section.dayTitles.length===1) section.title=section.dayTitles[0];
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
