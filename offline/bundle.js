@@ -18058,7 +18058,9 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const settings = resolveSettings(state.settings);
   const index = luach ? readerWeekIndex(state) : weekIndex(state);
   const allSerials = [...index.keys()].sort((a, b) => a - b);
-  let serials = allSerials;
+  const today = luach ? shulNow(new Date(), settings).serial : null;
+  const availableSerials = luach ? allSerials.filter(s => s >= today) : allSerials;
+  let serials = availableSerials;
 
   if (!serials.length) {
     container.innerHTML = luach
@@ -18080,7 +18082,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
      Three taps on the chart lets the whole season out again (navUnlocked in nav-helpers),
      and the admin app is never held at all. */
   const held = luach && !navUnlocked();
-  if (held) serials = chartStretchSerials(showing, index, state) || serials;
+  if (held) serials = (chartStretchSerials(showing, index, state) || serials)
+    .filter(s => availableSerials.includes(s));
   const at = serials.indexOf(showing);
   if (luach) {
     renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange,
