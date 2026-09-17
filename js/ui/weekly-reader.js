@@ -184,11 +184,44 @@ export function remainingReaderDays(data, showing, settings, now = new Date()) {
   };
 }
 
+/** Keep a continuous Shabbos/Yom Tov together across the weekly boundary. */
+export function weeklyAgendaData(showing,index,state,settings) {
+  let first=showing-6, last=showing;
+  if (agendaDayKind(first,settings).holy) {
+    while (agendaDayKind(first-1,settings).holy) first--;
+    first--;
+  }
+  if (agendaDayKind(last,settings).holy) {
+    while (agendaDayKind(last+1,settings).holy) last++;
+  }
+  const data={regular:[],special:[],night:[],shabbos:[]};
+  for (const anchor of [showing-7,showing,showing+7]) {
+    if (!index.has(anchor) || anchor<first || anchor-6>last) continue;
+    const part=weeklyReaderData(anchor,index,state,settings);
+    for(const kind of ['regular','special','night']) {
+      for(const day of part[kind]) {
+        if(day.serial<first || day.serial>last)continue;
+        const copy={...day};
+        if(day.serial<showing-6 && !agendaDayKind(day.serial,settings).holy) {
+          copy.events=day.events.filter(e=>e.mins>=720);
+          if(!copy.events.length && !copy.candles)continue;
+        }
+        data[kind].push(copy);
+      }
+    }
+    for(const row of part.shabbos) {
+      const serial=anchor-(row.friday?1:0);
+      if(serial>=first && serial<=last)data.shabbos.push({...row,eventSerial:serial});
+    }
+  }
+  return data;
+}
+
 export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
-  const data = weeklyReaderData(showing,index,state,settings);
+  const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);
-  const date = dateFromSerial(showing).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'});
+  const date = dateFromSerial(showing-6).toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric'});
   const displaySections = [];
   for (const section of agenda.sections) {
     if (!/^(holy|erev|motzaei)-/.test(section.key)) { displaySections.push(section); continue; }
@@ -227,7 +260,7 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     </details>`;
   }).join('');
   container.innerHTML=`<div class="weekly-reader">
-    <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>${showing - shulNow(now,settings).serial < 7 ? 'From now through Shabbos' : 'Week ending Shabbos'}, ${escAttr(date)}</p></header>
+    <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week of ${escAttr(date)}</p></header>
     <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
     </div></details>

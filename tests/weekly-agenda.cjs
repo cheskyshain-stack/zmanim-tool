@@ -16,7 +16,7 @@ const server=http.createServer((req,res)=>{
  const page=await context.newPage();await page.goto(origin+'/week/?count=off');await page.locator('.weekly-reader').waitFor();await page.evaluate(()=>document.fonts.ready);
 const check=await page.evaluate(async()=>{
  const {weeklyAgenda,agendaSection,agendaDayKind}=await import('/js/ui/weekly-agenda.js');
- const {weeklyReaderData,readerWeekIndex,renderWeeklyReader}=await import('/js/ui/weekly-reader.js');
+ const {weeklyReaderData,readerWeekIndex,renderWeeklyReader,weeklyAgendaData}=await import('/js/ui/weekly-reader.js');
  const {buildAutomaticCharts}=await import('/js/publish.js');
  const {loadTables}=await import('/js/data-loader.js');
  const {resolveSettings}=await import('/js/settings.js');
@@ -58,6 +58,10 @@ const check=await page.evaluate(async()=>{
  const atFive=weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:05:00Z')).sections.flatMap(s=>s.events);
  if(atFive.length!==1 || !atFive[0].started || atFive[0].next)throw Error('Five minute retention');
  if(weeklyAgenda(sample,serial,state,settings,new Date('2026-09-16T14:06:00Z')).sections.length)throw Error('Started minyan remains too long');
+ const extended=weeklyAgendaData(serial+7,index,state,settings);
+ if(!extended.special.some(d=>d.serial===serial+8))throw Error('Second day of Yom Tov missing across week');
+ const following=weeklyAgendaData(serial+14,index,state,settings);
+ if(!following.special.some(d=>d.serial===serial+7))throw Error('First day of Yom Tov missing in following week');
  const host=document.querySelector('#week-host');
  renderWeeklyReader(host,{showing:serial+7,index,state,settings,serials:[...index.keys()],onSerialChange:()=>{},title:'Audit',now:new Date('2026-09-16T18:00:00Z')});
  const titles=[...host.querySelectorAll('.reader-agenda-day > summary strong')].map(e=>e.textContent);

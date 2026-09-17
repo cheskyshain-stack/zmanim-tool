@@ -31,7 +31,7 @@ export function agendaSection(event, serial, settings) {
 function agendaChartEvents(rows, showing) {
   const out = [];
   for (const row of rows) {
-    const serial = showing - (row.friday ? 1 : 0);
+    const serial = row.eventSerial ?? showing - (row.friday ? 1 : 0);
     const plain = String(row.value).replace(/<u\b[^>]*>/gi, UL_START).replace(/<\/u>/gi, UL_END)
       .replace(/<br\s*\/?>|<\/div>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ');
     for (const line of plain.split('\n')) {
