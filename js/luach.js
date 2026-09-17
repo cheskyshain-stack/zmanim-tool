@@ -323,9 +323,10 @@ const DONATE = {
       /* Three of the four logos are the provider's own file on the provider's own server.
          OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
          on the tile visibly soft, which the user saw on a phone. So that one is ours:
-         assets/daf-ojc.png, built from the artwork the user supplied. The tile draws it
-         about 105 x 40, so it is shipped 330 wide, a little over 3x for a phone. See the
-         note on .luach-daf-provider img in app.css for how it was made.
+         assets/daf-ojc.png, built from the mark on OJC's own donor portal, which is the
+         page the tile links to and so the mark a donor sees next. The tile draws it about
+         99 x 40, so it is shipped 330 wide, over 3x for a phone. See the note on
+         .luach-daf-provider img in app.css for how it was made.
          The other three stay remote until there is artwork to replace them with, and the
          alt text below is what a tile shows when any of them does not arrive. Each url is
          the provider's own sign-in, since a donor here already has an account to spend. */

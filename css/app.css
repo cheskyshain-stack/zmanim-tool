@@ -4500,14 +4500,20 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
    the providers' own servers and cannot be measured against from here.
 
    assets/daf-ojc.png is the one logo this site serves itself, because the file OJC's own
-   site links is a small bitmap and the tile drew it visibly soft on a phone. Built from the
-   artwork the user supplied: cropped to the ink, then every pixel read as white mixed with
-   one of the two brand colours (#0E8CFC and #152A59) and written back as that colour with
-   the mix as its alpha, which is what turns the white page behind it into transparency
-   without leaving a halo. Resampled once to 330 wide, a little over 3x what the tile draws,
-   with alpha snapped at both ends and stepped in eighths in between, and the colour zeroed
-   where it is fully clear. That last part is only about weight: it takes the file from 42KB
-   to 21KB and changes nothing on screen. */
+   site links is a small bitmap and the tile drew it visibly soft on a phone. It is the mark
+   from OJC's donor portal, which is where this tile sends a donor, so the logo they click
+   is the logo on the page they land on.
+
+   Made from a picture of that page, in this order, because the order is what keeps it
+   clean. Cropped to the ink, then resampled to 330 wide while still opaque on its white
+   background: no colour can bleed out of a pixel that is not transparent yet, and the same
+   averaging takes the jpeg's edge ringing down with it. Only then is the white read out,
+   each pixel treated as ink laid over white and solved back into that ink at the alpha the
+   mix implies. That is what leaves no halo, and unlike snapping every pixel to a named
+   brand colour it keeps the tone the J carries where it crosses the C, which is part of the
+   mark. Alpha is then snapped at both ends and stepped in eighths between, and the colour
+   zeroed where it is fully clear: 14KB, and composited back onto white it is within 8
+   levels of the picture it came from, on antialiased edge pixels only. */
 .luach-daf-provider img { width:110px; height:40px; object-fit:contain; text-align:center; font-size:.82rem; line-height:1.2; color:var(--luach-ink); }
 @media (prefers-reduced-motion:reduce) { .luach-zmanim-group::details-content,.luach-zmanim-options { transition:none; } }
 
