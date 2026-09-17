@@ -4730,8 +4730,12 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 
 /* Combined weekly printout: Shabbos on the right, weekdays on the left. */
 .week-pair { width:11in; height:8.5in; padding:38px 48px 28px; }
-.week-pair-cols { gap:36px; }
-.week-pair .week-card.is-weekday-card { border-right:1px solid #bbb; padding-right:18px; }
+.week-pair-cols { gap:36px; position:relative; }
+.week-pair-cols:has(> .week-card + .week-card)::after {
+  content:""; position:absolute; left:50%; top:48px; bottom:0;
+  width:1px; background:#bbb; transform:translateX(-50%); pointer-events:none;
+}
+.week-pair .week-card.is-weekday-card { border-right:0; padding-right:0; }
 .week-pair .week-card .week-lines { margin-top:10px; }
 .week-pair .week-card .week-lines-inner { width:100%; max-width:none; }
 .week-pair .week-card .week-line {
