@@ -1161,6 +1161,11 @@ function weekTitle(showing, index) {
  *  Split out of renderWeek so a week other than the one on screen can be built too: that
  *  is what printing the rest of the season does, which lays every remaining week out at
  *  once rather than asking someone to page through and print them one at a time. */
+function printedDayNames(value) {
+  const names = { Sunday:'יום א', Monday:'יום ב', Tuesday:'יום ג', Wednesday:'יום ד', Thursday:'יום ה', Friday:'יום ו', Saturday:'שבת' };
+  return String(value).replace(/Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday/g, name=>names[name]);
+}
+
 function weekCardsHtml(showing, index, state, settings) {
   const { week, sheet } = index.get(showing);
 
@@ -1254,7 +1259,7 @@ function weekCardsHtml(showing, index, state, settings) {
         '',
         htmlLines(g.html),
         true, false,
-        `${weekEsc(g.name)}<br><span class="week-days" dir="ltr">(${weekEsc(g.day)})</span>`,
+        `${weekEsc(g.name)}<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(g.day))})</span>`,
         true
       )));
     }
@@ -1271,7 +1276,7 @@ function weekCardsHtml(showing, index, state, settings) {
          have no סליחות and stay שחרית. */
       const dayLabel = (d) =>
         `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
-        + `<br><span class="week-days" dir="ltr">(${weekEsc(d.day)})</span>`;
+        + `<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(d.day))})</span>`;
       /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
          list and read as one line naming both, which is what this has always done, and צום
          גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
