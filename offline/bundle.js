@@ -17780,6 +17780,23 @@ function fitLinesToPage(container) {
     const room = box.clientHeight;
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
+    if (card.matches('.is-shabbos-print, .is-weekday-card')) {
+      // Fit height while keeping both ruled lists at the full printable width.
+      const measure = (scale) => {
+        card.style.setProperty('--fit-scale', scale.toFixed(4));
+        card.style.setProperty('--fit-width', scale.toFixed(4));
+        return inner.getBoundingClientRect().height;
+      };
+      let low = 0.2;
+      let high = growCapFor(card);
+      for (let i = 0; i < 14; i++) {
+        const mid = (low + high) / 2;
+        if (measure(mid) <= room * 0.98) low = mid;
+        else high = mid;
+      }
+      measure(low);
+      return;
+    }
     // A hair under, so rounding never pushes the last row over the edge.
     const byHeight = (room / needed) * 0.98;
     if (needed > room) {
