@@ -4453,7 +4453,7 @@ body.is-locked { overflow: hidden; }
   html:has(body.is-luach) { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: 110px; }
   body.is-luach .luach-bar { pointer-events: none; touch-action: pan-y; }
   body.is-luach .luach-bar a, body.is-luach .luach-bar button { pointer-events: auto; }
-  body.is-luach .luach-cap-photo { top: 10px; height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
+  body.is-luach .luach-cap-photo { top: clamp(10px, calc(3.2px + 1.25vw), 16px); height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
   body.is-luach .luach-bar::after { pointer-events: none; }
 }
 
