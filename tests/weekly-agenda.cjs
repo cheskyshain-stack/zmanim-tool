@@ -27,6 +27,7 @@ const check=await page.evaluate(async()=>{
  const model=weeklyReaderData(serial,index,state,settings);
  const agenda=weeklyAgenda(model,serial,state,settings,new Date('2026-09-16T18:00:00Z'));
  const events=agenda.sections.flatMap(s=>s.events);
+ if(agendaSection({name:'שקיעה'},serial-1,settings).title!=='Shabbos')throw Error('Shkia outside Shabbos');
  const shabbos=agenda.sections.find(s=>s.title==='Shabbos');
  if(!shabbos.events[0].earlyShabbos && !shabbos.events[0].name.includes('הדלקת'))throw Error('Shabbos must start with early Mincha or candle lighting');
  if(agenda.sections.find(s=>s.title==='Erev Shabbos').events.some(e=>e.earlyShabbos))throw Error('Early mincha left in Erev Shabbos');

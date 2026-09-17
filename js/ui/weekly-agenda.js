@@ -18,7 +18,7 @@ export function agendaDayKind(serial, settings) {
 export function agendaSection(event, serial, settings) {
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
-  if ((event.earlyShabbos || /הדלקת/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
+  if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
   if (evening && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
