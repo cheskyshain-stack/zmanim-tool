@@ -17713,6 +17713,11 @@ function agendaChartEvents(rows, showing) {
        although it is written second. Pairing them by position without this turn crosses every
        name over the wrong time, which is the exact bug reckonings.js was written for. */
     const reckonings = headLines.map(reckoningParts).find(Boolean)?.slice().reverse() || null;
+    /* What this cell's פלג is called on the board: "פלג גר״א", "פלג מ״א", "פלג מ״א 72". The
+       cell itself only ever says the bare word, which is all it needs to say sitting under its
+       own מנחה. Standing on its own, once that מנחה has gone in and come off the screen, the
+       bare word does not say which of the three it is, and the shul asked for the name. */
+    const plagName = headLines.find(s=>s.startsWith('פלג')) || '';
     for (const line of plain.split('\n')) {
       const named = line.match(/דרשה|שקיעה|פלג[^\d]*/)?.[0]?.trim();
       /* The whole heading bar the two lines that say something the times already say: the
@@ -17744,7 +17749,7 @@ function agendaChartEvents(rows, showing) {
              paper they are one. Carried as a flag beside the name rather than by changing
              the name: `auxiliary` is worked out from the name, and a פלג that called itself
              מנחה would be offered as the next מנין. It is a זמן, not a מנין. */
-          cell:String(row.key ?? ''), plag:/^פלג/.test(named ?? ''),
+          cell:String(row.key ?? ''), plag:/^פלג/.test(named ?? ''), plagName,
           earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
         at++;
       }
@@ -18066,6 +18071,10 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     const rows=[];
     const sameWhere=(row,event)=>row && row.serial===event.serial
       && row.sectionTitle===event.sectionTitle && row.dayPart===event.dayPart;
+    /* What a row of this event would be called. A פלג under its own מנחה says the bare word,
+       which is all the second line of one cell has to say; a פלג left standing on its own,
+       its מנחה having gone in and come off the screen, is named in full off the board. */
+    const rowName=(e)=>(e.plag && e.plagName) || e.name;
     for(const event of section.events){
       /* A פלג goes under the מנחה it was written under, rather than into a rule-separated row
          of its own: on the board the two are one cell, and the shul asked for them read that
@@ -18080,8 +18089,8 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
          are all called מנחה and differ by the room they daven in, and until the פלג stopped
          sitting between them they were kept apart only by that accident: with it gone, 5:29
          and 6:05 ran into one row carrying one of the two פלג. */
-      if (!sameWhere(row,event) || row.name!==event.name || row.cell!==(event.cell||'')) row=null;
-      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
+      if (!sameWhere(row,event) || row.name!==rowName(event) || row.cell!==(event.cell||'')) row=null;
+      if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
