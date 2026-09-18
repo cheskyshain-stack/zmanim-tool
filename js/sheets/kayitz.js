@@ -87,7 +87,13 @@ export function buildKayitzRow(week, settings) {
   const sefirah = 'the Sefirah stretch, after Pesach and before Shavuos';
   const sunsetFriday = Z.sunset(fridayDate, settings);
   const maarivFri = zman('שקיעה', sunsetFriday, 'on the Friday')
-    .plus(extraMaariv ? 55 : 50, extraMaariv ? `55 rather than 50, this week falling in ${sefirah}` : undefined)
+    /* The reason is given on both sides of this, not only on the week that differs. Given
+       one way round, an ordinary week reads "add 50 minutes" with nothing to say that the
+       offset is 55 for part of the year, which is the same fault the shul found on the
+       1:35: a branch where only the winning side reaches the page. */
+    .plus(extraMaariv ? 55 : 50, extraMaariv
+      ? `55 rather than the usual 50, this week falling in ${sefirah}`
+      : `50, which is the usual. Inside ${sefirah} it is 55 instead`)
     .floor().underline();
   const F = maarivFri.text();
 
@@ -115,7 +121,14 @@ export function buildKayitzRow(week, settings) {
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
      and carry their traces once that file is converted; a column with no trace yet is drawn
      by the calculations page as "not written up", never silently blank. */
-  const early = (e) => [e.trace.mincha, e.trace.plag];
+  /* The three early columns are silenced outside their season rather than branched to null,
+     so I, J and K can still say what they are and when they run. A winter reader opening an
+     empty cell used to get nothing at all. */
+  const offSeason = 'the early מנינים run for part of the year only';
+  const early = (e) => [e.trace.mincha.onlyWhen(plagWindow, offSeason), e.trace.plag.onlyWhen(plagWindow, offSeason)];
+  const earlyCols = { I: early(early72), J: early(early50), K: early(earlyGRA) };
+  const heldOf = (list) => list.filter((t) => t.held !== false);
+  const cutOf = (list) => list.filter((t) => t.held === false);
   const traces = {
     B: tishaEvening ? null : [tz60, tz72],
     D: [shmaMGA, shmaGRA],
@@ -124,16 +137,23 @@ export function buildKayitzRow(week, settings) {
     H: candles.times,
     L: erevMincha.times,
     F: [maarivFri],
-    G: extraMaariv ? [minchaFri, secondMaariv] : [minchaFri],
-    I: plagWindow ? early(early72) : null,
-    J: plagWindow ? early(early50) : null,
-    K: plagWindow ? early(earlyGRA) : null,
+    G: [minchaFri, ...(extraMaariv ? [secondMaariv] : [])],
+    I: heldOf(earlyCols.I),
+    J: heldOf(earlyCols.J),
+    K: heldOf(earlyCols.K),
   };
 
   /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
      beside the ones it did, and the note each menu carries travels with them. */
   const notes = { C: shabbosMincha.note || null, L: erevMincha.note || null };
-  const dropped = { C: shabbosMincha.dropped || null };
+  const dropped = {
+    C: shabbosMincha.dropped || null,
+    L: erevMincha.dropped || null,
+    /* The second מעריב exists for part of the year, so on the weeks it does not run the cell
+       still says so rather than simply not mentioning a מנין. */
+    G: extraMaariv ? null : [secondMaariv],
+    I: cutOf(earlyCols.I), J: cutOf(earlyCols.J), K: cutOf(earlyCols.K),
+  };
 
   return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
 }

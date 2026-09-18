@@ -46,10 +46,14 @@ export function buildChorefRow(week, settings) {
   const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
   const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
   const plagWindow = inPlagWindow(friday, settings);
+  /* The three פלג מנינים are silenced outside their season rather than branched away, so the
+     column can still say they exist and when. Branched, a winter week simply had one time in
+     it and nothing to explain the other three. textjoin drops the empties, so the printed
+     cell is exactly what it was. */
+  const early = 'the early מנינים run for part of the year only';
+  const plagTimes = [plagGRA, plag50, plag72].map((t) => t.onlyWhen(plagWindow, early));
 
-  const G = plagWindow
-    ? textjoin(SLASH, true, [plagGRA.text(), plag50.text(), plag72.text(), minchaFri.text()])
-    : minchaFri.text();
+  const G = textjoin(SLASH, true, [...plagTimes.map((t) => t.text()), minchaFri.text()]);
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
@@ -67,13 +71,17 @@ export function buildChorefRow(week, settings) {
     H: candles.times,
     I: erevMincha.times,
     F: [maarivFri],
-    G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
+    G: [...plagTimes.filter((t) => t.held !== false), minchaFri],
   };
 
   /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
      beside the ones it did, and the note each menu carries travels with them. */
   const notes = { C: shabbosMincha.note || null, I: erevMincha.note || null };
-  const dropped = { C: shabbosMincha.dropped || null };
+  const dropped = {
+    C: shabbosMincha.dropped || null,
+    I: erevMincha.dropped || null,
+    G: plagTimes.filter((t) => t.held === false),
+  };
 
   return { B, C, D, E, F, G, H, I, traces, notes, dropped };
 }

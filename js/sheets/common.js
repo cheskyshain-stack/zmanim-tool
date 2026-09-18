@@ -59,10 +59,26 @@ export function fridayMainMinchaParts(fridayDate, settings) {
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
      up wrongly, which juggling two arrays by index invites. */
-  const times = [
-    onStandardTime ? mgl().laterOf(clockTime(12, 30), notBefore).underline() : null,
-    onStandardTime ? clockTime(1, 0).underline() : null,
-    onStandardTime && mglVal < T(13, 20) ? mgl().laterOf(clockTime(13, 15), notBefore).underline() : null,
+  /* **Every candidate is built, including the ones this week does not print.**
+
+     They used to be branched away to null, so a week on daylight saving simply had no 12:30
+     and no 1:00 and the page had nothing to say about them. That is the same fault the shul
+     found on the 1:35, one step further on: not a rule with a side missing but a מנין missing
+     altogether. A time that is not offered this week is still part of what this column is,
+     and it now says so and why, the way the שבת afternoon's 5:30, 6:00 and 6:30 already did.
+
+     Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
+     flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
+  const clocksBack = 'offered only while the clocks are back';
+  const all = [
+    /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
+       Math.max is symmetric so the answer is the same, but the chain starts where the name
+       does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
+       other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
+    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
+    clockTime(13, 15, 'the last of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
+      .onlyWhen(onStandardTime && mglVal < T(13, 20), `${clocksBack}, and then only where מנחה גדולה לחומרא is before 1:20`),
     /* Written as a comparison rather than as a branch, so the page can say what this time
        really is. Branched, the trace only ever saw the side that won and called a 1:35 a
        fixed time, which is what the shul caught: it is a floor, and on the weeks מנחה
@@ -72,11 +88,12 @@ export function fridayMainMinchaParts(fridayDate, settings) {
     fixedTime('1:50'),
     fixedTime('2:15'),
     fixedTime('3:00'),
-  ].filter(Boolean);
+  ];
 
   return {
-    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
-    times,
+    text: splitLinesInHalf(flattenNonEmpty(all.map((t) => t.text()))),
+    times: all.filter((t) => t.held !== false),
+    dropped: all.filter((t) => t.held === false),
     note: onStandardTime
       ? 'The clocks are back this week, so the earlier מנינים are offered in front of the 1:35.'
       : 'The clocks are forward this week, so nothing is offered before 1:35. That is the shul\'s own rule and the workbook does not have it.',
@@ -117,8 +134,14 @@ function roundTo5(dayFraction) {
 export function shabbosMinchaParts(shabbosDate, settings, specialParsha = '') {
   const sunsetVal = Z.sunset(shabbosDate, settings);
   const onDst = Z.dstLocal(shabbosDate, settings);
-  const early = fixedTime(onDst ? '1:40' : '1:20',
-    { label: onDst ? 'the opening מנחה while the clocks are forward' : 'the opening מנחה while the clocks are back' });
+  /* Both values named, not only the one printed this week. A label that says "while the
+     clocks are forward" and stops there leaves a reader thinking 1:40 is simply what this
+     column says. */
+  const early = fixedTime(onDst ? '1:40' : '1:20', {
+    label: onDst
+      ? 'the opening מנחה while the clocks are forward. Once they go back it is 1:20 instead'
+      : 'the opening מנחה while the clocks are back. Once they go forward it is 1:40 instead',
+  });
 
   /* Rounded **up** here, where almost every other column on these boards rounds down. That
      is what the workbook does on this one cell, and it is exactly the sort of thing a reader

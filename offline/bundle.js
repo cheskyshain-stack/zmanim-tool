@@ -2090,10 +2090,26 @@ function fridayMainMinchaParts(fridayDate, settings) {
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
      up wrongly, which juggling two arrays by index invites. */
-  const times = [
-    onStandardTime ? mgl().laterOf(clockTime(12, 30), notBefore).underline() : null,
-    onStandardTime ? clockTime(1, 0).underline() : null,
-    onStandardTime && mglVal < T(13, 20) ? mgl().laterOf(clockTime(13, 15), notBefore).underline() : null,
+  /* **Every candidate is built, including the ones this week does not print.**
+
+     They used to be branched away to null, so a week on daylight saving simply had no 12:30
+     and no 1:00 and the page had nothing to say about them. That is the same fault the shul
+     found on the 1:35, one step further on: not a rule with a side missing but a מנין missing
+     altogether. A time that is not offered this week is still part of what this column is,
+     and it now says so and why, the way the שבת afternoon's 5:30, 6:00 and 6:30 already did.
+
+     Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
+     flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
+  const clocksBack = 'offered only while the clocks are back';
+  const all = [
+    /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
+       Math.max is symmetric so the answer is the same, but the chain starts where the name
+       does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
+       other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
+    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
+    clockTime(13, 15, 'the last of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
+      .onlyWhen(onStandardTime && mglVal < T(13, 20), `${clocksBack}, and then only where מנחה גדולה לחומרא is before 1:20`),
     /* Written as a comparison rather than as a branch, so the page can say what this time
        really is. Branched, the trace only ever saw the side that won and called a 1:35 a
        fixed time, which is what the shul caught: it is a floor, and on the weeks מנחה
@@ -2103,11 +2119,12 @@ function fridayMainMinchaParts(fridayDate, settings) {
     fixedTime('1:50'),
     fixedTime('2:15'),
     fixedTime('3:00'),
-  ].filter(Boolean);
+  ];
 
   return {
-    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
-    times,
+    text: splitLinesInHalf(flattenNonEmpty(all.map((t) => t.text()))),
+    times: all.filter((t) => t.held !== false),
+    dropped: all.filter((t) => t.held === false),
     note: onStandardTime
       ? 'The clocks are back this week, so the earlier מנינים are offered in front of the 1:35.'
       : 'The clocks are forward this week, so nothing is offered before 1:35. That is the shul\'s own rule and the workbook does not have it.',
@@ -2148,8 +2165,14 @@ function roundTo5(dayFraction) {
 function shabbosMinchaParts(shabbosDate, settings, specialParsha = '') {
   const sunsetVal = Z.sunset(shabbosDate, settings);
   const onDst = Z.dstLocal(shabbosDate, settings);
-  const early = fixedTime(onDst ? '1:40' : '1:20',
-    { label: onDst ? 'the opening מנחה while the clocks are forward' : 'the opening מנחה while the clocks are back' });
+  /* Both values named, not only the one printed this week. A label that says "while the
+     clocks are forward" and stops there leaves a reader thinking 1:40 is simply what this
+     column says. */
+  const early = fixedTime(onDst ? '1:40' : '1:20', {
+    label: onDst
+      ? 'the opening מנחה while the clocks are forward. Once they go back it is 1:20 instead'
+      : 'the opening מנחה while the clocks are back. Once they go forward it is 1:40 instead',
+  });
 
   /* Rounded **up** here, where almost every other column on these boards rounds down. That
      is what the workbook does on this one cell, and it is exactly the sort of thing a reader
@@ -3964,7 +3987,13 @@ function buildKayitzRow(week, settings) {
   const sefirah = 'the Sefirah stretch, after Pesach and before Shavuos';
   const sunsetFriday = Z.sunset(fridayDate, settings);
   const maarivFri = zman('שקיעה', sunsetFriday, 'on the Friday')
-    .plus(extraMaariv ? 55 : 50, extraMaariv ? `55 rather than 50, this week falling in ${sefirah}` : undefined)
+    /* The reason is given on both sides of this, not only on the week that differs. Given
+       one way round, an ordinary week reads "add 50 minutes" with nothing to say that the
+       offset is 55 for part of the year, which is the same fault the shul found on the
+       1:35: a branch where only the winning side reaches the page. */
+    .plus(extraMaariv ? 55 : 50, extraMaariv
+      ? `55 rather than the usual 50, this week falling in ${sefirah}`
+      : `50, which is the usual. Inside ${sefirah} it is 55 instead`)
     .floor().underline();
   const F = maarivFri.text();
 
@@ -3992,7 +4021,14 @@ function buildKayitzRow(week, settings) {
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
      and carry their traces once that file is converted; a column with no trace yet is drawn
      by the calculations page as "not written up", never silently blank. */
-  const early = (e) => [e.trace.mincha, e.trace.plag];
+  /* The three early columns are silenced outside their season rather than branched to null,
+     so I, J and K can still say what they are and when they run. A winter reader opening an
+     empty cell used to get nothing at all. */
+  const offSeason = 'the early מנינים run for part of the year only';
+  const early = (e) => [e.trace.mincha.onlyWhen(plagWindow, offSeason), e.trace.plag.onlyWhen(plagWindow, offSeason)];
+  const earlyCols = { I: early(early72), J: early(early50), K: early(earlyGRA) };
+  const heldOf = (list) => list.filter((t) => t.held !== false);
+  const cutOf = (list) => list.filter((t) => t.held === false);
   const traces = {
     B: tishaEvening ? null : [tz60, tz72],
     D: [shmaMGA, shmaGRA],
@@ -4001,16 +4037,23 @@ function buildKayitzRow(week, settings) {
     H: candles.times,
     L: erevMincha.times,
     F: [maarivFri],
-    G: extraMaariv ? [minchaFri, secondMaariv] : [minchaFri],
-    I: plagWindow ? early(early72) : null,
-    J: plagWindow ? early(early50) : null,
-    K: plagWindow ? early(earlyGRA) : null,
+    G: [minchaFri, ...(extraMaariv ? [secondMaariv] : [])],
+    I: heldOf(earlyCols.I),
+    J: heldOf(earlyCols.J),
+    K: heldOf(earlyCols.K),
   };
 
   /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
      beside the ones it did, and the note each menu carries travels with them. */
   const notes = { C: shabbosMincha.note || null, L: erevMincha.note || null };
-  const dropped = { C: shabbosMincha.dropped || null };
+  const dropped = {
+    C: shabbosMincha.dropped || null,
+    L: erevMincha.dropped || null,
+    /* The second מעריב exists for part of the year, so on the weeks it does not run the cell
+       still says so rather than simply not mentioning a מנין. */
+    G: extraMaariv ? null : [secondMaariv],
+    I: cutOf(earlyCols.I), J: cutOf(earlyCols.J), K: cutOf(earlyCols.K),
+  };
 
   return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
 }
@@ -4912,10 +4955,14 @@ function buildChorefRow(week, settings) {
   const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
   const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
   const plagWindow = inPlagWindow(friday, settings);
+  /* The three פלג מנינים are silenced outside their season rather than branched away, so the
+     column can still say they exist and when. Branched, a winter week simply had one time in
+     it and nothing to explain the other three. textjoin drops the empties, so the printed
+     cell is exactly what it was. */
+  const early = 'the early מנינים run for part of the year only';
+  const plagTimes = [plagGRA, plag50, plag72].map((t) => t.onlyWhen(plagWindow, early));
 
-  const G = plagWindow
-    ? textjoin(SLASH, true, [plagGRA.text(), plag50.text(), plag72.text(), minchaFri.text()])
-    : minchaFri.text();
+  const G = textjoin(SLASH, true, [...plagTimes.map((t) => t.text()), minchaFri.text()]);
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
@@ -4933,13 +4980,17 @@ function buildChorefRow(week, settings) {
     H: candles.times,
     I: erevMincha.times,
     F: [maarivFri],
-    G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
+    G: [...plagTimes.filter((t) => t.held !== false), minchaFri],
   };
 
   /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
      beside the ones it did, and the note each menu carries travels with them. */
   const notes = { C: shabbosMincha.note || null, I: erevMincha.note || null };
-  const dropped = { C: shabbosMincha.dropped || null };
+  const dropped = {
+    C: shabbosMincha.dropped || null,
+    I: erevMincha.dropped || null,
+    G: plagTimes.filter((t) => t.held === false),
+  };
 
   return { B, C, D, E, F, G, H, I, traces, notes, dropped };
 }
@@ -6283,10 +6334,13 @@ function isBmgWeek(serial, settings) {
  */
 function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }) {
   let t = clockTime(Math.floor(slot.base / 60), slot.base % 60, label);
-  t = t.steppedTo(slot.mins / 1440, { by: STEP, until, untilAt, backwards });
+  /* A slot that does not run this week never moved, so it is not given a move to describe:
+     it is the standing time and the reason it is not on the board. */
+  if (!slot.offSeason) t = t.steppedTo(slot.mins / 1440, { by: STEP, until, untilAt, backwards });
   if (place === LMATA) t = t.underline();
   if (place === EZRAS) t = t.mark('*');
-  return keptReason ? t.onlyWhen(false, keptReason) : t;
+  const why = slot.offSeason || keptReason;
+  return why ? t.onlyWhen(false, why) : t;
 }
 
 /** מנחה.
@@ -6316,16 +6370,23 @@ function minchaParts(week, settings) {
   const latestAllowed = earliestShkia - 15;
   const clears = 'at least 15 minutes before the earliest שקיעה of the five days';
 
+  /* **A time that does not run this week stays in the list, marked, rather than being taken
+     out of it.** Removed, the column simply had no 12:45 and nothing to say about it, which
+     is the same fault the shul found on the 1:35 carried one step further: not a rule with a
+     side missing but a מנין missing altogether. offSeason slots are held out of the stepping
+     and the crowding below, since neither applies to a time that is not on the board. */
+  const clocksBack = 'offered only while the clocks are back';
   const slots = [
-    standardTime ? { mins: HM(12, 45), place: LMATA } : null,
-    standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    { mins: HM(12, 45), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    { mins: HM(13, 15), place: LMATA, offSeason: standardTime ? null : clocksBack },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
       ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
       : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
-    bmg ? { mins: HM(16, 15), place: LMATA, label: 'runs while BMG is in session' } : null,
+    { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
+      offSeason: bmg ? null : 'offered only while BMG is in session' },
     { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
     { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
     { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
@@ -6334,7 +6395,7 @@ function minchaParts(week, settings) {
 
   // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
   for (const slot of slots) {
-    if (!slot.shkiaDriven) continue;
+    if (slot.offSeason || !slot.shkiaDriven) continue;
     const base = slot.mins;
     for (let guard = 0; slot.mins > latestAllowed && guard < STEP_GUARD; guard++) slot.mins -= STEP;
     slot.moved = slot.mins !== base;
@@ -6344,6 +6405,7 @@ function minchaParts(week, settings) {
   // the previous מנחה still being printed, it stops being printed at all.
   const kept = [];
   for (const slot of slots) {
+    if (slot.offSeason) continue;
     const prev = kept[kept.length - 1];
     if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) {
       slot.droppedBecause = `moved back to within ${TOO_CLOSE} minutes of the ${fmtMinutes(prev.mins)} in front of it`;
@@ -6361,7 +6423,7 @@ function minchaParts(week, settings) {
   return {
     text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, slot.place))),
     times: kept.map(trace),
-    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };
 }
@@ -6400,13 +6462,14 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    !bmg ? { mins: HM(23, 30), label: 'runs only while BMG is out of session' } : null,
-    !bmg ? { mins: HM(24, 0), label: 'runs only while BMG is out of session' } : null,
+    { mins: HM(23, 30), offSeason: bmg ? 'offered only while BMG is out of session' : null },
+    { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
 
   // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
   for (const slot of slots) {
+    if (slot.offSeason) continue;
     const base = slot.mins;
     for (let guard = 0; slot.mins < earliestAllowed && guard < STEP_GUARD; guard++) slot.mins += STEP;
     slot.moved = slot.mins !== base;
@@ -6425,6 +6488,7 @@ function maarivParts(week, settings) {
   const kept = [];
   for (let i = slots.length - 1; i >= 0; i--) {
     const slot = slots[i];
+    if (slot.offSeason) continue;
     const next = kept[kept.length - 1];
     if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) {
       slot.droppedBecause = `pushed up to within ${TOO_CLOSE} minutes of the ${fmtMinutes(next.mins)} after it`;
@@ -6444,7 +6508,7 @@ function maarivParts(week, settings) {
   return {
     text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
     times: kept.map(trace),
-    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };
 }

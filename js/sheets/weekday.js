@@ -123,10 +123,13 @@ function isBmgWeek(serial, settings) {
  */
 function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }) {
   let t = clockTime(Math.floor(slot.base / 60), slot.base % 60, label);
-  t = t.steppedTo(slot.mins / 1440, { by: STEP, until, untilAt, backwards });
+  /* A slot that does not run this week never moved, so it is not given a move to describe:
+     it is the standing time and the reason it is not on the board. */
+  if (!slot.offSeason) t = t.steppedTo(slot.mins / 1440, { by: STEP, until, untilAt, backwards });
   if (place === LMATA) t = t.underline();
   if (place === EZRAS) t = t.mark('*');
-  return keptReason ? t.onlyWhen(false, keptReason) : t;
+  const why = slot.offSeason || keptReason;
+  return why ? t.onlyWhen(false, why) : t;
 }
 
 /** מנחה.
@@ -156,16 +159,23 @@ function minchaParts(week, settings) {
   const latestAllowed = earliestShkia - 15;
   const clears = 'at least 15 minutes before the earliest שקיעה of the five days';
 
+  /* **A time that does not run this week stays in the list, marked, rather than being taken
+     out of it.** Removed, the column simply had no 12:45 and nothing to say about it, which
+     is the same fault the shul found on the 1:35 carried one step further: not a rule with a
+     side missing but a מנין missing altogether. offSeason slots are held out of the stepping
+     and the crowding below, since neither applies to a time that is not on the board. */
+  const clocksBack = 'offered only while the clocks are back';
   const slots = [
-    standardTime ? { mins: HM(12, 45), place: LMATA } : null,
-    standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    { mins: HM(12, 45), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    { mins: HM(13, 15), place: LMATA, offSeason: standardTime ? null : clocksBack },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
       ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
       : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
-    bmg ? { mins: HM(16, 15), place: LMATA, label: 'runs while BMG is in session' } : null,
+    { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
+      offSeason: bmg ? null : 'offered only while BMG is in session' },
     { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
     { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
     { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
@@ -174,7 +184,7 @@ function minchaParts(week, settings) {
 
   // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
   for (const slot of slots) {
-    if (!slot.shkiaDriven) continue;
+    if (slot.offSeason || !slot.shkiaDriven) continue;
     const base = slot.mins;
     for (let guard = 0; slot.mins > latestAllowed && guard < STEP_GUARD; guard++) slot.mins -= STEP;
     slot.moved = slot.mins !== base;
@@ -184,6 +194,7 @@ function minchaParts(week, settings) {
   // the previous מנחה still being printed, it stops being printed at all.
   const kept = [];
   for (const slot of slots) {
+    if (slot.offSeason) continue;
     const prev = kept[kept.length - 1];
     if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) {
       slot.droppedBecause = `moved back to within ${TOO_CLOSE} minutes of the ${fmtMinutes(prev.mins)} in front of it`;
@@ -201,7 +212,7 @@ function minchaParts(week, settings) {
   return {
     text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, slot.place))),
     times: kept.map(trace),
-    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };
 }
@@ -240,13 +251,14 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    !bmg ? { mins: HM(23, 30), label: 'runs only while BMG is out of session' } : null,
-    !bmg ? { mins: HM(24, 0), label: 'runs only while BMG is out of session' } : null,
+    { mins: HM(23, 30), offSeason: bmg ? 'offered only while BMG is out of session' : null },
+    { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
 
   // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
   for (const slot of slots) {
+    if (slot.offSeason) continue;
     const base = slot.mins;
     for (let guard = 0; slot.mins < earliestAllowed && guard < STEP_GUARD; guard++) slot.mins += STEP;
     slot.moved = slot.mins !== base;
@@ -265,6 +277,7 @@ function maarivParts(week, settings) {
   const kept = [];
   for (let i = slots.length - 1; i >= 0; i--) {
     const slot = slots[i];
+    if (slot.offSeason) continue;
     const next = kept[kept.length - 1];
     if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) {
       slot.droppedBecause = `pushed up to within ${TOO_CLOSE} minutes of the ${fmtMinutes(next.mins)} after it`;
@@ -284,7 +297,7 @@ function maarivParts(week, settings) {
   return {
     text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
     times: kept.map(trace),
-    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };
 }
