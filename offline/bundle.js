@@ -18046,6 +18046,28 @@ function buildPairSheet(wrap) {
       title.textContent = card.classList.contains('is-weekday-card') ? 'זמני חול' : 'זמני שבת';
       title.lang = 'he';
     }
+    /* **Three times to a line at most, in the שבת column too.**
+
+       Only the weekday card was ever capped, where the times run across the row and a long
+       run would have left the card. In two columns the שבת side needs it just as much, for
+       a different reason: its lines are the workbook's own, and the workbook writes מנחה
+       ערב שבת as three times and then four. That four is the widest thing on the sheet, it
+       cannot turn (the charts' SLASH is non-breaking on both sides, so the line is one
+       unbreakable word), and it simply overruns its half of the row. Measured, it is what
+       held the band of times at 88%: at that width the row's ink already hung 14px past its
+       own cell while the name beside it sat 20px inside, and every narrowing from there
+       closed the gap between two things neither of which had grown.
+
+       capTimesPerLine lays the seven out fresh as 2, 2, 3 rather than honouring a break
+       that leaves a line over the cap. The widest line is then three times instead of four,
+       which is what buys the width. The shul asked for exactly this, in those words: split
+       the times into three when they come too close.
+
+       is-authored is skipped, as on the weekday card: a cell somebody typed by hand keeps
+       the lines they typed. */
+    card.querySelectorAll('.week-time').forEach((el) => {
+      if (!el.classList.contains('is-authored')) capTimesPerLine(el, 3);
+    });
     // appendChild moves them, so wrap is left empty and the sheet takes their place.
     cols.appendChild(card);
   });

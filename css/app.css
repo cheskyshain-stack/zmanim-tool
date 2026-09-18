@@ -1406,32 +1406,33 @@ body.is-luach .week-cards { align-items: center; }
 
 /* The band of times, the same fraction in both columns, rather than filling them.
 
-   88%, and it used to be 94%. A card's block is 5.6in inside 7.3in of paper; a column here
-   is only 3.7in wide to begin with, so the 77% a card uses would be far too tight. But 94%
-   held the times against one edge of the column and the name against the other with the
-   middle of the row empty, and the shul asked for the two brought closer.
+   80%, and it was 94% before that and 88% for a moment in between. A card's block is 5.6in
+   inside 7.3in of paper; a column here is only 3.7in wide to begin with, so the 77% a card
+   uses would be far too tight. But 94% held the times against one edge of the column and
+   the name against the other with the middle of the row empty, and the shul asked twice for
+   the two brought closer.
 
-   88% is the narrowest that is actually safe, measured rather than chosen. The row is a
-   grid of two 47% cells, so a long name overruns its cell and closes on the times beside
-   it without the cell's own box changing at all: measuring the boxes says there is room at
-   80% when the words are already touching. Measured on the ink instead, with a range over
-   each cell's contents, across thirty weeks at 412px, 820px and 1400px: 94% leaves 29px
-   between the two at the tightest, 88% leaves 20px, 86% leaves 11.8px, 84% is down to
-   3.6px, and **82% collides**, eleven rows of פרשת חיי שרה with the name written through
-   the times. 88% keeps 8.3px at its very tightest, which is on a phone where the whole
-   sheet is zoomed down, and it costs nothing in type size: the fitting came out at the
-   same scale anywhere between 94% and 64%.
+   88% was as far as it could go **while the widest row could not turn**. The workbook writes
+   מנחה ערב שבת as three times and then four, and the charts' SLASH is non-breaking on both
+   sides, so that four was one unbreakable word that simply overran its half of the row: at
+   88% its ink already hung 14px past its own cell while the name beside it sat 20px inside,
+   and narrowing further only closed the gap between two things neither of which had grown.
+   At 82% it collided, eleven rows of פרשת חיי שרה written through their own times.
 
-   A plain percentage is all it takes, and that is worth spelling out because two attempts
-   at dividing it by the fitting scale got it wrong, one of them putting a 5.33in block in
-   a 4.86in column. The block is zoomed to fit, and a percentage inside a zoomed box
-   resolves against the box divided by that zoom, so 77% of it comes out at 77% of the
-   column on the paper whatever the zoom is. Dividing again double counts. Measured: the
-   two bands paint the same width as each other and sit dead centre in their columns,
-   where before they were 3.88in and 4.86in, an inch apart on a sheet whose header, title
-   and address are all centred. max-width goes, or the card's 5.6in would cap one of
-   them instead. */
-.week-pair .week-lines-inner { width: 88%; max-width: none; }
+   The shul said to split those times into three when that happens, which is right and is
+   why capTimesPerLine now runs on this sheet's שבת column too (see buildPairSheet). The
+   seven are laid out 2, 2, 3, the widest line is three times instead of four, and the whole
+   row came inside its cell: measured over twenty four weeks, nothing collides now even at
+   62%.
+
+   80% is where it stops, and it is chosen for air rather than forced by anything. Measured
+   on the ink, with a range over each cell's contents, since a long name overruns its own
+   47% cell without that cell's box changing and measuring boxes says there is room long
+   after the words are touching. At 1400px it leaves 41.2px between the two at the tightest
+   and at 412px, where the whole sheet is zoomed down, 17.5px: **more clearance than 94% had
+   before the split, in a band fourteen points narrower.** Going on to 74% buys nothing, the
+   fitting coming out at the same 1.311 either way, and spends the margin. */
+.week-pair .week-lines-inner { width: 80%; max-width: none; }
 /* A row keeps its name and its times at the two outer edges and leaves the middle fifth
    of itself empty, which is right on a card 5.6in wide and wasteful in a column of 3.5in.
    The two cells take more of the row here, so the longer names have somewhere to go: at
