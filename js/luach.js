@@ -440,8 +440,9 @@ function nextUpHtml([minyan, candles]) {
  *  is a sheet of paper that must not be written on. And it stays at the top rather than
  *  moving with a long list of times, so it is in the same place on both pages. */
 function backBar(where) {
+  const schedulePage = where === 'chart' || where === 'schedules';
   return `<div class="luach-bar no-print">
-    <a class="luach-back" href="/">&larr; Menu</a>
+    <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : 'Menu'}</a>
     <h1 class="luach-bar-title">${escAttr(PAGE_NAMES[where] || '')}</h1>
     ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
@@ -1134,5 +1135,6 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
 

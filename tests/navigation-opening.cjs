@@ -27,9 +27,22 @@ const server=http.createServer((req,res)=>{
  if(new URL(page.url()).pathname!=='/'+dest+'/')throw Error('Wrong destination');
  }
  }
+ for (const width of [320,393,1280]) {
+ await page.setViewportSize({width,height:852});
+ for(const dest of ['chart','schedules']) {
+ await page.goto(origin+'/'+dest+'/?count=off');
+ const back=page.locator('.luach-back[aria-label="Back to Weekly Zmanim"]');await back.waitFor();
+ if(await back.getAttribute('href')!=='/week/')throw Error('Wrong back link');
+ await back.click();await page.locator('.reader-schedule-links').waitFor();
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Schedule overflow');
+ }
+ }
+ await page.screenshot({path:path.resolve(__dirname,'../../schedule-nav.png')});
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto(origin+'/?count=off');await page.locator('.luach-menu a[href="/week/"]').click();
  if(await page.locator('#main').evaluate(e=>e.getAnimations().length))throw Error('Reduced motion');
  console.log('Both pages animate on phone and desktop; reduced motion respected.');
  } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+
+
