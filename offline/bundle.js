@@ -3860,6 +3860,13 @@ function buildYomKippurPoster(year, settings) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
   const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark });
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
+  /* The same two taking a traced value, so a line carries the working that made it, and one
+     for the times this sheet simply has typed on it. See zmanim/trace.js. */
+  const tmT = (trace, underlined = false, mark = '') => ({ text: trace.plain(), underlined, mark, trace });
+  const txtT = (str, label) => ({ text: str, underlined: false, mark: '',
+    trace: /^\d{1,2}:\d{2}$/.test(str) ? fixedTime(str, { label }) : null });
+  const erevShkiaT = () => zman('שקיעה', erevShkia, "on ערב יום כיפור, at the shul's elevation");
+  const ykShkiaT = () => zman('שקיעה', ykShkia, "on יום כיפור itself, at the shul's elevation");
 
   // כל נדרי is the candle lighting taken up to the next 5, and if that leaves less than
   // four minutes to light in, on to the 5 after it. Both sheets turn on this: תשפ"ו lights
@@ -3876,28 +3883,42 @@ function buildYomKippurPoster(year, settings) {
   // `calc` names the rule behind the line, for the Calculations page: מעריב is on this
   // sheet three times over with a different rule each time, and שחרית twice, so the page
   // keys its prose on this rather than on the label.
+  /* נעילה and the מנחה in front of it both hang off the 60 minute מעריב, which is where the
+     sheet's afternoon is measured from, so they are built through that rather than beside it. */
+  const motzei60T = ykShkiaT().plus(60);
+  const neilaT = motzei60T.minus(110, 'נעילה is an hour and fifty before the 60 minute מעריב')
+    .roundToStep(5, 'said as a round time, the shul being told to come at it');
+  const kolNidreiT = (() => {
+    const lit = erevShkiaT().minus(settings.candleLightingMinutes, 'the candle lighting offset in Settings');
+    const first = lit.ceilToStep(5, 'up to the next five');
+    return kolNidrei === first.value
+      ? first
+      : first.plus(1).ceilToStep(5, 'on to the five after that, the first one leaving less than four minutes to light in');
+  })();
+
   const dayLines = [
-    line(YK_TEXT.candles, [tm(candles)], { calc: 'candles' }),
-    line(YK_TEXT.shkia, [tm(erevShkia)], { calc: 'erevShkia' }),
-    line(YK_TEXT.kolNidrei, [tm(kolNidrei)], { calc: 'kolNidrei' }),
-    line(YK_TEXT.drasha, [tm(ykNear5(nightMaariv - 30 * YK_MIN))], { calc: 'nightDrasha' }),
-    line(YK_TEXT.maariv, [tm(nightMaariv)], { calc: 'nightMaariv' }),
-    line(YK_TEXT.shacharis.label, [txt(YK_TEXT.shacharis.times)],
-      { calc: 'shacharis', extra: { label: YK_TEXT.hamelech.label, times: [txt(YK_TEXT.hamelech.times)] } }),
+    line(YK_TEXT.candles, [tmT(erevShkiaT().minus(settings.candleLightingMinutes, 'the candle lighting offset in Settings'))], { calc: 'candles' }),
+    line(YK_TEXT.shkia, [tmT(erevShkiaT())], { calc: 'erevShkia' }),
+    line(YK_TEXT.kolNidrei, [tmT(kolNidreiT)], { calc: 'kolNidrei' }),
+    line(YK_TEXT.drasha, [tmT(erevShkiaT().plus(72).minus(30, 'half an hour before מעריב').roundToStep(5, 'said as a round time'))], { calc: 'nightDrasha' }),
+    line(YK_TEXT.maariv, [tmT(erevShkiaT().plus(72))], { calc: 'nightMaariv' }),
+    line(YK_TEXT.shacharis.label, [txtT(YK_TEXT.shacharis.times, 'the שחרית this sheet opens on')],
+      { calc: 'shacharis', extra: { label: YK_TEXT.hamelech.label, times: [txtT(YK_TEXT.hamelech.times, 'when המלך is said, which rides on the שחרית line')] } }),
     // Earliest first, each time under the name of its own reckoning: see reckonings.js.
-    line(YK_TEXT.krias.name,
-      twoReckonings(Z.sofZmanShmaMGA72(yk, settings), Z.sofZmanShmaGRA(yk, settings))
-        .map((r) => ({ ...tm(r.at), name: r.name })),
-      { calc: 'krias' }),
-    line(YK_TEXT.yizkor.label, [txt(YK_TEXT.yizkor.times)], { calc: 'yizkor' }),
-    line(YK_TEXT.mincha, [tm(neila - 110 * YK_MIN)], { calc: 'dayMincha' }),   // 1:50 before נעילה
+    line(YK_TEXT.krias.name, (() => {
+      const mga = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(yk, settings), 'the day measured from עלות 72 to צאת 72');
+      const gra = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(yk, settings), 'the day measured from sunrise to שקיעה');
+      return twoReckonings(mga.value, gra.value).map((r) => ({ ...tmT(r.at === mga.value ? mga : gra), name: r.name }));
+    })(), { calc: 'krias' }),
+    line(YK_TEXT.yizkor.label, [txtT(YK_TEXT.yizkor.times, 'announced at this time on the sheet')], { calc: 'yizkor' }),
+    line(YK_TEXT.mincha, [tmT(neilaT.minus(110, 'מנחה is an hour and fifty in front of נעילה'))], { calc: 'dayMincha' }),
     line(YK_TEXT.drashaBeforeNeila, [], { calc: 'drashaBeforeNeila' }),
-    line(YK_TEXT.neila, [tm(neila)], { calc: 'neila' }),
+    line(YK_TEXT.neila, [tmT(neilaT)], { calc: 'neila' }),
     // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
     // time מעריב.
-    line(YK_TEXT.maariv, [tm(motzei60), tm(ykShkia + 72 * YK_MIN, true)], { calc: 'motzeiMaariv' }),
+    line(YK_TEXT.maariv, [tmT(motzei60T), tmT(ykShkiaT().plus(72).underline(), true)], { calc: 'motzeiMaariv' }),
     line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times), { calc: 'maarivGimmel' }),
-    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txt(t)),
+    line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txtT(t, 'given two ways on the sheet, after מעריב or at this time')),
       { calc: 'kiddushLevana', sep: YK_AMP }),
   ];
 
