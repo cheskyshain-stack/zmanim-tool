@@ -14663,12 +14663,33 @@ function chartSpreads(state) {
   return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
 }
 
-/** The spread covering now: the one holding the same week the week view opens on, so the
- *  two never disagree about which Shabbos is "this" one. */
+/** The spread covering now.
+ *
+ *  A chart page owns from its own first week until the next page begins, which is the span
+ *  chartStretchSerials already gives the week view, and a span rather than a list of rows for
+ *  one reason: a Shabbos that is yom tov has no parsha and so no row on either chart, and the
+ *  summer chart is what is hanging on the wall through it.
+ *
+ *  So this asks every Shabbos of the year which week it is now, not just the ones that have a
+ *  row. Asked of the rows it was three weeks out: after שבת האזינו the next row there is is
+ *  שבת בראשית, so the winter chart went up on the congregation's page on מוצאי שבת שובה, while
+ *  the week card beside it was still showing סוכות. The shul asked for the chart to wait until
+ *  the Sunday of בראשית, which is the end of the Shabbos before it, and this is that: the last
+ *  page whose first week has already started.
+ *
+ *  Both views now read the turn the same way, off the same list of page starts, so neither can
+ *  be on a different chart from the other. */
 function spreadIndexForNow(spreads, state, settings) {
   if (!spreads.length) return 0;
-  const target = currentSerial(spreads.flatMap((s) => s.serials), settings, (s) => weekEndsMins(s, state, settings));
-  const found = spreads.findIndex((s) => s.serials.includes(target));
+  const all = spreads.flatMap((s) => s.serials);
+  /* Every Shabbos from the first charted one to the last. They are seven days apart, so
+     counting by seven off a Shabbos gives Shabbosos and nothing else. */
+  const everyWeek = [];
+  for (let s = Math.min(...all); s <= Math.max(...all); s += 7) everyWeek.push(s);
+  const target = currentSerial(everyWeek, settings, (s) => weekEndsMins(s, state, settings));
+  const starts = spreads.map((s) => Math.min(...s.serials));
+  let found = -1;
+  for (let n = 0; n < starts.length; n++) if (starts[n] <= target) found = n;
   return found === -1 ? 0 : found;
 }
 
