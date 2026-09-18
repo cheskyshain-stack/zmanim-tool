@@ -20,8 +20,9 @@ const server=http.createServer((req,res)=>{
  for(const dest of ['week','donate']) {
  await page.goto(origin+'/?count=off');
  await page.locator('.luach-menu a[href="/'+dest+'/"]').click();
- const motion=await page.locator('#main').evaluate(e=>e.getAnimations().length);
+ const motion=await page.locator('#main').evaluate(e=>e.getAnimations({subtree:true}).length);
  if(!motion)throw Error('Missing opening animation '+dest);
+ if(await page.locator('#main').evaluate(e=>e.getAnimations().length) || await page.locator('.luach-bar').evaluate(e=>e.getAnimations({subtree:true}).length))throw Error('Header must stay still');
  await page.waitForTimeout(420);
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
  if(new URL(page.url()).pathname!=='/'+dest+'/')throw Error('Wrong destination');
@@ -40,9 +41,10 @@ const server=http.createServer((req,res)=>{
  await page.screenshot({path:path.resolve(__dirname,'../../schedule-nav.png')});
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto(origin+'/?count=off');await page.locator('.luach-menu a[href="/week/"]').click();
- if(await page.locator('#main').evaluate(e=>e.getAnimations().length))throw Error('Reduced motion');
+ if(await page.locator('#main').evaluate(e=>e.getAnimations({subtree:true}).length))throw Error('Reduced motion');
  console.log('Both pages animate on phone and desktop; reduced motion respected.');
  } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+
 
 

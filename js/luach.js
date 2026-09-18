@@ -1062,8 +1062,9 @@ function wireNav(published) {
     // did not answer: on a long week list the new page opens halfway down itself.
     window.scrollTo(0, 0);
     if ((first === 'week' || first === 'donate') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      main.getAnimations().forEach(animation => animation.cancel());
-      main.animate([
+      const content = main.querySelector(first === 'week' ? '#week-host' : '.luach-give-page');
+      content?.getAnimations().forEach(animation => animation.cancel());
+      content?.animate([
         { opacity: 0.2, transform: 'translateY(18px)' },
         { opacity: 1, transform: 'translateY(0)' }
       ], { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
@@ -1135,6 +1136,7 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
 
 
