@@ -32,3 +32,22 @@ export function chartTimes(cell) {
       };
     });
 }
+
+/** The same, with each time carrying the chart's own trace for it.
+ *
+ *  The chart already worked these out and wrote down how (sheets/choref.js hands its traces
+ *  back beside its columns), so a Shabbos on a yom tov sheet says exactly what the board says
+ *  about the same minute. Working it out a second time here is the shape this project keeps
+ *  getting hurt by.
+ *
+ *  Paired by the printed minute rather than by position: a column that splits its times over
+ *  two lines or orders them differently would otherwise put one time's working under another,
+ *  and a wrong explanation is worse than none. Anything that does not pair is left without a
+ *  trace, which the calculations page says in as many words. */
+export function chartLine(cell, traces) {
+  const pool = [...(traces || [])];
+  return chartTimes(cell).map((t) => {
+    const i = pool.findIndex((tr) => tr && tr.plain() === t.text);
+    return { ...t, trace: i === -1 ? null : pool.splice(i, 1)[0] };
+  });
+}
