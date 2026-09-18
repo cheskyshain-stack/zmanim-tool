@@ -81,114 +81,20 @@ const isolateHebrew = (html) => html.replace(HEBREW_RUN, (run) => `<bdi>${run}</
 // formulas, and anything a person can change in Settings is filled in from Settings at
 // render time rather than written down here.
 
-const SHARED = {
-  B: {
-    plain: 'Motzei Shabbos מעריב. Two times: 60 minutes after שקיעה, then 72 minutes after it. The 72 is underlined, so it davens למטה.',
-    exact: 'צאת 60 and צאת 72, both measured from שקיעה at the shul\'s elevation, each rounded up to the whole minute, printed with a slash between them. The second is underlined.',
-  },
-  C: {
-    plain:
-      'Shabbos afternoon מנחה. It starts at 1:40 on daylight saving time and 1:20 on standard time. Then 5:30, 6:00 and 6:30, each printed only once שקיעה is late enough for it. Then two more worked from שקיעה: 45 minutes before it, and 30 minutes before it. Printed over two lines.',
-    exact:
-      'First 1:40 when DST is in force, otherwise 1:20. Then each of 5:30, 6:00 and 6:30 is kept only if 5:30pm, 6:00pm or 6:30pm respectively is at or before שקיעה minus one hour; the kept ones are underlined. Then the earlier of (שקיעה minus 45 minutes, rounded up) and 7:00, and the earlier of (שקיעה minus 30 minutes, rounded up) and 7:30, the second underlined. Rounded up rather than down, which is what the workbook does here and nowhere else. The list is split across two lines, the longer half second.',
-  },
-  D: {
-    plain:
-      'סוף זמן קריאת שמע, both opinions. The earlier of the two is the מגן אברהם, whose day runs from עלות; the later is the גר״א, whose day runs from sunrise.',
-    exact:
-      'סוף זמן שמע מ״א with the day measured from עלות 72 minutes to צאת 72 minutes, then סוף זמן שמע גר״א from sunrise to שקיעה, printed with a slash between them in that order.',
-  },
-  E: {
-    plain: 'שחרית. The same two times every week, 7:30 and 8:15, with 7:30 underlined for למטה. Nothing about it is worked out from the date.',
-    exact: 'The literal string 7:30 / 8:15, the 7:30 underlined, with no-break spaces around the slash so it can never wrap.',
-  },
-  H: {
-    plain: (settings) =>
-      `הדלקת נרות, with שקיעה printed underneath it. Candle lighting is ${settings.candleLightingMinutes} minutes before שקיעה, which is the offset set in Settings: change it there and every Friday on every chart moves with it.`,
-    exact:
-      'שקיעה at the shul\'s elevation, rounded down to the whole minute, is the second line. The first line is that time less the candle lighting offset from Settings.',
-  },
-};
-
-const KAYITZ_RULES = {
-  ...SHARED,
-  F: {
-    plain: 'Friday מעריב, 50 minutes after שקיעה. Between Pesach and Shavuos it is 55 minutes instead.',
-    exact:
-      'שקיעה on the Friday plus 50 minutes, rounded down, underlined. Inside the Sefirah window the offset is 55 rather than 50. That window is Hebrew day-of-year above 16 and below 65, measured on the Friday.',
-  },
-  G: {
-    plain:
-      'The מנחה that runs straight into מעריב, 15 minutes before שקיעה. Between Pesach and Shavuos a second מעריב is printed under it, half an hour after שקיעה.',
-    exact:
-      'שקיעה on the Friday less 15 minutes, rounded down. In the same Sefirah window as column מעריב, a second line reading מעריב followed by שקיעה plus 30 minutes, rounded down.',
-  },
-  I: {
-    plain:
-      'The פלג מנחה that davens בעזרת נשים, on the מגן אברהם\'s פלג with the day ending at צאת 72. Printed 15 minutes before the פלג, with the פלג itself under it. Only in the season when the early minyanim run.',
-    exact:
-      'פלג המנחה with the day running from עלות 16.1 degrees to צאת 72 minutes. The first line is that less 15 minutes, rounded up; the second is the word פלג and the פלג itself, rounded up. Blank outside the פלג window.',
-  },
-  J: {
-    plain: 'The same thing למטה, but on the פלג with the day ending at צאת 50 rather than 72, so it is a little earlier.',
-    exact:
-      'פלג המנחה with the day running from עלות 16.1 degrees to צאת 50 minutes. First line that less 15 minutes, rounded up and underlined; second line the פלג itself. Blank outside the פלג window.',
-  },
-  K: {
-    plain: 'The same again on the גר״א\'s פלג, which measures the day from sunrise to שקיעה.',
-    exact:
-      'פלג המנחה גר״א for the Friday. First line that less 15 minutes, rounded up; second line the פלג itself. Blank outside the פלג window.',
-  },
-  L: {
-    plain:
-      'The main ערב שבת מנחה. While the clocks are forward nothing is offered before 1:35, so the list is 1:35, 1:50, 2:15 and 3:00. On standard time it opens earlier, with 12:30, 1:00 and one around 1:15 in front of those. The early ones never come out before מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead.',
-    exact:
-      'Built from מנחה גדולה לחומרא, which is the later of מנחה גדולה and half an hour after חצות. On standard time only: the later of 12:30 and מנחה גדולה לחומרא, then 1:00, then, when מנחה גדולה לחומרא is before 1:20, the later of it and 1:15. Then, on any day, מנחה גדולה לחומרא if it is after 1:35, otherwise 1:35. Then the fixed 1:50, 2:15 and 3:00. Everything except the last three is underlined. Split across two lines, the longer half second. The three early ones are held to standard time because חורף opens at Sukkos while the clocks are still forward, and through those weeks מנחה גדולה לחומרא sits just under 1:20, which used to put a 1:15 in front of the 1:35.',
-  },
-};
-
-const CHOREF_RULES = {
-  ...SHARED,
-  F: {
-    plain: 'Friday מעריב, 50 minutes after שקיעה. No Sefirah exception here: in the winter season that stretch does not arise.',
-    exact: 'שקיעה on the Friday plus 50 minutes, rounded down, underlined.',
-  },
-  G: {
-    plain:
-      'The Friday מנחה. Through most of the winter it is the single time 15 minutes before שקיעה. Once the early minyanim start running, three פלג times are printed before it on the same line: the גר״א\'s פלג, then the מגן אברהם\'s to צאת 50, then to צאת 72, each 15 minutes early.',
-    exact:
-      'Outside the פלג window: שקיעה less 15 minutes, rounded down. Inside it, four times joined by slashes: פלג גר״א less 15, פלג with the day ending at צאת 50 less 15, פלג with the day ending at צאת 72 less 15, and שקיעה less 15 rounded down. The three פלג values are not rounded to the minute before the 15 is taken off.',
-  },
-  I: KAYITZ_RULES.L,
-};
-
-const WEEKDAY_RULES = {
-  B: {
-    plain:
-      'The weekday מעריב times, one row for the whole week. The regular list is 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, and 11:30 and 12:00 while BMG is out of session. Every one of them has to be at least 50 minutes after שקיעה on all five days, so as the days lengthen each is pushed later in 5 minute steps until it clears. A time pushed up to within a quarter of an hour of the next one stops being printed. All of them are למטה except 10:30, which is the main בית מדרש, and the 8:45. Two weeks are the exception: the days between יום כיפור and סוכות, and the days after סוכות, which take the schedules off the יום כיפור and סוכות sheets instead.',
-    exact:
-      'Sunday through Thursday of the week ending on this Shabbos. The binding שקיעה is the latest of the five, rounded up; a time must be at or after that plus 50 minutes. Each time steps forward by 5 minutes until it does. Then, walking from the last time backwards, a time that moved and now sits within 14 minutes of the next one still being kept is dropped. The 8:45 is exempt from that, being its own מנין rather than a duplicate; it is in the main בית מדרש up to 8:45, למטה from 8:50 to 9:15, and בעזרת נשים from 9:20. On the two yom tov weeks all of that is set aside: the week whose Sunday to Thursday run holds the last day between יום כיפור and סוכות takes the box off the יום כיפור sheet, and the week whose run holds the first day after שמחת תורה takes the block off the סוכות sheet, so the board and the sheet hung beside it cannot disagree.',
-  },
-  C: {
-    plain:
-      'The weekday מנחה times. The regular list is 12:45 and 1:15 on standard time only, then an early afternoon one, then 1:50, then 4:15 while BMG is in session, then 6:35, 7:30 and 8:00. The evening ones have to be at least 15 minutes before שקיעה on all five days, so they are pulled earlier in 5 minute steps as the days shorten, and one that lands within a quarter of an hour of the one before it stops being printed. Everything is למטה except 1:50, the main בית מדרש. Two weeks are the exception: the days between יום כיפור and סוכות, where the column carries the schedule off the יום כיפור sheet, and the days after סוכות, where it carries the "זמני תפילה אחר סוכות" block off the סוכות sheet. Both of those open on a מנחה held to מנחה גדולה.',
-    exact:
-      'Sunday through Thursday of the week ending on this Shabbos. 12:45 and 1:15 only when none of the five days is on DST. The early afternoon time is 1:35, or 1:40 if מנחה גדולה לחומרא is after 1:35 on any of the five days. 4:15 only in a BMG week. The binding שקיעה is the earliest of the five, rounded down; an evening time must be at or before that less 15 minutes, and steps back by 5 minutes until it is. A time that moved and sits within 14 minutes of the one before it is dropped. On the week whose Sunday-to-Thursday run holds the last day between יום כיפור and סוכות, all of the above is set aside and the schedule from the יום כיפור sheet is printed. Its list opens at 1:15, or at מנחה גדולה לחומרא where that is later, taken from the latest of the run\'s own days; and if that leaves under 15 minutes to the 1:35 behind it, the opening מנין is not printed at all. The same on the week whose run holds the first day after שמחת תורה, which takes the block off the סוכות sheet: in an ordinary year that is the week of בראשית, and in a year where שמחת תורה is the Friday it is the week of נח, the בראשית week\'s own days still being יום טוב.',
-  },
-  E: {
-    plain:
-      'שחרית on the weekday chart is not worked out at all. It is one merged cell down the whole chart, holding the schedule the shul davens every morning, so the daily list is part of the program rather than computed.',
-    exact:
-      'Not calculated. It is the everyday שחרית the program carries, printed as written. A week carrying a fast or a Rosh Chodesh prints the second schedule under it as well.',
-  },
-};
+/* The charts' written rules are gone. Every column on all three now carries its own working
+   (zmanim/trace.js), read off the same pass that built the board, so a hand written
+   description beside it would be the one thing this page exists to do away with: a fact
+   stated twice and free to drift from the code with nothing to catch it. The posters below
+   still have theirs and are being moved over the same way.
+   Removed once every chart cell was measured to be opening on its steps rather than falling
+   back to prose, which is the check that makes deleting them safe. */
 
 const CHARTS = [
-  { key: 'kayitz', name: 'שבת קיץ', columns: KAYITZ_COLUMNS, rules: KAYITZ_RULES, build: buildKayitzRow,
+  { key: 'kayitz', name: 'שבת קיץ', columns: KAYITZ_COLUMNS, build: buildKayitzRow,
     note: 'Pesach to Sukkos. The early פלג minyanim run for part of it, which is why it has four מנחה columns the winter chart does not.' },
-  { key: 'choref', name: 'שבת חורף', columns: CHOREF_COLUMNS, rules: CHOREF_RULES, build: buildChorefRow,
+  { key: 'choref', name: 'שבת חורף', columns: CHOREF_COLUMNS, build: buildChorefRow,
     note: 'Sukkos to Pesach. A page holding a week past the spring clock change prints as a full שבת קיץ chart instead, so the last page of a winter season can be a summer one.' },
-  { key: 'weekday', name: 'Weekday', columns: WEEKDAY_COLUMNS, rules: WEEKDAY_RULES, build: buildWeekdayRow,
+  { key: 'weekday', name: 'Weekday', columns: WEEKDAY_COLUMNS, build: buildWeekdayRow,
     note: 'One row per week, covering Sunday through Thursday. Every time on it has to work for all five days at once, which is what makes it the only chart whose times move themselves.' },
 ];
 
@@ -918,7 +824,6 @@ function chartHtml(chart, state, settings) {
 
   const cells = cols.map(({ key, header, parsha }) => {
     const id = `${chart.key}:${key || 'parsha'}`;
-    const rule = chart.rules[key];
     const facts = parsha && week ? parshaFacts(week, settings) : null;
     const printed = parsha
       ? (week ? weekOfLabel(week.parsha, settings.english) + (week.specialParsha ? `\n${week.specialParsha}` : '') : '')
@@ -928,7 +833,6 @@ function chartHtml(chart, state, settings) {
       times: row.traces?.[key] || null,
       note: row.notes?.[key] || null,
       dropped: row.dropped?.[key] || null,
-      fallback: rule ? text(rule.plain, settings) : null,
     });
     const traced = facts ? facts.length > 0 : (row.traces?.[key] || []).length > 0;
     return `<td><button type="button" class="calc-cell${traced ? ' is-traced' : ''}" data-cell="${calcEsc(id)}">
