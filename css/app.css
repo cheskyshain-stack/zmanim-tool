@@ -4892,9 +4892,10 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 }
 
 .reader-schedule-links { display:flex; gap:10px; margin:0 0 12px; }
-.reader-schedule-links a { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #bca56d; border-radius:14px; background:#15283f; color:#fff; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 3px 8px rgb(21 40 63 / 14%); }
-.reader-schedule-links a:hover { background:#253e5b; }
-.reader-schedule-links a:active { background:#0d1b2c; }
+.reader-schedule-links a { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #c9b681; border-radius:14px; background:#f0e7d0; color:#15283f; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 2px 5px rgb(21 40 63 / 5%); }
+.reader-schedule-links a:hover { background:#e9ddbd; }
+.reader-schedule-links a:active { background:#e2d3ad; }
 .reader-schedule-links a:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
-.reader-schedule-links span { font-size:22px; color:#e1ca90; line-height:1; }
+.reader-schedule-links span { font-size:22px; color:#826b37; line-height:1; }
+
 
