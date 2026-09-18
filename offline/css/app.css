@@ -4721,7 +4721,7 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-agenda-row .reader-time { display:grid; grid-template-columns:4.25ch .65em max-content; column-gap:1px; justify-content:start; align-items:baseline; font-variant-numeric:tabular-nums; }
 .reader-digits { text-align:left; }
 .reader-room-mark { font-size:.75em; align-self:start; line-height:1.5; }
-.reader-time > small { grid-column:1 / -1; white-space:normal; }
+.reader-time > small:not(.reader-reckoning) { grid-column:1 / -1; white-space:normal; }
 .reader-next-time { padding:0; outline:none; box-shadow:0 0 0 3px #f5eedc,0 0 0 4px #c4af73; }
 @media(max-width:360px) {
   /* 108px of spare at 320px, so a lower ceiling: past this the name is what gives, not the
@@ -4759,21 +4759,21 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-digits { white-space:nowrap; }
 .reader-room-mark { position:static; vertical-align:super; font-size:.65em; line-height:0; margin-left:1px; }
 .reader-room-mark:empty { display:none; }
-.reader-time > small { flex-basis:100%; }
+.reader-time > small:not(.reader-reckoning) { flex-basis:100%; }
 /* The reckoning over its own time: a full-basis flex item written first in the markup, so it
    takes the line above the digits rather than the one below. Set right to left because it is
    Hebrew inside a row that is laid out left to right for the numbers' sake. */
-/* The reckoning over its own time, centred on it.
-   A grid rather than the wrapping flex the other times use, because a flex box at
-   width:max-content is measured as though it never wrapped: the name and the digits were
-   added up side by side, so the box came out wider than the digits and centring in it put
-   the name 12px to the right of the time it names. Measured. One max-content column is the
-   width of the wider of the two, which is the digits, and justify-items centres both in it.
-   Written first in the markup, so it takes the row above. */
+/* The reckoning to the right of its own time, centred on it, and the two times one to a line:
+   the same shape the פלג under a מנחה takes, which is what the shul asked for. Stacking them
+   is what lets each name sit beside its own number instead of over it, so nothing has to be
+   read across a gap to pair a name with a time.
+   The name is a <small> like the room note and "Just started", but it does not take a line of
+   its own the way those do, so it is the one excluded from the rule that gives them one. */
+.reader-agenda-row .reader-times:has(.reader-reckoning) { grid-template-columns:max-content; row-gap:2px; }
 .reader-agenda-row .reader-time:has(.reader-reckoning) {
-  display:grid; grid-template-columns:max-content; justify-items:center; width:max-content; gap:0;
+  display:inline-flex; align-items:center; gap:5px; width:max-content;
 }
-.reader-reckoning { direction:rtl; text-align:center; line-height:1.1; }
+.reader-reckoning { direction:rtl; line-height:1.1; }
 .reader-next-time { box-shadow:0 0 0 2px #f5eedc,0 0 0 3px #c4af73; }
 
 /* Size time columns to their contents instead of stretching them across the row. */

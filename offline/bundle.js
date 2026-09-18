@@ -17921,12 +17921,13 @@ function readerTimeHtml(e) {
   /* No am or pm beside the digits. The shul asked for it off: the boards print a twelve hour
      clock with no meridiem on it (see format.js), and this page is the same times said on a
      phone. The section a time sits under is what says which half of the day it is. */
-  /* The reckoning a זמן is given on, set small over its own time. It used to be the second
-     line of the column heading and so part of the label, which on a phone made "ס״ז קר״ש
-     גר״א / מ״א" wrap to three lines beside two numbers. Over the time it belongs to is where
-     the printed sheets put it, and it cannot be read against the wrong one. */
+  /* The reckoning a זמן is given on, small and to the right of its own time. It used to be
+     the second line of the column heading and so part of the label, which on a phone made
+     "ס״ז קר״ש גר״א / מ״א" wrap to three lines beside two numbers. Beside the time it belongs
+     to it cannot be read against the wrong one, and the shul asked for it set the way the פלג
+     under a מנחה is: the times one to a line, each name on its right. */
   const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${reckoning}<span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${room}${e.started?'<small>Just started</small>':''}</span>`;
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 /** The פלג under its own מנחה: the second line of one cell of the board, set small under the
