@@ -44,6 +44,20 @@ import { UL_START, UL_END } from './format.js';
 /** The closing line, and the only words here that are not read off the board. */
 const EREV_SIGN_OFF = 'Have a great Shabbos!';
 
+/** Which דרשה a שבת carries, in the English the message uses.
+ *
+ *  Keyed on both spellings a week's special parsha can be stored under, the two the board's
+ *  own DRASHA_NAMES holds (sheets/common.js). Written out here rather than paired off that
+ *  list by position: a list of four strings that happens to run Hebrew, English, Hebrew,
+ *  English is not something a reader of either file can see, and a fifth entry added there
+ *  would quietly hand the wrong name to this one. A week this does not know gets no דרשה
+ *  line at all, which is the right way for it to fail: the alternative sent a nameless
+ *  "Shabbos Drasha" on a week whose דרשה was ט באב's. */
+const EREV_DRASHA_NAMES = {
+  'שובה': 'Shuva', Shuva: 'Shuva',
+  'הגדול': 'Hagadol', Hagadol: 'Hagadol',
+};
+
 
 /** A cell as it is stored is plain text carrying the underline sentinels, but an override
  *  typed by hand is real HTML. Both are flattened to the same thing here: text, newlines,
@@ -121,6 +135,35 @@ export function erevWhereMark(time) {
   return time?.underlined ? 'd' : 'm';
 }
 
+/** The דרשה the board prints on a שבת שובה or a שבת הגדול: the Shabbos afternoon one, which
+ *  shabbosMinchaParts in sheets/common.js writes into the Shabbos מנחה column.
+ *
+ *  Read off the board rather than worked out again, like every other time in this message.
+ *  But off **that** column and nothing else, because it is not the only דרשה the board knows:
+ *  on שבת חזון the מעריב column carries the ט באב evening, "דרשה 8:45 / זמן 72 9:22 / מעריב
+ *  9:35", and asking the whole row for the word found it and announced a 8:45 "Shabbos Drasha"
+ *  on the Friday before ט באב. Measured over five years, which is how it was caught. That
+ *  evening is a different message the shul has not sent one of, so nothing here invents it.
+ *
+ *  The column is the one whose heading is מנחה and nothing else: every other מנחה column on
+ *  these boards says something more in its heading, which erevKindOf is already the list of.
+ *
+ *  No room letter after the time. d and m say which בית מדרש a מנין is in and a דרשה is not a
+ *  מנין, which is also why the board leaves the underline off it while the מנחה above it
+ *  carries one. The fast messages leave שקיעה bare for the same reason. */
+function erevDrasha(columns, row) {
+  for (const col of columns) {
+    const header = String(col.header ?? '').replace(/\s+/g, ' ');
+    if (erevKindOf(col.header) || !header.includes('מנחה')) continue;
+    for (const line of erevPlain(row[col.key]).split('\n')) {
+      if (!line.includes('דרשה')) continue;
+      const at = /\d{1,2}:\d{2}/.exec(line);
+      if (at) return at[0];
+    }
+  }
+  return null;
+}
+
 /** d, m or en: where this מנין davens, for a column whose heading already says the room. */
 function erevWhere(kind, time) {
   if (kind === 'ezrasNashim') return 'en';
@@ -134,9 +177,13 @@ function erevWhere(kind, time) {
  *  @param parshaEnglish - "Ki Savo". Left to the caller because looking it up needs the
  *    tables, which are loaded asynchronously, and this stays a plain function.
  *
+ *  @param specialParsha - the week's own, "שובה" or "הגדול" where it has one, which is the
+ *    only thing here that is not in the row. The דרשה's time is read off the board like
+ *    everything else; this says which דרשה it is, which the board does not spell in English.
+ *
  *  The order is the order the message is written in, which is the order the evening
  *  happens in, and that is the printed order of the columns reversed. */
-export function erevShabbosText(columns, row, parshaEnglish) {
+export function erevShabbosText(columns, row, parshaEnglish, specialParsha = '') {
   const lines = [];
   lines.push(`Erev P' ${parshaEnglish}`);
 
@@ -173,6 +220,17 @@ export function erevShabbosText(columns, row, parshaEnglish) {
   }
 
   lines.push(EREV_SIGN_OFF);
+
+  /* After the sign-off, which is where the shul's own sent message puts it. Every other line
+     of this message is part of the Friday evening and the דרשה is the Shabbos afternoon, so
+     it reads as the note it is rather than as one more מנין in the run. Written the way they
+     sent it: "Shabbos Shuva Drasha 5:15". */
+  /* Only on a week this file can name, which is the second half of the guard above: a דרשה
+     it cannot name is one it does not know the shape of, and "Shabbos Drasha 8:45" with no
+     name on it was exactly the wrong answer rather than a cautious one. */
+  const named = EREV_DRASHA_NAMES[String(specialParsha ?? '').trim()];
+  const drasha = named ? erevDrasha(columns, row) : null;
+  if (drasha) lines.push(`Shabbos ${named} Drasha ${drasha}`);
   return lines.join('\n');
 }
 

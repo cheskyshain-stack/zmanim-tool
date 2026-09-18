@@ -68,7 +68,7 @@ function txErevShabbos(state, settings, tables, today) {
     serial: found.week.serial - 1,
     name: 'Erev Shabbos',
     when: english || '',
-    text: erevShabbosText(columns, row, english),
+    text: erevShabbosText(columns, row, english, found.week.specialParsha),
   };
 }
 
@@ -648,7 +648,7 @@ export function renderTexts(container, state, settings, tables) {
         serial: serial - 1,
         name: 'Erev Shabbos',
         when: english || '',
-        text: erevShabbosText(columns, row, english),
+        text: erevShabbosText(columns, row, english, found.week.specialParsha),
       });
     }
   } else {

@@ -1695,7 +1695,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     if (!s) throw new Error('this week has no שבת row');
     const { columns, row } = rowFor(w, s, state, settings);
     const tables = await loadTables();
-    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames));
+    return erevShabbosText(columns, row, erevParshaEnglish(w.parsha, tables.parshaNames), w.specialParsha);
   });
 
   // The same PDF as the wall chart offers, for the same reason: an iPhone will not print
