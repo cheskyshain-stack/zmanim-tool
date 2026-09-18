@@ -152,9 +152,14 @@ function make(value, steps, flags) {
       return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
     },
 
-    /** A short line naming this time, for use inside another time's steps. */
+    /** A short line naming this time, for use inside another time's steps.
+     *
+     *  The name and its note come too, not just the number. "Take the later of this and
+     *  1:22" leaves the reader no way to know that 1:22 is מנחה גדולה and therefore moves
+     *  with חצות through the season, which is exactly the question the shul asked. */
     describe() {
-      return { text: formatTime(value), steps };
+      const base = steps[0] || {};
+      return { text: formatTime(value), name: base.name, note: base.note, steps };
     },
   });
 }

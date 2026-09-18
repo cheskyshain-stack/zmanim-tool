@@ -1879,9 +1879,14 @@ function make(value, steps, flags) {
       return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
     },
 
-    /** A short line naming this time, for use inside another time's steps. */
+    /** A short line naming this time, for use inside another time's steps.
+     *
+     *  The name and its note come too, not just the number. "Take the later of this and
+     *  1:22" leaves the reader no way to know that 1:22 is מנחה גדולה and therefore moves
+     *  with חצות through the season, which is exactly the question the shul asked. */
     describe() {
-      return { text: formatTime(value), steps };
+      const base = steps[0] || {};
+      return { text: formatTime(value), name: base.name, note: base.note, steps };
     },
   });
 }
@@ -2077,8 +2082,10 @@ function inPlagWindow(serial, settings) {
 function fridayMainMinchaParts(fridayDate, settings) {
   const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה לחומרא', mglVal, 'the later of מנחה גדולה and half an hour after חצות');
-  const notBefore = 'never earlier than מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead';
+  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
+    'the later of מנחה גדולה, which is half a proportional hour after חצות, and חצות plus thirty clock minutes. Both move with חצות, so this walks through the season');
+  /* Short, because the מנחה גדולה it is weighed against now explains itself. */
+  const notBefore = 'a מנחה is never offered before it';
 
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
@@ -2087,7 +2094,12 @@ function fridayMainMinchaParts(fridayDate, settings) {
     onStandardTime ? mgl().laterOf(clockTime(12, 30), notBefore).underline() : null,
     onStandardTime ? clockTime(1, 0).underline() : null,
     onStandardTime && mglVal < T(13, 20) ? mgl().laterOf(clockTime(13, 15), notBefore).underline() : null,
-    (mglVal > T(13, 35) ? mgl() : clockTime(1, 35)).underline(),
+    /* Written as a comparison rather than as a branch, so the page can say what this time
+       really is. Branched, the trace only ever saw the side that won and called a 1:35 a
+       fixed time, which is what the shul caught: it is a floor, and on the weeks מנחה
+       גדולה is past it, מנחה גדולה is what prints. Same answer either way: the fallback
+       used to be written as 1:35 in the morning, which formats identically. */
+    clockTime(13, 35, 'the earliest the main ערב שבת מנחה is ever offered').laterOf(mgl(), notBefore).underline(),
     fixedTime('1:50'),
     fixedTime('2:15'),
     fixedTime('3:00'),
@@ -6307,8 +6319,11 @@ function minchaParts(week, settings) {
   const slots = [
     standardTime ? { mins: HM(12, 45), place: LMATA } : null,
     standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
+       reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? '1:40 rather than 1:35, מנחה גדולה being past 1:35 somewhere in the week' : 'the early afternoon מנחה' },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     bmg ? { mins: HM(16, 15), place: LMATA, label: 'runs while BMG is in session' } : null,
     { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
@@ -6582,7 +6597,11 @@ function stepHtml(s) {
     case 'base':
       return line(`Starts from <strong>${withHebrew(s.name)}</strong>${s.note ? `, ${withHebrew(s.note)}` : ''}`);
     case 'fixed':
-      return line(`<strong>A fixed time.</strong> Nothing about it is worked out${s.label ? `: ${withHebrew(s.label)}` : ''}`);
+      /* "Nothing about it is worked out" was the old wording and the shul said it reads
+         oddly, which it does: it says what the time is not. This says what it is. */
+      return line(s.label
+        ? `<strong>Set by the shul:</strong> ${withHebrew(s.label)}`
+        : '<strong>Set by the shul</strong>, not worked out from the sun');
     case 'offset':
       return line(`${s.minutes < 0 ? 'Take off' : 'Add'} <strong>${minutes(s.minutes)}</strong>`);
     case 'round': {
@@ -6592,7 +6611,14 @@ function stepHtml(s) {
     }
     case 'pick': {
       const took = s.took === 'other' ? 'that one wins' : 'this one wins';
-      return line(`Take the <strong>${s.how}</strong> of this and <strong>${cellEsc(s.against.text)}</strong>, so ${took}`);
+      const a = s.against || {};
+      /* Named, not just numbered. A reader who sees "the later of this and 1:22" cannot tell
+         that 1:22 is מנחה גדולה and so walks through the season with חצות. */
+      const other = a.name
+        ? `<strong>${withHebrew(a.name)}</strong> (${cellEsc(a.text)})`
+        : `<strong>${cellEsc(a.text)}</strong>`;
+      const what = a.note ? `<span class="calc-because">${withHebrew(a.note)}</span>` : '';
+      return line(`Take the <strong>${s.how}</strong> of this and ${other}, so ${took}${what ? `. ${what}` : ''}`);
     }
     case 'condition':
       return line(s.held

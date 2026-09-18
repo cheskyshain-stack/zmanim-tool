@@ -51,8 +51,10 @@ export function inPlagWindow(serial, settings) {
 export function fridayMainMinchaParts(fridayDate, settings) {
   const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה לחומרא', mglVal, 'the later of מנחה גדולה and half an hour after חצות');
-  const notBefore = 'never earlier than מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead';
+  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
+    'the later of מנחה גדולה, which is half a proportional hour after חצות, and חצות plus thirty clock minutes. Both move with חצות, so this walks through the season');
+  /* Short, because the מנחה גדולה it is weighed against now explains itself. */
+  const notBefore = 'a מנחה is never offered before it';
 
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
@@ -61,7 +63,12 @@ export function fridayMainMinchaParts(fridayDate, settings) {
     onStandardTime ? mgl().laterOf(clockTime(12, 30), notBefore).underline() : null,
     onStandardTime ? clockTime(1, 0).underline() : null,
     onStandardTime && mglVal < T(13, 20) ? mgl().laterOf(clockTime(13, 15), notBefore).underline() : null,
-    (mglVal > T(13, 35) ? mgl() : clockTime(1, 35)).underline(),
+    /* Written as a comparison rather than as a branch, so the page can say what this time
+       really is. Branched, the trace only ever saw the side that won and called a 1:35 a
+       fixed time, which is what the shul caught: it is a floor, and on the weeks מנחה
+       גדולה is past it, מנחה גדולה is what prints. Same answer either way: the fallback
+       used to be written as 1:35 in the morning, which formats identically. */
+    clockTime(13, 35, 'the earliest the main ערב שבת מנחה is ever offered').laterOf(mgl(), notBefore).underline(),
     fixedTime('1:50'),
     fixedTime('2:15'),
     fixedTime('3:00'),

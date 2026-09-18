@@ -36,7 +36,11 @@ function stepHtml(s) {
     case 'base':
       return line(`Starts from <strong>${withHebrew(s.name)}</strong>${s.note ? `, ${withHebrew(s.note)}` : ''}`);
     case 'fixed':
-      return line(`<strong>A fixed time.</strong> Nothing about it is worked out${s.label ? `: ${withHebrew(s.label)}` : ''}`);
+      /* "Nothing about it is worked out" was the old wording and the shul said it reads
+         oddly, which it does: it says what the time is not. This says what it is. */
+      return line(s.label
+        ? `<strong>Set by the shul:</strong> ${withHebrew(s.label)}`
+        : '<strong>Set by the shul</strong>, not worked out from the sun');
     case 'offset':
       return line(`${s.minutes < 0 ? 'Take off' : 'Add'} <strong>${minutes(s.minutes)}</strong>`);
     case 'round': {
@@ -46,7 +50,14 @@ function stepHtml(s) {
     }
     case 'pick': {
       const took = s.took === 'other' ? 'that one wins' : 'this one wins';
-      return line(`Take the <strong>${s.how}</strong> of this and <strong>${cellEsc(s.against.text)}</strong>, so ${took}`);
+      const a = s.against || {};
+      /* Named, not just numbered. A reader who sees "the later of this and 1:22" cannot tell
+         that 1:22 is מנחה גדולה and so walks through the season with חצות. */
+      const other = a.name
+        ? `<strong>${withHebrew(a.name)}</strong> (${cellEsc(a.text)})`
+        : `<strong>${cellEsc(a.text)}</strong>`;
+      const what = a.note ? `<span class="calc-because">${withHebrew(a.note)}</span>` : '';
+      return line(`Take the <strong>${s.how}</strong> of this and ${other}, so ${took}${what ? `. ${what}` : ''}`);
     }
     case 'condition':
       return line(s.held

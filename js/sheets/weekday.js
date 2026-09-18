@@ -159,8 +159,11 @@ function minchaParts(week, settings) {
   const slots = [
     standardTime ? { mins: HM(12, 45), place: LMATA } : null,
     standardTime ? { mins: HM(13, 15), place: LMATA } : null,
+    /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
+       reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? '1:40 rather than 1:35, מנחה גדולה being past 1:35 somewhere in the week' : 'the early afternoon מנחה' },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     bmg ? { mins: HM(16, 15), place: LMATA, label: 'runs while BMG is in session' } : null,
     { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
