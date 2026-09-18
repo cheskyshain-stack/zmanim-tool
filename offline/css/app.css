@@ -1404,12 +1404,23 @@ body.is-luach .week-cards { align-items: center; }
 }
 .week-pair .week-card > .page-header, .week-pair .week-card > .week-foot { display: none; }
 
-/* The band of times, 77% of the column and the same in both, rather than filling it.
+/* The band of times, the same fraction in both columns, rather than filling them.
 
-   94% rather than the 77% a card uses. A card's block is 5.6in inside 7.3in of paper; a
-   column here is only 3.7in wide to begin with, so the same fraction again would squeeze
-   the longer labels onto two lines for no reason. Measured at 88%, ס״ז קר״ש גר״א / מ״א
-   still broke across two lines; at 94% it does not.
+   88%, and it used to be 94%. A card's block is 5.6in inside 7.3in of paper; a column here
+   is only 3.7in wide to begin with, so the 77% a card uses would be far too tight. But 94%
+   held the times against one edge of the column and the name against the other with the
+   middle of the row empty, and the shul asked for the two brought closer.
+
+   88% is the narrowest that is actually safe, measured rather than chosen. The row is a
+   grid of two 47% cells, so a long name overruns its cell and closes on the times beside
+   it without the cell's own box changing at all: measuring the boxes says there is room at
+   80% when the words are already touching. Measured on the ink instead, with a range over
+   each cell's contents, across thirty weeks at 412px, 820px and 1400px: 94% leaves 29px
+   between the two at the tightest, 88% leaves 20px, 86% leaves 11.8px, 84% is down to
+   3.6px, and **82% collides**, eleven rows of פרשת חיי שרה with the name written through
+   the times. 88% keeps 8.3px at its very tightest, which is on a phone where the whole
+   sheet is zoomed down, and it costs nothing in type size: the fitting came out at the
+   same scale anywhere between 94% and 64%.
 
    A plain percentage is all it takes, and that is worth spelling out because two attempts
    at dividing it by the fitting scale got it wrong, one of them putting a 5.33in block in
@@ -1420,7 +1431,7 @@ body.is-luach .week-cards { align-items: center; }
    where before they were 3.88in and 4.86in, an inch apart on a sheet whose header, title
    and address are all centred. max-width goes, or the card's 5.6in would cap one of
    them instead. */
-.week-pair .week-lines-inner { width: 94%; max-width: none; }
+.week-pair .week-lines-inner { width: 88%; max-width: none; }
 /* A row keeps its name and its times at the two outer edges and leaves the middle fifth
    of itself empty, which is right on a card 5.6in wide and wasteful in a column of 3.5in.
    The two cells take more of the row here, so the longer names have somewhere to go: at

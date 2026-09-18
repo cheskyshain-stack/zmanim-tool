@@ -17859,27 +17859,150 @@ function fitLinesToPage(container) {
  *  from one ratio and trusted.
  *
  *  A halving search: bigger type in a narrower measure is always taller on the paper, so
- *  there is one crossing point to find and nine tries land within a thousandth of it. */
+ *  there is one crossing point to find and the tries close on it.
+ *
+ *  **The search may grow a column, not only shrink it.** It ran between 0.5 and 1, so 1 was
+ *  a ceiling rather than the natural size, and a short week could only creep up to 0.999 and
+ *  stop. Measured on פרשת מקץ: the שבת column's nine rows ended 140px above the foot of a
+ *  461px column, **30% of it blank**, with the scale sitting against that ceiling. The shul
+ *  said the combined page does not fill the paper and that is what they were looking at.
+ *  The ceiling is now growCapFor, the same cap a separate page grows to.
+ *
+ *  Only one of the two columns ever showed it, which is why it survived. The weekday block
+ *  is a flex column and stretches to its box, so its rows spread out and it looks full at
+ *  any scale; the שבת block is block layout and stacks from the top, so whatever it does not
+ *  use is white space under the last row. Long weeks hid it too: at seventeen rows the שבת
+ *  list has to shrink to fit and fills the column on its way down. It is the short winter
+ *  weeks that wanted to grow.
+ *
+ *  **The test stays <= room, with no margin under it.** A hair of margin is what
+ *  fitLinesToPage uses and it is wrong here: this block stretches, so scrollHeight reports
+ *  the box height rather than the content's, the product is exactly room across the whole
+ *  range where the content is shorter than the box, and room * 0.98 is therefore false at
+ *  every scale. Tried, measured, and it drove the weekday column to the floor of the search.
+ *
+ *  The measure stays inner.scrollHeight * mid rather than getBoundingClientRect, so both
+ *  sides of the comparison are in the block's own space. That is what makes it immune to the
+ *  sheet's own zoom: this sheet is 8.5in across and fitSheetToWindow zooms the whole of it to
+ *  the window, and a measure that saw that zoom fitted the same sheet at 1.60 in a 412px
+ *  window and 0.70 in a 1280px one.
+ *
+ *  **breakAtLineEnds runs inside the search, not after it.** It re-decides where a row's
+ *  times turn, and turning one more time onto a second line makes the block taller than
+ *  whatever was just measured, so running it afterwards measures one thing and draws
+ *  another. At the old ceiling the type was small enough that this only ever cost a few
+ *  pixels on the longest week; asking for 1.44 it put up to 52px of a שבת column past the
+ *  foot of it, and only in a narrow window, because the breaking reads painted boxes and
+ *  those carry the sheet's zoom. Called on each try, every measurement is of the page as it
+ *  will really be drawn. It re-reads its own breaks back into separators before deciding
+ *  again, so calling it repeatedly settles rather than accumulating. */
 function fitPairColumns(sheet) {
+  /* Each column is sized on its own first, and then **both are set to the smaller of the two
+     answers**, so the two lists are in one size across the sheet.
+
+     Asked for by the shul, looking at the first fix: fitted freely the two columns land
+     wherever their own content puts them, and on פרשת וישב that was 1.404 for שבת beside
+     1.796 for the weekday, which reads as two different sheets pushed together rather than
+     one page. The smaller of the two is a scale each column has already been measured to fit
+     inside, so sharing it cannot make anything overflow, and it is the only version of this
+     that cannot: holding both to the larger would push the tighter column off its page.
+
+     What it costs is air. The weekday block's rows flex-grow, so at less than its own answer
+     it does not shrink, it spreads: the same three groups with more white between them. That
+     is the trade, and the shul asked for matching type over packed columns. If the spread
+     ever reads as too much, the lever is to let the larger column keep some fraction more
+     than the smaller rather than to set the two free again. */
+  const columns = [];
   sheet.querySelectorAll('.week-card').forEach((card) => {
     const box = card.querySelector('.week-lines');
     const inner = box?.firstElementChild;
     if (!inner) return;
     card.style.removeProperty('--fit-width');
-    const room = box.clientHeight;
-    if (!room) return;
+    /* **How full the column is, measured off the rows rather than off the block.**
+
+       scrollHeight was the wrong thing to ask, and it is what let the ceiling hide for so
+       long. The weekday block is a flex column and stretches to its box, so while the
+       content is shorter than the box scrollHeight reports the box's height, not the
+       content's: the product is then exactly room at every scale across that whole range,
+       and a test of "is it under room" is an equality that can never fail. There is no
+       crossing for a halving search to find, so it runs to the ceiling and stops there.
+       Measured on פרשת חיי שרה in a 412px window: a weekday column settled at 1.798 asking
+       669px of a 521px box, with 52px of it hanging past the foot.
+
+       The rows know where they really end, so they are what is asked. Both numbers are
+       painted boxes, which means the sheet's own zoom is on both sides of the comparison
+       and cancels: this sheet is 8.5in across and fitSheetToWindow scales the whole of it
+       to the window, and a ratio is the one form of this measurement that comes out the
+       same in a 412px window and a 1280px one. Taking one side painted and the other from
+       clientHeight is the mistake that fitted the same sheet at 1.60 and at 0.70.
+
+       breakAtLineEnds is inside this rather than after the search, because it re-decides
+       where a row's times turn from the boxes they paint, so the height at a scale is not
+       settled until it has run. It reads its own breaks back into separators first, so
+       calling it on every try settles rather than accumulates. */
+    const overflow = (scale) => {
+      card.style.setProperty('--fit-scale', scale.toFixed(3));
+      breakAtLineEnds(card);
+      const rows = inner.querySelectorAll('.week-line');
+      if (!rows.length) return 0;
+      const top = inner.getBoundingClientRect().top;
+      const bottom = rows[rows.length - 1].getBoundingClientRect().bottom;
+      const room = box.getBoundingClientRect().height;
+      if (!room) return 0;
+      /* Half a pixel of tolerance, and **no fraction taken off room**. The margin a card
+         uses is wrong here and collapsed the weekday column to a third of its size. Its
+         rows flex-grow, so they take up exactly the box at every scale until the content
+         genuinely needs more: measured on פרשת וישב, the rows filled 181.6px of a 181.6px
+         box from 0.4 all the way to 1.4, and only at 1.8 did they ask for 214.6. Equality
+         is the ordinary state of this column and it means the column fits. Against
+         room * 0.99 it read as overflowing at every scale, the search found nothing that
+         passed, and it walked down from its floor to 0.358.
+
+         Nothing is lost by dropping the margin, because the fitting is run again with the
+         sheet's zoom applied and so measures the page as it is really drawn. */
+      return (bottom - top) - room - 0.5;
+    };
+    /* The search may grow a column, not only shrink it, and that is the whole of the fix.
+       It ran between 0.5 and 1, so 1 was a ceiling rather than the natural size, and a
+       short week could only creep to 0.999 and stop. Measured on פרשת מקץ: the שבת
+       column's nine rows ended 140px above the foot of a 461px column, 30% of it blank.
+       The shul said the combined page does not fill the paper, and that is what they were
+       looking at. The ceiling is growCapFor now, the same cap a separate page grows to.
+
+       Only one column ever showed it, which is why it lasted. The weekday block stretches,
+       so its rows spread out and it looks full whatever the scale; the שבת block is block
+       layout and stacks from the top, so what it does not use is white under the last row.
+       Long weeks hid it too: at seventeen rows the שבת list has to shrink to fit and fills
+       the column on its way down. It is the short winter weeks that wanted to grow.
+
+       Twelve tries rather than nine, the range being wider: within a thousandth of the
+       crossing whether the cap is 1.6 or 2.6. */
     let fits = 0.5;
-    let tooBig = 1;
-    for (let i = 0; i < 9; i++) {
+    let tooBig = growCapFor(card);
+    for (let i = 0; i < 12; i++) {
       const mid = (fits + tooBig) / 2;
-      card.style.setProperty('--fit-scale', mid.toFixed(3));
-      // scrollHeight is in the block's own space, which zoom then scales onto the paper.
-      if (inner.scrollHeight * mid <= room) fits = mid;
+      if (overflow(mid) <= 0) fits = mid;
       else tooBig = mid;
     }
-    card.style.setProperty('--fit-scale', fits.toFixed(3));
-    breakAtLineEnds(card);
+    // The answer is drawn and then checked, not trusted: re-breaking at the winning scale
+    // can turn one more time onto a second line, and a column that overflows its box is
+    // clipped rather than shrunk, which takes a row off the paper silently.
+    let scale = fits;
+    for (let i = 0; i < 12 && overflow(scale) > 0; i++) scale *= 0.97;
+    columns.push({ overflow, scale });
   });
+  if (!columns.length) return;
+  /* The shared size, then drawn and checked again. Re-breaking at a scale a column did not
+     win at can turn one more time onto a second line, so the shared answer is measured the
+     same way a column's own was, and the two walk down together rather than apart: a step
+     that moved one of them alone would put the sheet back into two sizes. */
+  let shared = Math.min(...columns.map((c) => c.scale));
+  for (let i = 0; i < 12; i++) {
+    const over = Math.max(...columns.map((c) => c.overflow(shared)));
+    if (over <= 0) break;
+    shared *= 0.97;
+  }
+  for (const c of columns) c.overflow(shared);
 }
 
 /** Rebuilds the two cards on screen as one landscape sheet: a single header across the
@@ -18420,12 +18543,25 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     });
   } else if (onSheet) {
     setPrintPage('letter landscape');
-    // The columns are a different shape from the cards they came out of, so the times are
-    // sized again for them. Before the sheet is scaled to the window, not after: a scale
-    // on the sheet changes what the columns measure, and with it left on the same sheet
-    // fitted at 1.60 in a 412px window and 0.70 in a 1280px one.
+    /* The columns are a different shape from the cards they came out of, so the times are
+       sized again for them, and then again once the sheet has been scaled to the window.
+
+       It used to be fitted only before the scaling, because a scale on the sheet changed
+       what the columns measured and left the same sheet fitted at 1.60 in a 412px window
+       and 0.70 in a 1280px one. That was a fault in the measurement rather than in the
+       order: it compared a painted height against an unpainted one, so the zoom landed on
+       one side of the comparison only. fitPairColumns now asks for the rows and the box in
+       the same painted space, where the zoom is on both sides and cancels, so it comes out
+       the same at either window width and may safely be run with the zoom on.
+
+       Running it again there matters because zoom re-wraps: the type is laid out afresh at
+       the scaled size and a row's times can turn onto a second line that they did not
+       occupy when the fitting measured them. Fitted only beforehand, every week hung about
+       4px of its last row past the foot of a column that clips. Fitting again at the size
+       it is really drawn removes the guesswork, and since fitSheetToWindow keeps this for
+       its resize handler, it holds when the window changes too. */
     fitPairColumns(wrap.querySelector('.week-pair'));
-    fitSheetToWindow(container);
+    fitSheetToWindow(container, '.week-pair', () => fitPairColumns(wrap.querySelector('.week-pair')));
   } else {
     fitPagesToWindow(container);
   }
