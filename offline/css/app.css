@@ -4697,7 +4697,14 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-agenda-day > summary:has(.reader-next-badge) > span:first-child > small { bottom:39px; }
 
 /* Stable time columns and fixed places for room marks and AM/PM. */
-.reader-agenda-row { grid-template-columns:minmax(0,1fr) 5rem; }
+/* The name takes the width it needs, not a fixed strip of it.
+   It was a hard 5rem, so "מנחה ערב שבת" broke over two lines while 95px of the times column
+   beside it stood empty: measured at 412px, the widest line of times wants 136px of the 231
+   it was given and the longest name wants 118. fit-content is max-content held under a
+   ceiling, so a short name takes a short column and a long one is not cut, while the ceiling
+   keeps a name from ever squeezing the times. Measured spare room for the name: 175px at
+   412, 138px at 375. */
+.reader-agenda-row { grid-template-columns:minmax(0,1fr) fit-content(8.5rem); }
 .reader-agenda-row .reader-times { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; max-width:320px; }
 .reader-agenda-row .reader-time { display:grid; grid-template-columns:4.25ch .65em max-content; column-gap:1px; justify-content:start; align-items:baseline; font-variant-numeric:tabular-nums; }
 .reader-digits { text-align:left; }
@@ -4705,7 +4712,9 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-time > small { grid-column:1 / -1; white-space:normal; }
 .reader-next-time { padding:0; outline:none; box-shadow:0 0 0 3px #f5eedc,0 0 0 4px #c4af73; }
 @media(max-width:360px) {
-  .reader-agenda-row { grid-template-columns:minmax(0,1fr) 4rem; gap:8px; }
+  /* 108px of spare at 320px, so a lower ceiling: past this the name is what gives, not the
+     times, which is the right way round on the narrowest phone there is. */
+  .reader-agenda-row { grid-template-columns:minmax(0,1fr) fit-content(7rem); gap:8px; }
   .reader-agenda-row .reader-times { column-gap:8px; }
   .reader-agenda-row .reader-time { font-size:1rem; }
   .reader-agenda-row .reader-time small { font-size:.58rem; }
@@ -4720,7 +4729,17 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 /* The reckoning over its own time: a full-basis flex item written first in the markup, so it
    takes the line above the digits rather than the one below. Set right to left because it is
    Hebrew inside a row that is laid out left to right for the numbers' sake. */
-.reader-reckoning { order:-1; direction:rtl; text-align:left; line-height:1.1; }
+/* The reckoning over its own time, centred on it.
+   A grid rather than the wrapping flex the other times use, because a flex box at
+   width:max-content is measured as though it never wrapped: the name and the digits were
+   added up side by side, so the box came out wider than the digits and centring in it put
+   the name 12px to the right of the time it names. Measured. One max-content column is the
+   width of the wider of the two, which is the digits, and justify-items centres both in it.
+   Written first in the markup, so it takes the row above. */
+.reader-agenda-row .reader-time:has(.reader-reckoning) {
+  display:grid; grid-template-columns:max-content; justify-items:center; width:max-content; gap:0;
+}
+.reader-reckoning { direction:rtl; text-align:center; line-height:1.1; }
 .reader-next-time { box-shadow:0 0 0 2px #f5eedc,0 0 0 3px #c4af73; }
 
 /* Size time columns to their contents instead of stretching them across the row. */

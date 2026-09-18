@@ -42,7 +42,8 @@ export function agendaSection(event, serial, settings) {
      yom tov it is; holy on Erev and Motzaei, where a day number would be wrong. */
   if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
-  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
+  /* "Motzai", which is how the shul spells it. */
+  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzai ${here.holy}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holyDay, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
   return { key: `day-${serial}`, title: [dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}),here.label].filter(Boolean).join(' '), serial };
