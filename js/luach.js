@@ -1060,6 +1060,13 @@ function wireNav(published) {
     // A tap that swaps the page but leaves the scroll where it was reads as a page that
     // did not answer: on a long week list the new page opens halfway down itself.
     window.scrollTo(0, 0);
+    if ((first === 'week' || first === 'donate') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      main.getAnimations().forEach(animation => animation.cancel());
+      main.animate([
+        { opacity: 0.2, transform: 'translateY(18px)' },
+        { opacity: 1, transform: 'translateY(0)' }
+      ], { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    }
   });
   window.addEventListener('popstate', () => route(published));
 }
@@ -1127,4 +1134,5 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
