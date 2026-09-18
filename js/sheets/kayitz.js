@@ -5,7 +5,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { T, inPlagWindow, fridayMainMinchaMenu, tishaBavMaariv, shabbosMinchaMenu, shacharisLine, candleLightingCell } from './common.js';
+import { T, inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
 
@@ -74,12 +74,14 @@ export function buildKayitzRow(week, settings) {
   const tz72 = zman('צאת 72', Z.tzais72(shabbosDate, settings), '72 minutes after שקיעה, taken at the shul\'s elevation').ceil().underline();
   const B = tishaEvening?.slice(1).join('\n') ?? `${tz60.text()}${SLASH}${tz72.text()}`;
 
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
+  const shabbosMincha = shabbosMinchaParts(shabbosDate, settings, week.specialParsha);
+  const C = shabbosMincha.text + (tishaEvening ? '\n' + tishaEvening[0] : '');
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
   const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
-  const E = shacharisLine();
+  const shacharis = shacharisParts();
+  const E = shacharis.text;
 
   const extraMaariv = inExtraMaarivWindow(friday, settings);
   const sefirah = 'the Sefirah stretch, after Pesach and before Shavuos';
@@ -95,7 +97,8 @@ export function buildKayitzRow(week, settings) {
     .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
   const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
 
-  const H = candleLightingCell(fridayDate, settings);
+  const candles = candleLightingParts(fridayDate, settings);
+  const H = candles.text;
 
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
@@ -106,7 +109,8 @@ export function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  const L = fridayMainMinchaMenu(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const L = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
      and carry their traces once that file is converted; a column with no trace yet is drawn
@@ -115,6 +119,10 @@ export function buildKayitzRow(week, settings) {
   const traces = {
     B: tishaEvening ? null : [tz60, tz72],
     D: [shmaMGA, shmaGRA],
+    C: shabbosMincha.times,
+    E: shacharis.times,
+    H: candles.times,
+    L: erevMincha.times,
     F: [maarivFri],
     G: extraMaariv ? [minchaFri, secondMaariv] : [minchaFri],
     I: plagWindow ? early(early72) : null,

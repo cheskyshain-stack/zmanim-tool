@@ -71,6 +71,21 @@ function make(value, steps, flags) {
       return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
     },
 
+    /* To a whole number of minutes is not the only rounding on these boards. A time the shul
+       is told to come at is said as a round time: the דרשה lands on the nearest five, and
+       the ט באב evening steps down to the five below. Both are the same idea at a different
+       step, so they are one method with the step named. */
+    roundToStep(minutes, because) {
+      const per = 1440 / minutes;
+      return make(Math.round(value * per) / per,
+        [...steps, { kind: 'round', way: 'nearest', step: minutes, because }], flags);
+    },
+    floorToStep(minutes, because) {
+      const per = 1440 / minutes;
+      return make(Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440,
+        [...steps, { kind: 'round', way: 'down', step: minutes, because }], flags);
+    },
+
     /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
     underline() {
       return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });

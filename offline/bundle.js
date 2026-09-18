@@ -1725,6 +1725,176 @@ function markHeaderRoom(escaped) {
   return String(escaped).replace(/\([^()]*\)/g, '<span class="head-room">$&</span>');
 }
 
+// ==== zmanim/trace.js ====
+// A time that knows how it was made.
+//
+// Every time on a chart is some named zman, moved by so many minutes, rounded one way or the
+// other, and sometimes chosen against another candidate or printed only on certain weeks.
+// The arithmetic for all of that already lives in the column builders. What did not exist is
+// any record of what the arithmetic *meant*, so the calculations page had to say it a second
+// time, in prose, by hand.
+//
+// **That is the shape this project keeps getting hurt by.** A fact written down twice is a
+// fact that can disagree with itself: the published file went on printing a schedule the
+// admin had already fixed, and two retired rules went on firing on the congregation's board
+// for months. The standing lesson is to read a thing off the one place that owns it.
+//
+// So a traced time computes and records in the same call. `.minus(15)` both subtracts the
+// fifteen minutes and writes down that it did. The record cannot drift from the number
+// because there is only one of them:
+//
+//     zman('שקיעה', Z.sunsetElev(d, s)).plus(50).floor().underline()
+//
+// reads as the formula, prints exactly what the old expression printed, and hands the
+// calculations page the steps to draw.
+//
+// Values are Excel-style day fractions throughout, the same as everywhere else here, and the
+// rounding and formatting are format.js's own rather than a second implementation of them.
+//
+// Every object is frozen and each link returns a new one, so a candidate can be measured
+// against another (earlierOf, laterOf) without either being changed by the asking.
+
+
+/* Named for this file alone: zmanim.js already has a top-level MIN, and build-offline.py
+   flattens every module into one scope where two of a name is a hard error. It caught this. */
+const TRACE_MIN = 1 / 1440;
+
+/** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
+function make(value, steps, flags) {
+  return Object.freeze({
+    value,
+    steps: Object.freeze(steps),
+    flags: Object.freeze(flags),
+
+    /** The printed string, underline sentinels and marks included, which is exactly what
+     *  the builders used to produce by hand. */
+    text() {
+      const base = formatTime(value) + (flags.mark || '');
+      return flags.underlined ? underlineTime(base) : base;
+    },
+
+    /** The same without the underline sentinels or the mark, for comparing against a cell. */
+    plain() {
+      return formatTime(value);
+    },
+
+    plus(minutes, because) {
+      return make(value + minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes, because }], flags);
+    },
+    minus(minutes, because) {
+      return make(value - minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes: -minutes, because }], flags);
+    },
+
+    /* Three roundings rather than one, because the workbook uses all three and which one it
+       uses is part of the answer. The שבת afternoon מנחה rounds up where everything around it
+       rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
+    ceil(because) {
+      return make(ceilToMinute(value), [...steps, { kind: 'round', way: 'up', because }], flags);
+    },
+    floor(because) {
+      return make(floorToMinute(value), [...steps, { kind: 'round', way: 'down', because }], flags);
+    },
+    round(because) {
+      return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
+    },
+
+    /* To a whole number of minutes is not the only rounding on these boards. A time the shul
+       is told to come at is said as a round time: the דרשה lands on the nearest five, and
+       the ט באב evening steps down to the five below. Both are the same idea at a different
+       step, so they are one method with the step named. */
+    roundToStep(minutes, because) {
+      const per = 1440 / minutes;
+      return make(Math.round(value * per) / per,
+        [...steps, { kind: 'round', way: 'nearest', step: minutes, because }], flags);
+    },
+    floorToStep(minutes, because) {
+      const per = 1440 / minutes;
+      return make(Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440,
+        [...steps, { kind: 'round', way: 'down', step: minutes, because }], flags);
+    },
+
+    /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
+    underline() {
+      return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });
+    },
+
+    /** A run of stars after a time: one is בעזרת נשים, two is the שטיבל. */
+    mark(chars) {
+      return make(value, [...steps, { kind: 'mark', chars }], { ...flags, mark: chars });
+    },
+
+    /* The two that pick between candidates. Both record what they were weighed against and
+       which one won, since "the earlier of שקיעה less 45 and 7:00" is a rule a reader cannot
+       reconstruct from the winning number alone. */
+    earlierOf(other, because) {
+      const won = other.value < value ? other : this;
+      return make(won.value, [...steps, {
+        kind: 'pick', how: 'earlier', because,
+        against: other.describe(), took: won === other ? 'other' : 'this',
+      }], flags);
+    },
+    laterOf(other, because) {
+      const won = other.value > value ? other : this;
+      return make(won.value, [...steps, {
+        kind: 'pick', how: 'later', because,
+        against: other.describe(), took: won === other ? 'other' : 'this',
+      }], flags);
+    },
+
+    /** A time that is only printed on some weeks.
+     *
+     *  Recorded rather than branched around outside, so the page can say "this is on the
+     *  board when the clocks are back, and they are not this week" instead of the cell
+     *  simply not mentioning a מנין that exists for half the year. `held` is the answer for
+     *  this week; `when` names the condition in the shul's own terms.
+     *
+     *  A link in the chain rather than a wrapper around one: a wrapper would carry the other
+     *  methods too, and those close over the steps they were built with, so anything added
+     *  after it would quietly drop the condition again. */
+    onlyWhen(held, when) {
+      const next = make(value, [...steps, { kind: 'condition', when, held }], flags);
+      return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
+    },
+
+    /** A short line naming this time, for use inside another time's steps. */
+    describe() {
+      return { text: formatTime(value), steps };
+    },
+  });
+}
+
+/** A time that starts from a named zman.
+ *
+ *  The name is the Hebrew the board and the shul use, since that is what a reader is holding
+ *  in their head. `note` is for the part of a zman's identity that its name does not carry:
+ *  which opinion, which horizon, whether the elevation is in it. */
+function zman(name, value, note) {
+  return make(value, [{ kind: 'base', name, note, at: formatTime(value) }], {});
+}
+
+/** A clock time nobody works out: the shul davens at 1:50 and that is the whole rule.
+ *
+ *  Still a traced time rather than a bare string, so a fixed time can be compared against a
+ *  computed one (the מנחה list is full of "the later of מנחה גדולה and 12:30") and so the page
+ *  can say, in as many words, that this one is not calculated. */
+function clockTime(hours, minutes, label) {
+  const value = (hours + minutes / 60) / 24;
+  return make(value, [{ kind: 'fixed', at: formatTime(value), label }], {});
+}
+
+/** The same from a printed string: fixedTime('1:50'), afternoon unless told otherwise.
+ *
+ *  A board is a 12-hour clock with no am or pm on it, and every fixed time on these charts
+ *  except the morning שחרית ones is an afternoon or evening time, so 12 and the small hours
+ *  are read as pm. `am` forces the other way. */
+function fixedTime(text, { am = false, label } = {}) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text).trim());
+  if (!m) throw new Error(`fixedTime: not a time: ${text}`);
+  let h = Number(m[1]) % 12;
+  if (!am) h += 12;
+  return clockTime(h, Number(m[2]), label);
+}
+
 // ==== zmanim/zmanim.js ====
 // Named zman functions, ported 1:1 from the workbook's defined names.
 // Every function returns a fractional day (0-1) representing local time-of-day,
@@ -1839,6 +2009,7 @@ function sofZmanTfilaGRA(date, settings) {
 
 
 
+
 const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
 /** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
@@ -1880,18 +2051,35 @@ function inPlagWindow(serial, settings) {
  *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
  *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
  *  nothing there changes either way. */
-function fridayMainMinchaMenu(fridayDate, settings) {
-  const mgl = Z.minchaGedolaLechumra(fridayDate, settings);
+function fridayMainMinchaParts(fridayDate, settings) {
+  const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const items = flattenNonEmpty([
-    onStandardTime ? [underlineTime(Math.max(T(12, 30), mgl)), underlineTime(T(1, 0))] : '',
-    onStandardTime && mgl < T(13, 20) ? underlineTime(Math.max(mgl, T(13, 15))) : '',
-    underlineTime(mgl > T(13, 35) ? mgl : T(1, 35)),
-    '1:50',
-    '2:15',
-    '3:00',
-  ]);
-  return splitLinesInHalf(items);
+  const mgl = () => zman('מנחה גדולה לחומרא', mglVal, 'the later of מנחה גדולה and half an hour after חצות');
+  const notBefore = 'never earlier than מנחה גדולה: where the clock time would be too early, מנחה גדולה is printed instead';
+
+  /* The printed list is these values asked for their text, in this order, rather than a
+     second list built alongside them. A trace and the time it explains cannot then be paired
+     up wrongly, which juggling two arrays by index invites. */
+  const times = [
+    onStandardTime ? mgl().laterOf(clockTime(12, 30), notBefore).underline() : null,
+    onStandardTime ? clockTime(1, 0).underline() : null,
+    onStandardTime && mglVal < T(13, 20) ? mgl().laterOf(clockTime(13, 15), notBefore).underline() : null,
+    (mglVal > T(13, 35) ? mgl() : clockTime(1, 35)).underline(),
+    fixedTime('1:50'),
+    fixedTime('2:15'),
+    fixedTime('3:00'),
+  ].filter(Boolean);
+
+  return {
+    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
+    times,
+    note: onStandardTime
+      ? 'The clocks are back this week, so the earlier מנינים are offered in front of the 1:35.'
+      : 'The clocks are forward this week, so nothing is offered before 1:35. That is the shul\'s own rule and the workbook does not have it.',
+  };
+}
+function fridayMainMinchaMenu(fridayDate, settings) {
+  return fridayMainMinchaParts(fridayDate, settings).text;
 }
 
 /** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
@@ -1922,80 +2110,98 @@ function roundTo5(dayFraction) {
   return Math.round(dayFraction * 288) / 288; // 288 = 1440 minutes / 5
 }
 
-function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
+function shabbosMinchaParts(shabbosDate, settings, specialParsha = '') {
   const sunsetVal = Z.sunset(shabbosDate, settings);
-  const early = Z.dstLocal(shabbosDate, settings) ? '1:40' : '1:20';
-  // Original formula uses ROUNDUP here (not ROUNDDOWN, unlike most other columns) -
-  // ceilToMinute matches that.
-  const main = Math.min(ceilToMinute(sunsetVal - 45 / 1440), T(19, 0));
-  const late = underlineTime(Math.min(ceilToMinute(sunsetVal - 30 / 1440), T(19, 30)));
+  const onDst = Z.dstLocal(shabbosDate, settings);
+  const early = fixedTime(onDst ? '1:40' : '1:20',
+    { label: onDst ? 'the opening מנחה while the clocks are forward' : 'the opening מנחה while the clocks are back' });
 
-  /* שבת שובה and שבת הגדול: the דרשה, and the מנחה that goes with it.
-   *
-   * Both times are worked from the מנחה 45 minutes before שקיעה rather than from שקיעה
-   * itself, because that is the minyan the דרשה is timed against: an hour before it, to
-   * the nearest 5, and the מנחה למטה half an hour before that. So the whole afternoon
-   * moves with the season, as it should, and no one has to retype it each year.
-   *
-   * The afternoon minyanim the other weeks carry (5:30, 6:00, 6:30) are not here. The
-   * מנחה למטה is what happens instead of them on this Shabbos, which is what the sheet
-   * that was built by hand for 5786 says: 1:40 and 4:45, then the דרשה, then 6:14 and
-   * 6:29, with no 5:30.
-   *
-   * Underlined like the מנחה before it: both are downstairs, which is what the underline
-   * means on these boards (see the footer, "All underlined מנינים will be בבית מדרש למטה").
-   *
-   * The דרשה gets a line to itself, in the middle, and is not underlined. It is not a
-   * minyan: the underline on these boards means downstairs (see the footer, "All underlined
-   * מנינים will be בבית מדרש למטה"), and a speech is not somewhere to daven. The מנחה למטה
-   * above it is underlined, because that one is.
-   *
-   * Three lines where every other cell on the page is two. Making the other rows grow to
-   * match was tried and put back: syncHeaderRowHeight pins every row to an even share of
-   * the table, and flooring that share at the tallest row inflated page 1 from 816.95px to
-   * 988.47px, well past the 8.5in sheet. The comment in that function says as much, from an
-   * earlier attempt at the same thing. So this cell sits deeper than its neighbours exactly
-   * as the cell built by hand for 5786 does, which is what has been printing all along.
-   *
-   * Stored as "דרשה 5:15" and it reaches the paper as "5:15 דרשה", the time to the left of
-   * the word. That is not a fault and it is not worth trying to undo: read the way Hebrew
-   * is read, right to left, it says דרשה and then the time, and it is character for
-   * character what the cell built by hand for 5786 already puts on the board.
-   *
-   * The isolate around the pair is what stops it reaching anything else. It earned its
-   * place when the דרשה shared a line with the times: without it every number after the
-   * Hebrew word joined that word's run and the whole line reversed, measured on the chart
-   * as "6:29 / 6:14 / 5:15 דרשה". Alone on its own line there is nothing left to reverse,
-   * and it stays for the day somebody puts it back among the times. */
-  const drasha = DRASHA_NAMES.includes(specialParsha) ? roundTo5(main - 60 / 1440) : null;
-  if (drasha !== null) {
-    return [
-      `${early}${SLASH}${underlineTime(drasha - 30 / 1440)}`,
-      isolate(`דרשה ${formatTime(drasha)}`),
-      `${formatTime(main)}${SLASH}${late}`,
-    ].join('\n');
+  /* Rounded **up** here, where almost every other column on these boards rounds down. That
+     is what the workbook does on this one cell, and it is exactly the sort of thing a reader
+     comes to this page to find, so it is recorded rather than described. */
+  const roundsUp = 'rounded up, which this column does and almost no other does';
+  const main = zman('שקיעה', sunsetVal, 'on the שבת').minus(45).ceil(roundsUp)
+    .earlierOf(clockTime(19, 0), 'never later than 7:00');
+  const late = zman('שקיעה', sunsetVal, 'on the שבת').minus(30).ceil(roundsUp)
+    .earlierOf(clockTime(19, 30), 'never later than 7:30').underline();
+
+  if (DRASHA_NAMES.includes(specialParsha)) {
+    /* Both worked from the מנחה 45 minutes before שקיעה rather than from שקיעה itself,
+       because that is the מנין the דרשה is timed against. To the nearest five, since this is
+       a time the shul is told to come at and 5:14 is not one.
+       The דרשה carries no underline: the underline on these boards means downstairs, and a
+       speech is not somewhere to daven. The מנחה above it is underlined, because that one is. */
+    const drasha = main.minus(60, 'an hour before the מנחה it belongs to')
+      .roundToStep(5, 'said as a round time, the shul being told to come at it');
+    const minchaLmata = drasha.minus(30, 'half an hour before the דרשה').underline();
+    return {
+      text: [
+        `${early.text()}${SLASH}${minchaLmata.text()}`,
+        isolate(`דרשה ${drasha.plain()}`),
+        `${main.text()}${SLASH}${late.text()}`,
+      ].join('\n'),
+      times: [early, minchaLmata, drasha, main, late],
+      note: 'שבת שובה and שבת הגדול carry the דרשה afternoon instead of the standing 5:30, 6:00 and 6:30.',
+    };
   }
 
-  const candidates = [T(5, 30), T(6, 0), T(6, 30)];
-  const gates = [T(17, 30), T(18, 0), T(18, 30)];
-  const kept = candidates.filter((_, i) => gates[i] <= sunsetVal - 1 / 24).map((t) => underlineTime(t));
-  const items = flattenNonEmpty([early, kept, formatTime(main), late]);
-  return splitLinesInHalf(items);
+  /* 5:30, 6:00 and 6:30 are on the board only once שקיעה is late enough for them: each is
+     kept when its own clock time is at or before שקיעה less an hour.
+
+     The underline goes on before the condition, not after. onlyWhen hands back a value whose
+     text is silenced when the condition fails, and anything chained after that would be
+     built from the unsilenced one underneath and quietly lose the condition again. */
+  const standing = [[5, 30, 17, 30], [6, 0, 18, 0], [6, 30, 18, 30]].map(([h, m, gh, gm]) =>
+    clockTime(h, m, 'one of the standing afternoon מנינים').underline()
+      .onlyWhen(T(gh, gm) <= sunsetVal - 1 / 24, 'printed once שקיעה is at least an hour after it'));
+
+  const times = [early, ...standing.filter((t) => t.held), main, late];
+  return {
+    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
+    times,
+    dropped: standing.filter((t) => !t.held),
+  };
+}
+function shabbosMinchaMenu(shabbosDate, settings, specialParsha = '') {
+  return shabbosMinchaParts(shabbosDate, settings, specialParsha).text;
 }
 function floorMin(x) {
   return Math.floor(x * 1440 + 1e-7) / 1440;
 }
 
+/* The four cells below each come in two forms: a `...Parts` function that is the one
+   implementation, returning the printed text together with the traced times that made it,
+   and the plain function the charts have always called, which is now a one line wrapper
+   round it. One computation, two ways of asking, so the calculations page cannot describe a
+   time the board did not print. See zmanim/trace.js. */
+
 /** Fixed Shacharis line (קיץ column E / חורף column E) - identical, not date-dependent.
  *  Uses NBSP around the "/" so it can never wrap onto a second line. */
+function shacharisParts() {
+  /* Nothing here is worked out: the shul davens at half past seven and quarter past eight
+     and that is the whole rule. Still traced, so the page can say so in as many words
+     rather than leaving the one column that is not calculated looking unexplained. */
+  const early = clockTime(7, 30, 'the שחרית the shul davens every שבת').underline();
+  const later = fixedTime('8:15', { am: true, label: 'the second שחרית' });
+  return { text: `${early.text()}${SLASH}${later.text()}`, times: [early, later] };
+}
 function shacharisLine() {
-  return `${underlineTime(T(7, 30))}${SLASH}8:15`;
+  return shacharisParts().text;
 }
 
 /** Candle lighting + sunset (קיץ column H / חורף column H) - identical formula. */
+function candleLightingParts(fridayDate, settings) {
+  /* שקיעה is put down to the whole minute first and the candle lighting is taken off that
+     rounded value, not off the true one, which is why the floor comes before the minus. */
+  const shkia = zman('שקיעה', Z.sunsetElev(fridayDate, settings), "on the Friday, at the shul's elevation").floor();
+  const candles = shkia.minus(settings.candleLightingMinutes, 'the candle lighting offset in Settings, which moves every Friday on every chart with it');
+  return {
+    text: `${candles.text()}\nשקיעה${NBSP}${shkia.text()}`,
+    times: [candles, shkia],
+  };
+}
 function candleLightingCell(fridayDate, settings) {
-  const sunsetElevFriday = floorMin(Z.sunsetElev(fridayDate, settings));
-  return `${formatTime(sunsetElevFriday - settings.candleLightingMinutes / 1440)}\nשקיעה${NBSP}${formatTime(sunsetElevFriday)}`;
+  return candleLightingParts(fridayDate, settings).text;
 }
 
 /** If this Shabbos IS the 9th of Av, the fast is pushed off to Sunday (10 Av) - Motzei
@@ -3635,161 +3841,6 @@ function buildYomKippurPoster(year, settings) {
   };
 }
 
-// ==== zmanim/trace.js ====
-// A time that knows how it was made.
-//
-// Every time on a chart is some named zman, moved by so many minutes, rounded one way or the
-// other, and sometimes chosen against another candidate or printed only on certain weeks.
-// The arithmetic for all of that already lives in the column builders. What did not exist is
-// any record of what the arithmetic *meant*, so the calculations page had to say it a second
-// time, in prose, by hand.
-//
-// **That is the shape this project keeps getting hurt by.** A fact written down twice is a
-// fact that can disagree with itself: the published file went on printing a schedule the
-// admin had already fixed, and two retired rules went on firing on the congregation's board
-// for months. The standing lesson is to read a thing off the one place that owns it.
-//
-// So a traced time computes and records in the same call. `.minus(15)` both subtracts the
-// fifteen minutes and writes down that it did. The record cannot drift from the number
-// because there is only one of them:
-//
-//     zman('שקיעה', Z.sunsetElev(d, s)).plus(50).floor().underline()
-//
-// reads as the formula, prints exactly what the old expression printed, and hands the
-// calculations page the steps to draw.
-//
-// Values are Excel-style day fractions throughout, the same as everywhere else here, and the
-// rounding and formatting are format.js's own rather than a second implementation of them.
-//
-// Every object is frozen and each link returns a new one, so a candidate can be measured
-// against another (earlierOf, laterOf) without either being changed by the asking.
-
-
-/* Named for this file alone: zmanim.js already has a top-level MIN, and build-offline.py
-   flattens every module into one scope where two of a name is a hard error. It caught this. */
-const TRACE_MIN = 1 / 1440;
-
-/** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
-function make(value, steps, flags) {
-  return Object.freeze({
-    value,
-    steps: Object.freeze(steps),
-    flags: Object.freeze(flags),
-
-    /** The printed string, underline sentinels and marks included, which is exactly what
-     *  the builders used to produce by hand. */
-    text() {
-      const base = formatTime(value) + (flags.mark || '');
-      return flags.underlined ? underlineTime(base) : base;
-    },
-
-    /** The same without the underline sentinels or the mark, for comparing against a cell. */
-    plain() {
-      return formatTime(value);
-    },
-
-    plus(minutes, because) {
-      return make(value + minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes, because }], flags);
-    },
-    minus(minutes, because) {
-      return make(value - minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes: -minutes, because }], flags);
-    },
-
-    /* Three roundings rather than one, because the workbook uses all three and which one it
-       uses is part of the answer. The שבת afternoon מנחה rounds up where everything around it
-       rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
-    ceil(because) {
-      return make(ceilToMinute(value), [...steps, { kind: 'round', way: 'up', because }], flags);
-    },
-    floor(because) {
-      return make(floorToMinute(value), [...steps, { kind: 'round', way: 'down', because }], flags);
-    },
-    round(because) {
-      return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
-    },
-
-    /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
-    underline() {
-      return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });
-    },
-
-    /** A run of stars after a time: one is בעזרת נשים, two is the שטיבל. */
-    mark(chars) {
-      return make(value, [...steps, { kind: 'mark', chars }], { ...flags, mark: chars });
-    },
-
-    /* The two that pick between candidates. Both record what they were weighed against and
-       which one won, since "the earlier of שקיעה less 45 and 7:00" is a rule a reader cannot
-       reconstruct from the winning number alone. */
-    earlierOf(other, because) {
-      const won = other.value < value ? other : this;
-      return make(won.value, [...steps, {
-        kind: 'pick', how: 'earlier', because,
-        against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
-    },
-    laterOf(other, because) {
-      const won = other.value > value ? other : this;
-      return make(won.value, [...steps, {
-        kind: 'pick', how: 'later', because,
-        against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
-    },
-
-    /** A time that is only printed on some weeks.
-     *
-     *  Recorded rather than branched around outside, so the page can say "this is on the
-     *  board when the clocks are back, and they are not this week" instead of the cell
-     *  simply not mentioning a מנין that exists for half the year. `held` is the answer for
-     *  this week; `when` names the condition in the shul's own terms.
-     *
-     *  A link in the chain rather than a wrapper around one: a wrapper would carry the other
-     *  methods too, and those close over the steps they were built with, so anything added
-     *  after it would quietly drop the condition again. */
-    onlyWhen(held, when) {
-      const next = make(value, [...steps, { kind: 'condition', when, held }], flags);
-      return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
-    },
-
-    /** A short line naming this time, for use inside another time's steps. */
-    describe() {
-      return { text: formatTime(value), steps };
-    },
-  });
-}
-
-/** A time that starts from a named zman.
- *
- *  The name is the Hebrew the board and the shul use, since that is what a reader is holding
- *  in their head. `note` is for the part of a zman's identity that its name does not carry:
- *  which opinion, which horizon, whether the elevation is in it. */
-function zman(name, value, note) {
-  return make(value, [{ kind: 'base', name, note, at: formatTime(value) }], {});
-}
-
-/** A clock time nobody works out: the shul davens at 1:50 and that is the whole rule.
- *
- *  Still a traced time rather than a bare string, so a fixed time can be compared against a
- *  computed one (the מנחה list is full of "the later of מנחה גדולה and 12:30") and so the page
- *  can say, in as many words, that this one is not calculated. */
-function clockTime(hours, minutes, label) {
-  const value = (hours + minutes / 60) / 24;
-  return make(value, [{ kind: 'fixed', at: formatTime(value), label }], {});
-}
-
-/** The same from a printed string: fixedTime('1:50'), afternoon unless told otherwise.
- *
- *  A board is a 12-hour clock with no am or pm on it, and every fixed time on these charts
- *  except the morning שחרית ones is an afternoon or evening time, so 12 and the small hours
- *  are read as pm. `am` forces the other way. */
-function fixedTime(text, { am = false, label } = {}) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text).trim());
-  if (!m) throw new Error(`fixedTime: not a time: ${text}`);
-  let h = Number(m[1]) % 12;
-  if (!am) h += 12;
-  return clockTime(h, Number(m[2]), label);
-}
-
 // ==== sheets/kayitz.js ====
 // שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
 // SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
@@ -3865,12 +3916,14 @@ function buildKayitzRow(week, settings) {
   const tz72 = zman('צאת 72', Z.tzais72(shabbosDate, settings), '72 minutes after שקיעה, taken at the shul\'s elevation').ceil().underline();
   const B = tishaEvening?.slice(1).join('\n') ?? `${tz60.text()}${SLASH}${tz72.text()}`;
 
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
+  const shabbosMincha = shabbosMinchaParts(shabbosDate, settings, week.specialParsha);
+  const C = shabbosMincha.text + (tishaEvening ? '\n' + tishaEvening[0] : '');
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
   const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
-  const E = shacharisLine();
+  const shacharis = shacharisParts();
+  const E = shacharis.text;
 
   const extraMaariv = inExtraMaarivWindow(friday, settings);
   const sefirah = 'the Sefirah stretch, after Pesach and before Shavuos';
@@ -3886,7 +3939,8 @@ function buildKayitzRow(week, settings) {
     .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
   const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
 
-  const H = candleLightingCell(fridayDate, settings);
+  const candles = candleLightingParts(fridayDate, settings);
+  const H = candles.text;
 
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
@@ -3897,7 +3951,8 @@ function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  const L = fridayMainMinchaMenu(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const L = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
      and carry their traces once that file is converted; a column with no trace yet is drawn
@@ -3906,6 +3961,10 @@ function buildKayitzRow(week, settings) {
   const traces = {
     B: tishaEvening ? null : [tz60, tz72],
     D: [shmaMGA, shmaGRA],
+    C: shabbosMincha.times,
+    E: shacharis.times,
+    H: candles.times,
+    L: erevMincha.times,
     F: [maarivFri],
     G: extraMaariv ? [minchaFri, secondMaariv] : [minchaFri],
     I: plagWindow ? early(early72) : null,
@@ -4793,12 +4852,14 @@ function buildChorefRow(week, settings) {
   const tz72 = zman('צאת 72', Z.tzais72(shabbosDate, settings), '72 minutes after שקיעה, taken at the shul\'s elevation').ceil().underline();
   const B = tishaEvening?.slice(1).join('\n') ?? `${tz60.text()}${SLASH}${tz72.text()}`;
 
-  const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
+  const shabbosMincha = shabbosMinchaParts(shabbosDate, settings, week.specialParsha);
+  const C = shabbosMincha.text + (tishaEvening ? '\n' + tishaEvening[0] : '');
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
   const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
-  const E = shacharisLine();
+  const shacharis = shacharisParts();
+  const E = shacharis.text;
 
   const sunsetFriday = Z.sunset(fridayDate, settings);
   const maarivFri = zman('שקיעה', sunsetFriday, 'on the Friday').plus(50).floor().underline();
@@ -4816,8 +4877,10 @@ function buildChorefRow(week, settings) {
     ? textjoin(SLASH, true, [plagGRA.text(), plag50.text(), plag72.text(), minchaFri.text()])
     : minchaFri.text();
 
-  const H = candleLightingCell(fridayDate, settings);
-  const I = fridayMainMinchaMenu(fridayDate, settings);
+  const candles = candleLightingParts(fridayDate, settings);
+  const H = candles.text;
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const I = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
      and carry their traces once that file is converted too; a column with no trace yet is
@@ -4825,6 +4888,10 @@ function buildChorefRow(week, settings) {
   const traces = {
     B: tishaEvening ? null : [tz60, tz72],
     D: [shmaMGA, shmaGRA],
+    C: shabbosMincha.times,
+    E: shacharis.times,
+    H: candles.times,
+    I: erevMincha.times,
     F: [maarivFri],
     G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
   };
