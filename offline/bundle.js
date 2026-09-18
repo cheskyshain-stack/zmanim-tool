@@ -17727,6 +17727,13 @@ function agendaChartEvents(rows, showing) {
         const place = match[4] === '**' ? 'באולם השמחות' : match[4] === '*' ? 'בעזר״נ' : match[1] || match[5] ? 'למטה' : /בעזר/.test(row.title) ? 'בעזר״נ' : /למטה/.test(row.title) ? 'למטה' : '';
         out.push({serial,mins,name,place:auxiliary?'':place,auxiliary,
           reckoning:(named ? null : reckonings?.[at]) || '',
+          /* Which cell of the board this came out of, and whether it is the פלג written on
+             that cell's second line under its own מנחה (the paired columns in kayitz.js:
+             "6:25 \n פלג 6:40"). The reader puts the two back into one row, since on the
+             paper they are one. Carried as a flag beside the name rather than by changing
+             the name: `auxiliary` is worked out from the name, and a פלג that called itself
+             מנחה would be offered as the next מנין. It is a זמן, not a מנין. */
+          cell:String(row.key ?? ''), plag:/^פלג/.test(named ?? ''),
           earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
         at++;
       }
@@ -17894,8 +17901,12 @@ function weeklyReaderData(showing, index, state, settings) {
       if (specialSerials.has(serial)) continue;
       const value = built.row[c.key];
       if (value == null || value === '') continue;
-      shabbos.push({ title: c.header.replace(/\n/g,' '), header: c.header, value, html: built.overriddenKeys.has(c.key),
-        friday: fridayKeys.has(c.key) });
+      /* The column letter travels with the cell. A פלג is written on the second line of its
+         מנחה's own cell, and this is what lets the two be put back together on the screen
+         without depending on their landing next to each other once every time of the day has
+         been sorted into one list. */
+      shabbos.push({ title: c.header.replace(/\n/g,' '), header: c.header, value, key: c.key,
+        html: built.overriddenKeys.has(c.key), friday: fridayKeys.has(c.key) });
     }
   }
   return { regular, special, night, shabbos };
@@ -17916,6 +17927,19 @@ function readerTimeHtml(e) {
      the printed sheets put it, and it cannot be read against the wrong one. */
   const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
   return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${reckoning}<span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${room}${e.started?'<small>Just started</small>':''}</span>`;
+}
+
+/** The פלג under its own מנחה: the second line of one cell of the board, set small under the
+ *  first. Nothing when there is none, which is every row but the paired מנחה columns.
+ *
+ *  The name goes in front of the time, "פלג 5:44", which is how the cell is written. Isolated
+ *  because the run around it is set left to right for the digits' sake and a Hebrew word left
+ *  loose in one drags the time it is beside to the wrong side of it. */
+function readerSubHtml(subs) {
+  if (!subs?.length) return '';
+  return `<div class="reader-sub-times">${subs.map(e =>
+    `<span class="reader-sub"><bdi class="reader-sub-name" lang="he">${escAttr(e.name)}</bdi>${readerTimeHtml(e)}</span>`
+  ).join('')}</div>`;
 }
 
 function readerEventGroups(events) {
@@ -18027,17 +18051,31 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
+    const sameWhere=(row,event)=>row && row.serial===event.serial
+      && row.sectionTitle===event.sectionTitle && row.dayPart===event.dayPart;
     for(const event of section.events){
+      /* A פלג goes under the מנחה it was written under, rather than into a rule-separated row
+         of its own: on the board the two are one cell, and the shul asked for them read that
+         way here too. Found by the cell they both came out of rather than by "the row before
+         this one", so a time that sorts in between cannot come between them. */
+      if(event.plag && event.cell){
+        const owner=[...rows].reverse().find(r=>sameWhere(r,event) && r.cell===event.cell && r.events.length);
+        if(owner){ (owner.subs ||= []).push(event); continue; }
+      }
       let row=rows[rows.length-1];
-      if (row && (row.name!==event.name || row.serial!==event.serial || row.sectionTitle!==event.sectionTitle || row.dayPart!==event.dayPart)) row=null;
-      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,events:[]};rows.push(row);}
+      /* The cell is part of what makes a row, not only the name. Three of the board's columns
+         are all called מנחה and differ by the room they daven in, and until the פלג stopped
+         sitting between them they were kept apart only by that accident: with it gone, 5:29
+         and 6:05 ran into one row carrying one of the two פלג. */
+      if (!sameWhere(row,event) || row.name!==event.name || row.cell!==(event.cell||'')) row=null;
+      if(!row){row={name:event.name,serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
     const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?'':row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?'':row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`).join('')}</div>
     </details>`;
   }).join('');
   let hasSpecialSchedules = false;

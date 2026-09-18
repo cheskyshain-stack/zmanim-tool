@@ -104,6 +104,13 @@ function agendaChartEvents(rows, showing) {
         const place = match[4] === '**' ? 'באולם השמחות' : match[4] === '*' ? 'בעזר״נ' : match[1] || match[5] ? 'למטה' : /בעזר/.test(row.title) ? 'בעזר״נ' : /למטה/.test(row.title) ? 'למטה' : '';
         out.push({serial,mins,name,place:auxiliary?'':place,auxiliary,
           reckoning:(named ? null : reckonings?.[at]) || '',
+          /* Which cell of the board this came out of, and whether it is the פלג written on
+             that cell's second line under its own מנחה (the paired columns in kayitz.js:
+             "6:25 \n פלג 6:40"). The reader puts the two back into one row, since on the
+             paper they are one. Carried as a flag beside the name rather than by changing
+             the name: `auxiliary` is worked out from the name, and a פלג that called itself
+             מנחה would be offered as the next מנין. It is a זמן, not a מנין. */
+          cell:String(row.key ?? ''), plag:/^פלג/.test(named ?? ''),
           earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
         at++;
       }
