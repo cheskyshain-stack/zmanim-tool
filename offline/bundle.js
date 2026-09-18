@@ -4704,6 +4704,7 @@ function buildPesachPoster(year, settings) {
 
 
 
+
 const RH_MIN = 1 / 1440;
 const RH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
 const RH_FRIDAY = 6;
@@ -4784,9 +4785,24 @@ function buildRoshHashanaPoster(year, settings) {
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
   const tm = (t, underlined = false) => ({ text: formatTime(t), underlined, mark: '' });
   const at = (t) => [tm(t)];
+  /* The same two, taking a traced value instead of a bare number, so a line can carry the
+     working that made it. See zmanim/trace.js. */
+  const tmT = (trace, underlined = false) => ({ text: trace.plain(), underlined, mark: '', trace });
+  const atT = (trace) => [tmT(trace)];
+  /* A time typed into this sheet rather than worked out: the שחרית and המלך it opens on and
+     the two שופר times, which are announced "בערך". They do not come through parseTimes, so
+     they get the same answer here: set by the shul, not worked out from the sun. */
+  const typed = (text, label) => [{
+    text, underlined: false, mark: '',
+    trace: /^\d{1,2}:\d{2}$/.test(text) ? fixedTime(text, { label }) : null,
+  }];
   /** One זמן given both ways: earliest first, each time carrying the name of its own
    *  reckoning so the sheet can set the two under each other. See posters/reckonings.js. */
   const bothWays = (mga, gra) => twoReckonings(mga, gra).map((r) => ({ ...tm(r.at), name: r.name }));
+  /* twoReckonings only orders and names the same two numbers, so each can be matched back to
+     the trace it came from by value. */
+  const bothWaysT = (mgaT, graT) => twoReckonings(mgaT.value, graT.value)
+    .map((r) => ({ ...tmT(r.at === mgaT.value ? mgaT : graT), name: r.name }));
 
   // תשליך wants daylight after מנחה, so one day carries an earlier מנחה למטה as well, 50
   // minutes before the other one. It is the first day, unless that is Shabbos, when תשליך
@@ -4812,6 +4828,14 @@ function buildRoshHashanaPoster(year, settings) {
    * unchanged. */
   const dayShkias = days.map((day) => Z.sunsetElev(day, settings));
   const mainMincha = Math.max(...dayShkias.map((shkia) => downTo5(shkia - 60 * RH_MIN)));
+  /* Both days worked out and the later kept, which is the rule above said as a comparison so
+     the page can show the day that lost as well as the one that won. */
+  const minchaPerDay = dayShkias.map((shkia, i) => zman('שקיעה', shkia, `on ${RH_TEXT.day[i]} of ראש השנה, at the shul's elevation`)
+    .minus(60, 'the afternoon מנחה is an hour before שקיעה')
+    .floorToStep(5, 'down to the last five'));
+  const mainMinchaTrace = minchaPerDay.slice(1).reduce(
+    (a, b) => a.laterOf(b, 'one מנחה across both days rather than one worked out per day: the later of the two is printed on both, so a יום טוב does not print its two days five minutes apart'),
+    minchaPerDay[0]);
 
   /* The מנינים of these three days, for the congregation's "what is on next". Gathered here
      as the sheet is built, off the same numbers, so the card and the sheet cannot disagree.
@@ -4834,11 +4858,14 @@ function buildRoshHashanaPoster(year, settings) {
     const lines = [];
     // The night that opens the day. הדלקת נרות only on the first, since the second day's
     // candles are lit from an existing flame and the sheets have never printed a time.
-    if (i === 0) lines.push(line(RH_TEXT.candles, at(shkia - settings.candleLightingMinutes * RH_MIN), { calc: 'candles' }));
-    if (i === 0) lines.push(line(RH_TEXT.mincha, at(shkia - 15 * RH_MIN), { calc: 'nightMincha' }));
-    lines.push(line(RH_TEXT.shkia, at(shkia), { calc: 'nightShkia' }));
-    if (i === 0) lines.push(line(RH_TEXT.drasha, at(toNearest5(shkia + 30 * RH_MIN)), { calc: 'nightDrasha' }));
-    lines.push(line(RH_TEXT.maariv, at(shkia + 60 * RH_MIN), { calc: 'nightMaariv' }));
+    /* Everything on the night that opens a day hangs off that night's own שקיעה, so they all
+       start from the one traced value. */
+    const nightShkia = () => zman('שקיעה', shkia, `on the evening that opens ${RH_TEXT.day[i]}, at the shul's elevation`);
+    if (i === 0) lines.push(line(RH_TEXT.candles, atT(nightShkia().minus(settings.candleLightingMinutes, 'the candle lighting offset in Settings')), { calc: 'candles' }));
+    if (i === 0) lines.push(line(RH_TEXT.mincha, atT(nightShkia().minus(15)), { calc: 'nightMincha' }));
+    lines.push(line(RH_TEXT.shkia, atT(nightShkia()), { calc: 'nightShkia' }));
+    if (i === 0) lines.push(line(RH_TEXT.drasha, atT(nightShkia().plus(30).roundToStep(5, 'said as a round time, the shul being told to come at it')), { calc: 'nightDrasha' }));
+    lines.push(line(RH_TEXT.maariv, atT(nightShkia().plus(60)), { calc: 'nightMaariv' }));
     // These two are on the evening that opens the day, which is the day before it: under
     // "יום א'" that is ערב ר"ה, under "יום ב'" the first day. Getting that wrong is the one
     // way this could be a whole day out, so it is taken from the same `night` the שקיעה
@@ -4854,26 +4881,32 @@ function buildRoshHashanaPoster(year, settings) {
     // The morning.
     // המלך rides on the שחרית line as a second label and time, not as one run of text, so
     // it gets the same gap between word and time that every other row has.
-    lines.push(line(RH_TEXT.shacharis.label, [{ text: RH_TEXT.shacharis.times, underlined: false, mark: '' }],
+    lines.push(line(RH_TEXT.shacharis.label, typed(RH_TEXT.shacharis.times, 'the שחרית this sheet opens on'),
       { calc: 'shacharis',
-        extra: { label: RH_TEXT.hamelech.label, times: [{ text: RH_TEXT.hamelech.times, underlined: false, mark: '' }] } }));
-    lines.push(line(RH_TEXT.krias.name, bothWays(krias.mga, krias.gra), { calc: 'krias' }));
+        extra: { label: RH_TEXT.hamelech.label, times: typed(RH_TEXT.hamelech.times, 'when המלך is said, which rides on the שחרית line') } }));
+    lines.push(line(RH_TEXT.krias.name, bothWaysT(
+      zman('סוף זמן קריאת שמע מ״א', krias.mga, 'the day measured from עלות 72 to צאת 72'),
+      zman('סוף זמן קריאת שמע גר״א', krias.gra, 'the day measured from sunrise to שקיעה'),
+    ), { calc: 'krias' }));
 
     // Shabbos has no שופר: the דרשה moves to before מוסף and ט' שעות is printed instead.
     if (isShabbos) {
       lines.push(line(RH_TEXT.drashaBeforeMusaf, [], { calc: 'drashaBeforeMusaf' }));
-      lines.push(line(RH_TEXT.nineHours.name, bothWays(nine.mga, nine.gra), { calc: 'nineHours' }));
+      lines.push(line(RH_TEXT.nineHours.name, bothWaysT(
+        zman("ט' שעות מ״א", nine.mga, 'nine proportional hours into a day measured from עלות 72 to צאת 72'),
+        zman("ט' שעות גר״א", nine.gra, 'nine proportional hours into a day measured from sunrise to שקיעה'),
+      ), { calc: 'nineHours' }));
     } else {
       lines.push(line(RH_TEXT.drashaBeforeShofar, [], { calc: 'drashaBeforeShofar' }));
-      lines.push(line(RH_TEXT.shofar.label, [{ text: RH_TEXT.shofar.times, underlined: false, mark: '' }], { calc: 'shofar' }));
-      lines.push(line(RH_TEXT.shofarWomen.label, [{ text: RH_TEXT.shofarWomen.times, underlined: false, mark: '' }], { calc: 'shofarWomen' }));
+      lines.push(line(RH_TEXT.shofar.label, typed(RH_TEXT.shofar.times, 'announced בערך, so it is said as an approximate time rather than worked out'), { calc: 'shofar' }));
+      lines.push(line(RH_TEXT.shofarWomen.label, typed(RH_TEXT.shofarWomen.times, 'announced בערך, so it is said as an approximate time rather than worked out'), { calc: 'shofarWomen' }));
     }
 
     // The afternoon מנחה, the same on both days (see mainMincha above), with the earlier
     // תשליך one in front of it on the day that has one.
     lines.push(line(RH_TEXT.mincha, i === tashlichDay
-      ? [tm(mainMincha - TASHLICH_EARLIER * RH_MIN, true), tm(mainMincha)]
-      : at(mainMincha), { calc: 'dayMincha' }));
+      ? [tmT(mainMinchaTrace.minus(TASHLICH_EARLIER, 'the תשליך מנין is defined as this far before the main מנחה rather than as a time of its own, so it moves with it and the daylight it exists for is unchanged').underline(), true), tmT(mainMinchaTrace)]
+      : atT(mainMinchaTrace), { calc: 'dayMincha' }));
 
     // The morning and the afternoon, on the day itself. שחרית is typed rather than computed,
     // so it says which half of the day it is in; המלך rides on that line and is not a מנין of
@@ -4886,7 +4919,8 @@ function buildRoshHashanaPoster(year, settings) {
     // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
     // which is the same way round the boards print a two time מעריב (see calculations-view).
     if (i === 1) {
-      lines.push(line(RH_TEXT.maariv, [tm(dayShkia + 60 * RH_MIN), tm(dayShkia + 72 * RH_MIN, true)], { calc: 'motzeiMaariv' }));
+      const motzei = () => zman('שקיעה', dayShkia, `on ${RH_TEXT.day[i]} itself, at the shul's elevation`);
+      lines.push(line(RH_TEXT.maariv, [tmT(motzei().plus(60)), tmT(motzei().plus(72).underline(), true)], { calc: 'motzeiMaariv' }));
       M.at(dayOn, RH_TEXT.maariv, dayShkia + 60 * RH_MIN);
       M.at(dayOn, RH_TEXT.maariv, dayShkia + 72 * RH_MIN, { underlined: true });
     }
@@ -6083,6 +6117,7 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
+
 const VS_MIN = 1 / 1440;
 
 /** The wording. Everything else on the sheet is worked out. */
@@ -6187,16 +6222,35 @@ function vasikinDay(serial, settings, heading) {
   const before = (mins) => roundToMinute(netz - mins * VS_MIN);
   const hamelech = before(VS_RULES.hamelech);
   const shacharis = hamelech - VS_RULES.shacharisBeforeHamelech * VS_MIN;
+
+  /* Every time on this sheet is נץ moved back, so every trace starts there. The base says
+     that נץ is snapped to the second it prints as before anything is taken off it, which is
+     the rule this sheet keeps and the reason its own עלות cannot come out a minute adrift
+     from its own printed נץ. */
+  const anchor = () => zman(VS_TEXT.netz, netz,
+    'the sunrise this sheet is built on, snapped to the second it prints as before anything is taken off it');
+  const backFrom = (mins, why) => anchor().minus(mins, why).round('to the closer minute, one rule for both sheets');
+  const hamelechTrace = backFrom(VS_RULES.hamelech, 'the מנין is timed so that המלך is said at this point before נץ');
+  const traces = {
+    alos: backFrom(VS_RULES.alos),
+    /* Not rounded: it is half an hour before a המלך that is already a whole minute, so it is
+       one by arithmetic, and rounding again could only move it off the half hour it is
+       meant to be. */
+    shacharis: hamelechTrace.minus(VS_RULES.shacharisBeforeHamelech, 'שחרית opens that far before המלך'),
+    tallis: backFrom(VS_RULES.tallis),
+    hamelech: hamelechTrace,
+    netz: anchor(),
+  };
   return {
     serial,
     heading: named,
     lines: [
-      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos' },
-      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis' },
-      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis' },
-      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech' },
+      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos', trace: traces.alos },
+      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis', trace: traces.shacharis },
+      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis', trace: traces.tallis },
+      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech', trace: traces.hamelech },
       // The anchor, and the only time in the program printed to the second.
-      { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz' },
+      { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz', trace: traces.netz },
     ],
     shacharisAt: shacharis,
   };

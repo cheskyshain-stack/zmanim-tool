@@ -14,6 +14,7 @@ import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, roundToMinute } from '../format.js';
+import { zman } from '../zmanim/trace.js';
 import { minyanList } from './minyanim.js';
 
 const VS_MIN = 1 / 1440;
@@ -120,16 +121,35 @@ function vasikinDay(serial, settings, heading) {
   const before = (mins) => roundToMinute(netz - mins * VS_MIN);
   const hamelech = before(VS_RULES.hamelech);
   const shacharis = hamelech - VS_RULES.shacharisBeforeHamelech * VS_MIN;
+
+  /* Every time on this sheet is נץ moved back, so every trace starts there. The base says
+     that נץ is snapped to the second it prints as before anything is taken off it, which is
+     the rule this sheet keeps and the reason its own עלות cannot come out a minute adrift
+     from its own printed נץ. */
+  const anchor = () => zman(VS_TEXT.netz, netz,
+    'the sunrise this sheet is built on, snapped to the second it prints as before anything is taken off it');
+  const backFrom = (mins, why) => anchor().minus(mins, why).round('to the closer minute, one rule for both sheets');
+  const hamelechTrace = backFrom(VS_RULES.hamelech, 'the מנין is timed so that המלך is said at this point before נץ');
+  const traces = {
+    alos: backFrom(VS_RULES.alos),
+    /* Not rounded: it is half an hour before a המלך that is already a whole minute, so it is
+       one by arithmetic, and rounding again could only move it off the half hour it is
+       meant to be. */
+    shacharis: hamelechTrace.minus(VS_RULES.shacharisBeforeHamelech, 'שחרית opens that far before המלך'),
+    tallis: backFrom(VS_RULES.tallis),
+    hamelech: hamelechTrace,
+    netz: anchor(),
+  };
   return {
     serial,
     heading: named,
     lines: [
-      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos' },
-      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis' },
-      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis' },
-      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech' },
+      { label: VS_TEXT.alos, text: formatTime(before(VS_RULES.alos)), calc: 'alos', trace: traces.alos },
+      { label: VS_TEXT.shacharis, text: formatTime(shacharis), calc: 'shacharis', trace: traces.shacharis },
+      { label: VS_TEXT.tallis, text: formatTime(before(VS_RULES.tallis)), calc: 'tallis', trace: traces.tallis },
+      { label: VS_TEXT.hamelech, text: formatTime(hamelech), calc: 'hamelech', trace: traces.hamelech },
       // The anchor, and the only time in the program printed to the second.
-      { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz' },
+      { label: VS_TEXT.netz, text: netzText(netz), calc: 'netz', trace: traces.netz },
     ],
     shacharisAt: shacharis,
   };
