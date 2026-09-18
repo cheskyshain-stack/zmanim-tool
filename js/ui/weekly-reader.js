@@ -162,13 +162,14 @@ function readerTimeHtml(e) {
 /** The פלג under its own מנחה: the second line of one cell of the board, set small under the
  *  first. Nothing when there is none, which is every row but the paired מנחה columns.
  *
- *  The name goes in front of the time, "פלג 5:44", which is how the cell is written. Isolated
- *  because the run around it is set left to right for the digits' sake and a Hebrew word left
- *  loose in one drags the time it is beside to the wrong side of it. */
+ *  The time first and the name to its right, so the פלג's digits start where the מנחה's above
+ *  them start and the two read as one column of times. Isolated because the run around it is
+ *  set left to right for the digits' sake, and a Hebrew word loose in one drags the time
+ *  beside it to the wrong side. */
 function readerSubHtml(subs) {
   if (!subs?.length) return '';
   return `<div class="reader-sub-times">${subs.map(e =>
-    `<span class="reader-sub"><bdi class="reader-sub-name" lang="he">${escAttr(e.name)}</bdi>${readerTimeHtml(e)}</span>`
+    `<span class="reader-sub">${readerTimeHtml(e)}<bdi class="reader-sub-name" lang="he">${escAttr(e.name)}</bdi></span>`
   ).join('')}</div>`;
 }
 
