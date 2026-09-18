@@ -92,9 +92,20 @@ function agendaChartEvents(rows, showing) {
     const reckonings = headLines.map(reckoningParts).find(Boolean)?.slice().reverse() || null;
     for (const line of plain.split('\n')) {
       const named = line.match(/דרשה|שקיעה|פלג[^\d]*/)?.[0]?.trim();
-      const name = named || headLines.filter(s=>!s.startsWith('פלג') && !s.startsWith('(') && !reckoningParts(s)).join(' ');
+      /* The whole heading bar the two lines that say something the times already say: the
+         room in brackets, which the underline and the star carry, and the pair of reckonings,
+         which now sit beside their own times. So the פלג line stays in, and the three columns
+         all called מנחה are named for the פלג they carry: "מנחה פלג גר״א", "מנחה פלג מ״א",
+         "מנחה פלג מ״א 72". The shul asked for it: three rows reading מנחה said nothing about
+         which was which. */
+      const name = named || headLines.filter(s=>!s.startsWith('(') && !reckoningParts(s)).join(' ');
       const morning = /שחרית|קר.*ש/.test(row.title);
-      const auxiliary = /דרשה|שקיעה|פלג|הדלקת|קר.*ש/.test(name);
+      /* Whether this is a זמן rather than a מנין, which decides that it is never offered as
+         the next מנין. Off the line's own marker where it has one, and off the heading only
+         for the two headings that are themselves זמנים. It used to read the finished name for
+         the word פלג, and now that a מנחה's name carries that word the מנחה itself would have
+         stopped counting as a מנין. Same answer as before on every line there is. */
+      const auxiliary = Boolean(named) || /הדלקת|קר.*ש/.test(name);
       const re = new RegExp(`(${UL_START}?)\\s*(\\d{1,2}):(\\d{2})(\\*{0,2})(${UL_END}?)`, 'g');
       let at = 0;
       for (const match of line.matchAll(re)) {
