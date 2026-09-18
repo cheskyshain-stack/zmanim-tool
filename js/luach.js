@@ -12,7 +12,7 @@ import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
-import { wireCopyButton } from './ui/copy.js';
+import { wireCopyButton, copyToClipboard } from './ui/copy.js';
 import { showBlocked } from './ui/blocked.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
@@ -808,8 +808,8 @@ function donateWayHtml(way) {
      loses its picture is an empty box with nothing in it to click with confidence. This is
      the shul's donation page, so the name is the alt text: the logo when it comes, the
      provider's name when it does not, and never a blank tile. */
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
-  const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.copy?.value || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
+  const providerGrid = providers ? `<p class="luach-daf-copy-status" role="status">Choosing a provider also copies our Tax ID for you to paste.</p><div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
@@ -839,6 +839,18 @@ function donateWayHtml(way) {
  *  value beside the button is selectable text in the page regardless, so this one was never
  *  the dead end the message buttons were. */
 function wireDonateCopy(root) {
+  for (const link of root.querySelectorAll('.luach-daf-provider[data-tax-id]')) {
+    link.addEventListener('click', () => {
+      const taxId = link.dataset.taxId;
+      if (!taxId) return;
+      const status = link.closest('.luach-give-open').querySelector('.luach-daf-copy-status');
+      // Start copying during the tap; the normal link still opens the provider immediately.
+      copyToClipboard(taxId).then(ok => {
+        status.textContent = ok ? 'Tax ID copied: ' + taxId + '. Paste it on your provider’s page.'
+          : 'Automatic copying was blocked. Use Copy above or copy the Tax ID: ' + taxId;
+      });
+    });
+  }
   for (const btn of root.querySelectorAll('.luach-copy-btn')) {
     wireCopyButton(btn, () => btn.dataset.copy || '');
   }
@@ -1136,6 +1148,7 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
 
 
