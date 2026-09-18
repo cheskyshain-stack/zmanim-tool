@@ -91,6 +91,11 @@ function make(value, steps, flags) {
       const next = Math.round(value * per) / per;
       return make(next, step(steps, next, { kind: 'round', way: 'nearest', every: minutes, because }), flags);
     },
+    ceilToStep(minutes, because) {
+      const per = 1440 / minutes;
+      const next = Math.ceil(value * per - 1e-9) / per;
+      return make(next, step(steps, next, { kind: 'round', way: 'up', every: minutes, because }), flags);
+    },
     floorToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440;

@@ -17,6 +17,7 @@ import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
 import { parseTimes } from './slichos.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
+import { zman } from '../zmanim/trace.js';
 
 const TZG_MIN = 1 / 1440;
 /** To the nearest 5 minutes, and up to the next quarter hour. */
@@ -76,6 +77,23 @@ export function tzomGedaliaMincha(shkia) {
   return [middle - TZG_GAP * TZG_MIN, middle, last];
 }
 
+/** The same three as traced values, so the sheet can say how each was arrived at.
+ *
+ *  Built through the chain rather than beside it, so each one really is the one in front of
+ *  it moved back: the first is the middle less 45, the middle is the last less 45 put up to
+ *  the quarter hour, and the last is שקיעה less 45 to the nearest five. That the two
+ *  roundings go opposite ways is the part a reader comes here for, and it is now on the
+ *  page rather than only in the comment above. */
+export function tzomGedaliaMinchaTrace(shkia) {
+  const base = zman('שקיעה', shkia, 'on the fast day, at the shul\'s elevation');
+  const last = base.minus(TZG_GAP, 'the last מנין is three quarters of an hour before שקיעה')
+    .roundToStep(5, 'to the nearest five, this being a time the shul is told to come at');
+  const middle = last.minus(TZG_GAP, 'and the one before it three quarters of an hour earlier again')
+    .ceilToStep(15, 'up to the next quarter hour, which is what keeps the middle of the afternoon on a round time');
+  const first = middle.minus(TZG_GAP, 'and the same again, which needs no rounding of its own, being already on a quarter hour');
+  return [first, middle, last];
+}
+
 /** The finished poster for one Hebrew year. */
 export function buildTzomGedaliaPoster(year, settings) {
   if (!year) return null;
@@ -84,15 +102,23 @@ export function buildTzomGedaliaPoster(year, settings) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
 
   const shacharis = parseTimes(TZG_TEXT.morning);
+  /* Each computed time carries the traced value that made it, so the calculations page reads
+     this sheet's own working rather than a description of it written somewhere else. */
+  const minchaTrace = tzomGedaliaMinchaTrace(shkia);
   const mincha = [
     ...parseTimes(TZG_TEXT.earlyMincha),
     // The two that open the run are למטה and the one against שקיעה is the main בית מדרש,
     // the same way round as the afternoon on the everyday board.
-    ...tzomGedaliaMincha(shkia).map((t, i) => tm(t, i < 2)),
+    ...tzomGedaliaMincha(shkia).map((t, i) => ({ ...tm(t, i < 2), trace: i < 2 ? minchaTrace[i].underline() : minchaTrace[i] })),
   ];
   // 35 and 50 minutes after שקיעה. The later one is the underlined one, which is how the
   // boards print a two time מעריב.
-  const maariv = [tm(shkia + 35 * TZG_MIN), tm(shkia + 50 * TZG_MIN, true)];
+  const shkiaTrace = zman('שקיעה', shkia, 'on the fast day, at the shul\'s elevation');
+  const maarivTrace = [shkiaTrace.plus(35), shkiaTrace.plus(50).underline()];
+  const maariv = [
+    { ...tm(shkia + 35 * TZG_MIN), trace: maarivTrace[0] },
+    { ...tm(shkia + 50 * TZG_MIN, true), trace: maarivTrace[1] },
+  ];
 
   /* The fast day's מנינים, for the congregation's "what is on next", off the very lists the
      sheet prints rather than worked out again. שקיעה is not one of them: it stands between
@@ -122,7 +148,7 @@ export function buildTzomGedaliaPoster(year, settings) {
       // שקיעה stands on its own between the two, the way the sheet sets it. It is not a
       // מנין, so it is not part of the מנחה block: it carries no heading and its line is the
       // name and the time together.
-      { calc: 'shkia', note: { label: TZG_TEXT.shkia, text: formatTime(shkia) } },
+      { calc: 'shkia', note: { label: TZG_TEXT.shkia, text: formatTime(shkia), trace: shkiaTrace } },
       { calc: 'maariv', head: TZG_TEXT.maariv, lines: [maariv] },
     ],
     // The day's מנינים, for the congregation's "what is on next". Nothing on the printed

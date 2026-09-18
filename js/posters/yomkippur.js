@@ -129,7 +129,15 @@ function fiveEarlier(times) {
   return times.map((t) => {
     const [h, m] = t.text.split(':').map(Number);
     const shifted = at(h === 12 ? 0 : h, m) - 5 * YK_MIN;
-    return { ...t, text: formatTime(shifted) };
+    /* The trace is moved with the text, not carried over with it. Spreading `t` brings the
+       trace of the time this one was made from, so without this the sheet printed 6:55 while
+       the calculations page explained a 7:00. A wrong explanation is worse than none, and it
+       is the one failure a page like this must not have. */
+    return {
+      ...t,
+      text: formatTime(shifted),
+      trace: t.trace ? t.trace.minus(5, 'the morning after יום כיפור runs five minutes earlier than the ערב יום כיפור list it is taken from') : null,
+    };
   });
 }
 

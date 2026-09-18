@@ -17,6 +17,7 @@
 // one set of marks.
 import { roshHashana, excelWeekday, hebrewDateExtended } from '../hebrew-calendar.js';
 import { DAY_NAMES } from '../util.js';
+import { fixedTime } from '../zmanim/trace.js';
 
 /** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
 const DOW_SUNDAY = 1;
@@ -268,7 +269,18 @@ export function parseTimes(str) {
       const underlined = /^<u>.*<\/u>\**$/.test(part);
       const bare = part.replace(/<\/?u>/g, '');
       const stars = (bare.match(/\*+$/) || [''])[0];
-      return { text: bare.slice(0, bare.length - stars.length), underlined, mark: stars };
+      const text = bare.slice(0, bare.length - stars.length);
+      /* A trace beside the text, so the calculations page can say what these are: times the
+         shul sets by hand on the sheet, not worked out from the sun. Every poster's typed
+         times come through here, so one place answers for all of them.
+
+         Attached rather than replacing anything, so every existing reader is untouched. The
+         am flag is not guessed: a board is a 12 hour clock with no meridiem on it, so both
+         readings format to the same string, and the trace is only ever asked for that. */
+      const trace = /^\d{1,2}:\d{2}$/.test(text)
+        ? fixedTime(text, { label: 'typed into the sheet as the shul hangs it' })
+        : null;
+      return { text, underlined, mark: stars, trace };
     });
 }
 
