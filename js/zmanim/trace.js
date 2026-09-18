@@ -32,6 +32,12 @@ import { ceilToMinute, floorToMinute, roundToMinute, formatTime, underlineTime }
    flattens every module into one scope where two of a name is a hard error. It caught this. */
 const TRACE_MIN = 1 / 1440;
 
+/** Appends a step that records the value it left behind, so the calculations page can show
+ *  the arithmetic running rather than only its answer: "שקיעה 4:31, take off 15, 4:16". */
+function step(steps, value, entry) {
+  return [...steps, { ...entry, at: formatTime(value) }];
+}
+
 /** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
 function make(value, steps, flags) {
   return Object.freeze({
@@ -52,23 +58,28 @@ function make(value, steps, flags) {
     },
 
     plus(minutes, because) {
-      return make(value + minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes, because }], flags);
+      const next = value + minutes * TRACE_MIN;
+      return make(next, step(steps, next, { kind: 'offset', minutes, because }), flags);
     },
     minus(minutes, because) {
-      return make(value - minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes: -minutes, because }], flags);
+      const next = value - minutes * TRACE_MIN;
+      return make(next, step(steps, next, { kind: 'offset', minutes: -minutes, because }), flags);
     },
 
     /* Three roundings rather than one, because the workbook uses all three and which one it
        uses is part of the answer. The שבת afternoon מנחה rounds up where everything around it
        rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
     ceil(because) {
-      return make(ceilToMinute(value), [...steps, { kind: 'round', way: 'up', because }], flags);
+      const next = ceilToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'up', because }), flags);
     },
     floor(because) {
-      return make(floorToMinute(value), [...steps, { kind: 'round', way: 'down', because }], flags);
+      const next = floorToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'down', because }), flags);
     },
     round(because) {
-      return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
+      const next = roundToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'nearest', because }), flags);
     },
 
     /* To a whole number of minutes is not the only rounding on these boards. A time the shul
@@ -77,23 +88,23 @@ function make(value, steps, flags) {
        step, so they are one method with the step named. */
     roundToStep(minutes, because) {
       const per = 1440 / minutes;
-      return make(Math.round(value * per) / per,
-        [...steps, { kind: 'round', way: 'nearest', step: minutes, because }], flags);
+      const next = Math.round(value * per) / per;
+      return make(next, step(steps, next, { kind: 'round', way: 'nearest', every: minutes, because }), flags);
     },
     floorToStep(minutes, because) {
       const per = 1440 / minutes;
-      return make(Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440,
-        [...steps, { kind: 'round', way: 'down', step: minutes, because }], flags);
+      const next = Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440;
+      return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
     },
 
     /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
     underline() {
-      return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });
+      return make(value, step(steps, value, { kind: 'underline' }), { ...flags, underlined: true });
     },
 
     /** A run of stars after a time: one is בעזרת נשים, two is the שטיבל. */
     mark(chars) {
-      return make(value, [...steps, { kind: 'mark', chars }], { ...flags, mark: chars });
+      return make(value, step(steps, value, { kind: 'mark', chars }), { ...flags, mark: chars });
     },
 
     /* The two that pick between candidates. Both record what they were weighed against and
@@ -101,17 +112,17 @@ function make(value, steps, flags) {
        reconstruct from the winning number alone. */
     earlierOf(other, because) {
       const won = other.value < value ? other : this;
-      return make(won.value, [...steps, {
+      return make(won.value, step(steps, won.value, {
         kind: 'pick', how: 'earlier', because,
         against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
+      }), flags);
     },
     laterOf(other, because) {
       const won = other.value > value ? other : this;
-      return make(won.value, [...steps, {
+      return make(won.value, step(steps, won.value, {
         kind: 'pick', how: 'later', because,
         against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
+      }), flags);
     },
 
     /** A time that is only printed on some weeks.
@@ -125,7 +136,7 @@ function make(value, steps, flags) {
      *  methods too, and those close over the steps they were built with, so anything added
      *  after it would quietly drop the condition again. */
     onlyWhen(held, when) {
-      const next = make(value, [...steps, { kind: 'condition', when, held }], flags);
+      const next = make(value, step(steps, value, { kind: 'condition', when, held }), flags);
       return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
     },
 

@@ -1759,6 +1759,12 @@ function markHeaderRoom(escaped) {
    flattens every module into one scope where two of a name is a hard error. It caught this. */
 const TRACE_MIN = 1 / 1440;
 
+/** Appends a step that records the value it left behind, so the calculations page can show
+ *  the arithmetic running rather than only its answer: "שקיעה 4:31, take off 15, 4:16". */
+function step(steps, value, entry) {
+  return [...steps, { ...entry, at: formatTime(value) }];
+}
+
 /** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
 function make(value, steps, flags) {
   return Object.freeze({
@@ -1779,23 +1785,28 @@ function make(value, steps, flags) {
     },
 
     plus(minutes, because) {
-      return make(value + minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes, because }], flags);
+      const next = value + minutes * TRACE_MIN;
+      return make(next, step(steps, next, { kind: 'offset', minutes, because }), flags);
     },
     minus(minutes, because) {
-      return make(value - minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes: -minutes, because }], flags);
+      const next = value - minutes * TRACE_MIN;
+      return make(next, step(steps, next, { kind: 'offset', minutes: -minutes, because }), flags);
     },
 
     /* Three roundings rather than one, because the workbook uses all three and which one it
        uses is part of the answer. The שבת afternoon מנחה rounds up where everything around it
        rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
     ceil(because) {
-      return make(ceilToMinute(value), [...steps, { kind: 'round', way: 'up', because }], flags);
+      const next = ceilToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'up', because }), flags);
     },
     floor(because) {
-      return make(floorToMinute(value), [...steps, { kind: 'round', way: 'down', because }], flags);
+      const next = floorToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'down', because }), flags);
     },
     round(because) {
-      return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
+      const next = roundToMinute(value);
+      return make(next, step(steps, next, { kind: 'round', way: 'nearest', because }), flags);
     },
 
     /* To a whole number of minutes is not the only rounding on these boards. A time the shul
@@ -1804,23 +1815,23 @@ function make(value, steps, flags) {
        step, so they are one method with the step named. */
     roundToStep(minutes, because) {
       const per = 1440 / minutes;
-      return make(Math.round(value * per) / per,
-        [...steps, { kind: 'round', way: 'nearest', step: minutes, because }], flags);
+      const next = Math.round(value * per) / per;
+      return make(next, step(steps, next, { kind: 'round', way: 'nearest', every: minutes, because }), flags);
     },
     floorToStep(minutes, because) {
       const per = 1440 / minutes;
-      return make(Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440,
-        [...steps, { kind: 'round', way: 'down', step: minutes, because }], flags);
+      const next = Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440;
+      return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
     },
 
     /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
     underline() {
-      return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });
+      return make(value, step(steps, value, { kind: 'underline' }), { ...flags, underlined: true });
     },
 
     /** A run of stars after a time: one is בעזרת נשים, two is the שטיבל. */
     mark(chars) {
-      return make(value, [...steps, { kind: 'mark', chars }], { ...flags, mark: chars });
+      return make(value, step(steps, value, { kind: 'mark', chars }), { ...flags, mark: chars });
     },
 
     /* The two that pick between candidates. Both record what they were weighed against and
@@ -1828,17 +1839,17 @@ function make(value, steps, flags) {
        reconstruct from the winning number alone. */
     earlierOf(other, because) {
       const won = other.value < value ? other : this;
-      return make(won.value, [...steps, {
+      return make(won.value, step(steps, won.value, {
         kind: 'pick', how: 'earlier', because,
         against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
+      }), flags);
     },
     laterOf(other, because) {
       const won = other.value > value ? other : this;
-      return make(won.value, [...steps, {
+      return make(won.value, step(steps, won.value, {
         kind: 'pick', how: 'later', because,
         against: other.describe(), took: won === other ? 'other' : 'this',
-      }], flags);
+      }), flags);
     },
 
     /** A time that is only printed on some weeks.
@@ -1852,7 +1863,7 @@ function make(value, steps, flags) {
      *  methods too, and those close over the steps they were built with, so anything added
      *  after it would quietly drop the condition again. */
     onlyWhen(held, when) {
-      const next = make(value, [...steps, { kind: 'condition', when, held }], flags);
+      const next = make(value, step(steps, value, { kind: 'condition', when, held }), flags);
       return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
     },
 
@@ -3972,7 +3983,12 @@ function buildKayitzRow(week, settings) {
     K: plagWindow ? early(earlyGRA) : null,
   };
 
-  return { B, C, D, E, F, G, H, I, J, K, L, traces };
+  /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
+     beside the ones it did, and the note each menu carries travels with them. */
+  const notes = { C: shabbosMincha.note || null, L: erevMincha.note || null };
+  const dropped = { C: shabbosMincha.dropped || null };
+
+  return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
 }
 
 const KAYITZ_COLUMNS = [
@@ -4896,7 +4912,12 @@ function buildChorefRow(week, settings) {
     G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
   };
 
-  return { B, C, D, E, F, G, H, I, traces };
+  /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
+     beside the ones it did, and the note each menu carries travels with them. */
+  const notes = { C: shabbosMincha.note || null, I: erevMincha.note || null };
+  const dropped = { C: shabbosMincha.dropped || null };
+
+  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
 }
 
 const CHOREF_COLUMNS = [
@@ -6440,6 +6461,126 @@ const WEEKDAY_COLUMNS = [
   { key: 'C', header: 'מנחה' },
   { key: 'E', header: 'שחרית' },
 ];
+
+// ==== ui/calc-cell.js ====
+// One cell of a chart, opened up: each time in it, and what made that time.
+//
+// The shul asked for this shape in place of the paragraphs that used to be here. Somebody
+// checking a calculation wants to see the structure, not read for it: this is a fixed time,
+// this one is forty five minutes before שקיעה and rounded up, this one is on the board only
+// when שקיעה is late enough. So the answer is a short stack of steps under each time, in the
+// order the arithmetic happened, each showing what it left behind.
+//
+// Nothing here calculates. It reads the steps a traced time recorded while the board was
+// being built (zmanim/trace.js), which is the same pass that produced the printed cell, so
+// this page cannot describe a time the board did not print.
+
+
+/* cellEsc and cellTimeHtml rather than esc and timeHtml: week-sheet.js and posters-view.js
+   already have those, and build-offline.py flattens every module into one scope where two
+   of a name is a hard error. It caught both. */
+const cellEsc = (s) =>
+  String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Hebrew inside an otherwise English sentence, isolated so the digits beside it do not join
+ *  its run and reverse the line. The Weekday footer cost four rounds over exactly this. */
+const HEBREW = /[֐-׿]+(?:[ ֐-׿׳״"'“”]*[֐-׿]+)*/g;
+const withHebrew = (s) => cellEsc(s).replace(HEBREW, (run) => `<bdi>${run}</bdi>`);
+
+const minutes = (n) => `${Math.abs(n)} minute${Math.abs(n) === 1 ? '' : 's'}`;
+
+/** One step as a line of English. The value it left behind is shown beside it, so the
+ *  arithmetic can be followed down the list rather than taken on trust at the end. */
+function stepHtml(s) {
+  const because = s.because ? ` <span class="calc-because">${withHebrew(s.because)}</span>` : '';
+  const at = s.at ? `<span class="calc-at">${cellEsc(s.at)}</span>` : '';
+  const line = (body) => `<li><span class="calc-step-body">${body}${because}</span>${at}</li>`;
+
+  switch (s.kind) {
+    case 'base':
+      return line(`Starts from <strong>${withHebrew(s.name)}</strong>${s.note ? `, ${withHebrew(s.note)}` : ''}`);
+    case 'fixed':
+      return line(`<strong>A fixed time.</strong> Nothing about it is worked out${s.label ? `: ${withHebrew(s.label)}` : ''}`);
+    case 'offset':
+      return line(`${s.minutes < 0 ? 'Take off' : 'Add'} <strong>${minutes(s.minutes)}</strong>`);
+    case 'round': {
+      const every = s.every ? `the nearest ${s.every} minutes` : 'the whole minute';
+      const way = s.way === 'up' ? 'up to' : s.way === 'down' ? 'down to' : 'to';
+      return line(`Round <strong>${way} ${every}</strong>`);
+    }
+    case 'pick': {
+      const took = s.took === 'other' ? 'that one wins' : 'this one wins';
+      return line(`Take the <strong>${s.how}</strong> of this and <strong>${cellEsc(s.against.text)}</strong>, so ${took}`);
+    }
+    case 'condition':
+      return line(s.held
+        ? `<strong>On the board this week.</strong> ${withHebrew(s.when)}`
+        : `<strong>Not on the board this week.</strong> ${withHebrew(s.when)}`);
+    case 'underline':
+      return line(`Underlined, so this ${withHebrew('מנין')} is <strong>${withHebrew('בבית מדרש למטה')}</strong>`);
+    case 'mark':
+      return line(`Marked <strong>${cellEsc(s.chars)}</strong>, which says which room it is in`);
+    default:
+      return '';
+  }
+}
+
+/** One time and its working. */
+function cellTimeHtml(time) {
+  const printed = time.plain();
+  const dropped = time.held === false;
+  return `
+    <li class="calc-time${dropped ? ' is-dropped' : ''}">
+      <div class="calc-time-head">
+        <span class="calc-time-value">${cellEsc(printed)}</span>
+        ${dropped ? '<span class="calc-time-note">not printed this week</span>' : ''}
+      </div>
+      <ol class="calc-steps">${time.steps.map(stepHtml).join('')}</ol>
+    </li>`;
+}
+
+/** The cell as the board prints it, underline sentinels turned into a real underline.
+ *
+ *  Escaped first. The sentinels are private use characters, so escaping cannot touch them and
+ *  swapping them for tags afterwards cannot let anything else through. */
+function printedCellHtml(text) {
+  if (!text) return '<span class="calc-blank">blank that week</span>';
+  return cellEsc(text)
+    .split(UL_START).join('<u>')
+    .split(UL_END).join('</u>')
+    .replace(/\n/g, '<br>');
+}
+
+/** Everything the opened view shows for one cell.
+ *
+ *  A cell with no traces still opens and says so in as many words. A page that quietly
+ *  skipped one would look complete while being silent about it, which is the failure this
+ *  page has always been written to avoid. */
+function cellDetailHtml({ header, key, chartName, printed, times, note, dropped, fallback }) {
+  const all = [...(times || []), ...(dropped || [])];
+  /* A column whose times are not traced yet falls back to the written rule it has always
+     had. The structure is replacing that prose column by column, and a column part way
+     through the change must not go quiet: a page that silently dropped an explanation would
+     look complete while saying less than it did before. */
+  const body = all.length
+    ? `<ol class="calc-times">${all.map(cellTimeHtml).join('')}</ol>`
+    : fallback
+      ? `<div class="calc-fallback"><p class="calc-fallback-why">This column is still described in words rather than
+          step by step. The rule is the same one the board is built from.</p><p>${withHebrew(fallback)}</p></div>`
+      : `<p class="calc-nothing">This cell is not written up yet, so there is nothing to open. That is worth
+        reporting rather than working around: every other cell on this chart can say how it was made.</p>`;
+  return `
+    <div class="calc-open-head">
+      <div>
+        <bdi class="calc-open-name">${cellEsc(String(header).replace(/\n/g, ' '))}</bdi>
+        <span class="calc-open-where">${cellEsc(chartName)}, column ${cellEsc(key)}</span>
+      </div>
+      <button type="button" class="calc-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="calc-open-printed">${printedCellHtml(printed)}</div>
+    ${note ? `<p class="calc-open-note">${withHebrew(note)}</p>` : ''}
+    ${body}`;
+}
 
 // ==== ui/nav-helpers.js ====
 // Small pieces of navigation that more than one view needs.
@@ -12645,6 +12786,7 @@ function howFar(item) {
 
 
 
+
 const calcEsc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -13459,6 +13601,18 @@ function exampleWeek(state, season, settings) {
 const fmtWeek = (week) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(week.date);
 
+/** One chart, drawn as the board is drawn, with every cell a thing you can open.
+ *
+ *  The shul asked for a chart to click rather than a page to read. So the columns are laid
+ *  out in the order they print, right to left, with one real week under them, and opening a
+ *  cell shows what made each time in it.
+ *
+ *  The row is built by calling the chart's own builder, so the numbers here are the numbers
+ *  on that board, and the traces it hands back are from that same pass. The columns come from
+ *  the chart's own column list, which is what stops this page describing a column that no
+ *  longer exists or quietly missing one that was added. */
+const cellStore = new Map();
+
 function chartHtml(chart, state, settings) {
   const week = exampleWeek(state, chart.key, settings);
   let row = {};
@@ -13470,28 +13624,30 @@ function chartHtml(chart, state, settings) {
     }
   }
 
-  const entries = printedOrder(chart.columns)
-    .map(({ key, header }) => {
-      const rule = chart.rules[key];
-      const worked = week && key in row
-        ? `<div class="calc-worked"><span class="calc-worked-label">That week it comes out</span><span class="calc-worked-value">${cellHtml(row[key])}</span></div>`
-        : '';
-      return `
-        <div class="calc-col">
-          <div class="calc-col-head">
-            <bdi class="calc-col-name">${calcEsc(String(header).replace(/\n/g, ' '))}</bdi>
-            <span class="calc-col-key">column ${calcEsc(key)}</span>
-          </div>
-          <p class="calc-plain">${rule ? isolateHebrew(text(rule.plain, settings)) : 'Not written up yet.'}</p>
-          ${worked}
-          ${rule ? `<details class="calc-exact"><summary>The exact rule</summary><p>${isolateHebrew(text(rule.exact, settings))}</p></details>` : ''}
-        </div>`;
-    })
-    .join('');
+  const cols = printedOrder(chart.columns);
+  const heads = cols.map(({ key, header }) =>
+    `<th scope="col"><bdi>${calcEsc(String(header).replace(/\n/g, ' '))}</bdi><span class="calc-col-key">${calcEsc(key)}</span></th>`).join('');
+
+  const cells = cols.map(({ key, header }) => {
+    const id = `${chart.key}:${key}`;
+    const rule = chart.rules[key];
+    cellStore.set(id, {
+      header, key, chartName: chart.name,
+      printed: row[key],
+      times: row.traces?.[key] || null,
+      note: row.notes?.[key] || null,
+      dropped: row.dropped?.[key] || null,
+      fallback: rule ? text(rule.plain, settings) : null,
+    });
+    const traced = (row.traces?.[key] || []).length > 0;
+    return `<td><button type="button" class="calc-cell${traced ? ' is-traced' : ''}" data-cell="${calcEsc(id)}">
+        <span class="calc-cell-text">${printedCellHtml(row[key])}</span>
+      </button></td>`;
+  }).join('');
 
   const which = week
-    ? `<p class="hint">Worked through on <strong>${calcEsc(fmtWeek(week))}</strong>, the week this chart is on now.</p>`
-    : '<p class="hint">Generate a season and each column will show what it comes out to that week.</p>';
+    ? `<p class="hint">One real week, <strong>${calcEsc(fmtWeek(week))}</strong>, the week this chart is on now. Tap any box to see how its times were worked out.</p>`
+    : '<p class="hint">Generate a season and this chart will fill in.</p>';
 
   return `
     <details class="panel calc-chart" data-chart="${chart.key}">
@@ -13499,7 +13655,9 @@ function chartHtml(chart, state, settings) {
       <div class="panel-body">
         <p class="hint">${isolateHebrew(chart.note)}</p>
         ${which}
-        <div class="calc-cols">${entries}</div>
+        <div class="calc-table-wrap">
+          <table class="calc-table"><thead><tr>${heads}</tr></thead><tbody><tr>${cells}</tr></tbody></table>
+        </div>
       </div>
     </details>`;
 }
@@ -13563,11 +13721,13 @@ function renderCalculations(container, state, onOpenTab) {
     <p class="hint">Every column on every chart and every line on every poster, and how each one is worked out.</p>
 
     <div class="guide-lede">
-      <p>Two answers for each one. The plain rule is what the column or the line is, in the shul's terms. <strong>The exact rule</strong> under it is the formula as the program has it, down to the rounding, for checking against the workbook.</p>
-      <p>The numbers beside each rule are not written here: they are produced by running the real formula on a real week, and the real poster on the year coming up, so a time on this page is the time on that board or that sheet.</p>
+      <p>The charts below are real weeks. <strong>Tap any box</strong> and it opens up, and under each time it says what that time is: a fixed time, or so many minutes before or after a named זמן, and which way it was rounded.</p>
+      <p>Nothing on this page is written down twice. Every time and every step under it comes from the same pass that built the board, so this page cannot describe a time the board did not print. The posters below are still described in words, and are being moved over to the same shape.</p>
     </div>
 
     <p class="hint calc-not-rules">This is not the <button type="button" class="linkish" id="calc-to-rules">Rules in Settings</button>. Those are the shul's own exceptions, the ones that add דרשה on שבת הגדול and mark ט באב, applied on top of everything below. What is here is the calculation underneath, which is the same every year and is not editable: it comes from the workbook the boards were always made from.</p>
+
+    <dialog id="calc-open" class="calc-open"></dialog>
 
     <h3 class="calc-section">The charts</h3>
     ${CHARTS.map((c) => chartHtml(c, state, settings)).join('')}
@@ -13589,6 +13749,23 @@ function renderCalculations(container, state, onOpenTab) {
   `;
 
   container.querySelector('#calc-to-rules')?.addEventListener('click', () => onOpenTab('settings'));
+
+  /* Opening a cell. Delegated from the container rather than bound per cell, since a chart
+     redraws whenever its <details> is opened and per-cell handlers would go stale with it. */
+  const dialog = container.querySelector('#calc-open');
+  container.addEventListener('click', (e) => {
+    const cell = e.target.closest?.('.calc-cell');
+    if (!cell || !dialog) return;
+    const detail = cellStore.get(cell.dataset.cell);
+    if (!detail) return;
+    dialog.innerHTML = cellDetailHtml(detail);
+    dialog.showModal();
+  });
+  dialog?.addEventListener('click', (e) => {
+    /* The backdrop is the dialog element itself, so a click that lands on it and not on
+       anything inside is a click outside the panel. Escape is the browser's own. */
+    if (e.target.closest?.('.calc-close') || e.target === dialog) dialog.close();
+  });
 }
 
 // ==== ui/pdf-page.js ====
@@ -19424,7 +19601,12 @@ function paint() {
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
   } else if (currentTab === 'calc') {
-    renderCalculations(main, state, (tab) => {
+    /* The automatic sheets, not the raw state. The saved-sheet list is empty now that the
+       charts are computed rather than generated, and this page reads one real week off it to
+       work every column through: handed state it found nothing and quietly printed "blank
+       that week" in every cell, which is the shape of failure this page is written to avoid.
+       Same call the week card and the chart browser make, so all three show one week. */
+    renderCalculations(main, buildAutomaticCharts(state, tables), (tab) => {
       openTab(tab);
     });
   } else if (currentTab === 'traffic') {

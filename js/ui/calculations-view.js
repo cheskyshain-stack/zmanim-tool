@@ -37,6 +37,7 @@ import { currentSerial } from './nav-helpers.js';
 import { weekEndsMins } from '../upcoming.js';
 import { resolveSettings } from '../settings.js';
 import { UL_START, UL_END } from '../format.js';
+import { cellDetailHtml, printedCellHtml } from './calc-cell.js';
 
 const calcEsc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -852,6 +853,18 @@ function exampleWeek(state, season, settings) {
 const fmtWeek = (week) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(week.date);
 
+/** One chart, drawn as the board is drawn, with every cell a thing you can open.
+ *
+ *  The shul asked for a chart to click rather than a page to read. So the columns are laid
+ *  out in the order they print, right to left, with one real week under them, and opening a
+ *  cell shows what made each time in it.
+ *
+ *  The row is built by calling the chart's own builder, so the numbers here are the numbers
+ *  on that board, and the traces it hands back are from that same pass. The columns come from
+ *  the chart's own column list, which is what stops this page describing a column that no
+ *  longer exists or quietly missing one that was added. */
+const cellStore = new Map();
+
 function chartHtml(chart, state, settings) {
   const week = exampleWeek(state, chart.key, settings);
   let row = {};
@@ -863,28 +876,30 @@ function chartHtml(chart, state, settings) {
     }
   }
 
-  const entries = printedOrder(chart.columns)
-    .map(({ key, header }) => {
-      const rule = chart.rules[key];
-      const worked = week && key in row
-        ? `<div class="calc-worked"><span class="calc-worked-label">That week it comes out</span><span class="calc-worked-value">${cellHtml(row[key])}</span></div>`
-        : '';
-      return `
-        <div class="calc-col">
-          <div class="calc-col-head">
-            <bdi class="calc-col-name">${calcEsc(String(header).replace(/\n/g, ' '))}</bdi>
-            <span class="calc-col-key">column ${calcEsc(key)}</span>
-          </div>
-          <p class="calc-plain">${rule ? isolateHebrew(text(rule.plain, settings)) : 'Not written up yet.'}</p>
-          ${worked}
-          ${rule ? `<details class="calc-exact"><summary>The exact rule</summary><p>${isolateHebrew(text(rule.exact, settings))}</p></details>` : ''}
-        </div>`;
-    })
-    .join('');
+  const cols = printedOrder(chart.columns);
+  const heads = cols.map(({ key, header }) =>
+    `<th scope="col"><bdi>${calcEsc(String(header).replace(/\n/g, ' '))}</bdi><span class="calc-col-key">${calcEsc(key)}</span></th>`).join('');
+
+  const cells = cols.map(({ key, header }) => {
+    const id = `${chart.key}:${key}`;
+    const rule = chart.rules[key];
+    cellStore.set(id, {
+      header, key, chartName: chart.name,
+      printed: row[key],
+      times: row.traces?.[key] || null,
+      note: row.notes?.[key] || null,
+      dropped: row.dropped?.[key] || null,
+      fallback: rule ? text(rule.plain, settings) : null,
+    });
+    const traced = (row.traces?.[key] || []).length > 0;
+    return `<td><button type="button" class="calc-cell${traced ? ' is-traced' : ''}" data-cell="${calcEsc(id)}">
+        <span class="calc-cell-text">${printedCellHtml(row[key])}</span>
+      </button></td>`;
+  }).join('');
 
   const which = week
-    ? `<p class="hint">Worked through on <strong>${calcEsc(fmtWeek(week))}</strong>, the week this chart is on now.</p>`
-    : '<p class="hint">Generate a season and each column will show what it comes out to that week.</p>';
+    ? `<p class="hint">One real week, <strong>${calcEsc(fmtWeek(week))}</strong>, the week this chart is on now. Tap any box to see how its times were worked out.</p>`
+    : '<p class="hint">Generate a season and this chart will fill in.</p>';
 
   return `
     <details class="panel calc-chart" data-chart="${chart.key}">
@@ -892,7 +907,9 @@ function chartHtml(chart, state, settings) {
       <div class="panel-body">
         <p class="hint">${isolateHebrew(chart.note)}</p>
         ${which}
-        <div class="calc-cols">${entries}</div>
+        <div class="calc-table-wrap">
+          <table class="calc-table"><thead><tr>${heads}</tr></thead><tbody><tr>${cells}</tr></tbody></table>
+        </div>
       </div>
     </details>`;
 }
@@ -956,11 +973,13 @@ export function renderCalculations(container, state, onOpenTab) {
     <p class="hint">Every column on every chart and every line on every poster, and how each one is worked out.</p>
 
     <div class="guide-lede">
-      <p>Two answers for each one. The plain rule is what the column or the line is, in the shul's terms. <strong>The exact rule</strong> under it is the formula as the program has it, down to the rounding, for checking against the workbook.</p>
-      <p>The numbers beside each rule are not written here: they are produced by running the real formula on a real week, and the real poster on the year coming up, so a time on this page is the time on that board or that sheet.</p>
+      <p>The charts below are real weeks. <strong>Tap any box</strong> and it opens up, and under each time it says what that time is: a fixed time, or so many minutes before or after a named זמן, and which way it was rounded.</p>
+      <p>Nothing on this page is written down twice. Every time and every step under it comes from the same pass that built the board, so this page cannot describe a time the board did not print. The posters below are still described in words, and are being moved over to the same shape.</p>
     </div>
 
     <p class="hint calc-not-rules">This is not the <button type="button" class="linkish" id="calc-to-rules">Rules in Settings</button>. Those are the shul's own exceptions, the ones that add דרשה on שבת הגדול and mark ט באב, applied on top of everything below. What is here is the calculation underneath, which is the same every year and is not editable: it comes from the workbook the boards were always made from.</p>
+
+    <dialog id="calc-open" class="calc-open"></dialog>
 
     <h3 class="calc-section">The charts</h3>
     ${CHARTS.map((c) => chartHtml(c, state, settings)).join('')}
@@ -982,4 +1001,21 @@ export function renderCalculations(container, state, onOpenTab) {
   `;
 
   container.querySelector('#calc-to-rules')?.addEventListener('click', () => onOpenTab('settings'));
+
+  /* Opening a cell. Delegated from the container rather than bound per cell, since a chart
+     redraws whenever its <details> is opened and per-cell handlers would go stale with it. */
+  const dialog = container.querySelector('#calc-open');
+  container.addEventListener('click', (e) => {
+    const cell = e.target.closest?.('.calc-cell');
+    if (!cell || !dialog) return;
+    const detail = cellStore.get(cell.dataset.cell);
+    if (!detail) return;
+    dialog.innerHTML = cellDetailHtml(detail);
+    dialog.showModal();
+  });
+  dialog?.addEventListener('click', (e) => {
+    /* The backdrop is the dialog element itself, so a click that lands on it and not on
+       anything inside is a click outside the panel. Escape is the browser's own. */
+    if (e.target.closest?.('.calc-close') || e.target === dialog) dialog.close();
+  });
 }

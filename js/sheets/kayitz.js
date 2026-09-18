@@ -130,7 +130,12 @@ export function buildKayitzRow(week, settings) {
     K: plagWindow ? early(earlyGRA) : null,
   };
 
-  return { B, C, D, E, F, G, H, I, J, K, L, traces };
+  /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
+     beside the ones it did, and the note each menu carries travels with them. */
+  const notes = { C: shabbosMincha.note || null, L: erevMincha.note || null };
+  const dropped = { C: shabbosMincha.dropped || null };
+
+  return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
 }
 
 export const KAYITZ_COLUMNS = [

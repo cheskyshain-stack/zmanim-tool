@@ -70,7 +70,12 @@ export function buildChorefRow(week, settings) {
     G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
   };
 
-  return { B, C, D, E, F, G, H, I, traces };
+  /* Why a time is missing is part of the answer too, so the ones a week did not keep travel
+     beside the ones it did, and the note each menu carries travels with them. */
+  const notes = { C: shabbosMincha.note || null, I: erevMincha.note || null };
+  const dropped = { C: shabbosMincha.dropped || null };
+
+  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
 }
 
 export const CHOREF_COLUMNS = [

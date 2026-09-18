@@ -289,7 +289,12 @@ function paint() {
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
   } else if (currentTab === 'calc') {
-    renderCalculations(main, state, (tab) => {
+    /* The automatic sheets, not the raw state. The saved-sheet list is empty now that the
+       charts are computed rather than generated, and this page reads one real week off it to
+       work every column through: handed state it found nothing and quietly printed "blank
+       that week" in every cell, which is the shape of failure this page is written to avoid.
+       Same call the week card and the chart browser make, so all three show one week. */
+    renderCalculations(main, buildAutomaticCharts(state, tables), (tab) => {
       openTab(tab);
     });
   } else if (currentTab === 'traffic') {
