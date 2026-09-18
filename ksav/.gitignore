@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.spec.bak
+
+# Vendored binaries are fetched by packaging/fetch-vendor.py, not committed.
+packaging/vendor/
+
+# Local scratch
+*.log
+.DS_Store
