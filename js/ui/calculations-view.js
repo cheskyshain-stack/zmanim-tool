@@ -29,7 +29,7 @@ import { buildSukkosPoster, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildVasikinPoster, VS_TEXT, VS_RULES } from '../posters/vasikin.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { nextYomimNoraim } from './posters-view.js';
-import { hebrewYear } from '../hebrew-calendar.js';
+import { hebrewYear, hebrewDateExtended, jewishDateString, weekOfLabel } from '../hebrew-calendar.js';
 import { KAYITZ_COLUMNS, buildKayitzRow } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS, buildChorefRow } from '../sheets/choref.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from '../sheets/weekday.js';
@@ -865,6 +865,39 @@ const fmtWeek = (week) =>
  *  longer exists or quietly missing one that was added. */
 const cellStore = new Map();
 
+/** Where the parsha on a row comes from, as a chain of facts each read off the one above.
+ *
+ *  Nothing here is a זמן, so there is no offset and no rounding to show. What there is, and
+ *  what the shul asked to be able to see, is that the name on the row is worked out from the
+ *  date rather than typed: the Shabbos, that Shabbos on the Hebrew calendar, and the parsha
+ *  the tables give for it. */
+function parshaFacts(week, settings) {
+  const jdate = hebrewDateExtended(week.serial, settings.useGregorianBefore1582);
+  const leap = jdate.leap ? 'a leap year' : 'an ordinary year';
+  return [
+    {
+      label: 'The Shabbos this row is for',
+      value: fmtWeek(week),
+      note: 'Every row is anchored on its Shabbos. The Shabbos columns are worked on that day and the Friday columns on the day before it.',
+    },
+    {
+      label: 'That day on the Hebrew calendar',
+      value: jewishDateString(week.serial, false, settings.useGregorianBefore1582),
+      note: 'Worked out from the date, not looked up.',
+    },
+    {
+      label: 'The parsha read that Shabbos',
+      value: week.parsha || 'none: this Shabbos is Yom Tov, so the row is named for the week instead',
+      note: `Taken from the parsha table for ${settings.inIsrael ? 'ארץ ישראל' : 'חוץ לארץ'}, which is chosen by the shape of the year: which day ראש השנה fell on, whether the year is full or short, and that it is ${leap}. The week's own place in that year picks the row.`,
+    },
+    {
+      label: 'A special Shabbos',
+      value: week.specialParsha || 'not this week',
+      note: 'By its day of the year on the Hebrew calendar. These are what the דרשה afternoon and the ט באב note key on.',
+    },
+  ];
+}
+
 function chartHtml(chart, state, settings) {
   const week = exampleWeek(state, chart.key, settings);
   let row = {};
@@ -876,24 +909,30 @@ function chartHtml(chart, state, settings) {
     }
   }
 
-  const cols = printedOrder(chart.columns);
+  /* The parsha cell is not one of the chart's columns: sheet-view.js draws it beside them,
+     off the week rather than off a builder. It is on this page all the same, because the
+     shul asked for it by name: even the parsha should say that it comes from the date. */
+  const cols = [...printedOrder(chart.columns), { key: '', header: 'פרשה', parsha: true }];
   const heads = cols.map(({ key, header }) =>
     `<th scope="col"><bdi>${calcEsc(String(header).replace(/\n/g, ' '))}</bdi><span class="calc-col-key">${calcEsc(key)}</span></th>`).join('');
 
-  const cells = cols.map(({ key, header }) => {
-    const id = `${chart.key}:${key}`;
+  const cells = cols.map(({ key, header, parsha }) => {
+    const id = `${chart.key}:${key || 'parsha'}`;
     const rule = chart.rules[key];
+    const facts = parsha && week ? parshaFacts(week, settings) : null;
+    const printed = parsha
+      ? (week ? weekOfLabel(week.parsha, settings.english) + (week.specialParsha ? `\n${week.specialParsha}` : '') : '')
+      : row[key];
     cellStore.set(id, {
-      header, key, chartName: chart.name,
-      printed: row[key],
+      header, key, chartName: chart.name, printed, facts,
       times: row.traces?.[key] || null,
       note: row.notes?.[key] || null,
       dropped: row.dropped?.[key] || null,
       fallback: rule ? text(rule.plain, settings) : null,
     });
-    const traced = (row.traces?.[key] || []).length > 0;
+    const traced = facts ? facts.length > 0 : (row.traces?.[key] || []).length > 0;
     return `<td><button type="button" class="calc-cell${traced ? ' is-traced' : ''}" data-cell="${calcEsc(id)}">
-        <span class="calc-cell-text">${printedCellHtml(row[key])}</span>
+        <span class="calc-cell-text">${printedCellHtml(printed)}</span>
       </button></td>`;
   }).join('');
 

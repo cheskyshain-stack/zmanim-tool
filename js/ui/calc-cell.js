@@ -101,12 +101,29 @@ export function printedCellHtml(text) {
     .replace(/\n/g, '<br>');
 }
 
+/** A cell that holds no times at all.
+ *
+ *  The shul asked for this by name: even the parsha should say that it comes from the date.
+ *  It has no זמן, no offset and no rounding, so a stack of steps would be the wrong shape.
+ *  What it has is a short chain of facts, each derived from the one above it, which is the
+ *  same idea said in the form this kind of cell actually takes. */
+function factHtml(f) {
+  return `
+    <li class="calc-fact">
+      <div class="calc-fact-head">
+        <span class="calc-fact-label">${withHebrew(f.label)}</span>
+        <span class="calc-fact-value"><bdi>${withHebrew(f.value)}</bdi></span>
+      </div>
+      ${f.note ? `<p class="calc-fact-note">${withHebrew(f.note)}</p>` : ''}
+    </li>`;
+}
+
 /** Everything the opened view shows for one cell.
  *
  *  A cell with no traces still opens and says so in as many words. A page that quietly
  *  skipped one would look complete while being silent about it, which is the failure this
  *  page has always been written to avoid. */
-export function cellDetailHtml({ header, key, chartName, printed, times, note, dropped, fallback }) {
+export function cellDetailHtml({ header, key, chartName, printed, times, note, dropped, fallback, facts }) {
   const all = [...(times || []), ...(dropped || [])];
   /* A column whose times are not traced yet falls back to the written rule it has always
      had. The structure is replacing that prose column by column, and a column part way
@@ -115,7 +132,9 @@ export function cellDetailHtml({ header, key, chartName, printed, times, note, d
   /* A cell with a note and nothing to trace is not an unconverted cell: it is a cell with
      no working to show, and the note is the whole answer. Saying "still described in words"
      over it would be false. */
-  const body = all.length
+  const body = facts?.length
+    ? `<ol class="calc-facts">${facts.map(factHtml).join('')}</ol>`
+    : all.length
     ? `<ol class="calc-times">${all.map(cellTimeHtml).join('')}</ol>`
     : note
       ? ''
@@ -128,7 +147,7 @@ export function cellDetailHtml({ header, key, chartName, printed, times, note, d
     <div class="calc-open-head">
       <div>
         <bdi class="calc-open-name">${cellEsc(String(header).replace(/\n/g, ' '))}</bdi>
-        <span class="calc-open-where">${cellEsc(chartName)}, column ${cellEsc(key)}</span>
+        <span class="calc-open-where">${cellEsc(chartName)}${key ? `, column ${cellEsc(key)}` : ''}</span>
       </div>
       <button type="button" class="calc-close" aria-label="Close">&times;</button>
     </div>

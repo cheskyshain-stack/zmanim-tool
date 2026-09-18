@@ -4878,3 +4878,15 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
   .calc-open-printed { font-size: 1.5rem; }
   .calc-steps li { flex-direction: column; gap: 0.1rem; }
 }
+/* A cell with no times in it: the parsha, which is worked out from the date. A chain of
+   facts rather than a stack of steps, that being the shape this kind of cell actually has. */
+.calc-facts { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.calc-fact { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; }
+.calc-fact-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem; }
+.calc-fact-label { font-size: var(--fs-sm); color: var(--muted); }
+.calc-fact-value { font-weight: 700; text-align: right; }
+.calc-fact-note { margin: 0.35rem 0 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--muted); }
+@media (max-width: 520px) {
+  .calc-fact-head { flex-direction: column; gap: 0.1rem; }
+  .calc-fact-value { text-align: left; }
+}
