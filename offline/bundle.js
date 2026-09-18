@@ -3459,6 +3459,28 @@ function openingMincha(minchaGedola, next) {
   return null;
 }
 
+/** The same answer as a traced value, so a sheet can say why its afternoon opens where it
+ *  does, or why it does not open early at all.
+ *
+ *  The same three comparisons in the same order as above, so the two cannot come apart. */
+function openingMinchaTrace(minchaGedola, next) {
+  const gedola = emPrinted(minchaGedola);
+  const held = 'a מנין is never offered before מנחה גדולה, measured on the minute it prints as rather than on the raw זמן';
+  const mg = () => zman('מנחה גדולה לחומרא', gedola, 'the latest of every day this one printed list has to hold for');
+
+  if (EM_FIRST >= gedola - 1e-9) {
+    return clockTime(13, 15, 'the earlier of the two times an afternoon may open at').laterOf(mg(), held);
+  }
+  if (EM_SECOND >= gedola - 1e-9 && next - EM_SECOND >= EM_GAP - 1e-9) {
+    return clockTime(13, 20, 'the later of the two times an afternoon may open at, the 1:15 being before מנחה גדולה this year')
+      .laterOf(mg(), `${held}, and it has to leave a clear quarter hour in front of the מנין behind it`);
+  }
+  /* Nothing opens the afternoon this year, and that is worth showing rather than leaving the
+     list simply starting later with no account of why. */
+  return clockTime(13, 20, 'the later of the two times an afternoon may open at')
+    .onlyWhen(false, 'neither 1:15 nor 1:20 is past מנחה גדולה with a clear quarter hour left in front of the מנין behind it');
+}
+
 // ==== posters/yomkippur.js ====
 // The יום כיפור poster: ערב יו"כ, the day itself, and the schedule that starts after it.
 //
@@ -3474,6 +3496,7 @@ function openingMincha(minchaGedola, next) {
 // Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
 // תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
 // other way and is not self-consistent with it. See the commit for the line by line.
+
 
 
 
@@ -3704,14 +3727,68 @@ const AFTER_MAARIV_REST = [
  *  them is only which days are counted, and each sheet answers that for itself. */
 function afterSchedule(earliestShkia, latestMinchaGedola, settings, { lastFifteen = false } = {}) {
   const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
+  /* Each printed time carries the traced value that made it, so this box can say how it was
+     arrived at wherever it is hung: at the foot of the יום כיפור sheet and as a sheet of its
+     own, and the same helper again on the סוכות one. One working, three places. */
+  const shkia = () => zman('שקיעה', earliestShkia, 'the earliest of every day this one printed list has to hold for');
+  const minchaTraces = afterMinchaTrace(earliestShkia, latestMinchaGedola, { lastFifteen });
+  const early = afterEarlyMaariv(earliestShkia);
+  const earlyTrace = clockTime(19, 30, 'the מעריב this box opens with')
+    .steppedTo(early, { by: 5, backwards: false, untilAt: formatTime(earliestShkia + 50 * YK_MIN),
+      until: 'a full 50 minutes after the earliest שקיעה of the run, but never past 7:45, which leaves a quarter of an hour in front of the 8:00 behind it' })
+    .underline();
   return {
     shacharis: everydayShacharis(),
     // Everything is למטה except the 1:50, which is the main בית מדרש, as on the boards.
     mincha: afterMincha(earliestShkia, latestMinchaGedola, { lastFifteen })
-      .map((t) => tm(t, Math.abs(t - at(13, 50)) > 1e-9)),
-    maariv: [tm(afterEarlyMaariv(earliestShkia), true),
-      ...AFTER_MAARIV_REST.map(([h, m, u]) => tm(at(h, m), u))],
+      .map((t, i) => {
+        const under = Math.abs(t - at(13, 50)) > 1e-9;
+        const tr = minchaTraces[i];
+        return { ...tm(t, under), trace: tr && under ? tr.underline() : tr };
+      }),
+    maariv: [{ ...tm(early, true), trace: earlyTrace },
+      ...AFTER_MAARIV_REST.map(([h, m, u]) => ({
+        ...tm(at(h, m), u),
+        trace: (() => { const c = clockTime(h, m, 'one of the standing מעריב times, which do not move with the year'); return u ? c.underline() : c; })(),
+      }))],
   };
+}
+
+/** The מנחה list as traced values, one for one with afterMincha above.
+ *
+ *  A parallel walk rather than a rewrite of it: afterMincha stays the single answer for what
+ *  the times are, and this says what each of them is. They are built from the same constants
+ *  in the same order, and the check in the scratchpad compares every one against the printed
+ *  line, so the two cannot quietly come apart. */
+function afterMinchaTrace(earliestShkia, latestMinchaGedola = 0, { lastFifteen = false } = {}) {
+  const standing = (h, m, what) => clockTime(h, m, what);
+  const shkia = () => zman('שקיעה', earliestShkia, 'the earliest of every day this one printed list has to hold for');
+  const out = [];
+  const first = openingMincha(latestMinchaGedola, at(13, 35));
+  if (first !== null) out.push(openingMinchaTrace(latestMinchaGedola, at(13, 35)));
+  out.push(standing(13, 35, 'a standing מנין on this list'));
+  out.push(standing(13, 50, 'a standing מנין on this list, and the one in the main בית מדרש'));
+  out.push(standing(16, 15, 'a standing מנין on this list'));
+
+  const run = 'one of the run that goes every twenty minutes from 4:40, kept while it stays a quarter of an hour clear of שקיעה';
+  const times = afterMincha(earliestShkia, latestMinchaGedola, { lastFifteen });
+  for (const t of times.slice(out.length)) {
+    /* Whatever is left after the standing four is either a step of the twenty minute run or
+       one of the two that close it against שקיעה. A time on the run is on a whole number of
+       twenty minute steps from 4:40; anything else was worked out from שקיעה. */
+    const steps = (t - at(16, 40)) / (20 * YK_MIN);
+    const onRun = Math.abs(steps - Math.round(steps)) < 1e-6 && steps >= 0;
+    /* Decomposed from one rounded minute count, not from the float twice over. The run is
+       accumulated with += 20/1440, so 5:00 arrives as 1019.9999999999999 minutes: taking the
+       hour and then the minute separately rounded that remainder up to 60 and printed the
+       מנין an hour late. The check in the scratchpad caught it, which is what it is for. */
+    const mins = Math.round(t * 1440);
+    out.push(onRun
+      ? clockTime(Math.floor(mins / 60), mins % 60, run)
+      : shkia().minus(Math.round((earliestShkia - t) * 1440),
+          'the last of the afternoon, set against שקיעה so the run ends a clear quarter of an hour in front of it'));
+  }
+  return out;
 }
 
 /** The everyday schedule that runs from after יו"כ until סוכות.

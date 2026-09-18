@@ -1,3 +1,4 @@
+import { zman, clockTime } from '../zmanim/trace.js';
 // The מנין a יום טוב afternoon opens with, and the one rule that decides whether it is 1:15.
 //
 // Every one of these sheets opens its afternoon at 1:15, and 1:15 is not always late enough.
@@ -47,4 +48,26 @@ export function openingMincha(minchaGedola, next) {
   if (EM_FIRST >= gedola - 1e-9) return EM_FIRST;
   if (EM_SECOND >= gedola - 1e-9 && next - EM_SECOND >= EM_GAP - 1e-9) return EM_SECOND;
   return null;
+}
+
+/** The same answer as a traced value, so a sheet can say why its afternoon opens where it
+ *  does, or why it does not open early at all.
+ *
+ *  The same three comparisons in the same order as above, so the two cannot come apart. */
+export function openingMinchaTrace(minchaGedola, next) {
+  const gedola = emPrinted(minchaGedola);
+  const held = 'a מנין is never offered before מנחה גדולה, measured on the minute it prints as rather than on the raw זמן';
+  const mg = () => zman('מנחה גדולה לחומרא', gedola, 'the latest of every day this one printed list has to hold for');
+
+  if (EM_FIRST >= gedola - 1e-9) {
+    return clockTime(13, 15, 'the earlier of the two times an afternoon may open at').laterOf(mg(), held);
+  }
+  if (EM_SECOND >= gedola - 1e-9 && next - EM_SECOND >= EM_GAP - 1e-9) {
+    return clockTime(13, 20, 'the later of the two times an afternoon may open at, the 1:15 being before מנחה גדולה this year')
+      .laterOf(mg(), `${held}, and it has to leave a clear quarter hour in front of the מנין behind it`);
+  }
+  /* Nothing opens the afternoon this year, and that is worth showing rather than leaving the
+     list simply starting later with no account of why. */
+  return clockTime(13, 20, 'the later of the two times an afternoon may open at')
+    .onlyWhen(false, 'neither 1:15 nor 1:20 is past מנחה גדולה with a clear quarter hour left in front of the מנין behind it');
 }
