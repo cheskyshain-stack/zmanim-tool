@@ -443,7 +443,7 @@ function backBar(where) {
   const schedulePage = where === 'chart' || where === 'schedules';
   return `<div class="luach-bar no-print">
     <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : 'Menu'}</a>
-    <h1 class="luach-bar-title">${escAttr(PAGE_NAMES[where] || '')}</h1>
+    <h1 class="luach-bar-title">${escAttr(where === 'week' ? 'Zmanim' : PAGE_NAMES[where] || '')}</h1>
     ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
 }
@@ -1136,6 +1136,7 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
 
 

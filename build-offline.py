@@ -110,7 +110,7 @@ ROUTES = {
             "44 Coles Way, Lakewood NJ: shacharis, mincha, maariv, candle lighting and "
             "the Shabbos schedule."
         ),
-        "heading": "Weekly Zmanim",
+        "heading": "Zmanim",
         "blurb": (
             "The week's minyanim and zmanim at Bais Medrash of Lakewood Commons: shacharis, "
             "mincha and maariv, candle lighting for Shabbos, and the day's zmanim worked "
@@ -1066,3 +1066,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
