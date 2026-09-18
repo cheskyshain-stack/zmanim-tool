@@ -644,7 +644,6 @@ function renderWeekPage(published) {
   const draw = () => {
     clearTimeout(nextUpTimer);
     const expanded = new Map([...main.querySelectorAll('[data-agenda-key]')].map(el=>[el.dataset.agendaKey,el.open]));
-    const optionsOpen = main.querySelector('.reader-options')?.open || false;
     main.className = '';
     main.innerHTML = backBar('week') + '<div id="week-host"></div>';
     openTheDoor();
@@ -658,8 +657,9 @@ function renderWeekPage(published) {
       serial,
       { luach: true }
     );
-    const options = main.querySelector('.reader-options');
-    if (options) options.open = optionsOpen;
+    /* Previous, Today and Next used to live in a More options dropdown, whose open state had
+       to be carried across the once-a-minute redraw or it shut itself. They are three plain
+       buttons now, so there is nothing left to remember. */
     for (const el of main.querySelectorAll('[data-agenda-key]')) {
       if (expanded.has(el.dataset.agendaKey)) el.open = expanded.get(el.dataset.agendaKey);
     }

@@ -1,6 +1,6 @@
 import { currentOnePageSheets } from './posters-view.js';
 import { weeklyAgenda, agendaDayKind } from './weekly-agenda.js';
-import { minyanimForDay, clock, meridiem, candleLightingForDay } from '../upcoming.js';
+import { minyanimForDay, clock, candleLightingForDay } from '../upcoming.js';
 import { specialMinyanim } from '../posters/day.js';
 import { buildPesachPoster } from '../posters/pesach.js';
 import { hebrewDateExtended, hasTaanis, hasRoshChodesh, excelWeekday } from '../hebrew-calendar.js';
@@ -144,7 +144,15 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span><small class="reader-period">${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
+  /* No am or pm beside the digits. The shul asked for it off: the boards print a twelve hour
+     clock with no meridiem on it (see format.js), and this page is the same times said on a
+     phone. The section a time sits under is what says which half of the day it is. */
+  /* The reckoning a זמן is given on, set small over its own time. It used to be the second
+     line of the column heading and so part of the label, which on a phone made "ס״ז קר״ש
+     גר״א / מ״א" wrap to three lines beside two numbers. Over the time it belongs to is where
+     the printed sheets put it, and it cannot be read against the wrong one. */
+  const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${reckoning}<span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 function readerEventGroups(events) {
@@ -246,6 +254,9 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     const sectionName=section.key.startsWith('holy-') && !section.title.includes('Shabbos') ? `${dayName} ${section.title}` : section.title;
     if(section.key.startsWith('holy-') && !combined.dayTitles.includes(sectionName)) combined.dayTitles.push(sectionName);
     const subtitle=sectionName+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
+    /* dayPart is no longer printed (the shul asked for the word off), but it is still what keeps
+       a night's מנחה and the next day's from running together into one row when the two sit
+       side by side under the same heading. It is a grouping key, not a label. */
     combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   for(const section of displaySections) {
@@ -263,7 +274,7 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?`<small>${row.dayPart}</small>`:row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?'':row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
   let hasSpecialSchedules = false;
@@ -274,9 +285,9 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
       <a href="/chart/">Zmanim Chart <span aria-hidden="true">&rsaquo;</span></a>
       ${hasSpecialSchedules ? '<a href="/schedules/">Special Schedules <span aria-hidden="true">&rsaquo;</span></a>' : ''}
     </nav>
-    <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
+    <nav class="reader-nav no-print" aria-label="Other weeks">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
-    </div></details>
+    </nav>
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>

@@ -17546,16 +17546,34 @@ function fitWeekSheet(container) {
 }
 
 // ==== ui/weekly-agenda.js ====
+/** Which day of a yom tov this is, written the way the shul says it: "Sukkos 1st day".
+ *
+ *  Asked for on the congregation's own page, where two days of סוכות ran under one name and
+ *  there was nothing on the screen to say which of them a heading was for. A one day yom tov
+ *  takes none, and פסח's second pair are its seventh and eighth rather than its first and
+ *  second, which is why the number is worked from the date rather than counted off. */
+const YT_ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+const ytNth = (n) => `${YT_ORDINAL[n - 1]} day`;
+
 function agendaDayKind(serial, settings) {
   const h = hebrewDateExtended(serial, settings.useGregorianBefore1582);
   const d = h.dayOfMonth, m = h.month;
-  let holy = '';
-  if (m === 7) holy = d <= 2 ? 'Rosh Hashana' : d === 10 ? 'Yom Kippur' : [15,16].includes(d) ? 'Sukkos' : d === 22 ? 'Shemini Atzeres' : d === 23 ? 'Simchas Torah' : '';
-  if (m === 1 && [15,16,21,22].includes(d)) holy = 'Pesach';
-  if (m === 3 && [6,7].includes(d)) holy = 'Shavuos';
+  let holy = '', nth = '';
+  if (m === 7) {
+    holy = d <= 2 ? 'Rosh Hashana' : d === 10 ? 'Yom Kippur' : [15,16].includes(d) ? 'Sukkos' : d === 22 ? 'Shemini Atzeres' : d === 23 ? 'Simchas Torah' : '';
+    if (d <= 2) nth = ytNth(d);
+    if ([15,16].includes(d)) nth = ytNth(d - 14);
+  }
+  if (m === 1 && [15,16,21,22].includes(d)) { holy = 'Pesach'; nth = ytNth(d - 14); }
+  if (m === 3 && [6,7].includes(d)) { holy = 'Shavuos'; nth = ytNth(d - 5); }
   const chol = (m === 7 && d >= 17 && d <= 21) || (m === 1 && d >= 17 && d <= 20);
   const shabbos = excelWeekday(serial) === 7;
-  return { holy: shabbos ? (holy ? `Shabbos / ${holy}` : chol ? 'Shabbos Chol Hamoed' : 'Shabbos') : holy,
+  const named = holy && nth ? `${holy} ${nth}` : holy;
+  const withShabbos = (name) => (shabbos ? (name ? `Shabbos / ${name}` : chol ? 'Shabbos Chol Hamoed' : 'Shabbos') : name);
+  /* Two names rather than one. `holy` is the yom tov itself and is what "Erev" and "Motzaei"
+     are built on, where a day number would be wrong: ערב סוכות is not the eve of a particular
+     day of it. `holyDay` names the day and heads the times of that day alone. */
+  return { holy: withShabbos(holy), holyDay: withShabbos(named),
     chol, label: chol ? `Chol Hamoed ${m === 7 ? 'Sukkos' : 'Pesach'}` : '' };
 }
 
@@ -17564,12 +17582,29 @@ function agendaSection(event, serial, settings) {
   if (event.mins < 180 && /מעריב/.test(event.name)) serial--;
   const here = agendaDayKind(serial, settings), next = agendaDayKind(serial + 1, settings);
   const evening = /מעריב|כל נדרי|קול נדרי/.test(event.name);
-  if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
-  if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holy, serial: serial+1 };
+  /* holyDay on the three that head one day's own times, so a heading says which day of the
+     yom tov it is; holy on Erev and Motzaei, where a day number would be wrong. */
+  if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
+  if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
   if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzaei ${here.holy}`, serial };
-  if (here.holy) return { key: `holy-${serial}`, title: here.holy, serial };
+  if (here.holy) return { key: `holy-${serial}`, title: here.holyDay, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
   return { key: `day-${serial}`, title: [dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}),here.label].filter(Boolean).join(' '), serial };
+}
+
+/* The line of a column heading that names the two reckonings a זמן is given on, "גר״א / מ״א".
+   Run into the name it made a three line label on a phone, so it comes off the name and is set
+   small over the time it belongs to instead, which is how the posters already print this pair
+   (see posters/reckonings.js).
+
+   Matched by the names themselves rather than by "the second line", and normalised past the
+   quote mark first: the chart headings are written with the Hebrew gershayim and reckonings.js
+   with an ASCII one, so the two are different strings for the same word. */
+const RECKONING_NAMES = { 'מא': true, 'גרא': true };
+const reckoningBare = (s) => s.replace(/["״׳'\s]/g, '');
+function reckoningParts(line) {
+  const parts = line.split('/').map((s) => s.trim()).filter(Boolean);
+  return parts.length > 1 && parts.every((p) => RECKONING_NAMES[reckoningBare(p)]) ? parts : null;
 }
 
 function agendaChartEvents(rows, showing) {
@@ -17578,18 +17613,29 @@ function agendaChartEvents(rows, showing) {
     const serial = row.eventSerial ?? showing - (row.friday ? 1 : 0);
     const plain = String(row.value).replace(/<u\b[^>]*>/gi, UL_START).replace(/<\/u>/gi, UL_END)
       .replace(/<br\s*\/?>|<\/div>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ');
+    const headLines = String(row.header || row.title).split('\n').map(s=>s.trim()).filter(Boolean);
+    /* Reversed against the heading as it is stored. The heading reads "גר״א / מ״א" and the
+       cell holds מ״א first, because a Hebrew line is set right to left while the digits are
+       set left to right: measured on the board, מ״א paints over the earlier of the two times
+       although it is written second. Pairing them by position without this turn crosses every
+       name over the wrong time, which is the exact bug reckonings.js was written for. */
+    const reckonings = headLines.map(reckoningParts).find(Boolean)?.slice().reverse() || null;
     for (const line of plain.split('\n')) {
       const named = line.match(/דרשה|שקיעה|פלג[^\d]*/)?.[0]?.trim();
-      const name = named || (row.header || row.title).split('\n').map(s=>s.trim()).filter(s=>s && !s.startsWith('פלג') && !s.startsWith('(')).join(' ');
+      const name = named || headLines.filter(s=>!s.startsWith('פלג') && !s.startsWith('(') && !reckoningParts(s)).join(' ');
       const morning = /שחרית|קר.*ש/.test(row.title);
       const auxiliary = /דרשה|שקיעה|פלג|הדלקת|קר.*ש/.test(name);
       const re = new RegExp(`(${UL_START}?)\\s*(\\d{1,2}):(\\d{2})(\\*{0,2})(${UL_END}?)`, 'g');
+      let at = 0;
       for (const match of line.matchAll(re)) {
         const h = +match[2], m = +match[3];
         if (h < 1 || h > 12 || m > 59) continue;
         const mins = ((h % 12) + (morning ? 0 : 12))*60 + m;
         const place = match[4] === '**' ? 'באולם השמחות' : match[4] === '*' ? 'בעזר״נ' : match[1] || match[5] ? 'למטה' : /בעזר/.test(row.title) ? 'בעזר״נ' : /למטה/.test(row.title) ? 'למטה' : '';
-        out.push({serial,mins,name,place:auxiliary?'':place,auxiliary,earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
+        out.push({serial,mins,name,place:auxiliary?'':place,auxiliary,
+          reckoning:(named ? null : reckonings?.[at]) || '',
+          earlyShabbos:row.friday && /פלג/.test(row.header || row.title)});
+        at++;
       }
     }
   }
@@ -17768,7 +17814,15 @@ function readerTimeHtml(e) {
   const marked = place === 'למטה' ? `<u>${label}</u>` : label;
   const star = place === 'בעזר״נ' ? '*' : place === 'באולם השמחות' ? '**' : '';
   const room = place && !['למטה','בעזר״נ','באולם השמחות'].includes(place) ? `<small lang="he">${escAttr(place)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span><small class="reader-period">${meridiem(e.mins)}</small>${room}${e.started?'<small>Just started</small>':''}</span>`;
+  /* No am or pm beside the digits. The shul asked for it off: the boards print a twelve hour
+     clock with no meridiem on it (see format.js), and this page is the same times said on a
+     phone. The section a time sits under is what says which half of the day it is. */
+  /* The reckoning a זמן is given on, set small over its own time. It used to be the second
+     line of the column heading and so part of the label, which on a phone made "ס״ז קר״ש
+     גר״א / מ״א" wrap to three lines beside two numbers. Over the time it belongs to is where
+     the printed sheets put it, and it cannot be read against the wrong one. */
+  const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
+  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}">${reckoning}<span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${room}${e.started?'<small>Just started</small>':''}</span>`;
 }
 
 function readerEventGroups(events) {
@@ -17870,6 +17924,9 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     const sectionName=section.key.startsWith('holy-') && !section.title.includes('Shabbos') ? `${dayName} ${section.title}` : section.title;
     if(section.key.startsWith('holy-') && !combined.dayTitles.includes(sectionName)) combined.dayTitles.push(sectionName);
     const subtitle=sectionName+(repeated ? ` · ${dateFromSerial(section.serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})}` : '');
+    /* dayPart is no longer printed (the shul asked for the word off), but it is still what keeps
+       a night's מנחה and the next day's from running together into one row when the two sit
+       side by side under the same heading. It is a grouping key, not a label. */
     combined.events.push(...section.events.map(e=>({...e,sectionTitle:subtitle,dayPart:e.serial<section.serial?'Evening':'Day'})));
   }
   for(const section of displaySections) {
@@ -17887,7 +17944,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?`<small>${row.dayPart}</small>`:row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?'':row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
   let hasSpecialSchedules = false;
@@ -17898,9 +17955,9 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
       <a href="/chart/">Zmanim Chart <span aria-hidden="true">&rsaquo;</span></a>
       ${hasSpecialSchedules ? '<a href="/schedules/">Special Schedules <span aria-hidden="true">&rsaquo;</span></a>' : ''}
     </nav>
-    <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
+    <nav class="reader-nav no-print" aria-label="Other weeks">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
-    </div></details>
+    </nav>
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
