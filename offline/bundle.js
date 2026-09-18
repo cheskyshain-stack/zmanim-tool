@@ -17649,10 +17649,22 @@ function agendaDayKind(serial, settings) {
   const shabbos = excelWeekday(serial) === 7;
   const named = holy && nth ? `${holy} ${nth}` : holy;
   const withShabbos = (name) => (shabbos ? (name ? `Shabbos / ${name}` : chol ? 'Shabbos Chol Hamoed' : 'Shabbos') : name);
-  /* Two names rather than one. `holy` is the yom tov itself and is what "Erev" and "Motzaei"
-     are built on, where a day number would be wrong: ערב סוכות is not the eve of a particular
-     day of it. `holyDay` names the day and heads the times of that day alone. */
+  /* What the evening after this day is called, where the festival is not over with it.
+     Asked for on מוצאי יום ב' של סוכות: the yom tov is out, but Sukkos runs another week, so
+     "Motzai Sukkos" reads as the end of the whole thing rather than of the two days that
+     have just finished. Only the second days of סוכות and פסח are in it, those being the
+     only evenings this heading can land on with more of the same festival still to come:
+     every other one really is the end of what it names, and Motzai Shabbos and
+     Motzai Yom Kippur must stay the words they are.
+     Neither day can be a Shabbos, 16 תשרי and 16 ניסן never falling on one, so this never
+     has to swallow a "Shabbos / " in front of it. */
+  const runsOn = d === 16 && (m === 7 || m === 1);
+  /* Three names rather than one. `holy` is the yom tov itself and is what "Erev" is built on,
+     where a day number would be wrong: ערב סוכות is not the eve of a particular day of it.
+     `holyDay` names the day and heads the times of that day alone. `motzai` is the evening
+     after. */
   return { holy: withShabbos(holy), holyDay: withShabbos(named),
+    motzai: runsOn ? 'Yom Tov' : withShabbos(holy),
     chol, label: chol ? `Chol Hamoed ${m === 7 ? 'Sukkos' : 'Pesach'}` : '' };
 }
 
@@ -17665,8 +17677,9 @@ function agendaSection(event, serial, settings) {
      yom tov it is; holy on Erev and Motzaei, where a day number would be wrong. */
   if ((event.earlyShabbos || /הדלקת|שקיעה/.test(event.name)) && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
   if (evening && next.holy) return { key: `holy-${serial+1}`, title: next.holyDay, serial: serial+1 };
-  /* "Motzai", which is how the shul spells it. */
-  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzai ${here.holy}`, serial };
+  /* "Motzai", which is how the shul spells it, and `motzai` rather than `holy` because on the
+     second day of סוכות or פסח the festival has another week to run. */
+  if ((evening || /קידוש לבנה/.test(event.name)) && here.holy) return { key: `motzaei-${serial}`, title: `Motzai ${here.motzai}`, serial };
   if (here.holy) return { key: `holy-${serial}`, title: here.holyDay, serial };
   if (next.holy && (/מנחה|הדלקת|שקיעה|פלג/.test(event.name))) return { key: `erev-${serial}`, title: `Erev ${next.holy}`, serial };
   return { key: `day-${serial}`, title: [dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'long'}),here.label].filter(Boolean).join(' '), serial };
