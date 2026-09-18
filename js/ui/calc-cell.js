@@ -52,6 +52,15 @@ function stepHtml(s) {
       return line(s.held
         ? `<strong>On the board this week.</strong> ${withHebrew(s.when)}`
         : `<strong>Not on the board this week.</strong> ${withHebrew(s.when)}`);
+    case 'stepped': {
+      if (!s.moved) {
+        return line(`Stands at this time: it already clears ${withHebrew(s.until || 'its limit')}`);
+      }
+      const way = s.backwards ? 'earlier' : 'later';
+      const target = s.untilAt ? ` (<strong>${cellEsc(s.untilAt)}</strong>)` : '';
+      return line(`Moved <strong>${way}</strong> from <strong>${cellEsc(s.from)}</strong>, ${s.by} minutes at a
+        time, until it is ${withHebrew(s.until || '')}${target}`);
+    }
     case 'underline':
       return line(`Underlined, so this ${withHebrew('מנין')} is <strong>${withHebrew('בבית מדרש למטה')}</strong>`);
     case 'mark':
@@ -65,10 +74,15 @@ function stepHtml(s) {
 function cellTimeHtml(time) {
   const printed = time.plain();
   const dropped = time.held === false;
+  /* A dropped time is headed by where it started, not where it ended. On the Weekday chart
+     three מנינים can all be pushed onto the same minute and then dropped for crowding, and
+     headed by that minute they read as the same entry three times over. What the reader is
+     looking for is the standing 6:35 that is not on the board this week. */
+  const head = dropped ? (time.steps[0]?.at ?? printed) : printed;
   return `
     <li class="calc-time${dropped ? ' is-dropped' : ''}">
       <div class="calc-time-head">
-        <span class="calc-time-value">${cellEsc(printed)}</span>
+        <span class="calc-time-value">${cellEsc(head)}</span>
         ${dropped ? '<span class="calc-time-note">not printed this week</span>' : ''}
       </div>
       <ol class="calc-steps">${time.steps.map(stepHtml).join('')}</ol>
@@ -98,9 +112,14 @@ export function cellDetailHtml({ header, key, chartName, printed, times, note, d
      had. The structure is replacing that prose column by column, and a column part way
      through the change must not go quiet: a page that silently dropped an explanation would
      look complete while saying less than it did before. */
+  /* A cell with a note and nothing to trace is not an unconverted cell: it is a cell with
+     no working to show, and the note is the whole answer. Saying "still described in words"
+     over it would be false. */
   const body = all.length
     ? `<ol class="calc-times">${all.map(cellTimeHtml).join('')}</ol>`
-    : fallback
+    : note
+      ? ''
+      : fallback
       ? `<div class="calc-fallback"><p class="calc-fallback-why">This column is still described in words rather than
           step by step. The rule is the same one the board is built from.</p><p>${withHebrew(fallback)}</p></div>`
       : `<p class="calc-nothing">This cell is not written up yet, so there is nothing to open. That is worth

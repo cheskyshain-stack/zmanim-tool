@@ -1824,6 +1824,18 @@ function make(value, steps, flags) {
       return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
     },
 
+    /* The Weekday chart's times move themselves, which no offset describes: a standing 6:35
+       מעריב is walked later five minutes at a time until it clears שקיעה by fifty on all five
+       days of the week. The move is one step, recorded with what it was walking towards and
+       in what size of stride, because "6:35 became 7:15" without the reason is the least
+       useful thing this page could say. */
+    steppedTo(next, { by, until, untilAt, backwards } = {}) {
+      return make(next, step(steps, next, {
+        kind: 'stepped', by, until, untilAt, backwards,
+        from: formatTime(value), moved: next !== value,
+      }), flags);
+    },
+
     /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
     underline() {
       return make(value, step(steps, value, { kind: 'underline' }), { ...flags, underlined: true });
@@ -6173,6 +6185,7 @@ function buildVasikinPoster(year, settings, which = 'rh') {
 
 
 
+
 /** Times are handled in whole minutes after midnight rather than Excel day-fractions,
  *  because every zman on this chart sits on a 5-minute grid and the moves below are
  *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
@@ -6249,12 +6262,27 @@ function isBmgWeek(serial, settings) {
   return bmgDays * 2 > days.length;
 }
 
+/** One slot as a traced time, in the order base, move, room, kept or dropped.
+ *
+ *  The order is not free. underline and the star say which room a מנין is in, and where the
+ *  clock pushed it is what decides that for the 8:45, so the room goes on after the move.
+ *  onlyWhen goes last of all: it hands back a value whose text is silenced, and anything
+ *  chained after it would be built from the unsilenced one underneath and lose the condition.
+ */
+function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }) {
+  let t = clockTime(Math.floor(slot.base / 60), slot.base % 60, label);
+  t = t.steppedTo(slot.mins / 1440, { by: STEP, until, untilAt, backwards });
+  if (place === LMATA) t = t.underline();
+  if (place === EZRAS) t = t.mark('*');
+  return keptReason ? t.onlyWhen(false, keptReason) : t;
+}
+
 /** מנחה.
  *
  *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
  *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
  *  keeps the location it started with. */
-function minchaTimes(week, settings) {
+function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
 
@@ -6274,17 +6302,20 @@ function minchaTimes(week, settings) {
   // can never leave a zman a few seconds short of the 15.
   const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
   const latestAllowed = earliestShkia - 15;
+  const clears = 'at least 15 minutes before the earliest שקיעה of the five days';
 
   const slots = [
     standardTime ? { mins: HM(12, 45), place: LMATA } : null,
     standardTime ? { mins: HM(13, 15), place: LMATA } : null,
-    { mins: earlyAfternoon, place: LMATA },
+    { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
+      ? '1:40 rather than 1:35, מנחה גדולה being past 1:35 somewhere in the week' : 'the early afternoon מנחה' },
     { mins: HM(13, 50), place: MAIN },
-    bmg ? { mins: HM(16, 15), place: LMATA } : null, // 4:15 is a BMG zman
+    bmg ? { mins: HM(16, 15), place: LMATA, label: 'runs while BMG is in session' } : null,
     { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
     { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
     { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
   ].filter(Boolean);
+  for (const slot of slots) slot.base = slot.mins;
 
   // Walk each evening zman earlier, 5 minutes at a time, until it clears שקיעה.
   for (const slot of slots) {
@@ -6299,10 +6330,25 @@ function minchaTimes(week, settings) {
   const kept = [];
   for (const slot of slots) {
     const prev = kept[kept.length - 1];
-    if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) continue;
+    if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) {
+      slot.droppedBecause = `moved back to within ${TOO_CLOSE} minutes of the ${fmtMinutes(prev.mins)} in front of it`;
+      continue;
+    }
     kept.push(slot);
   }
-  return kept.map((slot) => renderTime(slot.mins, slot.place));
+
+  const trace = (slot) => slotTrace(slot, {
+    label: slot.label || (slot.shkiaDriven ? 'one of the standing evening מנחה times' : 'one of the standing afternoon מנחה times'),
+    until: clears, untilAt: fmtMinutes(latestAllowed), backwards: true,
+    place: slot.place, keptReason: slot.droppedBecause,
+  });
+
+  return {
+    text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, slot.place))),
+    times: kept.map(trace),
+    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
+  };
 }
 
 /** Where the 8:45 מעריב davens, which follows wherever the clock pushed it to. It is
@@ -6318,7 +6364,7 @@ function place845(mins) {
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
  *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
-function maarivTimes(week, settings) {
+function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
   const bmg = isBmgWeek(week.serial, settings);
@@ -6327,6 +6373,7 @@ function maarivTimes(week, settings) {
   // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
   const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
   const earliestAllowed = latestShkia + 50;
+  const clears = 'at least 50 minutes after the latest שקיעה of the five days';
 
   const slots = [
     { mins: HM(18, 35) },
@@ -6338,9 +6385,10 @@ function maarivTimes(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    !bmg ? { mins: HM(23, 30) } : null, // 11:30 and 12:00 run only when BMG is out
-    !bmg ? { mins: HM(24, 0) } : null,
+    !bmg ? { mins: HM(23, 30), label: 'runs only while BMG is out of session' } : null,
+    !bmg ? { mins: HM(24, 0), label: 'runs only while BMG is out of session' } : null,
   ].filter(Boolean);
+  for (const slot of slots) slot.base = slot.mins;
 
   // Walk each zman later, 5 minutes at a time, until it clears שקיעה by 50.
   for (const slot of slots) {
@@ -6363,11 +6411,27 @@ function maarivTimes(week, settings) {
   for (let i = slots.length - 1; i >= 0; i--) {
     const slot = slots[i];
     const next = kept[kept.length - 1];
-    if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) continue;
+    if (slot.moved && !slot.is845 && next && next.mins - slot.mins <= TOO_CLOSE) {
+      slot.droppedBecause = `pushed up to within ${TOO_CLOSE} minutes of the ${fmtMinutes(next.mins)} after it`;
+      continue;
+    }
     kept.push(slot);
   }
   kept.reverse();
-  return kept.map((slot) => renderTime(slot.mins, slot.is845 ? place845(slot.mins) : slot.place ?? LMATA));
+
+  const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
+  const trace = (slot) => slotTrace(slot, {
+    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it' : 'one of the standing מעריב times'),
+    until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
+    place: placeOf(slot), keptReason: slot.droppedBecause,
+  });
+
+  return {
+    text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
+    times: kept.map(trace),
+    dropped: slots.filter((s) => s.droppedBecause).map(trace),
+    note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
+  };
 }
 
 /** One time as the poster hands it over, in the marks this chart prints. Same three: plain
@@ -6443,16 +6507,34 @@ function afterSukkosRow(week, settings) {
 function buildWeekdayRow(week, settings) {
   // Both give the same three lists in the same shape, and no week can be in both runs: one
   // ends at ערב סוכות and the other starts after שמחת תורה.
-  const after = afterYomKippurRow(week, settings) || afterSukkosRow(week, settings);
+  const afterYK = afterYomKippurRow(week, settings);
+  const after = afterYK || afterSukkosRow(week, settings);
+  const fromSheet = afterYK
+    ? 'These are the days between יום כיפור and סוכות. The schedule is read off the יום כיפור sheet rather than worked out here.'
+    : 'These are the days after סוכות. The schedule is read off the סוכות sheet rather than worked out here.';
   if (after) {
+    /* These two weeks do not run the standing schedule at all: they take it off the יום כיפור
+       and the סוכות sheets, so the board and the sheet hanging beside it cannot disagree.
+       There are no traces to give because there is no working here to show, so the cell says
+       where its times came from instead of opening on silence. The posters themselves are
+       still described in words and are being moved over to the same shape. */
     return {
       B: splitLinesInHalf(after.maariv.map(fromPoster)),
       C: splitLinesInHalf(after.mincha.map(fromPoster)),
+      notes: { B: fromSheet, C: fromSheet, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     };
   }
+  const maariv = maarivParts(week, settings);
+  const mincha = minchaParts(week, settings);
   return {
-    B: splitLinesInHalf(maarivTimes(week, settings)),
-    C: splitLinesInHalf(minchaTimes(week, settings)),
+    B: maariv.text,
+    C: mincha.text,
+    /* The traces from that same pass, for the calculations page. E, the merged שחרית block,
+       is not calculated at all: it is the schedule the program carries, printed as written,
+       and the page says so rather than pretending there is working to show. */
+    traces: { B: maariv.times, C: mincha.times },
+    notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
+    dropped: { B: maariv.dropped, C: mincha.dropped },
   };
 }
 
@@ -6516,6 +6598,15 @@ function stepHtml(s) {
       return line(s.held
         ? `<strong>On the board this week.</strong> ${withHebrew(s.when)}`
         : `<strong>Not on the board this week.</strong> ${withHebrew(s.when)}`);
+    case 'stepped': {
+      if (!s.moved) {
+        return line(`Stands at this time: it already clears ${withHebrew(s.until || 'its limit')}`);
+      }
+      const way = s.backwards ? 'earlier' : 'later';
+      const target = s.untilAt ? ` (<strong>${cellEsc(s.untilAt)}</strong>)` : '';
+      return line(`Moved <strong>${way}</strong> from <strong>${cellEsc(s.from)}</strong>, ${s.by} minutes at a
+        time, until it is ${withHebrew(s.until || '')}${target}`);
+    }
     case 'underline':
       return line(`Underlined, so this ${withHebrew('מנין')} is <strong>${withHebrew('בבית מדרש למטה')}</strong>`);
     case 'mark':
@@ -6529,10 +6620,15 @@ function stepHtml(s) {
 function cellTimeHtml(time) {
   const printed = time.plain();
   const dropped = time.held === false;
+  /* A dropped time is headed by where it started, not where it ended. On the Weekday chart
+     three מנינים can all be pushed onto the same minute and then dropped for crowding, and
+     headed by that minute they read as the same entry three times over. What the reader is
+     looking for is the standing 6:35 that is not on the board this week. */
+  const head = dropped ? (time.steps[0]?.at ?? printed) : printed;
   return `
     <li class="calc-time${dropped ? ' is-dropped' : ''}">
       <div class="calc-time-head">
-        <span class="calc-time-value">${cellEsc(printed)}</span>
+        <span class="calc-time-value">${cellEsc(head)}</span>
         ${dropped ? '<span class="calc-time-note">not printed this week</span>' : ''}
       </div>
       <ol class="calc-steps">${time.steps.map(stepHtml).join('')}</ol>
@@ -6562,9 +6658,14 @@ function cellDetailHtml({ header, key, chartName, printed, times, note, dropped,
      had. The structure is replacing that prose column by column, and a column part way
      through the change must not go quiet: a page that silently dropped an explanation would
      look complete while saying less than it did before. */
+  /* A cell with a note and nothing to trace is not an unconverted cell: it is a cell with
+     no working to show, and the note is the whole answer. Saying "still described in words"
+     over it would be false. */
   const body = all.length
     ? `<ol class="calc-times">${all.map(cellTimeHtml).join('')}</ol>`
-    : fallback
+    : note
+      ? ''
+      : fallback
       ? `<div class="calc-fallback"><p class="calc-fallback-why">This column is still described in words rather than
           step by step. The rule is the same one the board is built from.</p><p>${withHebrew(fallback)}</p></div>`
       : `<p class="calc-nothing">This cell is not written up yet, so there is nothing to open. That is worth

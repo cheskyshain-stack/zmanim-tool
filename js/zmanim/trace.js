@@ -97,6 +97,18 @@ function make(value, steps, flags) {
       return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
     },
 
+    /* The Weekday chart's times move themselves, which no offset describes: a standing 6:35
+       מעריב is walked later five minutes at a time until it clears שקיעה by fifty on all five
+       days of the week. The move is one step, recorded with what it was walking towards and
+       in what size of stride, because "6:35 became 7:15" without the reason is the least
+       useful thing this page could say. */
+    steppedTo(next, { by, until, untilAt, backwards } = {}) {
+      return make(next, step(steps, next, {
+        kind: 'stepped', by, until, untilAt, backwards,
+        from: formatTime(value), moved: next !== value,
+      }), flags);
+    },
+
     /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
     underline() {
       return make(value, step(steps, value, { kind: 'underline' }), { ...flags, underlined: true });
