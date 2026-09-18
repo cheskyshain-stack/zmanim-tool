@@ -1146,6 +1146,18 @@ td.ruled .cell { background: var(--ruled); }
  * and place line all down the middle, and its own panel rule already covers it. */
 body:not(.is-luach) .week-nav,
 body:not(.is-luach) .week-print-panel { max-width: 8.5in; }
+/* On the congregation's chart page Print goes above the dates, which is where Special
+   Schedules already has it. The two pages are one tap apart from the same menu and the button
+   was landing 41px apart on them, which reads as the page having moved rather than as two
+   pages. The admin keeps the dates first: there Print sits in a row with Previous, Today and
+   Next, and those belong under the dates they move.
+   Done by ordering the row rather than by moving the markup, so the two pages are one piece of
+   HTML laid out two ways. */
+body.is-luach .week-nav { display: flex; flex-direction: column; }
+/* margin-top off with it: the 0.6rem this row carries is the gap between it and whatever it
+   sits under, and first in the column it sits under nothing. Left in, the button landed 9.6px
+   lower than the one on Special Schedules, which is the whole of what was being reported. */
+body.is-luach .week-nav-print-one { order: -1; margin-top: 0; margin-bottom: 0.5rem; }
 /* These carried no styling of their own at all: they were the browser's default buttons,
    which is why pressing one showed nothing on a phone. Same look as the app's other
    buttons, with a pressed state that is a real change of colour rather than only the 1px
