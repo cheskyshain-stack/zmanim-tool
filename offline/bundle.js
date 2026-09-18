@@ -3635,10 +3635,166 @@ function buildYomKippurPoster(year, settings) {
   };
 }
 
+// ==== zmanim/trace.js ====
+// A time that knows how it was made.
+//
+// Every time on a chart is some named zman, moved by so many minutes, rounded one way or the
+// other, and sometimes chosen against another candidate or printed only on certain weeks.
+// The arithmetic for all of that already lives in the column builders. What did not exist is
+// any record of what the arithmetic *meant*, so the calculations page had to say it a second
+// time, in prose, by hand.
+//
+// **That is the shape this project keeps getting hurt by.** A fact written down twice is a
+// fact that can disagree with itself: the published file went on printing a schedule the
+// admin had already fixed, and two retired rules went on firing on the congregation's board
+// for months. The standing lesson is to read a thing off the one place that owns it.
+//
+// So a traced time computes and records in the same call. `.minus(15)` both subtracts the
+// fifteen minutes and writes down that it did. The record cannot drift from the number
+// because there is only one of them:
+//
+//     zman('שקיעה', Z.sunsetElev(d, s)).plus(50).floor().underline()
+//
+// reads as the formula, prints exactly what the old expression printed, and hands the
+// calculations page the steps to draw.
+//
+// Values are Excel-style day fractions throughout, the same as everywhere else here, and the
+// rounding and formatting are format.js's own rather than a second implementation of them.
+//
+// Every object is frozen and each link returns a new one, so a candidate can be measured
+// against another (earlierOf, laterOf) without either being changed by the asking.
+
+
+/* Named for this file alone: zmanim.js already has a top-level MIN, and build-offline.py
+   flattens every module into one scope where two of a name is a hard error. It caught this. */
+const TRACE_MIN = 1 / 1440;
+
+/** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
+function make(value, steps, flags) {
+  return Object.freeze({
+    value,
+    steps: Object.freeze(steps),
+    flags: Object.freeze(flags),
+
+    /** The printed string, underline sentinels and marks included, which is exactly what
+     *  the builders used to produce by hand. */
+    text() {
+      const base = formatTime(value) + (flags.mark || '');
+      return flags.underlined ? underlineTime(base) : base;
+    },
+
+    /** The same without the underline sentinels or the mark, for comparing against a cell. */
+    plain() {
+      return formatTime(value);
+    },
+
+    plus(minutes, because) {
+      return make(value + minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes, because }], flags);
+    },
+    minus(minutes, because) {
+      return make(value - minutes * TRACE_MIN, [...steps, { kind: 'offset', minutes: -minutes, because }], flags);
+    },
+
+    /* Three roundings rather than one, because the workbook uses all three and which one it
+       uses is part of the answer. The שבת afternoon מנחה rounds up where everything around it
+       rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
+    ceil(because) {
+      return make(ceilToMinute(value), [...steps, { kind: 'round', way: 'up', because }], flags);
+    },
+    floor(because) {
+      return make(floorToMinute(value), [...steps, { kind: 'round', way: 'down', because }], flags);
+    },
+    round(because) {
+      return make(roundToMinute(value), [...steps, { kind: 'round', way: 'nearest', because }], flags);
+    },
+
+    /** Underlined on the board means the מנין is downstairs, in the בית מדרש למטה. */
+    underline() {
+      return make(value, [...steps, { kind: 'underline' }], { ...flags, underlined: true });
+    },
+
+    /** A run of stars after a time: one is בעזרת נשים, two is the שטיבל. */
+    mark(chars) {
+      return make(value, [...steps, { kind: 'mark', chars }], { ...flags, mark: chars });
+    },
+
+    /* The two that pick between candidates. Both record what they were weighed against and
+       which one won, since "the earlier of שקיעה less 45 and 7:00" is a rule a reader cannot
+       reconstruct from the winning number alone. */
+    earlierOf(other, because) {
+      const won = other.value < value ? other : this;
+      return make(won.value, [...steps, {
+        kind: 'pick', how: 'earlier', because,
+        against: other.describe(), took: won === other ? 'other' : 'this',
+      }], flags);
+    },
+    laterOf(other, because) {
+      const won = other.value > value ? other : this;
+      return make(won.value, [...steps, {
+        kind: 'pick', how: 'later', because,
+        against: other.describe(), took: won === other ? 'other' : 'this',
+      }], flags);
+    },
+
+    /** A time that is only printed on some weeks.
+     *
+     *  Recorded rather than branched around outside, so the page can say "this is on the
+     *  board when the clocks are back, and they are not this week" instead of the cell
+     *  simply not mentioning a מנין that exists for half the year. `held` is the answer for
+     *  this week; `when` names the condition in the shul's own terms.
+     *
+     *  A link in the chain rather than a wrapper around one: a wrapper would carry the other
+     *  methods too, and those close over the steps they were built with, so anything added
+     *  after it would quietly drop the condition again. */
+    onlyWhen(held, when) {
+      const next = make(value, [...steps, { kind: 'condition', when, held }], flags);
+      return Object.freeze({ ...next, held, text: () => (held ? next.text() : '') });
+    },
+
+    /** A short line naming this time, for use inside another time's steps. */
+    describe() {
+      return { text: formatTime(value), steps };
+    },
+  });
+}
+
+/** A time that starts from a named zman.
+ *
+ *  The name is the Hebrew the board and the shul use, since that is what a reader is holding
+ *  in their head. `note` is for the part of a zman's identity that its name does not carry:
+ *  which opinion, which horizon, whether the elevation is in it. */
+function zman(name, value, note) {
+  return make(value, [{ kind: 'base', name, note, at: formatTime(value) }], {});
+}
+
+/** A clock time nobody works out: the shul davens at 1:50 and that is the whole rule.
+ *
+ *  Still a traced time rather than a bare string, so a fixed time can be compared against a
+ *  computed one (the מנחה list is full of "the later of מנחה גדולה and 12:30") and so the page
+ *  can say, in as many words, that this one is not calculated. */
+function clockTime(hours, minutes, label) {
+  const value = (hours + minutes / 60) / 24;
+  return make(value, [{ kind: 'fixed', at: formatTime(value), label }], {});
+}
+
+/** The same from a printed string: fixedTime('1:50'), afternoon unless told otherwise.
+ *
+ *  A board is a 12-hour clock with no am or pm on it, and every fixed time on these charts
+ *  except the morning שחרית ones is an afternoon or evening time, so 12 and the small hours
+ *  are read as pm. `am` forces the other way. */
+function fixedTime(text, { am = false, label } = {}) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text).trim());
+  if (!m) throw new Error(`fixedTime: not a time: ${text}`);
+  let h = Number(m[1]) % 12;
+  if (!am) h += 12;
+  return clockTime(h, Number(m[2]), label);
+}
+
 // ==== sheets/kayitz.js ====
 // שבת קיץ (Summer Shabbos) column formulas, ported 1:1 from the workbook's
 // SUMMER_ZMANIM_1 table (columns B:M). `week.serial` is the Shabbos (Saturday)
 // Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
+
 
 
 
@@ -3676,7 +3832,16 @@ function earlyMinchaPlag(fridayDate, settings) {
     { name: 'מ"א', plag: Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), alos), underlined: true, mark: '' },
     { name: 'גר"א', plag: Z.plagHamincha(fridayDate, settings), underlined: false, mark: '' },
   ];
-  return pairs.map((p) => ({ ...p, plag: ceilToMinute(p.plag), mincha: ceilToMinute(p.plag - 15 / 1440) }));
+  /* `trace` is added beside the numbers rather than replacing them: every existing caller,
+     the פסח sheet included, keeps reading .plag and .mincha as before. See zmanim/trace.js. */
+  return pairs.map((p) => {
+    const base = zman(`פלג המנחה ${p.name}`, p.plag, 'the day measured to the צאת its name gives');
+    const plagT = base.ceil();
+    let minchaT = base.minus(15, 'the מנין is a quarter of an hour before its own פלג').ceil();
+    if (p.underlined) minchaT = minchaT.underline();
+    return { ...p, plag: ceilToMinute(p.plag), mincha: ceilToMinute(p.plag - 15 / 1440),
+             trace: { plag: plagT, mincha: minchaT } };
+  });
 }
 
 /** Whether the early מנחה and פלג are printed at all on a given ערב שבת or ערב יום טוב. */
@@ -3690,18 +3855,36 @@ function buildKayitzRow(week, settings) {
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
+  /* Built through traced values, which do the arithmetic and record what it meant in the
+     same call: see zmanim/trace.js, and the note at the head of sheets/choref.js. The
+     printed strings are unchanged, proved by diffing a season of cells against the old
+     output. */
   const tishaEvening = tishaBavMaariv(shabbos, settings)?.split('\n');
-  const B = tishaEvening?.slice(1).join('\n') ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+
+  const tz60 = zman('צאת 60', Z.tzais60(shabbosDate, settings), '60 minutes after שקיעה, taken at the shul\'s elevation').ceil();
+  const tz72 = zman('צאת 72', Z.tzais72(shabbosDate, settings), '72 minutes after שקיעה, taken at the shul\'s elevation').ceil().underline();
+  const B = tishaEvening?.slice(1).join('\n') ?? `${tz60.text()}${SLASH}${tz72.text()}`;
+
   const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+
+  const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
+  const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
+  const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
   const E = shacharisLine();
 
   const extraMaariv = inExtraMaarivWindow(friday, settings);
+  const sefirah = 'the Sefirah stretch, after Pesach and before Shavuos';
   const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + (extraMaariv ? 55 : 50) / 1440));
+  const maarivFri = zman('שקיעה', sunsetFriday, 'on the Friday')
+    .plus(extraMaariv ? 55 : 50, extraMaariv ? `55 rather than 50, this week falling in ${sefirah}` : undefined)
+    .floor().underline();
+  const F = maarivFri.text();
 
+  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
   const gBase = floorToMinute(sunsetFriday - 15 / 1440);
-  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב ${formatTime(floorToMinute(sunsetFriday + 30 / 1440))}` : '');
+  const secondMaariv = zman('שקיעה', sunsetFriday, 'on the Friday').plus(30).floor()
+    .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
+  const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
 
   const H = candleLightingCell(fridayDate, settings);
 
@@ -3709,14 +3892,28 @@ function buildKayitzRow(week, settings) {
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
   // Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
   // its own זמן under it. NBSP after the word so the pair can never wrap apart.
-  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\nפלג\u00a0${formatTime(e.plag)}`;
+  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\nפלג ${formatTime(e.plag)}`;
   const I = plagWindow ? cell(early72) : '';
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
   const L = fridayMainMinchaMenu(fridayDate, settings);
 
-  return { B, C, D, E, F, G, H, I, J, K, L };
+  /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
+     and carry their traces once that file is converted; a column with no trace yet is drawn
+     by the calculations page as "not written up", never silently blank. */
+  const early = (e) => [e.trace.mincha, e.trace.plag];
+  const traces = {
+    B: tishaEvening ? null : [tz60, tz72],
+    D: [shmaMGA, shmaGRA],
+    F: [maarivFri],
+    G: extraMaariv ? [minchaFri, secondMaariv] : [minchaFri],
+    I: plagWindow ? early(early72) : null,
+    J: plagWindow ? early(early50) : null,
+    K: plagWindow ? early(earlyGRA) : null,
+  };
+
+  return { B, C, D, E, F, G, H, I, J, K, L, traces };
 }
 
 const KAYITZ_COLUMNS = [
@@ -4577,34 +4774,62 @@ function buildRoshHashanaPoster(year, settings) {
 
 
 
+
 function buildChorefRow(week, settings) {
   const shabbos = week.serial;
   const friday = shabbos - 1;
   const shabbosDate = dateFromSerial(shabbos);
   const fridayDate = dateFromSerial(friday);
 
+  /* Each time is built through a traced value (zmanim/trace.js), which does the arithmetic
+     and writes down what it did in the same call. The printed string is unchanged: .text()
+     composes exactly what formatTime and underlineTime composed here before, and a whole
+     season of cells is diffed against the old output to prove it. What is new is `traces`,
+     which the calculations page reads so it can say what a time is instead of a paragraph
+     of prose saying it a second time and being free to drift. */
   const tishaEvening = tishaBavMaariv(shabbos, settings)?.split('\n');
-  const B = tishaEvening?.slice(1).join('\n') ?? `${formatTime(ceilToMinute(Z.tzais60(shabbosDate, settings)))}${SLASH}${underlineTime(ceilToMinute(Z.tzais72(shabbosDate, settings)))}`;
+
+  const tz60 = zman('צאת 60', Z.tzais60(shabbosDate, settings), '60 minutes after שקיעה, taken at the shul\'s elevation').ceil();
+  const tz72 = zman('צאת 72', Z.tzais72(shabbosDate, settings), '72 minutes after שקיעה, taken at the shul\'s elevation').ceil().underline();
+  const B = tishaEvening?.slice(1).join('\n') ?? `${tz60.text()}${SLASH}${tz72.text()}`;
+
   const C = shabbosMinchaMenu(shabbosDate, settings, week.specialParsha) + (tishaEvening ? '\n' + tishaEvening[0] : '');
-  const D = `${formatTime(Z.sofZmanShmaMGA72(shabbosDate, settings))}${SLASH}${formatTime(Z.sofZmanShmaGRA(shabbosDate, settings))}`;
+
+  const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
+  const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
+  const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
   const E = shacharisLine();
 
   const sunsetFriday = Z.sunset(fridayDate, settings);
-  const F = underlineTime(floorToMinute(sunsetFriday + 50 / 1440));
+  const maarivFri = zman('שקיעה', sunsetFriday, 'on the Friday').plus(50).floor().underline();
+  const F = maarivFri.text();
 
-  const G = inPlagWindow(friday, settings)
-    ? textjoin(SLASH, true, [
-        formatTime(Z.plagHamincha(fridayDate, settings) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)) - 15 / 1440),
-        formatTime(floorToMinute(sunsetFriday - 15 / 1440)),
-      ])
-    : formatTime(floorToMinute(sunsetFriday - 15 / 1440));
+  /* The three פלג values are deliberately not rounded before the 15 is taken off them, which
+     is why there is no .floor() on those three and there is one on the שקיעה line. */
+  const plagGRA = zman('פלג המנחה גר״א', Z.plagHamincha(fridayDate, settings), 'the day measured from sunrise to שקיעה').minus(15);
+  const plag50 = zman('פלג המנחה מ״א', Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 50').minus(15);
+  const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
+  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
+  const plagWindow = inPlagWindow(friday, settings);
+
+  const G = plagWindow
+    ? textjoin(SLASH, true, [plagGRA.text(), plag50.text(), plag72.text(), minchaFri.text()])
+    : minchaFri.text();
 
   const H = candleLightingCell(fridayDate, settings);
   const I = fridayMainMinchaMenu(fridayDate, settings);
 
-  return { B, C, D, E, F, G, H, I };
+  /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
+     and carry their traces once that file is converted too; a column with no trace yet is
+     drawn by the calculations page as "not written up", never silently blank. */
+  const traces = {
+    B: tishaEvening ? null : [tz60, tz72],
+    D: [shmaMGA, shmaGRA],
+    F: [maarivFri],
+    G: plagWindow ? [plagGRA, plag50, plag72, minchaFri] : [minchaFri],
+  };
+
+  return { B, C, D, E, F, G, H, I, traces };
 }
 
 const CHOREF_COLUMNS = [
