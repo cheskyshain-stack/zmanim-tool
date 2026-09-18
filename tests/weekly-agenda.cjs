@@ -77,6 +77,7 @@ const check=await page.evaluate(async()=>{
 await page.reload();await page.locator('.weekly-reader').waitFor();
 await page.locator('.reader-options summary').click();
 for(const id of ['reader-next','reader-prev','reader-today']){await page.locator('#'+id).click();if(!await page.locator('.reader-options').evaluate(e=>e.open))throw Error('Options closed');}
+await page.locator('#reader-next').click();
 const drawers=page.locator('.reader-agenda-day');
 await drawers.nth(1).locator('summary').click();
 await page.waitForTimeout(400);
@@ -92,3 +93,4 @@ for(const width of [320,393,768,1280]){
 
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+

@@ -1,3 +1,4 @@
+import { currentOnePageSheets } from './posters-view.js';
 import { weeklyAgenda, agendaDayKind } from './weekly-agenda.js';
 import { minyanimForDay, clock, meridiem, candleLightingForDay } from '../upcoming.js';
 import { specialMinyanim } from '../posters/day.js';
@@ -265,14 +266,19 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
       <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?`<small>${row.dayPart}</small>`:row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div></div>`).join('')}</div>
     </details>`;
   }).join('');
+  let hasSpecialSchedules = false;
+  try { hasSpecialSchedules = currentOnePageSheets(state, settings).length > 0; } catch { /* Keep the weekly schedule available if a poster cannot be built. */ }
   container.innerHTML=`<div class="weekly-reader">
     <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week of ${escAttr(date)}</p></header>
+    <nav class="reader-schedule-links no-print" aria-label="Other schedules">
+      <a href="/chart/">Zmanim Chart <span aria-hidden="true">&rsaquo;</span></a>
+      ${hasSpecialSchedules ? '<a href="/schedules/">Special Schedules <span aria-hidden="true">&rsaquo;</span></a>' : ''}
+    </nav>
     <details class="reader-options no-print"><summary>More options</summary><div class="reader-nav">
       <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
     </div></details>
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
-    <p class="reader-note">For additional zmanim and notices, see <a href="/schedules/">Special schedules</a>.</p>
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));

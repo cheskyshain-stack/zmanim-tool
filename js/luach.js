@@ -468,20 +468,9 @@ function homeHtml(published) {
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
-      <details class="luach-zmanim-group">
-        <summary class="luach-item">${ICON_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}</summary>
-        <div class="luach-zmanim-options">
       <a class="luach-item" href="/week/">
-        ${ICON_CLOCK}<span class="luach-item-title">${escAttr(PAGE_NAMES.week)}</span>${CHEVRON}
+        ${ICON_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}
       </a>
-      <a class="luach-item" href="/chart/">
-        ${ICON_CALENDAR}<span class="luach-item-title">${escAttr(PAGE_NAMES.chart)}</span>${CHEVRON}
-      </a>
-      ${schedulesNow(published).length ? `<a class="luach-item" href="/schedules/">
-        ${ICON_SHEET}<span class="luach-item-title">${escAttr(PAGE_NAMES.schedules)}</span>${CHEVRON}
-      </a>` : ''}
-        </div>
-      </details>
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
       </a>
