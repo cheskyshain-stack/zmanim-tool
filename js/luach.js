@@ -32,8 +32,9 @@ const ICON_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="no
   <rect x="3" y="5" width="18" height="16" rx="2.6"/><path d="M8 2.6v4M16 2.6v4M3 10h18"/>
   <path d="M7.6 13.6h.01M12 13.6h.01M16.4 13.6h.01M7.6 17.4h.01M12 17.4h.01M16.4 17.4h.01" stroke-width="2.3"/>
 </svg>`;
-const ICON_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-  <circle cx="12" cy="12" r="9.1"/><path d="M12 6.6v5.7l3.6 2.1"/>
+const ICON_CALENDAR_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+  <path d="M10.5 21H5.6A2.6 2.6 0 0 1 3 18.4V7.6A2.6 2.6 0 0 1 5.6 5h12.8A2.6 2.6 0 0 1 21 7.6v3M8 2.6v4M16 2.6v4M3 10h18"/>
+  <circle cx="17" cy="17" r="5.2"/><path d="M17 14v3l2 1.2"/>
 </svg>`;
 const ICON_HEART = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M3 20V13h3l4-3h5a2 2 0 0 1 0 4h-4m4 0 4-3a2 2 0 0 1 3 3l-7 6H3"/><circle cx="13" cy="5" r="3"/>
@@ -470,7 +471,7 @@ function homeHtml(published) {
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
       <a class="luach-item" href="/week/">
-        ${ICON_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}
+        ${ICON_CALENDAR_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}
       </a>
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
@@ -1148,6 +1149,7 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
+
 
 
 
