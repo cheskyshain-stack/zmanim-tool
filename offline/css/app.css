@@ -4734,6 +4734,13 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 
 /* Keep each time together while aligning the two outer columns. */
 .reader-agenda-row .reader-time { display:inline-flex; width:max-content; max-width:100%; gap:3px; flex-wrap:wrap; }
+/* And each one keeps its own height. A grid item stretches to the tallest in its row by
+   default (so does a flex item in its line, which is what this falls back to on a wide
+   screen), and one time in a row can carry a second line under it: "Just started" on the
+   מנין that has just gone in. That stretched its neighbours with it, and the highlight ring
+   around the next מנין is drawn on the item's own box, so the ring came out 47px tall around
+   30px of digits, half again as tall as the time inside it. Measured. */
+.reader-agenda-row .reader-time { align-self:start; }
 .reader-digits { white-space:nowrap; }
 .reader-room-mark { position:static; vertical-align:super; font-size:.65em; line-height:0; margin-left:1px; }
 .reader-room-mark:empty { display:none; }
