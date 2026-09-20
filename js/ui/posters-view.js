@@ -999,10 +999,12 @@ function rhBody(poster, { year = true } = {}) {
            without a heading, which was fine while it had nothing to say beyond its rows, and
            is not once it carries עירוב תבשילין in the years ר"ה runs into Shabbos. Off the
            poster, which knows the year; the whole-occasion sheet reads the same string. -->
+      <!-- The ערב block is named like every other block on this sheet. It was the one without a
+           heading, which was fine while it had nothing to say beyond its rows and is not once it
+           carries עירוב תבשילין. Its rows come off the poster now rather than off RH_TEXT, which
+           cannot know the year, and the whole-occasion sheet draws the same list. -->
       <h3 class="poster-day" lang="he">${escAttr(poster.erevHeading || RH_TEXT.erevHeading)}</h3>
-      ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
-      ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
-      ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
+      ${poster.erevLines.map((ln) => rhRow(ln.label, ln.times)).join('')}
       ${poster.blocks.map((b) => `
         <h3 class="poster-day" lang="he">${escAttr(b.heading)}</h3>
         ${b.lines.map((ln) => rhRow(ln.label, ln.times, ln.extra, ln.sub)).join('')}`).join('')}
@@ -1577,13 +1579,14 @@ const ONEPAGE_SECTIONS = {
   slichos: (p) => [oneSection(SLICHOS_TEXT.title, p.rows.filter(
     (r) => !SLICHOS_ELSEWHERE.includes(r.label) && !SLICHOS_MOVED.includes(r.label)))],
   roshhashana: (p) => [
-    // The day in the label as well as in the heading is the same word twice on two lines
-    // running, so under a block that is already named these are סליחות and מנחה.
-    oneSection(p.erevHeading || RH_TEXT.erevHeading, [
-      { label: RH_TEXT.slichos.short, times: parseTimes(RH_TEXT.slichos.times) },
-      { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
-      { label: RH_TEXT.erevMincha.short, times: parseTimes(RH_TEXT.erevMincha.times) },
-    ]),
+    /* The day in the label as well as in the heading is the same word twice on two lines
+       running, so under a block that is already named these are סליחות and מנחה. Off the
+       poster's own rows, so the עירוב row is on this sheet exactly when it is on the other. */
+    oneSection(p.erevHeading || RH_TEXT.erevHeading, p.erevLines.map((ln) => ({
+      ...ln,
+      label: ln.label === RH_TEXT.slichos.label ? RH_TEXT.slichos.short
+        : ln.label === RH_TEXT.erevMincha.label ? RH_TEXT.erevMincha.short : ln.label,
+    }))),
     ...p.blocks.map((b) => oneSection(
       namedDay(b.heading, RH_TEXT.title, RH_TEXT.day, RH_TEXT.daySep), b.lines)),
   ],

@@ -13,6 +13,7 @@
 // translation the ראש השנה, יום כיפור and סוכות sheets already make, so somebody holding this
 // and the board is reading one set of marks.
 import { roshHashana, excelWeekday, hebrewDateExtended } from '../hebrew-calendar.js';
+import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
 import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
@@ -101,7 +102,8 @@ export const PS_TEXT = {
   // is underlined and an underline running under a bracket reads as though it is cutting
   // through it.
   shabbos: 'שבת',
-  eiruv: 'עירוב תבשילין',
+  // The words themselves live in posters/eiruv.js, with the rule that puts them on a sheet.
+  eiruv: EIRUV_LABEL,
   daySep: ' · ',
   shirHashirim: 'שיר השירים',
 
@@ -252,11 +254,10 @@ export function buildPesachPoster(year, settings) {
 
   const M = minyanList();
   const blocks = [];
-  const heading = (name, n, { eiruv = false, note = '' } = {}) => {
+  const heading = (name, n, { note = '' } = {}) => {
     const notes = [];
     if (isShabbos(n)) notes.push(PS_TEXT.shabbos);
     if (note) notes.push(note);
-    if (eiruv) notes.push(PS_TEXT.eiruv);
     return [name, ...notes].join(PS_TEXT.daySep);
   };
 
@@ -273,9 +274,9 @@ export function buildPesachPoster(year, settings) {
    *  and תשצ"ט all printed שביעי with no עירוב over it. The first days happen never to show the
    *  difference, since 15 ניסן and 15 תשרי can never fall on a Friday, and they are written the same
    *  way regardless so that the next reader is not left working out which of the two rules this is. */
-  const eiruvOn = (...ns) => ns.some((n) => excelWeekday(day(n)) === PS_FRIDAY);
-  const eiruvDay1 = eiruvOn(PS_DAY1, PS_DAY2);
-  const eiruvShvii = eiruvOn(PS_SHVII, PS_ACHRON);
+  const isFriday = (n) => excelWeekday(day(n)) === PS_FRIDAY;
+  const eiruvDay1 = eiruvMade(isFriday, PS_DAY1, PS_DAY2);
+  const eiruvShvii = eiruvMade(isFriday, PS_SHVII, PS_ACHRON);
 
   /* Where ותן ברכה is said for the first time. In most years יום ב' goes out into a weekday
      night and its own מוצאי is the first מעריב that is neither יום טוב nor שבת. In a year where
@@ -322,6 +323,9 @@ export function buildPesachPoster(year, settings) {
         // no such run: that afternoon is Shabbos's own and the board carries it.
         erevShabbos ? null
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
+        /* The עירוב, on the afternoon it is made rather than over the day of יום טוב that is
+           the Friday. One rule and one shape for all three sheets: see posters/eiruv.js. */
+        ...eiruvRow(eiruvDay1),
       ].filter(Boolean),
     });
     M.list(on, PS_TEXT.shacharis, everydayShacharis(), MORNING);
@@ -381,7 +385,7 @@ export function buildPesachPoster(year, settings) {
   // יום א'
   blocks.push({
     at: day(PS_DAY1),
-    heading: heading(PS_TEXT.day1, PS_DAY1, { eiruv: eiruvDay1 }),
+    heading: heading(PS_TEXT.day1, PS_DAY1),
     lines: [
       ...eveningLines(PS_EREV, { drasha: true }),
       chatzosLine(PS_EREV),
@@ -506,10 +510,12 @@ export function buildPesachPoster(year, settings) {
     const erevShabbos = excelWeekday(day(n) - 1) === PS_SHABBOS;
     blocks.push({
       at: day(n),
-      heading: heading(PS_TEXT.shvii, n, { eiruv: eiruvShvii }),
+      heading: heading(PS_TEXT.shvii, n),
       lines: [
         erevShabbos ? null
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
+        // Made on ערב שביעי, which is the afternoon this block opens with. See posters/eiruv.js.
+        ...eiruvRow(eiruvShvii),
         // The same gate: an ערב שביעי that is Shabbos is already Shabbos and has nothing to
         // bring in early from.
         ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),

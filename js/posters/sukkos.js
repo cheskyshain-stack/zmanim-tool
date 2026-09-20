@@ -12,6 +12,7 @@
 // is למטה, * is בעזר״נ and ** is אולם השמחות. Same translation the סליחות and צום גדליה sheets
 // already make, so somebody holding this and the board is reading one set of marks.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
+import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
 import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
@@ -102,7 +103,8 @@ export const SK_TEXT = {
   // What a heading adds when the day is Shabbos, or when an עירוב תבשילין is made that
   // afternoon. Both are on the old sheets in brackets after the day.
   shabbos: 'שבת',
-  eiruv: 'עירוב תבשילין',
+  // The words themselves live in posters/eiruv.js, with the rule that puts them on a sheet.
+  eiruv: EIRUV_LABEL,
   // Joined to the day with a dot rather than wrapped in brackets, which is how the ראש השנה
   // sheet has always set its Shabbos and the same reason (see RH_TEXT.daySep): the heading is
   // underlined, and the underline running under a bracket reads as though it is cutting
@@ -597,6 +599,9 @@ export function buildSukkosPoster(year, settings) {
       // Shabbos days: the afternoon is ערב יום טוב first, and the Shabbos is said in the
       // heading above.
       line(SK_TEXT.erevMincha, list(erevMincha), { calc: 'erevMincha' }),
+      /* The עירוב, on the afternoon it is made, after that afternoon's מנחה and before its
+         candles. One rule and one shape for all three sheets: see posters/eiruv.js. */
+      ...eiruvRow(opts.eiruv === true),
       // הדלקת נרות, and the מנין three minutes behind it on a line of its own. The two were
       // one row for a while, the way the sheets it was ported from set them; the shul asked
       // for two, which is also how the one-page sheet has always set them.
@@ -638,12 +643,7 @@ export function buildSukkosPoster(year, settings) {
   ];
 
   const blocks = [];
-  const heading = (name, n, { eiruv = false } = {}) => {
-    const notes = [];
-    if (isShabbos(n)) notes.push(SK_TEXT.shabbos);
-    if (eiruv) notes.push(SK_TEXT.eiruv);
-    return [name, ...notes].join(SK_TEXT.daySep);
-  };
+  const heading = (name, n) => (isShabbos(n) ? [name, SK_TEXT.shabbos].join(SK_TEXT.daySep) : name);
 
   /** Whether an עירוב תבשילין is made before this yom tov.
    *
@@ -658,9 +658,9 @@ export function buildSukkosPoster(year, settings) {
    *  and תשצ"ט all printed שביעי with no עירוב over it. The first days happen never to show the
    *  difference, since 15 ניסן and 15 תשרי can never fall on a Friday, and they are written the same
    *  way regardless so that the next reader is not left working out which of the two rules this is. */
-  const eiruvOn = (...ns) => ns.some((n) => excelWeekday(day(n)) === SK_FRIDAY);
-  const eiruvDay1 = eiruvOn(SK_DAY1, SK_DAY2);
-  const eiruvShmini = eiruvOn(SK_SHMINI, SK_SIMCHAS);
+  const isFriday = (n) => excelWeekday(day(n)) === SK_FRIDAY;
+  const eiruvDay1 = eiruvMade(isFriday, SK_DAY1, SK_DAY2);
+  const eiruvShmini = eiruvMade(isFriday, SK_SHMINI, SK_SIMCHAS);
   /* A different question that used to be written as the same one: whether יום ב' itself runs
      straight into Shabbos, which is what decides that its afternoon belongs to both days. It was
      an alias of eiruvDay1, and the two agree only because 15 תשרי is never a Friday. Asked on its
@@ -679,9 +679,9 @@ export function buildSukkosPoster(year, settings) {
   // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
   const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });
   blocks.push({
-    heading: heading(SK_TEXT.day1, SK_DAY1, { eiruv: eiruvDay1 }),
+    heading: heading(SK_TEXT.day1, SK_DAY1),
     lines: [
-      ...eveningLines(SK_EREV),
+      ...eveningLines(SK_EREV, { eiruv: eiruvDay1 }),
       ...morningLines(SK_DAY1),
       line(SK_TEXT.mincha, list(day1Mincha), { calc: 'dayMincha' }),
     ],
@@ -854,11 +854,11 @@ export function buildSukkosPoster(year, settings) {
     const shminiMincha = sukkosDayMincha(day(n), settings,
       { five: false, fiveIfRoom: true, early: isShabbos(n) });
     blocks.push({
-      heading: heading(SK_TEXT.shmini, n, { eiruv: eiruvShmini }),
+      heading: heading(SK_TEXT.shmini, n),
       lines: [
         /* the evening of הושענא רבה, which is the one that opens שמיני עצרת. Its whole מנחה
            run is למטה: see sukkosErevMincha. */
-        ...eveningLines(SK_SHMINI - 1, { allDown: true }),
+        ...eveningLines(SK_SHMINI - 1, { allDown: true, eiruv: eiruvShmini }),
         ...yizkor,
         line(SK_TEXT.krias, bothWays(day(n)), { calc: 'krias' }),
         ...nineLine(n),

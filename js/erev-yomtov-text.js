@@ -35,6 +35,7 @@
 // flattens every module into one scope, where a second const of the same name is a hard error.
 
 import { RH_TEXT } from './posters/roshhashana.js';
+import { blockHasEiruv } from './posters/eiruv.js';
 import { VS_TEXT } from './posters/vasikin.js';
 import { YK_TEXT } from './posters/yomkippur.js';
 import { PS_TEXT } from './posters/pesach.js';
@@ -115,7 +116,10 @@ const ytWhere = (t) => erevWhereMark(t);
  *  thing belongs: the note is now on the paper the shul hangs as well as in the message.
  *
  *  @param block - the sheet block whose heading covers the day. */
-const ytEruv = (block, word) => String(block?.heading || '').includes(word);
+/* Whether the sheet prints an עירוב on this block. Off the block's own rows now, the note
+   having moved from a day heading onto the afternoon it is made on: see posters/eiruv.js. The
+   point of asking the sheet at all is that the paper and the message cannot disagree. */
+const ytEruv = (block) => blockHasEiruv(block);
 const YT_ERUV_LINE = 'ERUV TAVSHILIN';
 
 /** A row of מנינים, each with the room it is in. */
@@ -172,7 +176,7 @@ export function erevRoshHashanaText(poster) {
      two day blocks, because the note used to sit over the Friday of יום טוב: the day it is made
      for rather than the day it is made. Asking the heading at all is the point, so the paper and
      the message cannot disagree about a year. */
-  if (ytEruv({ heading: poster?.erevHeading }, RH_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
+  if (ytEruv({ lines: poster?.erevLines })) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -281,7 +285,7 @@ export function erevPesachText(poster) {
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   // The first days' note sits over the פסח sheet's יום א' block.
-  if (ytEruv(ytBlock(poster, PS_TEXT.day1), PS_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
+  if (ytEruv(ytBlock(poster, PS_TEXT.erev))) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -335,7 +339,7 @@ export function erevSukkosText(poster) {
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   // The first days' note sits over the סוכות sheet's יום א' block, which is this message's own.
-  if (ytEruv(ytBlock(poster, SK_TEXT.day1), SK_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
+  if (ytEruv(ytBlock(poster, SK_TEXT.day1))) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -386,7 +390,7 @@ export function erevShminiAtzeresText(poster) {
   const mincha = ytLine(block, 'erevMincha')?.times;
   if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  if (ytEruv(block, SK_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
+  if (ytEruv(block)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
@@ -478,7 +482,7 @@ export function erevShviiShelPesachText(poster) {
 
   lines.push(...ytEarlyLines(block));
 
-  if (ytEruv(block, PS_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
+  if (ytEruv(block)) lines.push(YT_ERUV_LINE);
 
   const candles = timeOf('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
