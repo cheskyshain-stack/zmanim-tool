@@ -4759,7 +4759,8 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-digits { white-space:nowrap; }
 .reader-room-mark { position:static; vertical-align:super; font-size:.65em; line-height:0; margin-left:1px; }
 .reader-room-mark:empty { display:none; }
-.reader-time > small:not(.reader-reckoning) { flex-basis:100%; }
+.reader-time > small:not(.reader-reckoning) { flex-basis:100%; width:0; min-width:100%; contain:inline-size; }
+.reader-agenda-row .reader-time:has(> small):not(:has(.reader-reckoning)) { display:grid; grid-template-columns:max-content; column-gap:0; row-gap:3px; }
 /* The reckoning over its own time: a full-basis flex item written first in the markup, so it
    takes the line above the digits rather than the one below. Set right to left because it is
    Hebrew inside a row that is laid out left to right for the numbers' sake. */
