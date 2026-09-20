@@ -4776,8 +4776,9 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-reckoning { direction:rtl; line-height:1.1; }
 .reader-next-time { box-shadow:0 0 0 2px #f5eedc,0 0 0 3px #c4af73; }
 
-/* Size time columns to their contents instead of stretching them across the row. */
-.reader-agenda-row .reader-times { grid-template-columns:repeat(2,max-content); justify-content:start; column-gap:12px; }
+/* Wrap whole times into as many slots as the available row width permits. */
+.reader-agenda-row .reader-times { display:flex; flex-wrap:wrap; max-width:none; justify-content:start; gap:8px 12px; }
+.reader-agenda-row .reader-times:has(.reader-reckoning) { display:grid; }
 @media(max-width:360px) { .reader-agenda-row .reader-times { column-gap:8px; } }
 
 @media(min-width:600px) {
