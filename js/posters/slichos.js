@@ -70,13 +70,16 @@ export function posterDays(hebrewYearNum) {
   for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
 
   const tzom = tzomGedaliaDay(rh);
-  const aseres = [];
+  /* The days themselves as well as which weekday each is. The whole-occasion sheet places the
+     עשי"ת block by the first of them, and working that out a second time somewhere else is a
+     second walk that can disagree with this one about which mornings the block covers. */
+  const aseresDays = [];
   for (let n = 3; n <= 8; n++) {
     const d = rh + n - 1;
     if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    aseres.push(excelWeekday(d));
+    aseresDays.push(d);
   }
-  return { slichos, aseres };
+  return { slichos, aseres: aseresDays.map(excelWeekday), aseresDays };
 }
 
 /** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,

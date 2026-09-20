@@ -3171,13 +3171,16 @@ function posterDays(hebrewYearNum) {
   for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
 
   const tzom = tzomGedaliaDay(rh);
-  const aseres = [];
+  /* The days themselves as well as which weekday each is. The whole-occasion sheet places the
+     עשי"ת block by the first of them, and working that out a second time somewhere else is a
+     second walk that can disagree with this one about which mornings the block covers. */
+  const aseresDays = [];
   for (let n = 3; n <= 8; n++) {
     const d = rh + n - 1;
     if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    aseres.push(excelWeekday(d));
+    aseresDays.push(d);
   }
-  return { slichos, aseres };
+  return { slichos, aseres: aseresDays.map(excelWeekday), aseresDays };
 }
 
 /** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
@@ -11646,11 +11649,17 @@ function renderOnePagePoster(built, settings) {
    * rather than a day. Here every other day of the season has a block, and it read as though
    * those mornings belonged to the סליחות before ר"ה rather than to the days after it.
    *
-   * צום גדליה or שבת שובה, whichever the year puts second: the items are already in date order
-   * (postersByDate), so this is the later of the two rather than a rule about the calendar. In
-   * a year where ר"ה is on Thursday שבת שובה is 3 תשרי and the fast is נדחה to the 4th, and the
-   * two change places; this follows them. Neither on the sheet, which a group filter can do,
-   * and it stays with the סליחות block it came off. */
+   * Placed by its own first morning, among the days around it, which is what the shul asked
+   * for: sometimes שבת שובה comes before these mornings and sometimes after, and the sheet was
+   * printing them in one order whatever the year did. It used to go after whichever of צום
+   * גדליה and שבת שובה came second, which is the same answer only in a year where ר"ה is on a
+   * Thursday. In תשפ"ז, ר"ה on Shabbos, the fast is 3 תשרי, these mornings are the 4th to the
+   * 7th and שבת שובה is the 8th, and the block was printing after the Shabbos it runs before.
+   *
+   * Two of the four years it straddles שבת שובה rather than sitting either side of it: ר"ה on
+   * Monday gives 4, 5, 7, 8 תשרי with the Shabbos on the 6th. There is no one right place for
+   * it in those years, and the first morning is the honest answer, since that is the day the
+   * block starts speaking for. */
   /* A sheet the shul wrote itself arrives with its blocks already cut, because there are no
      other sheets under it to cut them out of: it is one schedule typed on the Posters tab
      rather than a season's worth of posters gathered onto one page. Everything past this
@@ -11658,15 +11667,24 @@ function renderOnePagePoster(built, settings) {
      See posters/own.js. */
   const own = built.own === true && Array.isArray(built.sections);
   const items = own ? [] : built.items;
-  const keys = items.map((it) => it.key);
-  const at = (k) => keys.lastIndexOf(k);
-  const afterKey = ['tzomgedalia', 'shuva'].filter((k) => at(k) >= 0)
-    .sort((a, b) => at(b) - at(a))[0] || 'slichos';
   const moved = (items.find((it) => it.key === 'slichos')?.poster.rows || [])
     .filter((r) => SLICHOS_MOVED.includes(r.label));
-
+  /* The first of those mornings, off the same walk that decides which mornings they are
+     (posterDays in posters/slichos.js), and then the last block that opens before it. A block
+     opens on its span's first day, which is the same number postersByDate put them in order
+     by, so this reads the order that is already there rather than making a second one. */
+  let aseresAfter = -1;
+  if (moved.length) {
+    let first = 0;
+    try { first = posterDays(built.hebrewYear).aseresDays[0] ?? 0; } catch { first = 0; }
+    if (first) items.forEach((it, i) => { if ((it.poster?.span?.from ?? Infinity) < first) aseresAfter = i; });
+  }
   const sections = own ? [...built.sections] : [];
-  for (const it of items) {
+  const pushMoved = () => sections.push(...moved.map((r) => oneSection(r.label,
+    [{ label: SLICHOS_TEXT.title, times: r.times, note: r.note }])));
+  // Nothing opens before them, so they open the sheet. Cannot happen while סליחות is on it.
+  if (moved.length && aseresAfter < 0) pushMoved();
+  for (const [index, it] of items.entries()) {
     const cut = ONEPAGE_SECTIONS[it.key];
     if (cut) sections.push(...cut(it.poster));
     /* A sheet the shul wrote itself is not cut out of anything: its blocks are the blocks.
@@ -11678,10 +11696,7 @@ function renderOnePagePoster(built, settings) {
     else if (it.poster.own === true) sections.push(...(it.poster.sections || []));
     // The block takes the line's own name as its heading, and the row under it is called by
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
-    if (it.key === afterKey) {
-      sections.push(...moved.map((r) => oneSection(r.label,
-        [{ label: SLICHOS_TEXT.title, times: r.times, note: r.note }])));
-    }
+    if (moved.length && index === aseresAfter) pushMoved();
   }
   /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
      Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
