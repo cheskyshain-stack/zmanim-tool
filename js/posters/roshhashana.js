@@ -89,10 +89,14 @@ export function buildRoshHashanaPoster(year, settings) {
   /* An עירוב תבשילין is made when a day of יום טוב is a Friday, which for ראש השנה is יום ב':
      1 תשרי falls on a Monday, Tuesday, Thursday or Saturday and never on a Friday, so the Friday
      is always the second day. It happens in תשפ"ה, תשפ"ט, תשצ"ב, תשצ"ה, תשצ"ו, תשצ"ח and תשצ"ט.
-     This sheet printed nothing at all before, where the סוכות and פסח sheets have always put the
-     note over the day. The shul's message for those years says ERUV TAVSHILIN, so the sheet should
-     say it too, and now the message reads it off here rather than working the weekday out again. */
-  const eiruvDay = days.findIndex((d, i) => excelWeekday(rh + i) === RH_FRIDAY);
+
+     **The note goes over ערב ראש השנה, which is the day it is made on.** It was over the Friday
+     itself, the day it is made *for*, and the shul reported that: an עירוב תבשילין is made before
+     יום טוב comes in, so on a ר"ה that runs Thursday into Friday it is made on the Wednesday. The
+     סוכות and פסח sheets were right all along without looking it, because there the ערב afternoon
+     is inside the block that carries the note; this sheet is the one with an ערב block of its own,
+     and the note was on the wrong one of the two. */
+  const eiruv = days.some((d, i) => excelWeekday(rh + i) === RH_FRIDAY);
 
   // `calc` names the rule behind the line, for the Calculations page. A label cannot do
   // it: מנחה, שקיעה and מעריב each appear more than once on this sheet with a different
@@ -242,11 +246,7 @@ export function buildRoshHashanaPoster(year, settings) {
     }
 
     return {
-      heading: [RH_TEXT.day[i],
-        ...(isShabbos ? [RH_TEXT.shabbos] : []),
-        // Over the day the עירוב is made for, which is the Friday itself, the way the סוכות and
-        // פסח sheets put it over theirs.
-        ...(i === eiruvDay ? [RH_TEXT.eiruv] : [])].join(RH_TEXT.daySep),
+      heading: [RH_TEXT.day[i], ...(isShabbos ? [RH_TEXT.shabbos] : [])].join(RH_TEXT.daySep),
       isShabbos,
       lines,
     };
@@ -264,6 +264,11 @@ export function buildRoshHashanaPoster(year, settings) {
     hebrewYear: year,
     legend: legendForTimes(marks),
     span: { from: rh - 1, to: rh + 1 },
+    /* The ערב ראש השנה heading, carried on the poster rather than read off RH_TEXT by whoever
+       draws it, because it moves with the year: on a ר"ה that runs into Shabbos it also says
+       עירוב תבשילין. Three sheets print this heading, so it is worked once here and they cannot
+       disagree, the same reason the יום כיפור poster carries its own two. */
+    erevHeading: [RH_TEXT.erevHeading, ...(eiruv ? [RH_TEXT.eiruv] : [])].join(RH_TEXT.daySep),
     // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
     // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
     // minute later than חצות really is, and no printed זמן should say that.

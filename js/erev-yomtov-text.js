@@ -168,9 +168,11 @@ export function erevRoshHashanaText(poster) {
   const mincha = parseTimes(RH_TEXT.erevMincha.times);
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
-  // ראש השנה is its two days, which are the day before the sheet's last and that last day.
-  // Off the sheet's own heading, whichever of the two days carries the note.
-  if ((poster?.blocks || []).some((b) => ytEruv(b, RH_TEXT.eiruv))) lines.push(YT_ERUV_LINE);
+  /* Off the sheet's own ערב heading, which is the day the עירוב is made on. It used to ask the
+     two day blocks, because the note used to sit over the Friday of יום טוב: the day it is made
+     for rather than the day it is made. Asking the heading at all is the point, so the paper and
+     the message cannot disagree about a year. */
+  if (ytEruv({ heading: poster?.erevHeading }, RH_TEXT.eiruv)) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);

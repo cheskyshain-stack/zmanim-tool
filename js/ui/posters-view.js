@@ -995,6 +995,11 @@ function rhBody(poster, { year = true } = {}) {
   return `
     <h2 class="poster-title" lang="he">${escAttr(RH_TEXT.title)}${year ? ' ' + escAttr(hebrewYear(poster.hebrewYear)) : ''}</h2>
     <div class="poster-rows is-dense">
+      <!-- The ערב block is named like every other block on this sheet. It was the one block
+           without a heading, which was fine while it had nothing to say beyond its rows, and
+           is not once it carries עירוב תבשילין in the years ר"ה runs into Shabbos. Off the
+           poster, which knows the year; the whole-occasion sheet reads the same string. -->
+      <h3 class="poster-day" lang="he">${escAttr(poster.erevHeading || RH_TEXT.erevHeading)}</h3>
       ${rhRow(RH_TEXT.slichos.label, typed(RH_TEXT.slichos.times))}
       ${rhRow(RH_TEXT.chatzos, [{ text: poster.chatzos, underlined: false, mark: '' }])}
       ${rhRow(RH_TEXT.erevMincha.label, typed(RH_TEXT.erevMincha.times))}
@@ -1574,7 +1579,7 @@ const ONEPAGE_SECTIONS = {
   roshhashana: (p) => [
     // The day in the label as well as in the heading is the same word twice on two lines
     // running, so under a block that is already named these are סליחות and מנחה.
-    oneSection(RH_TEXT.erevHeading, [
+    oneSection(p.erevHeading || RH_TEXT.erevHeading, [
       { label: RH_TEXT.slichos.short, times: parseTimes(RH_TEXT.slichos.times) },
       { label: RH_TEXT.chatzos, times: onePlain(p.chatzos) },
       { label: RH_TEXT.erevMincha.short, times: parseTimes(RH_TEXT.erevMincha.times) },
