@@ -327,6 +327,15 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
       <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span>${row.dayPart?'':row.serial>section.serial?'<small>After midnight</small>':''}</div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`).join('')}</div>
     </details>`;
   }).join('');
+  /* Previous is offered only where there is a week behind this one worth opening: not simply
+     one in the list, but one that still has something on it. Standing on the coming week
+     because this one is finished, the week behind is the finished one, and a button that
+     leads to a note saying there is nothing there is a button offering what it cannot do.
+     The shul asked for it gone rather than greyed, which is also the call the chart browser
+     already makes about its own dead controls (see renderChartBrowser's `held`). Next needs no
+     such test: a week ahead always has something on it. */
+  const canPrev = at > 0 && readerWeekHasTimes(serials[at-1], index, state, settings, now);
+  const canNext = at >= 0 && at < serials.length - 1;
   let hasSpecialSchedules = false;
   try { hasSpecialSchedules = currentOnePageSheets(state, settings).length > 0; } catch { /* Keep the weekly schedule available if a poster cannot be built. */ }
   container.innerHTML=`<div class="weekly-reader">
@@ -336,13 +345,13 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
       ${hasSpecialSchedules ? '<a href="/schedules/">Special Schedules <span aria-hidden="true">&rsaquo;</span></a>' : ''}
     </nav>
     <nav class="reader-nav no-print" aria-label="Other weeks">
-      <button id="reader-prev" ${at<=0?'disabled':''}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${at>=serials.length-1?'disabled':''}>Next →</button>
+      ${canPrev?'<button id="reader-prev">← Previous</button>':''}<button id="reader-today">Today</button>${canNext?'<button id="reader-next">Next →</button>':''}
     </nav>
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
-  container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
-  container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
+  container.querySelector('#reader-prev')?.addEventListener('click',()=>onSerialChange(serials[at-1]));
+  container.querySelector('#reader-next')?.addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
 }
