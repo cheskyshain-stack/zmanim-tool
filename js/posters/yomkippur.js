@@ -434,8 +434,7 @@ export function buildYomKippurPoster(year, settings) {
     line(YK_TEXT.neila, [tmT(neilaT)], { calc: 'neila' }),
     // מוצאי יו"כ. The 72 is the underlined one, the same way round the boards print a two
     // time מעריב.
-    line(YK_TEXT.maariv, [tmT(motzei60T), tmT(ykShkiaT().plus(72).underline(), true)], { calc: 'motzeiMaariv' }),
-    line(YK_TEXT.maarivGimmel.label, parseTimes(YK_TEXT.maarivGimmel.times), { calc: 'maarivGimmel' }),
+    line(YK_TEXT.maariv, [tmT(motzei60T), tmT(ykShkiaT().plus(72).underline(), true), ...parseTimes(YK_TEXT.maarivGimmel.times)], { calc: 'motzeiMaariv' }),
     line(YK_TEXT.kiddushLevana.label, YK_TEXT.kiddushLevana.times.map((t) => txtT(t, 'given two ways on the sheet, after מעריב or at this time')),
       { calc: 'kiddushLevana', sep: YK_AMP }),
   ];
