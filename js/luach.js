@@ -810,7 +810,7 @@ function donateWayHtml(way) {
      the shul's donation page, so the name is the alt text: the logo when it comes, the
      provider's name when it does not, and never a blank tile. */
   const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.copy?.value || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
-  const providerGrid = providers ? `<p class="luach-daf-copy-status" role="status">Choosing a provider also copies our Tax ID for you to paste.</p><div class="luach-daf-providers">${providers}</div>` : '';
+  const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
@@ -856,13 +856,8 @@ function wireDonateCopy(root) {
     link.addEventListener('click', () => {
       const taxId = link.dataset.taxId;
       if (!taxId) return;
-      const status = link.closest('.luach-give-open').querySelector('.luach-daf-copy-status');
-      // Start copying during the tap; the normal link still opens the provider immediately.
-      copyDonationIdOnce(taxId).then(ok => {
-        if (ok === null) return;
-        status.textContent = ok ? 'Tax ID copied: ' + taxId + '. Paste it on your provider’s page.'
-          : 'Automatic copying was blocked. Use Copy above or copy the Tax ID: ' + taxId;
-      });
+      // Copy silently; the normal link still opens the provider immediately.
+      copyDonationIdOnce(taxId);
     });
   }
   for (const btn of root.querySelectorAll('.luach-copy-btn')) {
