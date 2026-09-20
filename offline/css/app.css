@@ -4778,13 +4778,16 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 
 /* Keep compact, straight columns: up to three on phones and four on wider screens. */
 .reader-agenda-row .reader-times {
-  display:grid; grid-template-columns:repeat(auto-fill,3.75rem);
+  display:grid; grid-template-columns:repeat(2,max-content);
   width:100%; max-width:calc(11.25rem + 24px); justify-content:start; gap:8px 12px;
 }
 .reader-agenda-row .reader-times:has(.reader-reckoning) { grid-template-columns:max-content; }
 @media(max-width:360px) { .reader-agenda-row .reader-times { column-gap:8px; } }
+@media(min-width:380px) {
+  .reader-agenda-row .reader-times:not(:has(.reader-reckoning)) { grid-template-columns:repeat(3,max-content); }
+}
 @media(min-width:600px) {
-  .reader-agenda-row .reader-times { max-width:calc(15rem + 48px); column-gap:16px; }
+  .reader-agenda-row .reader-times:not(:has(.reader-reckoning)) { grid-template-columns:repeat(4,max-content); max-width:none; column-gap:12px; }
 }
 
 /* Weekly Shabbos printout: one uniform list, with a separate row for each zman. */
