@@ -18031,6 +18031,19 @@ function weeklyAgendaData(showing,index,state,settings) {
   return data;
 }
 
+/** Whether this week still has anything on it: a מנין or a זמן that has not gone yet, or a day
+ *  the page has something to say about.
+ *
+ *  It is exactly the question renderWeeklyReader answers when it decides whether to draw the
+ *  week or the "No remaining minyanim this week" note, asked from outside so the page can pick
+ *  a week that has something on it rather than draw an empty one and tell the reader to press
+ *  Next. Built the same way and out of the same call, so the two cannot come to different
+ *  answers about the same week. */
+function readerWeekHasTimes(showing, index, state, settings, now = new Date()) {
+  const agenda = weeklyAgenda(weeklyAgendaData(showing, index, state, settings), showing, state, settings, now);
+  return agenda.sections.length > 0 || agenda.notices.length > 0;
+}
+
 function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
   const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
@@ -18310,6 +18323,10 @@ const layoutNow = () => (congregationView ? 'charts' : weekLayout);
  *  Not in localStorage, again like pairView: opening the page fresh should show the panel
  *  closed, the same as it always has. */
 let optionsOpen = false;
+
+/** How many weeks past an empty one the congregation's page will look for one with times on
+ *  it before giving up and drawing the empty one. See firstWithTimes in renderWeek. */
+const LUACH_SKIP_MAX = 3;
 
 /** Which season a week belongs to, as something two weeks can be compared by.
  *
@@ -19622,7 +19639,23 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : luach ? serials[0] : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  /* The week the congregation's page opens on is the first one that still has something on
+     it, not simply the first that is not in the past.
+     They are the same week all but one evening a week. On מוצאי שבת, once the last מעריב has
+     gone in, the week that has just ended is still not past (the serial is today's until
+     midnight), so the page opened on it with nothing on it and a note telling the reader to
+     press Next. The shul asked for it to turn over by itself.
+     A week the reader picked by hand is never skipped, whether or not anything is left on it:
+     they asked for that one. Only the default is moved on.
+     Bounded rather than a walk to the end of the list: a week with a chart row always has
+     times and a week without one always has something to say about itself, so the answer is
+     the first or the second candidate. The bound is what keeps a state nobody has foreseen
+     from building an agenda for every week of three years. */
+  const firstWithTimes = () => serials.slice(0, LUACH_SKIP_MAX + 1)
+    .find((s) => readerWeekHasTimes(s, index, state, settings)) ?? serials[0];
+  const showing = serials.includes(serial) ? serial
+    : luach ? firstWithTimes()
+    : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones

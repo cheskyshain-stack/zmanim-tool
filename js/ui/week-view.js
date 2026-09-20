@@ -1,5 +1,5 @@
 import { safeHeaderImage, sanitizeRichText } from '../security.js';
-import { renderWeeklyReader, readerWeekIndex } from './weekly-reader.js';
+import { renderWeeklyReader, readerWeekIndex, readerWeekHasTimes } from './weekly-reader.js';
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
 // right and its time on the left, running top to bottom.
@@ -191,6 +191,10 @@ const layoutNow = () => (congregationView ? 'charts' : weekLayout);
  *  Not in localStorage, again like pairView: opening the page fresh should show the panel
  *  closed, the same as it always has. */
 let optionsOpen = false;
+
+/** How many weeks past an empty one the congregation's page will look for one with times on
+ *  it before giving up and drawing the empty one. See firstWithTimes in renderWeek. */
+const LUACH_SKIP_MAX = 3;
 
 /** Which season a week belongs to, as something two weeks can be compared by.
  *
@@ -1503,7 +1507,23 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     return;
   }
 
-  const showing = serials.includes(serial) ? serial : luach ? serials[0] : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
+  /* The week the congregation's page opens on is the first one that still has something on
+     it, not simply the first that is not in the past.
+     They are the same week all but one evening a week. On מוצאי שבת, once the last מעריב has
+     gone in, the week that has just ended is still not past (the serial is today's until
+     midnight), so the page opened on it with nothing on it and a note telling the reader to
+     press Next. The shul asked for it to turn over by itself.
+     A week the reader picked by hand is never skipped, whether or not anything is left on it:
+     they asked for that one. Only the default is moved on.
+     Bounded rather than a walk to the end of the list: a week with a chart row always has
+     times and a week without one always has something to say about itself, so the answer is
+     the first or the second candidate. The bound is what keeps a state nobody has foreseen
+     from building an agenda for every week of three years. */
+  const firstWithTimes = () => serials.slice(0, LUACH_SKIP_MAX + 1)
+    .find((s) => readerWeekHasTimes(s, index, state, settings)) ?? serials[0];
+  const showing = serials.includes(serial) ? serial
+    : luach ? firstWithTimes()
+    : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,
      but what is on the wall is one page of it, and the weeks on that page are the ones

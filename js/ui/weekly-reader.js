@@ -245,6 +245,19 @@ export function weeklyAgendaData(showing,index,state,settings) {
   return data;
 }
 
+/** Whether this week still has anything on it: a מנין or a זמן that has not gone yet, or a day
+ *  the page has something to say about.
+ *
+ *  It is exactly the question renderWeeklyReader answers when it decides whether to draw the
+ *  week or the "No remaining minyanim this week" note, asked from outside so the page can pick
+ *  a week that has something on it rather than draw an empty one and tell the reader to press
+ *  Next. Built the same way and out of the same call, so the two cannot come to different
+ *  answers about the same week. */
+export function readerWeekHasTimes(showing, index, state, settings, now = new Date()) {
+  const agenda = weeklyAgenda(weeklyAgendaData(showing, index, state, settings), showing, state, settings, now);
+  return agenda.sections.length > 0 || agenda.notices.length > 0;
+}
+
 export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
   const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
