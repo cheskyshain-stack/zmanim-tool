@@ -12,7 +12,7 @@
 // Verified against two of those sheets, תשפ"ד (first day Shabbos) and תשפ"ו (neither day),
 // which between them cover both shapes. See the test notes in the commit.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
-import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
+import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
@@ -272,12 +272,12 @@ export function buildRoshHashanaPoster(year, settings) {
     /* The ערב ראש השנה block's own rows, so both sheets that draw them draw the same list and
        the עירוב row cannot be on one and not the other. They were written out in the renderer
        off RH_TEXT, which cannot know the year, and this row does. */
-    erevHeading: RH_TEXT.erevHeading,
+    erevHeading: RH_TEXT.erevHeading + (eiruv ? ' · ' + EIRUV_LABEL : ''),
     erevLines: [
       { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
       { label: RH_TEXT.chatzos, times: [{ text: formatTime(floorToMinute(Z.solarNoon(erev, settings))), underlined: false, mark: '' }] },
       { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
-      ...eiruvRow(eiruv),
+
     ],
     // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
     // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a

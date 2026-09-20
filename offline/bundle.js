@@ -2942,30 +2942,8 @@ function chartLine(cell, traces) {
 }
 
 // ==== posters/eiruv.js ====
-// עירוב תבשילין: when one is made, and the line that says so.
-//
-// One definition for the three sheets that carry it. It was written out three times, once per
-// sheet, and the three had already come apart: ראש השנה put the note over the Friday of יום טוב,
-// while סוכות and פסח put it over a block that happens to open with its own ערב. The same note
-// named a different day on each sheet.
-//
-// **When.** Whenever any day of that yom tov is a Friday, first or last. Said by the shul in
-// those words: "eiruv tavshilin is when yomtov is on Friday, regardless if its 1st day or 2nd
-// day of yom tov". Written the general way even where only one of a pair can ever be the Friday,
-// so the next reader is not left working out which of two rules a given line is: 1 תשרי, 15 ניסן
-// and 15 תשרי can never be a Friday, so the first days always turn on the second day, and 22
-// ניסן can never be one either, so פסח's second pair turn on שביעי.
-//
-// **Where.** On ערב יום טוב, which is the day it is made on. It is made before יום טוב comes in,
-// which is what makes cooking on the Friday for Shabbos allowed; the Friday is the day it is made
-// *for*. The shul reported the difference on תשפ"ט, where the note sat over יום ב' של ראש השנה
-// and it is made on the Wednesday.
-//
-// A row of its own on that afternoon, after its מנחה and before its הדלקת נרות, rather than a
-// word added to a heading. A heading names a day, and on סוכות and פסח the day it names is the
-// yom tov rather than the ערב: "a day's heading gathers the night that opens it" is the shul's
-// own shape for those sheets and is not worth breaking to place one note. A row with a label and
-// no time is a shape those sheets already print (מכירת עליות, מעריב אחר משנה תורה).
+// Eiruv reminders appear in the first relevant holiday or Erev heading.
+// The calendar rule and message detection are shared by all special schedules.
 
 /** The words, in one place. The three sheets' own `*_TEXT.eiruv` read from here, so the label
  *  on the paper and the label the message looks for cannot come apart. */
@@ -2991,7 +2969,7 @@ function eiruvRow(made) {
 /** Whether a built block carries the row. What the messages ask, so that a message cannot say
  *  ERUV TAVSHILIN on a week the sheet does not print it, or stay silent on one it does. */
 function blockHasEiruv(block) {
-  return (block?.lines || []).some((l) => l?.label === EIRUV_LABEL);
+  return (block?.heading || '').includes(EIRUV_LABEL) || (block?.erevHeading || '').includes(EIRUV_LABEL) || (block?.lines || []).some((l) => l?.label === EIRUV_LABEL);
 }
 
 // ==== posters/minyanim.js ====
@@ -4586,7 +4564,7 @@ function buildPesachPoster(year, settings) {
     const erevShabbos = excelWeekday(on) === PS_SHABBOS;
     blocks.push({
       at: on,
-      heading: heading(PS_TEXT.erev, PS_EREV),
+      heading: heading(PS_TEXT.erev, PS_EREV) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
         line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
@@ -4597,7 +4575,7 @@ function buildPesachPoster(year, settings) {
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
         /* The עירוב, on the afternoon it is made rather than over the day of יום טוב that is
            the Friday. One rule and one shape for all three sheets: see posters/eiruv.js. */
-        ...eiruvRow(eiruvDay1),
+
       ].filter(Boolean),
     });
     M.list(on, PS_TEXT.shacharis, everydayShacharis(), MORNING);
@@ -4782,12 +4760,12 @@ function buildPesachPoster(year, settings) {
     const erevShabbos = excelWeekday(day(n) - 1) === PS_SHABBOS;
     blocks.push({
       at: day(n),
-      heading: heading(PS_TEXT.shvii, n),
+      heading: heading(PS_TEXT.shvii, n) + (eiruvShvii ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         erevShabbos ? null
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
         // Made on ערב שביעי, which is the afternoon this block opens with. See posters/eiruv.js.
-        ...eiruvRow(eiruvShvii),
+
         // The same gate: an ערב שביעי that is Shabbos is already Shabbos and has nothing to
         // bring in early from.
         ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),
@@ -5135,12 +5113,12 @@ function buildRoshHashanaPoster(year, settings) {
     /* The ערב ראש השנה block's own rows, so both sheets that draw them draw the same list and
        the עירוב row cannot be on one and not the other. They were written out in the renderer
        off RH_TEXT, which cannot know the year, and this row does. */
-    erevHeading: RH_TEXT.erevHeading,
+    erevHeading: RH_TEXT.erevHeading + (eiruv ? ' · ' + EIRUV_LABEL : ''),
     erevLines: [
       { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
       { label: RH_TEXT.chatzos, times: [{ text: formatTime(floorToMinute(Z.solarNoon(erev, settings))), underlined: false, mark: '' }] },
       { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
-      ...eiruvRow(eiruv),
+
     ],
     // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
     // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
@@ -5853,7 +5831,7 @@ function buildSukkosPoster(year, settings) {
       line(SK_TEXT.erevMincha, list(erevMincha), { calc: 'erevMincha' }),
       /* The עירוב, on the afternoon it is made, after that afternoon's מנחה and before its
          candles. One rule and one shape for all three sheets: see posters/eiruv.js. */
-      ...eiruvRow(opts.eiruv === true),
+
       // הדלקת נרות, and the מנין three minutes behind it on a line of its own. The two were
       // one row for a while, the way the sheets it was ported from set them; the shul asked
       // for two, which is also how the one-page sheet has always set them.
@@ -5931,7 +5909,7 @@ function buildSukkosPoster(year, settings) {
   // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
   const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });
   blocks.push({
-    heading: heading(SK_TEXT.day1, SK_DAY1),
+    heading: heading(SK_TEXT.day1, SK_DAY1) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
     lines: [
       ...eveningLines(SK_EREV, { eiruv: eiruvDay1 }),
       ...morningLines(SK_DAY1),
@@ -6106,7 +6084,7 @@ function buildSukkosPoster(year, settings) {
     const shminiMincha = sukkosDayMincha(day(n), settings,
       { five: false, fiveIfRoom: true, early: isShabbos(n) });
     blocks.push({
-      heading: heading(SK_TEXT.shmini, n),
+      heading: heading(SK_TEXT.shmini, n) + (eiruvShmini ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         /* the evening of הושענא רבה, which is the one that opens שמיני עצרת. Its whole מנחה
            run is למטה: see sukkosErevMincha. */
@@ -7781,7 +7759,7 @@ function erevRoshHashanaText(poster) {
      two day blocks, because the note used to sit over the Friday of יום טוב: the day it is made
      for rather than the day it is made. Asking the heading at all is the point, so the paper and
      the message cannot disagree about a year. */
-  if (ytEruv({ lines: poster?.erevLines })) lines.push(YT_ERUV_LINE);
+  if (ytEruv({ heading: poster?.erevHeading, lines: poster?.erevLines })) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);

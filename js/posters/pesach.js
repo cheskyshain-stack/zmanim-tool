@@ -13,7 +13,7 @@
 // translation the ראש השנה, יום כיפור and סוכות sheets already make, so somebody holding this
 // and the board is reading one set of marks.
 import { roshHashana, excelWeekday, hebrewDateExtended } from '../hebrew-calendar.js';
-import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
+import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js';
@@ -313,7 +313,7 @@ export function buildPesachPoster(year, settings) {
     const erevShabbos = excelWeekday(on) === PS_SHABBOS;
     blocks.push({
       at: on,
-      heading: heading(PS_TEXT.erev, PS_EREV),
+      heading: heading(PS_TEXT.erev, PS_EREV) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
         line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
@@ -324,7 +324,7 @@ export function buildPesachPoster(year, settings) {
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
         /* The עירוב, on the afternoon it is made rather than over the day of יום טוב that is
            the Friday. One rule and one shape for all three sheets: see posters/eiruv.js. */
-        ...eiruvRow(eiruvDay1),
+
       ].filter(Boolean),
     });
     M.list(on, PS_TEXT.shacharis, everydayShacharis(), MORNING);
@@ -509,12 +509,12 @@ export function buildPesachPoster(year, settings) {
     const erevShabbos = excelWeekday(day(n) - 1) === PS_SHABBOS;
     blocks.push({
       at: day(n),
-      heading: heading(PS_TEXT.shvii, n),
+      heading: heading(PS_TEXT.shvii, n) + (eiruvShvii ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         erevShabbos ? null
           : line(PS_TEXT.erevMincha, parseTimes(PS_TEXT.erevMincha4), { calc: 'erevMincha' }),
         // Made on ערב שביעי, which is the afternoon this block opens with. See posters/eiruv.js.
-        ...eiruvRow(eiruvShvii),
+
         // The same gate: an ערב שביעי that is Shabbos is already Shabbos and has nothing to
         // bring in early from.
         ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),

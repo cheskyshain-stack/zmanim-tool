@@ -12,7 +12,7 @@
 // is למטה, * is בעזר״נ and ** is אולם השמחות. Same translation the סליחות and צום גדליה sheets
 // already make, so somebody holding this and the board is reading one set of marks.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
-import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
+import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, ceilToMinute, roundToMinute, UL_START } from '../format.js';
@@ -600,7 +600,7 @@ export function buildSukkosPoster(year, settings) {
       line(SK_TEXT.erevMincha, list(erevMincha), { calc: 'erevMincha' }),
       /* The עירוב, on the afternoon it is made, after that afternoon's מנחה and before its
          candles. One rule and one shape for all three sheets: see posters/eiruv.js. */
-      ...eiruvRow(opts.eiruv === true),
+
       // הדלקת נרות, and the מנין three minutes behind it on a line of its own. The two were
       // one row for a while, the way the sheets it was ported from set them; the shul asked
       // for two, which is also how the one-page sheet has always set them.
@@ -678,7 +678,7 @@ export function buildSukkosPoster(year, settings) {
   // יום א'. Its afternoon opens with the early מנין in a year where it is Shabbos.
   const day1Mincha = sukkosDayMincha(day(SK_DAY1), settings, { early: isShabbos(SK_DAY1) });
   blocks.push({
-    heading: heading(SK_TEXT.day1, SK_DAY1),
+    heading: heading(SK_TEXT.day1, SK_DAY1) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
     lines: [
       ...eveningLines(SK_EREV, { eiruv: eiruvDay1 }),
       ...morningLines(SK_DAY1),
@@ -853,7 +853,7 @@ export function buildSukkosPoster(year, settings) {
     const shminiMincha = sukkosDayMincha(day(n), settings,
       { five: false, fiveIfRoom: true, early: isShabbos(n) });
     blocks.push({
-      heading: heading(SK_TEXT.shmini, n),
+      heading: heading(SK_TEXT.shmini, n) + (eiruvShmini ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         /* the evening of הושענא רבה, which is the one that opens שמיני עצרת. Its whole מנחה
            run is למטה: see sukkosErevMincha. */

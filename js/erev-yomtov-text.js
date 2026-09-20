@@ -176,7 +176,7 @@ export function erevRoshHashanaText(poster) {
      two day blocks, because the note used to sit over the Friday of יום טוב: the day it is made
      for rather than the day it is made. Asking the heading at all is the point, so the paper and
      the message cannot disagree about a year. */
-  if (ytEruv({ lines: poster?.erevLines })) lines.push(YT_ERUV_LINE);
+  if (ytEruv({ heading: poster?.erevHeading, lines: poster?.erevLines })) lines.push(YT_ERUV_LINE);
 
   const candles = timeFor('candles');
   if (candles) lines.push(`Hadlakas Neiros ${candles.text}`);
