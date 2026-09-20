@@ -839,6 +839,18 @@ function donateWayHtml(way) {
  *  See ui/copy.js for the two routes and for what happens when a browser allows neither. The
  *  value beside the button is selectable text in the page regardless, so this one was never
  *  the dead end the message buttons were. */
+const copiedDonationIds = new Set();
+const pendingDonationIds = new Set();
+async function copyDonationIdOnce(taxId) {
+  if (copiedDonationIds.has(taxId)) return true;
+  if (pendingDonationIds.has(taxId)) return null;
+  pendingDonationIds.add(taxId);
+  try {
+    const ok = await copyToClipboard(taxId);
+    if (ok) copiedDonationIds.add(taxId);
+    return ok;
+  } finally { pendingDonationIds.delete(taxId); }
+}
 function wireDonateCopy(root) {
   for (const link of root.querySelectorAll('.luach-daf-provider[data-tax-id]')) {
     link.addEventListener('click', () => {
@@ -846,14 +858,21 @@ function wireDonateCopy(root) {
       if (!taxId) return;
       const status = link.closest('.luach-give-open').querySelector('.luach-daf-copy-status');
       // Start copying during the tap; the normal link still opens the provider immediately.
-      copyToClipboard(taxId).then(ok => {
+      copyDonationIdOnce(taxId).then(ok => {
+        if (ok === null) return;
         status.textContent = ok ? 'Tax ID copied: ' + taxId + '. Paste it on your provider’s page.'
           : 'Automatic copying was blocked. Use Copy above or copy the Tax ID: ' + taxId;
       });
     });
   }
   for (const btn of root.querySelectorAll('.luach-copy-btn')) {
-    wireCopyButton(btn, () => btn.dataset.copy || '');
+    const taxId = btn.dataset.copy || '';
+    if (root.querySelector('.luach-daf-provider[data-tax-id]')?.dataset.taxId === taxId) {
+      btn.addEventListener('click', async () => {
+        const ok = await copyDonationIdOnce(taxId);
+        if (ok !== null) btn.textContent = ok ? 'Copied' : 'Try again';
+      });
+    } else wireCopyButton(btn, () => btn.dataset.copy || '');
   }
 }
 
