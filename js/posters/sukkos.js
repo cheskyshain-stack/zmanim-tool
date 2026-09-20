@@ -13,7 +13,6 @@
 // already make, so somebody holding this and the board is reading one set of marks.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
-import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, ceilToMinute, roundToMinute, UL_START } from '../format.js';
@@ -948,6 +947,9 @@ export function buildSukkosPoster(year, settings) {
   // Every printed time on the sheet, the second half of a two-part row included: which marks
   // the key at the foot explains is a question about what is actually on the paper.
   const all = blocks.flatMap((b) => b.lines.flatMap((l) => [...l.times, ...(l.extra?.times || [])]));
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -974,7 +976,11 @@ export function buildSukkosPoster(year, settings) {
        sheet, and belongs with it. */
     minyanim: M.out,
     zmanim: M.zmanim,
-    legend: legendForTimes(all),
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
   };
 }
 

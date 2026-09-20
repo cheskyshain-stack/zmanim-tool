@@ -16,7 +16,6 @@
 // is written in the app's system, so somebody holding the poster and the chart is reading
 // one set of marks.
 import { roshHashana, excelWeekday, hebrewDateExtended } from '../hebrew-calendar.js';
-import { legendForTimes } from '../legend.js';
 import { DAY_NAMES } from '../util.js';
 import { fixedTime } from '../zmanim/trace.js';
 
@@ -310,6 +309,9 @@ export function buildSlichosPoster(hebrewYearNum) {
   // line is Hebrew and is right to left, and setting it the other way puts the star on the
   // far side of the phrase instead of against the word it belongs to. Same split as the
   // week card's legend in week-view.js, and the same as the printed chart's own footer.
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   return {
     hebrewYear: hebrewYearNum,
     rows,
@@ -318,6 +320,10 @@ export function buildSlichosPoster(hebrewYearNum) {
     // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
     // years, since סליחות are the end of one and ערב יו"כ the start of the next.
     span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
-    legend: legendForTimes(all),
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
   };
 }

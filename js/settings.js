@@ -52,11 +52,13 @@ export const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00
  *  the everyday one above it rather than on a short line. */
 export const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
-/* The Weekday chart used to carry a footer note of its own, whose whole content was the key to
-   the marks: what an underline means and what each star means. The key is worked out from the
-   page now and written in one place (legend.js), so there is nothing left for that constant to
-   hold and it is gone. The weekday chart prints the key and no extra sentence, which is what it
-   printed before. */
+/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
+ *
+ *  It says what the marks on the times above it mean, so it belongs with the schedules and not
+ *  with the shul's own footer: the stars are written by the schedules and read by every screen
+ *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
+ *  one of them would be the board explaining its own marks wrongly. */
+export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -97,16 +99,6 @@ export function specialShacharisHeading(kinds) {
  *  Medrash of Lakewood Commons". One name, one spelling, and the one with the "of" is the
  *  one the shul goes by. An install that never edited this line is moved onto it; anything
  *  typed by hand stays exactly as typed. */
-/** The footer note as it shipped while it still carried the key to the marks.
- *
- *  The key is worked out from the page now (legend.js), so the setting is the extra sentence
- *  alone. An install still holding the old two line value never typed it, so it is moved on to
- *  the new default rather than left printing the key a second time under the one the page
- *  draws. Same rule as LEGACY_FOOTER_ADDRESS below. */
-export const LEGACY_FOOTER_NOTE = [
-  'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
-];
-
 export const LEGACY_FOOTER_ADDRESS = [
   'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
 ];
@@ -141,7 +133,7 @@ export const DEFAULT_SETTINGS = {
   headerIconImage: null,
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
-  footerNote: 'All zmanim are rounded off. Please be מחמיר two minutes.',
+  footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
   /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
      WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight

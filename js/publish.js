@@ -1,5 +1,5 @@
 import { loadTables } from './data-loader.js';
-import { DEFAULT_SETTINGS, LEGACY_FOOTER_NOTE, resolveSettings } from './settings.js';
+import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 import { computeSeasonWeeks, computeWeekdayWeeks } from './sheets/weeks.js';
 import { defaultPageSizes, alignPageSizesTo } from './pagination.js';
 import { hebrewDateExtended } from './hebrew-calendar.js';
@@ -163,11 +163,6 @@ export async function unpublishFromSite() {
 export function buildAutomaticCharts(config, tables, now = new Date()) {
   const settings = { ...DEFAULT_SETTINGS, ...config.settings,
     sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
-  /* A published file is a snapshot of the day it was written, and the congregation's site reads
-     it rather than localStorage, so a default that has since changed has to be carried forward
-     here as well as in storage.js. It was not, once: the retired rules went on firing on the
-     board for months because only the admin's door was watched. */
-  if (LEGACY_FOOTER_NOTE.includes(settings.footerNote)) settings.footerNote = DEFAULT_SETTINGS.footerNote;
   const resolved = resolveSettings(settings);
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: settings.timezoneId || 'America/New_York',
     year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now);

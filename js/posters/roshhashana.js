@@ -13,7 +13,6 @@
 // which between them cover both shapes. See the test notes in the commit.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { eiruvMade, eiruvRow, EIRUV_LABEL } from './eiruv.js';
-import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
@@ -258,10 +257,17 @@ export function buildRoshHashanaPoster(year, settings) {
     ...parseTimes(RH_TEXT.erevMincha.times),
     ...blocks.flatMap((b) => b.lines.flatMap((l) => l.times)),
   ];
+  const stars = [];
+  if (marks.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (marks.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
-    legend: legendForTimes(marks),
+    legend: [
+      marks.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
     span: { from: rh - 1, to: rh + 1 },
     /* The ערב ראש השנה block's own rows, so both sheets that draw them draw the same list and
        the עירוב row cannot be on one and not the other. They were written out in the renderer

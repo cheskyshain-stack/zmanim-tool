@@ -1,5 +1,4 @@
 import { safeHeaderImage } from '../security.js';
-import { legendForHtml, legendHtml } from '../legend.js';
 // One week on one sheet, set the way the yomim noraim sheet is set.
 //
 // The two cards are the week as the boards have always had it: a שבת chart and a חול chart,
@@ -292,9 +291,15 @@ function sheetSections(showing, index, state, settings, withChol) {
 }
 
 /** The key at the foot, built from what is really on this sheet rather than written out.
- *  One definition of the wording and the order, in legend.js, which every printed page uses. */
+ *  Same rule and same wording as the week card's own legend. */
 function sheetLegend(html) {
-  return legendForHtml(html);
+  const lines = [];
+  if (html.includes('<u>')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
+  const stars = [];
+  if (/\d:\d\d\*(?!\*)/.test(html)) stars.push('*בעזרת נשים');
+  if (/\d:\d\d\*\*/.test(html)) stars.push('**באולם השמחות');
+  if (stars.length) lines.push({ dir: 'rtl', text: stars.join(' ') });
+  return lines;
 }
 
 /** The whole sheet, ready to be dropped into the page.
@@ -327,7 +332,10 @@ export function weekSheetHtml(showing, index, state, settings, title, { withChol
     </div>
     <h2 class="onepage-title"${hebrewLang(title)}>${esc(title)}</h2>
     <div class="onepage-cols"><div class="onepage-col">${body}</div></div>
-    ${legend.length ? `<div class="poster-legend">${legendHtml(legend)}</div>` : ''}
+    ${legend.length
+      ? `<div class="poster-legend">${legend
+          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
+      : ''}
   </div>`;
 }
 

@@ -8,15 +8,18 @@
 // The sheet can be printed either way up, which is the caller's choice rather than this
 // module's: see the orientation picker on the Posters tab.
 import { buildRoshHashanaPoster } from './roshhashana.js';
-import { legendUnion } from '../legend.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildSlichosPoster } from './slichos.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
 
 /** One key at the foot of a paired sheet rather than each half's own, so a mark is explained
- *  once. A union of which marks the halves use: see legend.js. */
+ *  once. Merged on the text, since the halves word their lines identically. */
 function pairLegend(...posters) {
-  return legendUnion(...posters.map((p) => p?.legend || []));
+  const legend = [];
+  for (const line of posters.flatMap((p) => p?.legend || [])) {
+    if (!legend.some((l) => l.text === line.text)) legend.push(line);
+  }
+  return legend;
 }
 
 /** Both posters for one Hebrew year, and the key to the marks either of them uses. */

@@ -1,8 +1,7 @@
 import { safeHeaderImage } from '../security.js';
-import { legendForHtml, legendHtml } from '../legend.js';
 import {
   resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR,
-  WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL,
+  WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
 } from '../settings.js';
 import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
@@ -382,10 +381,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
-  /* The extra sentence under the key, which is the shul's to type and only the שבת chart has
-     one: "All zmanim are rounded off". The key itself is no longer part of it, so the weekday
-     chart's own constant is gone with it. See legend.js and LEGACY_FOOTER_NOTE. */
-  const footerNote = sheet.season === 'weekday' ? '' : state.settings.footerNote;
+  const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
   const isWeekday = effectiveSeason === 'weekday';
 
@@ -509,12 +505,6 @@ ${special}` : '');
     })
     .join('');
   const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;
-  /* The key at the foot, worked out from what is really on this page rather than typed into
-     a setting: a שבת chart has underlines and no stars, a weekday chart has both. One
-     definition of the wording and the order, in legend.js, shared with every poster and both
-     week sheets. Asked of the rows and the שחרית panel together, which is everything a mark
-     can be in. */
-  const legendKey = legendHtml(legendForHtml(rows + theadRow));
 
   page.innerHTML = `
     <div class="page-header">
@@ -535,7 +525,6 @@ ${special}` : '');
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
-        ${legendKey ? legendKey + '<br>' : ''}
         ${footerNote ? nl2br(escText(footerNote)) + '<br>' : ''}
         <span class="footer-address">${escText(state.settings.footerAddress)}</span>
       </div>

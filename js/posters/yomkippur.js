@@ -13,7 +13,6 @@
 // תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
 // other way and is not self-consistent with it. See the commit for the line by line.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
-import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
@@ -352,12 +351,19 @@ export function buildAfterYomKippurPoster(year, settings) {
   const rh = roshHashana(year - 3761);
   const after = buildAfterYomKippur(year, settings);
   const all = [...after.shacharis, ...after.mincha, ...after.maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   return {
     hebrewYear: year,
     // From the morning after יו"כ through ערב סוכות, which is what it covers.
     span: { from: rh + 10, to: rh + 13 },
     after,
-    legend: legendForTimes(all),
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
   };
 }
 
@@ -499,6 +505,9 @@ export function buildYomKippurPoster(year, settings) {
 
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -523,6 +532,10 @@ export function buildYomKippurPoster(year, settings) {
     // printed sheet reads this.
     minyanim: M.out,
     zmanim: M.zmanim,
-    legend: legendForTimes(all),
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
   };
 }

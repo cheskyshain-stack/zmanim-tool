@@ -12,7 +12,6 @@
 // Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
 // its own list. It sits in TZG_TEXT with the other slots that are set by hand.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
-import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
@@ -135,6 +134,9 @@ export function buildTzomGedaliaPoster(year, settings) {
   M.list(serial, TZG_TEXT.maariv, maariv, AFTERNOON);
 
   const all = [...shacharis, ...mincha, ...maariv];
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -152,6 +154,10 @@ export function buildTzomGedaliaPoster(year, settings) {
     // The day's מנינים, for the congregation's "what is on next". Nothing on the printed
     // sheet reads this.
     minyanim: M.out,
-    legend: legendForTimes(all),
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
   };
 }
