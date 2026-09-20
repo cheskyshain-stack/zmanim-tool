@@ -1393,13 +1393,11 @@ const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* 
  *  the everyday one above it rather than on a short line. */
 const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
-/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
- *
- *  It says what the marks on the times above it mean, so it belongs with the schedules and not
- *  with the shul's own footer: the stars are written by the schedules and read by every screen
- *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
- *  one of them would be the board explaining its own marks wrongly. */
-const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
+/* The Weekday chart used to carry a footer note of its own, whose whole content was the key to
+   the marks: what an underline means and what each star means. The key is worked out from the
+   page now and written in one place (legend.js), so there is nothing left for that constant to
+   hold and it is gone. The weekday chart prints the key and no extra sentence, which is what it
+   printed before. */
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -1440,6 +1438,16 @@ function specialShacharisHeading(kinds) {
  *  Medrash of Lakewood Commons". One name, one spelling, and the one with the "of" is the
  *  one the shul goes by. An install that never edited this line is moved onto it; anything
  *  typed by hand stays exactly as typed. */
+/** The footer note as it shipped while it still carried the key to the marks.
+ *
+ *  The key is worked out from the page now (legend.js), so the setting is the extra sentence
+ *  alone. An install still holding the old two line value never typed it, so it is moved on to
+ *  the new default rather than left printing the key a second time under the one the page
+ *  draws. Same rule as LEGACY_FOOTER_ADDRESS below. */
+const LEGACY_FOOTER_NOTE = [
+  'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
+];
+
 const LEGACY_FOOTER_ADDRESS = [
   'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
 ];
@@ -1474,7 +1482,7 @@ const DEFAULT_SETTINGS = {
   headerIconImage: null,
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
-  footerNote: 'All underlined מנינים will be בבית מדרש למטה\nAll zmanim are rounded off. Please be מחמיר two minutes.',
+  footerNote: 'All zmanim are rounded off. Please be מחמיר two minutes.',
   footerAddress: 'Bais Medrash of Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
   /* No Weekday chart entries. The two שחרית schedules and the chart's footer note are
      WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL and WEEKDAY_FOOTER_NOTE above, read straight
@@ -2657,6 +2665,11 @@ async function unpublishFromSite() {
 function buildAutomaticCharts(config, tables, now = new Date()) {
   const settings = { ...DEFAULT_SETTINGS, ...config.settings,
     sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
+  /* A published file is a snapshot of the day it was written, and the congregation's site reads
+     it rather than localStorage, so a default that has since changed has to be carried forward
+     here as well as in storage.js. It was not, once: the retired rules went on firing on the
+     board for months because only the admin's door was watched. */
+  if (LEGACY_FOOTER_NOTE.includes(settings.footerNote)) settings.footerNote = DEFAULT_SETTINGS.footerNote;
   const resolved = resolveSettings(settings);
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: settings.timezoneId || 'America/New_York',
     year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now);
@@ -2752,6 +2765,7 @@ function applySeeds(state) {
 function normalizeSettings(raw) {
   const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
   if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
+  if (LEGACY_FOOTER_NOTE.includes(merged.footerNote)) merged.footerNote = DEFAULT_SETTINGS.footerNote;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
   for (const key of RETIRED_SETTINGS) delete merged[key];
   return merged;
@@ -2885,6 +2899,93 @@ function importStateFromText(text) {
 
 function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ==== legend.js ====
+// The key at the foot of a printed page: what an underline and the stars on it mean.
+//
+// One definition. The wording was written out in thirteen files, which is thirteen chances for
+// two pages to explain the same mark differently, and this project has been hurt by that shape
+// more than once: the published file went on printing a schedule the admin had already fixed,
+// and two retired rules went on firing for months. Read a thing off the one place that owns it.
+//
+// **The line is read right to left**, the way the shul reads it: the underline first, then one
+// star, then two. That is why the row itself is set right to left while each piece inside it is
+// its own left-to-right isolate, which is what keeps a star on the left of the words it marks.
+// Measured rather than reasoned about, because this line is Hebrew, Latin and punctuation on one
+// line and stored order is not display order (see CLAUDE.md). On the chart's footer the ink
+// paints Underlined@721, בב״מ למטה@772 with the two starred pieces to their left, which is the
+// order it is written in here.
+//
+// **Only the marks a page actually carries are named.** Telling a reader what a star means on a
+// page with no star on it is noise, and the שבת chart is exactly that page: underlines and no
+// stars at all.
+
+
+/** The three pieces, in the order they are read.
+ *
+ *  `mark` is what the board prints beside a time, so the key and the boards cannot come to
+ *  disagree about which mark means which room. The underline has no mark of its own: it is the
+ *  word itself, underlined, which is the whole of what it has to say. */
+const LEGEND_PIECES = [
+  { key: 'underline', mark: '', en: 'Underlined', he: 'בב״מ למטה' },
+  { key: 'ezras', mark: '*', en: '', he: 'בעזרת נשים' },
+  { key: 'simcha', mark: '**', en: '', he: 'באולם השמחות' },
+];
+
+const LEGEND_ORDER = LEGEND_PIECES.map((p) => p.key);
+
+/** The pieces a page carries, from three yes-or-no answers, always in reading order. */
+function legendKeys({ underlined = false, star = false, twoStars = false } = {}) {
+  return [underlined && 'underline', star && 'ezras', twoStars && 'simcha'].filter(Boolean);
+}
+
+/** The same, asked of a list of printed times: `{ text, underlined, mark }`, which is the
+ *  shape every poster's lines are already made of. */
+function legendForTimes(times) {
+  const all = times || [];
+  return legendKeys({
+    underlined: all.some((t) => t?.underlined),
+    star: all.some((t) => t?.mark === '*'),
+    twoStars: all.some((t) => t?.mark === '**'),
+  });
+}
+
+/** The same, asked of a page that is already markup.
+ *
+ *  The two are looked for in different places on purpose. An underline only ever exists as
+ *  markup, so it is looked for there. A star is a character the reader sees, and the wall
+ *  chart sets it in an element of its own beside the time it marks ("7:20" and "*" in two
+ *  divs), so a regex over the HTML never finds one: the tags come out first and the stars are
+ *  looked for in the words that are left. Measured on the chart, which is how this was found. */
+function legendForHtml(html) {
+  const markup = String(html ?? '');
+  const words = markup.replace(/<[^>]*>/g, ' ');
+  return legendKeys({
+    underlined: /<u[\s>]/i.test(markup),
+    star: /\d:\d\d\s*\*(?!\*)/.test(words),
+    twoStars: /\d:\d\d\s*\*\*/.test(words),
+  });
+}
+
+/** One key for several pages, each mark named once and in reading order. Two sheets on a page
+ *  and the whole season on a page both want this. */
+function legendUnion(...lists) {
+  const all = new Set(lists.flat().filter(Boolean));
+  return LEGEND_ORDER.filter((k) => all.has(k));
+}
+
+/** The key as one line of markup, or nothing where the page carries no marks at all.
+ *
+ *  The row is right to left so the first piece is at the right; each piece is a left-to-right
+ *  isolate so its star stays on the left of its own words and the Hebrew inside it still reads
+ *  as Hebrew. The word is underlined because it is the mark it is explaining. */
+function legendHtml(keys) {
+  const on = LEGEND_PIECES.filter((p) => (keys || []).includes(p.key));
+  if (!on.length) return '';
+  const piece = (p) => `<span dir="ltr">${p.en ? `<u>${escAttr(p.en)}</u> ` : escAttr(p.mark)}`
+    + `<bdi lang="he">${escAttr(p.he)}</bdi></span>`;
+  return `<span class="legend-key" dir="rtl">${on.map(piece).join('')}</span>`;
 }
 
 // ==== posters/chart-cell.js ====
@@ -3117,6 +3218,7 @@ function nineHours(date, settings) {
 // מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
 // is written in the app's system, so somebody holding the poster and the chart is reading
 // one set of marks.
+
 
 
 
@@ -3410,9 +3512,6 @@ function buildSlichosPoster(hebrewYearNum) {
   // line is Hebrew and is right to left, and setting it the other way puts the star on the
   // far side of the phrase instead of against the word it belongs to. Same split as the
   // week card's legend in week-view.js, and the same as the printed chart's own footer.
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   return {
     hebrewYear: hebrewYearNum,
     rows,
@@ -3421,11 +3520,7 @@ function buildSlichosPoster(hebrewYearNum) {
     // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
     // years, since סליחות are the end of one and ערב יו"כ the start of the next.
     span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -3518,6 +3613,7 @@ function openingMinchaTrace(minchaGedola, next) {
 // Verified against two of the sheets the shul hangs, תשפ"ו and תשפ"ד. The rules reproduce
 // תשפ"ו to the minute nearly throughout; תשפ"ד, which is older, rounds several lines the
 // other way and is not self-consistent with it. See the commit for the line by line.
+
 
 
 
@@ -3855,19 +3951,12 @@ function buildAfterYomKippurPoster(year, settings) {
   const rh = roshHashana(year - 3761);
   const after = buildAfterYomKippur(year, settings);
   const all = [...after.shacharis, ...after.mincha, ...after.maariv];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   return {
     hebrewYear: year,
     // From the morning after יו"כ through ערב סוכות, which is what it covers.
     span: { from: rh + 10, to: rh + 13 },
     after,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -4009,9 +4098,6 @@ function buildYomKippurPoster(year, settings) {
 
   const all = [...dayLines.flatMap((l) => l.times), ...after.mincha, ...after.maariv,
     ...after.shacharis, ...nextMorning.times, ...parseTimes(YK_TEXT.erevShacharis.times)];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -4036,11 +4122,7 @@ function buildYomKippurPoster(year, settings) {
     // printed sheet reads this.
     minyanim: M.out,
     zmanim: M.zmanim,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -4235,6 +4317,7 @@ const KAYITZ_COLUMNS = [
 // בית מדרש למטה; here plain is the main בית מדרש, an underline is למטה and * is בעזר״נ. Same
 // translation the ראש השנה, יום כיפור and סוכות sheets already make, so somebody holding this
 // and the board is reading one set of marks.
+
 
 
 
@@ -4782,9 +4865,6 @@ function buildPesachPoster(year, settings) {
   blocks.sort((a, b) => a.at - b.at);
 
   const all = blocks.flatMap((b) => b.lines.flatMap((l) => [...l.times, ...(l.extra?.times || [])]));
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -4796,11 +4876,7 @@ function buildPesachPoster(year, settings) {
     blocks: blocks.map(({ at, ...b }) => b),
     minyanim: M.out,
     zmanim: M.zmanim,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -4818,6 +4894,7 @@ function buildPesachPoster(year, settings) {
 //
 // Verified against two of those sheets, תשפ"ד (first day Shabbos) and תשפ"ו (neither day),
 // which between them cover both shapes. See the test notes in the commit.
+
 
 
 
@@ -5063,17 +5140,10 @@ function buildRoshHashanaPoster(year, settings) {
     ...parseTimes(RH_TEXT.erevMincha.times),
     ...blocks.flatMap((b) => b.lines.flatMap((l) => l.times)),
   ];
-  const stars = [];
-  if (marks.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (marks.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
-    legend: [
-      marks.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(marks),
     span: { from: rh - 1, to: rh + 1 },
     // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
     // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
@@ -5199,6 +5269,7 @@ const CHOREF_COLUMNS = [
 // ** for בית מדרש למטה and *** for אולם השמחות; here plain is the main בית מדרש, an underline
 // is למטה, * is בעזר״נ and ** is אולם השמחות. Same translation the סליחות and צום גדליה sheets
 // already make, so somebody holding this and the board is reading one set of marks.
+
 
 
 
@@ -6133,9 +6204,6 @@ function buildSukkosPoster(year, settings) {
   // Every printed time on the sheet, the second half of a two-part row included: which marks
   // the key at the foot explains is a question about what is actually on the paper.
   const all = blocks.flatMap((b) => b.lines.flatMap((l) => [...l.times, ...(l.extra?.times || [])]));
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -6162,11 +6230,7 @@ function buildSukkosPoster(year, settings) {
        sheet, and belongs with it. */
     minyanim: M.out,
     zmanim: M.zmanim,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -6206,6 +6270,7 @@ function buildSukkosShuavaPoster(year) {
 // The morning is not calculated at all, and it is not the ר"ח בה"ב ותענ"צ schedule out of
 // Settings either: a fast day starts earlier than that, and the sheet the shul hangs prints
 // its own list. It sits in TZG_TEXT with the other slots that are set by hand.
+
 
 
 
@@ -6327,9 +6392,6 @@ function buildTzomGedaliaPoster(year, settings) {
   M.list(serial, TZG_TEXT.maariv, maariv, AFTERNOON);
 
   const all = [...shacharis, ...mincha, ...maariv];
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
@@ -6347,11 +6409,7 @@ function buildTzomGedaliaPoster(year, settings) {
     // The day's מנינים, for the congregation's "what is on next". Nothing on the printed
     // sheet reads this.
     minyanim: M.out,
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -8055,6 +8113,7 @@ function erevShviiShelPesachText(poster) {
 
 
 
+
 /** The months, as the Hebrew date counts them: Nisan is 1, the way rules count them too.
  *  Both Adars are offered; a plain year has neither and takes אדר. */
 const OWN_MONTHS = JEWISH_MONTHS_HE.map((name, i) => ({ value: i + 1, name }));
@@ -8180,9 +8239,6 @@ function buildOwnPoster(sheet, year, settings) {
   });
   if (!blocks.length) return null;
   const all = blocks.flatMap((b) => b.rows.flatMap((r) => r.times));
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
   const days = blocks.map((b) => b.serial);
   return {
     hebrewYear: year,
@@ -8195,11 +8251,7 @@ function buildOwnPoster(sheet, year, settings) {
     // Same two lines, in the same order, on the same reasoning as every other sheet: see
     // buildSlichosPoster. The underline line is an English sentence with Hebrew in it and is
     // set left to right; the star line is Hebrew and is set right to left.
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(all),
   };
 }
 
@@ -8217,14 +8269,11 @@ function buildOwnPoster(sheet, year, settings) {
 
 
 
+
 /** One key at the foot of a paired sheet rather than each half's own, so a mark is explained
- *  once. Merged on the text, since the halves word their lines identically. */
+ *  once. A union of which marks the halves use: see legend.js. */
 function pairLegend(...posters) {
-  const legend = [];
-  for (const line of posters.flatMap((p) => p?.legend || [])) {
-    if (!legend.some((l) => l.text === line.text)) legend.push(line);
-  }
-  return legend;
+  return legendUnion(...posters.map((p) => p?.legend || []));
 }
 
 /** Both posters for one Hebrew year, and the key to the marks either of them uses. */
@@ -8399,6 +8448,7 @@ function rowFor(week, sheet, state, settings) {
 
 
 
+
 /** The lines that are the poster rather than the times: what it is, and who is speaking.
  *
  *  In one place and not in settings, for now. They have not changed in the years of posters
@@ -8510,16 +8560,9 @@ function posterFromCell(week, cell) {
     span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
     mincha,
-    // Only the marks that are actually on this poster get explained. Each line says which
-    // direction it has to be set in: the underline line is an English sentence carrying
-    // Hebrew and reads left to right, the star line is Hebrew and reads right to left, and
-    // setting that one the wrong way puts the star at the far end of the line instead of
-    // against the words it marks. Same split as the week card's legend.
-    legend: [
-      mincha.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
-    ].filter(Boolean),
+    // Only the marks that are actually on this poster get explained. One definition of what
+    // each mark means and how the line is set, in legend.js.
+    legend: legendForTimes(mincha),
   };
 }
 
@@ -9722,7 +9765,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
-  const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
+  /* The extra sentence under the key, which is the shul's to type and only the שבת chart has
+     one: "All zmanim are rounded off". The key itself is no longer part of it, so the weekday
+     chart's own constant is gone with it. See legend.js and LEGACY_FOOTER_NOTE. */
+  const footerNote = sheet.season === 'weekday' ? '' : state.settings.footerNote;
   const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
   const isWeekday = effectiveSeason === 'weekday';
 
@@ -9846,6 +9892,12 @@ ${special}` : '');
     })
     .join('');
   const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;
+  /* The key at the foot, worked out from what is really on this page rather than typed into
+     a setting: a שבת chart has underlines and no stars, a weekday chart has both. One
+     definition of the wording and the order, in legend.js, shared with every poster and both
+     week sheets. Asked of the rows and the שחרית panel together, which is everything a mark
+     can be in. */
+  const legendKey = legendHtml(legendForHtml(rows + theadRow));
 
   page.innerHTML = `
     <div class="page-header">
@@ -9866,6 +9918,7 @@ ${special}` : '');
     <div class="page-footer">
       <span class="footer-line"></span>
       <div class="footer-text">
+        ${legendKey ? legendKey + '<br>' : ''}
         ${footerNote ? nl2br(escText(footerNote)) + '<br>' : ''}
         <span class="footer-address">${escText(state.settings.footerAddress)}</span>
       </div>
@@ -10802,7 +10855,7 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, notes = [] } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
@@ -10853,9 +10906,9 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${escAttr(fontStackFor(POSTER_FONT))}">
     ${head}
     ${body}
-    ${legend.length
-      ? `<div class="poster-legend">${legend
-          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${escAttr(l.text)}</div>`).join('')}</div>`
+    ${legend.length || notes.length
+      ? `<div class="poster-legend">${legendHtml(legend)}${notes
+          .map((t) => `<div${hebrewLang(t)}>${escAttr(t)}</div>`).join('')}</div>`
       : ''}
   </div>`;
 }
@@ -11698,23 +11751,15 @@ function renderOnePagePoster(built, settings) {
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
     if (moved.length && index === aseresAfter) pushMoved();
   }
-  /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
-     Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
-     **באולם השמחות" and one using only the first writes "*בעזרת נשים", which are two
-     different strings saying one thing, and the sheet came out with the key's second line
-     under itself. A line is kept only where no other line already covers it. Asked of the
-     lines rather than of the times, so the wording stays where it is written and this does
-     not become a second place that has to say what a star means. */
-  const lines = own ? [...(built.legend || [])] : [];
-  for (const it of items) for (const l of it.poster.legend || []) lines.push(l);
-  const legend = lines.filter((l, i) =>
-    !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
-    // Two identical lines: keep the first.
-    && lines.findIndex((o) => o.text === l.text) === i);
-  /* And the rounding note, last, under the marks. Added here rather than to each poster's own
-     legend because it is about this sheet: it says every time on the page is a whole minute
-     and asks for two minutes in hand, and the sheets of their own do not carry it. */
-  legend.push({ dir: 'ltr', text: ONEPAGE_TEXT.rounded });
+  /* One key at the foot for the whole sheet, gathered off the sheets it is made of. A union
+     of which marks are used rather than of the sentences that explain them: the sheets used to
+     hand back wording, so one naming both marks and one naming only the first were two strings
+     saying overlapping things and the sheet printed the shorter under the longer. */
+  const legend = legendUnion(own ? built.legend || [] : [], ...items.map((it) => it.poster.legend || []));
+  /* And the rounding note, last, under the marks. Kept apart from the key rather than added to
+     it: it is about this sheet, saying every time on the page is a whole minute and asking for
+     two minutes in hand, and the sheets of their own do not carry it. */
+  const notes = [ONEPAGE_TEXT.rounded];
   /* Both columns are written out, and every block starts in the first one. Which of them
      each block ends up in is settled by fitOnePage, after the browser has said how tall
      each is: the split is a measurement, not a number written down here, so a year that
@@ -11730,7 +11775,7 @@ function renderOnePagePoster(built, settings) {
       </div>
       <div class="onepage-col"></div>
     </div>`;
-  return posterShell(settings, body, legend, { onepage: true, chartHead: true })
+  return posterShell(settings, body, legend, { onepage: true, chartHead: true, notes })
     + ((built.notBuilt || []).length
       ? `<p class="hint no-print">Not on this sheet, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : '');
@@ -17449,15 +17494,9 @@ function sheetSections(showing, index, state, settings, withChol) {
 }
 
 /** The key at the foot, built from what is really on this sheet rather than written out.
- *  Same rule and same wording as the week card's own legend. */
+ *  One definition of the wording and the order, in legend.js, which every printed page uses. */
 function sheetLegend(html) {
-  const lines = [];
-  if (html.includes('<u>')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
-  const stars = [];
-  if (/\d:\d\d\*(?!\*)/.test(html)) stars.push('*בעזרת נשים');
-  if (/\d:\d\d\*\*/.test(html)) stars.push('**באולם השמחות');
-  if (stars.length) lines.push({ dir: 'rtl', text: stars.join(' ') });
-  return lines;
+  return legendForHtml(html);
 }
 
 /** The whole sheet, ready to be dropped into the page.
@@ -17490,10 +17529,7 @@ function weekSheetHtml(showing, index, state, settings, title, { withChol = true
     </div>
     <h2 class="onepage-title"${hebrewLang(title)}>${esc(title)}</h2>
     <div class="onepage-cols"><div class="onepage-col">${body}</div></div>
-    ${legend.length
-      ? `<div class="poster-legend">${legend
-          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${esc(l.text)}</div>`).join('')}</div>`
-      : ''}
+    ${legend.length ? `<div class="poster-legend">${legendHtml(legend)}</div>` : ''}
   </div>`;
 }
 
@@ -18909,16 +18945,14 @@ function trimSeparatorsBeforeBreaks(root) {
 function fillLegend(card) {
   const legend = card.querySelector('.week-legend');
   if (!legend) return;
+  /* Asked of the card itself: a star is in a .time-mark of its own here, and the underline is
+     markup. One definition of what each mark means and how the line is set, in legend.js. */
   const marks = [...card.querySelectorAll('.week-lines .time-mark')].map((m) => m.textContent.trim());
-  const lines = [];
-  if (card.querySelector('.week-lines u')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
-  // The two star notes share a line, in the order the printed chart's footer has them,
-  // and either can appear on its own if only its mark is on the card.
-  const stars = [];
-  if (marks.includes('*')) stars.push('*בעזרת נשים');
-  if (marks.includes('**')) stars.push('**באולם השמחות');
-  if (stars.length) lines.push({ dir: 'rtl', text: stars.join(' ') });
-  legend.innerHTML = lines.map((l) => `<div class="week-legend-line" dir="${l.dir}">${weekEsc(l.text)}</div>`).join('');
+  legend.innerHTML = legendHtml(legendKeys({
+    underlined: Boolean(card.querySelector('.week-lines u')),
+    star: marks.includes('*'),
+    twoStars: marks.includes('**'),
+  }));
 }
 
 /** A row's name, taken from the chart's column header.

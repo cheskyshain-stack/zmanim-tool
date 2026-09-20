@@ -1,4 +1,5 @@
 import { safeHeaderImage } from '../security.js';
+import { legendHtml, legendUnion } from '../legend.js';
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
 // Two so far, שבת שובה and סליחות, and the tab is shaped for the others to follow rather
@@ -844,7 +845,7 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, notes = [] } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
@@ -895,9 +896,9 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
   return `<div class="${cls}" dir="rtl" style="--poster-font-family: ${escAttr(fontStackFor(POSTER_FONT))}">
     ${head}
     ${body}
-    ${legend.length
-      ? `<div class="poster-legend">${legend
-          .map((l) => `<div dir="${l.dir}"${hebrewLang(l.text)}>${escAttr(l.text)}</div>`).join('')}</div>`
+    ${legend.length || notes.length
+      ? `<div class="poster-legend">${legendHtml(legend)}${notes
+          .map((t) => `<div${hebrewLang(t)}>${escAttr(t)}</div>`).join('')}</div>`
       : ''}
   </div>`;
 }
@@ -1740,23 +1741,15 @@ function renderOnePagePoster(built, settings) {
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
     if (moved.length && index === aseresAfter) pushMoved();
   }
-  /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
-     Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
-     **באולם השמחות" and one using only the first writes "*בעזרת נשים", which are two
-     different strings saying one thing, and the sheet came out with the key's second line
-     under itself. A line is kept only where no other line already covers it. Asked of the
-     lines rather than of the times, so the wording stays where it is written and this does
-     not become a second place that has to say what a star means. */
-  const lines = own ? [...(built.legend || [])] : [];
-  for (const it of items) for (const l of it.poster.legend || []) lines.push(l);
-  const legend = lines.filter((l, i) =>
-    !lines.some((o, j) => j !== i && o.text !== l.text && o.text.includes(l.text))
-    // Two identical lines: keep the first.
-    && lines.findIndex((o) => o.text === l.text) === i);
-  /* And the rounding note, last, under the marks. Added here rather than to each poster's own
-     legend because it is about this sheet: it says every time on the page is a whole minute
-     and asks for two minutes in hand, and the sheets of their own do not carry it. */
-  legend.push({ dir: 'ltr', text: ONEPAGE_TEXT.rounded });
+  /* One key at the foot for the whole sheet, gathered off the sheets it is made of. A union
+     of which marks are used rather than of the sentences that explain them: the sheets used to
+     hand back wording, so one naming both marks and one naming only the first were two strings
+     saying overlapping things and the sheet printed the shorter under the longer. */
+  const legend = legendUnion(own ? built.legend || [] : [], ...items.map((it) => it.poster.legend || []));
+  /* And the rounding note, last, under the marks. Kept apart from the key rather than added to
+     it: it is about this sheet, saying every time on the page is a whole minute and asking for
+     two minutes in hand, and the sheets of their own do not carry it. */
+  const notes = [ONEPAGE_TEXT.rounded];
   /* Both columns are written out, and every block starts in the first one. Which of them
      each block ends up in is settled by fitOnePage, after the browser has said how tall
      each is: the split is a measurement, not a number written down here, so a year that
@@ -1772,7 +1765,7 @@ function renderOnePagePoster(built, settings) {
       </div>
       <div class="onepage-col"></div>
     </div>`;
-  return posterShell(settings, body, legend, { onepage: true, chartHead: true })
+  return posterShell(settings, body, legend, { onepage: true, chartHead: true, notes })
     + ((built.notBuilt || []).length
       ? `<p class="hint no-print">Not on this sheet, nothing to build them from this year: ${escAttr(built.notBuilt.join(', '))}</p>`
       : '');

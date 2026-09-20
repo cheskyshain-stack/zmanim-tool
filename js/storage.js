@@ -4,6 +4,7 @@
 import {
   DEFAULT_SETTINGS,
   LEGACY_FOOTER_ADDRESS,
+  LEGACY_FOOTER_NOTE,
   DEFAULT_ACCENT_COLOR,
   LEGACY_ACCENT_COLORS,
 } from './settings.js';
@@ -66,6 +67,7 @@ function applySeeds(state) {
 function normalizeSettings(raw) {
   const merged = { ...DEFAULT_SETTINGS, ...raw, sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...(raw?.sheetStyle || {}) } };
   if (LEGACY_FOOTER_ADDRESS.includes(merged.footerAddress)) merged.footerAddress = DEFAULT_SETTINGS.footerAddress;
+  if (LEGACY_FOOTER_NOTE.includes(merged.footerNote)) merged.footerNote = DEFAULT_SETTINGS.footerNote;
   if (isLegacyAccent(merged.sheetStyle.accentColor)) merged.sheetStyle.accentColor = DEFAULT_ACCENT_COLOR;
   for (const key of RETIRED_SETTINGS) delete merged[key];
   return merged;

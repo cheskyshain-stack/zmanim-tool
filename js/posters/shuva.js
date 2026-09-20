@@ -14,6 +14,7 @@
 // underlined is למטה, * is בעזרת נשים. The note at the foot is built from whichever of
 // those actually appear, so a poster never explains a mark it does not carry.
 import { rowFor } from '../sheets/rows.js';
+import { legendForTimes } from '../legend.js';
 import { erevPlain, erevTimes } from '../erev-text.js';
 import { SHUVA_NAMES } from '../sheets/common.js';
 import { roshHashana, excelWeekday, hasParsha, hasSpecialParsha } from '../hebrew-calendar.js';
@@ -130,16 +131,9 @@ function posterFromCell(week, cell) {
     span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
     mincha,
-    // Only the marks that are actually on this poster get explained. Each line says which
-    // direction it has to be set in: the underline line is an English sentence carrying
-    // Hebrew and reads left to right, the star line is Hebrew and reads right to left, and
-    // setting that one the wrong way puts the star at the far end of the line instead of
-    // against the words it marks. Same split as the week card's legend.
-    legend: [
-      mincha.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      mincha.some((t) => t.mark === '*') ? { dir: 'rtl', text: '*בעזרת נשים' } : null,
-    ].filter(Boolean),
+    // Only the marks that are actually on this poster get explained. One definition of what
+    // each mark means and how the line is set, in legend.js.
+    legend: legendForTimes(mincha),
   };
 }
 

@@ -1,4 +1,5 @@
 import { safeHeaderImage, sanitizeRichText } from '../security.js';
+import { legendHtml, legendKeys } from '../legend.js';
 import { renderWeeklyReader, readerWeekIndex, readerWeekHasTimes } from './weekly-reader.js';
 // One week on its own page, for the congregation to read rather than for printing a
 // season on a wall: the parsha at the top, then a row per minyan with its name on the
@@ -751,16 +752,14 @@ function trimSeparatorsBeforeBreaks(root) {
 function fillLegend(card) {
   const legend = card.querySelector('.week-legend');
   if (!legend) return;
+  /* Asked of the card itself: a star is in a .time-mark of its own here, and the underline is
+     markup. One definition of what each mark means and how the line is set, in legend.js. */
   const marks = [...card.querySelectorAll('.week-lines .time-mark')].map((m) => m.textContent.trim());
-  const lines = [];
-  if (card.querySelector('.week-lines u')) lines.push({ dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' });
-  // The two star notes share a line, in the order the printed chart's footer has them,
-  // and either can appear on its own if only its mark is on the card.
-  const stars = [];
-  if (marks.includes('*')) stars.push('*בעזרת נשים');
-  if (marks.includes('**')) stars.push('**באולם השמחות');
-  if (stars.length) lines.push({ dir: 'rtl', text: stars.join(' ') });
-  legend.innerHTML = lines.map((l) => `<div class="week-legend-line" dir="${l.dir}">${weekEsc(l.text)}</div>`).join('');
+  legend.innerHTML = legendHtml(legendKeys({
+    underlined: Boolean(card.querySelector('.week-lines u')),
+    star: marks.includes('*'),
+    twoStars: marks.includes('**'),
+  }));
 }
 
 /** A row's name, taken from the chart's column header.

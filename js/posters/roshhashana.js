@@ -12,6 +12,7 @@
 // Verified against two of those sheets, תשפ"ד (first day Shabbos) and תשפ"ו (neither day),
 // which between them cover both shapes. See the test notes in the commit.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
+import { legendForTimes } from '../legend.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute } from '../format.js';
@@ -258,17 +259,10 @@ export function buildRoshHashanaPoster(year, settings) {
     ...parseTimes(RH_TEXT.erevMincha.times),
     ...blocks.flatMap((b) => b.lines.flatMap((l) => l.times)),
   ];
-  const stars = [];
-  if (marks.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (marks.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
 
   return {
     hebrewYear: year,
-    legend: [
-      marks.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
+    legend: legendForTimes(marks),
     span: { from: rh - 1, to: rh + 1 },
     // חצות is cut to the minute rather than rounded. Both sheets settle it: 12:52.25 and
     // 12:49.58, printed as 12:52 and 12:49. Rounding the second gives 12:50, which is a
