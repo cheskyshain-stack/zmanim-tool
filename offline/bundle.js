@@ -18185,7 +18185,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     /* What a row of this event would be called. A פלג under its own מנחה says the bare word,
        which is all the second line of one cell has to say; a פלג left standing on its own,
        its מנחה having gone in and come off the screen, is named in full off the board. */
-    const rowName=(e)=>(e.plag && e.plagName) || e.name;
+    const rowName=(e)=>/^מעריב\s+ג['׳’]?$/.test(e.name) ? 'מעריב' : (e.plag && e.plagName) || e.name;
     for(const event of section.events){
       /* A פלג goes under the מנחה it was written under, rather than into a rule-separated row
          of its own: on the board the two are one cell, and the shul asked for them read that
@@ -18200,7 +18200,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
          are all called מנחה and differ by the room they daven in, and until the פלג stopped
          sitting between them they were kept apart only by that accident: with it gone, 5:29
          and 6:05 ran into one row carrying one of the two פלג. */
-      if (!sameWhere(row,event) || row.name!==rowName(event) || row.cell!==(event.cell||'')) row=null;
+      if (!sameWhere(row,event) || row.name!==rowName(event) || (row.cell!==(event.cell||'') && !(row.name==='מעריב' && /^מעריב\s+ג['׳’]?$/.test(event.name)))) row=null;
       if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
       row.events.push(event);
     }
