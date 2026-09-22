@@ -628,10 +628,13 @@ export function renderTexts(container, state, settings, tables) {
     return out;
   };
 
+  /* Both views push the same four groups in the same relative order: weekly, Erev Shabbos,
+     yom tov, Rosh Chodesh. The sort below is stable and only breaks a same-day tie by push
+     order, so the two views used to disagree about which of two messages on one day comes
+     first, since the year view built yom tov and Rosh Chodesh before the week and the today
+     view built them after. The shul asked for one answer to "what happens first", and that
+     answer has to be the same whichever view is open. */
   if (txAll) {
-    messages.push(...yomTov());
-    // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
-    messages.push(...txRoshChodesh(settings, today, 14));
     // Everything still to come: the year view relaxes only how far ahead, never the near end.
     messages.push(...weekly(Infinity, TX_WEEK_TO));
     const weeks = txSeasonWeeks(settings, tables, today, 2);
@@ -651,6 +654,9 @@ export function renderTexts(container, state, settings, tables) {
         text: erevShabbosText(columns, row, english, found.week.specialParsha),
       });
     }
+    messages.push(...yomTov());
+    // Thirteen covers a leap year's thirteen months, minus תשרי, plus one either side of the edges.
+    messages.push(...txRoshChodesh(settings, today, 14));
   } else {
     // The Friday before through the Thursday: see TX_WEEK_FROM.
     messages.push(...weekly(TX_WEEK_FROM, TX_WEEK_TO));
