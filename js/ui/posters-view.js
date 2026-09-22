@@ -76,7 +76,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = nextYomimNoraim();
+  const next = hebrewDateExtended(excelSerial(new Date())).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -732,7 +732,7 @@ export const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 export function onePageOccasionSpans(state, settings) {
-  const next = nextYomimNoraim();
+  const next = hebrewDateExtended(excelSerial(new Date())).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -767,7 +767,7 @@ export function onePageOccasionSpans(state, settings) {
 }
 
 export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = nextYomimNoraim();
+  const next = hebrewDateExtended(excelSerial(new Date())).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
@@ -2424,11 +2424,8 @@ export function renderPosters(container, state, routeChanged, tables) {
   // is settled here rather than below, because the order has to be known before the poster is
   // picked out of it. Every poster's sources are the same list of years and a source id is
   // that year, so this is the Year picker's answer without having to build anything first.
-  /* The year, stepped rather than picked out of a list. It opens on the yomim noraim coming
-     up, not on the calendar's own year: in אלול the calendar still says last year, and that
-     is the year somebody would print by mistake. The list is still what says how far the
-     steps reach, since a year with a chart saved for its שבת שובה is in it whether or not it
-     is one of the ten either side. */
+  // Current means the actual Hebrew year, including after Yom Kippur.
+  // Future years remain available through the year stepper.
   const { years, preferred } = posterYears(state);
   const year = years.includes(chosenYear) ? chosenYear : preferred;
   const at = years.indexOf(year);
@@ -2531,7 +2528,7 @@ export function renderPosters(container, state, routeChanged, tables) {
                way the two steppers are at the ends of the list, so it keeps its place in
                the box rather than the bar changing shape as the year moves. -->
           <button type="button" id="poster-year-today" class="poster-year-reset"
-            aria-label="The year coming up" ${year === preferred ? 'disabled' : ''}>Current</button>
+            aria-label="The current Hebrew year" ${year === preferred ? 'disabled' : ''}>Current</button>
         </div>
       </div>
       <!-- The occasion, in the same box as the year: a step either side of a control that is
