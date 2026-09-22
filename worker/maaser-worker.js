@@ -308,7 +308,7 @@ async function loadState(db, trackerId) {
 
 async function handleGetState(request, env, tracker) {
   const state = await loadState(env.MAASER_DB, tracker.id);
-  return json(request, { ...state, pinEnabled: !!tracker.pin_hash, adminManaged: !!tracker.managed });
+  return json(request, { ...state, pinEnabled: !!tracker.pin_hash, adminManaged: !!tracker.managed, givingDefaultMode: tracker.giving_default_mode || 'source' });
 }
 
 function requireNumber(v, field) {
@@ -472,32 +472,60 @@ function validateAllocations(allocations, totalCents) {
   }
 }
 
+function generalAllocations(state, date, amountCents) {
+  const balance = new Map(state.sources.map((s) => [s.id, 0]));
+  for (const e of state.income) if (e.entry_date <= date) balance.set(e.source_id, (balance.get(e.source_id) || 0) + e.maaser_cents);
+  for (const o of state.opening) if (o.entry_date <= date) balance.set(o.source_id, (balance.get(o.source_id) || 0) + (o.balance_type === 'remaining' ? o.amount_cents : -o.amount_cents));
+  const givingIds = new Set(state.giving.filter((g) => g.entry_date <= date).map((g) => g.id));
+  for (const a of state.allocations) if (givingIds.has(a.giving_id)) balance.set(a.source_id, (balance.get(a.source_id) || 0) - a.amount_cents);
+  const owed = state.sources.map((s) => ({ sourceId: s.id, cents: Math.max(0, balance.get(s.id) || 0) })).filter((s) => s.cents > 0);
+  const total = owed.reduce((sum, s) => sum + s.cents, 0);
+  const applied = Math.min(amountCents, total);
+  if (!total || !applied) return [];
+  const totalBig = BigInt(total), appliedBig = BigInt(applied);
+  const shares = owed.map((s, index) => {
+    const product = appliedBig * BigInt(s.cents);
+    return { sourceId: s.sourceId, cents: Number(product / totalBig), remainder: product % totalBig, index };
+  });
+  let left = applied - shares.reduce((sum, s) => sum + s.cents, 0);
+  for (const s of [...shares].sort((a, b) => a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1)) {
+    if (left-- <= 0) break;
+    s.cents++;
+  }
+  return shares.filter((s) => s.cents > 0).map((s) => ({ sourceId: s.sourceId, cents: s.cents }));
+}
+
 async function handleCreateGiving(request, env, tracker) {
   const body = await readJson(request);
   const amountCents = toCents(body.amount, 'amount');
   if (amountCents <= 0) throw new HttpError(400, 'invalid_input', 'Amount must be greater than zero.');
+  if (!Number.isSafeInteger(amountCents)) throw new HttpError(400, 'invalid_input', 'Amount is too large.');
   const date = requireDate(body.date, 'date');
   const recipient = body.recipient ? String(body.recipient).trim().slice(0, 120) : null;
   const note = body.note ? String(body.note).trim().slice(0, 500) : null;
 
-  const allocations = Array.isArray(body.allocations) && body.allocations.length
-    ? body.allocations
-    : [{ sourceId: body.sourceId, amount: body.amount }];
-  validateAllocations(allocations, amountCents);
-  for (const a of allocations) await assertOwnedSource(env.MAASER_DB, tracker.id, a.sourceId);
+  const mode = body.mode === 'general' || body.mode === 'unassigned' ? body.mode : 'source';
+  const allocations = mode === 'general'
+    ? generalAllocations(await loadState(env.MAASER_DB, tracker.id), date, amountCents)
+    : mode === 'unassigned' ? []
+    : (Array.isArray(body.allocations) && body.allocations.length ? body.allocations : [{ sourceId: body.sourceId, amount: body.amount }]);
+  if (mode === 'source') {
+    validateAllocations(allocations, amountCents);
+    for (const a of allocations) await assertOwnedSource(env.MAASER_DB, tracker.id, a.sourceId);
+  }
 
   const now = Date.now();
   const givingId = newId();
   const statements = [
     env.MAASER_DB.prepare(
-      `INSERT INTO giving_entries (id, tracker_id, amount_cents, entry_date, recipient, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(givingId, tracker.id, amountCents, date, recipient, note, now, now),
+      `INSERT INTO giving_entries (id, tracker_id, amount_cents, entry_date, recipient, note, mode, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(givingId, tracker.id, amountCents, date, recipient, note, mode, now, now),
   ];
   for (const a of allocations) {
     statements.push(
       env.MAASER_DB.prepare('INSERT INTO giving_allocations (id, giving_id, source_id, amount_cents) VALUES (?, ?, ?, ?)')
-        .bind(newId(), givingId, a.sourceId, toCents(a.amount, 'allocation amount'))
+        .bind(newId(), givingId, a.sourceId, mode === 'general' ? a.cents : toCents(a.amount, 'allocation amount'))
     );
   }
   // D1's batch runs as one transaction: every statement commits together or none do, so a
@@ -510,6 +538,9 @@ async function handleUpdateGiving(request, env, tracker, givingId) {
   const existing = await env.MAASER_DB.prepare('SELECT * FROM giving_entries WHERE id = ? AND tracker_id = ?').bind(givingId, tracker.id).first();
   if (!existing) throw new HttpError(404, 'not_found', 'That giving entry was not found.');
   const body = await readJson(request);
+  if (existing.mode !== 'source' && (body.amount != null || body.date != null || body.allocations)) {
+    throw new HttpError(400, 'invalid_input', 'To change the amount or date of general giving, delete this entry and add it again.');
+  }
   const amountCents = body.amount != null ? toCents(body.amount, 'amount') : existing.amount_cents;
   const date = body.date != null ? requireDate(body.date, 'date') : existing.entry_date;
   const recipient = body.recipient !== undefined ? (body.recipient ? String(body.recipient).trim().slice(0, 120) : null) : existing.recipient;
@@ -581,6 +612,16 @@ async function handleDeleteOpening(request, env, tracker, id) {
 }
 
 // --- settings: PIN ------------------------------------------------------------------------
+
+async function handleGivingDefault(request, env, tracker) {
+  const body = await readJson(request);
+  if (!['source', 'general', 'unassigned'].includes(body.mode)) {
+    return fail(request, 400, 'invalid_input', 'Choose source, general, or unassigned giving.');
+  }
+  await env.MAASER_DB.prepare('UPDATE trackers SET giving_default_mode = ?, updated_at = ? WHERE id = ?')
+    .bind(body.mode, Date.now(), tracker.id).run();
+  return json(request, { ok: true, givingDefaultMode: body.mode });
+}
 
 async function handleSetPin(request, env, tracker) {
   const body = await readJson(request);
@@ -743,6 +784,7 @@ export default {
       if (parts[0] === 'opening' && parts.length === 1 && request.method === 'POST') return await withIdempotency(request, env, tracker, () => handleCreateOpening(request, env, tracker));
       if (parts[0] === 'opening' && parts.length === 2 && request.method === 'DELETE') return await handleDeleteOpening(request, env, tracker, parts[1]);
       if (parts[0] === 'settings' && parts[1] === 'pin' && request.method === 'POST') return await handleSetPin(request, env, tracker);
+      if (parts[0] === 'settings' && parts[1] === 'giving-default' && request.method === 'POST') return await handleGivingDefault(request, env, tracker);
 
       return fail(request, 404, 'not_found', 'Unknown endpoint.');
     } catch (err) {
@@ -752,3 +794,5 @@ export default {
     }
   },
 };
+
+export { generalAllocations };

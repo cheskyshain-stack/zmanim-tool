@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS trackers (
   pin_fail_count INTEGER NOT NULL DEFAULT 0,
   pin_locked_until INTEGER,
   recovery_hash TEXT NOT NULL,
+  giving_default_mode TEXT NOT NULL DEFAULT 'source',
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS giving_entries (
   entry_date TEXT NOT NULL,
   recipient TEXT,
   note TEXT,
+  mode TEXT NOT NULL DEFAULT 'source',
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
