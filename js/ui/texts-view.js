@@ -25,7 +25,8 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { wireCopyButton } from './copy.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
-import { weekText, weekName } from '../week-text.js';
+import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-text.js';
+import { shulNow } from '../zmanim/solar.js';
 import { tzomGedaliaText, chartFastText, fastsBetween } from '../taanis-text.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
@@ -172,6 +173,36 @@ function txWeekName(week, settings, tables) {
   return weekName(yomTov || week.parsha, false);
 }
 
+/** Which of the two morning-after-יום כיפור lines the Week message carries right now, or ''
+ *  the rest of the time: nothing before שקיעה the night יום כיפור ends, "TOMORROW..." from
+ *  there through 3am, "TODAY..." from 3am through the last שחרית of that morning, then nothing
+ *  again. A live reminder rather than a flag on the whole week, matching what the shul asked
+ *  for: the wording is only ever true for the hours it names.
+ *
+ *  שקיעה and the morning's own last time both come straight off buildYomKippurPoster, the exact
+ *  same numbers its own poster and its nextMorning box are built from, never worked out fresh;
+ *  the switch hour is not a זמן at all and is the shul's own plain clock hour, the same kind of
+ *  fixed reader-facing constant as MINYAN_GRACE or TX_AHEAD_DAYS. */
+const AFTER_YK_SWITCH_MINS = 3 * 60; // 3:00am, the shul's own hour to stop saying "tomorrow".
+
+function afterYomKippurLine(shabbos, settings, now) {
+  const dayAfter = afterYomKippurDayInWeek(shabbos, settings);
+  if (dayAfter == null) return '';
+  const ykSerial = dayAfter - 1;
+  const poster = buildYomKippurPoster(hebrewDateExtended(ykSerial, settings.useGregorianBefore1582).year, settings);
+  const lastMorning = poster?.nextMorning?.times?.at(-1)?.text;
+  if (!poster || typeof poster.shkia !== 'number' || !lastMorning) return '';
+  const [lh, lm] = lastMorning.split(':').map(Number);
+  const clock = shulNow(now, settings);
+  const nowAbs = clock.serial * 1440 + clock.mins;
+  const shkiaAbs = ykSerial * 1440 + Math.round(poster.shkia * 1440);
+  const switchAbs = dayAfter * 1440 + AFTER_YK_SWITCH_MINS;
+  const lastAbs = dayAfter * 1440 + (lh % 12) * 60 + lm;
+  if (nowAbs >= shkiaAbs && nowAbs < switchAbs) return WK_TEXT.afterYomKippurTomorrow;
+  if (nowAbs >= switchAbs && nowAbs < lastAbs) return WK_TEXT.afterYomKippurToday;
+  return '';
+}
+
 /** The weekly message for one week, off the Weekday chart.
  *
  *  The Weekday chart is anchored on the Shabbos that ends the week, and covers the Sunday through
@@ -185,7 +216,7 @@ function txWeekName(week, settings, tables) {
  *  stands.
  *
  *  @param entry - a week and its season, from txWeekdayWeeks. */
-function txWeek(state, settings, tables, entry) {
+function txWeek(state, settings, tables, entry, now) {
   const shabbos = entry.week.serial;
   const name = txWeekName(entry.week, settings, tables);
   const built = buildWeekdayRow(entry.week, settings);
@@ -196,7 +227,7 @@ function txWeek(state, settings, tables, entry) {
      weeks no Shabbos sheet has. */
   const chart = weekdayChartFor(null, shabbos, state);
   const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
-  const text = weekText(WEEKDAY_SHACHARIS, row, name, shabbos, settings);
+  const text = weekText(WEEKDAY_SHACHARIS, row, name, shabbos, settings, afterYomKippurLine(shabbos, settings, now));
   if (!text) return null;
   return {
     id: `week-${shabbos}`,
@@ -590,7 +621,8 @@ const TX_KIND_NAMES = {
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
   const messages = [];
-  const today = Math.floor((Date.now() - Date.UTC(1899, 11, 30)) / 86400000);
+  const now = new Date();
+  const today = Math.floor((now.getTime() - Date.UTC(1899, 11, 30)) / 86400000);
 
   const year = txTishreiYear(today);
 
@@ -622,7 +654,7 @@ export function renderTexts(container, state, settings, tables) {
     for (const serial of [...weeks.keys()].sort((a, b) => a - b)) {
       if (serial - to < today || serial - from > today) continue;
       if (txAll && serial - today > TX_ALL_DAYS) continue;
-      const week = txWeek(state, settings, tables, weeks.get(serial));
+      const week = txWeek(state, settings, tables, weeks.get(serial), now);
       if (week) out.push(week);
     }
     return out;

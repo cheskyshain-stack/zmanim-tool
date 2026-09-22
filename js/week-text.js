@@ -30,13 +30,13 @@
 // move them, and the box on the messages page can be typed into. It is the same answer the shul
 // already gave for the ROSH CHODESH line's own T"T and its 6:50 בעזרת נשים.
 //
-// A fourth line joins the three where the week carries the morning after יום כיפור:
-//
-//   TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted
-//
-// It names no minute of its own, only "earlier then posted", which is the Shacharis line right
-// above it in the same message, so it cannot say a time the chart disagrees with. See
-// afterYomKippurInWeek.
+// A fourth line joins the three where the week carries the morning after יום כיפור, and only
+// for as long as it is still true: "TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted"
+// from שקיעה the night יום כיפור ends until 3am, "TODAY ALL SHACHARIS..." from 3am until the
+// last שחרית of that morning, and nothing outside that window. Built in texts-view.js, which is
+// the one place on this page that is allowed to ask what time it actually is; this module stays
+// a cold function of the chart and the calendar, so it only hands back which week the note
+// belongs on (afterYomKippurDayInWeek) and takes the finished line as a plain string.
 
 import { erevTimes, erevWhereMark } from './erev-text.js';
 import { weekdayMornings } from './posters/day.js';
@@ -60,17 +60,20 @@ export const WK_TEXT = {
    *  message on this page, where the table says Succos. Rosh Hashana, Shavuos and Pesach come off
    *  that table already spelled the way they write them. */
   spelling: { Succos: 'Sukkos' },
-  /** Sent the week the morning after יום כיפור falls in it, and only that week. No time of its
-   *  own, on purpose: it says "earlier then posted" rather than naming a minute, so it cannot
-   *  come apart from the Shacharis line printed right above it in the same message. "then" is
-   *  the shul's own spelling, kept as sent. */
-  afterYomKippur: 'TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted',
+  /** The two wordings of the morning-after-יום כיפור line, differing only in the one word that
+   *  says whether that morning is still ahead or has arrived. Neither names a minute of its
+   *  own: both say "earlier then posted" rather than a time, so neither can come apart from the
+   *  Shacharis line printed right above it in the same message. "then" is the shul's own
+   *  spelling, kept as sent. */
+  afterYomKippurTomorrow: 'TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted',
+  afterYomKippurToday: 'TODAY ALL SHACHARIS Minyanim 5 min earlier then posted',
 };
 
-/** Whether the day after יום כיפור falls Sunday through Friday of this week (see weekText's own
- *  comment for that range). יום כיפור is 10 תשרי and never falls on a Friday or a Sunday, so the
- *  day after it never falls on a Shabbos, but the check is written as a plain range rather than
- *  leaning on that so the next reader is not left re-deriving why.
+/** The serial of the day after יום כיפור, where that day falls Sunday through Friday of this
+ *  week (see weekText's own comment for that range), or null where it does not. יום כיפור is
+ *  10 תשרי and never falls on a Friday or a Sunday, so the day after it never falls on a
+ *  Shabbos, but the check is written as a plain range rather than leaning on that so the next
+ *  reader is not left re-deriving why.
  *
  *  Only asked of a week genuinely anchored on a Shabbos. computeWeekdayWeeks in sheets/weeks.js
  *  also emits a trailing-gap row anchored on a season boundary that is not a Saturday at all, to
@@ -79,11 +82,11 @@ export const WK_TEXT = {
  *  land on an unrelated date; a 5786 gap row anchored the Wednesday after יום כיפור was found
  *  reading its own -6 as landing back on יום כיפור itself and flagging a week the line has no
  *  business being on. */
-function afterYomKippurInWeek(shabbosSerial, settings) {
-  if (excelWeekday(shabbosSerial) !== 7) return false;
+export function afterYomKippurDayInWeek(shabbosSerial, settings) {
+  if (excelWeekday(shabbosSerial) !== 7) return null;
   const year = hebrewDateExtended(shabbosSerial, settings.useGregorianBefore1582).year;
   const dayAfter = dateFromHebrew(10, 7, year) + 1;
-  return dayAfter >= shabbosSerial - 6 && dayAfter <= shabbosSerial - 1;
+  return dayAfter >= shabbosSerial - 6 && dayAfter <= shabbosSerial - 1 ? dayAfter : null;
 }
 
 /** What the סליחות season's own morning lines are called, in the message's language.
@@ -172,10 +175,12 @@ export function weekName(english, isParsha) {
  *  @param name - "P' Ki Seitzei" or "Sukkos", from weekName.
  *  @param shabbosSerial - the Shabbos the week runs up to, which is what the chart anchors on.
  *  @param settings - for the סליחות season, which is a calendar question.
+ *  @param afterYomKippurLine - WK_TEXT.afterYomKippurTomorrow, .afterYomKippurToday, or '' (the
+ *    default), decided by the caller off the actual time of day. See this file's own top note.
  *
  *  A line the chart has not got is left out rather than guessed at, and a week with no מנחה and
  *  no מעריב at all is not a week to send a message about, so it answers with nothing. */
-export function weekText(shacharisCell, row, name, shabbosSerial, settings) {
+export function weekText(shacharisCell, row, name, shabbosSerial, settings, afterYomKippurLine = '') {
   const mincha = wkRow(row?.C);
   const maariv = wkRow(row?.B);
   if (!mincha && !maariv) return '';
@@ -184,6 +189,6 @@ export function weekText(shacharisCell, row, name, shabbosSerial, settings) {
   lines.push(...wkMornings(shacharisCell, shabbosSerial, settings));
   if (mincha) lines.push(`${WK_TEXT.mincha} ${mincha}`);
   if (maariv) lines.push(`${WK_TEXT.maariv} ${maariv}`);
-  if (afterYomKippurInWeek(shabbosSerial, settings)) lines.push(WK_TEXT.afterYomKippur);
+  if (afterYomKippurLine) lines.push(afterYomKippurLine);
   return lines.join('\n');
 }
