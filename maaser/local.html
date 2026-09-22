@@ -256,17 +256,30 @@ button { font-family: inherit; }
     constructor(status, code, message) { super(message); this.status = status; this.code = code; }
   }
 
+  // Distinguishing "nothing saved yet" from "something is there but unreadable" matters:
+  // treating a corrupt-but-present value as simply absent would let the welcome screen's
+  // "Start Tracking" overwrite it with an empty tracker, turning a recoverable problem (bad
+  // JSON, a future field this version doesn't know about) into real data loss. boot() below
+  // sends the two cases to different screens for exactly this reason.
+  function rawStoreExists() {
+    try { return localStorage.getItem(LOCAL_KEY) != null; } catch { return false; }
+  }
   function loadStore() {
     try {
-      const raw = JSON.parse(localStorage.getItem(LOCAL_KEY));
-      if (raw && Array.isArray(raw.sources)) return raw;
-    } catch { /* corrupt or cleared storage: treated as no tracker yet, below */ }
-    return null;
+      const item = localStorage.getItem(LOCAL_KEY);
+      if (item == null) return null;
+      const raw = JSON.parse(item);
+      if (raw && Array.isArray(raw.sources) && Array.isArray(raw.income) && Array.isArray(raw.giving)) return raw;
+    } catch { /* malformed JSON: falls through, reported as corrupt by the caller */ }
+    return undefined; // present but not usable, as opposed to null (nothing saved at all)
   }
   function saveStore(store) {
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(store));
-      return true;
+      // Read back what was actually stored rather than trusting the write call succeeded:
+      // some browsers (notably iOS Safari in certain low-storage states) accept setItem
+      // without throwing and then silently do not persist it.
+      return localStorage.getItem(LOCAL_KEY) === JSON.stringify(store);
     } catch {
       return false; // storage full or disabled (private browsing) - the caller reports this as a save failure
     }
@@ -306,6 +319,7 @@ button { font-family: inherit; }
     try { body = opts.body ? JSON.parse(opts.body) : {}; } catch { /* no body sent */ }
 
     const store = loadStore();
+    if (store === undefined) throw new ApiError(0, 'store_corrupt', "This device's saved data could not be read. See the recovery screen.");
     if (!store) throw new ApiError(0, 'no_store', 'No tracker set up on this device yet.');
     // Every call, not just /api/state, is refused until the PIN for this page load is
     // unlocked - boot() and renderPinScreen() are the only ordinary way to reach that state,
@@ -468,6 +482,7 @@ button { font-family: inherit; }
   function render() {
     if (view.screen === 'loading') return renderLoading();
     if (view.screen === 'welcome') return renderWelcome();
+    if (view.screen === 'corrupted') return renderCorrupted();
     if (view.screen === 'pin') return renderPinScreen();
     if (view.screen === 'dashboard') return renderDashboard();
   }
@@ -491,6 +506,43 @@ button { font-family: inherit; }
           clearing site data or changing phones.
         </div>
       </div>`;
+  }
+
+  function renderCorrupted() {
+    root.innerHTML = `
+      <div class="mz-page">
+        <div class="mz-card">
+          <h1>This device's saved data could not be read</h1>
+          <div class="mz-notice mz-notice-danger">
+            Something is saved here, but it isn't in a shape this page understands - this is
+            different from there being nothing saved, and nothing has been erased.
+          </div>
+          <p>If you have a backup file (from Settings → Download Backup), restore it below.
+             Otherwise, "Start Fresh" is available but permanently erases whatever is
+             currently saved on this device, which cannot be undone.</p>
+          <input type="file" id="corrupt-restore-input" accept="application/json,.json" style="display:none">
+          <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" id="corrupt-restore-btn">Restore From Backup File</button>
+          <button class="mz-btn mz-btn-danger mz-btn-block" data-action="start-fresh-after-corrupt" style="margin-top:0.6rem">Start Fresh (erases what's saved here)</button>
+        </div>
+      </div>`;
+    const fileInput = document.getElementById('corrupt-restore-input');
+    document.getElementById('corrupt-restore-btn').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        if (!parsed || !Array.isArray(parsed.sources) || !Array.isArray(parsed.income) || !Array.isArray(parsed.giving)) {
+          throw new Error("That file doesn't look like a Maaser Tracker backup.");
+        }
+        if (!saveStore(parsed)) throw new Error('Could not save: storage full or unavailable.');
+        showToast('Backup restored.');
+        if (parsed.pin) { session.pinOk = false; session.pinWrong = false; setView({ screen: 'pin' }); }
+        else { session.pinOk = true; await refreshState(); setView({ screen: 'dashboard' }); }
+      } catch (err) {
+        showToast(err.message || 'Could not read that file.');
+      }
+    });
   }
 
   function renderPinScreen() {
@@ -1053,14 +1105,19 @@ button { font-family: inherit; }
   }
 
   function downloadBackup() {
+    // Prefer the raw saved store (it carries the PIN's hash, which the in-memory `data` does
+    // not). Reading from `data` instead when storage cannot be read right now still backs up
+    // every dollar amount, just without the PIN - better than refusing to back up at all.
     const store = loadStore();
-    const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+    const usable = store && typeof store === 'object';
+    const backup = usable ? store : { sources: data.sources, income: data.income, giving: data.giving, allocations: data.allocations, opening: data.opening, pin: null };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `maaser-tracker-backup-${todayIso()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    showToast('Backup downloaded.');
+    showToast(usable ? 'Backup downloaded.' : "Backup downloaded, but this device's PIN could not be included.");
   }
 
   // ---------------------------------------------------------------------------------------
@@ -1092,7 +1149,23 @@ button { font-family: inherit; }
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.dataset.action;
-    if (action === 'start-local') { saveStore(newStore()); await refreshState(); setView({ screen: 'dashboard' }); return; }
+    if (action === 'start-local') {
+      // Defense in depth: boot() only shows the welcome screen (the only place this action
+      // lives) when there is nothing saved at all, but refusing to overwrite an existing key
+      // here too means this can never wipe real data no matter how it's reached.
+      if (rawStoreExists()) { setView({ screen: 'corrupted' }); return; }
+      if (!saveStore(newStore())) { showToast("Could not save: this device's storage is full or unavailable."); return; }
+      await refreshState();
+      setView({ screen: 'dashboard' });
+      return;
+    }
+    if (action === 'start-fresh-after-corrupt') {
+      if (!confirm("This will erase what's currently saved on this device, since it could not be read. This cannot be undone. Continue?")) return;
+      if (!saveStore(newStore())) { showToast("Could not save: this device's storage is full or unavailable."); return; }
+      await refreshState();
+      setView({ screen: 'dashboard' });
+      return;
+    }
     if (action === 'open-settings') { openSettingsSheet(); return; }
     if (action === 'close-sheet') { closeSheet(); return; }
     if (action === 'add-income') { openAddIncomeSheet(btn.dataset.source); return; }
@@ -1120,6 +1193,7 @@ button { font-family: inherit; }
     e.preventDefault();
     const pin = document.getElementById('pin-input').value;
     const store = loadStore();
+    if (!store) { setView({ screen: 'corrupted' }); return; }
     const hash = await hashPin(pin);
     if (store.pin && store.pin.hash === hash) {
       session.pinOk = true; session.pinWrong = false;
@@ -1137,6 +1211,7 @@ button { font-family: inherit; }
 
   async function boot() {
     const store = loadStore();
+    if (store === undefined) { setView({ screen: 'corrupted' }); return; }
     if (!store) { setView({ screen: 'welcome' }); return; }
     if (store.pin && !session.pinOk) { setView({ screen: 'pin' }); return; }
     await refreshState();
