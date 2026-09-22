@@ -29,10 +29,19 @@
 // מעריב. Neither is on any chart, so nothing in this program knows when they are or what would
 // move them, and the box on the messages page can be typed into. It is the same answer the shul
 // already gave for the ROSH CHODESH line's own T"T and its 6:50 בעזרת נשים.
+//
+// A fourth line joins the three where the week carries the morning after יום כיפור:
+//
+//   TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted
+//
+// It names no minute of its own, only "earlier then posted", which is the Shacharis line right
+// above it in the same message, so it cannot say a time the chart disagrees with. See
+// afterYomKippurInWeek.
 
 import { erevTimes, erevWhereMark } from './erev-text.js';
 import { weekdayMornings } from './posters/day.js';
 import { SLICHOS_TEXT } from './posters/slichos.js';
+import { hebrewDateExtended, dateFromHebrew, excelWeekday } from './hebrew-calendar.js';
 
 /** The wording, as the shul writes it. The colons are theirs: the morning line has none and the
  *  other two do, in every one of the forty sent messages. */
@@ -51,7 +60,31 @@ export const WK_TEXT = {
    *  message on this page, where the table says Succos. Rosh Hashana, Shavuos and Pesach come off
    *  that table already spelled the way they write them. */
   spelling: { Succos: 'Sukkos' },
+  /** Sent the week the morning after יום כיפור falls in it, and only that week. No time of its
+   *  own, on purpose: it says "earlier then posted" rather than naming a minute, so it cannot
+   *  come apart from the Shacharis line printed right above it in the same message. "then" is
+   *  the shul's own spelling, kept as sent. */
+  afterYomKippur: 'TOMORROW ALL SHACHARIS Minyanim 5 min earlier then posted',
 };
+
+/** Whether the day after יום כיפור falls Sunday through Friday of this week (see weekText's own
+ *  comment for that range). יום כיפור is 10 תשרי and never falls on a Friday or a Sunday, so the
+ *  day after it never falls on a Shabbos, but the check is written as a plain range rather than
+ *  leaning on that so the next reader is not left re-deriving why.
+ *
+ *  Only asked of a week genuinely anchored on a Shabbos. computeWeekdayWeeks in sheets/weeks.js
+ *  also emits a trailing-gap row anchored on a season boundary that is not a Saturday at all, to
+ *  carry the handful of regular days left over between the last real week and the next season.
+ *  Sunday-through-Friday-in-front-of-it is not what that row covers, so shabbosSerial - 6 can
+ *  land on an unrelated date; a 5786 gap row anchored the Wednesday after יום כיפור was found
+ *  reading its own -6 as landing back on יום כיפור itself and flagging a week the line has no
+ *  business being on. */
+function afterYomKippurInWeek(shabbosSerial, settings) {
+  if (excelWeekday(shabbosSerial) !== 7) return false;
+  const year = hebrewDateExtended(shabbosSerial, settings.useGregorianBefore1582).year;
+  const dayAfter = dateFromHebrew(10, 7, year) + 1;
+  return dayAfter >= shabbosSerial - 6 && dayAfter <= shabbosSerial - 1;
+}
 
 /** What the סליחות season's own morning lines are called, in the message's language.
  *
@@ -151,5 +184,6 @@ export function weekText(shacharisCell, row, name, shabbosSerial, settings) {
   lines.push(...wkMornings(shacharisCell, shabbosSerial, settings));
   if (mincha) lines.push(`${WK_TEXT.mincha} ${mincha}`);
   if (maariv) lines.push(`${WK_TEXT.maariv} ${maariv}`);
+  if (afterYomKippurInWeek(shabbosSerial, settings)) lines.push(WK_TEXT.afterYomKippur);
   return lines.join('\n');
 }
