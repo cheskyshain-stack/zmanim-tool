@@ -82,6 +82,26 @@ button { font-family: inherit; }
 .mz-topbar h1 { font-size: 1.05rem; margin: 0; }
 .mz-topbar .mz-icon-btn { flex-shrink: 0; }
 
+/* Bottom tab bar: Overview / Sources / History. Extra bottom padding on the page content so
+   the last card is never hidden behind the fixed bar; env(safe-area-inset-bottom) clears an
+   iPhone's home indicator, and is simply 0 everywhere else, Android included. */
+.mz-page-tabbed { padding-bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px)); }
+.mz-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--surface); border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 14px rgba(20, 20, 15, 0.08);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mz-tabbar-inner { max-width: var(--max); margin: 0 auto; display: flex; padding: 0.3rem 0.4rem; }
+.mz-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  background: none; border: none; padding: 0.4rem 0.2rem; border-radius: var(--radius-sm);
+  color: var(--ink-soft); font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mz-tab svg { width: 23px; height: 23px; }
+.mz-tab.is-active { color: var(--accent-dark); }
+
 /* ---- buttons ---- */
 
 .mz-btn {

@@ -169,10 +169,12 @@
 
   let view = { screen: 'loading' };
   let data = null; // raw state from /api/state once loaded
+  let dashboardTab = 'overview'; // 'overview' | 'sources' | 'history'
   let period = 'month';
   let customFrom = todayIso();
   let customTo = todayIso();
   let historyTab = 'all';
+  let historySource = 'all'; // 'all' or a source id
 
   function setView(next) { view = next; render(); }
 
@@ -452,85 +454,109 @@
 
   // ---- dashboard --------------------------------------------------------------------------
 
-  function renderDashboard() {
-    const range = periodRange(period, customFrom, customTo);
-    const totals = overallTotals(data, range);
-    const allTime = overallTotals(data, null);
-    const active = data.sources.filter((s) => !s.archived);
-    const archived = data.sources.filter((s) => s.archived);
+  const TAB_TITLES = { overview: 'My Maaser Tracker', sources: 'Income Sources', history: 'History' };
+  const TAB_LABELS = { overview: 'Overview', sources: 'Sources', history: 'History' };
+  const TAB_ICONS = {
+    // A 2x2 grid: the summary cards, at a glance.
+    overview: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
+    // A coin with a dollar sign: the sources, each its own running total.
+    sources: '<circle cx="12" cy="12" r="9"/><path d="M12 6.5v11M15.2 9.2c0-1.3-1.4-2.2-3.2-2.2-2.1 0-3.6 1-3.6 2.5 0 3.4 6.8 1.6 6.8 5 0 1.5-1.6 2.5-3.6 2.5-1.9 0-3.2-.9-3.2-2.2"/>',
+    // A clock: everything that happened, in order.
+    history: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.3 2"/>',
+  };
+  const tabIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_ICONS[name]}</svg>`;
 
+  function renderDashboard() {
     root.innerHTML = `
       <header class="mz-topbar">
-        <h1>My Maaser Tracker</h1>
+        <h1>${TAB_TITLES[dashboardTab]}</h1>
         <button class="mz-icon-btn" data-action="open-settings" aria-label="Settings">⚙️</button>
       </header>
-      <div class="mz-page">
-
-        <div class="mz-filter-row" role="tablist" aria-label="Time period">
-          ${['month', 'year', 'all', 'custom'].map((p) => `
-            <button class="mz-pill ${period === p ? 'is-active' : ''}" data-action="set-period" data-period="${p}">
-              ${{ month: 'This Month', year: 'This Year', all: 'All Time', custom: 'Custom' }[p]}
+      <div class="mz-page mz-page-tabbed">
+        ${dashboardTab === 'overview' ? renderOverviewTab() : dashboardTab === 'sources' ? renderSourcesTab() : renderHistoryTab()}
+      </div>
+      <nav class="mz-tabbar" aria-label="Sections">
+        <div class="mz-tabbar-inner">
+          ${['overview', 'sources', 'history'].map((t) => `
+            <button type="button" class="mz-tab ${dashboardTab === t ? 'is-active' : ''}" data-action="set-dash-tab" data-tab="${t}" ${dashboardTab === t ? 'aria-current="page"' : ''}>
+              ${tabIcon(t)}<span>${TAB_LABELS[t]}</span>
             </button>`).join('')}
         </div>
-        <div class="mz-custom-range ${period === 'custom' ? 'is-open' : ''}">
-          <input type="date" class="mz-input" id="custom-from" value="${customFrom}">
-          <input type="date" class="mz-input" id="custom-to" value="${customTo}">
-        </div>
-
-        <div class="mz-summary-grid">
-          <div class="mz-summary-card">
-            <div class="mz-summary-label">Total Income</div>
-            <div class="mz-summary-amount">${money(totals.incomeCents)}</div>
-          </div>
-          <div class="mz-summary-card">
-            <div class="mz-summary-label">Maaser Goal</div>
-            <div class="mz-summary-amount">${money(totals.goalCents)}</div>
-          </div>
-          <div class="mz-summary-card">
-            <div class="mz-summary-label">Total Given</div>
-            <div class="mz-summary-amount">${money(totals.givenTotalCents)}</div>
-          </div>
-          <div class="mz-summary-card">
-            <div class="mz-summary-label">${totals.netCents >= 0 ? 'Remaining to Give' : 'Ahead'}</div>
-            <div class="mz-summary-amount ${totals.netCents >= 0 ? 'is-remaining' : 'is-ahead'}">${money(Math.abs(totals.netCents))}</div>
-          </div>
-        </div>
-
-        <div class="mz-balance-banner ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : 'is-even'}">
-          <div>
-            <div class="mz-balance-label">All Time Balance</div>
-            <div style="font-size:0.85rem;color:var(--ink-soft)">Every entry ever recorded, regardless of the filter above.</div>
-          </div>
-          <div class="mz-balance-amount ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : ''}">
-            ${allTime.netCents === 0 ? 'Even' : allTime.netCents > 0 ? `${money(allTime.netCents)} remaining` : `${money(-allTime.netCents)} ahead`}
-          </div>
-        </div>
-
-        <div class="mz-actions-row">
-          <button class="mz-btn mz-btn-primary" data-action="add-income">+ Add Income</button>
-          <button class="mz-btn mz-btn-primary" style="background:var(--ahead);border-color:var(--ahead)" data-action="add-giving">+ Add Giving</button>
-        </div>
-
-        <div class="mz-section-title">Income Sources</div>
-        ${active.map((s) => sourceCardHtml(s, range)).join('') || `
-          <div class="mz-empty"><div class="mz-coin">🪙</div>No income sources yet.</div>`}
-        <button class="mz-btn mz-btn-block" data-action="new-source" style="margin-bottom:1.2rem">+ Add Income Source</button>
-
-        ${archived.length ? `
-          <div class="mz-section-title">Archived Sources</div>
-          ${archived.map((s) => sourceCardHtml(s, range, true)).join('')}
-        ` : ''}
-
-        <div class="mz-section-title">History</div>
-        ${historyHtml(range)}
-
-        <div class="mz-actions-row" style="grid-template-columns:1fr">
-          <button class="mz-btn mz-btn-block" data-action="export-csv">Export CSV</button>
-        </div>
-      </div>`;
+      </nav>`;
 
     document.getElementById('custom-from')?.addEventListener('change', (e) => { customFrom = e.target.value; render(); });
     document.getElementById('custom-to')?.addEventListener('change', (e) => { customTo = e.target.value; render(); });
+  }
+
+  function renderOverviewTab() {
+    const range = periodRange(period, customFrom, customTo);
+    const totals = overallTotals(data, range);
+    const allTime = overallTotals(data, null);
+    return `
+      <div class="mz-filter-row" role="tablist" aria-label="Time period">
+        ${['month', 'year', 'all', 'custom'].map((p) => `
+          <button class="mz-pill ${period === p ? 'is-active' : ''}" data-action="set-period" data-period="${p}">
+            ${{ month: 'This Month', year: 'This Year', all: 'All Time', custom: 'Custom' }[p]}
+          </button>`).join('')}
+      </div>
+      <div class="mz-custom-range ${period === 'custom' ? 'is-open' : ''}">
+        <input type="date" class="mz-input" id="custom-from" value="${customFrom}">
+        <input type="date" class="mz-input" id="custom-to" value="${customTo}">
+      </div>
+
+      <div class="mz-summary-grid">
+        <div class="mz-summary-card">
+          <div class="mz-summary-label">Total Income</div>
+          <div class="mz-summary-amount">${money(totals.incomeCents)}</div>
+        </div>
+        <div class="mz-summary-card">
+          <div class="mz-summary-label">Maaser Goal</div>
+          <div class="mz-summary-amount">${money(totals.goalCents)}</div>
+        </div>
+        <div class="mz-summary-card">
+          <div class="mz-summary-label">Total Given</div>
+          <div class="mz-summary-amount">${money(totals.givenTotalCents)}</div>
+        </div>
+        <div class="mz-summary-card">
+          <div class="mz-summary-label">${totals.netCents >= 0 ? 'Remaining to Give' : 'Ahead'}</div>
+          <div class="mz-summary-amount ${totals.netCents >= 0 ? 'is-remaining' : 'is-ahead'}">${money(Math.abs(totals.netCents))}</div>
+        </div>
+      </div>
+
+      <div class="mz-balance-banner ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : 'is-even'}">
+        <div>
+          <div class="mz-balance-label">All Time Balance</div>
+          <div style="font-size:0.85rem;color:var(--ink-soft)">Every entry ever recorded, regardless of the filter above.</div>
+        </div>
+        <div class="mz-balance-amount ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : ''}">
+          ${allTime.netCents === 0 ? 'Even' : allTime.netCents > 0 ? `${money(allTime.netCents)} remaining` : `${money(-allTime.netCents)} ahead`}
+        </div>
+      </div>
+
+      <div class="mz-actions-row">
+        <button class="mz-btn mz-btn-primary" data-action="add-income">+ Add Income</button>
+        <button class="mz-btn mz-btn-primary" style="background:var(--ahead);border-color:var(--ahead)" data-action="add-giving">+ Add Giving</button>
+      </div>`;
+  }
+
+  function renderSourcesTab() {
+    const active = data.sources.filter((s) => !s.archived);
+    const archived = data.sources.filter((s) => s.archived);
+    // Always all time here, not the Overview period filter: a source's balance is a running
+    // total by definition (see openAdjustBalanceSheet), so showing it filtered to "This Month"
+    // would mean the same card disagrees with itself depending on which tab you last looked at.
+    return `
+      ${active.map((s) => sourceCardHtml(s, null)).join('') || `
+        <div class="mz-empty"><div class="mz-coin">🪙</div>No income sources yet.</div>`}
+      <button class="mz-btn mz-btn-block" data-action="new-source" style="margin-bottom:1.2rem">+ Add Income Source</button>
+      ${archived.length ? `
+        <div class="mz-section-title" style="margin-top:0">Archived Sources</div>
+        ${archived.map((s) => sourceCardHtml(s, null, true)).join('')}
+      ` : ''}`;
+  }
+
+  function renderHistoryTab() {
+    return historyHtml();
   }
 
   function sourceCardHtml(source, range, archived) {
@@ -567,9 +593,13 @@
     return Number.isInteger(p) ? String(p) : p.toFixed(1).replace(/\.0$/, '');
   }
 
-  function historyHtml(range) {
-    const incomeRows = data.income.filter((e) => inRange(e.entry_date, range)).map((e) => ({ kind: 'income', e }));
-    const givingRows = data.giving.filter((g) => inRange(g.entry_date, range)).map((g) => ({ kind: 'giving', g }));
+  function historyHtml() {
+    let incomeRows = data.income.map((e) => ({ kind: 'income', e }));
+    let givingRows = data.giving.map((g) => ({ kind: 'giving', g }));
+    if (historySource !== 'all') {
+      incomeRows = incomeRows.filter((r) => r.e.source_id === historySource);
+      givingRows = givingRows.filter((r) => data.allocations.some((a) => a.giving_id === r.g.id && a.source_id === historySource));
+    }
     let rows = [...incomeRows, ...givingRows];
     if (historyTab !== 'all') rows = rows.filter((r) => r.kind === historyTab);
     rows.sort((a, b) => {
@@ -579,13 +609,25 @@
     });
     const sourceName = (id) => data.sources.find((s) => s.id === id)?.name || 'Unknown source';
 
+    // "History should have an option to see a specific income source" - a select rather than
+    // another row of pills, since a household could have more sources than fit across a phone
+    // screen and a dropdown scales to any number of them without wrapping.
+    const sourceFilter = `<div class="mz-field" style="margin-bottom:0.6rem">
+      <select class="mz-select" id="history-source-select">
+        <option value="all" ${historySource === 'all' ? 'selected' : ''}>All Sources</option>
+        ${data.sources.map((s) => `<option value="${s.id}" ${historySource === s.id ? 'selected' : ''}>${escapeHtml(s.name)}${s.archived ? ' (archived)' : ''}</option>`).join('')}
+      </select>
+    </div>`;
     const tabs = `<div class="mz-history-tabs">
       ${['all', 'income', 'giving'].map((t) => `<button class="mz-pill ${historyTab === t ? 'is-active' : ''}" data-action="set-history-tab" data-tab="${t}">${t === 'all' ? 'All' : t === 'income' ? 'Income' : 'Giving'}</button>`).join('')}
     </div>`;
+    const exportRow = `<div class="mz-actions-row" style="grid-template-columns:1fr;margin-top:0.9rem">
+      <button class="mz-btn mz-btn-block" data-action="export-csv">Export CSV</button>
+    </div>`;
 
-    if (!rows.length) return tabs + `<div class="mz-empty">No entries in this range yet.</div>`;
+    if (!rows.length) return sourceFilter + tabs + `<div class="mz-empty">No entries match these filters.</div>` + exportRow;
 
-    const list = rows.slice(0, 60).map((r) => {
+    const list = rows.slice(0, 100).map((r) => {
       if (r.kind === 'income') {
         const e = r.e;
         return `<div class="mz-history-row">
@@ -614,7 +656,7 @@
         <div class="mz-history-amount is-giving">${money(g.amount_cents)}</div>
       </div>`;
     }).join('');
-    return tabs + `<div class="mz-card" style="padding:0.2rem 1.1rem">${list}</div>`;
+    return sourceFilter + tabs + `<div class="mz-card" style="padding:0.2rem 1.1rem">${list}</div>` + exportRow;
   }
 
   // ---------------------------------------------------------------------------------------
@@ -1223,6 +1265,7 @@
       await refreshState(); render(); return;
     }
     if (action === 'set-period') { period = btn.dataset.period; render(); return; }
+    if (action === 'set-dash-tab') { dashboardTab = btn.dataset.tab; window.scrollTo(0, 0); render(); return; }
     if (action === 'set-history-tab') { historyTab = btn.dataset.tab; render(); return; }
     if (action === 'export-csv') { exportCsv(); return; }
     if (action === 'edit-income') { openEditIncomeSheet(btn.dataset.id); return; }
@@ -1236,6 +1279,10 @@
       await api(`/api/giving/${btn.dataset.id}`, { method: 'DELETE' });
       await refreshState(); render(); showToast('Deleted.'); return;
     }
+  });
+
+  root.addEventListener('change', (e) => {
+    if (e.target.id === 'history-source-select') { historySource = e.target.value; render(); }
   });
 
   function openEditIncomeSheet(entryId) {
