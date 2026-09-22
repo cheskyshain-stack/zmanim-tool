@@ -895,9 +895,10 @@ td.ruled .cell { background: var(--ruled); }
      rather than guessed: the ink of 7:00, 7:35, 8:20 and 6:40 is 1.833em in the boards' serif at
      both sizes, the figures being tabular, and a hundredth of an em is left over so nothing sits
      on the edge of its column. An asterisk is 0.5em of ink and two are 1.0em, measured the same
-     way, and each column carries its mark's lead-in on top of that. The slash column is
-     deliberately narrow. */
-  --sh-t: 1.84em; --sh-star: 0.5em; --sh-star2: 1em; --sh-slash: 0.34em; --sh-space: 0.5em;
+     way, and each column carries its mark's lead-in on top of that (0.15em, added below in
+     --sh-star and --sh-star2 themselves so .sh-mark's own padding-left has a column wide enough
+     to sit inside; see .sh-mark). The slash column is deliberately narrow. */
+  --sh-t: 1.84em; --sh-star: 0.65em; --sh-star2: 1.15em; --sh-slash: 0.34em; --sh-space: 0.5em;
 }
 .sh-row.is-times {
   display: grid; column-gap: 0; align-items: baseline;
@@ -919,8 +920,18 @@ td.ruled .cell { background: var(--ruled); }
 .sh-time { text-align: right; white-space: nowrap; }
 /* The mark is set from the left of its column with a lead-in in front of it, so an asterisk has
    air between it and the digits rather than standing against the 0 of 8:20, which is what the
-   shul saw. The column is cut to hold the lead-in and the mark and nothing else. */
+   shul saw. The column is cut to hold the lead-in and the mark and nothing else.
+   The lead-in itself is this padding: --sh-star/--sh-star2 above carry the same 0.15em so the
+   column grows to hold it without moving the slash after it, which is what "nothing else"
+   means - the star's own ink still ends where it always did, the column just starts 0.15em
+   earlier to leave room in front of it. Comments here described this and the rule that does it
+   had gone missing; the columns measured flush against the time until it was added back. */
 .sh-mark { text-align: left; }
+/* Only where there is a mark to pad: an empty one is a position no row in this block ever
+   stars, held at 0px so a schedule whose stars all fall in one place pays for one column and
+   not four (see shacharis-grid.js). Padding it unconditionally reopened exactly that column on
+   every row, 0.15em of dead width nothing was ever going to sit in. */
+.sh-mark:not(:empty) { padding-left: 0.15em; }
 /* The asterisk column is exactly the mark's own ink, so the mark sits against its time the way it
    would in a line of typing. A position no row marks gets no column at all (see
    shacharis-grid.js), which is what keeps a schedule whose stars all fall in the same place from
