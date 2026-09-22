@@ -20515,6 +20515,8 @@ const tabIcons = {
   posters: '<rect x="4.5" y="4" width="11" height="13.5" rx="1"/><path d="M10 1.5v2.5"/><circle cx="10" cy="1.6" r="1.1"/><path d="M7.5 8.5h5M7.5 11.5h5M7.5 14.5h3"/>',
   // An open eye: what the congregation is looking at right now.
   status: '<path d="M2.5 10S5.5 4.5 10 4.5 17.5 10 17.5 10 14.5 15.5 10 15.5 2.5 10 2.5 10z"/><circle cx="10" cy="10" r="2.4"/>',
+  // A coin: the Maaser Tracker, a separate page like Messages rather than a tab here.
+  maaser: '<circle cx="10" cy="10" r="7.5"/><path d="M10 5.5v9M12.6 7.8c0-1-1-1.6-2.3-1.6-1.5 0-2.6.7-2.6 1.9 0 2.6 5.1 1.2 5.1 3.8 0 1.2-1.2 1.9-2.6 1.9-1.4 0-2.5-.6-2.5-1.7"/>',
 };
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
@@ -20552,7 +20554,8 @@ function renderNav() {
   const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
   nav.innerHTML = group('Schedules', ['week', 'charts', 'posters', 'status'].map(button).join('')
       + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
-    + group('Management', ['traffic', 'settings'].map(button).join(''))
+    + group('Management', ['traffic', 'settings'].map(button).join('')
+      + `<a class="nav-btn" href="/maaser/">${icon('maaser')}<span>Maaser Tracker</span></a>`)
     + group('Help', ['calc', 'guide'].map(button).join(''))
     + `<a class="nav-btn admin-site-link" href="/">${icon('site')}<span>View Website</span></a>`;
   nav.querySelectorAll('button[data-tab]').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.tab)));

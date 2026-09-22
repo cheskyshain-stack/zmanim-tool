@@ -902,6 +902,27 @@ def write_sitemap():
     (ROOT / "robots.txt").write_text(robots, encoding="utf-8", newline="\n")
 
 
+def stamp_maaser_versions():
+    """Hash-stamp maaser/app.js and maaser/style.css in maaser/index.html.
+
+    The Maaser Tracker is one HTML page pulling in exactly one script and one stylesheet,
+    neither of which imports anything else (it deliberately isn't part of the js/ module
+    graph at all, so it never goes through the bundler or the import map). A single file each
+    means the cross-file mismatch stamp_js_versions exists to prevent can't happen here, so a
+    plain content hash on each src/href, the same idea as stamp_css_versions, is enough to
+    beat GitHub Pages' 10 minute cache after a deploy.
+    """
+    page = ROOT / "maaser" / "index.html"
+    html = page.read_text(encoding="utf-8")
+
+    def digest(rel):
+        return hashlib.md5((ROOT / "maaser" / rel).read_bytes()).hexdigest()[:8]
+
+    html = re.sub(r'href="style\.css(?:\?v=[0-9a-f]+)?"', f'href="style.css?v={digest("style.css")}"', html)
+    html = re.sub(r'src="app\.js(?:\?v=[0-9a-f]+)?"', f'src="app.js?v={digest("app.js")}"', html)
+    page.write_text(html, encoding="utf-8", newline="\n")
+
+
 def stamp_js_versions(page: Path, prefix: str, entry: str):
     """Give every JS module a content hash in its URL, via an import map.
 
@@ -954,7 +975,7 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "maaser", "offline"]
 DIST_FILES = ["index.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
@@ -1080,6 +1101,9 @@ def main():
     # modules. Its own entry, since it is a much smaller program than the admin.
     stamp_css_versions(ROOT / "texts" / "index.html", "../")
     stamp_js_versions(ROOT / "texts" / "index.html", "../", "texts-app.js")
+    # The Maaser Tracker: a separate feature with its own single-file script and stylesheet,
+    # so it gets its own small stamp rather than the module import map (see the docstring).
+    stamp_maaser_versions()
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain

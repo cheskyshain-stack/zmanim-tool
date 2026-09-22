@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- The Income and Maaser Tracker, a separate feature from the zmanim boards this site was
+     built for and deliberately kept out of the congregation's own page: see CLAUDE.md's
+     screen layout notes on why /texts/ and /admin/ each get their own address rather than
+     folding into the luach. This one is reachable from the admin's sidebar (Management group)
+     and stands on its own otherwise.
+
+     No account, no login: the private link in the URL fragment (never sent to a server in a
+     Referer or a log line) is the only key. See js/maaser-worker... rather, worker/maaser-worker.js
+     for the backend this page talks to. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maaser Tracker</title>
+<meta name="description" content="Track income, maaser giving, and running balances by source. No account needed.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<meta name="theme-color" content="#f6f5f1">
+<link rel="stylesheet" href="style.css?v=08e049cc">
+</head>
+<body>
+<div id="root"></div>
+<script src="app.js?v=51173b17"></script>
+</body>
+</html>
