@@ -4362,6 +4362,39 @@ body.is-locked { overflow: hidden; }
 .traffic-setup code, .traffic-error code { background: var(--accent-soft); border-radius: 3px; padding: 0.05rem 0.3rem; }
 .traffic-error h3 { color: var(--danger); margin-top: 0; }
 
+/* ── What the Congregation Sees, the admin's own status tab ───────────────────────────────
+   Read js/ui/status-view.js: three sections, one per congregation-facing page, the last one
+   a table of the Special Schedules and their own lead-time window. */
+.status-section { margin-bottom: 1.8rem; max-width: 60rem; }
+.status-heading { font-size: var(--fs-lg); margin: 0 0 0.5rem; }
+/* Scrolls sideways rather than blowing out the page: five columns of full dates do not fit a
+   phone's width, and this table is read, not printed, so a scrollbar costs nothing a chart's
+   own fixed page would. Same fix as calc-table-wrap. */
+.status-table-wrap { overflow-x: auto; margin-top: 0.6rem; }
+/* Its own borders and background, said outright, the same reason traffic-table does: a bare
+   table here inherits the printed chart's banded grey rows further up this file. */
+/* Every cell here is one fact (a name, a date, a badge), never a sentence, so none of them
+   should wrap: on a phone that shrank the table to fit instead of letting it scroll, which is
+   the wrong one of the two, since a wrapped date reads worse than a sideways swipe. white-space
+   keeps the table at its natural width so status-table-wrap has something to actually scroll. */
+.status-table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: var(--fs-sm); }
+.status-table th, .status-table td {
+  border: 0; border-bottom: 1px solid var(--border); white-space: nowrap;
+  padding: 0.5rem 0.6rem; text-align: left; background-color: transparent; vertical-align: top;
+}
+.status-table th { color: var(--muted); font-weight: 500; }
+.status-table tbody tr:last-child td { border-bottom: 0; }
+.status-badge {
+  display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: 600; white-space: nowrap;
+}
+.status-badge.is-live { background: #dcfce7; color: #14532d; }
+.status-badge.is-upcoming { background: var(--accent-soft); color: var(--accent-dark); }
+.status-badge.is-past { background: var(--accent-soft); color: var(--muted); }
+/* The row itself dimmed once it has passed, so the table reads at a glance rather than word
+   by word: what is live and what is still ahead stand out, and what is over recedes. */
+.status-table tr.is-past td { color: var(--muted); }
+
 /* ── The messages page, /texts/ ────────────────────────────────────────────────────────────
    Its own screen rather than a tab inside the program, because the person who sends the
    weekly message is not the person who prints the boards and the address is handed to them
