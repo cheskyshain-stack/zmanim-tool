@@ -697,10 +697,9 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  be listed here: the separate ones are what goes on a wall, where there is room for eight
  *  sheets of paper; a phone has room for one page and the one page holds the same schedule.
  *
- *  Up from three days before the first date on the sheet, and down after the last: the shul's
- *  own rule, and the same shape as the wall, where a sheet goes up a few days early and comes
- *  down when the days it covers are over. Three where the separate sheets used five, which is
- *  what the shul asked for.
+ *  Up from ONEPAGE_LEAD_DAYS before the first date on the sheet, and down after the last: the
+ *  shul's own rule, and the same shape as the wall, where a sheet goes up a few days early and
+ *  comes down when the days it covers are over.
  *
  *  The two-on-a-page sheets are left out, as they are on the printed one-page sheet: both
  *  halves of each are already on it under their own names, and a sheet holding them twice is
@@ -717,7 +716,57 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  That is the right way round here rather than a shortcut: the chart is what the board says,
  *  hand edits and all, and the congregation should be reading the same times as the sheet on
  *  the wall. */
-export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = 10 } = {}) {
+export const ONEPAGE_LEAD_DAYS = 10;
+
+/** Every occasion the one-page run can name, across the two years it looks at, with its span
+ *  and nothing else worked out - not filtered to what is showing today.
+ *
+ *  currentOnePageSheets is this exact walk, cut down to what a visitor sees right now and
+ *  drawn out to real markup, with one thing this does not have: it skips building a year at
+ *  all when `on` is nowhere near it, because that walk runs on every visit to the
+ *  congregation's own page and a year nobody is close to costs 120ms on a slow phone to rule
+ *  out. This has no visitor to be quick for - it is what the admin's status panel reads to
+ *  say what is coming as well as what is showing, which currentOnePageSheets was never asked
+ *  and cannot answer - so it simply builds both years' occasions in full. Kept as its own
+ *  walk rather than sharing currentOnePageSheets' loop for that reason, not because the two
+ *  questions are different: they read the identical `buildEveryPoster` and the identical
+ *  ותיקין call, so the two cannot describe two different calendars. */
+export function onePageOccasionSpans(state, settings) {
+  const next = nextYomimNoraim();
+  const out = [];
+  for (const year of [next - 1, next]) {
+    for (const name of POSTER_OCCASIONS) {
+      let built = null;
+      try {
+        built = buildEveryPoster(state, settings, year, { combined: false, group: name })?.poster || null;
+      } catch {
+        built = null;
+      }
+      if (!built?.span) continue;
+      // The span of a one-page sheet is the whole occasion's: the first date on any of the
+      // sheets it holds through the last date on any of them. See buildEveryPoster.
+      out.push({ key: `onepage-${year}-${name}`, year, label: name, span: built.span });
+    }
+    /* And the ותיקין sheet, both occasions on one page, as a sheet of its own beside them.
+       It is not part of the one-page run and never has been: that sheet is the shul's own
+       schedule, and this is a second מנין with its own times on the same days, which is why
+       the shul hangs it as its own paper. Left out of the run it was on nothing the
+       congregation could read at all, so here it is the second sheet on the page, the same as
+       the second sheet on the wall.
+       The two-in-one is the one to show rather than the pair: this page is read on a phone,
+       where a sheet is a sheet to scroll past whether it holds one occasion or two. */
+    let vasikin = null;
+    try {
+      vasikin = buildVasikinPoster(year, settings, 'both');
+    } catch {
+      vasikin = null;
+    }
+    if (vasikin?.span) out.push({ key: `vasikin-${year}`, year, label: VS_TEXT.who, span: vasikin.span });
+  }
+  return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
+}
+
+export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = ONEPAGE_LEAD_DAYS } = {}) {
   const next = nextYomimNoraim();
   const out = [];
   for (const year of [next - 1, next]) {
@@ -731,8 +780,6 @@ export function currentOnePageSheets(state, settings, { on = excelSerial(new Dat
         built = null;
       }
       if (!built?.span) continue;
-      // The span of a one-page sheet is the whole occasion's: the first date on any of the
-      // sheets it holds through the last date on any of them. See buildEveryPoster.
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
       out.push({
@@ -744,14 +791,6 @@ export function currentOnePageSheets(state, settings, { on = excelSerial(new Dat
         html: renderOnePagePoster(built, settings),
       });
     }
-    /* And the ותיקין sheet, both occasions on one page, as a sheet of its own beside them.
-       It is not part of the one-page run and never has been: that sheet is the shul's own
-       schedule, and this is a second מנין with its own times on the same days, which is why
-       the shul hangs it as its own paper. Left out of the run it was on nothing the
-       congregation could read at all, so here it is the second sheet on the page, the same as
-       the second sheet on the wall.
-       The two-in-one is the one to show rather than the pair: this page is read on a phone,
-       where a sheet is a sheet to scroll past whether it holds one occasion or two. */
     let vasikin = null;
     try {
       vasikin = buildVasikinPoster(year, settings, 'both');

@@ -193,8 +193,23 @@ const layoutNow = () => (congregationView ? 'charts' : weekLayout);
 let optionsOpen = false;
 
 /** How many weeks past an empty one the congregation's page will look for one with times on
- *  it before giving up and drawing the empty one. See firstWithTimes in renderWeek. */
+ *  it before giving up and drawing the empty one. See currentReaderWeek below. */
 const LUACH_SKIP_MAX = 3;
+
+/** Which week the congregation's own page opens on right now, without drawing it.
+ *
+ *  The same computation renderWeek makes for the reader view (see the note there on why the
+ *  default is the first week with something left on it rather than simply the first that is
+ *  not in the past), pulled out so the admin's status panel can ask it directly. A second
+ *  reader of the one answer, not a second way of working it out. */
+export function currentReaderWeek(state, settings, now = new Date()) {
+  const index = readerWeekIndex(state);
+  const today = shulNow(now, settings).serial;
+  const serials = [...index.keys()].filter((s) => s >= today).sort((a, b) => a - b);
+  if (!serials.length) return null;
+  return serials.slice(0, LUACH_SKIP_MAX + 1)
+    .find((s) => readerWeekHasTimes(s, index, state, settings, now)) ?? serials[0];
+}
 
 /** Which season a week belongs to, as something two weeks can be compared by.
  *
@@ -1300,7 +1315,7 @@ function decorateCards(root) {
  *
  *  Its own function rather than a line inside the card builder, since the sheet needs the same
  *  answer and two places working it out is two places to get it wrong. */
-function weekTitle(showing, index) {
+export function weekTitle(showing, index) {
   const { week } = index.get(showing);
   const parsha = week.parsha + (week.specialParsha ? ' · ' + week.specialParsha : '');
   return isYomTovWeekLabel(week.parsha) ? weekOfLabel(week.parsha, false) : 'פרשת ' + parsha;
@@ -1515,14 +1530,10 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
      press Next. The shul asked for it to turn over by itself.
      A week the reader picked by hand is never skipped, whether or not anything is left on it:
      they asked for that one. Only the default is moved on.
-     Bounded rather than a walk to the end of the list: a week with a chart row always has
-     times and a week without one always has something to say about itself, so the answer is
-     the first or the second candidate. The bound is what keeps a state nobody has foreseen
-     from building an agenda for every week of three years. */
-  const firstWithTimes = () => serials.slice(0, LUACH_SKIP_MAX + 1)
-    .find((s) => readerWeekHasTimes(s, index, state, settings)) ?? serials[0];
+     See currentReaderWeek above, which is this same computation pulled out so the admin's
+     status panel can ask it too, rather than a second copy of the rule living there. */
   const showing = serials.includes(serial) ? serial
-    : luach ? firstWithTimes()
+    : luach ? (currentReaderWeek(state, settings) ?? serials[0])
     : currentSerial(serials, settings, (s) => weekEndsMins(s, state, settings));
   /* On the congregation's site, Previous and Next reach only the weeks printed on the
      chart that is up now, and stop at its first and last. A published sheet is a season,

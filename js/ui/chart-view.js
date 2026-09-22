@@ -52,8 +52,12 @@ export function chartSpreads(state) {
  *  page whose first week has already started.
  *
  *  Both views now read the turn the same way, off the same list of page starts, so neither can
- *  be on a different chart from the other. */
-function spreadIndexForNow(spreads, state, settings) {
+ *  be on a different chart from the other.
+ *
+ *  Exported so the admin's own status panel can say which chart is up without drawing the
+ *  page: see js/ui/status-view.js. A third reader of the same number rather than a second
+ *  way of asking it. */
+export function spreadIndexForNow(spreads, state, settings) {
   if (!spreads.length) return 0;
   const all = spreads.flatMap((s) => s.serials);
   /* Every Shabbos from the first charted one to the last. They are seven days apart, so
@@ -73,7 +77,7 @@ function spreadIndexForNow(spreads, state, settings) {
  *  The Hebrew pair goes on its own line in its own direction. Run into the English one it
  *  would be reordered against it, and inside a right-to-left line the earlier date sits
  *  on the right, which is the order it is read in. */
-function spreadLabel(spread) {
+export function spreadLabel(spread) {
   const ends = [Math.min(...spread.serials), Math.max(...spread.serials)];
   const english = ends.map((serial) =>
     new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }).format(dateFromSerial(serial))

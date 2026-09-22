@@ -12,6 +12,7 @@ import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { renderTraffic } from './ui/traffic-view.js';
+import { renderStatus } from './ui/status-view.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
 
@@ -54,10 +55,10 @@ const nav = document.getElementById('nav');
 // the things you set once. Rules is no longer among them - it is the first panel inside
 // Settings, being something configured rather than a place you go. Generate leading also
 // matches where the app opens.
-const tabs = ['week', 'charts', 'generate', 'saved', 'posters', 'settings', 'traffic', 'calc', 'program', 'guide'];
+const tabs = ['week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
 // "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
 // said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings: 'Settings', saved: 'Saved Copies', traffic: 'Visitor Statistics', calc: 'How Times Are Calculated', program: 'Get the Program', guide: 'Help & Instructions', week: 'Weekly Schedule', posters: 'Special Schedules' };
+const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings: 'Settings', saved: 'Saved Copies', traffic: 'Visitor Statistics', calc: 'How Times Are Calculated', program: 'Get the Program', guide: 'Help & Instructions', week: 'Weekly Schedule', posters: 'Special Schedules', status: 'What the Congregation Sees' };
 
 /* --- The screen you are on, in the address ------------------------------------------
    Without this the tab was a variable that started at Generate and was never written
@@ -125,6 +126,8 @@ const tabIcons = {
   site: '<path d="M3 9.5 10 3.5l7 6"/><path d="M4.8 8.2v8.3a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1V8.2"/><path d="M8.2 17.5v-5h3.6v5"/>',
   // A sheet on a wall, with a pin at the top.
   posters: '<rect x="4.5" y="4" width="11" height="13.5" rx="1"/><path d="M10 1.5v2.5"/><circle cx="10" cy="1.6" r="1.1"/><path d="M7.5 8.5h5M7.5 11.5h5M7.5 14.5h3"/>',
+  // An open eye: what the congregation is looking at right now.
+  status: '<path d="M2.5 10S5.5 4.5 10 4.5 17.5 10 17.5 10 14.5 15.5 10 15.5 2.5 10 2.5 10z"/><circle cx="10" cy="10" r="2.4"/>',
 };
 const icon = (name) =>
   `<svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tabIcons[name]}</svg>`;
@@ -160,7 +163,7 @@ function renderNav() {
     : currentTab === 'program' ? 'guide' : currentTab;
   const button = t => `<button class="nav-btn ${active === t ? 'active' : ''}" ${active === t ? 'aria-current="page"' : ''} data-tab="${t}">${icon(t === 'charts' ? 'generate' : t)}<span>${tabLabels[t]}</span></button>`;
   const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
-  nav.innerHTML = group('Schedules', ['week', 'charts', 'posters'].map(button).join('')
+  nav.innerHTML = group('Schedules', ['week', 'charts', 'posters', 'status'].map(button).join('')
       + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
     + group('Management', ['traffic', 'settings'].map(button).join(''))
     + group('Help', ['calc', 'guide'].map(button).join(''))
@@ -301,6 +304,8 @@ function paint() {
     renderTraffic(main);
   } else if (currentTab === 'posters') {
     renderPosters(main, state, writeRoute, tables);
+  } else if (currentTab === 'status') {
+    renderStatus(main);
   } else if (currentTab === 'program') {
     renderProgram(main);
   } else if (currentTab === 'guide') {
