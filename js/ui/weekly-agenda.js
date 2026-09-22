@@ -149,7 +149,14 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
   // come from the chart, including its drasha and other non-minyan times.
   events.push(...agendaChartEvents(data.shabbos, showing));
   const unique = new Set();
-  const normalized = events.map(e=>({...e,auxiliary:e.auxiliary || /קידוש לבנה|דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}));
+  /* דרשה only ever reaches this list already marked, off the chart cell's own line in
+     agendaChartEvents above; קידוש לבנה used to be caught by the same regex and lost its
+     chance to ever be the card's "Next minyan", although the sheet that prints it
+     (posters/yomkippur.js) keeps a real clock alternative to מוצאי יום כיפור's "אחר מעריב"
+     for exactly that purpose, and the congregation's home page, reading the same event off
+     the same sheet with no such filter, does offer it. This page and that one are meant to
+     read the boards the same way. */
+  const normalized = events.map(e=>({...e,auxiliary:e.auxiliary || /דרשה/.test(e.name),serial:e.serial+Math.floor(e.mins/1440),mins:e.mins%1440}));
   const delta = e => (e.serial-clock.serial)*1440+e.mins-clock.mins;
   const categoryKey = e => JSON.stringify([
     agendaSection(e,e.serial,settings).key,
