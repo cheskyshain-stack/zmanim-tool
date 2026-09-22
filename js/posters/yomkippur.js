@@ -511,6 +511,11 @@ export function buildYomKippurPoster(year, settings) {
   return {
     hebrewYear: year,
     span: { from: rh + 8, to: rh + 9 },
+    /* שקיעה on יום כיפור itself, a fraction of that day, the exact value every מעריב time on
+       this sheet after the fast is built from. Exported so the messages page can ask "is it
+       past sunset yet" without working the sun out a second time: see afterYomKippurLine in
+       ui/texts-view.js. */
+    shkia: ykShkia,
     /* The two headings, carried on the poster rather than read off YK_TEXT by whoever is
        drawing it, because one of them moves with the year and three sheets print it: this
        one, the ראש השנה ויום כיפור pair, and the all-on-one. Worked once here and they
