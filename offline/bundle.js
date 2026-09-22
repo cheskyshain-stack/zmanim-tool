@@ -17049,9 +17049,19 @@ function agendaDayKind(serial, settings) {
      where a day number would be wrong: ערב סוכות is not the eve of a particular day of it.
      `holyDay` names the day and heads the times of that day alone. `motzai` is the evening
      after. */
+  /* הושענא רבה carries its own name rather than the generic "Chol Hamoed Sukkos" every other
+     day of חול המועד gets. It stays `chol` (it is not אסור במלאכה, and withShabbos above must
+     go on treating it as an ordinary chol hamoed day if it ever needs to - though it never can:
+     21 תשרי can never fall on a Shabbos, the same way 16 תשרי and 16 ניסן cannot), and it is
+     deliberately never `holy`, since weekly-reader.js reads `.holy` to decide which days keep a
+     week's span open through a real Yom Tov, and הושענא רבה davens the ordinary chol hamoed
+     schedule rather than closing the shul for the day. Only the label people actually read
+     changes. */
+  const label = m === 7 && d === 21 ? 'Hoshana Rabbah'
+    : chol ? `Chol Hamoed ${m === 7 ? 'Sukkos' : 'Pesach'}` : '';
   return { holy: withShabbos(holy), holyDay: withShabbos(named),
     motzai: runsOn ? 'Yom Tov' : withShabbos(holy),
-    chol, label: chol ? `Chol Hamoed ${m === 7 ? 'Sukkos' : 'Pesach'}` : '' };
+    chol, label };
 }
 
 function agendaSection(event, serial, settings) {
