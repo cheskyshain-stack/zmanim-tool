@@ -69,7 +69,7 @@ function corsHeaders(request) {
   const allowed = ALLOWED_ORIGINS.some((o) => origin === o || origin.startsWith(o + ':'));
   const headers = {
     'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'access-control-allow-headers': 'authorization, content-type, x-tracker-pin, idempotency-key',
+    'access-control-allow-headers': 'authorization, content-type, x-tracker-pin, x-maaser-admin-key, idempotency-key',
     'vary': 'origin',
   };
   if (allowed) headers['access-control-allow-origin'] = origin;
@@ -210,6 +210,10 @@ async function authenticate(request, env) {
   const tracker = await env.MAASER_DB.prepare('SELECT * FROM trackers WHERE token_hash = ?').bind(tokenHash).first();
   if (!tracker) return { error: fail(request, 401, 'invalid_token', 'This link does not open a tracker. Check that it was copied in full.') };
 
+  const managed = await env.MAASER_DB.prepare('SELECT status FROM managed_trackers WHERE tracker_id = ?').bind(tracker.id).first();
+  if (managed?.status === 'pending') return { error: fail(request, 403, 'pin_setup_required', 'Create your PIN to activate this tracker.') };
+  tracker.managed = !!managed;
+
   if (tracker.pin_hash) {
     if (tracker.pin_locked_until && tracker.pin_locked_until > Date.now()) {
       return { error: fail(request, 423, 'pin_locked', 'Too many wrong PIN attempts. Try again in a few minutes.') };
@@ -304,7 +308,7 @@ async function loadState(db, trackerId) {
 
 async function handleGetState(request, env, tracker) {
   const state = await loadState(env.MAASER_DB, tracker.id);
-  return json(request, { ...state, pinEnabled: !!tracker.pin_hash });
+  return json(request, { ...state, pinEnabled: !!tracker.pin_hash, adminManaged: !!tracker.managed });
 }
 
 function requireNumber(v, field) {
@@ -576,29 +580,22 @@ async function handleDeleteOpening(request, env, tracker, id) {
   return json(request, { ok: true });
 }
 
-// --- settings: PIN, link rotation ---------------------------------------------------------
+// --- settings: PIN ------------------------------------------------------------------------
 
 async function handleSetPin(request, env, tracker) {
   const body = await readJson(request);
   if (body.pin === null || body.pin === '') {
+    if (tracker.managed) return fail(request, 403, 'admin_required', 'Ask the admin to reset access.');
     await env.MAASER_DB.prepare('UPDATE trackers SET pin_hash = NULL, pin_salt = NULL, pin_fail_count = 0, pin_locked_until = NULL, updated_at = ? WHERE id = ?')
       .bind(Date.now(), tracker.id).run();
     return json(request, { ok: true, pinEnabled: false });
   }
   const pin = String(body.pin);
-  if (!/^\d{4,10}$/.test(pin)) throw new HttpError(400, 'invalid_input', 'PIN must be 4 to 10 digits.');
+  if (!new RegExp(tracker.managed ? '^\\d{6,10}$' : '^\\d{4,10}$').test(pin)) throw new HttpError(400, 'invalid_input', tracker.managed ? 'PIN must be 6 to 10 digits.' : 'PIN must be 4 to 10 digits.');
   const { hashHex, saltHex } = await hashPin(pin);
   await env.MAASER_DB.prepare('UPDATE trackers SET pin_hash = ?, pin_salt = ?, pin_fail_count = 0, pin_locked_until = NULL, updated_at = ? WHERE id = ?')
     .bind(hashHex, saltHex, Date.now(), tracker.id).run();
   return json(request, { ok: true, pinEnabled: true });
-}
-
-async function handleRotateLink(request, env, tracker) {
-  const token = randomSecret();
-  const tokenHash = await sha256Hex(normalizeSecret(token));
-  await env.MAASER_DB.prepare('UPDATE trackers SET token_hash = ?, updated_at = ? WHERE id = ?')
-    .bind(tokenHash, Date.now(), tracker.id).run();
-  return json(request, { token });
 }
 
 // --- recovery ------------------------------------------------------------------------------
@@ -614,6 +611,9 @@ async function handleRecovery(request, env) {
   const hash = await sha256Hex(code);
   const tracker = await env.MAASER_DB.prepare('SELECT * FROM trackers WHERE recovery_hash = ?').bind(hash).first();
   if (!tracker) return fail(request, 401, 'invalid_code', 'That recovery code was not recognized.');
+  if (await env.MAASER_DB.prepare('SELECT tracker_id FROM managed_trackers WHERE tracker_id = ?').bind(tracker.id).first()) {
+    return fail(request, 403, 'admin_required', 'Ask the admin for a new link.');
+  }
 
   const newToken = randomSecret();
   const newRecovery = randomSecret();
@@ -639,6 +639,57 @@ async function handleRecovery(request, env) {
 // Router
 // ---------------------------------------------------------------------------------------
 
+async function adminAuthorized(request, env) {
+  const supplied = request.headers.get('x-maaser-admin-key') || '';
+  if (!env.MAASER_ADMIN_KEY || supplied.length < 32 || supplied.length > 256) return false;
+  const [a, b] = await Promise.all([sha256Hex(supplied), sha256Hex(env.MAASER_ADMIN_KEY)]);
+  return timingSafeEqual(a, b);
+}
+
+async function handleAdminCreate(request, env) {
+  const body = await readJson(request);
+  const label = String(body.label || '').trim();
+  if (!label || label.length > 100) return fail(request, 400, 'invalid_input', 'Enter a name (up to 100 characters).');
+  const now = Date.now(), id = newId(), token = randomSecret();
+  const tokenHash = await sha256Hex(normalizeSecret(token));
+  const recoveryHash = await sha256Hex(normalizeSecret(randomSecret()));
+  await env.MAASER_DB.batch([
+    env.MAASER_DB.prepare('INSERT INTO trackers (id, token_hash, recovery_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').bind(id, tokenHash, recoveryHash, now, now),
+    env.MAASER_DB.prepare('INSERT INTO sources (id, tracker_id, name, default_percent, sort_order, archived, created_at, updated_at) VALUES (?, ?, ?, 10, 0, 0, ?, ?)').bind(newId(), id, 'Salary', now, now),
+    env.MAASER_DB.prepare('INSERT INTO managed_trackers (tracker_id, label, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').bind(id, label, 'pending', now, now),
+  ]);
+  return json(request, { id, label, status: 'pending', token }, 201);
+}
+
+async function handleAdminReset(request, env, id) {
+  const managed = await env.MAASER_DB.prepare('SELECT tracker_id FROM managed_trackers WHERE tracker_id = ?').bind(id).first();
+  if (!managed) return fail(request, 404, 'not_found', 'Tracker not found.');
+  const token = randomSecret(), tokenHash = await sha256Hex(normalizeSecret(token)), now = Date.now();
+  await env.MAASER_DB.batch([
+    env.MAASER_DB.prepare('UPDATE trackers SET token_hash = ?, pin_hash = NULL, pin_salt = NULL, pin_fail_count = 0, pin_locked_until = NULL, updated_at = ? WHERE id = ?').bind(tokenHash, now, id),
+    env.MAASER_DB.prepare("UPDATE managed_trackers SET status = 'pending', updated_at = ? WHERE tracker_id = ?").bind(now, id),
+  ]);
+  return json(request, { id, status: 'pending', token });
+}
+
+async function handleActivate(request, env) {
+  const auth = request.headers.get('authorization') || '';
+  const match = /^Bearer\s+(.+)$/i.exec(auth.trim());
+  if (!match) return fail(request, 401, 'no_token', 'Missing invitation link.');
+  if (!(await rateLimit(env.MAASER_DB, 'open', clientIp(request)))) return fail(request, 429, 'rate_limited', 'Too many attempts. Try again later.');
+  const tokenHash = await sha256Hex(normalizeSecret(match[1]));
+  const tracker = await env.MAASER_DB.prepare('SELECT id FROM trackers WHERE token_hash = ?').bind(tokenHash).first();
+  if (!tracker) return fail(request, 401, 'invalid_token', 'This invitation is no longer valid. Ask the admin for a new link.');
+  const body = await readJson(request), pin = String(body.pin || '');
+  if (!/^\d{6,10}$/.test(pin)) return fail(request, 400, 'invalid_input', 'PIN must be 6 to 10 digits.');
+  const { hashHex, saltHex } = await hashPin(pin), now = Date.now();
+  const result = await env.MAASER_DB.prepare("UPDATE trackers SET pin_hash = ?, pin_salt = ?, pin_fail_count = 0, pin_locked_until = NULL, updated_at = ? WHERE id = ? AND token_hash = ? AND pin_hash IS NULL AND EXISTS (SELECT 1 FROM managed_trackers WHERE tracker_id = ? AND status = 'pending')")
+    .bind(hashHex, saltHex, now, tracker.id, tokenHash, tracker.id).run();
+  if (result.meta.changes !== 1) return fail(request, 409, 'already_activated', 'This invitation has already been used. Ask the admin for a new link if needed.');
+  await env.MAASER_DB.prepare("UPDATE managed_trackers SET status = 'active', updated_at = ? WHERE tracker_id = ? AND status = 'pending'").bind(now, tracker.id).run();
+  return json(request, { ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -652,9 +703,19 @@ export default {
     }
 
     try {
-      if (path === '/api/trackers' && request.method === 'POST') {
-        return await handleCreate(request, env);
+      if (path.startsWith('/api/admin/')) {
+        if (!(await adminAuthorized(request, env))) return fail(request, 401, 'admin_required', 'Admin key required.');
+        if (path === '/api/admin/trackers' && request.method === 'GET') {
+          const rows = await env.MAASER_DB.prepare('SELECT tracker_id AS id, label, status, created_at, updated_at FROM managed_trackers ORDER BY created_at DESC').all();
+          return json(request, { trackers: rows.results });
+        }
+        if (path === '/api/admin/trackers' && request.method === 'POST') return await handleAdminCreate(request, env);
+        const reset = /^\/api\/admin\/trackers\/([a-f0-9-]+)\/reset$/.exec(path);
+        if (reset && request.method === 'POST') return await handleAdminReset(request, env, reset[1]);
+        return fail(request, 404, 'not_found', 'Unknown admin endpoint.');
       }
+      if (path === '/api/trackers' && request.method === 'POST') return fail(request, 403, 'admin_required', 'Ask the admin to create a tracker.');
+      if (path === '/api/activate' && request.method === 'POST') return await handleActivate(request, env);
       if (path === '/api/recovery' && request.method === 'POST') {
         return await handleRecovery(request, env);
       }
@@ -682,7 +743,6 @@ export default {
       if (parts[0] === 'opening' && parts.length === 1 && request.method === 'POST') return await withIdempotency(request, env, tracker, () => handleCreateOpening(request, env, tracker));
       if (parts[0] === 'opening' && parts.length === 2 && request.method === 'DELETE') return await handleDeleteOpening(request, env, tracker, parts[1]);
       if (parts[0] === 'settings' && parts[1] === 'pin' && request.method === 'POST') return await handleSetPin(request, env, tracker);
-      if (parts[0] === 'settings' && parts[1] === 'rotate-link' && request.method === 'POST') return await handleRotateLink(request, env, tracker);
 
       return fail(request, 404, 'not_found', 'Unknown endpoint.');
     } catch (err) {

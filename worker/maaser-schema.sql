@@ -29,6 +29,17 @@ CREATE TABLE IF NOT EXISTS trackers (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trackers_token_hash ON trackers(token_hash);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_trackers_recovery_hash ON trackers(recovery_hash);
 
+-- Trackers created by the Maaser administrator. An invitation token cannot read or change
+-- records until its recipient chooses a PIN. Older self-created trackers have no row here
+-- and keep their original link and recovery-code flow.
+CREATE TABLE IF NOT EXISTS managed_trackers (
+  tracker_id TEXT PRIMARY KEY REFERENCES trackers(id),
+  label TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sources (
   id TEXT PRIMARY KEY,
   tracker_id TEXT NOT NULL REFERENCES trackers(id),
