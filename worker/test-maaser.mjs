@@ -1,6 +1,6 @@
 // Integration test against a locally running `wrangler dev --local` maaser worker.
 // Not part of the deploy loop; run by hand while iterating: node worker/test-maaser.mjs
-const BASE = 'http://127.0.0.1:8787';
+const BASE = process.env.BASE || 'http://127.0.0.1:8787';
 let failures = 0;
 function ok(name, cond, extra) {
   if (cond) { console.log('ok  -', name); }

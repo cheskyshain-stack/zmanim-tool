@@ -33,6 +33,7 @@
    quietly spending a visitor's browser against this Worker and passing the result off as
    its own, the same reasoning as traffic-worker.js. */
 const ALLOWED_ORIGINS = [
+  'https://tools.cjaffa.com',
   'https://baismedrashoflakewoodcommons.org',
   'https://lczmanim.cjaffa.com',
   'http://localhost',

@@ -1,0 +1,13 @@
+{
+  "name": "maaser-tracker",
+  "main": "maaser-worker.js",
+  "compatibility_date": "2026-09-22",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "MAASER_DB",
+      "database_name": "maaser-tracker",
+      "database_id": "75334dc3-49a5-4f8a-a40b-65680617b40b"
+    }
+  ]
+}
