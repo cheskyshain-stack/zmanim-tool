@@ -335,15 +335,19 @@ export function hasTaanis(serial, settings) {
  *  at Thursday, but Friday morning davens the weekday שחרית too (see minyanimForDay), so a
  *  ר"ח on a Friday is a ר"ח this heading is about. Shabbos is not, whatever falls on it.
  *
- *  Two of the fasts are left out, for the reason specialDaysInWeek leaves them out: יום כפור
+ *  Three of the fasts are left out, for the reason specialDaysInWeek leaves them out. יום כפור
  *  and תשעה באב have sheets of their own, and neither runs a schedule that can be read as
- *  "שחרית is earlier that day". A season whose only fast is one of those two is a season with
- *  no תענ"צ in this heading.
+ *  "שחרית is earlier that day". צום גדליה also has a sheet of its own, and a different reason:
+ *  its own סליחות run longer than the ר"ח / בה"ב / תענית list out of Settings does, so that
+ *  sheet opens at 6:20 where this list opens at 6:40. A page whose only fast is one of these
+ *  three is a page with no תענ"צ in this heading, and no box, since the box under it would be
+ *  printing the wrong שחרית for the one day it is naming.
  *
- *  The other four count, צום גדליה with them. It was left out at first, on the grounds that the
- *  shul's own sheet for that day opens earlier than this list does, and the shul said otherwise:
- *  it is a תענית ציבור, the heading names the kinds of day the list is for, and a קיץ chart whose
- *  only weekday fast is צום גדליה is a chart that should read ר"ח ותענ"צ. */
+ *  This was tried the other way for a while, printing תענ"צ for צום גדליה too on the grounds
+ *  that the heading only names what kind of day it is rather than promising the box's own
+ *  times, and the shul asked for it back: the box sits directly under the heading and reads as
+ *  one claim, and a reader is not expected to know that one of the three days it names is an
+ *  exception with times of its own elsewhere. */
 export function specialShacharisKinds(shabbosSerials, settings) {
   const kinds = { roshChodesh: false, behab: false, taanis: false };
   for (const shabbos of shabbosSerials) {
@@ -352,7 +356,7 @@ export function specialShacharisKinds(shabbosSerials, settings) {
       if (hasRoshChodesh(serial, settings)) kinds.roshChodesh = true;
       if (hasBehab(serial, settings)) kinds.behab = true;
       const fast = hasTaanis(serial, settings);
-      if (fast && !/יום כפור|Yom Kippur|תשעה באב|Tishah/.test(fast)) kinds.taanis = true;
+      if (fast && !/יום כפור|Yom Kippur|תשעה באב|Tishah|צום גדליה|Gedaly/.test(fast)) kinds.taanis = true;
     }
   }
   return kinds;
