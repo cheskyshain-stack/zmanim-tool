@@ -547,7 +547,11 @@
           <div><div class="mz-stat-label">Total Income</div><div class="mz-stat-value">${money(t.incomeCents)}</div></div>
           <div><div class="mz-stat-label">Maaser Goal</div><div class="mz-stat-value">${money(t.goalCents)}</div></div>
           <div><div class="mz-stat-label">Total Given</div><div class="mz-stat-value">${money(t.givenTotalCents)}</div></div>
-          <div><div class="mz-stat-label">${statusLabel}</div><div class="mz-stat-value ${statusClass}">${money(Math.abs(t.netCents))}</div></div>
+          ${archived ? `<div><div class="mz-stat-label">${statusLabel}</div><div class="mz-stat-value ${statusClass}">${money(Math.abs(t.netCents))}</div></div>` : `
+          <button type="button" class="mz-stat-block mz-stat-editable" data-action="adjust-balance" data-id="${source.id}">
+            <div class="mz-stat-label">${statusLabel} <span aria-hidden="true">✎</span></div>
+            <div class="mz-stat-value ${statusClass}">${money(Math.abs(t.netCents))}</div>
+          </button>`}
         </div>
         ${archived ? `<p class="mz-archived-note">Archived. Its records and balances are kept.</p>
           <button class="mz-btn mz-btn-block" data-action="unarchive-source" data-id="${source.id}">Unarchive</button>` : `
@@ -952,9 +956,10 @@
         ${saveStateRow()}
         <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Changes</button>
       </form>
-      <div class="mz-section-title">Opening Balance</div>
-      <p style="margin-top:-0.4rem">A one-time starting point for this source, from before this tracker existed. Not income and not a donation.</p>
-      <button class="mz-btn mz-btn-block" id="open-opening-btn" type="button">Set Opening Balance</button>
+      <div class="mz-section-title">Balance</div>
+      <p style="margin-top:-0.4rem">Set what this source's balance should be right now (its
+         starting point, or a correction later on) and this figures out the adjustment for you.</p>
+      <button class="mz-btn mz-btn-block" id="open-opening-btn" type="button">Adjust Balance</button>
       <div class="mz-section-title">Archive</div>
       <p style="margin-top:-0.4rem">Archiving hides this source from the main list. Its records and balances are kept and it can be unarchived any time.</p>
       <button class="mz-btn mz-btn-block mz-btn-danger" id="archive-btn" type="button">Archive This Source</button>`, (el) => {
@@ -974,7 +979,7 @@
       }
       el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
       el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
-      el.querySelector('#open-opening-btn').addEventListener('click', () => { closeSheet(); openOpeningBalanceSheet(sourceId); });
+      el.querySelector('#open-opening-btn').addEventListener('click', () => { closeSheet(); openAdjustBalanceSheet(sourceId); });
       el.querySelector('#archive-btn').addEventListener('click', async () => {
         if (!confirm(`Archive ${source.name}? Its records and balances will be kept.`)) return;
         await api(`/api/sources/${sourceId}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) });
@@ -985,41 +990,73 @@
     });
   }
 
-  function openOpeningBalanceSheet(sourceId) {
+  // Set what a source's balance should be, rather than typing an amount to add on top of it.
+  // Reads as "what should this say", which is both how a brand-new source gets its starting
+  // point (nothing recorded yet, so the current balance is $0, and the whole target becomes
+  // the adjustment) and how a wrong number gets fixed later (the current balance is whatever
+  // it's computed to be, and only the difference from what it should be gets saved). Either
+  // way this saves one more row in opening_balances - the same "dated opening balance" the
+  // data model already has, just arrived at by typing the answer instead of the adjustment.
+  function openAdjustBalanceSheet(sourceId) {
     const source = data.sources.find((s) => s.id === sourceId);
+    const current = sourceTotals(data, sourceId, null); // all time, unfiltered: balance is a running total, not a period figure
+    const currentLabel = current.netCents === 0 ? 'Even' : current.netCents > 0 ? `${money(current.netCents)} remaining` : `${money(-current.netCents)} ahead`;
     openSheet(`
-      <div class="mz-sheet-head"><h2>Opening Balance</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
-      <form data-form="opening">
-        <p>What ${escapeHtml(source.name)}'s balance was before this tracker started, as of a date you choose.</p>
+      <div class="mz-sheet-head"><h2>Adjust Balance</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="adjust-balance">
+        <p>${escapeHtml(source.name)} currently shows <strong>${currentLabel}</strong> (all time).
+           Enter what the balance should actually be, and the difference gets saved as a
+           dated adjustment - not income, not a donation.</p>
         <div class="mz-field">
-          <label>This amount was</label>
+          <label>The balance should be</label>
           <div class="mz-pct-row">
-            <button type="button" class="mz-pct-choice is-active" data-type="remaining">Remaining to give</button>
-            <button type="button" class="mz-pct-choice" data-type="ahead">Already given ahead</button>
+            <button type="button" class="mz-pct-choice ${current.netCents < 0 ? '' : 'is-active'}" data-type="remaining">Remaining to give</button>
+            <button type="button" class="mz-pct-choice ${current.netCents < 0 ? 'is-active' : ''}" data-type="ahead">Already given ahead</button>
           </div>
         </div>
         <div class="mz-field">
-          <label for="ob-amount">Amount</label>
-          <div class="mz-amount-field"><span class="mz-dollar">$</span><input id="ob-amount" class="mz-input" type="text" inputmode="decimal" placeholder="0.00" autofocus></div>
+          <label for="ab-amount">Amount</label>
+          <div class="mz-amount-field"><span class="mz-dollar">$</span><input id="ab-amount" class="mz-input" type="text" inputmode="decimal" value="${(Math.abs(current.netCents) / 100).toFixed(2)}" autofocus></div>
         </div>
-        <div class="mz-field"><label for="ob-date">As of date</label><input id="ob-date" class="mz-input" type="date" value="${todayIso()}"></div>
-        <div class="mz-field"><label for="ob-note">Note (optional)</label><input id="ob-note" class="mz-input" type="text" maxlength="500"></div>
+        <div class="mz-calc-preview"><span id="ab-preview-label">No change needed</span><span id="ab-preview-amount"></span></div>
+        <div class="mz-field"><label for="ab-date">Adjustment date</label><input id="ab-date" class="mz-input" type="date" value="${todayIso()}"></div>
+        <div class="mz-field"><label for="ab-note">Note (optional)</label><input id="ab-note" class="mz-input" type="text" maxlength="500" placeholder="e.g. Correcting a typo, or a starting balance"></div>
         ${saveStateRow()}
-        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Opening Balance</button>
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Adjustment</button>
       </form>`, (el) => {
-      let type = 'remaining';
+      let type = current.netCents < 0 ? 'ahead' : 'remaining';
+      const amountInput = el.querySelector('#ab-amount');
+      const previewLabel = el.querySelector('#ab-preview-label');
+      const previewAmount = el.querySelector('#ab-preview-amount');
+      function computeDelta() {
+        const targetCents = (parseDollarsToCents(amountInput.value) || 0) * (type === 'remaining' ? 1 : -1);
+        return targetCents - current.netCents; // > 0 needs a "remaining" row, < 0 needs an "ahead" row, 0 needs nothing
+      }
+      function updatePreview() {
+        const delta = computeDelta();
+        if (delta === 0) { previewLabel.textContent = 'No change needed'; previewAmount.textContent = ''; return; }
+        previewLabel.textContent = delta > 0 ? 'Adds a "remaining" adjustment of' : 'Adds an "ahead" adjustment of';
+        previewAmount.textContent = money(Math.abs(delta));
+      }
       el.querySelectorAll('.mz-pct-choice').forEach((b) => b.addEventListener('click', () => {
         el.querySelectorAll('.mz-pct-choice').forEach((x) => x.classList.remove('is-active'));
-        b.classList.add('is-active'); type = b.dataset.type;
+        b.classList.add('is-active'); type = b.dataset.type; updatePreview();
       }));
+      amountInput.addEventListener('input', updatePreview);
+      updatePreview();
       async function submit() {
-        const cents = parseDollarsToCents(el.querySelector('#ob-amount').value);
-        if (cents == null || cents <= 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        const amountCents = parseDollarsToCents(amountInput.value);
+        if (amountCents == null || amountCents < 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        const delta = computeDelta();
+        if (delta === 0) { setSaveState(el, 'error', 'That already matches the current balance; nothing to save.'); return; }
         setSaveState(el, 'saving');
         try {
           await api('/api/opening', {
             method: 'POST', headers: { 'idempotency-key': uid() },
-            body: JSON.stringify({ sourceId, type, amount: cents / 100, date: el.querySelector('#ob-date').value, note: el.querySelector('#ob-note').value }),
+            body: JSON.stringify({
+              sourceId, type: delta > 0 ? 'remaining' : 'ahead', amount: Math.abs(delta) / 100,
+              date: el.querySelector('#ab-date').value, note: el.querySelector('#ab-note').value,
+            }),
           });
           await refreshState();
           setSaveState(el, 'ok');
@@ -1180,6 +1217,7 @@
     if (action === 'add-giving') { openAddGivingSheet(btn.dataset.source); return; }
     if (action === 'new-source') { openNewSourceSheet(); return; }
     if (action === 'edit-source') { openEditSourceSheet(btn.dataset.id); return; }
+    if (action === 'adjust-balance') { openAdjustBalanceSheet(btn.dataset.id); return; }
     if (action === 'unarchive-source') {
       await api(`/api/sources/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ archived: false }) });
       await refreshState(); render(); return;

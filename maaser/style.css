@@ -151,6 +151,13 @@ button { font-family: inherit; }
 .mz-source-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 0.5rem; margin-bottom: 0.85rem; }
 .mz-stat-label { font-size: 0.74rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.02em; }
 .mz-stat-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mz-stat-block { text-align: left; }
+.mz-stat-editable {
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer; font: inherit; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.mz-stat-editable:active { opacity: 0.7; }
+.mz-stat-editable .mz-stat-label span { font-size: 0.85em; opacity: 0.7; }
 .mz-source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .mz-source-actions .mz-btn { padding: 0.65rem 0.7rem; font-size: 0.92rem; min-height: 2.6rem; }
 .mz-source-edit { text-align: right; margin-top: 0.5rem; }
