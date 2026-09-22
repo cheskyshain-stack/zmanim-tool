@@ -259,6 +259,13 @@
              <code>worker/maaser-worker.js</code>, then set <code>MAASER_API</code> at the top
              of <code>maaser/app.js</code> to the deployed Worker's address.</p>
         </div>
+        <div class="mz-card">
+          <h2>Want to start now instead?</h2>
+          <p><a href="local.html" class="mz-btn mz-btn-primary mz-btn-block">Use the on-this-device version</a></p>
+          <p style="margin-top:0.6rem">Saves everything right in this browser, no server needed.
+             It won't sync across devices or survive clearing this browser's data, so back it up
+             from its own Settings once you've entered anything.</p>
+        </div>
       </div>`;
   }
 
@@ -615,7 +622,12 @@
     backdrop.className = 'mz-sheet-backdrop';
     backdrop.innerHTML = `<div class="mz-sheet">${html}</div>`;
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
-    document.body.appendChild(backdrop);
+    // Appended inside #root, not document.body: the root's click listener below is delegated
+    // (root.addEventListener, not document's), so a data-action button that lives only in a
+    // sheet - the (x) close button, Export CSV inside Settings - would otherwise sit outside
+    // that listener's subtree and never fire. position: fixed still renders it full-viewport
+    // regardless of this nesting.
+    root.appendChild(backdrop);
     document.body.style.overflow = 'hidden';
     if (onMount) onMount(backdrop);
     return backdrop;
@@ -1134,9 +1146,13 @@
         const res = await api('/api/trackers', { method: 'POST', headers: { 'idempotency-key': idemKey } });
         setView({ screen: 'created', token: res.token, recoveryCode: res.recoveryCode });
       } catch (err) {
-        showToast(err.message);
-        btn.disabled = false;
-        btn.textContent = 'Create My Tracker';
+        if (err.code === 'not_configured') {
+          setView({ screen: 'not-configured' });
+        } else {
+          showToast(err.message);
+          btn.disabled = false;
+          btn.textContent = 'Create My Tracker';
+        }
       } finally {
         creatingTracker = false;
       }

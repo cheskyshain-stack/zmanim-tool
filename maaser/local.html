@@ -1,0 +1,1150 @@
+<!doctype html>
+<!-- Maaser Tracker: On This Device.
+     A stand-alone fallback for use before worker/maaser-worker.js is deployed (or for anyone
+     who would rather not use a network-backed tracker at all). Everything - the layout, the
+     forms, the balance math - is copied from maaser/app.js and maaser/style.css; the only real
+     difference is the data layer at the top of the script, which reads and writes
+     localStorage directly instead of calling a Worker. See the notice at the very top of the
+     dashboard for what that trades away.
+
+     One file, nothing else to load: no fetch, no external stylesheet, no external script, no
+     absolute paths. Email it, put it on a USB stick, open it straight from Downloads on an
+     Android phone - it works the same way file:// or served over http(s). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maaser Tracker (This Device)</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f6f5f1">
+<style>
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #fbfaf7;
+  --ink: #1f2420;
+  --ink-soft: #5b6360;
+  --border: #e4e1d8;
+  --border-strong: #d3cfc2;
+  --accent: #2b6e5e;
+  --accent-dark: #1e4f43;
+  --accent-soft: #e4f0ec;
+  --ahead: #1e7d4b;
+  --ahead-soft: #e6f5ec;
+  --remaining: #92600a;
+  --remaining-soft: #fbf1de;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --radius-lg: 18px;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow-sm: 0 1px 3px rgba(30, 30, 20, 0.06), 0 1px 1px rgba(30, 30, 20, 0.05);
+  --shadow-md: 0 10px 30px rgba(30, 30, 20, 0.10);
+  --max: 30rem;
+  font-size: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181a; --surface: #1d2225; --surface-2: #20262a; --ink: #eef0ee; --ink-soft: #a8b0ac;
+    --border: #2c3336; --border-strong: #3a4245; --accent: #4fa88f; --accent-dark: #7ecdb6;
+    --accent-soft: #1c2f2b; --ahead: #4fbf82; --ahead-soft: #163425; --remaining: #e0a94a;
+    --remaining-soft: #332711; --danger: #e8776e; --danger-soft: #34201e;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.45; -webkit-text-size-adjust: 100%;
+}
+#root { min-height: 100vh; overflow-x: hidden; }
+h1, h2, h3 { margin: 0 0 0.35rem; font-weight: 700; letter-spacing: -0.01em; }
+p { margin: 0 0 0.7rem; color: var(--ink-soft); }
+button { font-family: inherit; }
+.mz-page { max-width: var(--max); margin: 0 auto; padding: 1.1rem 1rem 4rem; }
+.mz-center-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem 1rem; }
+.mz-topbar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1rem; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.mz-topbar h1 { font-size: 1.05rem; margin: 0; }
+.mz-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--ink); font-size: 1rem; font-weight: 600; padding: 0.85rem 1.2rem; cursor: pointer;
+  min-height: 3rem; text-decoration: none; transition: transform 0.05s ease, box-shadow 0.15s ease;
+}
+.mz-btn:active { transform: scale(0.98); }
+.mz-btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+.mz-btn-block { width: 100%; }
+.mz-btn-lg { padding: 1.05rem 1.3rem; font-size: 1.1rem; min-height: 3.4rem; border-radius: var(--radius-lg); }
+.mz-btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border-strong)); background: var(--surface); }
+.mz-btn:disabled { opacity: 0.55; cursor: default; }
+.mz-icon-btn {
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; border: 1px solid var(--border-strong);
+  background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink);
+}
+.mz-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin: 1rem 0; }
+.mz-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); padding: 1.1rem 1.15rem; margin-bottom: 0.9rem;
+}
+.mz-hero { text-align: center; padding: 1.6rem 1.2rem; }
+.mz-hero .mz-coin { font-size: 2.6rem; margin-bottom: 0.4rem; }
+.mz-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.8rem; }
+.mz-summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 0.9rem; box-shadow: var(--shadow-sm); }
+.mz-summary-label { font-size: 0.78rem; color: var(--ink-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
+.mz-summary-amount { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mz-summary-amount.is-ahead { color: var(--ahead); }
+.mz-summary-amount.is-remaining { color: var(--remaining); }
+.mz-balance-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  border-radius: var(--radius-lg); padding: 1rem 1.1rem; margin-bottom: 1rem; border: 1px solid var(--border);
+}
+.mz-balance-banner.is-ahead { background: var(--ahead-soft); border-color: color-mix(in srgb, var(--ahead) 30%, var(--border)); }
+.mz-balance-banner.is-remaining { background: var(--remaining-soft); border-color: color-mix(in srgb, var(--remaining) 30%, var(--border)); }
+.mz-balance-banner.is-even { background: var(--surface-2); }
+.mz-balance-label { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.15rem; }
+.mz-balance-amount { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mz-balance-amount.is-ahead { color: var(--ahead); }
+.mz-balance-amount.is-remaining { color: var(--remaining); }
+.mz-filter-row { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.2rem; margin-bottom: 0.8rem; -webkit-overflow-scrolling: touch; }
+.mz-pill {
+  flex: none; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; padding: 0.45rem 0.95rem; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+}
+.mz-pill.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mz-custom-range { display: none; gap: 0.5rem; margin: -0.3rem 0 0.8rem; }
+.mz-custom-range.is-open { display: grid; grid-template-columns: 1fr 1fr; }
+.mz-source-card { border-radius: var(--radius-lg); }
+.mz-source-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.7rem; }
+.mz-source-name { font-size: 1.08rem; font-weight: 700; }
+.mz-source-pct { font-size: 0.85rem; font-weight: 600; background: var(--accent-soft); color: var(--accent-dark); padding: 0.15rem 0.55rem; border-radius: 999px; }
+.mz-source-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 0.5rem; margin-bottom: 0.85rem; }
+.mz-stat-label { font-size: 0.74rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.02em; }
+.mz-stat-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mz-source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.mz-source-actions .mz-btn { padding: 0.65rem 0.7rem; font-size: 0.92rem; min-height: 2.6rem; }
+.mz-source-edit { text-align: right; margin-top: 0.5rem; }
+.mz-source-edit button { background: none; border: none; color: var(--ink-soft); font-size: 0.85rem; cursor: pointer; padding: 0.3rem; }
+.mz-archived-note { font-size: 0.82rem; color: var(--ink-soft); font-style: italic; }
+.mz-field { margin-bottom: 1rem; }
+.mz-field label { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 0.35rem; }
+.mz-field .mz-hint { font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.3rem; }
+.mz-input, .mz-select, textarea.mz-input {
+  width: 100%; border: 1.5px solid var(--border-strong); border-radius: var(--radius);
+  padding: 0.85rem 0.9rem; font-size: 1.05rem; background: var(--surface); color: var(--ink); font-family: inherit;
+}
+.mz-input:focus, .mz-select:focus, textarea.mz-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mz-amount-field { position: relative; }
+.mz-amount-field .mz-dollar { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); font-size: 1.05rem; color: var(--ink-soft); font-weight: 600; }
+.mz-amount-field .mz-input { padding-left: 1.9rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.mz-pct-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.mz-pct-choice {
+  flex: 1; min-width: 4rem; border: 1.5px solid var(--border-strong); background: var(--surface); border-radius: var(--radius);
+  padding: 0.7rem 0.5rem; text-align: center; font-weight: 700; cursor: pointer; color: var(--ink);
+}
+.mz-pct-choice.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); }
+.mz-calc-preview {
+  background: var(--accent-soft); border-radius: var(--radius); padding: 0.8rem 0.9rem; margin: 0.2rem 0 1rem;
+  display: flex; align-items: center; justify-content: space-between; font-weight: 700; color: var(--accent-dark);
+}
+.mz-split-row { display: grid; grid-template-columns: 1fr 6.5rem auto; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.mz-split-remove { background: none; border: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0.3rem; }
+.mz-split-total { font-size: 0.88rem; margin: 0.3rem 0 1rem; font-weight: 600; }
+.mz-split-total.is-bad { color: var(--danger); }
+.mz-split-total.is-good { color: var(--ahead); }
+.mz-save-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0; min-height: 1.4rem; font-size: 0.9rem; }
+.mz-save-row.is-error { color: var(--danger); }
+.mz-save-row.is-ok { color: var(--ahead); }
+.mz-spinner { width: 1rem; height: 1rem; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: mz-spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes mz-spin { to { transform: rotate(360deg); } }
+.mz-history-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; padding: 0.8rem 0; border-bottom: 1px solid var(--border); }
+.mz-history-row:last-child { border-bottom: none; }
+.mz-history-main { min-width: 0; }
+.mz-history-title { font-weight: 600; }
+.mz-history-sub { font-size: 0.82rem; color: var(--ink-soft); }
+.mz-history-amount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mz-history-amount.is-income { color: var(--accent-dark); }
+.mz-history-amount.is-giving { color: var(--ahead); }
+.mz-history-controls { display: flex; gap: 0.4rem; margin-top: 0.35rem; }
+.mz-history-controls button { background: none; border: none; color: var(--ink-soft); font-size: 0.8rem; cursor: pointer; padding: 0.15rem 0.3rem; text-decoration: underline; }
+.mz-history-tabs { display: flex; gap: 0.4rem; margin-bottom: 0.7rem; }
+.mz-notice { border-radius: var(--radius); padding: 0.85rem 0.95rem; margin-bottom: 0.9rem; font-size: 0.92rem; }
+.mz-notice-warn { background: var(--remaining-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--remaining) 30%, var(--border)); }
+.mz-notice-info { background: var(--accent-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); }
+.mz-notice-danger { background: var(--danger-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); }
+.mz-checkbox-row { display: flex; align-items: flex-start; gap: 0.6rem; margin: 1rem 0; }
+.mz-checkbox-row input { width: 1.3rem; height: 1.3rem; margin-top: 0.15rem; flex-shrink: 0; }
+.mz-sheet-backdrop { position: fixed; inset: 0; background: rgba(20, 20, 15, 0.45); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.mz-sheet {
+  background: var(--bg); width: 100%; max-width: var(--max); max-height: 92vh; overflow-y: auto;
+  border-radius: 22px 22px 0 0; padding: 1.1rem 1.1rem 2rem; box-shadow: var(--shadow-md);
+}
+@media (min-width: 560px) {
+  .mz-sheet-backdrop { align-items: center; }
+  .mz-sheet { border-radius: var(--radius-lg); max-height: 88vh; }
+}
+.mz-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; position: sticky; top: 0; background: var(--bg); padding-top: 0.2rem; }
+.mz-sheet-head h2 { font-size: 1.15rem; margin: 0; }
+.mz-empty { text-align: center; padding: 2.2rem 1rem; color: var(--ink-soft); }
+.mz-empty .mz-coin { font-size: 2rem; margin-bottom: 0.5rem; }
+.mz-back-link { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--ink-soft); text-decoration: none; font-size: 0.9rem; margin-bottom: 0.8rem; }
+.mz-section-title { font-size: 0.95rem; font-weight: 700; margin: 1.3rem 0 0.6rem; text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink-soft); }
+.mz-toast {
+  position: fixed; bottom: 1.2rem; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 0.65rem 1.1rem; border-radius: 999px; font-size: 0.88rem; font-weight: 600; box-shadow: var(--shadow-md); z-index: 60;
+}
+@media (max-width: 380px) { .mz-summary-amount { font-size: 1.15rem; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  'use strict';
+
+  const LOCAL_KEY = 'zmanim-maaser-local-v1';
+  const root = document.getElementById('root');
+
+  // ---- money / date helpers (identical to maaser/app.js) ----------------------------------
+
+  const money = (cents) => {
+    const sign = cents < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(cents));
+    const dollars = Math.floor(abs / 100);
+    const c = String(abs % 100).padStart(2, '0');
+    return `${sign}$${dollars.toLocaleString('en-US')}.${c}`;
+  };
+  function parseDollarsToCents(input) {
+    const s = String(input || '').trim().replace(/[$,]/g, '');
+    if (!s || !/^\d+(\.\d{1,2})?$/.test(s)) return null;
+    return Math.round(parseFloat(s) * 100);
+  }
+  const todayIso = () => new Date().toLocaleDateString('en-CA');
+  function periodRange(period, customFrom, customTo) {
+    const now = new Date();
+    if (period === 'all') return null;
+    if (period === 'month') return { from: new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA'), to: todayIso() };
+    if (period === 'year') return { from: new Date(now.getFullYear(), 0, 1).toLocaleDateString('en-CA'), to: todayIso() };
+    if (period === 'custom') return { from: customFrom || '0000-01-01', to: customTo || '9999-12-31' };
+    return null;
+  }
+  function inRange(dateStr, range) { return !range || (dateStr >= range.from && dateStr <= range.to); }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function formatDateLabel(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function uid() { return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`); }
+  function formatPercent(p) { return Number.isInteger(p) ? String(p) : p.toFixed(1).replace(/\.0$/, ''); }
+
+  // ---------------------------------------------------------------------------------------
+  // Data layer: everything below this block is the whole difference from maaser/app.js. No
+  // network, no token, no PIN checked on a server - this is one browser's own localStorage,
+  // read and written directly, with the same shapes (source_id, entry_date, amount_cents,
+  // maaser_cents, ...) the real Worker uses so every calculation and render function below
+  // is copied unchanged from maaser/app.js and cannot disagree with it about what a balance
+  // means.
+  // ---------------------------------------------------------------------------------------
+
+  class ApiError extends Error {
+    constructor(status, code, message) { super(message); this.status = status; this.code = code; }
+  }
+
+  function loadStore() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LOCAL_KEY));
+      if (raw && Array.isArray(raw.sources)) return raw;
+    } catch { /* corrupt or cleared storage: treated as no tracker yet, below */ }
+    return null;
+  }
+  function saveStore(store) {
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(store));
+      return true;
+    } catch {
+      return false; // storage full or disabled (private browsing) - the caller reports this as a save failure
+    }
+  }
+  function newStore() {
+    const now = Date.now();
+    return {
+      sources: [{ id: uid(), name: 'Salary', default_percent: 10, sort_order: 0, archived: false, updated_at: now }],
+      income: [], giving: [], allocations: [], opening: [],
+      pin: null, // { hash, salt } | null
+    };
+  }
+
+  // A PIN here gates the screen, nothing more: this whole file, including the hash, lives in
+  // one browser's storage, so anyone with access to that browser's devtools can read it
+  // regardless. It exists for "someone else picked up my phone", not for real protection -
+  // exactly the weight CLAUDE.md gives the admin's own four-digit PIN elsewhere in this
+  // project. SHA-256 via Web Crypto when it's available (file:// documents get it in Chrome);
+  // a plain non-cryptographic fallback otherwise, so the screen still works everywhere.
+  async function hashPin(pin) {
+    const text = 'maaser-local:' + pin;
+    if (window.crypto && window.crypto.subtle) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    let h = 0;
+    for (let i = 0; i < text.length; i++) { h = (Math.imul(31, h) + text.charCodeAt(i)) | 0; }
+    return 'fallback:' + h;
+  }
+
+  const idemSeen = new Set(); // in-memory only: covers a double-tap within this page load
+
+  async function api(path, opts = {}) {
+    const method = opts.method || 'GET';
+    const idemKey = (opts.headers && opts.headers['idempotency-key']) || null;
+    let body = {};
+    try { body = opts.body ? JSON.parse(opts.body) : {}; } catch { /* no body sent */ }
+
+    const store = loadStore();
+    if (!store) throw new ApiError(0, 'no_store', 'No tracker set up on this device yet.');
+    // Every call, not just /api/state, is refused until the PIN for this page load is
+    // unlocked - boot() and renderPinScreen() are the only ordinary way to reach that state,
+    // but a mutating call reaching here first (there isn't one in the UI below) would still
+    // be refused rather than silently allowed.
+    if (store.pin && !session.pinOk) {
+      throw new ApiError(401, session.pinWrong ? 'wrong_pin' : 'pin_required', session.pinWrong ? 'Wrong PIN.' : 'Enter the PIN for this tracker.');
+    }
+    if (path === '/api/state' && method === 'GET') {
+      return { sources: store.sources, income: store.income, giving: store.giving, allocations: store.allocations, opening: store.opening, pinEnabled: !!store.pin };
+    }
+
+    if (idemKey && idemSeen.has(idemKey)) return { ok: true, deduped: true };
+
+    const m = /^\/api\/(.+)$/.exec(path);
+    const parts = m ? m[1].split('/') : [];
+    const now = Date.now();
+    const findSource = (id) => store.sources.find((s) => s.id === id);
+
+    function fail(status, code, message) { throw new ApiError(status, code, message); }
+    function commit(result) {
+      if (!saveStore(store)) fail(0, 'storage_full', "Could not save: this device's storage is full or unavailable.");
+      if (idemKey) idemSeen.add(idemKey);
+      return result;
+    }
+
+    if (parts[0] === 'sources' && parts.length === 1 && method === 'POST') {
+      const name = String(body.name || '').trim().slice(0, 80);
+      if (!name) fail(400, 'invalid_input', 'Give the source a name.');
+      const id = uid();
+      store.sources.push({ id, name, default_percent: Number(body.defaultPercent) || 10, sort_order: store.sources.length, archived: false, updated_at: now });
+      return commit({ id });
+    }
+    if (parts[0] === 'sources' && parts.length === 2 && method === 'PATCH') {
+      const s = findSource(parts[1]);
+      if (!s) fail(404, 'not_found', 'That income source was not found.');
+      if (body.name != null) { const n = String(body.name).trim().slice(0, 80); if (!n) fail(400, 'invalid_input', 'Give the source a name.'); s.name = n; }
+      if (body.defaultPercent != null) s.default_percent = Number(body.defaultPercent);
+      if (body.archived != null) s.archived = !!body.archived;
+      return commit({ ok: true });
+    }
+    if (parts[0] === 'income' && parts.length === 1 && method === 'POST') {
+      if (!findSource(body.sourceId)) fail(404, 'not_found', 'That income source was not found.');
+      const amountCents = Math.round(Number(body.amount) * 100);
+      if (!(amountCents > 0)) fail(400, 'invalid_input', 'Amount must be greater than zero.');
+      const percent = Number(body.percent);
+      if (!(percent >= 0)) fail(400, 'invalid_input', 'Enter a valid percent.');
+      const id = uid();
+      store.income.push({
+        id, source_id: body.sourceId, amount_cents: amountCents, entry_date: body.date || todayIso(),
+        note: body.note ? String(body.note).trim().slice(0, 500) : null, percent, maaser_cents: Math.round(amountCents * percent / 100),
+      });
+      return commit({ id, maaserCents: store.income[store.income.length - 1].maaser_cents });
+    }
+    if (parts[0] === 'income' && parts.length === 2 && method === 'PATCH') {
+      const e = store.income.find((x) => x.id === parts[1]);
+      if (!e) fail(404, 'not_found', 'That income entry was not found.');
+      if (body.sourceId != null) { if (!findSource(body.sourceId)) fail(404, 'not_found', 'That income source was not found.'); e.source_id = body.sourceId; }
+      if (body.amount != null) e.amount_cents = Math.round(Number(body.amount) * 100);
+      if (body.date != null) e.entry_date = body.date;
+      if (body.percent != null) e.percent = Number(body.percent);
+      if (body.note !== undefined) e.note = body.note ? String(body.note).trim().slice(0, 500) : null;
+      e.maaser_cents = Math.round(e.amount_cents * e.percent / 100);
+      return commit({ ok: true, maaserCents: e.maaser_cents });
+    }
+    if (parts[0] === 'income' && parts.length === 2 && method === 'DELETE') {
+      store.income = store.income.filter((x) => x.id !== parts[1]);
+      return commit({ ok: true });
+    }
+    if (parts[0] === 'giving' && parts.length === 1 && method === 'POST') {
+      const totalCents = Math.round(Number(body.amount) * 100);
+      if (!(totalCents > 0)) fail(400, 'invalid_input', 'Amount must be greater than zero.');
+      const allocations = Array.isArray(body.allocations) && body.allocations.length ? body.allocations : [{ sourceId: body.sourceId, amount: body.amount }];
+      let sum = 0;
+      for (const a of allocations) { if (!findSource(a.sourceId)) fail(404, 'not_found', 'That income source was not found.'); sum += Math.round(Number(a.amount) * 100); }
+      if (sum !== totalCents) fail(400, 'allocations_mismatch', 'The split amounts must add up to the total donation.');
+      const givingId = uid();
+      store.giving.push({ id: givingId, amount_cents: totalCents, entry_date: body.date || todayIso(), recipient: body.recipient ? String(body.recipient).trim().slice(0, 120) : null, note: body.note ? String(body.note).trim().slice(0, 500) : null });
+      for (const a of allocations) store.allocations.push({ id: uid(), giving_id: givingId, source_id: a.sourceId, amount_cents: Math.round(Number(a.amount) * 100) });
+      return commit({ id: givingId });
+    }
+    if (parts[0] === 'giving' && parts.length === 2 && method === 'DELETE') {
+      store.allocations = store.allocations.filter((a) => a.giving_id !== parts[1]);
+      store.giving = store.giving.filter((g) => g.id !== parts[1]);
+      return commit({ ok: true });
+    }
+    if (parts[0] === 'opening' && parts.length === 1 && method === 'POST') {
+      if (!findSource(body.sourceId)) fail(404, 'not_found', 'That income source was not found.');
+      const amountCents = Math.round(Number(body.amount) * 100);
+      if (!(amountCents > 0)) fail(400, 'invalid_input', 'Amount must be greater than zero.');
+      const type = body.type === 'ahead' ? 'ahead' : 'remaining';
+      const id = uid();
+      store.opening.push({ id, source_id: body.sourceId, balance_type: type, amount_cents: amountCents, entry_date: body.date || todayIso(), note: body.note ? String(body.note).trim().slice(0, 500) : null });
+      return commit({ id });
+    }
+    if (parts[0] === 'settings' && parts[1] === 'pin' && method === 'POST') {
+      if (body.pin === null || body.pin === '') { store.pin = null; session.pinOk = true; return commit({ ok: true, pinEnabled: false }); }
+      if (!/^\d{4,10}$/.test(String(body.pin))) fail(400, 'invalid_input', 'PIN must be 4 to 10 digits.');
+      store.pin = { hash: await hashPin(body.pin) };
+      session.pinOk = true;
+      return commit({ ok: true, pinEnabled: true });
+    }
+    fail(404, 'not_found', 'Unknown action.');
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Calculations - identical to maaser/app.js
+  // ---------------------------------------------------------------------------------------
+
+  function sourceTotals(data, sourceId, range) {
+    const income = data.income.filter((e) => e.source_id === sourceId && inRange(e.entry_date, range));
+    const openings = data.opening.filter((o) => o.source_id === sourceId && inRange(o.entry_date, range));
+    const allocs = data.allocations.filter((a) => a.source_id === sourceId);
+    const givingById = new Map(data.giving.map((g) => [g.id, g]));
+    const givenAllocs = allocs.filter((a) => { const g = givingById.get(a.giving_id); return g && inRange(g.entry_date, range); });
+    const incomeCents = income.reduce((s, e) => s + e.amount_cents, 0);
+    const maaserCents = income.reduce((s, e) => s + e.maaser_cents, 0);
+    const givenCents = givenAllocs.reduce((s, a) => s + a.amount_cents, 0);
+    const openingRemaining = openings.filter((o) => o.balance_type === 'remaining').reduce((s, o) => s + o.amount_cents, 0);
+    const openingAhead = openings.filter((o) => o.balance_type === 'ahead').reduce((s, o) => s + o.amount_cents, 0);
+    const goalCents = maaserCents + openingRemaining;
+    const givenTotalCents = givenCents + openingAhead;
+    const netCents = goalCents - givenTotalCents;
+    return { incomeCents, maaserCents, givenCents, goalCents, givenTotalCents, netCents, openingRemaining, openingAhead };
+  }
+  function overallTotals(data, range) {
+    const totals = data.sources.map((s) => sourceTotals(data, s.id, range));
+    return totals.reduce((acc, t) => ({
+      incomeCents: acc.incomeCents + t.incomeCents, goalCents: acc.goalCents + t.goalCents,
+      givenTotalCents: acc.givenTotalCents + t.givenTotalCents, netCents: acc.netCents + t.netCents,
+    }), { incomeCents: 0, goalCents: 0, givenTotalCents: 0, netCents: 0 });
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // App state
+  // ---------------------------------------------------------------------------------------
+
+  let view = { screen: 'loading' };
+  let data = null;
+  let period = 'month';
+  let customFrom = todayIso();
+  let customTo = todayIso();
+  let historyTab = 'all';
+  let session = { pinOk: false, pinWrong: false };
+
+  function setView(next) { view = next; render(); }
+  function showToast(message) {
+    document.querySelectorAll('.mz-toast').forEach((n) => n.remove());
+    const el = document.createElement('div');
+    el.className = 'mz-toast'; el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+  async function refreshState() { data = await api('/api/state'); }
+
+  // ---------------------------------------------------------------------------------------
+  // Rendering: screens
+  // ---------------------------------------------------------------------------------------
+
+  function render() {
+    if (view.screen === 'loading') return renderLoading();
+    if (view.screen === 'welcome') return renderWelcome();
+    if (view.screen === 'pin') return renderPinScreen();
+    if (view.screen === 'dashboard') return renderDashboard();
+  }
+  function renderLoading() { root.innerHTML = `<div class="mz-center-page"><div class="mz-spinner" style="width:2rem;height:2rem;"></div></div>`; }
+
+  function renderWelcome() {
+    root.innerHTML = `
+      <div class="mz-page">
+        <div class="mz-card mz-hero">
+          <div class="mz-coin" aria-hidden="true">🪙</div>
+          <h1>Maaser Tracker (This Device)</h1>
+          <p>Track income and maaser giving right here, saved only in this browser. No
+             account, no link to lose, nothing sent anywhere.</p>
+          <button class="mz-btn mz-btn-primary mz-btn-lg mz-btn-block" data-action="start-local">Start Tracking</button>
+        </div>
+        <div class="mz-notice mz-notice-warn">
+          <strong>This copy lives only in this browser, on this device.</strong>
+          Clearing your browsing data, uninstalling the browser, or switching phones will lose
+          it, since there is no server and no link to reopen it with. Use <strong>Settings →
+          Backup</strong> once you've entered anything, and export a fresh backup before
+          clearing site data or changing phones.
+        </div>
+      </div>`;
+  }
+
+  function renderPinScreen() {
+    root.innerHTML = `
+      <div class="mz-page">
+        <div class="mz-card">
+          <h1>Enter PIN</h1>
+          <p>This device's tracker is protected with a PIN.</p>
+          ${session.pinWrong ? '<div class="mz-notice mz-notice-danger">Wrong PIN. Try again.</div>' : ''}
+          <form data-form="pin">
+            <div class="mz-field">
+              <label for="pin-input">PIN</label>
+              <input id="pin-input" class="mz-input" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus>
+            </div>
+            <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Unlock</button>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  // ---- dashboard (identical to maaser/app.js) ----------------------------------------------
+
+  function renderDashboard() {
+    const range = periodRange(period, customFrom, customTo);
+    const totals = overallTotals(data, range);
+    const allTime = overallTotals(data, null);
+    const active = data.sources.filter((s) => !s.archived);
+    const archived = data.sources.filter((s) => s.archived);
+
+    root.innerHTML = `
+      <header class="mz-topbar">
+        <h1>Maaser Tracker (This Device)</h1>
+        <button class="mz-icon-btn" data-action="open-settings" aria-label="Settings">⚙️</button>
+      </header>
+      <div class="mz-page">
+        <div class="mz-notice mz-notice-info" style="margin-top:0.9rem">
+          Saved on this device only. See Settings → Backup to protect this data.
+        </div>
+
+        <div class="mz-filter-row" role="tablist" aria-label="Time period">
+          ${['month', 'year', 'all', 'custom'].map((p) => `
+            <button class="mz-pill ${period === p ? 'is-active' : ''}" data-action="set-period" data-period="${p}">
+              ${{ month: 'This Month', year: 'This Year', all: 'All Time', custom: 'Custom' }[p]}
+            </button>`).join('')}
+        </div>
+        <div class="mz-custom-range ${period === 'custom' ? 'is-open' : ''}">
+          <input type="date" class="mz-input" id="custom-from" value="${customFrom}">
+          <input type="date" class="mz-input" id="custom-to" value="${customTo}">
+        </div>
+
+        <div class="mz-summary-grid">
+          <div class="mz-summary-card"><div class="mz-summary-label">Total Income</div><div class="mz-summary-amount">${money(totals.incomeCents)}</div></div>
+          <div class="mz-summary-card"><div class="mz-summary-label">Maaser Goal</div><div class="mz-summary-amount">${money(totals.goalCents)}</div></div>
+          <div class="mz-summary-card"><div class="mz-summary-label">Total Given</div><div class="mz-summary-amount">${money(totals.givenTotalCents)}</div></div>
+          <div class="mz-summary-card">
+            <div class="mz-summary-label">${totals.netCents >= 0 ? 'Remaining to Give' : 'Ahead'}</div>
+            <div class="mz-summary-amount ${totals.netCents >= 0 ? 'is-remaining' : 'is-ahead'}">${money(Math.abs(totals.netCents))}</div>
+          </div>
+        </div>
+
+        <div class="mz-balance-banner ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : 'is-even'}">
+          <div>
+            <div class="mz-balance-label">All Time Balance</div>
+            <div style="font-size:0.85rem;color:var(--ink-soft)">Every entry ever recorded, regardless of the filter above.</div>
+          </div>
+          <div class="mz-balance-amount ${allTime.netCents > 0 ? 'is-remaining' : allTime.netCents < 0 ? 'is-ahead' : ''}">
+            ${allTime.netCents === 0 ? 'Even' : allTime.netCents > 0 ? `${money(allTime.netCents)} remaining` : `${money(-allTime.netCents)} ahead`}
+          </div>
+        </div>
+
+        <div class="mz-actions-row">
+          <button class="mz-btn mz-btn-primary" data-action="add-income">+ Add Income</button>
+          <button class="mz-btn mz-btn-primary" style="background:var(--ahead);border-color:var(--ahead)" data-action="add-giving">+ Add Giving</button>
+        </div>
+
+        <div class="mz-section-title">Income Sources</div>
+        ${active.map((s) => sourceCardHtml(s, range)).join('') || `<div class="mz-empty"><div class="mz-coin">🪙</div>No income sources yet.</div>`}
+        <button class="mz-btn mz-btn-block" data-action="new-source" style="margin-bottom:1.2rem">+ Add Income Source</button>
+
+        ${archived.length ? `<div class="mz-section-title">Archived Sources</div>${archived.map((s) => sourceCardHtml(s, range, true)).join('')}` : ''}
+
+        <div class="mz-section-title">History</div>
+        ${historyHtml(range)}
+
+        <div class="mz-actions-row" style="grid-template-columns:1fr">
+          <button class="mz-btn mz-btn-block" data-action="export-csv">Export CSV</button>
+        </div>
+      </div>`;
+
+    document.getElementById('custom-from')?.addEventListener('change', (e) => { customFrom = e.target.value; render(); });
+    document.getElementById('custom-to')?.addEventListener('change', (e) => { customTo = e.target.value; render(); });
+  }
+
+  function sourceCardHtml(source, range, archived) {
+    const t = sourceTotals(data, source.id, range);
+    const statusLabel = t.netCents >= 0 ? 'Remaining to give' : 'Ahead';
+    const statusClass = t.netCents >= 0 ? 'is-remaining' : 'is-ahead';
+    return `
+      <div class="mz-card mz-source-card">
+        <div class="mz-source-head">
+          <div class="mz-source-name">${escapeHtml(source.name)}</div>
+          <div class="mz-source-pct">${formatPercent(source.default_percent)}%</div>
+        </div>
+        <div class="mz-source-stats">
+          <div><div class="mz-stat-label">Total Income</div><div class="mz-stat-value">${money(t.incomeCents)}</div></div>
+          <div><div class="mz-stat-label">Maaser Goal</div><div class="mz-stat-value">${money(t.goalCents)}</div></div>
+          <div><div class="mz-stat-label">Total Given</div><div class="mz-stat-value">${money(t.givenTotalCents)}</div></div>
+          <div><div class="mz-stat-label">${statusLabel}</div><div class="mz-stat-value ${statusClass}">${money(Math.abs(t.netCents))}</div></div>
+        </div>
+        ${archived ? `<p class="mz-archived-note">Archived. Its records and balances are kept.</p>
+          <button class="mz-btn mz-btn-block" data-action="unarchive-source" data-id="${source.id}">Unarchive</button>` : `
+        <div class="mz-source-actions">
+          <button class="mz-btn" data-action="add-income" data-source="${source.id}">+ Income</button>
+          <button class="mz-btn" data-action="add-giving" data-source="${source.id}">+ Giving</button>
+        </div>
+        <div class="mz-source-edit"><button data-action="edit-source" data-id="${source.id}">Edit source</button></div>`}
+      </div>`;
+  }
+
+  function historyHtml(range) {
+    const incomeRows = data.income.filter((e) => inRange(e.entry_date, range)).map((e) => ({ kind: 'income', e }));
+    const givingRows = data.giving.filter((g) => inRange(g.entry_date, range)).map((g) => ({ kind: 'giving', g }));
+    let rows = [...incomeRows, ...givingRows];
+    if (historyTab !== 'all') rows = rows.filter((r) => r.kind === historyTab);
+    rows.sort((a, b) => (b.kind === 'income' ? b.e.entry_date : b.g.entry_date).localeCompare(a.kind === 'income' ? a.e.entry_date : a.g.entry_date));
+    const sourceName = (id) => data.sources.find((s) => s.id === id)?.name || 'Unknown source';
+    const tabs = `<div class="mz-history-tabs">${['all', 'income', 'giving'].map((t) => `<button class="mz-pill ${historyTab === t ? 'is-active' : ''}" data-action="set-history-tab" data-tab="${t}">${t === 'all' ? 'All' : t === 'income' ? 'Income' : 'Giving'}</button>`).join('')}</div>`;
+    if (!rows.length) return tabs + `<div class="mz-empty">No entries in this range yet.</div>`;
+    const list = rows.slice(0, 60).map((r) => {
+      if (r.kind === 'income') {
+        const e = r.e;
+        return `<div class="mz-history-row">
+          <div class="mz-history-main">
+            <div class="mz-history-title">${escapeHtml(sourceName(e.source_id))}</div>
+            <div class="mz-history-sub">${formatDateLabel(e.entry_date)} &middot; income &middot; ${formatPercent(e.percent)}% = ${money(e.maaser_cents)} maaser${e.note ? ' &middot; ' + escapeHtml(e.note) : ''}</div>
+            <div class="mz-history-controls"><button data-action="edit-income" data-id="${e.id}">Edit</button><button data-action="delete-income" data-id="${e.id}">Delete</button></div>
+          </div>
+          <div class="mz-history-amount is-income">+${money(e.amount_cents)}</div>
+        </div>`;
+      }
+      const g = r.g;
+      const allocs = data.allocations.filter((a) => a.giving_id === g.id);
+      const splitLabel = allocs.length > 1 ? `split across ${allocs.length} sources` : sourceName(allocs[0]?.source_id);
+      return `<div class="mz-history-row">
+        <div class="mz-history-main">
+          <div class="mz-history-title">${escapeHtml(splitLabel)}</div>
+          <div class="mz-history-sub">${formatDateLabel(g.entry_date)} &middot; giving${g.recipient ? ' to ' + escapeHtml(g.recipient) : ''}${g.note ? ' &middot; ' + escapeHtml(g.note) : ''}</div>
+          <div class="mz-history-controls"><button data-action="delete-giving" data-id="${g.id}">Delete</button></div>
+        </div>
+        <div class="mz-history-amount is-giving">${money(g.amount_cents)}</div>
+      </div>`;
+    }).join('');
+    return tabs + `<div class="mz-card" style="padding:0.2rem 1.1rem">${list}</div>`;
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Sheets - identical to maaser/app.js (add income, add giving, new source, edit source,
+  // opening balance, edit income); only openSettingsSheet differs (backup instead of link).
+  // ---------------------------------------------------------------------------------------
+
+  function openSheet(html, onMount) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'mz-sheet-backdrop';
+    backdrop.innerHTML = `<div class="mz-sheet">${html}</div>`;
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeSheet(); });
+    // Inside #root, not document.body: see the matching comment in maaser/app.js's
+    // openSheet - the click listener below is delegated from #root, so a sheet appended
+    // outside it would silently lose its (x) close button and any other data-action button
+    // that lives only inside a sheet.
+    root.appendChild(backdrop);
+    document.body.style.overflow = 'hidden';
+    if (onMount) onMount(backdrop);
+    return backdrop;
+  }
+  function closeSheet() { document.querySelectorAll('.mz-sheet-backdrop').forEach((n) => n.remove()); document.body.style.overflow = ''; }
+  function saveStateRow() { return `<div class="mz-save-row" data-save-row></div>`; }
+  function setSaveState(container, state, message) {
+    const row = container.querySelector('[data-save-row]');
+    if (!row) return;
+    row.className = 'mz-save-row' + (state === 'error' ? ' is-error' : state === 'ok' ? ' is-ok' : '');
+    if (state === 'saving') row.innerHTML = `<span class="mz-spinner"></span> Saving…`;
+    else if (state === 'ok') row.innerHTML = `Saved.`;
+    else if (state === 'error') row.innerHTML = `${escapeHtml(message || 'Failed to save.')} <button class="mz-btn" data-retry style="min-height:auto;padding:0.3rem 0.7rem;margin-left:0.4rem">Retry</button>`;
+    else row.innerHTML = '';
+  }
+
+  function openAddIncomeSheet(preselectSourceId) {
+    const sources = data.sources.filter((s) => !s.archived);
+    if (!sources.length) { showToast('Add an income source first.'); return; }
+    const defaultSource = sources.find((s) => s.id === preselectSourceId) || sources[0];
+    const idemKey = uid();
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Add Income</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="add-income">
+        <div class="mz-field"><label for="inc-source">Income source</label>
+          <select id="inc-source" class="mz-select">${sources.map((s) => `<option value="${s.id}" data-pct="${s.default_percent}" ${s.id === defaultSource.id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select>
+        </div>
+        <div class="mz-field"><label for="inc-amount">Amount earned</label>
+          <div class="mz-amount-field"><span class="mz-dollar">$</span><input id="inc-amount" class="mz-input" type="text" inputmode="decimal" placeholder="0.00" autofocus required></div>
+        </div>
+        <div class="mz-field"><label>Maaser percent</label>
+          <div class="mz-pct-row" id="inc-pct-row">
+            ${[10, 20].map((p) => `<button type="button" class="mz-pct-choice" data-pct="${p}">${p}%</button>`).join('')}
+            <button type="button" class="mz-pct-choice" data-pct="custom">Custom</button>
+          </div>
+          <input id="inc-pct-custom" class="mz-input" style="margin-top:0.5rem;display:none" type="text" inputmode="decimal" placeholder="Percent">
+        </div>
+        <div class="mz-calc-preview"><span>Maaser on this income</span><span id="inc-preview">$0.00</span></div>
+        <div class="mz-field"><label for="inc-date">Date</label><input id="inc-date" class="mz-input" type="date" value="${todayIso()}"></div>
+        <div class="mz-field"><label for="inc-note">Note (optional)</label><input id="inc-note" class="mz-input" type="text" maxlength="500"></div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Income</button>
+      </form>`, (el) => {
+      const sourceSel = el.querySelector('#inc-source');
+      const amountInput = el.querySelector('#inc-amount');
+      const pctRow = el.querySelector('#inc-pct-row');
+      const pctCustom = el.querySelector('#inc-pct-custom');
+      const preview = el.querySelector('#inc-preview');
+      let selectedPct = defaultSource.default_percent;
+      function markPct() { pctRow.querySelectorAll('.mz-pct-choice').forEach((b) => b.classList.toggle('is-active', b.dataset.pct == selectedPct || (b.dataset.pct === 'custom' && ![10, 20].includes(selectedPct)))); }
+      function updatePreview() { const cents = parseDollarsToCents(amountInput.value) || 0; preview.textContent = money(Math.round(cents * selectedPct / 100)); }
+      pctRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('.mz-pct-choice'); if (!btn) return;
+        if (btn.dataset.pct === 'custom') { pctCustom.style.display = 'block'; pctCustom.focus(); selectedPct = parseFloat(pctCustom.value) || 0; }
+        else { pctCustom.style.display = 'none'; selectedPct = Number(btn.dataset.pct); }
+        markPct(); updatePreview();
+      });
+      pctCustom.addEventListener('input', () => { selectedPct = parseFloat(pctCustom.value) || 0; updatePreview(); });
+      sourceSel.addEventListener('change', () => { selectedPct = Number(sourceSel.selectedOptions[0].dataset.pct); pctCustom.style.display = 'none'; markPct(); updatePreview(); });
+      amountInput.addEventListener('input', updatePreview);
+      markPct(); updatePreview();
+      async function submit() {
+        const amountCents = parseDollarsToCents(amountInput.value);
+        if (amountCents == null || amountCents <= 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        if (!selectedPct || selectedPct <= 0) { setSaveState(el, 'error', 'Enter a valid percent.'); return; }
+        setSaveState(el, 'saving');
+        try {
+          await api('/api/income', { method: 'POST', headers: { 'idempotency-key': idemKey }, body: JSON.stringify({ sourceId: sourceSel.value, amount: amountCents / 100, date: el.querySelector('#inc-date').value || todayIso(), percent: selectedPct, note: el.querySelector('#inc-note').value }) });
+          await refreshState(); setSaveState(el, 'ok'); showToast('Income saved.'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+    });
+  }
+
+  function openAddGivingSheet(preselectSourceId) {
+    const sources = data.sources.filter((s) => !s.archived);
+    if (!sources.length) { showToast('Add an income source first.'); return; }
+    const idemKey = uid();
+    let rows = [{ sourceId: preselectSourceId || sources[0].id, amount: '' }];
+    let splitMode = false;
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Add Giving</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="add-giving">
+        <div class="mz-field"><label for="give-amount">Amount given</label>
+          <div class="mz-amount-field"><span class="mz-dollar">$</span><input id="give-amount" class="mz-input" type="text" inputmode="decimal" placeholder="0.00" autofocus required></div>
+        </div>
+        <div class="mz-field"><button type="button" class="mz-btn" id="split-toggle">Split across sources (advanced)</button></div>
+        <div id="split-area"></div>
+        <div class="mz-field" id="single-source-field"><label for="give-source">Income source</label>
+          <select id="give-source" class="mz-select">${sources.map((s) => `<option value="${s.id}" ${s.id === rows[0].sourceId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select>
+        </div>
+        <div class="mz-field"><label for="give-date">Date</label><input id="give-date" class="mz-input" type="date" value="${todayIso()}"></div>
+        <div class="mz-field"><label for="give-recipient">Recipient (optional)</label><input id="give-recipient" class="mz-input" type="text" maxlength="120"></div>
+        <div class="mz-field"><label for="give-note">Note (optional)</label><input id="give-note" class="mz-input" type="text" maxlength="500"></div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit" style="background:var(--ahead);border-color:var(--ahead)">Save Giving</button>
+      </form>`, (el) => {
+      const amountInput = el.querySelector('#give-amount');
+      const splitToggle = el.querySelector('#split-toggle');
+      const splitArea = el.querySelector('#split-area');
+      const singleField = el.querySelector('#single-source-field');
+      function renderSplit() {
+        if (!splitMode) { splitArea.innerHTML = ''; singleField.style.display = ''; return; }
+        singleField.style.display = 'none';
+        const total = parseDollarsToCents(amountInput.value) || 0;
+        const sum = rows.reduce((s, r) => s + (parseDollarsToCents(r.amount) || 0), 0);
+        splitArea.innerHTML = `
+          ${rows.map((r, i) => `
+            <div class="mz-split-row">
+              <select class="mz-select" data-split-source="${i}">${sources.map((s) => `<option value="${s.id}" ${s.id === r.sourceId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select>
+              <div class="mz-amount-field"><span class="mz-dollar">$</span><input class="mz-input" type="text" inputmode="decimal" placeholder="0.00" data-split-amount="${i}" value="${escapeHtml(r.amount)}"></div>
+              <button type="button" class="mz-split-remove" data-split-remove="${i}" aria-label="Remove">&times;</button>
+            </div>`).join('')}
+          <button type="button" class="mz-btn" id="split-add-row">+ Add another source</button>
+          <div class="mz-split-total ${sum === total && total > 0 ? 'is-good' : 'is-bad'}">Split total: ${money(sum)} of ${money(total)} ${sum === total && total > 0 ? '(matches)' : '(must match the amount above)'}</div>`;
+      }
+      splitToggle.addEventListener('click', () => {
+        splitMode = !splitMode;
+        splitToggle.textContent = splitMode ? 'Use a single source instead' : 'Split across sources (advanced)';
+        if (splitMode && rows.length < 2) rows.push({ sourceId: sources[Math.min(1, sources.length - 1)].id, amount: '' });
+        renderSplit();
+      });
+      splitArea.addEventListener('input', (e) => {
+        const si = e.target.dataset.splitAmount;
+        if (si != null) {
+          rows[si].amount = e.target.value; renderSplit();
+          const el2 = splitArea.querySelector(`[data-split-amount="${si}"]`);
+          if (el2 && document.activeElement !== el2) { const pos = el2.selectionStart; el2.focus(); try { el2.setSelectionRange(pos, pos); } catch {} }
+        }
+      });
+      splitArea.addEventListener('change', (e) => { const si = e.target.dataset.splitSource; if (si != null) rows[si].sourceId = e.target.value; });
+      splitArea.addEventListener('click', (e) => {
+        if (e.target.id === 'split-add-row') { rows.push({ sourceId: sources[0].id, amount: '' }); renderSplit(); }
+        const ri = e.target.dataset.splitRemove;
+        if (ri != null && rows.length > 1) { rows.splice(ri, 1); renderSplit(); }
+      });
+      amountInput.addEventListener('input', () => { if (splitMode) renderSplit(); });
+      async function submit() {
+        const totalCents = parseDollarsToCents(amountInput.value);
+        if (totalCents == null || totalCents <= 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        let allocations;
+        if (splitMode) {
+          allocations = rows.map((r) => ({ sourceId: r.sourceId, amount: (parseDollarsToCents(r.amount) || 0) / 100 }));
+          const sum = allocations.reduce((s, a) => s + Math.round(a.amount * 100), 0);
+          if (sum !== totalCents) { setSaveState(el, 'error', 'The split amounts must add up to the total.'); return; }
+        }
+        setSaveState(el, 'saving');
+        try {
+          await api('/api/giving', { method: 'POST', headers: { 'idempotency-key': idemKey }, body: JSON.stringify({ amount: totalCents / 100, date: el.querySelector('#give-date').value || todayIso(), recipient: el.querySelector('#give-recipient').value, note: el.querySelector('#give-note').value, ...(splitMode ? { allocations } : { sourceId: el.querySelector('#give-source').value }) }) });
+          await refreshState(); setSaveState(el, 'ok'); showToast('Giving saved.'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+    });
+  }
+
+  function openNewSourceSheet() {
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Add Income Source</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="new-source">
+        <div class="mz-field"><label for="src-name">Name</label><input id="src-name" class="mz-input" type="text" maxlength="80" placeholder="e.g. Business" autofocus required></div>
+        <div class="mz-field"><label>Default maaser percent</label>
+          <div class="mz-pct-row" id="src-pct-row">
+            ${[10, 20].map((p) => `<button type="button" class="mz-pct-choice ${p === 10 ? 'is-active' : ''}" data-pct="${p}">${p}%</button>`).join('')}
+            <button type="button" class="mz-pct-choice" data-pct="custom">Custom</button>
+          </div>
+          <input id="src-pct-custom" class="mz-input" style="margin-top:0.5rem;display:none" type="text" inputmode="decimal" placeholder="Percent">
+        </div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Add Source</button>
+      </form>`, (el) => {
+      let pct = 10;
+      const pctRow = el.querySelector('#src-pct-row');
+      const pctCustom = el.querySelector('#src-pct-custom');
+      pctRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('.mz-pct-choice'); if (!btn) return;
+        pctRow.querySelectorAll('.mz-pct-choice').forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        if (btn.dataset.pct === 'custom') { pctCustom.style.display = 'block'; pctCustom.focus(); pct = parseFloat(pctCustom.value) || 0; }
+        else { pctCustom.style.display = 'none'; pct = Number(btn.dataset.pct); }
+      });
+      pctCustom.addEventListener('input', () => { pct = parseFloat(pctCustom.value) || 0; });
+      async function submit() {
+        const name = el.querySelector('#src-name').value.trim();
+        if (!name) { setSaveState(el, 'error', 'Give the source a name.'); return; }
+        setSaveState(el, 'saving');
+        try {
+          await api('/api/sources', { method: 'POST', headers: { 'idempotency-key': uid() }, body: JSON.stringify({ name, defaultPercent: pct }) });
+          await refreshState(); setSaveState(el, 'ok'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+    });
+  }
+
+  function openEditSourceSheet(sourceId) {
+    const source = data.sources.find((s) => s.id === sourceId);
+    if (!source) return;
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Edit ${escapeHtml(source.name)}</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="edit-source">
+        <div class="mz-field"><label for="es-name">Name</label><input id="es-name" class="mz-input" type="text" maxlength="80" value="${escapeHtml(source.name)}"></div>
+        <div class="mz-field"><label for="es-pct">Default maaser percent</label><input id="es-pct" class="mz-input" type="text" inputmode="decimal" value="${formatPercent(source.default_percent)}">
+          <div class="mz-hint">Changes apply to future income only. Past entries keep the percent they were saved with.</div>
+        </div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Changes</button>
+      </form>
+      <div class="mz-section-title">Opening Balance</div>
+      <p style="margin-top:-0.4rem">A one-time starting point for this source, from before this tracker existed. Not income and not a donation.</p>
+      <button class="mz-btn mz-btn-block" id="open-opening-btn" type="button">Set Opening Balance</button>
+      <div class="mz-section-title">Archive</div>
+      <p style="margin-top:-0.4rem">Archiving hides this source from the main list. Its records and balances are kept and it can be unarchived any time.</p>
+      <button class="mz-btn mz-btn-block mz-btn-danger" id="archive-btn" type="button">Archive This Source</button>`, (el) => {
+      async function submit() {
+        const name = el.querySelector('#es-name').value.trim();
+        const pct = parseFloat(el.querySelector('#es-pct').value);
+        if (!name) { setSaveState(el, 'error', 'Give the source a name.'); return; }
+        if (!Number.isFinite(pct) || pct < 0) { setSaveState(el, 'error', 'Enter a valid percent.'); return; }
+        setSaveState(el, 'saving');
+        try {
+          await api(`/api/sources/${sourceId}`, { method: 'PATCH', body: JSON.stringify({ name, defaultPercent: pct }) });
+          await refreshState(); setSaveState(el, 'ok'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+      el.querySelector('#open-opening-btn').addEventListener('click', () => { closeSheet(); openOpeningBalanceSheet(sourceId); });
+      el.querySelector('#archive-btn').addEventListener('click', async () => {
+        if (!confirm(`Archive ${source.name}? Its records and balances will be kept.`)) return;
+        await api(`/api/sources/${sourceId}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) });
+        await refreshState(); closeSheet(); render();
+      });
+    });
+  }
+
+  function openOpeningBalanceSheet(sourceId) {
+    const source = data.sources.find((s) => s.id === sourceId);
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Opening Balance</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="opening">
+        <p>What ${escapeHtml(source.name)}'s balance was before this tracker started, as of a date you choose.</p>
+        <div class="mz-field"><label>This amount was</label>
+          <div class="mz-pct-row">
+            <button type="button" class="mz-pct-choice is-active" data-type="remaining">Remaining to give</button>
+            <button type="button" class="mz-pct-choice" data-type="ahead">Already given ahead</button>
+          </div>
+        </div>
+        <div class="mz-field"><label for="ob-amount">Amount</label><div class="mz-amount-field"><span class="mz-dollar">$</span><input id="ob-amount" class="mz-input" type="text" inputmode="decimal" placeholder="0.00" autofocus></div></div>
+        <div class="mz-field"><label for="ob-date">As of date</label><input id="ob-date" class="mz-input" type="date" value="${todayIso()}"></div>
+        <div class="mz-field"><label for="ob-note">Note (optional)</label><input id="ob-note" class="mz-input" type="text" maxlength="500"></div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Opening Balance</button>
+      </form>`, (el) => {
+      let type = 'remaining';
+      el.querySelectorAll('.mz-pct-choice').forEach((b) => b.addEventListener('click', () => { el.querySelectorAll('.mz-pct-choice').forEach((x) => x.classList.remove('is-active')); b.classList.add('is-active'); type = b.dataset.type; }));
+      async function submit() {
+        const cents = parseDollarsToCents(el.querySelector('#ob-amount').value);
+        if (cents == null || cents <= 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        setSaveState(el, 'saving');
+        try {
+          await api('/api/opening', { method: 'POST', headers: { 'idempotency-key': uid() }, body: JSON.stringify({ sourceId, type, amount: cents / 100, date: el.querySelector('#ob-date').value, note: el.querySelector('#ob-note').value }) });
+          await refreshState(); setSaveState(el, 'ok'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+    });
+  }
+
+  function openEditIncomeSheet(entryId) {
+    const entry = data.income.find((e) => e.id === entryId);
+    if (!entry) return;
+    const sources = data.sources.filter((s) => !s.archived || s.id === entry.source_id);
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Edit Income</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+      <form data-form="edit-income">
+        <div class="mz-field"><label for="ei-source">Income source</label><select id="ei-source" class="mz-select">${sources.map((s) => `<option value="${s.id}" ${s.id === entry.source_id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}</select></div>
+        <div class="mz-field"><label for="ei-amount">Amount earned</label><div class="mz-amount-field"><span class="mz-dollar">$</span><input id="ei-amount" class="mz-input" type="text" inputmode="decimal" value="${(entry.amount_cents / 100).toFixed(2)}"></div></div>
+        <div class="mz-field"><label for="ei-pct">Applied percent</label><input id="ei-pct" class="mz-input" type="text" inputmode="decimal" value="${formatPercent(entry.percent)}"></div>
+        <div class="mz-calc-preview"><span>Maaser on this income</span><span id="ei-preview">${money(entry.maaser_cents)}</span></div>
+        <div class="mz-field"><label for="ei-date">Date</label><input id="ei-date" class="mz-input" type="date" value="${entry.entry_date}"></div>
+        <div class="mz-field"><label for="ei-note">Note (optional)</label><input id="ei-note" class="mz-input" type="text" maxlength="500" value="${escapeHtml(entry.note || '')}"></div>
+        ${saveStateRow()}
+        <button class="mz-btn mz-btn-primary mz-btn-block mz-btn-lg" type="submit">Save Changes</button>
+      </form>`, (el) => {
+      const amountInput = el.querySelector('#ei-amount');
+      const pctInput = el.querySelector('#ei-pct');
+      const preview = el.querySelector('#ei-preview');
+      function updatePreview() { const cents = parseDollarsToCents(amountInput.value) || 0; const pct = parseFloat(pctInput.value) || 0; preview.textContent = money(Math.round(cents * pct / 100)); }
+      amountInput.addEventListener('input', updatePreview);
+      pctInput.addEventListener('input', updatePreview);
+      async function submit() {
+        const amountCents = parseDollarsToCents(amountInput.value);
+        const pct = parseFloat(pctInput.value);
+        if (amountCents == null || amountCents <= 0) { setSaveState(el, 'error', 'Enter a valid amount.'); return; }
+        if (!Number.isFinite(pct) || pct < 0) { setSaveState(el, 'error', 'Enter a valid percent.'); return; }
+        setSaveState(el, 'saving');
+        try {
+          await api(`/api/income/${entryId}`, { method: 'PATCH', body: JSON.stringify({ sourceId: el.querySelector('#ei-source').value, amount: amountCents / 100, percent: pct, date: el.querySelector('#ei-date').value, note: el.querySelector('#ei-note').value }) });
+          await refreshState(); setSaveState(el, 'ok'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      }
+      el.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+      el.addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) submit(); });
+    });
+  }
+
+  // ---- Settings: differs from maaser/app.js - backup/restore instead of link rotation -----
+
+  function openSettingsSheet() {
+    const pinEnabled = !!data.pinEnabled;
+    openSheet(`
+      <div class="mz-sheet-head"><h2>Settings</h2><button class="mz-icon-btn" data-action="close-sheet">&times;</button></div>
+
+      <div class="mz-section-title" style="margin-top:0">PIN</div>
+      <p>${pinEnabled ? 'A PIN is currently required to open this device\'s tracker.' : 'No PIN set. Anyone who opens this browser can see and change this tracker.'}
+         Since everything here lives in this browser, the PIN only stops someone glancing at
+         the screen, not someone with access to this device's files.</p>
+      <form data-form="pin-settings">
+        ${!pinEnabled ? `
+          <div class="mz-field"><label for="new-pin">Set a PIN (4-10 digits)</label><input id="new-pin" class="mz-input" type="password" inputmode="numeric" pattern="[0-9]*"></div>
+          <button class="mz-btn mz-btn-primary mz-btn-block" type="submit">Turn On PIN</button>
+        ` : `<button class="mz-btn mz-btn-danger mz-btn-block" type="submit">Turn Off PIN</button>`}
+        ${saveStateRow()}
+      </form>
+
+      <div class="mz-section-title">Backup</div>
+      <p>This is the only copy of this data. Download a backup after entering anything
+         important, and definitely before clearing your browser's site data, switching
+         phones, or reinstalling the browser.</p>
+      <div class="mz-actions-row">
+        <button class="mz-btn mz-btn-block" id="backup-download-btn">Download Backup</button>
+        <button class="mz-btn mz-btn-block" id="backup-restore-btn">Restore Backup</button>
+      </div>
+      <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none">
+
+      <div class="mz-section-title">Export</div>
+      <button class="mz-btn mz-btn-block" data-action="export-csv">Export CSV</button>`, (el) => {
+      el.querySelector('[data-form="pin-settings"]').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setSaveState(el, 'saving');
+        try {
+          if (pinEnabled) {
+            if (!confirm('Turn off the PIN? Anyone who opens this browser will then see this tracker.')) { setSaveState(el, ''); return; }
+            await api('/api/settings/pin', { method: 'POST', body: JSON.stringify({ pin: null }) });
+          } else {
+            const pin = el.querySelector('#new-pin').value;
+            if (!/^\d{4,10}$/.test(pin)) { setSaveState(el, 'error', 'PIN must be 4 to 10 digits.'); return; }
+            await api('/api/settings/pin', { method: 'POST', body: JSON.stringify({ pin }) });
+          }
+          await refreshState(); setSaveState(el, 'ok'); closeSheet(); render();
+        } catch (err) { setSaveState(el, 'error', err.message); }
+      });
+      el.querySelector('#backup-download-btn').addEventListener('click', downloadBackup);
+      el.querySelector('#backup-restore-btn').addEventListener('click', () => el.querySelector('#backup-file-input').click());
+      el.querySelector('#backup-file-input').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (!parsed || !Array.isArray(parsed.sources) || !Array.isArray(parsed.income) || !Array.isArray(parsed.giving)) {
+            throw new Error("That file doesn't look like a Maaser Tracker backup.");
+          }
+          if (!confirm('Restore this backup? Everything currently on this device will be replaced with what is in the file.')) return;
+          if (!saveStore(parsed)) throw new Error('Could not save: storage full or unavailable.');
+          closeSheet();
+          showToast('Backup restored.');
+          if (parsed.pin) {
+            // The restored backup has its own PIN, which may not match whatever was unlocked
+            // to get into Settings (a backup from a different point in time, say). Reboot
+            // through the normal PIN gate rather than assuming the current session still applies.
+            session.pinOk = false; session.pinWrong = false;
+            setView({ screen: 'pin' });
+          } else {
+            session.pinOk = true;
+            await refreshState();
+            setView({ screen: 'dashboard' });
+          }
+        } catch (err) {
+          showToast(err.message || 'Could not read that file.');
+        }
+      });
+    });
+  }
+
+  function downloadBackup() {
+    const store = loadStore();
+    const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `maaser-tracker-backup-${todayIso()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded.');
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // CSV export - identical to maaser/app.js
+  // ---------------------------------------------------------------------------------------
+
+  const CSV_NEEDS_QUOTING = /[",\n]/;
+  function csvEscape(v) { const s = String(v == null ? '' : v); return CSV_NEEDS_QUOTING.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+  function exportCsv() {
+    const sourceName = (id) => data.sources.find((s) => s.id === id)?.name || '';
+    const lines = [['type', 'date', 'source', 'amount', 'percent', 'maaser_amount', 'recipient', 'balance_type', 'note']];
+    for (const e of data.income) lines.push(['income', e.entry_date, sourceName(e.source_id), (e.amount_cents / 100).toFixed(2), e.percent, (e.maaser_cents / 100).toFixed(2), '', '', e.note || '']);
+    for (const g of data.giving) { const allocs = data.allocations.filter((a) => a.giving_id === g.id); for (const a of allocs) lines.push(['giving', g.entry_date, sourceName(a.source_id), (a.amount_cents / 100).toFixed(2), '', '', g.recipient || '', '', g.note || '']); }
+    for (const o of data.opening) lines.push(['opening_balance', o.entry_date, sourceName(o.source_id), (o.amount_cents / 100).toFixed(2), '', '', '', o.balance_type, o.note || '']);
+    const csv = lines.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `maaser-tracker-${todayIso()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Global event delegation
+  // ---------------------------------------------------------------------------------------
+
+  root.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'start-local') { saveStore(newStore()); await refreshState(); setView({ screen: 'dashboard' }); return; }
+    if (action === 'open-settings') { openSettingsSheet(); return; }
+    if (action === 'close-sheet') { closeSheet(); return; }
+    if (action === 'add-income') { openAddIncomeSheet(btn.dataset.source); return; }
+    if (action === 'add-giving') { openAddGivingSheet(btn.dataset.source); return; }
+    if (action === 'new-source') { openNewSourceSheet(); return; }
+    if (action === 'edit-source') { openEditSourceSheet(btn.dataset.id); return; }
+    if (action === 'unarchive-source') { await api(`/api/sources/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ archived: false }) }); await refreshState(); render(); return; }
+    if (action === 'set-period') { period = btn.dataset.period; render(); return; }
+    if (action === 'set-history-tab') { historyTab = btn.dataset.tab; render(); return; }
+    if (action === 'export-csv') { exportCsv(); return; }
+    if (action === 'edit-income') { openEditIncomeSheet(btn.dataset.id); return; }
+    if (action === 'delete-income') {
+      if (!confirm('Delete this income entry? This cannot be undone.')) return;
+      await api(`/api/income/${btn.dataset.id}`, { method: 'DELETE' }); await refreshState(); render(); showToast('Deleted.'); return;
+    }
+    if (action === 'delete-giving') {
+      if (!confirm('Delete this giving entry? This cannot be undone.')) return;
+      await api(`/api/giving/${btn.dataset.id}`, { method: 'DELETE' }); await refreshState(); render(); showToast('Deleted.'); return;
+    }
+  });
+
+  root.addEventListener('submit', async (e) => {
+    const form = e.target.closest('[data-form="pin"]');
+    if (!form) return;
+    e.preventDefault();
+    const pin = document.getElementById('pin-input').value;
+    const store = loadStore();
+    const hash = await hashPin(pin);
+    if (store.pin && store.pin.hash === hash) {
+      session.pinOk = true; session.pinWrong = false;
+      await refreshState();
+      setView({ screen: 'dashboard' });
+    } else {
+      session.pinWrong = true;
+      render();
+    }
+  });
+
+  // ---------------------------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------------------------
+
+  async function boot() {
+    const store = loadStore();
+    if (!store) { setView({ screen: 'welcome' }); return; }
+    if (store.pin && !session.pinOk) { setView({ screen: 'pin' }); return; }
+    await refreshState();
+    setView({ screen: 'dashboard' });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
