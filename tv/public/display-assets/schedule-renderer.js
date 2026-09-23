@@ -15,7 +15,7 @@ function pattern(g,i,name){
 }export function fullSchedules(p,upcoming=""){
  const w=p.weekly;
  const services=w.services.map(service=>{const groups=service.groups.filter(g=>g.events.length);return `<section class="weekly-service">${groups.map((g,i)=>pattern(g,i,service.name)).join('')}</section>`;}).join(''); const s=p.special;
- return `<section class="tv-panel weekly-reference"><h2 class="tv-panel-title" dir="rtl">${esc(w.title)}</h2><p class="tv-panel-date">${date(w.from)} – ${date(w.to)} · לוח השבוע</p><div class="weekly-body">${services}${(w.posterSections||[]).map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${section.dates.map(date).join(', ')}</small></h3>${section.morningExclusion?`<p class="weekly-scope" dir="rtl">${esc(section.morningExclusion)}</p>`:''}${section.rows.map(sourceRow).join('')}</section>`).join('')}<div class="weekly-references">${w.references.map(r=>`<p dir="rtl">${esc(r.label)} <bdi>(${date(r.date)})</bdi>: ${esc(r.text)}</p>`).join('')}</div>${upcoming}</div></section>${s?`<section class="tv-panel complete-special"><h2 class="tv-panel-title" dir="rtl">${esc(s.title)}</h2><p class="tv-panel-date">${date(s.from)} – ${date(s.to)} <span class="schedule-page-label"></span></p><div class="special-body">${s.sections.map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${date(section.date)}</small></h3>${section.rows.map(sourceRow).join('')}</section>`).join('')}</div></section>`:''}`;
+ return `<section class="tv-panel weekly-reference"><h2 class="tv-panel-title" dir="rtl">${esc(w.title)}</h2><p class="tv-panel-date">${date(w.from)} – ${date(w.to)} · לוח השבוע</p><div class="weekly-body">${services}${(w.posterSections||[]).map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${section.dates.map(date).join(', ')}</small></h3>${section.morningExclusion?`<p class="weekly-scope" dir="rtl">${esc(section.morningExclusion)}</p>`:''}${section.rows.map(sourceRow).join('')}</section>`).join('')}${upcoming}</div></section>${s?`<section class="tv-panel complete-special"><h2 class="tv-panel-title" dir="rtl">${esc(s.title)}</h2><p class="tv-panel-date">${date(s.from)} – ${date(s.to)} <span class="schedule-page-label"></span></p><div class="special-body">${s.sections.map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${date(section.date)}</small></h3>${section.rows.map(sourceRow).join('')}</section>`).join('')}</div></section>`:''}`;
 }
 /** Measure actual typography. Never discard rows or shrink them to fit. */
 export function paginateSpecial(stage){
@@ -35,6 +35,21 @@ export function paginateSpecial(stage){
    page.append(evening,day);
    if(page.scrollHeight<=height){return {pages:[page.outerHTML],body,label:panel.querySelector('.schedule-page-label')};}
    page.replaceChildren();page.className='';
+ }
+ // Keep the two opening Sukkos days side by side when the full source fits.
+ const festivalDays=new Map();
+ for(const section of source){const id=section.querySelector('[data-source-id]')?.dataset.sourceId;const key=id?.match(/^sk:\d+:(15|16):/)?.[0];if(!key){festivalDays.clear();break;}if(!festivalDays.has(key))festivalDays.set(key,[]);festivalDays.get(key).push(section);}
+ if(festivalDays.size===2&&panel.clientWidth>=780){
+  page.className='festival-overview';
+  for(const sections of festivalDays.values()){
+   const column=document.createElement('section');column.className='festival-day';
+   const main=sections.find(s=>!/^ערב|^מוצאי/.test(s.querySelector('.source-heading').textContent))||sections[0];
+   column.append(main.querySelector('.source-heading').cloneNode(true));
+   for(const section of sections)for(const row of section.querySelectorAll('.source-row'))column.append(row.cloneNode(true));
+   page.append(column);
+  }
+  if(page.scrollHeight<=height)return {pages:[page.outerHTML],body,label:panel.querySelector('.schedule-page-label')};
+  page.replaceChildren();page.className='';
  }
  let current=null;
  const newSection=heading=>{const section=document.createElement('section');section.className='source-section';section.append(heading.cloneNode(true));page.append(section);return section;};
