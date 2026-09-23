@@ -105,7 +105,7 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
   }
   if(!source&&holy(s-1))parts=parts.map(x=>({...x,rows:x.rows.filter(r=>!/:([IJKL])$/.test(r.id))})).filter(x=>x.rows.length);
   if(holy(s+1))parts=parts.map(x=>({...x,rows:x.rows.filter(r=>!r.id.endsWith(':B')&&!['motzeiMaariv','shabbosMotzei'].includes(r.calc))})).filter(x=>x.rows.length);
-  sections.push(...parts);covered.push(hebrewDay(s,settings));
+  sections.push(...parts.map(part=>({...part,groupDay:civil(s)})));covered.push(hebrewDay(s,settings));
  }
  const weekdaysData=[],references=[],posterSections=[];
  for(let s=start;s<sat;s++){
