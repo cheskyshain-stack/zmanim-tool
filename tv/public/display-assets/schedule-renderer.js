@@ -1,6 +1,6 @@
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=d=>new Date(d+'T12:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
-const rich=v=>esc(v).replace(/\uE000/g,'<u>').replace(/\uE001/g,'</u>').replace(/\n/g,'<br>').replace(/\u00a0/g,' ');
+const rich=v=>esc(String(v??'').replace(/\uE000\s*/g,'\uE000').replace(/\s*\uE001/g,'\uE001')).replace(/\uE000/g,'<u>').replace(/\uE001/g,'</u>').replace(/\n/g,'<br>').replace(/\u00a0/g,' ');
 function times(ts,sep=""){return ts.map(t=>`<span class="source-time"><bdi dir="ltr">${t.underlined?'<u>':''}${rich(String(t.text??'').replace(/\s*\/\s*/g,'\u2003'))}${t.underlined?'</u>':''}${esc(t.mark)}</bdi>${t.name?`<small dir="rtl">${esc(t.name)}</small>`:''}</span>`).join(` <span class="time-sep">${esc(sep.replace(/\//g,'').trim())}</span> `);}
 export function sourceRow(row){return `<div class="source-row${row.plagDetail?' has-plag':''}" data-source-id="${esc(row.id)}"><div class="source-times">${times(row.times||[],row.sep)}</div><div class="source-label" dir="rtl">${rich(row.label)}</div>${row.note?`<p class="source-note" dir="auto">${rich(row.note)}</p>`:''}</div>`;}
 function eventTimes(events){const source=events.find(e=>e.sourceText);if(source)return times([{text:source.sourceText}]);return times(events.map(e=>({text:e.time,underlined:/למטה/.test(e.place),mark:/אולם/.test(e.place)?'**':/בעזר/.test(e.place)?'*':'',name:!['בית מדרש','למטה','בעזר״נ','באולם השמחות',''].includes(e.place)?e.place:''})));}
@@ -27,7 +27,8 @@ export function paginateSpecial(stage){
  // Ordinary Shabbos is a complete reference: show Friday alongside Shabbos/Motzai
  // when both columns fit at the normal readable font size.
  const ordinary=source.length&&source.every(section=>[...section.querySelectorAll('[data-source-id]')].every(row=>row.dataset.sourceId.startsWith('chart:')));
- if(ordinary&&panel.clientWidth>=850){
+ panel.classList.toggle('ordinary-shabbos', Boolean(ordinary));
+ if(ordinary&&panel.clientWidth>=780){
    page.className='shabbos-overview';
    const evening=document.createElement('div'),day=document.createElement('div');
    source.forEach((section,i)=>(i===0?evening:day).append(section.cloneNode(true)));

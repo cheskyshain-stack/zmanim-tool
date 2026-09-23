@@ -517,3 +517,27 @@ button {
 .schedule-page-label:empty {display:none}
 .shabbos-overview .source-row {padding:6px 0}
 .shabbos-overview .has-plag {row-gap:3px}
+/* Approved Shul View composition; shared with every admin preview. */
+.tv-stage{padding:24px 32px 0;gap:14px}
+.tv-head{height:88px;padding-bottom:13px}
+.tv-clock{font-size:46px}.tv-brand{font-size:32px}.tv-date{font-size:19px}
+.tv-stage :is(.tv-brand,.tv-date b,.tv-panel-title,.source-heading,.source-label,.source-times,.weekly-body .source-times,.source-time small,.weekly-service h3,.weekly-scope,.weekly-references p,.tv-footer strong){font-family:David,serif;font-weight:700}
+.tv-panel{border-radius:0;border:0;background:transparent;padding:0 18px}
+.tv-center{grid-template-columns:minmax(370px,.9fr) minmax(0,2fr);gap:26px}
+.tv-panel-title,.complete-special .tv-panel-title{font-size:30px}
+.tv-side{width:290px;gap:12px}.tv-layout{gap:20px}
+.source-label,.source-times,.weekly-body .source-times,.weekly-pattern .weekly-row-label,.weekly-compact .weekly-pattern .weekly-row-label,.shabbos-overview .source-label,.shabbos-overview .source-times{font-size:29px;line-height:1.2}
+.weekly-pattern{grid-template-columns:minmax(0,1fr) 125px;gap:12px}
+.source-times{grid-template-columns:repeat(auto-fit,minmax(65px,1fr));gap:8px 12px}
+.source-row,.shabbos-overview .source-row{grid-template-columns:minmax(0,1fr) minmax(130px,1fr);padding:6px 0}
+.source-time small{font-size:18px}.has-plag .source-label,.has-plag .source-times{font-size:25px}
+.tv-stage u{text-decoration:none;border-bottom:2px solid currentColor;padding-bottom:2px;display:inline-block;line-height:1}
+.ordinary-shabbos .source-heading{display:none}
+.shabbos-overview{gap:24px;border-top:2px solid #b59c63;padding-top:10px}
+.tv-card{background:transparent;border-radius:0;padding:14px 8px;border-width:0 0 1px;box-shadow:none}
+.tv-card h2{font-size:25px}.tv-card p{font-size:22px;line-height:1.4}
+.shul-bottom{display:grid;grid-template-columns:290px minmax(0,1fr) 400px;gap:20px;align-items:center;min-height:142px;flex-shrink:0;border-top:1px solid #b59c63}
+.bottom-dedication{grid-column:2;text-align:center}.bottom-dedication .tv-card{border:0;padding:8px;box-shadow:none;background:transparent}.bottom-dedication .tv-card h2{font:700 30px David,serif;margin:0 0 4px}.bottom-dedication .tv-card p{font:700 25px David,serif;margin:2px 0;line-height:1.15}.bottom-dedication .tv-card .sponsor,.bottom-dedication .tv-card .card-page{font-size:17px}
+.shul-donate{grid-column:3;display:flex;gap:16px;align-items:center;color:inherit;text-decoration:none}.shul-donate img{width:120px;height:120px}.shul-donate strong{font-size:24px;color:#9b7d37}.shul-donate p{font-size:21px;margin:8px 0}.shul-donate small{font-size:12px}
+.tv-footer{min-height:60px;padding:8px 32px}.tv-footer strong{font-size:32px}.tv-footer .key{font-size:15px}.tv-footer .next-label{font-size:17px}.tv-footer .next-place{font-size:22px}
+.tv-stage[data-theme="dark"] .tv-panel,.tv-stage[data-theme="dark"] .tv-card{background:transparent}.tv-stage[data-theme="dark"] :is(.source-label,.weekly-service h3,.shul-donate strong){color:#D8B76A}
