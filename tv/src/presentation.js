@@ -148,7 +148,9 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
  let title=hasParsha(sat,{...settings,english:false},tables)||hebrewDay(sat,settings);
  if(title&&!/פרשת|שבת|סוכות|פסח|ראש השנה|שבועות|כיפור/.test(title))title='פרשת '+title;
  const parshaFor=s=>{let name=hasParsha(s,{...settings,english:false},tables)||'';return name.replace(/^פרשת\s*/, '').replace(/^שבת\s*/, '');};
- if(posterSections.length)title='חול המועד';
+ const headingDate=hebrewDateExtended(sat);
+ if(headingDate.month===7&&[15,16].includes(headingDate.dayOfMonth))title='שבוע של סוכות';
+ else if(posterSections.length)title='חול המועד';
  else if(title.startsWith('פרשת '))title='חול '+title;
  let specialTitle=[...new Set(covered)].join(' · ');
  if(group){
