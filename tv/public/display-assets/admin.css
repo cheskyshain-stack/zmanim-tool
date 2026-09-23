@@ -348,3 +348,8 @@ dialog::backdrop {
  .toolbar label{min-width:0;grid-column:1/-1}
  .form-footer{display:grid;grid-template-columns:1fr 1fr}
 }
+#appearance-times[hidden] {display:none}
+#appearance-form {max-width:760px}
+#appearance-form label {display:block;margin:16px 0}
+#appearance-form select {width:100%}
+.calendar-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.calendar-toolbar h2{margin:0;min-width:190px}.calendar-toolbar label{margin-left:auto}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.calendar-weekday{text-align:center;padding:8px;font-weight:700;color:#59687b}.calendar-day{display:flex;flex-direction:column;align-items:stretch;text-align:left;min-height:112px;padding:10px;border-radius:10px;border:1px solid #dce1e6;background:#fff;color:#142a42;gap:5px}.calendar-day strong{font-size:21px}.calendar-day .hebrew-date{font-size:15px;line-height:1.3}.calendar-holiday{font-size:15px;color:#6e5623;font-weight:700}.calendar-day[aria-pressed="true"]{background:#f2ead7;outline:2px solid #9c8249;outline-offset:-2px}.calendar-day[aria-current="date"] strong{text-decoration:underline;text-underline-offset:4px}.calendar-day:focus-visible{outline:3px solid #2868ad}.calendar-day:hover{background:#f3f5f7}@media(max-width:650px){.month-grid{gap:3px}.calendar-day{min-height:96px;padding:6px 3px;border-radius:5px}.calendar-day strong{font-size:18px}.calendar-day .hebrew-date,.calendar-holiday{font-size:12px}.calendar-toolbar h2{min-width:0;font-size:20px}.calendar-toolbar label{margin-left:0;width:100%}.calendar-weekday{font-size:12px;padding:5px 0}}

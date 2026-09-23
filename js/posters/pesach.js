@@ -578,7 +578,7 @@ export function buildPesachPoster(year, settings) {
     title: PS_TEXT.title,
     // From the night of בדיקת חמץ to אחרון של פסח, which is every date on the sheet.
     span: { from: bedikaOn, to: day(PS_ACHRON) },
-    blocks: blocks.map(({ at, ...b }) => b),
+    blocks: blocks.map(({ at, ...b }) => ({ serial: at, ...b })),
     minyanim: M.out,
     zmanim: M.zmanim,
     legend: [

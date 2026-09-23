@@ -26,3 +26,34 @@ The screenshots in the task's `outputs/tv-display` directory show actual local a
 Production D1, Access issuer/audience and admin allowlist, scoped Worker routes in the site's Cloudflare zone, and a staging check of production runtime limits. See README.md. Production authentication, remote persistence and network routing cannot be claimed verified before those resources are configured.
 
 The current shared source lacks complete Shavuos and Tisha B'Av-day information; the display flags this rather than inventing times. Schedule source changes must be released to the TV Worker alongside the main website. Crowded pinned/long cards are warned about in preview and publishing confirmation; review actual content before publishing.
+
+## Appearance addition, September 23, 2026
+
+- 10 unit/integration test groups passed: NY midnight/DST boundaries, validation,
+  database persistence, concurrent-save rejection, private audit fields, granular
+  permissions, and existing schedule behavior.
+- Dark palette main, secondary and accent text exceed 4.5:1 on all card surfaces.
+- `tests/themes.cjs` passed: actual 1920x1080 renderer screenshots, no overflow,
+  identical panel/card sizes, same DOM elements and unchanged rotation state on
+  theme switch, automatic saved update, offline retention, OS-theme independence,
+  unsaved Light/Dark previews and 390px mobile admin without horizontal overflow.
+- Existing 14-date layout suite passed without overflow; lifecycle suite passed.
+- Screenshots: outputs/tv-themes in the shared workspace. Preview-only sample
+  announcements and dedication exist only in the screenshot browser memory.
+- Applied migration 0003 to local D1 only. Production is unchanged.
+
+## Complete schedules correction
+
+17 unit/integration groups pass, including exact weekday consolidation, location
+changes, earlier Selichos, complete Shabbos source columns, Yom Kippur, both
+connected-day orders, preservation on later days, and unchanged next-minyan data.
+The Weds/Thurs Rosh Chodesh browser example is April 26–27, 2028, from the actual
+calendar. The small Selichos test is explicitly a development fixture.
+
+Browser source-ID coverage confirms each presentation row appears exactly once
+across pages: ordinary Shabbos 11, Shabbos/Sukkos 18, Yom Kippur 16, three-day
+Sukkos/Shabbos 25, Shabbos followed by Pesach 30. The weekday panel remains
+identical during special-page changes. Both themes were captured at 1920x1080.
+The 14-date layout suite includes announcement and dedication side panels and
+passes without panel overflow. Theme switching retains DOM geometry and card
+rotation state. No production publication occurred.

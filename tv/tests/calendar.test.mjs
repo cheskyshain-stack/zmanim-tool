@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {previewMonth} from '../src/schedules.js';
+test('preview month includes real civil days, Hebrew dates and holidays',()=>{const m=previewMonth('2026-09');assert.equal(m.days.length,30);assert.equal(m.offset,2);assert.match(m.days[11].hebrew,/א׳ תשרי/);assert.ok(m.days[20].holidays.includes('יום כפור'));assert.equal(previewMonth('2028-02').days.length,29);assert.throws(()=>previewMonth('2026-13'));assert.throws(()=>previewMonth('1999-12'));});

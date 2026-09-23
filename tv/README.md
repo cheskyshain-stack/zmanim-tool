@@ -142,3 +142,136 @@ The Worker bundles the shared source at build time. Rebuild/redeploy the TV Work
 - `tests/`: server, API, browser and seasonal layout checks.
 
 The existing public website/donation source is unchanged. Outside `tv/`, the only behavior change is the admin navigation link; the existing schedule-cleanup function is exported for reuse, and the site's generated asset hashes/offline bundle are rebuilt.
+
+## TV appearance
+
+Manage TV Display → Appearance (full display managers only) offers Light, Dark,
+and Scheduled. Light remains the default. Save appearance updates open screens
+on the existing 15-second refresh cycle. The display evaluates the saved theme
+every second, including while temporarily offline, using its last successful
+server snapshot and elapsed time. No operating-system theme preference is used.
+
+Scheduled start times are recurring America/New_York wall times. Dark applies
+until the next Light transition, including across midnight. Identical times are
+rejected. A nonexistent spring time runs at the first valid minute after the gap;
+a repeated fall time runs on its first occurrence without switching back.
+
+Preview Light / Preview Dark do not save. Use selected setting previews the
+unsaved configuration. The existing future-time preview follows the saved setting.
+Appearance saves use optimistic version checks and record actor/time in the audit.
+The public response includes only the three appearance values, without audit data.
+
+Before release apply `migrations/0003_appearance.sql` through the existing migration
+workflow. No additional environment variables are required. This feature has only
+been built and migrated locally; production deployment remains pending review.
+
+Theme browser checks: `node tests/themes.cjs` with Playwright available and
+`DISPLAY_TEST_URL` pointing at the local Worker. Screenshots contain explicitly
+labeled preview-only content. No sample content is published by this test.
+
+## Complete schedule presentation
+
+The TV's `src/presentation.js` separates visual grouping from `scheduleSnapshot`
+actual daily events. `next` still uses the dated, located event engine and active
+special overrides; it never reads exception captions.
+
+- The weekly reference is anchored Sunday through Shabbos for the entire week.
+  Each service groups complete matching event signatures, including locations and
+  notes. Small differences show exact replacement times, never inferred offsets.
+  Holy days and relevant Erev portions refer to their special schedules.
+- Shabbos reads all published chart columns through `rowFor`, including manual
+  overrides. Special days read complete poster rows (times, named reckonings,
+  extra rows, untimed labels and notes), not just the minyan collector.
+- Consecutive sacred dates use the existing calendar classification. Their group
+  crosses civil week boundaries and stays selected through its final closing
+  events. A following sacred evening supersedes normal Motzai entries. On Erev
+  Pesach that falls on Shabbos, the Pesach poster owns its morning and deadlines;
+  the Shabbos chart supplies the remaining Shabbos sections.
+- Pesach poster blocks now retain their existing serial date as additive metadata.
+  No formula or public website styling changed. Root offline assets were rebuilt.
+- `schedule-renderer.js` measures the full rows, adjusts schedule widths as needed,
+  and paginates the special panel at 35 seconds per page. Heading/date/page count
+  remain visible; the weekly panel stays steady. Every row keeps a source ID for
+  coverage tests. Theme changes do not restart the page or announcement clocks.
+- Current civil day and Hebrew date are separate from the weekly parsha and the
+  upcoming special group.
+
+No database migration or new permissions are required for this correction.
+Both admin previews use the same presentation and renderer as `/display/`.
+
+Source limitations: the existing catalog has no complete Shavuos schedule or
+complete Tisha B'Av day schedule. Missing schedules are explicitly marked for
+confirmation rather than populated with invented times. Display retention uses
+the later of the source's last timed closing event and the existing 72-minute
+sunset boundary, with the existing five-minute grace period; it does not claim to
+know when an untimed event or service has actually finished.
+
+Validation: `npm test`, `node tests/presentation-browser.cjs`,
+`node tests/layout.cjs`, `node tests/themes.cjs`, and `node tests/lifecycle.cjs`.
+Screenshots are in the shared workspace's `outputs/tv-schedules/`.
+Production deployment remains pending review.
+
+## Required follow-up after production deployment
+
+User request: once the TV feature is deployed, add two links to the existing main
+website's protected admin page:
+
+- **View TV Display**: the deployed public `/display/` screen.
+- **Manage TV Display**: the deployed protected `/admin/display/` management area.
+
+Use the actual deployed URLs and existing admin navigation styling. Preserve
+server-enforced permissions on the management destination. Verify both links
+after deployment. Do not add live navigation links before deployment, and do not
+treat this follow-up as authorization to deploy; production remains for review.
+
+
+### TV schedule refinement
+
+Yom Tov and Chol Hamoed use the full saved poster information with spaced times
+instead of slash separators. Underlines and location marks remain intact.
+The weekly panel includes the Chol Hamoed source rows and a distinct Hoshana
+Rabbah section with its untimed instructions. Regular weekday patterns show full
+lists on scoped lines, with calendar-derived Rosh Chodesh month, BeHaB and fast
+names. These are presentation changes only; next-minyan calculation is unchanged.
+Validated locally in both themes, including Chol Hamoed. Not deployed.
+
+### Distance-readable TV redesign
+
+The display now uses a slimmer header, larger 31px schedule times, stronger day
+heading bands, highlighted weekly exception rows, clearer phone numbers and a
+larger next-minyan strip. Dense weeks tighten spacing while keeping the same time
+size. Complete special schedules retain numbered 35-second pages. Both themes
+share the same geometry. Validated at 1920x1080 across 14 dates with side cards;
+production deployment remains pending review.
+
+
+TV layout refinement: regular prayer rows omit routine weekday names. Differing
+patterns retain explicit day/occasion labels at the same size as prayer labels.
+Times use aligned columns, preserving underlines and location marks. Panel titles
+use חול פרשת, שבת פרשת, סוכות, שמיני עצרת / שמחת תורה, and חול המועד as applicable.
+The modern Hebrew sans-serif style is now applied to the local display itself.
+
+## Agreed TV heading hierarchy
+
+- One שבת פרשת… heading covers Erev Shabbos, Shabbos and Motzai Shabbos.
+- One overall Yom Tov heading covers the connected holiday schedule.
+- Within that heading, use יום א׳ and יום ב׳ for unnamed numbered days.
+- Where a day has its own established name, use that name instead of its day
+  number, e.g. שמיני עצרת, שמחת תורה, שביעי של פסח, אחרון של פסח.
+- Preserve the actual dates and all source entries; heading simplification must
+  not change the schedule data or next-minyan calculation.
+- Apply this hierarchy when integrating the fresh TV concept. Production remains
+  undeployed and the HTML concept files are previews only.
+
+
+## Admin preview calendar
+
+Manage TV Display > Preview screen now opens a clickable month calendar. It shows
+civil dates, Hebrew daytime dates, and holidays from the existing calendar rules.
+Select a date to automatically request the protected future preview at the chosen
+New York time. Month navigation, jump-to-month and Today are supported. Existing
+DST occurrence controls and unsaved editor previews are preserved. No migration
+is required. The newest HTML design concepts remain separate from the integrated
+DisplayView; this calendar uses the actual integrated renderer, not the static
+photo-based mockups. Future previews reflect currently saved data and may change
+when administrators publish new content or schedules.

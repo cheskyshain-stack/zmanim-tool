@@ -1,3 +1,5 @@
+import { fullSchedules, paginateSpecial } from './schedule-renderer.js';
+import { themeAt } from './appearance.js';
 import { localStamp } from "./time.js";
 export const escapeHTML = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const esc = escapeHTML;
@@ -53,6 +55,7 @@ export class DisplayView {
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(host);
     this.resize();
+    if(document.fonts?.status!=="loaded") document.fonts?.ready.then(()=>{this.lastRender="";});
   }
   choose(key, items, now, limit = 260) {
     if (!items.length) {
@@ -70,9 +73,10 @@ export class DisplayView {
     }
     return selected;
   }
-  update(snapshot, { now = Date.now(), stale = false, preview = false } = {}) {
+  update(snapshot, { now = Date.now(), stale = false, preview = false, theme = null } = {}) {
     this.snapshot = snapshot;
     const instant = preview ? snapshot.at : new Date(now).toISOString();
+    this.stage.dataset.theme = theme || themeAt(snapshot.appearance, instant);
     const items = snapshot.items.filter((i) => i.startsAt <= instant && (!i.endsAt || instant < i.endsAt));
     const ranks = { urgent: 3, important: 2, normal: 1 };
     const announcements = items.filter((i) => i.kind === "announcement").sort((a, b) => (ranks[b.data.priority] || 1) - (ranks[a.data.priority] || 1) || a.id.localeCompare(b.id));
@@ -90,10 +94,27 @@ export class DisplayView {
     const s = snapshot.schedule;
     const next = s.next && s.next.at >= instant ? s.next : null;
     const upcoming = [this.choose("upcoming", snapshot.upcoming.filter((i) => i.startsAt > instant), now)].filter(Boolean).map((i) => `<div class="tv-upcoming"><strong>Upcoming: ${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} to ${dateLabel(i.data.appliesTo)}</div>`).join("");
-    const html = `${preview ? '<div class="tv-preview-label">PRIVATE PREVIEW · NOT THE LIVE SCREEN</div>' : ""}<header class="tv-head"><div class="tv-brand" lang="he" dir="rtl">${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small></div><div class="tv-date"><b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.parsha ? ' · <bdi dir="auto">' + esc(s.parsha) + "</bdi>" : ""}</div><div class="tv-clock"></div></header>${stale ? '<div class="tv-stale">Connection lost · Schedule may be out of date. Please confirm times.</div>' : ""}<div class="tv-layout">${left ? `<aside class="tv-side">${left}</aside>` : ""}<main class="tv-center"><section class="tv-panel"><h2 class="tv-panel-title">${esc(s.today.title)}</h2><p class="tv-panel-date">${dateLabel(s.today.date)}</p>${dayRows(s.today)}${upcoming}</section><section class="tv-panel"><h2 class="tv-panel-title">${esc(s.shabbos[1].title)}</h2><p class="tv-panel-date">${dateLabel(s.shabbos[0].date)} / ${dateLabel(s.shabbos[1].date)}</p>${s.shabbos.map((d, i) => `<h3 class="tv-schedule-section">${i === 0 ? "Friday afternoon & evening" : "Shabbos day"}</h3>${dayRows(d, i === 0)}`).join("")}</section></main>${right ? `<aside class="tv-side">${right}</aside>` : ""}</div><footer class="tv-footer ${stale ? "stale-next" : ""}"><span class="next-label">Next minyan</span>${!stale && next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : `<strong>${stale ? "Confirm times while connection is unavailable" : "Checking the next minyan…"}</strong>`}<span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer>`;
+    const html = `${preview ? '<div class="tv-preview-label">PRIVATE PREVIEW · NOT THE LIVE SCREEN</div>' : ""}<header class="tv-head"><div class="tv-brand" lang="he" dir="rtl">${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small></div><div class="tv-date"><b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.presentation ? ' · <bdi dir="rtl">' + esc(s.presentation.currentDay) + "</bdi>" : ""}</div><div class="tv-clock"></div></header>${stale ? '<div class="tv-stale">Connection lost · Schedule may be out of date. Please confirm times.</div>' : ""}<div class="tv-layout">${left ? `<aside class="tv-side">${left}</aside>` : ""}<main class="tv-center">${s.presentation ? fullSchedules(s.presentation,upcoming) : '<p>Schedule presentation unavailable</p>'}</main>${right ? `<aside class="tv-side">${right}</aside>` : ""}</div><footer class="tv-footer ${stale ? "stale-next" : ""}"><span class="next-label">Next minyan</span>${!stale && next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : `<strong>${stale ? "Confirm times while connection is unavailable" : "Checking the next minyan…"}</strong>`}<span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer>`;
     if (html !== this.lastRender) {
       this.stage.innerHTML = html;
       this.lastRender = html;
+      const center=this.stage.querySelector('.tv-center'),weekly=this.stage.querySelector('.weekly-body');
+      if(center&&weekly){
+        if(weekly.scrollHeight>weekly.clientHeight+2) weekly.parentElement.classList.add('weekly-compact');
+        let width=weekly.parentElement.clientWidth;
+        while(weekly.scrollHeight>weekly.clientHeight+2&&width<center.clientWidth-440){width+=40;center.style.gridTemplateColumns=`minmax(0,${width}px) minmax(0,1fr)`;}
+      }
+      const special=this.stage.querySelector('.complete-special');
+      if(special) special._sections=[...special.querySelectorAll('.source-section')].map(e=>e.cloneNode(true));
+      this.schedulePages=paginateSpecial(this.stage);
+    }
+    if(this.schedulePages?.pages.length){
+      const id=s.presentation.special.id;
+      if(this.scheduleGroup!==id){this.scheduleGroup=id;this.scheduleStarted=now;}
+      const {pages,body,label}=this.schedulePages;
+      const page=Math.floor(Math.max(0,now-this.scheduleStarted)/35000)%pages.length;
+      if(body.dataset.page!==String(page)){body.innerHTML=pages[page];body.dataset.page=String(page);}
+      label.textContent=pages.length>1?` · ${page+1} / ${pages.length}`:'';
     }
     this.stage.querySelector(".tv-clock").textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
     this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card")].filter((e) => e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");

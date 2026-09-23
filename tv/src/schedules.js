@@ -1,3 +1,4 @@
+import { schedulePresentation } from './presentation.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
 import parshaEY from "../../data/parsha_ey.json" with { type: "json" };
@@ -8,7 +9,7 @@ import { resolveSettings, DEFAULT_SETTINGS } from "../../js/settings.js";
 import { minyanimForDay, candleLightingForDay, clock } from "../../js/upcoming.js";
 import { dateFromSerial, excelSerial, shulNow } from "../../js/zmanim/solar.js";
 import { sunsetElev } from "../../js/zmanim/zmanim.js";
-import { hebrewDateExtended, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis } from "../../js/hebrew-calendar.js";
+import { hebrewDateExtended, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
 import { agendaDayKind } from "../../js/ui/weekly-agenda.js";
 import { buildRoshHashanaPoster } from "../../js/posters/roshhashana.js";
 import { buildYomKippurPoster } from "../../js/posters/yomkippur.js";
@@ -118,6 +119,29 @@ export function scheduleSnapshot(instant, controls = []) {
   };
   const days = Array.from({ length: 9 }, (_, i) => day(serial + i));
   const next = days.flatMap((d) => d.events).filter((e) => !e.auxiliary && e.at >= instant).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
+  // Keep the full civil week and extend each sacred block across week boundaries.
+  const weekStart = serial - (excelWeekday(serial) - 1);
+  const week = Array.from({length:7}, (_,i)=>day(weekStart+i));
+  const sacredGroups = [];
+  for(let cursor=weekStart;cursor<=weekStart+6;cursor++) {
+    if(!agendaDayKind(cursor,settings).holy) continue;
+    let first=cursor,last=cursor;
+    while(agendaDayKind(first-1,settings).holy) first--;
+    while(agendaDayKind(last+1,settings).holy) last++;
+    if(!sacredGroups.some(g=>g.from===civil(first))) sacredGroups.push({from:civil(first),to:civil(last),days:Array.from({length:last-first+2},(_,i)=>day(first-1+i))});
+    cursor=last;
+  }
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
-  return { today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+  return { presentation: schedulePresentation({serial,state,settings,tables,day,instant,sunset}), week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+}
+
+
+export function previewMonth(month) {
+ if(!/^(20\d{2})-(0[1-9]|1[0-2])$/.test(month||''))throw new RangeError('Choose a month between 2000 and 2099.');
+ const first=new Date(month+'-01T12:00:00Z'),offset=first.getUTCDay(),count=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+ const he={...settings,english:false};
+ return {month,offset,days:Array.from({length:count},(_,i)=>{
+  const date=month+'-'+String(i+1).padStart(2,'0'),serial=excelSerial(new Date(date+'T12:00:00Z'));
+  return {date,day:i+1,hebrew:jewishDateString(serial,false),holidays:[...new Set([hasYomTov(serial,he,specialDays),hasTaanis(serial,he),hasRoshChodesh(serial,he)].filter(Boolean))]};
+ })};
 }

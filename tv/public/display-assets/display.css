@@ -355,3 +355,165 @@ button {
   font-size: 20px;
   z-index: 2;
 }
+/* TV-only colors. Geometry and rotation remain identical in both themes. */
+.tv-stage[data-theme="dark"] {background:#0B1423;color:#F5F2EA;color-scheme:dark}
+.tv-stage[data-theme="dark"] .tv-panel,
+.tv-stage[data-theme="dark"] .tv-card {background:#142238;border-color:#34445C}
+.tv-stage[data-theme="dark"] .tv-head {border-color:#D8B76A}
+.tv-stage[data-theme="dark"] .tv-schedule-row {border-color:#34445C}
+.tv-stage[data-theme="dark"] .tv-brand,
+.tv-stage[data-theme="dark"] .tv-date b,
+.tv-stage[data-theme="dark"] .tv-panel-title,
+.tv-stage[data-theme="dark"] .tv-schedule-section,
+.tv-stage[data-theme="dark"] .tv-card h2,
+.tv-stage[data-theme="dark"] .tv-card .eyebrow,
+.tv-stage[data-theme="dark"] .dedication-type,
+.tv-stage[data-theme="dark"] .tv-upcoming strong {color:#D8B76A}
+.tv-stage[data-theme="dark"] .tv-brand small,
+.tv-stage[data-theme="dark"] .tv-panel-date,
+.tv-stage[data-theme="dark"] .tv-note,
+.tv-stage[data-theme="dark"] .tv-card .card-page,
+.tv-stage[data-theme="dark"] .tv-card .sponsor {color:#C5CEDB}
+.tv-stage[data-theme="dark"] .tv-card.important {border-top-color:#D8B76A}
+.tv-stage[data-theme="dark"] .tv-card.urgent {border-top-color:#D5A295;background:#202738}
+.tv-stage[data-theme="dark"] .tv-card.dedication,
+.tv-stage[data-theme="dark"] .tv-upcoming {background:#1C2B40}
+.tv-stage[data-theme="dark"] .tv-footer {background:#142238;color:#F5F2EA;box-shadow:inset 0 1px #34445C}
+.tv-stage[data-theme="dark"] .tv-footer .key {color:#C5CEDB}
+.tv-stage[data-theme="dark"] .tv-footer .next-label {color:#D8B76A}
+.tv-stage[data-theme="dark"] .tv-preview-label {background:#D8B76A;color:#0B1423}
+.tv-stage[data-theme="dark"] .boot {color:#F5F2EA}
+/* Complete schedule presentation, shared by public and private previews. */
+.tv-center {grid-template-columns:minmax(0,.9fr) minmax(0,1.3fr)}
+.weekly-reference,.complete-special {display:flex;flex-direction:column}
+.weekly-body,.special-body {flex:1;min-height:0}
+.special-body {overflow:hidden}
+.source-row {display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.85fr);gap:8px;padding:9px 0;border-top:1px solid #dedace;align-items:center}
+.source-label {font:700 25px David,serif;line-height:1.18;white-space:pre-line}
+.source-times {font:700 27px David,serif;line-height:1.35;direction:ltr;overflow-wrap:anywhere}
+.source-time {display:inline-block;white-space:normal;vertical-align:middle}
+.source-time small {display:block;text-align:center;font:700 17px David,serif}
+.source-note {grid-column:1/-1;margin:0;font-size:21px;line-height:1.25}
+.source-heading {font:700 25px David,serif;color:#786338;margin:12px 0 6px;line-height:1.25}
+.source-heading small {font:16px Arial;white-space:nowrap}
+.weekly-service {border-top:1px solid #dedace;padding:10px 0}
+.weekly-service h3 {font:700 29px David,serif;margin:0 0 5px}
+.weekly-scope {font:700 19px David,serif;line-height:1.25;margin:4px 0;color:#536176}
+.weekly-pattern.exception {margin-top:7px}
+.weekly-references p {font:700 18px David,serif;line-height:1.3;margin:5px 0}
+.schedule-page-label {font-weight:bold;white-space:nowrap}
+.tv-stage[data-theme="dark"] .source-row,.tv-stage[data-theme="dark"] .weekly-service {border-color:#34445C}
+.tv-stage[data-theme="dark"] .source-heading,.tv-stage[data-theme="dark"] .weekly-service h3 {color:#D8B76A}
+.tv-stage[data-theme="dark"] .weekly-scope {color:#C5CEDB}
+.special-body {display:flow-root}
+.source-heading {margin-top:8px}
+.complete-special .tv-panel-title {font-family:David,serif;font-size:29px}
+.source-label {white-space:normal}
+.weekly-scope {font-size:18px;margin:3px 0}
+.weekly-service {padding:7px 0}
+.weekly-service h3 {font-size:27px}
+.weekly-body .source-times {font-size:26px;line-height:1.25}
+.replacement-word {font:700 19px David,serif;margin:0 8px}
+
+/* TV schedules separate times with space, preserving all location marks. */
+.time-sep:empty {display:inline-block;width:12px}
+.time-gap {display:inline-block;width:18px}
+/* Distance-readable TV presentation. Shared by the display and its previews. */
+.tv-stage {padding:28px 32px 0;gap:18px}
+.tv-head {height:100px;padding-bottom:16px;border-bottom-width:1px}
+.tv-brand {font-size:43px}
+.tv-brand small {font-size:16px;margin-top:4px}
+.tv-clock {font-size:64px;font-weight:700}
+.tv-date {font-size:22px;line-height:1.35}
+.tv-layout {gap:18px}
+.tv-center {gap:18px}
+.tv-panel {padding:20px 22px;border-radius:14px}
+.tv-panel-title,.complete-special .tv-panel-title {font:700 34px David,serif;line-height:1.12;margin-bottom:8px}
+.tv-panel-date {font-size:20px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #dedace}
+.source-heading {font-size:29px;padding:8px 12px;margin:10px 0 4px;background:#eee7d6;border-radius:7px}
+.source-heading small {font-size:17px;margin-inline-start:10px}
+.source-row {grid-template-columns:minmax(0,1.1fr) minmax(110px,.9fr);padding:10px 0;column-gap:16px;border-top:0;border-bottom:1px solid #dedace}
+.source-label {font-size:28px;line-height:1.2}
+.source-times,.weekly-body .source-times {font-size:31px;line-height:1.3;font-variant-numeric:tabular-nums}
+.source-time {white-space:nowrap}
+.source-time small {font-size:19px}
+.source-note {font-size:22px}
+.weekly-service {padding:12px 0;border-top:0;border-bottom:1px solid #dedace}
+.weekly-service h3 {font-size:32px;margin-bottom:6px}
+.weekly-pattern {padding:3px 0}
+.weekly-pattern.exception {margin-top:8px;padding:8px 12px;background:#f2ecdf;border-radius:7px}
+.weekly-scope {font-size:22px;line-height:1.2;margin:0 0 5px}
+.weekly-references p {font-size:20px;margin-top:9px}
+.schedule-page-label {display:inline-block;padding:2px 9px;border-radius:5px;background:#eee7d6;margin-left:8px}
+.tv-side {width:300px;gap:18px}
+.tv-card {border-radius:14px}
+.tv-card .eyebrow {font-size:17px;letter-spacing:.7px}
+.tv-card h2 {font-size:31px;line-height:1.15}
+.tv-card p {font-size:26px;line-height:1.4}
+.tv-card .contact {font-size:25px;padding-top:12px;border-top:1px solid #dedace}
+.tv-card .contact bdi:last-child {font-weight:700;font-variant-numeric:tabular-nums}
+.tv-footer {margin:0 -32px;padding:14px 32px;min-height:94px;gap:22px}
+.tv-footer strong {font-size:48px}
+.tv-footer .next-label {font-size:22px}
+.tv-footer .next-place {font-size:27px}
+.tv-footer .key {font-size:18px;line-height:1.45}
+.tv-stage[data-theme="dark"] .source-heading,
+.tv-stage[data-theme="dark"] .schedule-page-label {background:#24344b}
+.tv-stage[data-theme="dark"] .weekly-pattern.exception {background:#1c2b40}
+.tv-stage[data-theme="dark"] .tv-panel-date,
+.tv-stage[data-theme="dark"] .source-row,
+.tv-stage[data-theme="dark"] .weekly-service,
+.tv-stage[data-theme="dark"] .tv-card .contact {border-color:#34445C}
+
+/* Dense weeks retain every entry with tighter spacing, never smaller time text. */
+.weekly-compact .weekly-service {padding:5px 0}
+.weekly-compact .weekly-pattern {padding:0}
+.weekly-compact .weekly-pattern.exception {padding:4px 8px;margin-top:4px}
+.weekly-compact .weekly-scope {font-size:20px;margin-bottom:3px}
+.weekly-compact .weekly-service h3 {font-size:29px;margin-bottom:3px}
+.weekly-compact .source-heading {margin:5px 0 2px;padding:4px 8px;font-size:26px}
+.weekly-compact .source-row {padding:5px 0}
+.weekly-compact .weekly-references p {margin:3px 0;font-size:19px}
+.weekly-compact .source-label {font-size:26px}
+/* Modern TV typography and app-style aligned time columns. */
+.tv-stage :is(.tv-brand,.tv-date b,.tv-panel-title,.complete-special .tv-panel-title,.source-heading,.source-label,.source-times,.weekly-body .source-times,.source-time small,.weekly-service h3,.weekly-scope,.weekly-references p,.tv-footer strong) {font-family:Arial,sans-serif}
+.tv-brand {font-size:35px;font-weight:600}
+.tv-panel-title,.complete-special .tv-panel-title {font-size:29px;line-height:1.3}
+.weekly-pattern {display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:14px;align-items:start;padding:6px 0}
+.weekly-pattern .weekly-row-label {grid-column:2;grid-row:1;font-size:26px;line-height:1.3;margin:0}
+.weekly-pattern .source-times {grid-column:1;grid-row:1}
+.source-times {display:grid;grid-template-columns:repeat(auto-fill, minmax(88px,1fr));gap:10px 12px;align-items:start;font-weight:600}
+.source-times .time-sep {display:none}
+.source-times .source-time {min-width:0;white-space:normal}
+.source-times .source-time bdi {white-space:normal}
+.source-times:has(.source-time:only-child) {display:block}
+.weekly-body .source-times {font-size:29px;line-height:1.35}
+.source-label {font-size:25px;line-height:1.3}
+.source-heading {font-size:26px}
+.weekly-pattern.exception {background:#edf0f3;border-radius:6px}
+.tv-stage[data-theme="dark"] :is(.tv-brand,.tv-date b,.tv-panel-title,.tv-card h2) {color:#F5F2EA}
+.tv-stage[data-theme="dark"] :is(.source-heading,.weekly-service h3) {color:#c3d5e5}
+.tv-stage[data-theme="dark"] .source-heading {background:#203044}
+.tv-stage[data-theme="dark"] .weekly-pattern.exception {background:#203044}
+.weekly-compact .weekly-pattern .weekly-row-label {font-size:26px}
+
+.shabbos-overview {display:grid!important;grid-template-columns:1fr 1fr;gap:24px}
+.shabbos-overview>div {min-width:0}
+.shabbos-overview .source-row {grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);padding:8px 0}
+.shabbos-overview .source-label {font-size:23px}
+.shabbos-overview .source-times {font-size:28px}
+.shabbos-overview .source-heading {font-size:24px;padding:6px 9px}
+
+/* Hebrew reading order, named reckonings and supporting zmanim. */
+.shabbos-overview>div:first-child {grid-column:2;grid-row:1}
+.shabbos-overview>div:last-child {grid-column:1;grid-row:1}
+.source-time {position:relative}
+.source-time:has(small) {display:inline-flex;flex-direction:column;align-items:center}
+.source-time small {order:-1;margin-bottom:3px}
+.has-plag .source-note {grid-column:1;direction:ltr;font-size:21px;line-height:1.2;color:#697785}
+.tv-stage[data-theme="dark"] .has-plag .source-note {color:#C5CEDB}
+.tv-stage[data-theme="dark"] :is(.tv-brand,.tv-date b,.tv-panel-title,.tv-card h2,.source-heading,.weekly-service h3) {color:#D8B76A}
+.tv-stage[data-theme="dark"] .source-heading {background:#243044;border-right:3px solid #D8B76A}
+.schedule-page-label:empty {display:none}
+.shabbos-overview .source-row {padding:6px 0}
+.shabbos-overview .has-plag {row-gap:3px}

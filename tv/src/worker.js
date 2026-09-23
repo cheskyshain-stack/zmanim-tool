@@ -1,6 +1,8 @@
+import { readAppearance, saveAppearance } from './appearance.js';
+import { themeAt } from '../public/display-assets/appearance.js';
 import { actor, allow, ApiError, CAPABILITIES } from "./auth.js";
 import { validate, conflicts, publicItem, publicItems, warnings, text } from "./model.js";
-import { scheduleSnapshot, catalog, dateInfo } from "./schedules.js";
+import { scheduleSnapshot, catalog, dateInfo, previewMonth } from "./schedules.js";
 import { phase, localStamp } from "../public/display-assets/time.js";
 const json = (x, status = 200) => Response.json(x, { status });
 const decode = (r) => ({ id: r.id, kind: r.kind, status: r.status, internalName: r.internal_name, title: r.title, startsAt: r.starts_at, endsAt: r.ends_at, data: JSON.parse(r.data_json), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by, updatedBy: r.updated_by });
@@ -32,21 +34,21 @@ async function body(req) {
     throw new ApiError(400, "Invalid JSON.");
   }
 }
-async function snapshot(items, at, preview = false) {
+async function snapshot(items, at, preview = false, appearance) {
   const controls = items.filter((i) => i.kind === "schedule"), schedule = scheduleSnapshot(at, controls);
   const boundaries = items.filter((i) => i.status === "published").flatMap((i) => [i.startsAt, i.endsAt, i.data.previewAt]).filter((x) => x && x > at);
   const today = dateInfo(schedule.date);
   boundaries.push(today.civilEnd);
   if (today.sunset > at) boundaries.push(today.sunset);
   if (schedule.next) boundaries.push(schedule.next.at);
-  return { at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at) : [] };
+  return { appearance, theme: themeAt(appearance, at), at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at) : [] };
 }
 async function handle(req, env) {
   const url = new URL(req.url), path = url.pathname;
   if (path === "/api/display/public" && req.method === "GET") {
     const at = new Date().toISOString();
     const items = (await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
-    return json(await snapshot(items, at));
+    return json(await snapshot(items, at, false, await readAppearance(env.DB)));
   }
   const isAdmin = path.startsWith("/admin/display") || path.startsWith("/api/display/");
   let who;
@@ -67,6 +69,11 @@ async function handle(req, env) {
       const d = await body(req);
       return json(dateInfo(d.date, d.hebrew));
     }
+    if(path === '/api/display/admin/calendar' && req.method === 'GET') {
+      const month=url.searchParams.get('month');
+      if(!/^(20\d{2})-(0[1-9]|1[0-2])$/.test(month||''))throw new ApiError(422,'Choose a month between 2000 and 2099.');
+      return json(previewMonth(month));
+    }
     if (path === "/api/display/admin/preview" && req.method === "POST") {
       const raw = await body(req), at = new Date(raw.at).toISOString();
       if (+new Date(at) < Date.parse("2000-01-01") || +new Date(at) > Date.parse("2100-01-01")) throw new ApiError(422, "Choose a preview between 2000 and 2099.");
@@ -77,9 +84,14 @@ async function handle(req, env) {
         items = items.filter((i) => i.id !== raw.item.id);
         items.push({ ...draft, id: raw.item.id || "unsaved-preview" });
       }
-      const result = await snapshot(items, at, true);
+      const result = await snapshot(items, at, true, await readAppearance(env.DB));
       result.timeline = items.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ id: i.id, title: i.internalName || i.title, phase: phase(i, at) }));
       return json(result);
+    }
+    if (path === '/api/display/admin/appearance') {
+      allow(who, 'full');
+      if (req.method === 'GET') return json(await readAppearance(env.DB, true));
+      if (req.method === 'PUT') return json(await saveAppearance(env.DB, await body(req), who.email));
     }
     if (path === "/api/display/admin/permissions") {
       allow(who, "full");

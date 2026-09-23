@@ -1,3 +1,5 @@
+import {previewCalendar} from './preview-calendar.js';
+import { validateAppearance, appearanceSummary } from './appearance.js';
 import { DisplayView, cardHTML, escapeHTML as esc, announcementPages } from "./renderer.js";
 import { localStamp, localToISO, formatInstant, addDays, phase } from "./time.js";
 const app = document.querySelector("#admin"), dialog = document.querySelector("#confirm");
@@ -60,13 +62,14 @@ async function dashboard() {
   dirty = false;
   try {
     items = await api("items");
-    page(`<h1>Manage TV Display</h1><p class="subtitle">Keep the shul informed. Set the dates once, and the screen takes care of the rest.</p>${me.local ? '<div class="notice">LOCAL DEVELOPMENT · Nothing here has been deployed to the public website.</div>' : ""}<div class="toolbar">${can("announcement") ? '<button class="primary" data-new="announcement">+ Add announcement</button>' : ""}${can("dedication") ? '<button class="primary" data-new="dedication">+ Add פרנס היום</button>' : ""}${can("schedule") ? '<button data-new="schedule">Manage display schedules</button>' : ""}<button id="preview-screen">Preview screen</button>${can("full") ? '<button id="permissions">Permissions</button>' : ""}</div><div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => phase(i, (/* @__PURE__ */ new Date()).toISOString()) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="error" class="error" role="alert"></div><div id="list"></div><p class="identity">${esc(me.email)} · All scheduling uses America/New_York · <a href="/cdn-cgi/access/logout">Sign out</a></p>`);
+    page(`<h1>Manage TV Display</h1><p class="subtitle">Keep the shul informed. Set the dates once, and the screen takes care of the rest.</p>${me.local ? '<div class="notice">LOCAL DEVELOPMENT · Nothing here has been deployed to the public website.</div>' : ""}<div class="toolbar">${can("announcement") ? '<button class="primary" data-new="announcement">+ Add announcement</button>' : ""}${can("dedication") ? '<button class="primary" data-new="dedication">+ Add פרנס היום</button>' : ""}${can("schedule") ? '<button data-new="schedule">Manage display schedules</button>' : ""}<button id="preview-screen">Preview screen</button>${can("full") ? '<button id="appearance">Appearance</button><button id="permissions">Permissions</button>' : ""}</div><div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => phase(i, (/* @__PURE__ */ new Date()).toISOString()) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="error" class="error" role="alert"></div><div id="list"></div><p class="identity">${esc(me.email)} · All scheduling uses America/New_York · <a href="/cdn-cgi/access/logout">Sign out</a></p>`);
     document.querySelectorAll("[data-new]").forEach((b) => b.onclick = () => edit({ kind: b.dataset.new, status: "draft", data: {} }));
     document.querySelectorAll("[data-filter]").forEach((b) => b.onclick = () => {
       filter = b.dataset.filter;
       dashboard();
     });
     document.querySelector("#preview-screen").onclick = () => preview();
+    document.querySelector("#appearance")?.addEventListener("click", appearance);
     document.querySelector("#permissions")?.addEventListener("click", permissions);
     document.querySelector("#search").oninput = (e) => {
       search = e.target.value;
@@ -294,13 +297,17 @@ async function edit(s, unsaved = false) {
 }
 async function preview(item = null, back = dashboard) {
   dirty = !!item;
-  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview screen</h1><p class="subtitle">Private preview using the same components as the TV. Nothing here is published.</p><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${localStamp()}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="preview-host" id="preview-host"></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
+  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview calendar</h1><p class="subtitle">Private preview using the same components as the TV. Nothing here is published.</p><section class="panel" id="preview-calendar"></section><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${localStamp()}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="preview-host" id="preview-host"></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
   document.querySelector("#back").onclick = back;
   previewView = new DisplayView(document.querySelector("#preview-host"));
-  let result;
+  let result, previewRequest=0;
+  const host=document.querySelector("#preview-host");
   const run = async () => {
+    const token=++previewRequest;
     try {
-      result = await api("preview", "POST", { at: localToISO(document.querySelector("#at").value, document.querySelector("#fold").value), item });
+      const loaded = await api("preview", "POST", { at: localToISO(document.querySelector("#at").value, document.querySelector("#fold").value), item });
+      if(token!==previewRequest||!host.isConnected)return;
+      result=loaded;
       previewView.update(result, { preview: true });
       const warnings = [...result.warnings, ...previewView.warning];
       document.querySelector("#warnings").hidden = !warnings.length;
@@ -310,6 +317,12 @@ async function preview(item = null, back = dashboard) {
       showError(e);
     }
   };
+  const calendar=previewCalendar(document.querySelector('#preview-calendar'),api,date=>{
+    const at=document.querySelector('#at');at.value=date+'T'+(at.value.split('T')[1]||'12:00');
+    run();
+  });
+  document.querySelector('#at').onchange=()=>{calendar.select(document.querySelector('#at').value.slice(0,10));run();};
+  document.querySelector('#fold').onchange=run;
   document.querySelector("#apply").onclick = run;
   previewTimer = setInterval(() => {
     if (result) {
@@ -347,4 +360,25 @@ try {
   dashboard();
 } catch (e) {
   page(`<h1>Manage TV Display</h1><div class="error">${esc(e.message)}</div><p>Display management requires server-verified sign-in. The main admin PIN does not grant these permissions.</p>`);
+}
+
+async function appearance() {
+ try {
+  let saved=await api('appearance'), snapshot, override=null;
+  page(`<h1>Appearance</h1><p>Choose how the TV looks. Changes take effect after saving.</p><div id="error" class="error" role="alert"></div><form id="appearance-form"><label>Theme<select id="appearance-mode"><option value="light">Light</option><option value="dark">Dark</option><option value="scheduled">Scheduled</option></select></label><div id="appearance-times" class="toolbar"><label>Dark begins<input id="dark-start" type="time" required></label><label>Light begins<input id="light-start" type="time" required></label></div><p id="appearance-summary" aria-live="polite"></p><p>Scheduled times use America/New_York. During a spring clock change, a skipped time starts when the clock resumes. A repeated fall time uses its first occurrence.</p><div class="actions"><button class="primary" type="submit">Save appearance</button><button type="button" id="appearance-cancel">Back</button></div></form><h2>Private preview</h2><p>Preview colors immediately without changing the live screen.</p><div class="toolbar"><button id="preview-light">Preview Light</button><button id="preview-dark">Preview Dark</button><button id="preview-setting">Use selected setting</button><label>Preview at (New York)<input id="appearance-at" type="datetime-local" value="${localStamp()}"></label><button id="appearance-load">Update preview time</button></div><p id="appearance-preview-label" aria-live="polite"></p><div class="preview-host" id="appearance-preview"></div>`);
+  const mode=document.querySelector('#appearance-mode'), dark=document.querySelector('#dark-start'), light=document.querySelector('#light-start');
+  mode.value=saved.mode;dark.value=saved.darkStart;light.value=saved.lightStart;
+  previewView=new DisplayView(document.querySelector('#appearance-preview'));
+  const draft=()=>validateAppearance({mode:mode.value,darkStart:dark.value,lightStart:light.value});
+  const draw=()=>{if(snapshot)previewView.update({...snapshot,appearance:draft()},{preview:true,theme:override});document.querySelector('#appearance-preview-label').textContent=override?`${override==='dark'?'Dark':'Light'} preview only`: 'Preview follows your selected setting';};
+  const change=()=>{document.querySelector('#appearance-times').hidden=mode.value!=='scheduled';try{document.querySelector('#appearance-summary').textContent=appearanceSummary(draft());document.querySelector('#error').textContent='';draw();}catch(e){showError(e);}};
+  async function load(){try{snapshot=await api('preview','POST',{at:localToISO(document.querySelector('#appearance-at').value,'earlier')});draw();}catch(e){showError(e);}}
+  document.querySelector('#appearance-form').oninput=()=>{dirty=true;override=null;change();};
+  document.querySelector('#appearance-form').onsubmit=async e=>{e.preventDefault();try{saved=await api('appearance','PUT',{...draft(),version:saved.version});dirty=false;toast('Appearance saved. Open TVs update automatically.');}catch(e){showError(e);}};
+  document.querySelector('#appearance-cancel').onclick=()=>leave(dashboard);
+  for(const color of ['light','dark'])document.querySelector('#preview-'+color).onclick=()=>{override=color;try{draw();}catch(e){showError(e);}};
+  document.querySelector('#preview-setting').onclick=()=>{override=null;change();};
+  document.querySelector('#appearance-load').onclick=load;
+  change();await load();previewTimer=setInterval(()=>{try{draw();}catch{}},1000);
+ } catch(e){showError(e);}
 }

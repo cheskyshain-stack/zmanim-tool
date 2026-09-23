@@ -17,6 +17,8 @@ test("signed Access identity, issuer, audience, expiry and granular server permi
     const denied = await worker.fetch(request(token, "/api/display/admin/items", "POST", { kind: "dedication" }), env);
     assert.equal(denied.status, 403);
     assert.equal((await worker.fetch(request(token, "/api/display/admin/permissions"), env)).status, 403);
+    assert.equal((await worker.fetch(request(token, "/api/display/admin/appearance"), env)).status, 403);
+    assert.equal((await worker.fetch(request(token, "/api/display/admin/appearance", "PUT", {mode:"dark"}), env)).status, 403);
     const badAudience = await new SignJWT({ email: "announcements@example.com" }).setProtectedHeader({ alg: "RS256", kid: "display-test" }).setIssuer("https://display-test.cloudflareaccess.com").setAudience("another-app").setExpirationTime("5m").sign(privateKey);
     await assert.rejects(identity(request(badAudience), env), /expired/);
     const expired = await new SignJWT({ email: "announcements@example.com" }).setProtectedHeader({ alg: "RS256", kid: "display-test" }).setIssuer("https://display-test.cloudflareaccess.com").setAudience("display-audience").setExpirationTime(1).sign(privateKey);

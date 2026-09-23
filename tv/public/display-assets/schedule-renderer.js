@@ -1,0 +1,47 @@
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const date=d=>new Date(d+'T12:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+const rich=v=>esc(v).replace(/\uE000/g,'<u>').replace(/\uE001/g,'</u>').replace(/\n/g,'<br>').replace(/\u00a0/g,' ');
+function times(ts,sep=""){return ts.map(t=>`<span class="source-time"><bdi dir="ltr">${t.underlined?'<u>':''}${rich(String(t.text??'').replace(/\s*\/\s*/g,'\u2003'))}${t.underlined?'</u>':''}${esc(t.mark)}</bdi>${t.name?`<small dir="rtl">${esc(t.name)}</small>`:''}</span>`).join(` <span class="time-sep">${esc(sep.replace(/\//g,'').trim())}</span> `);}
+export function sourceRow(row){return `<div class="source-row${row.plagDetail?' has-plag':''}" data-source-id="${esc(row.id)}"><div class="source-times">${times(row.times||[],row.sep)}</div><div class="source-label" dir="rtl">${rich(row.label)}</div>${row.note?`<p class="source-note" dir="auto">${rich(row.note)}</p>`:''}</div>`;}
+function eventTimes(events){const source=events.find(e=>e.sourceText);if(source)return times([{text:source.sourceText}]);return times(events.map(e=>({text:e.time,underlined:/למטה/.test(e.place),mark:/אולם/.test(e.place)?'**':/בעזר/.test(e.place)?'*':'',name:!['בית מדרש','למטה','בעזר״נ','באולם השמחות',''].includes(e.place)?e.place:''})));}
+function scope(days){
+ const groups=new Map();
+ for(const d of days){const pieces=d.label.split(' · '),day=pieces.pop(),occasion=pieces.join(' · ');if(!groups.has(occasion))groups.set(occasion,[]);groups.get(occasion).push(day);}
+ return [...groups].map(([occasion,labels])=>`${esc(occasion)}${occasion?' · ':''}${[...new Set(labels)].map(esc).join(' · ')}`).join(' · ');
+}
+function pattern(g,i,name){
+ const label=i?scope(g.days):esc(name);
+ return `<div class="weekly-pattern${i?' exception':''}"><h3 class="weekly-row-label" dir="rtl">${label}</h3><div class="source-times">${eventTimes(g.events)}</div>${g.events.some(e=>e.note)?`<p class="source-note">${g.events.map(e=>esc(e.note||'')).filter(Boolean).join(' · ')}</p>`:''}</div>`;
+}export function fullSchedules(p,upcoming=""){
+ const w=p.weekly;
+ const services=w.services.map(service=>{const groups=service.groups.filter(g=>g.events.length);return `<section class="weekly-service">${groups.map((g,i)=>pattern(g,i,service.name)).join('')}</section>`;}).join(''); const s=p.special;
+ return `<section class="tv-panel weekly-reference"><h2 class="tv-panel-title" dir="rtl">${esc(w.title)}</h2><p class="tv-panel-date">${date(w.from)} – ${date(w.to)} · לוח השבוע</p><div class="weekly-body">${services}${(w.posterSections||[]).map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${section.dates.map(date).join(', ')}</small></h3>${section.morningExclusion?`<p class="weekly-scope" dir="rtl">${esc(section.morningExclusion)}</p>`:''}${section.rows.map(sourceRow).join('')}</section>`).join('')}<div class="weekly-references">${w.references.map(r=>`<p dir="rtl">${esc(r.label)} <bdi>(${date(r.date)})</bdi>: ${esc(r.text)}</p>`).join('')}</div>${upcoming}</div></section>${s?`<section class="tv-panel complete-special"><h2 class="tv-panel-title" dir="rtl">${esc(s.title)}</h2><p class="tv-panel-date">${date(s.from)} – ${date(s.to)} <span class="schedule-page-label"></span></p><div class="special-body">${s.sections.map(section=>`<section class="source-section"><h3 class="source-heading" dir="rtl">${esc(section.heading)} <small dir="ltr">${date(section.date)}</small></h3>${section.rows.map(sourceRow).join('')}</section>`).join('')}</div></section>`:''}`;
+}
+/** Measure actual typography. Never discard rows or shrink them to fit. */
+export function paginateSpecial(stage){
+ const panel=stage.querySelector('.complete-special'),body=panel?.querySelector('.special-body');
+ if(!body)return null;
+ const height=body.clientHeight-18,pages=[];let page=document.createElement('div');page.style.display='flow-root';body.replaceChildren(page);
+ const source=panel._sections; // caller supplies the original rendered sections
+ if(!source)return null;
+ // Ordinary Shabbos is a complete reference: show Friday alongside Shabbos/Motzai
+ // when both columns fit at the normal readable font size.
+ const ordinary=source.length&&source.every(section=>[...section.querySelectorAll('[data-source-id]')].every(row=>row.dataset.sourceId.startsWith('chart:')));
+ if(ordinary&&panel.clientWidth>=850){
+   page.className='shabbos-overview';
+   const evening=document.createElement('div'),day=document.createElement('div');
+   source.forEach((section,i)=>(i===0?evening:day).append(section.cloneNode(true)));
+   page.append(evening,day);
+   if(page.scrollHeight<=height){return {pages:[page.outerHTML],body,label:panel.querySelector('.schedule-page-label')};}
+   page.replaceChildren();page.className='';
+ }
+ let current=null;
+ const newSection=heading=>{const section=document.createElement('section');section.className='source-section';section.append(heading.cloneNode(true));page.append(section);return section;};
+ for(const section of source){const heading=section.querySelector('.source-heading');current=newSection(heading);
+  for(const row of section.querySelectorAll('.source-row')){const copy=row.cloneNode(true);current.append(copy);
+   if(page.scrollHeight>height && page.querySelectorAll('.source-row').length>1){copy.remove();if(!current.querySelector('.source-row'))current.remove();pages.push(page.innerHTML);page=document.createElement('div');page.style.display='flow-root';body.replaceChildren(page);current=newSection(heading);current.append(copy);}
+  }
+ }
+ if(page.querySelector('.source-row'))pages.push(page.innerHTML);
+ body.innerHTML=pages[0]||'';return {pages,body,label:panel.querySelector('.schedule-page-label')};
+}
