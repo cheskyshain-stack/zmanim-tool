@@ -86,8 +86,20 @@ export function consolidateWeek(days) {
  });
 }
 export function schedulePresentation({serial,state,settings,tables,day,instant,sunset}) {
- const start=serial-excelWeekday(serial)+1, sat=start+6;
+ let start=serial-excelWeekday(serial)+1, sat=start+6;
  const holy=s=>!!agendaDayKind(s,settings).holy;
+ // Advance only the weekday reference after its final applicable minyan.
+ // The active connected holy-day group below remains tied to the real instant.
+ const weekdayInstants=[];
+ for(let s=start;s<sat;s++){
+  if(holy(s))continue;
+  const next=hebrewDateExtended(s+1),ownsErev=holy(s+1);
+  const entireErev=ownsErev&&((next.month===7&&[1,10].includes(next.dayOfMonth))||(next.month===1&&next.dayOfMonth===15));
+  if(entireErev)continue;
+  for(const event of day(s).events)if(!ownsErev||event.mins<720)weekdayInstants.push(Date.parse(event.at));
+ }
+ if(weekdayInstants.length&&Date.parse(instant)>Math.max(...weekdayInstants)+5*60000){start+=7;sat+=7;}
+
  const span=s=>{let first=s,last=s;while(holy(first-1))first--;while(holy(last+1))last++;return {first,last};};
  // Retain yesterday's group through its last closing event, even after midnight.
  const candidates=[];for(let s=serial-1;s<=serial+8;s++)if(holy(s)){const g=span(s);if(!candidates.some(x=>x.first===g.first))candidates.push(g);}
