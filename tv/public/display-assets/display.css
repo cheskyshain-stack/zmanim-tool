@@ -547,3 +547,4 @@ button {
 /* Times read left to right and wrap only between complete entries. */
 .source-times,.weekly-body .source-times,.festival-day .source-times,.source-times:has(.source-time:only-child){display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:flex-end;gap:9px 24px;direction:ltr;text-align:left}
 .source-times .source-time{flex:0 0 auto;white-space:nowrap;text-align:left}.source-times .source-time bdi{white-space:nowrap}.source-time:has(small){align-items:flex-start}.has-plag .source-times{align-items:flex-end}
+.has-plag .source-time:has(small){align-items:center}.has-plag .source-time small{width:100%;text-align:center}
