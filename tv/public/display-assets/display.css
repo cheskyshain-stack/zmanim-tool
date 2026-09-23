@@ -554,3 +554,5 @@ button {
 .tv-center{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .static-dense .source-label,.static-dense .source-times{font-size:24px}.static-dense .source-heading{font-size:21px}.static-dense .source-note{font-size:16px}.static-dense .source-row{grid-template-columns:minmax(0,1fr) minmax(80px,1fr);gap:2px 6px}.static-dense .source-times{gap:4px 10px}
 .static-dense .source-row{padding:0}.static-dense .source-heading{margin:2px 0;padding:2px}
+.weekly-compact .source-row{padding:2px 0}.weekly-compact .source-heading{padding:3px 5px;margin:3px 0}.weekly-compact .source-note{font-size:18px;margin:2px 0}.weekly-compact .source-times{gap:6px 18px}
+.tv-stage:has(.weekly-compact){gap:8px}.tv-stage:has(.weekly-compact) .tv-head{height:72px}.tv-stage:has(.weekly-compact) .shul-bottom{min-height:78px}.tv-stage:has(.weekly-compact) .shul-donate img{width:66px;height:66px}.tv-stage:has(.weekly-compact) .tv-footer{min-height:50px}

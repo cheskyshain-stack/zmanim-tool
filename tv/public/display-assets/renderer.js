@@ -98,6 +98,12 @@ export class DisplayView {
       this.stage.innerHTML = html;
       this.lastRender = html;
       const center=this.stage.querySelector('.tv-center'),weekly=this.stage.querySelector('.weekly-body');
+      const sections=s.presentation?.special?.sections||[];
+      const dayCount=new Set(sections.map(section=>section.groupDay||section.date)).size;
+      const chartOnly=sections.length&&sections.every(section=>section.rows.every(row=>row.id.startsWith('chart:')));
+      const columns=chartOnly?2:Math.max(2,dayCount);
+      if(center&&sections.length)center.style.gridTemplateColumns=`minmax(0,1fr) minmax(0,${columns}fr)`;
+
       if(center&&weekly){
         if(weekly.scrollHeight>weekly.clientHeight+2) weekly.parentElement.classList.add('weekly-compact');
 
