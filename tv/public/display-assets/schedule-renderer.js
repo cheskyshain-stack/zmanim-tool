@@ -56,13 +56,23 @@ export function paginateSpecial(stage){
   if(page.scrollHeight<=height)return {pages:[page.outerHTML],body,label:panel.querySelector('.schedule-page-label')};
   page.replaceChildren();page.className='';
  }
- let current=null;
- const newSection=heading=>{const section=document.createElement('section');section.className='source-section';section.append(heading.cloneNode(true));page.append(section);return section;};
- for(const section of source){const heading=section.querySelector('.source-heading');current=newSection(heading);
-  for(const row of section.querySelectorAll('.source-row')){const copy=row.cloneNode(true);current.append(copy);
-   if(page.scrollHeight>height && page.querySelectorAll('.source-row').length>1){copy.remove();if(!current.querySelector('.source-row'))current.remove();pages.push(page.innerHTML);page=document.createElement('div');page.style.display='flow-root';body.replaceChildren(page);current=newSection(heading);current.append(copy);}
+ // Dense groups use fixed columns, never rotating pages.
+ panel.classList.add('static-dense');
+ const rows=source.flatMap(section=>[...section.querySelectorAll('.source-row')].map(row=>({row,heading:section.querySelector('.source-heading')})));
+ let best='',bestHeight=Infinity;
+ for(const count of [2,3,4]){
+  page.className='static-schedule-columns';page.style.gridTemplateColumns=`repeat(${count},minmax(0,1fr))`;page.replaceChildren();
+  const columns=Array.from({length:count},()=>{const col=document.createElement('section');col.className='static-schedule-column';page.append(col);return col;});
+  let index=0,previous=null;
+  for(let i=0;i<rows.length;i++){
+   if(index<count-1&&i>=Math.ceil(rows.length*(index+1)/count)){index++;previous=null;}
+   const {row,heading}=rows[i];
+   if(heading!==previous){columns[index].append(heading.cloneNode(true));previous=heading;}
+   columns[index].append(row.cloneNode(true));
   }
+  if(page.scrollHeight<bestHeight){bestHeight=page.scrollHeight;best=page.outerHTML;}
+  if(page.scrollHeight<=height)break;
  }
- if(page.querySelector('.source-row'))pages.push(page.innerHTML);
- body.innerHTML=pages[0]||'';return {pages,body,label:panel.querySelector('.schedule-page-label')};
+ body.innerHTML=best;
+ return {pages:[best],body,label:panel.querySelector('.schedule-page-label')};
 }
