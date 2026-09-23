@@ -297,7 +297,7 @@ async function edit(s, unsaved = false) {
 }
 async function preview(item = null, back = dashboard) {
   dirty = !!item;
-  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview calendar</h1><p class="subtitle">Private preview using the same components as Shul View. Nothing here is published.</p><section class="panel" id="preview-calendar"></section><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${localStamp()}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="preview-host" id="preview-host"></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
+  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview calendar</h1><p class="subtitle">Private preview using the same components as Shul View. Nothing here is published.</p><section class="panel" id="preview-calendar"></section><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${localStamp()}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="toolbar"><button id="preview-prev" type="button">← Previous day</button><span>Swipe the preview to change dates</span><button id="preview-next" type="button">Next day →</button></div><div class="preview-host" id="preview-host" tabindex="0" aria-label="Schedule preview. Swipe left for next day or right for previous day."></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
   document.querySelector("#back").onclick = back;
   previewView = new DisplayView(document.querySelector("#preview-host"));
   let result, previewRequest=0;
@@ -322,6 +322,22 @@ async function preview(item = null, back = dashboard) {
     run();
   });
   document.querySelector('#at').onchange=()=>{calendar.select(document.querySelector('#at').value.slice(0,10));run();};
+  const moveDay=delta=>{
+    const at=document.querySelector('#at'),[date,time]=at.value.split('T');
+    if(!date)return;
+    const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+delta);
+    const next=d.toISOString().slice(0,10);if(next<'2000-01-01'||next>'2099-12-31')return;
+    at.value=next+'T'+(time||'12:00');document.querySelector('#fold').value='';calendar.select(next);run();
+  };
+  document.querySelector('#preview-prev').onclick=()=>moveDay(-1);
+  document.querySelector('#preview-next').onclick=()=>moveDay(1);
+  host.style.touchAction='pan-y pinch-zoom';
+  let gesture=null;
+  host.addEventListener('pointerdown',e=>{if(!e.isPrimary){gesture=null;return;}gesture={id:e.pointerId,x:e.clientX,y:e.clientY};});
+  host.addEventListener('pointercancel',()=>{gesture=null;});
+  host.addEventListener('pointerup',e=>{const g=gesture;gesture=null;if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;if(Math.abs(dx)>=50&&Math.abs(dx)>Math.abs(dy)*1.5){host.dataset.swiped='true';setTimeout(()=>delete host.dataset.swiped,350);moveDay(dx<0?1:-1);}});
+  host.addEventListener('click',e=>{if(host.dataset.swiped){e.preventDefault();e.stopPropagation();}},true);
+  host.addEventListener('keydown',e=>{if(e.target!==host)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();moveDay(e.key==='ArrowRight'?1:-1);}});
   document.querySelector('#fold').onchange=run;
   document.querySelector("#apply").onclick = run;
   previewTimer = setInterval(() => {
