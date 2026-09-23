@@ -81,7 +81,7 @@ export function downloadPublished(payload) {
  *  is what makes the one already on the site right without anybody having to.
  *
  *  The overrides are cleaned the same way, for the cells the rule had already been typed into. */
-function withoutRetiredDrasha(data) {
+export function withoutRetiredDrasha(data) {
   if (!data) return data;
   const rules = (data.rules || []).filter((r) => !isRetiredDrashaRule(r) && !isRetiredTishaBavRule(r));
   const sheets = (data.sheets || []).map((sheet) => {

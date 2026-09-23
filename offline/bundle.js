@@ -20549,7 +20549,8 @@ function renderNav() {
   const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
   nav.innerHTML = group('Schedules', ['week', 'charts', 'posters', 'status'].map(button).join('')
       + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
-    + group('Management', ['traffic', 'settings'].map(button).join(''))
+    + group('Management', ['traffic', 'settings'].map(button).join('')
+      + `<a class="nav-btn" href="/admin/display/">${icon('site')}<span>Manage TV Display</span></a>`)
     + group('Help', ['calc', 'guide'].map(button).join(''))
     + `<a class="nav-btn admin-site-link" href="/">${icon('site')}<span>View Website</span></a>`;
   nav.querySelectorAll('button[data-tab]').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.tab)));

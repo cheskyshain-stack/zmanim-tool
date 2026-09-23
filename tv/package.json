@@ -1,0 +1,19 @@
+{
+  "name": "lakewood-tv-display",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.local.jsonc --ip 127.0.0.1 --port 8795",
+    "db:local": "wrangler d1 migrations apply shul-display --local --config wrangler.local.jsonc",
+    "test": "node --test --test-isolation=none tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "test:browser": "node tests/browser.cjs && node tests/layout.cjs && node tests/lifecycle.cjs && node tests/publish.cjs"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0",
+    "esbuild": "0.28.1"
+  }
+}

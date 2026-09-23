@@ -1,0 +1,26 @@
+{
+  "name": "shul-tv-display",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-23",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "DISPLAY_ADMINS": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shul-display",
+      "database_id": "REPLACE_BEFORE_DEPLOYMENT",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "minify": true
+}

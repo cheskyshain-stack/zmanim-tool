@@ -1,0 +1,131 @@
+const { chromium } = require("playwright");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const base = process.env.DISPLAY_TEST_URL || "http://127.0.0.1:8795";
+const ids = [];
+async function api(path, method = "GET", body) {
+  const r = await fetch(base + "/api/display/admin/" + path, { method, headers: { "Content-Type": "application/json", Origin: base, "X-Display-Request": "1" }, body: body ? JSON.stringify(body) : void 0 });
+  const x = await r.json();
+  if (!r.ok) throw Error(JSON.stringify(x));
+  return x;
+}
+(async () => {
+  fs.mkdirSync("test-results", { recursive: true });
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  try {
+    const add = async (body) => {
+      const i = await api("items", "POST", body);
+      ids.push(i.id);
+      return i;
+    };
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(/* @__PURE__ */ new Date());
+    const tomorrow = new Date(Date.parse(today + "T12:00Z") + 864e5).toISOString().slice(0, 10);
+    const common = { status: "published", startLocal: today + "T00:00", endLocal: tomorrow + "T00:00" };
+    await add({ ...common, kind: "announcement", title: "DEVELOPMENT SAMPLE", data: { message: "Community announcements appear here. This is a local preview, not a live announcement.", category: "General reminders", behavior: "pinned", priority: "normal", placement: "left", duration: 15 } });
+    await add({ ...common, kind: "announcement", title: "Sample event card", data: { message: "DEVELOPMENT SAMPLE. Add an approved shiur or community event using the mobile editor.", category: "Shiurim and events", behavior: "rotating", priority: "important", placement: "left", duration: 15 } });
+    for (const name of ["דוגמה לתצוגה בלבד", "Development sample two"]) await add({ ...common, kind: "dedication", data: { sponsor: "DEVELOPMENT SAMPLE", anonymous: false, dedicationType: "לזכות", dedicationName: name, dedicationText: "Preview dedication only. No sponsorship has been published.", sponsorshipDate: today, timing: "civil", duration: 25 } });
+    await page.goto(base + "/display/");
+    await page.waitForSelector(".tv-panel");
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "test-results/display-1920.png" });
+    const overflow = await page.locator(".tv-panel,.tv-card").evaluateAll((es) => es.map((e) => ({ class: e.className, h: e.clientHeight, scroll: e.scrollHeight })));
+    console.log("OVERFLOW", JSON.stringify(overflow));
+    assert.ok(overflow.every((x) => x.scroll <= x.h + 2));
+    await page.setViewportSize({ width: 3840, height: 2160 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "test-results/display-4k.png" });
+    assert.equal(await page.locator(".tv-stage").evaluate((e) => e.getBoundingClientRect().width), 3840);
+    await page.context().setOffline(true);
+    await page.waitForTimeout(300);
+    assert.ok(await page.locator(".tv-stale").isVisible());
+    assert.equal(await page.locator(".tv-panel").count(), 2);
+    assert.match(await page.locator(".tv-footer").innerText(), /Confirm times/);
+    await page.context().setOffline(false);
+    await page.waitForTimeout(500);
+    const rotations = await page.evaluate(async () => {
+      const { DisplayView } = await import("/display-assets/renderer.js");
+      const data = await (await fetch("/api/display/public")).json();
+      const el = document.createElement("div");
+      el.style = "width:1920px;height:1080px;position:absolute;left:-5000px";
+      document.body.append(el);
+      const view = new DisplayView(el);
+      let now = Date.now();
+      view.update(data, { now });
+      const first = el.querySelector(".dedication-name").textContent;
+      view.update(data, { now: now + 26e3 });
+      const second = el.querySelector(".dedication-name").textContent;
+      view.update(data, { now: now + 27e3 });
+      const preserved = el.querySelector(".dedication-name").textContent;
+      view.destroy();
+      el.remove();
+      return { first, second, preserved };
+    });
+    assert.notEqual(rotations.first, rotations.second);
+    assert.equal(rotations.second, rotations.preserved);
+    await page.setViewportSize({ width: 1440, height: 1e3 });
+    await page.goto(base + "/admin/display/");
+    await page.getByRole("button", { name: "+ Add announcement", exact: true }).click();
+    await page.locator("[name=title]").fill("DEVELOPMENT SAMPLE UI");
+    await page.locator("[name=message]").fill("DEVELOPMENT SAMPLE. Created through the actual admin form.");
+    await page.getByRole("button", { name: "Today only", exact: true }).click();
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await page.getByRole("heading", { name: "Manage TV Display", exact: true }).waitFor();
+    const draft = (await api("items")).find((i) => i.title === "DEVELOPMENT SAMPLE UI");
+    assert.ok(draft);
+    ids.push(draft.id);
+    assert.equal(draft.status, "draft");
+    await page.waitForTimeout(4100);
+    await page.screenshot({ path: "test-results/admin-desktop.png" });
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.screenshot({ path: "test-results/admin-mobile.png", fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.getByRole("button", { name: "+ Add פרנס היום", exact: true }).click();
+    await page.locator("[name=sponsor]").fill("DEVELOPMENT SAMPLE");
+    await page.locator("[name=dedicationName]").fill("דוגמה בלבד");
+    await page.locator("[name=sponsorshipDate]").fill("2026-09-23");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "test-results/editor-mobile.png", fullPage: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    assert.match(await page.locator("#exact-times").innerText(), /Sep 22/);
+    await page.locator('[name=hebrewDay]').fill('13');
+    await page.waitForTimeout(200);
+    assert.equal(await page.locator('[name=hebrewDay]').inputValue(),'13');
+    await page.getByRole('button',{name:'Use Hebrew date',exact:true}).click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.locator('[name=sponsorshipDate]').inputValue(),'2026-09-24');
+    await page.locator('[name=sponsorshipDate]').fill('2026-09-23');
+    await page.waitForTimeout(200);
+
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+    await page.waitForSelector(".tv-panel");
+    await page.screenshot({ path: "test-results/preview-mobile.png", fullPage: true });
+    await page.getByRole("button", { name: "← Editor", exact: true }).click();
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await page.getByRole("heading", { name: "Manage TV Display", exact: true }).waitFor();
+    const added = (await api("items")).find((i) => i.kind === "dedication" && i.data.dedicationName === "דוגמה בלבד" && i.status === "draft");
+    assert.ok(added);
+    ids.push(added.id);
+    const fresh = await browser.newContext();
+    const p = await fresh.newPage();
+    await p.goto(base + "/admin/display/");
+    await p.getByRole("button", { name: /Drafts/ }).click();
+    await p.getByRole("heading", { name: "DEVELOPMENT SAMPLE UI" }).waitFor();
+    await fresh.close();
+    assert.deepEqual(errors, []);
+    console.log("PASS: display 1080p/4K, no overflow, rotation preserved, mobile editors, UI draft saves, future preview, fresh session persistence.");
+  } finally {
+    await browser.close();
+    const rows = await api("items");
+    for (const id of ids) {
+      const i = rows.find((i2) => i2.id === id);
+      if (i) await api("items/" + id + "/archive", "POST", { version: i.version });
+    }
+  }
+})().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

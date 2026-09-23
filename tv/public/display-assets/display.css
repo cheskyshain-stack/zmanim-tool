@@ -1,0 +1,357 @@
+@font-face {
+  font-family: David;
+  src: url(/display-assets/fonts/david-libre-700.woff2) format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family:
+    Arial,
+    system-ui,
+    sans-serif;
+  color: #142a42;
+  background: #f6f2e9;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+.tv-body {
+  overflow: hidden;
+  background: #101f31;
+}
+.tv-stage {
+  width: 1920px;
+  height: 1080px;
+  position: absolute;
+  transform-origin: top left;
+  background: #f7f3eb;
+  display: flex;
+  flex-direction: column;
+  padding: 35px 40px 0;
+  gap: 26px;
+}
+.tv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  border-bottom: 2px solid #b59c63;
+  padding-bottom: 22px;
+  height: 126px;
+  flex-shrink: 0;
+}
+.tv-brand {
+  font-family: David, serif;
+  font-size: 48px;
+}
+.tv-brand small {
+  font: 18px Arial;
+  display: block;
+  letter-spacing: 2px;
+  margin-top: 9px;
+  color: #647081;
+}
+.tv-date {
+  text-align: center;
+  font-size: 23px;
+  line-height: 1.55;
+}
+.tv-date b {
+  font-family: David, serif;
+  font-size: 30px;
+}
+.tv-clock {
+  font-size: 58px;
+  letter-spacing: -2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tv-clock small {
+  font-size: 24px;
+  margin-left: 8px;
+  letter-spacing: 0;
+}
+.tv-layout {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+}
+.tv-side {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.tv-side:empty {
+  display: none;
+}
+.tv-center {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.tv-panel {
+  background: #fff;
+  border: 1px solid #dedace;
+  border-radius: 20px;
+  padding: 24px 24px;
+  overflow: hidden;
+}
+.tv-panel-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0 0 8px;
+}
+.tv-panel-date {
+  font-size: 19px;
+  color: #647081;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+.tv-schedule-section {
+  margin: 16px 0 12px;
+  font-size: 20px;
+  color: #786338;
+}
+.tv-schedule-row {
+  border-top: 1px solid #e8e3d9;
+  padding: 12px 0;
+}
+.tv-schedule-row h3 {
+  margin: 0 0 6px;
+  font: 700 28px David, serif;
+  text-align: right;
+}
+.tv-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 17px;
+  direction: ltr;
+  font: bold 32px David, serif;
+  line-height: 1.25;
+}
+.tv-time {
+  white-space: nowrap;
+}
+.tv-time sup {
+  font: 14px Arial;
+  vertical-align: super;
+}
+.tv-note {
+  font-size: 23px;
+  line-height: 1.4;
+  color: #647081;
+}
+.tv-card {
+  background: #fff;
+  border: 1px solid #dedace;
+  border-radius: 19px;
+  padding: 25px 24px;
+  overflow: hidden;
+  min-height: 180px;
+}
+.tv-card .eyebrow {
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8c7545;
+  margin: 0 0 20px;
+}
+.tv-card h2 {
+  font-size: 29px;
+  line-height: 1.2;
+  margin: 0 0 18px;
+  overflow-wrap: anywhere;
+}
+.tv-card p {
+  font-size: 25px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin: 0;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+.tv-card .contact {
+  font-size: 21px;
+  margin-top: 22px;
+}
+.tv-card .contact bdi {
+  display: block;
+  margin-top: 7px;
+}
+.tv-card.important {
+  border-top: 5px solid #b59c63;
+}
+.tv-card.urgent {
+  border-top: 5px solid #955045;
+  background: #fff8f3;
+}
+.tv-card.dedication {
+  background: #eee5cf;
+  text-align: center;
+}
+.dedication h2 {
+  font: 700 39px David, serif;
+  margin-bottom: 20px;
+}
+.dedication .dedication-type {
+  font: 700 30px David, serif;
+  margin-bottom: 13px;
+}
+.dedication .dedication-name {
+  font: 700 36px David, serif;
+  line-height: 1.35;
+}
+.dedication .sponsor {
+  font-size: 20px;
+  margin-top: 20px;
+}
+.tv-card .card-page {
+  font-size: 15px;
+  color: #777;
+  margin-top: 15px;
+}
+.tv-footer {
+  margin: 0 -40px;
+  background: #142a42;
+  color: #fff;
+  padding: 22px 42px;
+  min-height: 105px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-shrink: 0;
+}
+.tv-footer .next-label {
+  color: #dcc58e;
+  font-size: 23px;
+}
+.tv-footer strong {
+  font: 700 42px David, serif;
+}
+.tv-footer .next-place {
+  font-size: 25px;
+}
+.tv-footer .key {
+  margin-left: auto;
+  font-size: 17px;
+  line-height: 1.6;
+  text-align: right;
+  color: #d3dce5;
+}
+.tv-stale {
+  background: #a64131;
+  color: white;
+  font-size: 22px;
+  padding: 10px 18px;
+  text-align: center;
+}
+.tv-preview-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #bd8730;
+  text-align: center;
+  color: #fff;
+  font-size: 16px;
+}
+.tv-upcoming {
+  font-size: 21px;
+  margin-top: 18px;
+  padding: 13px;
+  background: #f3ecd9;
+  border-radius: 8px;
+}
+.boot {
+  color: #fff;
+  padding: 40px;
+  font-size: 24px;
+}
+.tv-overflow {
+  font-size: 18px;
+  color: #a34231;
+}
+.tv-footer.stale-next strong {
+  font: 24px Arial;
+}
+.tv-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+}
+.tv-schedule-row h3 {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 26px;
+  margin: 0;
+  line-height: 1.3;
+}
+.tv-times {
+  grid-column: 1;
+  grid-row: 1;
+  gap: 8px 18px;
+  align-items: baseline;
+}
+.tv-side .tv-card {
+  flex: 1;
+  min-height: 0;
+}
+.tv-side .tv-card:only-child {
+  flex: 0 1 auto;
+}
+.tv-side .tv-card {
+  padding: 20px;
+}
+.tv-card .eyebrow {
+  margin-bottom: 10px;
+}
+.tv-card h2 {
+  margin-bottom: 12px;
+}
+.tv-card .contact {
+  margin-top: 12px;
+}
+.boot {
+  color: #142a42;
+}
+.tv-panel {
+  padding: 22px;
+}
+.tv-panel-title {
+  font-size: 27px;
+}
+.tv-panel:nth-child(2) .tv-schedule-row {
+  padding: 8px 0;
+}
+.tv-panel:nth-child(2) .tv-panel-date {
+  margin-bottom: 12px;
+}
+.tv-panel:nth-child(2) .tv-schedule-section {
+  margin: 12px 0 8px;
+}
+.tv-stale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 18px;
+  font-size: 20px;
+  z-index: 2;
+}
