@@ -100,8 +100,7 @@ export class DisplayView {
       const center=this.stage.querySelector('.tv-center'),weekly=this.stage.querySelector('.weekly-body');
       if(center&&weekly){
         if(weekly.scrollHeight>weekly.clientHeight+2) weekly.parentElement.classList.add('weekly-compact');
-        let width=weekly.parentElement.clientWidth;
-        while(weekly.scrollHeight>weekly.clientHeight+2&&width<center.clientWidth-440){width+=40;center.style.gridTemplateColumns=`minmax(0,${width}px) minmax(0,1fr)`;}
+
       }
       const special=this.stage.querySelector('.complete-special');
       if(special) special._sections=[...special.querySelectorAll('.source-section')].map(e=>e.cloneNode(true));
