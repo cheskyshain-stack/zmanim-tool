@@ -26,7 +26,14 @@ const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 // Existing public text, rendered only in private development previews. No saves.
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
   .map(i=>({...i,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
-const cases=['2026-09-08','2026-09-12','2026-09-13','2026-09-14','2027-09-28','2027-10-02','2027-10-03','2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-05','2026-10-15','2029-09-12','2032-09-08'];
+const cases=['2026-09-08','2026-09-12','2026-09-13','2026-09-14','2027-09-28','2027-10-02','2027-10-03','2026-09-17','2027-04-11','2029-07-21','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-05','2026-10-15','2029-09-12','2032-09-08'];
+// Published chart examples: Shuva, HaGadol, and Motzei Shabbos entering the
+// postponed Tisha B'Av fast. These expected rows are independent of presentation.
+const drashaExpectations={
+ '2026-09-17':[{label:'מנחה',times:['1:40','4:45']},{label:'דרשה',times:['5:15']},{label:'מנחה',times:['6:14','6:29']}],
+ '2027-04-11':[{label:'מנחה',times:['1:40','5:25']},{label:'דרשה',times:['5:55']},{label:'מנחה',times:['6:53','7:08']}],
+ '2029-07-21':[{label:'דרשה',times:['8:55']},{label:'זמן 72',times:['9:33']},{label:'מעריב',times:['9:45']}],
+};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const failures=[],results=[];
 try{
@@ -43,7 +50,7 @@ try{
  for(const date of cases)for(const withNotices of [false,true])for(const theme of ['light','dark']){
   const at=date+'T16:00:00.000Z',schedule=scheduleSnapshot(at);
   const snapshot={at,schedule,items:withNotices?notices:[],upcoming:[],appearance:{mode:theme}};
-  const r=await page.evaluate(async({snapshot})=>{
+  const r=await page.evaluate(async({snapshot,expectedDrashaRows})=>{
    const view=window.audit;view.update(snapshot,{preview:true,now:100000});
    await document.fonts.ready;
    const host=view.stage.querySelector('.original-sheet-host');if(host)await host.originalSheetReady;
@@ -60,7 +67,23 @@ try{
     if(panel.scrollHeight>panel.clientHeight+2||panel.scrollWidth>panel.clientWidth+2)overflow.push({panel:panel.className,extra:panel.scrollHeight-panel.clientHeight});
     for(const text of panel.querySelectorAll('.board-service,.board-day-section,.board-day-service,.board-schedule-row,.board-zmanim>div,h2,h3,h4,p'))if(outside(text,panel))overflow.push({text:text.className||text.tagName,content:text.textContent.slice(0,45)});
    }
-   const weekdayIssues=[],normalize=value=>String(value||'').replace(/[\uE000\uE001]/g,'').replace(/\s+/g,' ').trim();
+   const weekdayIssues=[],normalize=value=>String(value||'').replace(/[\uE000\uE001\u2066-\u2069\u200E\u200F]/g,'').replace(/\s+/g,' ').trim();
+   const drashaIssues=[],isDrasha=value=>/(?:דרשה|דרשת|דרשות|דברי התעוררות|Drasha)/i.test(value);
+   for(const times of root.querySelectorAll('.board-times'))if(isDrasha(times.textContent))drashaIssues.push({inlineDrasha:normalize(times.textContent)});
+   if(expectedDrashaRows){
+    const rows=[...root.querySelectorAll('.board-shabbos .board-schedule-row')];
+    const labels=rows.map(row=>normalize(row.querySelector('.board-prayer-label')?.textContent));
+    const drashaIndices=labels.flatMap((label,index)=>isDrasha(label)?[index]:[]);
+    if(drashaIndices.length!==1)drashaIssues.push({expectedDrashaRows:1,actual:drashaIndices.length});
+    const start=drashaIndices[0]-expectedDrashaRows.findIndex(row=>isDrasha(row.label));
+    for(const [offset,expected] of expectedDrashaRows.entries()){
+     const row=rows[start+offset],label=labels[start+offset],times=row?.querySelector('.board-times');
+     const actualTimes=times?.textContent.match(/\d{1,2}:\d{2}/g)||[];
+     if(label!==expected.label||JSON.stringify(actualTimes)!==JSON.stringify(expected.times))drashaIssues.push({expected,actual:{label,times:actualTimes}});
+     if(row&&row.querySelectorAll(':scope > .board-prayer-label').length!==1)drashaIssues.push({missingOwnLabel:expected.label});
+     if(row&&row.querySelectorAll(':scope > .board-times').length!==1)drashaIssues.push({missingOwnTimes:expected.label});
+    }
+   }
    if(!snapshot.schedule.specialSheet){
     const patterns=[...root.querySelectorAll('[data-weekday-service]')];
     for(const service of snapshot.schedule.presentation.weekly.services)for(const group of service.groups.filter(g=>g.events.length))for(const day of group.days){
@@ -98,15 +121,17 @@ try{
     for(const e of host.shadowRoot.querySelectorAll('.onepage-row,.onepage-sec-head,.onepage-title'))if(outside(e,host))overflow.push({sheet:e.className});
    }
    const weekly=root.querySelector('.board-weekly'),right=root.querySelector('.board-shabbos,.original-sheet-box'),z=root.querySelector('.board-zmanim');
-   return {classes:root.className,overflow,weekdayIssues,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,rhTogether,
+   return {classes:root.className,overflow,weekdayIssues,drashaIssues,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,rhTogether,
     shabbosColumns:root.querySelectorAll('.board-static-column').length,sourceIds:[...root.querySelectorAll('.board-schedule-row')].map(e=>e.dataset.sourceId),theme:root.dataset.theme};
-  },{snapshot});
+  },{snapshot,expectedDrashaRows:drashaExpectations[date]});
   const name=`${date} ${theme} notices=${withNotices}`;
   const check=(ok,what)=>{if(!ok)failures.push({name,what,result:r});};
   check(!r.overflow.length&&!r.warnings.length,'all content stays inside its panel');
   check(!r.weekdayIssues.length,'weekday dates and prayers match their source, with Gedalya in its daily section');
+  check(!r.drashaIssues.length,'drasha has its own label and times row, preserving adjacent prayer times and order');
   if(['2026-09-14','2029-09-12','2032-09-08'].includes(date))check(!schedule.specialSheet&&!!r.weekly,'Gedalya uses the regular weekly panel');
   if(date==='2026-10-05')check(!schedule.specialSheet&&!!r.weekly,'the post-Sukkos weekday uses the regular weekly panel');
+  if(date==='2029-07-21'&&withNotices)check(r.classes.includes('right-extended'),'the longer Tisha B’Av Shabbos uses the available height beside all notices');
   check(r.shabbosColumns===0,'Shabbos never splits into columns');
   check(r.pages===(withNotices?1:0),'all announcements remain visible together, including special schedules');
   check(!r.weekly||r.weekly.left>=r.zmanim.right&&r.right.left>=r.weekly.right,'weekday center, Shabbos/special right');
@@ -131,6 +156,6 @@ try{
  });
  assert.ok(rotation,'Complete dedications still rotate');
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({results,failures:failures.map(f=>({name:f.name,what:f.what,overflow:f.result.overflow,weekdayIssues:f.result.weekdayIssues,warnings:f.result.warnings,seen:f.result.seen}))},null,2));
+ console.log(JSON.stringify({results,failures:failures.map(f=>({name:f.name,what:f.what,overflow:f.result.overflow,weekdayIssues:f.result.weekdayIssues,drashaIssues:f.result.drashaIssues,warnings:f.result.warnings,seen:f.result.seen}))},null,2));
  assert.equal(failures.length,0,'Right-column layout has failures listed above');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -392,6 +392,12 @@ The regular pattern stays first. Date-specific changes are ordered by their
 earliest applicable date, with the days inside each shared change also in date
 order. This applies in live, future-preview and offline views.
 
+Saved drasha lines in a Shabbos chart get their own labeled screen rows, with
+earlier and later Mincha runs kept in source order. This includes Shabbos Shuva,
+Shabbos Hagadol and the drasha before Tisha B'Av Maariv. Source times, underlines,
+stars and untimed announcements remain intact; special posters keep their
+existing separate drasha rows. No daily minyan calculation changes.
+
 The calendar supplies a public `fastDay` boolean on grouped dates so short weeks
 can choose an ordinary baseline without interpreting holiday names. No stored
 schedule or database migration is needed. Shared exceptions retain their complete

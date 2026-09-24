@@ -27,6 +27,37 @@ const publicTime=t=>({text:cleanText(t.text),underlined:!!t.underlined,mark:t.ma
 export function posterRows(lines,prefix) {
  return lines.flatMap((l,i)=>[{id:prefix+':'+i,label:cleanText(l.label),times:(l.times||[]).map(publicTime),note:[l.note,l.sub].filter(Boolean).map(cleanText).join('\n'),calc:l.calc||'',sep:l.sep||' / ',keepUp:!!l.keepUp},...(l.extra?[{id:prefix+':'+i+':extra',label:cleanText(l.extra.label),times:(l.extra.times||[]).map(publicTime),note:'',calc:l.calc||'',sep:l.sep||' / ',keepUp:true}]:[])]);
 }
+/** A saved chart cell can contain a drasha between two prayer-time runs.
+ * Keep its explicit lines and formatting; never calculate a replacement time.
+ * Poster sources already have separate rows and do not need this conversion. */
+export function splitChartDrashas(row, text = row.times[0]?.text) {
+ if(row.times.length!==1)return [row];
+ const start='\uE000',end='\uE001',plain=text=>text.replace(/[\uE000\uE001]/g,'').trim();
+ let depth=0;
+ const lines=String(text).replace(/[\u2066-\u2069\u200E\u200F]/g,'').split('\n').map(line=>{
+   const inherited=depth>0;
+   for(const mark of line.match(/[\uE000\uE001]/g)||[])depth=mark===start?depth+1:Math.max(0,depth-1);
+   return (inherited?start:'')+line+(depth?end:'');
+ }).filter(line=>plain(line));
+ const drasha=/^(?:דרשה|דרשת|דרשות|דברי התעוררות|Drasha)(?:\s|$)/i;
+ if(!lines.some(line=>drasha.test(plain(line))))return [row];
+ const named=/^(?:דרשה|דרשת|דרשות|דברי התעוררות|Drasha|שקיעה|מעריב|מנחה|זמן 72)(?:\s|$)/i;
+ const rows=[],pending=[];
+ const add=(label,times)=>rows.push({...row,id:rows.length?row.id+':detail:'+rows.length:row.id,label,times,note:rows.length?'':row.note});
+ const flush=()=>{if(pending.length){add(row.label,[{...row.times[0],text:pending.join('\n')}]);pending.length=0;}};
+ for(const line of lines){
+   if(!named.test(plain(line))){pending.push(line);continue;}
+   flush();
+   const time=/\d{1,2}:\d{2}/.exec(line);
+   if(!time){add(plain(line),[]);continue;}
+   const prefix=line.slice(0,time.index);
+   let open=0;
+   for(const mark of prefix.match(/[\uE000\uE001]/g)||[])open=mark===start?open+1:Math.max(0,open-1);
+   add(plain(prefix),[{...row.times[0],text:(open?start:'')+line.slice(time.index)}]);
+ }
+ flush();
+ return rows;
+}
 function splitPoster(block,s,prefix) {
  const rows=posterRows(block.lines,prefix);
  // Explicit source calculation identifiers mark morning and closing boundaries.
@@ -60,12 +91,18 @@ function ordinaryShabbos(s,state,settings) {
  const sections=[{heading:'ערב שבת / ליל שבת',date:civil(s-1),rows:[]},{heading:'שבת קודש',date:civil(s),rows:[]},{heading:'מוצאי שבת',date:civil(s),rows:[]}];
  for(const c of [...built.columns].reverse()){
   if(c.key==='A')continue;const value=built.row[c.key];if(value==null||value==='')continue;
-  const row={id:'chart:'+s+':'+c.key,label:cleanText(c.header).replace(/\n/g,' '),times:[{text:cleanText(value)}],note:''};
+  const text=cleanText(value);
+  const row={id:'chart:'+s+':'+c.key,label:cleanText(c.header).replace(/\n/g,' '),times:[{text}],note:''};
   // Both chart seasons store MGA first, GRA second in column D.
   if(c.key==='D'){row.label='ס״ז קר״ש';row.times=cleanText(value).split('/').map((text,i)=>({text:text.trim(),name:i===0?'מ״א':'גר״א'}));}
   const target=sections[c.key==='B'?2:friday.has(c.key)?0:1].rows;
-  const lines=cleanText(value).split('\n');
-  if(['H','G'].includes(c.key)&&lines.length>1&&/^(שקיעה|מעריב)\s/.test(lines[1])){
+  // A drasha in an edited <div> or <p> must not join the preceding time.
+  // Leave the established formatting of cells without a drasha untouched.
+  const drashaRows=splitChartDrashas(row,cleanText(String(value).replace(/<(?:div|p)\b[^>]*>/gi,'\n')));
+  const lines=text.split('\n');
+  if(drashaRows.length!==1||drashaRows[0]!==row){
+    target.push(...drashaRows);
+  }else if(['H','G'].includes(c.key)&&lines.length>1&&/^(שקיעה|מעריב)\s/.test(lines[1])){
     row.times=[{text:lines[0]}];
     if(c.key==='G')row.label='מנחה';
     target.push(row);

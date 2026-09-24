@@ -207,9 +207,21 @@ export class DisplayView {
         if (balancedHeight < parseFloat(this.stage.style.getPropertyValue('--notice-height'))) {
           this.noticePages = balanced;
           this.stage.style.setProperty('--notice-height',balancedHeight+'px');
-          fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+          fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
         }
       }
+    }
+    if (groups.length && !sheet && fit.special?.overflow) {
+      // A long Shabbos keeps reading down the right column. Measure the whole
+      // announcement row again at its narrower width before fitting the left
+      // panels, so every saved notice remains visible on the same screen.
+      this.stage.classList.add('right-extended');
+      const extended = [groups], balanced = [groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
+      const extendedHeight = Math.max(280,this.noticeHeight(extended));
+      const balancedHeight = Math.max(280,this.noticeHeight(balanced));
+      this.noticePages = balancedHeight < extendedHeight ? balanced : extended;
+      this.stage.style.setProperty('--notice-height',Math.min(extendedHeight,balancedHeight)+'px');
+      fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
     }
     if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
     if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);
