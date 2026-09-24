@@ -556,3 +556,4 @@ button {
 .static-dense .source-row{padding:0}.static-dense .source-heading{margin:2px 0;padding:2px}
 .weekly-compact .source-row{padding:2px 0}.weekly-compact .source-heading{padding:3px 5px;margin:3px 0}.weekly-compact .source-note{font-size:18px;margin:2px 0}.weekly-compact .source-times{gap:6px 18px}
 .tv-stage:has(.weekly-compact){gap:8px}.tv-stage:has(.weekly-compact) .tv-head{height:72px}.tv-stage:has(.weekly-compact) .shul-bottom{min-height:78px}.tv-stage:has(.weekly-compact) .shul-donate img{width:66px;height:66px}.tv-stage:has(.weekly-compact) .tv-footer{min-height:50px}
+.source-row,.shabbos-overview .source-row,.festival-day .source-row{padding-top:8px;padding-bottom:8px}.source-times,.weekly-body .source-times,.festival-day .source-times{row-gap:14px}.weekly-service{padding-top:14px;padding-bottom:14px}.static-dense .source-row{padding-top:3px;padding-bottom:3px}.static-dense .source-times{row-gap:8px}
