@@ -767,8 +767,10 @@ button {
 .sheet-wide-notices .announcement-group-sections{gap:5px}
 .sheet-wide-notices .announcement-section+.announcement-section{padding-top:4px}
 
-/* Keep seconds readable but visually secondary to hours and minutes. */
-.tv-stage .board-zmanim .zman-seconds{font:inherit;font-weight:400}
+/* A shared right edge keeps one- and two-digit hours in the same time column.
+   Seconds stay on the baseline, slightly smaller and lighter than HH:MM. */
+.tv-stage .board-zmanim>div>bdi{flex:0 0 7ch;text-align:right;font-variant-numeric:tabular-nums}
+.tv-stage .board-zmanim .zman-seconds{font:inherit;font-size:.82em;font-weight:400}
 .stable-board .tv-footer .key{line-height:1.15}
 
 /* Whole-day changes belong beneath the ordinary reference, with one date
