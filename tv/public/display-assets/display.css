@@ -563,13 +563,14 @@ button {
 .source-times,.weekly-body .source-times,.festival-day .source-times,.source-times:has(.source-time:only-child){grid-template-columns:repeat(auto-fill,minmax(76px,1fr));column-gap:12px}.weekly-compact .source-times{row-gap:9px}.static-dense .source-times{grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px 10px}
 .weekly-body .source-row{grid-template-columns:minmax(0,1fr) 125px;column-gap:12px}.weekly-compact .source-row{grid-template-columns:minmax(0,1fr) 110px;column-gap:8px}
 /* Separate tefillos clearly and give multi-line minyan lists room to breathe. */
-.weekly-service{padding-top:24px;padding-bottom:24px}
-.source-times,.weekly-body .source-times,.festival-day .source-times,.source-times:has(.source-time:only-child){row-gap:20px}
+.weekly-service{padding-top:30px;padding-bottom:30px}
+.source-times,.weekly-body .source-times,.festival-day .source-times,.source-times:has(.source-time:only-child){row-gap:24px}
 .weekly-pattern.exception{margin-top:12px}
 .weekly-body .source-row{padding-top:14px;padding-bottom:14px}
 /* Dense holiday weeks retain every entry while keeping additional line spacing. */
-.weekly-compact .weekly-service{padding-top:10px;padding-bottom:10px}
-.weekly-compact .source-times{row-gap:14px}
+.weekly-compact .weekly-service{padding-top:18px;padding-bottom:18px}
+.weekly-compact .source-times{row-gap:16px}
 .weekly-compact .weekly-pattern.exception{margin-top:10px}
 .weekly-compact .source-row{padding-top:2px;padding-bottom:2px}
 .static-dense .source-times{row-gap:12px}
+
