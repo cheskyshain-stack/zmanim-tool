@@ -225,7 +225,19 @@ export function scheduleSnapshot(instant, controls = []) {
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
   const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
   const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey);
-  const zmanim = [['זמן ציצית','misheyakir10_2'],['הנץ החמה','sunrise'],['סוף זמן ק״ש · מ״א','sofZmanShmaMGA72'],['סוף זמן ק״ש · גר״א','sofZmanShmaGRA'],['סוף זמן תפילה · גר״א','sofZmanTfilaGRA'],['חצות היום','solarNoon'],['מנחה גדולה','minchaGedola'],['פלג המנחה','plagHamincha'],['שקיעת החמה','sunset'],['צאת הכוכבים','tzaisGeonim8_5'],['לילה · 72 דקות','tzais72']].map(([label,key])=>{const f=dailyZmanim[key](dateFromSerial(serial),settings);const total=Math.round((((f%1)+1)%1)*86400);return {label,time:(Math.floor(total/3600)%12||12)+':'+String(Math.floor(total/60)%60).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};});
+  const zmanim = [
+    ['עלות','alos72'],
+    ['טלית ותפילין','misheyakir10_2'],
+    ['נץ','sunrise'],
+    ['סזק"ש מ"א','sofZmanShmaMGA72'],
+    ['סזק"ש גר"א','sofZmanShmaGRA'],
+    ['סז"ת מ"א','sofZmanTfilaMGA72'],
+    ['סז"ת גר"א','sofZmanTfilaGRA'],
+    ['חצות','solarNoon'],
+    ['שקיעה','sunset'],
+    ["צאת ג' כוכבים",'tzaisGeonim8_5'],
+    ['צאת 72','tzais72'],
+  ].map(([label,key])=>{const f=dailyZmanim[key](dateFromSerial(serial),settings);const total=Math.round((((f%1)+1)%1)*86400);return {label,time:(Math.floor(total/3600)%12||12)+':'+String(Math.floor(total/60)%60).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};});
   return { presentation, specialSheet, nextChangeAt, zmanim, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
 }
 

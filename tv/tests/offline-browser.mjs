@@ -53,7 +53,7 @@ try{
  await recovery.goto(origin+'/display/');
  await recovery.waitForFunction(()=>document.querySelector('.boot')&&!document.querySelector('.boot').hidden);
  await recovery.evaluate(()=>window.dispatchEvent(new Event('online')));
- await recovery.waitForFunction(()=>document.querySelector('.board-zmanim')?.textContent.includes('הנץ החמה'));
+ await recovery.waitForFunction(()=>document.querySelector('.board-zmanim')?.textContent.includes('טלית ותפילין'));
  assert.ok(await recovery.locator('.tv-clock').textContent());
  assert.equal(await recovery.locator('.boot').isVisible(),false);
  console.log(JSON.stringify({firstConnectionFailureRecovered:true,attempts}));await fresh.close();

@@ -104,3 +104,7 @@ export function sofZmanShmaMGA72(date, settings) {
 export function sofZmanTfilaGRA(date, settings) {
   return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
 }
+// The same 72-minute MGA day as Shema, at its fourth proportional hour.
+export function sofZmanTfilaMGA72(date, settings) {
+  return fromStartOfDay(alos72(date, settings), solarNoon(date, settings), tzais72(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
+}

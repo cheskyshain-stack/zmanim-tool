@@ -57,12 +57,15 @@ test('a visible control applying to unrelated dates does not suppress the Sukkos
 });
 
 test('the daily zmanim retain seconds and use the existing source calculations', () => {
-  const functions = ['misheyakir10_2', 'sunrise', 'sofZmanShmaMGA72', 'sofZmanShmaGRA',
-    'sofZmanTfilaGRA', 'solarNoon', 'minchaGedola', 'plagHamincha', 'sunset', 'tzaisGeonim8_5', 'tzais72'];
+  const functions = ['alos72', 'misheyakir10_2', 'sunrise', 'sofZmanShmaMGA72', 'sofZmanShmaGRA',
+    'sofZmanTfilaMGA72', 'sofZmanTfilaGRA', 'solarNoon', 'sunset', 'tzaisGeonim8_5', 'tzais72'];
+  const labels = ['עלות', 'טלית ותפילין', 'נץ', 'סזק"ש מ"א', 'סזק"ש גר"א',
+    'סז"ת מ"א', 'סז"ת גר"א', 'חצות', 'שקיעה', "צאת ג' כוכבים", 'צאת 72'];
   // Include both sides of New York's spring and fall daylight-saving changes.
   for (const date of ['2026-03-07', '2026-03-08', '2026-09-24', '2026-10-31', '2026-11-01']) {
     const rows = scheduleSnapshot(date + 'T16:00:00Z').zmanim;
     assert.equal(rows.length, 11, date);
+    assert.deepEqual(rows.map(r => r.label), labels, date);
     assert.equal(new Set(rows.map(r => r.label)).size, 11, date);
     rows.forEach((row, index) => {
       assert.match(row.time, /^(?:[1-9]|1[0-2]):[0-5]\d:[0-5]\d$/, row.label);
@@ -70,6 +73,19 @@ test('the daily zmanim retain seconds and use the existing source calculations',
       const sourceSeconds = Math.round(zmanim[functions[index]](new Date(date + 'T00:00:00Z'), settings) * 86400);
       assert.equal((hours % 12) * 3600 + minutes * 60 + seconds, ((sourceSeconds % 43200) + 43200) % 43200, `${date}: ${row.label}`);
     });
+  }
+});
+
+test('MGA72 tefila is 24 minutes before GRA in both existing proportional-day modes', () => {
+  for (const date of ['2026-01-15', '2026-03-08', '2026-06-21', '2026-09-24', '2026-11-01']) {
+    for (const useAstronomicalChatzos of [false, true]) {
+      const d = new Date(date + 'T00:00:00Z'), s = { ...settings, useAstronomicalChatzos };
+      const mga = zmanim.sofZmanTfilaMGA72(d, s), gra = zmanim.sofZmanTfilaGRA(d, s);
+      // Extending each end of the GRA day by 72 minutes moves its fourth hour
+      // 24 minutes earlier, including when morning hours end at solar noon.
+      assert.ok(Math.abs((gra - mga) * 1440 - 24) < 1e-8, date);
+      assert.ok(zmanim.sofZmanShmaMGA72(d, s) < mga && mga < zmanim.solarNoon(d, s), date);
+    }
   }
 });
 

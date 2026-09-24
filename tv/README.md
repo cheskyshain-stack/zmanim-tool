@@ -341,6 +341,11 @@ be split into two columns or that the upcoming special page is on the left.
 ## Schedule spacing audit
 
 Daily zmanim keep hours and minutes bold while seconds use regular weight.
+The panel follows the shul's requested order: עלות, טלית ותפילין, נץ, the מ"א
+and גר"א Shema deadlines, the מ"א and גר"א tefila deadlines, חצות, שקיעה,
+צאת ג' כוכבים and צאת 72. עלות uses the site's 72-minute reckoning; the added
+מ"א tefila deadline uses the same MGA day and astronomical-chatzos setting as
+its Shema deadline. The list is shared by live, future-preview and offline views.
 The special page retains its original row padding, separate time runs, heading
 spacing and column gutter; only the outer paper margins, branding and colors
 are adapted to the screen. No schedule data is changed.
