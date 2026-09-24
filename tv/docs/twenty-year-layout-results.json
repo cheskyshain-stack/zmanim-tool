@@ -1,0 +1,631 @@
+{
+  "start": "2026-09-23",
+  "endExclusive": "2046-09-23",
+  "checked": 7305,
+  "resolution": "1920x1080",
+  "dailyInstant": "16:00 UTC",
+  "fixture": "Development announcement plus dedication; no content saved or published",
+  "failures": [],
+  "errors": [],
+  "sourceGaps": [
+    {
+      "date": "2027-06-06",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2027-06-07",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2027-06-08",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2027-06-09",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2027-06-10",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2027-06-11",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2027-06-12",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2027-08-12",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2028-05-28",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2028-05-29",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2028-05-30",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2028-05-31",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2028-06-01",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2028-08-01",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2029-05-13",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-14",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-15",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-16",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-17",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-18",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-19",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2029-05-20",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2029-05-21",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2029-07-22",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2030-06-02",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2030-06-03",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2030-06-04",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2030-06-05",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2030-06-06",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2030-06-07",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2030-06-08",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2030-08-08",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2031-05-25",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2031-05-26",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2031-05-27",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2031-05-28",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2031-05-29",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2031-07-29",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2032-05-09",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-10",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-11",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-12",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-13",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-14",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-15",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2032-05-16",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2032-05-17",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2032-07-18",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2033-05-29",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2033-05-30",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2033-05-31",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2033-06-01",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2033-06-02",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2033-06-03",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2033-06-04",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2033-08-04",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2034-05-21",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2034-05-22",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2034-05-23",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2034-05-24",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2034-05-25",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2034-07-25",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2035-06-10",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2035-06-11",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2035-06-12",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2035-06-13",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2035-06-14",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2035-08-14",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2036-05-25",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-26",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-27",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-28",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-29",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-30",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-05-31",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2036-06-01",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2036-06-02",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2036-08-03",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2037-05-17",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2037-05-18",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2037-05-19",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2037-05-20",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2037-05-21",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2037-07-21",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2038-06-06",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2038-06-07",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2038-06-08",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2038-06-09",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2038-06-10",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2038-08-10",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2039-05-22",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-23",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-24",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-25",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-26",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-27",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-28",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2039-05-29",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2039-05-30",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2039-07-31",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2040-05-13",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2040-05-14",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2040-05-15",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2040-05-16",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2040-05-17",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2040-05-18",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2040-05-19",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2040-07-19",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2041-06-02",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2041-06-03",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2041-06-04",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2041-06-05",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2041-06-06",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2041-08-06",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2042-05-18",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-19",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-20",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-21",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-22",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-23",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-24",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2042-05-25",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2042-05-26",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2042-07-27",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2043-06-07",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-08",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-09",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-10",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-11",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-12",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-13",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2043-06-14",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2043-06-15",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2043-08-16",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2044-05-29",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2044-05-30",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2044-05-31",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2044-06-01",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2044-06-02",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2044-08-02",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2045-05-21",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2045-05-22",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2045-05-23",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2045-07-23",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2046-06-03",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-04",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-05",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-06",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-07",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-08",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-09",
+      "note": "Full saved chart unavailable"
+    },
+    {
+      "date": "2046-06-10",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2046-06-11",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    },
+    {
+      "date": "2046-08-12",
+      "note": "Special times are not available in the existing schedule source. Please confirm with the shul."
+    }
+  ],
+  "themeContentVariants": 66,
+  "variantFailures": 0,
+  "applicationTestsPassed": 20
+}

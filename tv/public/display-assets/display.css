@@ -580,3 +580,38 @@ button {
 .label-above>.source-times{grid-column:1;grid-row:2}
 .label-above>.source-note{grid-column:1;grid-row:3}
 .label-above>.source-times:empty{display:none}
+/* Source phrases consume complete time slots and wrap within their own entry. */
+.source-times .source-time.time-prose,.source-times .source-time.time-prose bdi{white-space:normal;overflow-wrap:anywhere;max-width:100%}
+/* A compact, consistent prayer-name column leaves room for whole time slots. */
+.weekly-pattern,.weekly-body .source-row,.weekly-compact .source-row{grid-template-columns:minmax(0,1fr) 90px;column-gap:12px}
+.weekly-pattern.label-above,.weekly-body .source-row.label-above{grid-template-columns:minmax(0,1fr)}
+/* Exception-heavy weeks spend less height on padding, without reducing lettering. */
+.weekly-tight .weekly-service{padding-top:8px;padding-bottom:8px}
+.weekly-tight .source-times{row-gap:10px}
+.weekly-tight .weekly-pattern.exception{margin-top:6px;padding-top:3px;padding-bottom:3px}
+.weekly-tight .label-above{row-gap:4px}
+/* Exceptional holiday weeks reclaim sidebar width; notices remain in the bottom band. */
+.schedule-wide .shul-bottom{display:flex;gap:24px;min-height:130px;align-items:center}
+.schedule-wide .shul-bottom>.tv-side{flex:1;width:auto;min-width:0;flex-direction:row}
+.schedule-wide .shul-bottom .tv-card{flex:1;padding:6px 0;border:0}
+.schedule-wide .shul-bottom .tv-card .eyebrow{display:none}
+.schedule-wide .shul-bottom .tv-card h2{font-size:22px;margin:0 0 4px}
+.schedule-wide .shul-bottom .tv-card p{font-size:20px;line-height:1.2;margin:3px 0}
+.schedule-wide .bottom-dedication{flex:1;min-width:0}
+.schedule-wide .bottom-dedication:empty{display:none}
+.schedule-wide .shul-donate{flex:0 0 350px}
+.weekly-split .weekly-body{columns:2;column-gap:20px;column-fill:balance}
+.weekly-split .weekly-service,.weekly-split .source-section{break-inside:avoid}
+.special-tight .source-row{padding-top:0;padding-bottom:0}
+.special-tight .source-heading{margin-top:2px;margin-bottom:2px}
+.weekly-split .source-section{break-inside:auto}
+.weekly-split .source-row,.weekly-split .weekly-pattern{break-inside:avoid}
+.weekly-split .source-heading{break-after:avoid}
+.schedule-wide .shul-bottom .contact{display:flex;flex-direction:row;align-items:baseline;gap:12px;padding-top:4px;margin-top:4px;font-size:18px}
+.schedule-wide .shul-bottom .contact bdi{display:inline}
+.schedule-wide .bottom-dedication .dedication-type,.schedule-wide .bottom-dedication .dedication-name{display:inline;margin-inline:4px}
+.schedule-wide .bottom-dedication .card-page:empty{display:none}
+.special-tight .label-above{row-gap:3px}
+.special-tight .source-times{row-gap:6px}
+
+.weekly-split .weekly-service{break-inside:auto}

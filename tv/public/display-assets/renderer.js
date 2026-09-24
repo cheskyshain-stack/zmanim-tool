@@ -95,6 +95,7 @@ export class DisplayView {
     const upcoming = [this.choose("upcoming", snapshot.upcoming.filter((i) => i.startsAt > instant), now)].filter(Boolean).map((i) => `<div class="tv-upcoming"><strong>Upcoming: ${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} to ${dateLabel(i.data.appliesTo)}</div>`).join("");
     const html = `${preview ? '<div class="tv-preview-label">PRIVATE PREVIEW · NOT THE LIVE SCREEN</div>' : ""}<header class="tv-head"><div class="tv-brand" lang="he" dir="rtl">${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small></div><div class="tv-date"><b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.presentation ? ' · <bdi dir="rtl">' + esc(s.presentation.currentDay) + "</bdi>" : ""}</div><div class="tv-clock"></div></header>${stale ? '<div class="tv-stale">Connection lost · Schedule may be out of date. Please confirm times.</div>' : ""}<div class="tv-layout">${left ? `<aside class="tv-side">${left}</aside>` : ""}<main class="tv-center">${s.presentation ? fullSchedules(s.presentation,upcoming) : '<p>Schedule presentation unavailable</p>'}</main>${right ? `<aside class="tv-side">${right}</aside>` : ""}</div><section class="shul-bottom"><div class="bottom-dedication">${dedication ? cardHTML(dedication) : ""}</div><a class="shul-donate" href="https://baismedrashoflakewoodcommons.org/donate/"><div><strong>Support our shul</strong><p>Scan to donate</p><small>baismedrashoflakewoodcommons.org</small></div><img src="/display-assets/donate-qr.png" alt="Scan to donate to the shul"></a></section><footer class="tv-footer ${stale ? "stale-next" : ""}"><span class="next-label">Next minyan</span>${!stale && next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : `<strong>${stale ? "Confirm times while connection is unavailable" : "Checking the next minyan…"}</strong>`}<span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer>`;
     if (html !== this.lastRender) {
+      this.stage.classList.remove('schedule-wide');
       this.stage.innerHTML = html;
       this.lastRender = html;
       const center=this.stage.querySelector('.tv-center'),weekly=this.stage.querySelector('.weekly-body');
@@ -113,6 +114,29 @@ export class DisplayView {
       if(special) special._sections=[...special.querySelectorAll('.source-section')].map(e=>e.cloneNode(true));
       this.schedulePages=paginateSpecial(this.stage);
       fitScheduleLabels(weekly);
+      if(weekly&&weekly.scrollHeight>weekly.clientHeight+2){
+        weekly.parentElement.classList.add('weekly-tight');
+        fitScheduleLabels(weekly);
+      }
+      if((weekly&&weekly.scrollHeight>weekly.clientHeight+2)||(special&&special.querySelector('.special-body').scrollHeight>special.querySelector('.special-body').clientHeight+2)){
+        const notices=[...this.stage.querySelectorAll('.tv-layout>.tv-side')];
+        if(notices.length){
+          this.stage.classList.add('schedule-wide');
+          const bottom=this.stage.querySelector('.shul-bottom');
+          for(const notice of notices)bottom.prepend(notice);
+          fitScheduleLabels(weekly);
+          if(special){special.classList.remove('static-dense');this.schedulePages=paginateSpecial(this.stage);}
+        }
+      }
+      if(weekly&&weekly.scrollHeight>weekly.clientHeight+2){
+        weekly.parentElement.classList.add('weekly-split');
+        center.style.gridTemplateColumns=`minmax(0,2fr) minmax(0,${columns}fr)`;
+        fitScheduleLabels(weekly);
+        if(special){special.classList.remove('static-dense');this.schedulePages=paginateSpecial(this.stage);}
+      }
+      const specialBody=special?.querySelector('.special-body');
+      if(specialBody&&specialBody.scrollHeight>specialBody.clientHeight+2){special.classList.add('special-tight');this.schedulePages=paginateSpecial(this.stage);}
+      fitScheduleLabels(weekly);
     }
     if(this.schedulePages?.pages.length){
       const id=s.presentation.special.id;
@@ -129,4 +153,3 @@ export class DisplayView {
     this.observer.disconnect();
   }
 }
-
