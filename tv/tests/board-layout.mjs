@@ -1,4 +1,5 @@
 import { scheduleSnapshot } from '../src/schedules.js';
+import { groupAnnouncements } from '../public/display-assets/announcements.js';
 import { createRequire } from 'node:module';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +12,7 @@ const sameIds = (a,b) => JSON.stringify([...a].sort()) === JSON.stringify([...b]
 // Read-only capture of the current public notices, used only in local browser
 // previews. Move starts back for pre-publication layout dates without saving it.
 const notices = JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,'')).map(item=>({...item,startsAt:'2020-01-01T00:00:00Z'}));
+const expectedGroups = groupAnnouncements(notices);
 // Clearly labeled dedication fixtures: never saved or published.
 const dedications=[1,2].map(i=>({id:`development-dedication-${i}`,kind:'dedication',title:'DEVELOPMENT DEDICATION',startsAt:'2020-01-01T00:00:00Z',endsAt:null,data:{anonymous:true,dedicationType:'לזכות',dedicationName:`תצוגה לדוגמה ${i}`,dedicationText:'Development preview only',message:'',duration:25}}));
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -45,7 +47,7 @@ try {
      if(outside(body,body.parentElement))overflow.push({className:body.className,outsideParent:true});
      for(const child of body.children)if(outside(child,body.parentElement))overflow.push({className:child.className,outsideSchedulePanel:true});
     }
-    const center=root.querySelector('.tv-center'),sheet=root.querySelector('.original-sheet-box'),shadow=host?.shadowRoot,weekly=root.querySelector('.board-weekly');
+    const sheet=root.querySelector('.original-sheet-box'),shadow=host?.shadowRoot,weekly=root.querySelector('.board-weekly'),right=root.querySelector('.board-shabbos,.original-sheet-box'),zmanim=root.querySelector('.board-zmanim'),footer=root.querySelector('.tv-footer');
     const normalized=text=>String(text||'').replace(/[\s/]+/g,'');
     // Compare every original rendered row, including notes, reckoning names,
     // underlining and asterisks. The page's measurement may move rows between
@@ -68,19 +70,35 @@ try {
       if(outside(text,sheet))overflow.push({className:text.className,outsideSheet:true,text:text.textContent,rect:rect(text),sheet:rect(sheet)});
      }
     }
-    const noticeSections=[...root.querySelectorAll('.announcement-section')].map(section=>({sourceId:section.dataset.sourceId,title:section.querySelector('h3')?.textContent||'',message:section.querySelector('.announcement-message')?.textContent||'',contact:section.querySelector('.announcement-contact bdi[dir="auto"]')?.textContent||'',phone:section.querySelector('.announcement-contact bdi[dir="ltr"]')?.textContent||''}));
-    return {theme:root.dataset.theme,overflow,notices:noticeSections.length,noticeSections,groups:root.querySelectorAll('.announcement-group').length,noticeTitles:noticeSections.map(section=>section.title),zmanim:root.querySelectorAll('.board-zmanim>div').length,dedication:root.querySelector('.board-dedication')?.textContent,sheetPresent:!!sheet,sheetContained:!sheet||!outside(sheet,center),sheetPlacement:sheet?.dataset.placement,sheetRect:sheet?rect(sheet):null,centerRect:rect(center),weeklyRect:weekly?rect(weekly):null,sheetColumns:shadow?.querySelectorAll('.onepage-col').length,sheetFooter:!!shadow?.querySelector('footer,.poster-legend'),sheetHeader:!!shadow?.querySelector('.page-header'),sheetTitle:normalized(shadow?.querySelector('.onepage-title')?.textContent),expectedTitle,sheetRows:[...shadow?.querySelectorAll('.onepage-row')||[]].map(signature),expectedRows,sourceIds:[...root.querySelectorAll('.board-schedule-row[data-source-id]')].map(e=>e.dataset.sourceId),weeklyServices:[...root.querySelectorAll('.board-service>h3')].map(e=>e.textContent)};
+    // Inspect every rotation slot: each group must appear once, with every
+    // saved section intact and fitting inside the space beside the schedule.
+    const noticeSections=[],groups=[],pages=Number(v.notices.dataset.pages)||0;
+    for(let page=0;page<Math.max(1,pages);page++){
+     if(page)v.update(snapshot,{preview:true,now:100000+page*300000});
+     for(const card of v.notices.querySelectorAll('.announcement-group')){
+      groups.push({id:card.dataset.announcementGroup,sourceIds:[...card.querySelectorAll('.announcement-section')].map(section=>section.dataset.sourceId)});
+      if(outside(card,v.notices)||card.scrollHeight>card.clientHeight+2||card.scrollWidth>card.clientWidth+2)overflow.push({page,group:card.dataset.announcementGroup,overflow:true});
+      for(const body of card.querySelectorAll('h2,h3,p,bdi'))if(outside(body,card))overflow.push({page,group:card.dataset.announcementGroup,clippedBody:body.className||body.tagName});
+     }
+     noticeSections.push(...[...v.notices.querySelectorAll('.announcement-section')].map(section=>({sourceId:section.dataset.sourceId,title:section.querySelector('h3')?.textContent||'',message:section.querySelector('.announcement-message')?.textContent||'',contact:section.querySelector('.announcement-contact bdi[dir="auto"]')?.textContent||'',phone:section.querySelector('.announcement-contact bdi[dir="ltr"]')?.textContent||''})));
+    }
+    return {theme:root.dataset.theme,overflow,notices:noticeSections.length,noticeSections,groups,pages,noticeTitles:noticeSections.map(section=>section.title),zmanim:root.querySelectorAll('.board-zmanim>div').length,dedication:root.querySelector('.board-dedication')?.textContent,sheetPresent:!!sheet,sheetContained:!sheet||!outside(sheet,root),sheetPlacement:sheet?.dataset.placement,sheetRect:sheet?rect(sheet):null,weeklyRect:weekly?rect(weekly):null,rightRect:right?rect(right):null,zmanimRect:rect(zmanim),noticesRect:rect(v.notices),footerRect:rect(footer),stageRect:rect(root),extended:root.classList.contains('right-extended'),shabbosColumns:root.querySelectorAll('.board-static-column').length,sheetColumns:shadow?.querySelectorAll('.onepage-col').length,sheetFooter:!!shadow?.querySelector('footer,.poster-legend'),sheetHeader:!!shadow?.querySelector('.page-header'),sheetTitle:normalized(shadow?.querySelector('.onepage-title')?.textContent),expectedTitle,sheetRows:[...shadow?.querySelectorAll('.onepage-row')||[]].map(signature),expectedRows,sourceIds:[...root.querySelectorAll('.board-schedule-row[data-source-id]')].map(e=>e.dataset.sourceId),weeklyServices:[...root.querySelectorAll('.board-service>h3')].map(e=>e.textContent)};
    },snapshot);
    const name=`${date} ${theme}`;
    check(result.theme===theme,`${name}: saved theme applied`,result.theme);
    check(!result.overflow.length,`${name}: content fits without clipping`,result.overflow);
-   check(result.notices===10&&sameIds(result.noticeTitles,notices.map(n=>n.title)),`${name}: all 10 notices visible`,result.noticeTitles);
-   check(result.groups===4,`${name}: related notices share four complete groups`,result.groups);
+   check(result.notices===notices.length&&sameIds(result.noticeTitles,notices.map(n=>n.title)),`${name}: every notice appears once across a full rotation`,result.noticeTitles);
+   check(sameIds(result.groups.map(group=>group.id),expectedGroups.map(group=>group.id)),`${name}: every complete group appears once across a full rotation`,result.groups);
+   for(const group of expectedGroups)check(sameIds(result.groups.find(actual=>actual.id===group.id)?.sourceIds||[],group.sourceIds),`${name}: ${group.id} stays together in one slot`,result.groups);
    for(const item of notices){const actual=result.noticeSections.find(section=>section.sourceId===item.id);check(actual&&actual.title===item.title&&['message','contact','phone'].every(key=>actual[key]===(item.data[key]||'')),`${name}: ${item.id} complete saved text is present`,actual);}
    check(result.zmanim===11,`${name}: all 11 daily zmanim visible`,result.zmanim);
    check(!!result.dedication,`${name}: dedication remains visible`);
+   check(result.shabbosColumns===0,`${name}: Shabbos remains one column`,result.shabbosColumns);
+   check(!result.weeklyRect||(result.weeklyRect.left>=result.zmanimRect.right-2&&result.rightRect.left>=result.weeklyRect.right-2),`${name}: weekday schedule is centered with Shabbos or special sheet on its right`,result);
+   check(result.rightRect.bottom<=result.footerRect.top+2,`${name}: right schedule stays above the footer`,result.rightRect);
+   if(result.extended)check(result.rightRect.bottom>result.noticesRect.top&&result.noticesRect.right<=result.rightRect.left+2,`${name}: extended schedule uses lower space without covering announcements`,{right:result.rightRect,notices:result.noticesRect});
    if(schedule.specialSheet){
-    check(result.sheetPresent&&result.sheetContained,`${name}: sheet stays inside schedule area`,result.sheetContained);
+    check(result.sheetPresent&&result.sheetContained,`${name}: sheet stays inside the screen`,result.sheetContained);
     check(result.sheetColumns===2,`${name}: original page has exactly two columns`,result.sheetColumns);
     check(!result.sheetFooter,`${name}: no sheet footer`);
     check(!result.sheetHeader,`${name}: printed shul header is removed`);
@@ -88,12 +106,12 @@ try {
     check(sameIds(result.sheetRows,result.expectedRows),`${name}: every original source row and location mark appears exactly once`,{actual:result.sheetRows,expected:result.expectedRows});
     check(result.sheetPlacement===schedule.specialSheet.placement,`${name}: scheduled sheet placement applies`,result.sheetPlacement);
     if(schedule.specialSheet.placement==='shabbos'){
-     check(!!result.weeklyRect&&result.weeklyRect.left>=result.sheetRect.right-2,`${name}: original sheet stays in Shabbos box with weekday schedule visible on its right`,{sheet:result.sheetRect,weekly:result.weeklyRect});
-     check(result.sheetRect.width<result.centerRect.width*0.7,`${name}: upcoming sheet does not cover both schedules`,result.sheetRect);
+     check(!!result.weeklyRect&&result.sheetRect.left>=result.weeklyRect.right-2,`${name}: original sheet stays to the right of the visible weekday schedule`,{sheet:result.sheetRect,weekly:result.weeklyRect});
+     check(result.sheetRect.width<result.stageRect.width*0.5,`${name}: upcoming sheet uses only the right schedule column`,result.sheetRect);
      check(sameIds(result.weeklyServices,[...schedule.presentation.weekly.services.map(s=>s.name),...(schedule.presentation.weekly.posterSections||[]).map(s=>s.heading)]),`${name}: weekday prayer sections remain complete`,result.weeklyServices);
     }else{
      check(!result.weeklyRect,`${name}: weekday box is covered once its schedule finishes`);
-     check(Math.abs(result.sheetRect.width-result.centerRect.width)<3,`${name}: active original sheet covers the full schedule area`,{sheet:result.sheetRect,center:result.centerRect});
+     check(result.sheetRect.left>=result.zmanimRect.right-2&&result.sheetRect.width>result.stageRect.width*0.6,`${name}: active original sheet spans both schedule columns beside daily zmanim`,{sheet:result.sheetRect,zmanim:result.zmanimRect});
     }
    }else{
     check(!result.sheetPresent,`${name}: ordinary schedule panels used`);
@@ -109,10 +127,10 @@ try {
   const before=JSON.stringify([...v.slots]),selected=v.slots.get('dedication').id;
   v.update({...snapshot,appearance:{mode:'light'}},{preview:true,now:201000});const afterTheme=JSON.stringify([...v.slots]);
   v.update({...snapshot,appearance:{mode:'light'}},{preview:true,now:226000});
-  return {before,afterTheme,selected,afterRotation:v.slots.get('dedication').id,theme:v.stage.dataset.theme,notices:v.stage.querySelectorAll('.announcement-section').length};
+  return {before,afterTheme,selected,afterRotation:v.slots.get('dedication').id,theme:v.stage.dataset.theme,notices:v.stage.querySelectorAll('.announcement-section').length,pages:Number(v.notices.dataset.pages),groups:v.noticePages.flat().map(group=>group.id)};
  });
  check(rotation.before===rotation.afterTheme,'Theme change preserves selected cards and rotation start times',rotation);
  check(rotation.selected!==rotation.afterRotation,'Dedications advance after configured duration',rotation);
- check(rotation.theme==='light'&&rotation.notices===10,'Timed rotation preserves saved theme and announcement slots',rotation);
+ check(rotation.theme==='light'&&rotation.notices>0&&rotation.pages>0&&sameIds(rotation.groups,expectedGroups.map(group=>group.id)),'Timed dedication rotation preserves saved theme and every announcement group',rotation);
 }finally{await browser.close();}
-if(issues.length){console.error(JSON.stringify(issues,null,2));process.exitCode=1;}else console.log('Board layout passed: original two-column page, scheduled Shabbos-only and full-width placement, ordinary schedules, Light/Dark, complete sources, actual card bounds, theme/rotation continuity.');
+if(issues.length){console.error(JSON.stringify(issues,null,2));process.exitCode=1;}else console.log('Board layout passed: weekday center and single-column Shabbos right, original special-page placement, whole announcement groups across rotation, Light/Dark, complete sources, actual card bounds, theme/rotation continuity.');

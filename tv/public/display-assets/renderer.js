@@ -29,6 +29,7 @@ export class DisplayView {
     this.warning = [];
     host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><a class="shul-donate" href="https://baismedrashoflakewoodcommons.org/donate/"><img src="/display-assets/donate-qr.png" alt="Scan to donate to the shul"><div><strong>Support our shul</strong><small>baismedrashof<wbr>lakewoodcommons.org</small></div></a><section class="board-dedication"></section><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><section class="board-zmanim"></section><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
     this.stage = host.firstElementChild;
+    this.stage.classList.add('right-column-board');
     for (const [key, selector] of Object.entries({brand:'.tv-brand',date:'.tv-date',clock:'.tv-clock',dedication:'.board-dedication',zmanim:'.board-zmanim',schedules:'.tv-center',notices:'.board-notices',next:'.next-minyan',connection:'.connection-state'})) this[key] = this.stage.querySelector(selector);
     this.resize = () => {
       const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
@@ -46,6 +47,7 @@ export class DisplayView {
       // Regular panels also measure the final Hebrew font, once at startup.
       if (this.snapshot && !this.originalSheetBox) {
         this.scheduleKey = null;
+        this.layoutKey = null;
         this.update(this.snapshot, this.options);
       }
       this.checkCapacity();
@@ -76,13 +78,7 @@ export class DisplayView {
     this.dedication.hidden = !dedication;
     setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${esc(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
 
-    const groups = groupAnnouncements(items);
-    if (setHTML(this.notices, groups.map(renderAnnouncementGroup).join(''))) {
-      this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
-      this.stage.classList.toggle('without-notices', !groups.length);
-      this.stage.style.setProperty('--notice-height', groups.length ? '340px' : '0px');
-      this.fitNotices();
-    }
+    const groups = groupAnnouncements(items), groupsKey = JSON.stringify(groups);
     const upcoming = (snapshot.upcoming || []).filter(i => i.startsAt > instant).map(i => `<div class="tv-upcoming"><strong>${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} – ${dateLabel(i.data.appliesTo)}</div>`).join('');
     const sheet = s.specialSheet && instant >= s.specialSheet.previewStartsAt && instant < s.specialSheet.endsAt ? s.specialSheet : null;
     const placement = sheet && instant >= sheet.coversBothAt ? 'both' : 'shabbos';
@@ -116,16 +112,18 @@ export class DisplayView {
       }
       if (box) {
         if (box.parentElement !== this.schedules) this.schedules.prepend(box);
-        fitOriginalSheet(box);
-        const weekly = this.schedules.querySelector('.board-weekly');
-        if (weekly && weekly.scrollHeight > weekly.clientHeight + 2) weekly.classList.add('board-compact');
       } else {
         this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
         this.originalSheetBox = null;
         this.originalSheetKey = null;
-        fitBoardSchedules(this.schedules, s.presentation);
       }
     }
+    const layoutKey = scheduleKey + groupsKey;
+    if (this.layoutKey !== layoutKey) {
+      this.layoutKey = layoutKey;
+      this.layoutBoard(groups, sheet, placement, now);
+    }
+    this.renderNotices(now);
     const next = s.next && s.next.at >= instant ? s.next : null;
     setHTML(this.next, `<span class="next-label">Next minyan</span>${next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : '<strong>No further minyan in the loaded schedule</strong>'}`);
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
@@ -133,11 +131,71 @@ export class DisplayView {
     this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';
     this.checkCapacity();
   }
-  fitNotices() {
-    // Grow the band before sacrificing any wording. Larger notices get more
-    // width. Beyond physical screen capacity, preview reports the exact issue.
-    const required = Math.max(0, ...[...this.notices.children].map(card => card.scrollHeight + 4));
-    if (required > 340) this.stage.style.setProperty('--notice-height', `${Math.min(430, required)}px`);
+  noticeHeight(pages) {
+    const measure = document.createElement('section');
+    measure.className = 'board-notices notice-measure';
+    Object.assign(measure.style, {position:'absolute',left:'0',top:'-10000px',width:this.notices.offsetWidth+'px',height:'auto',gridAutoRows:'auto',visibility:'hidden',pointerEvents:'none'});
+    this.stage.append(measure);
+    let height = 0;
+    for (const groups of pages) {
+      measure.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
+      measure.innerHTML = groups.map(renderAnnouncementGroup).join('');
+      height = Math.max(height, measure.scrollHeight + 4);
+    }
+    measure.remove();
+    return height;
+  }
+  layoutBoard(groups, sheet, placement, now) {
+    // Reserve the right column before laying out notices. Neither the clock nor
+    // notice rotation reruns this measurement or changes the schedule geometry.
+    this.stage.classList.remove('right-extended','special-expanded','week-extended');
+    this.stage.classList.toggle('without-notices', !groups.length);
+    this.stage.style.setProperty('--notice-height', groups.length ? '340px' : '0px');
+    let pages = groups.length ? [groups] : [];
+    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(340,this.noticeHeight(pages))+'px');
+    const fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {compactWeekly:false});
+    if (sheet || fit.special?.overflow) {
+      this.stage.classList.add('right-extended');
+      this.stage.classList.toggle('special-expanded', !!sheet && placement === 'both');
+      const perPage = sheet && placement === 'both' ? 1 : 2;
+      pages = [];
+      for (let i = 0; i < groups.length; i += perPage) pages.push(groups.slice(i,i+perPage));
+      if (groups.length) {
+        const minimum = sheet && placement === 'both' ? 460 : 340;
+        this.stage.style.setProperty('--notice-height', Math.max(minimum,this.noticeHeight(pages))+'px');
+      }
+    }
+    let fitted = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+    // Exception-heavy Selichos weeks also need a full-height center reference.
+    // Move complete notices to the left rail instead of covering any prayer.
+    if (fitted.weekly?.overflow) {
+      this.stage.classList.add('right-extended','week-extended');
+      pages = groups.map(group => [group]);
+      if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(460,this.noticeHeight(pages))+'px');
+      fitted = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+    }
+    const previous = this.noticePages?.[this.noticePage || 0]?.map(g => g.id).join('|');
+    this.noticePages = pages;
+    const current = pages.findIndex(page => page.map(g => g.id).join('|') === previous);
+    this.noticePage = current < 0 ? 0 : current;
+    if (current < 0) this.noticeStarted = now;
+    if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);
+  }
+  renderNotices(now) {
+    let groups = this.noticePages?.[this.noticePage || 0] || [];
+    if (now < this.noticeStarted) this.noticeStarted = now;
+    // A whole group stays together. Longer pages get longer reading time.
+    const duration = Math.max(60000, groups.reduce((n,g) => n+g.charCount,0)/14*1000);
+    if (this.noticePages?.length > 1 && now-this.noticeStarted >= duration) {
+      this.noticePage = (this.noticePage+1)%this.noticePages.length;
+      this.noticeStarted = now;
+      groups = this.noticePages[this.noticePage];
+    }
+    setHTML(this.notices, groups.map(renderAnnouncementGroup).join(''));
+    this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
+    this.notices.dataset.page = String((this.noticePage || 0)+1);
+    this.notices.dataset.pages = String(this.noticePages?.length || 0);
+    this.notices.setAttribute('aria-label', `Announcements ${this.notices.dataset.page} of ${this.notices.dataset.pages}`);
   }
   checkCapacity() {
     this.warning = [...this.stage.querySelectorAll('.announcement-group,.board-dedication,.board-weekly,.board-shabbos')]

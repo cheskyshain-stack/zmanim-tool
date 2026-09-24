@@ -694,3 +694,32 @@ button {
 .tv-stage.stable-board{--shul-sheet-background:#f7f3eb;--shul-sheet-gold:#80641f}
 .tv-stage.stable-board[data-theme=dark]{--shul-sheet-background:#0b1423;--shul-sheet-gold:#d8b76a}
 .stable-board .announcement-phone{white-space:nowrap}
+
+/* Weekday reference in the center; the entire Shabbos column reads downward
+   on the right. Its optional extra height replaces only the space beneath it. */
+.tv-stage.right-column-board{grid-template-columns:300px minmax(0,1fr) minmax(0,1fr);column-gap:16px}
+.right-column-board .tv-head,.right-column-board .tv-footer{grid-column:1/-1}
+.right-column-board .tv-layout,.right-column-board .tv-center{display:contents!important}
+.right-column-board .board-zmanim{grid-column:1;grid-row:2}
+.right-column-board .board-weekly{grid-column:2;grid-row:2}
+.right-column-board .board-shabbos{grid-column:3;grid-row:2}
+.right-column-board .board-shabbos-body{display:block;columns:auto;flex:1}
+.right-column-board .board-notices{grid-column:1/-1;grid-row:3}
+.right-column-board .original-sheet-box[data-placement=shabbos]{grid-column:3;grid-row:2}
+.right-column-board .original-sheet-box[data-placement=shabbos]~.board-weekly{grid-column:2;grid-row:2}
+.right-column-board .original-sheet-box[data-placement=both]{grid-column:2/4;grid-row:2}
+.right-column-board.right-extended :is(.board-shabbos,.original-sheet-box){grid-row:2/4}
+.right-column-board.right-extended .board-notices{grid-column:1/3}
+.tv-stage.right-column-board.special-expanded{grid-template-columns:420px minmax(0,1fr) minmax(0,1fr)}
+.right-column-board.special-expanded .board-notices{grid-column:1}
+.right-column-board.special-expanded .board-zmanim>div{font-size:22px;padding:2px 0}
+.right-column-board.special-expanded .board-zmanim>div span{font-size:19px}
+.right-column-board.special-expanded .board-zmanim h2{font-size:26px;margin-bottom:5px}
+.right-column-board.right-extended .board-shabbos.board-compact .board-schedule-row{padding:4px 0}
+.right-column-board .notice-measure{grid-column:auto;grid-row:auto}
+.tv-stage.right-column-board.week-extended{grid-template-columns:420px minmax(0,1fr) minmax(0,1fr)}
+.right-column-board.week-extended .board-weekly{grid-row:2/4}
+.right-column-board.week-extended .board-notices{grid-column:1}
+.right-column-board.week-extended .board-zmanim>div{font-size:22px;padding:2px 0}
+.right-column-board.week-extended .board-zmanim>div span{font-size:19px}
+.right-column-board.week-extended .board-zmanim h2{font-size:26px;margin-bottom:5px}
