@@ -32,6 +32,16 @@ export function paginateSpecial(stage){
  // when both columns fit at the normal readable font size.
  const ordinary=source.length&&source.every(section=>[...section.querySelectorAll('[data-source-id]')].every(row=>row.dataset.sourceId.startsWith('chart:')));
  panel.classList.toggle('ordinary-shabbos', Boolean(ordinary));
+ if(ordinary){
+  const center=stage.querySelector('.tv-center');
+  const previousColumns=center?.style.gridTemplateColumns;
+  if(center)center.style.gridTemplateColumns='minmax(0,1fr) minmax(0,1fr)';
+  page.className='shabbos-single';
+  for(const section of source)page.append(section.cloneNode(true));
+  if(page.scrollHeight<=body.clientHeight-18)return {pages:[page.outerHTML],body,label:panel.querySelector('.schedule-page-label')};
+  if(center)center.style.gridTemplateColumns=previousColumns;
+  page.replaceChildren();page.className='';
+ }
  if(ordinary&&panel.clientWidth>=780){
    page.className='shabbos-overview';
    const evening=document.createElement('div'),day=document.createElement('div');
