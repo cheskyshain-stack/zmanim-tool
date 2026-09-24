@@ -1,4 +1,4 @@
-import { schedulePresentation, posterRows } from './presentation.js';
+import { schedulePresentation } from './presentation.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
 import parshaEY from "../../data/parsha_ey.json" with { type: "json" };
@@ -9,7 +9,7 @@ import { resolveSettings, DEFAULT_SETTINGS } from "../../js/settings.js";
 import { minyanimForDay, candleLightingForDay, clock } from "../../js/upcoming.js";
 import { dateFromSerial, excelSerial, shulNow } from "../../js/zmanim/solar.js";
 import { sunsetElev } from "../../js/zmanim/zmanim.js";
-import { hebrewDateExtended, hebrewYear, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
+import { hebrewDateExtended, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
 import { agendaDayKind } from "../../js/ui/weekly-agenda.js";
 import { buildRoshHashanaPoster } from "../../js/posters/roshhashana.js";
 import { buildYomKippurPoster } from "../../js/posters/yomkippur.js";
@@ -132,13 +132,7 @@ export function scheduleSnapshot(instant, controls = []) {
     cursor=last;
   }
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
-  const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
-  // Show the complete approved Sukkos sheet while that season is the applicable
-  // or upcoming display group. Explicit admin overrides retain the normal renderer.
-  const sukkos = !active.length && (presentation.special?.sections.some(section=>section.rows.some(row=>row.id.startsWith('sk:'))) || presentation.weekly.posterSections.some(section=>section.rows.some(row=>row.id.startsWith('hoshana:') || row.id.startsWith('chm:'+h.year+':7'))));
-  const poster = sukkos ? buildSukkosPoster(h.year,settings) : null;
-  const fullSheet = poster ? {title:'סוכות',year:h.year,yearLabel:hebrewYear(h.year),blocks:poster.blocks.map((block,i)=>({heading:block.heading,rows:posterRows(block.lines,'full-sk:'+h.year+':'+i)}))} : null;
-  return { presentation, fullSheet, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+  return { presentation: schedulePresentation({serial,state,settings,tables,day,instant,sunset}), week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
 }
 
 

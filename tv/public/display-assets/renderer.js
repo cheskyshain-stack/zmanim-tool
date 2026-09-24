@@ -1,5 +1,4 @@
 import { fullSchedules, paginateSpecial, fitScheduleLabels } from './schedule-renderer.js';
-import { fullSheetHTML, fitFullSheet } from './full-sheet.js';
 import { themeAt } from './appearance.js';
 import { localStamp } from "./time.js";
 export const escapeHTML = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -147,13 +146,7 @@ export class DisplayView {
       if(body.dataset.page!==String(page)){body.innerHTML=pages[page];body.dataset.page=String(page);}
       label.textContent=pages.length>1?` · ${page+1} / ${pages.length}`:'';
     }
-    const sheetKey = s.fullSheet ? JSON.stringify([s.fullSheet,s.date,s.hebrewDate,preview,stale]) : '';
-    if(sheetKey !== this.sheetKey || (sheetKey && !this.stage.querySelector('.full-sheet'))){
-      this.stage.querySelector('.full-sheet')?.remove();
-      this.sheetKey=sheetKey;
-      if(s.fullSheet){this.stage.insertAdjacentHTML('beforeend',fullSheetHTML(s.fullSheet,s,{preview,stale}));fitFullSheet(this.stage);}
-    }
-    for(const clock of this.stage.querySelectorAll('.tv-clock')) clock.textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
+    this.stage.querySelector(".tv-clock").textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
     this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card")].filter((e) => e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");
   }
   destroy() {
