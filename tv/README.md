@@ -382,6 +382,10 @@ space above it, including in compact layouts. Whole-day blocks have at least
 16px separation. This is presentation only; actual daily events and next-minyan
 calculations are unchanged.
 
+The regular pattern stays first. Date-specific changes are ordered by their
+earliest applicable date, with the days inside each shared change also in date
+order. This applies in live, future-preview and offline views.
+
 The calendar supplies a public `fastDay` boolean on grouped dates so short weeks
 can choose an ordinary baseline without interpreting holiday names. No stored
 schedule or database migration is needed. Shared exceptions retain their complete

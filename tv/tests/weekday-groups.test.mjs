@@ -112,3 +112,84 @@ test('empty Friday groups do not become baselines and tied first groups stay aut
   const result = groupWeekdayPresentation(tied);
   assert.deepEqual(result.daySections[0].days.map(day=>day.date), ['2030-01-04']);
 });
+
+test('real Selichos week puts an earlier one-day change before a later two-day change', () => {
+  const services = snapshot('2026-09-06').presentation.weekly.services;
+  const before = structuredClone(services);
+  const result = groupWeekdayPresentation(services);
+  const selichos = result.services.find(service => service.name === 'סליחות');
+  assert.deepEqual(selichos.groups.slice(1).map(group => group.days.map(day => day.date)), [
+    ['2026-09-06'], ['2026-09-08', '2026-09-09'],
+  ]);
+  assert.deepEqual(byDate(result.services), byDate(services));
+  assert.deepEqual(services, before);
+});
+
+const unorderedService = name => ({name, groups:[
+  {days:[day('2030-01-06'), day('2030-01-05')], events:[event(name, '6:30')]},
+  {days:[day('2030-01-07'), day('2030-01-03'), day('2030-01-01'), day('2030-01-02')], events:[event(name, '7:00')]},
+  {days:[day('2030-01-04')], events:[event(name, '6:15')]},
+]});
+const orderedDates = [
+  ['2030-01-01', '2030-01-02', '2030-01-03', '2030-01-07'],
+  ['2030-01-04'],
+  ['2030-01-05', '2030-01-06'],
+];
+const groupDates = service => service.groups.map(group => group.days.map(day => day.date));
+
+test('baseline stays first while inline exceptions and their dates use chronological order', () => {
+  const services = [unorderedService('שחרית'), ...names.slice(1).map(name => ({name, groups:[{
+    days:Array.from({length:7}, (_, index) => day(`2030-01-0${7-index}`)),
+    events:[event(name, '7:00')],
+  }]}))];
+  const before = structuredClone(services);
+  const result = groupWeekdayPresentation(services);
+  assert.deepEqual(groupDates(result.services[0]), orderedDates);
+  assert.deepEqual(groupDates(result.services[1]), [Array.from({length:7}, (_, index) => `2030-01-0${index+1}`)]);
+  assert.deepEqual(result.daySections, []);
+  assert.deepEqual(byDate(result.services), byDate(services));
+  assert.deepEqual(services, before);
+});
+
+test('chronological presentation also applies when a main prayer is absent', () => {
+  for (const missing of names) {
+    const services = names.filter(name => name !== missing).map(unorderedService);
+    const before = structuredClone(services);
+    const result = groupWeekdayPresentation(services);
+    assert.deepEqual(result.services.map(groupDates), services.map(() => orderedDates), missing);
+    assert.deepEqual(result.daySections, [], missing);
+    assert.deepEqual(services, before, missing);
+  }
+});
+
+test('chronological presentation also applies when a main prayer has no nonempty baseline', () => {
+  const services = names.map(unorderedService);
+  for (const group of services[2].groups) group.events = [];
+  const before = structuredClone(services);
+  const result = groupWeekdayPresentation(services);
+  assert.deepEqual(result.services.slice(0, 2).map(groupDates), [orderedDates, orderedDates]);
+  assert.deepEqual(groupDates(result.services[2]), [orderedDates[0], orderedDates[1], orderedDates[2]]);
+  assert.deepEqual(result.daySections, []);
+  assert.deepEqual(services, before);
+});
+
+test('inline exceptions are sorted by dates remaining after a full-day section is removed', () => {
+  const baseline = ['2030-01-10', '2030-01-11', '2030-01-12', '2030-01-13'];
+  const services = names.map((name, index) => ({name, groups:[
+    {days:baseline.concat(index ? ['2030-01-04', '2030-01-09'] : []).map(date => day(date)), events:[event(name, '7:00')]},
+    {days:(index ? ['2030-01-01'] : ['2030-01-01', '2030-01-09']).map(date => day(date)), events:[event(name, '6:30')]},
+    ...(index ? [] : [{days:[day('2030-01-04')], events:[event(name, '6:15')]}]),
+  ]}));
+  const result = groupWeekdayPresentation(services);
+  assert.deepEqual(result.daySections.map(section => section.days.map(day => day.date)), [['2030-01-01']]);
+  assert.deepEqual(groupDates(result.services[0]), [baseline, ['2030-01-04'], ['2030-01-09']]);
+});
+
+test('full-day sections and dates within a shared section are chronological', () => {
+  const services = names.map(unorderedService);
+  const result = groupWeekdayPresentation(services);
+  assert.deepEqual(result.services.map(groupDates), services.map(() => [orderedDates[0]]));
+  assert.deepEqual(result.daySections.map(section => section.days.map(day => day.date)), [
+    ['2030-01-04'], ['2030-01-05', '2030-01-06'],
+  ]);
+});

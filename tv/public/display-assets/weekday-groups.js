@@ -5,12 +5,13 @@
  */
 export function groupWeekdayPresentation(services = []) {
   const copy = structuredClone(services);
+  for (const service of copy) for (const group of service.groups)
+    group.days.sort((a, b) => a.date.localeCompare(b.date));
   const morning = copy.flatMap((service, index) =>
     ['שחרית', 'סליחות'].includes(service.name) && service.groups.some(group => group.events.length)
       ? [index] : []);
   const mincha = copy.findIndex(service => service.name === 'מנחה');
   const maariv = copy.findIndex(service => service.name === 'מעריב');
-  if (!morning.length || mincha < 0 || maariv < 0) return {services:copy, daySections:[]};
 
   // Empty Friday groups record that the Shabbos chart owns those hours; they
   // cannot become a baseline or qualify a day as having a complete schedule.
@@ -29,8 +30,19 @@ export function groupWeekdayPresentation(services = []) {
       return group.days.length > previous.days.length ? index : best;
     }, -1);
   });
+  const orderedServices = (excluded = new Set()) => copy.map((service, index) => ({...service,
+    groups:service.groups
+      .map((group, groupIndex) => ({group:{...group, days:group.days.filter(day => !excluded.has(day.date))}, groupIndex}))
+      .filter(({group}) => group.days.length)
+      // Only the ordinary reference stays first. Dated changes follow the
+      // calendar, never the number of days that happen to share their times.
+      .sort((a, b) => Number(b.groupIndex === bases[index]) - Number(a.groupIndex === bases[index])
+        || a.group.days[0].date.localeCompare(b.group.days[0].date))
+      .map(({group}) => group),
+  }));
+  if (!morning.length || mincha < 0 || maariv < 0) return {services:orderedServices(), daySections:[]};
   const required = [...morning, mincha, maariv];
-  if (required.some(index => bases[index] < 0)) return {services:copy, daySections:[]};
+  if (required.some(index => bases[index] < 0)) return {services:orderedServices(), daySections:[]};
 
   const dates = new Map();
   for (const service of copy) for (const group of service.groups) for (const day of group.days)
@@ -58,12 +70,7 @@ export function groupWeekdayPresentation(services = []) {
   }
 
   return {
-    services:copy.map((service, index) => ({...service, groups:service.groups
-      .map((group, groupIndex) => ({group, groupIndex}))
-      .sort((a, b) => Number(b.groupIndex === bases[index]) - Number(a.groupIndex === bases[index]))
-      .map(({group}) => group)
-      .map(group => ({...group, days:group.days.filter(day => !moved.has(day.date))}))
-      .filter(group => group.days.length)})),
+    services:orderedServices(moved),
     daySections:[...sections.values()],
   };
 }
