@@ -29,6 +29,8 @@ export function originalSheetHTML(sheet) {
 }
 
 const hostStyles = `
+  /* Inherit every palette token across the shadow boundary. Safari does not
+     support :host-context, so theme selection belongs to the outer stage. */
   :host {
     --sheet-background: var(--shul-sheet-background, #faf7ef);
     --sheet-text: var(--shul-sheet-text, #142a42);
@@ -37,13 +39,6 @@ const hostStyles = `
     --sheet-border: var(--shul-sheet-border, #d6cbb4);
     display:block; position:relative; width:100%; height:100%; overflow:hidden;
     background:var(--sheet-background); color:var(--sheet-text);
-  }
-  :host-context(.tv-stage[data-theme="dark"]) {
-    --sheet-background:var(--shul-sheet-background, #0b1423);
-    --sheet-text:var(--shul-sheet-text, #f5f2ea);
-    --sheet-gold:var(--shul-sheet-gold, #d8b76a);
-    --sheet-band:var(--shul-sheet-band, #142238);
-    --sheet-border:var(--shul-sheet-border, #34445c);
   }
   *,*::before,*::after { box-sizing:border-box; }
   .original-page { position:absolute; inset:0; min-width:0; min-height:0; overflow:hidden; visibility:hidden; }

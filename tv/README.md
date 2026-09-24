@@ -349,6 +349,13 @@ its Shema deadline. The list is shared by live, future-preview and offline views
 The special page retains its original row padding, separate time runs, heading
 spacing and column gutter; only the outer paper margins, branding and colors
 are adapted to the screen. No schedule data is changed.
+Its full palette inherits from the selected display theme across the shadow
+root, without relying on `:host-context`, so Safari receives the same schedule
+ink, heading bands, gold labels and borders. Theme changes keep the fitted page.
+`node tests/sheet-theme-browser.mjs` checks the actual colors and stable page
+through theme changes on desktop and iPhone-sized viewports, with the opposite
+OS color preference. It uses installed Playwright WebKit when available and
+explicitly reports its Chrome compatibility fallback otherwise.
 
 `node tests/year-layout-browser.mjs` checks every date from September 24, 2026
 through September 23, 2027 using the real calendar and saved public-announcement

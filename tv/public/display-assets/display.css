@@ -691,8 +691,9 @@ button {
 .stable-board .announcement-section h3{margin-bottom:2px}
 .stable-board .announcement-section p{line-height:1.18}
 .stable-board .announcement-contact{margin-top:3px!important}
-.tv-stage.stable-board{--shul-sheet-background:#f7f3eb;--shul-sheet-gold:#80641f}
-.tv-stage.stable-board[data-theme=dark]{--shul-sheet-background:#0b1423;--shul-sheet-gold:#d8b76a}
+/* All original-chart colors inherit through its shadow root, including Safari. */
+.tv-stage.stable-board{--shul-sheet-background:#f7f3eb;--shul-sheet-text:#142a42;--shul-sheet-gold:#80641f;--shul-sheet-band:#eee5d0;--shul-sheet-border:#d6cbb4}
+.tv-stage.stable-board[data-theme=dark]{--shul-sheet-background:#0b1423;--shul-sheet-text:#f5f2ea;--shul-sheet-gold:#d8b76a;--shul-sheet-band:#142238;--shul-sheet-border:#34445c}
 .stable-board .announcement-phone{white-space:nowrap}
 
 /* Weekday reference in the center; the entire Shabbos column reads downward
