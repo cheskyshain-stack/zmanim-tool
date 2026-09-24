@@ -312,16 +312,18 @@ This section supersedes the earlier rotating/paged screen layout notes above.
 
 Weekday schedules now occupy the center, with Shabbos on the right. Shabbos is
 always one continuous column: no duplicated headings, split columns or changing
-pages. When it needs additional height, it extends down to the footer and takes
-the space beneath its column. Special sheets use the same taller right-hand area;
+pages. Ordinary weeks keep all complete announcements together in a full-width
+bottom band, with compact schedule spacing and exception scopes beside their
+times. Special sheets use the taller right-hand area down to the footer;
 the original page remains complete and keeps its own two source columns. The
 existing timed expansion across both schedule areas still applies.
 
-When the schedule uses the lower space, complete announcement groups rotate in
+When a special sheet uses the lower space, complete announcement groups rotate in
 the remaining slots (at least 60 seconds, longer for longer groups). Messages are
 never divided into fragments. Dense weekday exception weeks can also extend the
-center reference, leaving the left rail for zmanim and full announcement groups.
-Shorter layouts retain the full-width notice band where it fits. Empty notice
+center reference alongside a special sheet, leaving the left rail for zmanim and
+full announcement groups. After the special sheet ends, all ordinary announcement
+groups automatically return together; they never rotate on ordinary weeks. Empty notice
 areas are reclaimed. All sizes are measured before display and remain steady
 while notices, clock, connection state or themes change.
 

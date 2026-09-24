@@ -150,11 +150,13 @@ export class DisplayView {
     // notice rotation reruns this measurement or changes the schedule geometry.
     this.stage.classList.remove('right-extended','special-expanded','week-extended');
     this.stage.classList.toggle('without-notices', !groups.length);
+    this.stage.classList.toggle('ordinary-notices', !sheet && !!groups.length);
     this.stage.style.setProperty('--notice-height', groups.length ? '340px' : '0px');
     let pages = groups.length ? [groups] : [];
-    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(340,this.noticeHeight(pages))+'px');
-    const fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {compactWeekly:false});
-    if (sheet || fit.special?.overflow) {
+    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(sheet ? 340 : 280,this.noticeHeight(pages))+'px');
+    // Ordinary weeks keep every announcement together in the full-width band.
+    // Only the original special page can reclaim that area and rotate groups.
+    if (sheet) {
       this.stage.classList.add('right-extended');
       this.stage.classList.toggle('special-expanded', !!sheet && placement === 'both');
       const perPage = sheet && placement === 'both' ? 1 : 2;
@@ -166,9 +168,9 @@ export class DisplayView {
       }
     }
     let fitted = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    // Exception-heavy Selichos weeks also need a full-height center reference.
-    // Move complete notices to the left rail instead of covering any prayer.
-    if (fitted.weekly?.overflow) {
+    // A dense weekday reference beside a special sheet can also need height.
+    // This exception never rotates announcements on ordinary weeks.
+    if (sheet && fitted.weekly?.overflow) {
       this.stage.classList.add('right-extended','week-extended');
       pages = groups.map(group => [group]);
       if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(460,this.noticeHeight(pages))+'px');

@@ -723,3 +723,25 @@ button {
 .right-column-board.week-extended .board-zmanim>div{font-size:22px;padding:2px 0}
 .right-column-board.week-extended .board-zmanim>div span{font-size:19px}
 .right-column-board.week-extended .board-zmanim h2{font-size:26px;margin-bottom:5px}
+
+/* Ordinary weeks show every complete notice together. Compact the surrounding
+   spacing and put exception scopes beside their times to preserve all entries. */
+.tv-stage.ordinary-notices{grid-template-rows:80px minmax(0,1fr) var(--notice-height) 26px;gap:12px}
+.ordinary-notices .tv-head{height:80px}
+.ordinary-notices .announcement-group{padding:10px 12px}
+.ordinary-notices .announcement-section p,.ordinary-notices .announcement-section h3{font-size:16px}
+.ordinary-notices .announcement-group>h2{font-size:20px}
+.ordinary-notices .board-shabbos .board-schedule-row{padding:1px 0;grid-template-columns:1.4fr 1fr;gap:8px}
+.ordinary-notices .board-shabbos .board-long-label{grid-template-columns:1fr}
+.ordinary-notices .board-shabbos .board-prayer-label,.ordinary-notices .board-shabbos .board-times{font-size:26px}
+.ordinary-notices .board-shabbos .board-times{gap:5px 14px}
+.ordinary-notices .board-shabbos .board-row-note{font-size:18px}
+.ordinary-notices .board-weekly .board-service{padding:4px 0}
+.ordinary-notices .board-weekly .board-times{font-size:26px;gap:5px 14px}
+.ordinary-notices .board-weekly .board-service>h3,.ordinary-notices .board-weekly .board-exception h4{font-size:26px;margin-bottom:4px}
+.ordinary-notices .board-weekly .board-exception{padding:4px;margin-top:5px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}
+.ordinary-notices .board-exception>h4{grid-column:2;grid-row:1;margin:0!important}
+.ordinary-notices .board-exception>.board-times{grid-column:1;grid-row:1}
+.ordinary-notices .board-exception>p{grid-column:1/-1}
+.ordinary-notices .board-shabbos>h2{font-size:28px}
+.ordinary-notices .board-range{margin-bottom:8px}

@@ -1,21 +1,38 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFile,mkdir} from 'node:fs/promises';
+import {createServer} from 'node:http';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {scheduleSnapshot} from '../src/schedules.js';
 const {chromium}=createRequire(import.meta.url)('playwright');
-const origin=process.env.DISPLAY_TEST_URL||'http://127.0.0.1:8795';
+// Layout verification uses built assets and explicit private snapshots, without
+// depending on a running Worker or reading/writing any database.
+const dist=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
+const types={'.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'};
+const server=createServer(async(req,res)=>{
+ try{
+  const pathname=new URL(req.url,'http://localhost').pathname;
+  if(pathname==='/display/'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><head><link rel="stylesheet" href="/display-assets/display.css"></head><body></body></html>');return;}
+  const file=path.resolve(dist,'.'+pathname);
+  if(!file.startsWith(dist+path.sep)){res.writeHead(403).end();return;}
+  res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');res.end(await readFile(file));
+ }catch{res.writeHead(404).end();}
+});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const origin=`http://127.0.0.1:${server.address().port}`;
 const screenshots=process.env.BOARD_SCREENSHOT_DIR;
 const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 // Existing public text, rendered only in private development previews. No saves.
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
   .map(i=>({...i,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
-const cases=['2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26'];
+const cases=['2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-15'];
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const failures=[],results=[];
 try{
  const page=await browser.newPage({viewport:{width:1920*scale,height:1080*scale}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(origin+'/display/');await page.waitForSelector('.board-zmanim>div');
+ await page.goto(origin+'/display/');
  await page.evaluate(async()=>{
   await document.fonts.load('700 28px David');await document.fonts.ready;
   const {DisplayView}=await import('/display-assets/renderer.js');
@@ -73,6 +90,7 @@ try{
   if(withNotices&&r.classes.includes('right-extended'))check(r.right.bottom>r.notices.top&&r.notices.right<=r.right.left,'right panel reclaims lower area without covering notices');
   if(schedule.specialSheet)check(r.sheetRows===r.expectedRows&&r.stable,'whole special page remains stable');
   else {
+   check(r.pages===(withNotices?1:0),'ordinary announcements all remain visible on one screen');
    const ids=[...(schedule.presentation.special?.sections||[]),...(schedule.presentation.weekly.posterSections||[])].flatMap(s=>s.rows.map(r=>r.id)).sort();
    check(JSON.stringify([...r.sourceIds].sort())===JSON.stringify(ids),'all original schedule rows retained');
   }
@@ -90,4 +108,4 @@ try{
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({results,failures:failures.map(f=>({name:f.name,what:f.what,overflow:f.result.overflow,warnings:f.result.warnings,seen:f.result.seen}))},null,2));
  assert.equal(failures.length,0,'Right-column layout has failures listed above');
-}finally{await browser.close();}
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
