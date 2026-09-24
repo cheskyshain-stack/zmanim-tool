@@ -1,5 +1,6 @@
 import * as dailyZmanim from '../../js/zmanim/zmanim.js';
-import { schedulePresentation, posterRows } from './presentation.js';
+import { schedulePresentation } from './presentation.js';
+import { publicPosterSections } from '../../js/ui/posters-view.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
 import parshaEY from "../../data/parsha_ey.json" with { type: "json" };
@@ -45,7 +46,88 @@ export function dateInfo(date, hebrew) {
   return { date: day, hebrew: hebrewDateExtended(serial), label: jewishDateString(serial, false), sunset: sunset(day), previousSunset: sunset(civil(serial - 1)), civilStart: localToISO(day + "T00:00"), civilEnd: localToISO(civil(serial + 1) + "T00:00") };
 }
 const catalogs = /* @__PURE__ */ new Map(), dayCache = /* @__PURE__ */ new Map();
+const sheetCatalogs = /* @__PURE__ */ new Map();
+const sheetTimelines = /* @__PURE__ */ new Map();
+const sheetTitles = {rh:'ראש השנה',yk:'יום כיפור',sukkos:'סוכות',pesach:'פסח',gedalia:'צום גדליה'};
+const RETAIN_MS = 5 * 60000;
 let cachedYear, cachedState;
+
+// Calendar dates and resolved minyan events are the source of display boundaries.
+// In particular, neither an English heading nor a printed time is parsed here.
+const eventInstant = e => localToISO(`${civil(e.serial + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2,'0')}:${String(e.mins % 60).padStart(2,'0')}`);
+function sheetCatalog(year) {
+  if (sheetCatalogs.has(year)) return sheetCatalogs.get(year);
+  const result = Object.entries(builders).map(([key,[,build]]) => {
+    const poster = build(year,settings);
+    const {from,to} = poster.span;
+    const events = (poster.minyanim || []).filter(e=>e.serial>=from&&e.serial<=to);
+    return {key,sourceId:`${key}:${year}`,title:sheetTitles[key],year,yearLabel:hebrewYear(year),from,to,events,sections:publicPosterSections(key,poster)};
+  }).filter(sheet=>sheet.events.length&&sheet.sections.length);
+  if(sheetCatalogs.size>=4)sheetCatalogs.delete(sheetCatalogs.keys().next().value);
+  sheetCatalogs.set(year,result);
+  return result;
+}
+
+/** The original page first replaces the Shabbos box, then the weekday box as well.
+ * Publication controls still take precedence. This metadata changes presentation only;
+ * live minyan selection continues to use the actual daily schedule below. */
+function originalSheetState(instant,year,day,controls,controlKey) {
+  const instantMs=Date.parse(instant);
+  const closing=s=>{
+    const actual=day(s).events.map(e=>Date.parse(e.at));
+    // Use the existing holy-day closing boundary, including its final saved minyan.
+    const night=Date.parse(sunset(civil(s)))+(agendaDayKind(s,settings).holy?72*60000:0);
+    return Math.max(night,...actual)+RETAIN_MS;
+  };
+  const timelineKey=year+'|'+controlKey;
+  let candidates=sheetTimelines.get(timelineKey);
+  if(!candidates){
+    candidates=[...sheetCatalog(year),...sheetCatalog(year+1)].map(sheet=>{
+      // The Sukkos builder also supplies the ordinary erev morning to the daily
+      // minyan API, but the original page opens with erev Mincha. That morning
+      // must remain in the weekday box until its final Shacharis is finished.
+      const covered=sheet.events.filter(e=>sheet.key!=='sukkos'||e.serial!==sheet.from||e.mins>=720);
+      const firstEvent=Math.min(...covered.map(e=>Date.parse(eventInstant(e))));
+      // Strictly preceding Shabbos: a sheet's erev entries belong to the new schedule.
+      const previousShabbos=sheet.from-(excelWeekday(sheet.from)%7||7);
+      const preview=closing(previousShabbos);
+      const earliest=covered.reduce((a,b)=>Date.parse(eventInstant(a))<=Date.parse(eventInstant(b))?a:b);
+      const preceding=[];
+      for(let s=previousShabbos+1;s<=earliest.serial;s++){
+        if(agendaDayKind(s,settings).holy)continue;
+        for(const event of day(s).events){
+          const at=Date.parse(event.at);
+          if(!event.auxiliary&&at<firstEvent)preceding.push({serial:s,at});
+        }
+      }
+      // An afternoon-only erev source can omit that morning's ordinary schedule.
+      // If it does, do not guess its end: retain weekdays until the first saved event.
+      const hasSameDay=preceding.some(e=>e.serial===earliest.serial);
+      const ordinaryEnd=preceding.length&&(earliest.mins<720||hasSameDay)
+        ? Math.max(...preceding.map(e=>e.at))+RETAIN_MS : firstEvent;
+      const both=Math.max(preview,Math.min(firstEvent,ordinaryEnd));
+      const finalSource=Math.max(...sheet.events.map(e=>Date.parse(eventInstant(e))))+RETAIN_MS;
+      const end=Math.max(closing(sheet.to),finalSource);
+      return {...sheet,preview,both,end,firstEvent,previousShabbos};
+    }).sort((a,b)=>a.firstEvent-b.firstEvent);
+    if(sheetTimelines.size>=8)sheetTimelines.delete(sheetTimelines.keys().next().value);
+    sheetTimelines.set(timelineKey,candidates);
+  }
+  // Keep an earlier active source until its closing events finish; advertising the
+  // next holiday must not take an active holy-day page off the screen.
+  const selected=candidates.find(s=>instantMs>=s.preview&&instantMs<s.end);
+  const future=candidates.flatMap(s=>[s.preview,s.both,s.end]).filter(t=>t>instantMs);
+  for(const c of controls)if(c.status==='published')for(const at of [c.startsAt,c.endsAt,c.data.previewAt])if(at&&Date.parse(at)>instantMs)future.push(Date.parse(at));
+  const nextChangeAt=future.length?new Date(Math.min(...future)).toISOString():null;
+  const overridden=selected&&controls.some(c=>visible(c,instant)&&c.data.appliesFrom<=civil(selected.to)&&c.data.appliesTo>=civil(selected.from));
+  if(!selected||overridden)return {specialSheet:null,nextChangeAt};
+  const s=selected;
+  return {specialSheet:{sourceId:s.sourceId,title:s.title,year:s.year,yearLabel:s.yearLabel,
+    from:civil(s.from),to:civil(s.to),previousShabbos:civil(s.previousShabbos),
+    placement:instantMs<s.both?'shabbos':'both',
+    previewStartsAt:new Date(s.preview).toISOString(),coversBothAt:new Date(s.both).toISOString(),
+    endsAt:new Date(s.end).toISOString(),nextChangeAt,sections:s.sections},nextChangeAt};
+}
 export function catalog(year) {
   if (catalogs.has(year)) return catalogs.get(year);
   const result = Object.entries(builders).map(([key, [name, build]]) => {
@@ -134,16 +216,9 @@ export function scheduleSnapshot(instant, controls = []) {
   }
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
   const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
-  // Show the complete approved Sukkos sheet while that season is the applicable
-  // or upcoming display group. Explicit admin overrides retain the normal renderer.
-  const sukkos = presentation.special?.sections.some(section=>section.rows.some(row=>row.id.startsWith('sk:'))) || presentation.weekly.posterSections.some(section=>section.rows.some(row=>row.id.startsWith('hoshana:') || row.id.startsWith('chm:'+h.year+':7')));
-  const poster = sukkos ? buildSukkosPoster(h.year,settings) : null;
-  const posterFrom = poster && civil(Math.min(...poster.minyanim.map(e=>e.serial)));
-  const posterTo = poster && civil(Math.max(...poster.minyanim.map(e=>e.serial)));
-  const overridesPoster = poster && active.some(c=>c.data.appliesFrom<=posterTo && c.data.appliesTo>=posterFrom);
-  const fullSheet = poster && !overridesPoster ? {title:'סוכות',year:h.year,yearLabel:hebrewYear(h.year),blocks:poster.blocks.map((block,i)=>({heading:block.heading,rows:posterRows(block.lines,'full-sk:'+h.year+':'+i)}))} : null;
+  const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey);
   const zmanim = [['זמן ציצית','misheyakir10_2'],['הנץ החמה','sunrise'],['סוף זמן ק״ש · מ״א','sofZmanShmaMGA72'],['סוף זמן ק״ש · גר״א','sofZmanShmaGRA'],['סוף זמן תפילה · גר״א','sofZmanTfilaGRA'],['חצות היום','solarNoon'],['מנחה גדולה','minchaGedola'],['פלג המנחה','plagHamincha'],['שקיעת החמה','sunset'],['צאת הכוכבים','tzaisGeonim8_5'],['לילה · 72 דקות','tzais72']].map(([label,key])=>{const f=dailyZmanim[key](dateFromSerial(serial),settings);const total=Math.round((((f%1)+1)%1)*86400);return {label,time:(Math.floor(total/3600)%12||12)+':'+String(Math.floor(total/60)%60).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};});
-  return { presentation, fullSheet, zmanim, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+  return { presentation, specialSheet, nextChangeAt, zmanim, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
 }
 
 

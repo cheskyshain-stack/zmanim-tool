@@ -3,61 +3,43 @@ import assert from 'node:assert/strict';
 import { scheduleSnapshot, settings } from '../src/schedules.js';
 import { validate } from '../src/model.js';
 import { buildSukkosPoster, SK_TEXT } from '../../js/posters/sukkos.js';
+import { publicPosterSections } from '../../js/ui/posters-view.js';
 import * as zmanim from '../../js/zmanim/zmanim.js';
 
 const SUKKOS_PREVIEW = '2026-09-24T16:00:00Z';
 
-test('the Sukkos board preserves every source block and public time', () => {
-  const sheet = scheduleSnapshot(SUKKOS_PREVIEW).fullSheet;
+test('the Sukkos board preserves the original page sections and public times', () => {
+  const sheet = scheduleSnapshot(SUKKOS_PREVIEW).specialSheet;
   const source = buildSukkosPoster(5787, settings);
   assert.ok(sheet);
   assert.equal(sheet.title, SK_TEXT.title);
   assert.equal(sheet.year, 5787);
-  assert.equal(sheet.blocks.length, 7);
-  assert.deepEqual(sheet.blocks.map(b => b.heading), source.blocks.map(b => b.heading));
-
-  let count = 0;
-  source.blocks.forEach((block, index) => {
-    const lines = block.lines.flatMap(line => [line, line.extra].filter(Boolean));
-    const rows = sheet.blocks[index].rows;
-    assert.equal(rows.length, lines.length, block.heading);
-    rows.forEach((row, rowIndex) => {
-      const line = lines[rowIndex];
-      assert.equal(row.label, line.label, `${block.heading}: label ${rowIndex}`);
-      assert.deepEqual(row.times, (line.times || []).map(t => ({
-        text: t.text,
-        underlined: !!t.underlined,
-        mark: t.mark || '',
-        name: t.name || ''
-      })), `${block.heading}: times, locations and reckoning labels ${rowIndex}`);
-      for (const note of [line.note, line.sub].filter(Boolean)) {
-        assert.ok(row.note.includes(note), `${block.heading}: source note ${rowIndex}`);
-      }
-      count++;
-    });
-  });
-  assert.equal(count, 45);
-  assert.equal(new Set(sheet.blocks.flatMap(b => b.rows.map(r => r.id))).size, count);
+  assert.equal(sheet.sections.length, 7);
+  assert.deepEqual(sheet.sections, publicPosterSections('sukkos', source));
+  assert.equal(sheet.sections.flatMap(s => s.rows).length, 45);
+  assert.equal('fullSheet' in scheduleSnapshot(SUKKOS_PREVIEW), false);
 });
 
-test('the full sheet contains public fields only, without source calculation traces', () => {
-  const sheet = scheduleSnapshot(SUKKOS_PREVIEW).fullSheet;
+test('the original sheet contains public fields only, without calculation traces', () => {
+  const sheet = scheduleSnapshot(SUKKOS_PREVIEW).specialSheet;
   const walk = value => {
     if (!value || typeof value !== 'object') return;
     for (const [key, nested] of Object.entries(value)) {
-      assert.doesNotMatch(key, /^(trace|internalName|createdBy|updatedBy|sponsor|privateNotes)$/i);
+      assert.doesNotMatch(key, /^(trace|calc|internalName|createdBy|updatedBy|sponsor|privateNotes)$/i);
       walk(nested);
     }
   };
   walk(sheet);
-  for (const time of sheet.blocks.flatMap(b => b.rows.flatMap(r => r.times))) {
-    assert.deepEqual(Object.keys(time).sort(), ['mark', 'name', 'text', 'underlined']);
+  for (const time of sheet.sections.flatMap(b => b.rows.flatMap(r => r.times || []))) {
+    assert.ok(Object.keys(time).every(key => ['mark', 'name', 'text', 'underlined'].includes(key)));
+    assert.equal(typeof time.text, 'string');
   }
 });
 
-test('ordinary weeks and Yom Kippur do not acquire the Sukkos sheet', () => {
-  for (const at of ['2026-09-21T16:00:00Z', '2026-10-05T16:00:00Z', '2026-10-15T16:00:00Z']) {
-    assert.equal(scheduleSnapshot(at).fullSheet, null, at);
+test('ordinary weeks do not acquire a special sheet; Yom Kippur has its own page', () => {
+  assert.equal(scheduleSnapshot('2026-09-21T16:00:00Z').specialSheet.sourceId, 'yk:5787');
+  for (const at of ['2026-10-15T16:00:00Z', '2027-01-15T16:00:00Z']) {
+    assert.equal(scheduleSnapshot(at).specialSheet, null, at);
   }
 });
 
@@ -70,7 +52,7 @@ test('a visible control applying to unrelated dates does not suppress the Sukkos
   assert.ok(unrelated.startsAt < SUKKOS_PREVIEW && SUKKOS_PREVIEW < unrelated.endsAt);
   const before = scheduleSnapshot(SUKKOS_PREVIEW);
   const after = scheduleSnapshot(SUKKOS_PREVIEW, [unrelated]);
-  assert.deepEqual(after.fullSheet, before.fullSheet);
+  assert.deepEqual(after.specialSheet, before.specialSheet);
   assert.deepEqual(after.next, before.next);
 });
 

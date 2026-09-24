@@ -1,7 +1,7 @@
 import { readdir, readFile, mkdir, writeFile, copyFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { transform } from "esbuild";
+import { transform, build as bundle } from "esbuild";
 const root = fileURLToPath(new URL("../", import.meta.url));
 async function build(relative = "") {
   const from = join(root, "public", relative), to = join(root, "dist", relative);
@@ -19,4 +19,19 @@ async function build(relative = "") {
   }
 }
 await build();
+// The special schedule is the site's original page inside an isolated shadow
+// root. Bundle its renderer and copy its own stylesheet/font dependencies.
+await bundle({
+  entryPoints: [join(root, 'public/display-assets/original-sheet.js')],
+  outfile: join(root, 'dist/display-assets/original-sheet.js'),
+  bundle: true, format: 'esm', platform: 'browser', minify: true,
+  legalComments: 'none', target: 'es2022',
+});
+const original = join(root, 'dist/display-assets/original');
+await mkdir(join(original, 'css'), { recursive: true });
+await mkdir(join(original, 'assets/fonts'), { recursive: true });
+await copyFile(join(root, '../css/app.css'), join(original, 'css/app.css'));
+for (const font of ['david-libre-400.woff2', 'david-libre-700.woff2', 'frank-ruhl-libre.woff2', 'OFL-david-libre.txt', 'OFL-frank-ruhl-libre.txt']) {
+  await copyFile(join(root, '../assets/fonts', font), join(original, 'assets/fonts', font));
+}
 console.log("TV assets built in tv/dist. No deployment performed.");

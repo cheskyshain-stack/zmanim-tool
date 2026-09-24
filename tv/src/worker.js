@@ -41,6 +41,7 @@ async function snapshot(items, at, preview = false, appearance) {
   boundaries.push(today.civilEnd);
   if (today.sunset > at) boundaries.push(today.sunset);
   if (schedule.next) boundaries.push(schedule.next.at);
+  if (schedule.nextChangeAt && schedule.nextChangeAt > at) boundaries.push(schedule.nextChangeAt);
   return { appearance, theme: themeAt(appearance, at), at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at) : [] };
 }
 async function handle(req, env) {

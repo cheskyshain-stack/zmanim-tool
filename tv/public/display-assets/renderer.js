@@ -1,5 +1,5 @@
 import { fullSchedules, paginateSpecial, fitScheduleLabels } from './schedule-renderer.js';
-import { fullSheetHTML, fitSheetColumns } from './full-sheet.js';
+import { originalSheetHTML, fitOriginalSheet } from './original-sheet.js';
 import { boardSchedules, fitBoardSchedules } from './board-schedules.js';
 import { themeAt } from './appearance.js';
 import { localStamp } from "./time.js";
@@ -154,7 +154,9 @@ export class DisplayView {
     const boardCards=announcements.map(item=>cardHTML(this.choose('board-'+item.id,[item],now,item.data.contact||item.data.phone?55:95))).join('');
     const hall=announcements.find(i=>/Simcha Hall/i.test(i.title));
     const hallCard=hall?cardHTML(this.choose('board-hall',[hall],now,95)):'';
-    const boardKey=JSON.stringify([s,boardCards,hallCard,dedication,stale,preview]);
+    const sheet=s.specialSheet && instant>=s.specialSheet.previewStartsAt && instant<s.specialSheet.endsAt ? s.specialSheet : null;
+    const sheetPlacement=sheet && instant>=sheet.coversBothAt ? 'both' : 'shabbos';
+    const boardKey=JSON.stringify([s,boardCards,hallCard,dedication,stale,preview,sheet?.sourceId,sheetPlacement]);
     if(boardKey!==this.boardKey || !this.stage.querySelector('.board-notices')){
       this.boardKey=boardKey;
       this.stage.querySelectorAll('.board-notices,.board-zmanim,.board-community,.board-dedication,.schedule-sheet-box').forEach(e=>e.remove());
@@ -167,20 +169,32 @@ export class DisplayView {
       const notices=document.createElement('section');notices.className='board-notices';notices.innerHTML=boardCards;this.stage.append(notices);
       if(dedication){const d=document.createElement('section');d.className='board-dedication';d.innerHTML=cardHTML(dedication);this.stage.append(d);}
       const scheduleArea=this.stage.querySelector('.tv-center');
-      scheduleArea.innerHTML=s.fullSheet?'':boardSchedules(s.presentation,upcoming);
-      if(s.fullSheet){const box=document.createElement('section');box.className='schedule-sheet-box';box.innerHTML=fullSheetHTML(s.fullSheet,s,{preview,stale});scheduleArea.append(box);}
-      if(s.fullSheet){
-        if(!fitSheetColumns(scheduleArea).fits){
-          scheduleArea.querySelector('.full-sheet').classList.add('sheet-dense');
-          fitSheetColumns(scheduleArea);
+      scheduleArea.innerHTML=sheet&&sheetPlacement==='both'?'':boardSchedules(s.presentation,upcoming);
+      if(sheet){
+        const sheetKey=JSON.stringify([sheet.sourceId,sheet.title,sheet.year,sheet.sections]);
+        let box=this.originalSheetBox;
+        if(!box||this.originalSheetKey!==sheetKey){
+          box?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
+          box=document.createElement('section');
+          box.className='schedule-sheet-box original-sheet-box';
+          box.innerHTML=originalSheetHTML(sheet);
+          this.originalSheetBox=box;
+          this.originalSheetKey=sheetKey;
         }
-      }
-      else fitBoardSchedules(scheduleArea,s.presentation);
+        box.dataset.placement=sheetPlacement;
+        box.setAttribute('aria-label',`${sheet.title} ${sheet.yearLabel}`);
+        const shabbos=scheduleArea.querySelector('.board-shabbos');
+        if(shabbos)shabbos.replaceWith(box);else scheduleArea.prepend(box);
+        fitOriginalSheet(box);
+        const weekly=scheduleArea.querySelector('.board-weekly');
+        if(weekly&&weekly.scrollHeight>weekly.clientHeight+2)weekly.classList.add('board-compact');
+      }else fitBoardSchedules(scheduleArea,s.presentation);
     }
     for(const clock of this.stage.querySelectorAll('.tv-clock'))clock.textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
     this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card,.board-weekly,.board-shabbos,.sheet-column")].filter((e) => e.getClientRects().length && e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");
   }
   destroy() {
     this.observer.disconnect();
+    this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
   }
 }

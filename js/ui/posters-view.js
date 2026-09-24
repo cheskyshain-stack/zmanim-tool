@@ -1670,6 +1670,29 @@ const ONEPAGE_SECTIONS = {
   ])],
 };
 
+/** Public rows for the Shul View copy of the original special-schedule page.
+ * Keep the source page's section mapping, while excluding calculation traces and
+ * other internal builder fields from the public display response. */
+export function publicPosterSections(sourceKey, poster) {
+  const key = ({ rh: 'roshhashana', yk: 'yomkippur', gedalia: 'tzomgedalia' })[sourceKey] || sourceKey;
+  const cut = ONEPAGE_SECTIONS[key];
+  if (!cut || !poster) return [];
+  const publicTime = (time) => ({
+    text: String(time.text ?? ''),
+    underlined: Boolean(time.underlined),
+    mark: String(time.mark ?? ''),
+    ...(time.name ? { name: String(time.name) } : {}),
+  });
+  const publicRow = (row) => {
+    const result = { label: String(row.label ?? ''), times: (row.times || []).map(publicTime) };
+    for (const name of ['note', 'sub', 'sep']) if (row[name] != null) result[name] = String(row[name]);
+    for (const name of ['wrap', 'ltrLabel', 'keepUp']) if (row[name]) result[name] = true;
+    if (row.extra) result.extra = { label: String(row.extra.label ?? ''), times: (row.extra.times || []).map(publicTime) };
+    return result;
+  };
+  return cut(poster).map((section) => ({ title: String(section.title ?? ''), rows: section.rows.map(publicRow) }));
+}
+
 /** One row: the name on the right, the times on the left, the way a timetable is read.
  *
  *  `extra` becomes a row of its own rather than riding on the end of this one. On a full
@@ -1731,7 +1754,7 @@ function onePageRows(r) {
  *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
  *
  *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
-function renderOnePagePoster(built, settings) {
+export function renderOnePagePoster(built, settings) {
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
    * On the סליחות sheet it is a line among the rest, being a stretch of ordinary mornings
@@ -1957,7 +1980,7 @@ function splitColumns(cols, groups, atDayOnly = false) {
  *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
  *  line over there, and one line over is a block off the sheet. */
 const OP_ROOM = 11;
-function fitOnePage(container) {
+function fitOnePage(container, { minimumScale = OP_MIN, paddingInches = chosenMargin } = {}) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelectorAll(':scope > .onepage-col');
@@ -1968,7 +1991,7 @@ function fitOnePage(container) {
        the search below fits the type to that room. Set on the sheet rather than in the CSS so
        the bar can move it; the CSS still carries 0.35in as the fallback, which is what the
        week's own sheet and a sheet drawn outside this tab get. */
-    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    sheet.style.setProperty('--op-pad', `${paddingInches}in`);
     // Colour only, so it cannot move the fit; set here with the padding so the two cannot get
     // out of step, and so a sheet redrawn on a turned phone comes back the way it was left.
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
@@ -1991,7 +2014,7 @@ function fitOnePage(container) {
     // gap left over from the last pass would be part of what the type is fitted against.
     sheet.style.setProperty('--op-gap-1', '0px');
     sheet.style.setProperty('--op-gap-2', '0px');
-    let best = OP_MIN;
+    let best = minimumScale;
     for (const step of [0.05, OP_STEP]) {
       for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
         set(v);
@@ -2346,13 +2369,13 @@ let fitHandler = null;
  *  The two cuts come before the fit and can: every time on a line scales by the same factor,
  *  so where a run should be cut does not change when the type does, and the heights they
  *  settle are what the fit then measures. */
-export function layoutPosters(container) {
+export function layoutPosters(container, options) {
   balanceRuns(container);
   balanceOnePageTimes(container);
-  fitPoster(container);
+  fitPoster(container, options);
 }
 
-export function fitPoster(container) {
+export function fitPoster(container, options) {
   // All of them at once is a run of sheets rather than one, and they are not all the same
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
   // measured and scaled on its own, so a portrait sheet is not shrunk to fit a landscape
@@ -2374,7 +2397,7 @@ export function fitPoster(container) {
     // The one-page sheet's type is set against the zoom just chosen, so the two are decided
     // together and a resize cannot leave one of them behind. See fitOnePage for why it has
     // to be this way round. The סוכות sheet's type is set here for the same reason.
-    fitOnePage(container);
+    fitOnePage(container, options);
     fitSukkos(container);
   };
   decide();
