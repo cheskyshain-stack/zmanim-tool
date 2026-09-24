@@ -142,6 +142,46 @@ try{
   await page.locator('#screen-layout').click();await screen(page);
   await full.context.close();
 
+  // Names and the anonymous checkbox are optional through preview and publishing.
+  const nameless=await scenario({records:initial}),namelessPage=nameless.page;
+  const dedicationText='לזכות כל לומדי בית המדרש\nולהצלחת כל הקהילה\nבברכת שנה טובה';
+  await screen(namelessPage);
+  await namelessPage.locator('#screen-add-dedication').click();await namelessPage.locator('#editor').waitFor();
+  assert.equal(await namelessPage.locator('[name=sponsor]').inputValue(),'');
+  assert.equal(await namelessPage.locator('[name=dedicationName]').inputValue(),'');
+  assert.equal(await namelessPage.locator('[name=anonymous]').isChecked(),false);
+  await namelessPage.locator('[name=dedicationText]').fill(dedicationText);
+  await namelessPage.locator('[name=timing]').selectOption('civil');
+  await namelessPage.locator('[name=sponsorshipDate]').fill('2026-09-24');
+  await namelessPage.waitForFunction(start=>document.querySelector('[name=startLocal]')?.value===start,localStamp(dateInfo('2026-09-24').civilStart));
+  await namelessPage.locator('#preview').click();await namelessPage.locator('#preview-host .dedication-text').waitFor();
+  assert.equal(await namelessPage.locator('#preview-host .dedication-text').textContent(),dedicationText);
+  assert.equal(await namelessPage.locator('#preview-host .board-dedication .sponsor').count(),0);
+  assert.equal(nameless.state.writes.length,0,'preview must not publish the nameless dedication');
+  await namelessPage.locator('#back').click();await namelessPage.locator('#editor').waitFor();
+  assert.equal(await namelessPage.locator('[name=dedicationText]').inputValue(),dedicationText);
+  await namelessPage.locator('#editor button[type=submit]').click();await namelessPage.locator('#confirm[open]').waitFor();
+  assert.equal(nameless.state.writes.length,0,'publishing still waits for the normal confirmation');
+  await namelessPage.locator('#confirm #yes').click();await screen(namelessPage);
+  assert.equal(nameless.state.writes.length,1);
+  const published=nameless.state.writes[0].saved;
+  assert.equal(published.status,'published');assert.equal(published.data.sponsor,'');
+  assert.equal(published.data.dedicationName,'');assert.equal(published.data.anonymous,false);
+  assert.equal(published.data.dedicationText,dedicationText);
+  assert.equal(published.startsAt,dateInfo('2026-09-24').civilStart);
+  assert.equal(published.endsAt,dateInfo('2026-09-24').civilEnd);
+  assert.equal(await namelessPage.locator('#screen-editor .dedication-text').textContent(),dedicationText);
+  const namelessPublic=await nameless.context.newPage();await namelessPublic.goto(origin+'/__public_view__');
+  await namelessPublic.evaluate(async snapshot=>{
+    const {DisplayView}=await import('/display-assets/renderer.js');
+    window.publicView=new DisplayView(document.querySelector('#public-check'));
+    window.publicView.update(snapshot,{preview:true});
+  },{at,schedule:schedule(at),items:publicItems(nameless.state.records,at),appearance:{mode:'dark'},upcoming:[],warnings:[]});
+  assert.equal(await namelessPublic.locator('.board-dedication .dedication-text').textContent(),dedicationText);
+  assert.equal(await namelessPublic.locator('.board-dedication .sponsor').count(),0);
+  assert.doesNotMatch(await namelessPublic.locator('.board-dedication').textContent(),/anonymous/i,'blank sponsor must not create an anonymous placeholder');
+  await nameless.context.close();
+
   // Mobile users can choose/edit content with full-size controls below the screen.
   const mobile=await scenario({mobile:true});await screen(mobile.page);
   assert.equal(await mobile.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -178,5 +218,5 @@ try{
   assert.equal(await delayed.page.locator('#screen-editor').count(),0);assert.equal(await delayed.page.locator('#list').isVisible(),true);
   await delayed.context.close();
   assert.deepEqual(errors,[]);
-  console.log('PASS: screen-shaped admin, exact notice editing, persistent area selection, draft/version/timing preservation, mobile controls, restricted capabilities, empty areas, stale-response navigation, public display unchanged, and admin modules excluded from public offline cache. No database writes.');
+  console.log('PASS: screen-shaped admin, exact notice editing, persistent area selection, draft/version/timing preservation, nameless dedication preview and confirmed publishing, mobile controls, restricted capabilities, empty areas, stale-response navigation, public display unchanged, and admin modules excluded from public offline cache. No database writes.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

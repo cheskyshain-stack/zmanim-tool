@@ -36,7 +36,8 @@ export function validate(raw) {
         endsAt = data.timing === "evening" ? info.sunset : info.civilEnd;
       }
     }
-    if (status === "published" && (!data.sponsorshipDate || !data.anonymous && !data.sponsor || !data.dedicationName)) throw new ApiError(422, "Enter a sponsorship date, dedication name and sponsor (or choose anonymous).");
+    if (status === "published" && !data.sponsorshipDate) throw new ApiError(422, "Enter a sponsorship date.");
+    if (status === "published" && !data.dedicationName && !data.dedicationText && !data.message) throw new ApiError(422, "Enter a dedication name, dedication text or additional message.");
   }
   if (kind === "schedule") {
     Object.assign(data, { source: text(d.source), appliesFrom: text(d.appliesFrom, 10), appliesTo: text(d.appliesTo, 10), portion: choice(d.portion, ["all", "morning", "mincha", "maariv"], "all"), precedence: Number(d.precedence) || 0, overlapAcknowledged: d.overlapAcknowledged === true });

@@ -14,7 +14,11 @@ const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {m
 export function announcementPages(item) { return [item]; }
 export function cardHTML(item) {
   const d = item.data || {};
-  if (item.kind === 'dedication') return `<article class="tv-card dedication"><h2 lang="he" dir="rtl">פרנס היום</h2><p class="dedication-type" dir="auto">${esc(d.dedicationType === 'Custom' ? '' : d.dedicationType)}</p><p class="dedication-name" dir="auto">${esc(d.dedicationName)}</p><p dir="auto">${esc(d.dedicationText)}</p>${d.message ? `<p dir="auto">${esc(d.message)}</p>` : ''}<p class="sponsor" dir="auto">${d.anonymous ? 'Sponsored anonymously' : esc(d.sponsor)}</p><p class="card-page" dir="auto">${esc(d.hebrewLabel)}</p></article>`;
+  if (item.kind === 'dedication') {
+    const sponsor = d.anonymous ? 'Sponsored anonymously' : d.sponsor;
+    const lines = [['dedication-type',d.dedicationType === 'Custom' ? '' : d.dedicationType],['dedication-name',d.dedicationName],['dedication-text',d.dedicationText],['dedication-message',d.message],['sponsor',sponsor]];
+    return `<article class="tv-card dedication"><h2 lang="he" dir="rtl">פרנס היום</h2><div class="dedication-copy">${lines.filter(([,text])=>String(text||'').trim()).map(([name,text])=>`<p class="${name}" dir="auto">${esc(text)}</p>`).join('')}</div>${d.hebrewLabel ? `<p class="card-page" dir="auto">${esc(d.hebrewLabel)}</p>` : ''}</article>`;
+  }
   return `<article class="tv-card ${esc(d.priority)}"><p class="eyebrow">${esc(d.category || 'Community')}</p><h2 dir="auto">${esc(item.title)}</h2><p dir="auto" style="white-space:pre-wrap">${esc(d.message)}</p>${d.contact || d.phone ? `<p class="contact"><bdi dir="auto">${esc(d.contact)}</bdi><bdi dir="ltr">${esc(d.phone)}</bdi></p>` : ''}</article>`;
 }
 function setHTML(node, html) {
@@ -49,8 +53,9 @@ export class DisplayView {
     fontsReady.then(() => {
       if (this.destroyed) return;
       // Regular panels also measure the final Hebrew font, once at startup.
-      if (this.snapshot && !this.originalSheetBox) {
-        this.scheduleKey = null;
+      if (this.snapshot) {
+        if (!this.originalSheetBox) this.scheduleKey = null;
+        this.headerKey = null;
         this.layoutKey = null;
         this.update(this.snapshot, this.options);
       }
@@ -73,13 +78,15 @@ export class DisplayView {
     this.stage.dataset.theme = theme || themeAt(snapshot.appearance, instant);
     this.stage.querySelector('.tv-preview-label').hidden = !preview;
     const items = (snapshot.items || []).filter(i => i.startsAt <= instant && (!i.endsAt || instant < i.endsAt));
-    setHTML(this.brand, `${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small>`);
+    setHTML(this.brand, `<span class="brand-english" lang="en" dir="ltr">Bais Medrash of<br> Lakewood Commons</span><span class="brand-hebrew" lang="he" dir="rtl">${esc(s.shulName)}</span>`);
     setHTML(this.date, `<b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.presentation ? ' · <bdi dir="rtl">' + esc(s.presentation.currentDay) + '</bdi>' : ''}`);
     const clock = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',minute:'2-digit'}).format(new Date(instant));
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
-    const dedication = this.choose('dedication', items.filter(i => i.kind === 'dedication'), now);
+    const dedications = items.filter(i => i.kind === 'dedication');
+    const dedication = this.choose('dedication', dedications, now);
     setHTML(this.dedication, dedication ? cardHTML(dedication) : '');
     this.dedication.hidden = !dedication;
+    this.fitDedicationHeader(dedications);
     setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${zmanTime(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
 
     const groups = groupAnnouncements(items), groupsKey = JSON.stringify(groups);
@@ -122,7 +129,7 @@ export class DisplayView {
         this.originalSheetKey = null;
       }
     }
-    const layoutKey = scheduleKey + groupsKey;
+    const layoutKey = scheduleKey + groupsKey + this.headerKey;
     if (this.layoutKey !== layoutKey) {
       this.layoutKey = layoutKey;
       this.layoutBoard(groups, sheet, placement);
@@ -134,6 +141,27 @@ export class DisplayView {
     if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;
     this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';
     this.checkCapacity();
+  }
+  fitDedicationHeader(items) {
+    const key = JSON.stringify(items.map(item=>[item.id,item.data]));
+    if (key === this.headerKey) return;
+    this.headerKey = key;
+    this.stage.classList.toggle('has-dedication',!!items.length);
+    this.stage.style.removeProperty('--board-head-height');
+    if (!items.length) return;
+    // Reserve the tallest active dedication once. Rotation and clock ticks do
+    // not move the schedules; short dedications still get a three-line area.
+    const measure = document.createElement('section');
+    measure.className = 'board-dedication dedication-measure';
+    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',width:this.dedication.offsetWidth+'px',height:'auto',visibility:'hidden',pointerEvents:'none'});
+    this.stage.append(measure);
+    let height = 104;
+    for (const item of items) {
+      measure.innerHTML = cardHTML(item);
+      height = Math.max(height,measure.scrollHeight);
+    }
+    measure.remove();
+    this.stage.style.setProperty('--board-head-height',Math.ceil(height+14)+'px');
   }
   noticeHeight(pages) {
     const measure = document.createElement('section');
@@ -152,7 +180,7 @@ export class DisplayView {
   layoutBoard(groups, sheet, placement) {
     // Every published announcement stays visible together, including beside a
     // special chart. Clock ticks and theme changes never rerun this measurement.
-    this.stage.classList.remove('right-extended','special-expanded','week-extended');
+    this.stage.classList.remove('right-extended','special-expanded','week-extended','compact-notice-spacing','compact-zmanim-spacing');
     this.stage.classList.toggle('without-notices', !groups.length);
     this.stage.classList.toggle('all-notices', !!groups.length);
     this.stage.classList.toggle('sheet-notices', !!sheet && !!groups.length);
@@ -162,7 +190,28 @@ export class DisplayView {
     this.noticePage = 0;
     if (sheet) this.stage.classList.add('right-extended');
     if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(280,this.noticeHeight(this.noticePages))+'px');
-    fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+    let fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+    const zmanimOverflows = () => this.zmanim.scrollHeight > this.zmanim.clientHeight + 2;
+    if (groups.length && (fit.weekly?.overflow || fit.special?.overflow || zmanimOverflows())) {
+      // Preserve the full dedication and schedule type sizes by reclaiming
+      // surplus notice spacing only when the panels above actually need it.
+      this.stage.classList.add('compact-notice-spacing');
+      this.stage.style.setProperty('--notice-height', Math.max(280,this.noticeHeight(this.noticePages))+'px');
+      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+      if (fit.weekly?.overflow || fit.special?.overflow || zmanimOverflows()) {
+        // Narrow notice columns can dictate the whole row's height. Try a
+        // modest width balance and keep it only when every complete card fits
+        // in less height. The saved groups and their order remain untouched.
+        const balanced = [groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
+        const balancedHeight = Math.max(280,this.noticeHeight(balanced));
+        if (balancedHeight < parseFloat(this.stage.style.getPropertyValue('--notice-height'))) {
+          this.noticePages = balanced;
+          this.stage.style.setProperty('--notice-height',balancedHeight+'px');
+          fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+        }
+      }
+    }
+    if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
     if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);
   }
   renderNotices() {
@@ -174,9 +223,9 @@ export class DisplayView {
     this.notices.setAttribute('aria-label', 'All current announcements');
   }
   checkCapacity() {
-    this.warning = [...this.stage.querySelectorAll('.announcement-group,.board-dedication,.board-weekly,.board-shabbos')]
-      .filter(e => e.getClientRects().length && e.scrollHeight > e.clientHeight + 2)
-      .map(e => e.classList.contains('announcement-group') ? `The ${e.querySelector('h2')?.textContent || 'announcement'} area needs more space. Review the full screen before publishing.` : 'Screen content exceeds its panel. Review the full screen before publishing.');
+    this.warning = [...this.stage.querySelectorAll('.announcement-group,.board-dedication,.board-weekly,.board-shabbos,.board-zmanim')]
+      .filter(e => !e.hidden && e.getClientRects().length && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2))
+      .map(e => e.classList.contains('announcement-group') ? `The ${e.querySelector('h2')?.textContent || 'announcement'} area needs more space. Review the full screen before publishing.` : 'Screen content exceeds its panel. Shorten the dedication or review the full screen before publishing.');
   }
   destroy() {
     this.destroyed = true;

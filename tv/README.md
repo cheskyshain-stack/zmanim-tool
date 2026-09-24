@@ -406,3 +406,23 @@ When a dense Selichos week still exceeds its panel after compact spacing, plain
 services may place their full-size prayer name on the right of the centered time
 run. Date-specific exceptions retain separate headings and their spacing. This
 fallback is measured afresh and removed whenever the ordinary layout fits.
+
+## Parnas Hayom header
+
+Sponsor and dedication names are optional. Publishing requires a sponsorship
+date and at least a dedication name, dedication text, or additional message.
+The optional privacy checkbox still hides an entered sponsor name publicly.
+Leaving the sponsor blank creates neither a sponsor row nor an anonymous label.
+
+The screen's left header reads Bais Medrash of Lakewood Commons and קהל לב מנחם.
+An active dedication gets a gold-bordered card centered on the full screen, with
+at least three readable lines of space. Optional fields render only when filled;
+Hebrew/English text and intentional line breaks are preserved. The header reserves
+enough height for the tallest active dedication so rotation does not move the
+schedules. When no dedication is active, the smaller header returns that space.
+Long copy remains complete and the shared admin preview flags capacity problems.
+
+Validation: `tests/dedication-model.test.mjs`, `tests/admin-screen-browser.mjs`,
+and `tests/dedication-header-browser.mjs` (set `DISPLAY_TEST_SCALE=2` for 4K).
+Development dedication fixtures are never written to a database or published.
+No migration or configuration change is needed.

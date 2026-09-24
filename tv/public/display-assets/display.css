@@ -796,3 +796,43 @@ button {
 .board-weekly.board-inline-services .board-service:has(>.board-pattern:last-child):not(:has(.board-exception)){display:grid;grid-template-columns:minmax(0,1fr) 90px;column-gap:12px;align-items:center}
 .board-weekly.board-inline-services .board-service:has(>.board-pattern:last-child):not(:has(.board-exception))>h3{grid-column:2;grid-row:1;margin:0;text-align:right}
 .board-weekly.board-inline-services .board-service:has(>.board-pattern:last-child):not(:has(.board-exception))>.board-pattern{grid-column:1;grid-row:1}
+
+/* The bilingual shul name anchors the left; the dedication stays centered on
+   the screen and grows to hold its full copy, with three lines as a minimum. */
+.tv-stage.stable-board{--board-head-height:92px;--screen-text:#142a42;--screen-background:#f7f3eb;grid-template-rows:var(--board-head-height) minmax(0,1fr) var(--notice-height,224px) 26px}
+.tv-stage.stable-board[data-theme=dark]{--screen-text:#f5f2ea;--screen-background:#0b1423}
+.tv-stage.stable-board.all-notices{--board-head-height:80px}
+.tv-stage.stable-board.without-notices{grid-template-rows:var(--board-head-height) minmax(0,1fr) 0 26px}
+.stable-board .tv-head{height:var(--board-head-height);display:grid;grid-template-columns:230px 175px minmax(0,1fr) 240px 165px;gap:18px;padding-bottom:8px}
+.stable-board .tv-brand{grid-column:1;max-width:none;min-width:0;text-align:left}
+.stable-board .brand-english{display:block;font:700 18px/1.04 Arial,sans-serif;letter-spacing:0;color:var(--screen-text)}
+.stable-board .brand-hebrew{display:block;font:700 28px/1.04 David,serif;margin-top:2px;color:var(--screen-gold);text-align:left}
+.stable-board .tv-head .shul-donate{grid-column:2;min-width:0;gap:8px}
+.stable-board .shul-donate img{width:58px;height:58px}
+.stable-board .shul-donate strong{font-size:14px}
+.stable-board .shul-donate small{font-size:10px;max-width:108px;margin-top:4px}
+.stable-board .board-dedication{grid-column:3;height:100%;align-self:stretch;display:flex;align-items:stretch;min-width:0}
+.stable-board .board-dedication .tv-card{width:100%;height:auto;min-height:104px;padding:8px 18px;display:flex;flex-direction:column;justify-content:center;gap:4px;overflow:visible;background:var(--screen-card);border:1px solid var(--screen-gold);border-radius:12px;box-shadow:inset 0 0 0 3px var(--screen-background)}
+.stable-board .board-dedication .tv-card h2{font:700 28px/1.08 David,serif;color:var(--screen-gold);margin:0}
+.stable-board .dedication-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stable-board .board-dedication .tv-card p{display:block;font:700 25px/1.12 David,serif;margin:0;white-space:pre-wrap;overflow-wrap:break-word}
+.stable-board .board-dedication .tv-card .dedication-type{font-size:21px;color:var(--screen-gold)}
+.stable-board .board-dedication .tv-card .dedication-name{font-size:28px}
+.stable-board .board-dedication .tv-card .sponsor{font-size:18px;font-weight:400}
+.stable-board .board-dedication .tv-card .card-page{display:none}
+.stable-board .tv-date{grid-column:4;margin-left:0;min-width:0;font-size:15px}
+.stable-board .tv-clock{grid-column:5;text-align:right}
+
+/* A taller dedication first reclaims notice spacing; all saved words and type
+   sizes remain. Daily zmanim tighten only if their own panel still overflows. */
+.stable-board.compact-notice-spacing .board-notices{gap:8px}
+.stable-board.compact-notice-spacing .announcement-group{padding-block:4px}
+.stable-board.compact-notice-spacing .announcement-group>h2{margin-bottom:2px}
+.stable-board.compact-notice-spacing .announcement-group-sections{gap:2px}
+.stable-board.compact-notice-spacing .announcement-section+.announcement-section{padding-top:2px}
+.stable-board.compact-notice-spacing .announcement-section h3{margin-bottom:1px;line-height:1.1}
+.stable-board.compact-notice-spacing .announcement-section p{line-height:1.1}
+.stable-board.compact-notice-spacing .announcement-contact{margin-top:2px!important}
+.stable-board.compact-zmanim-spacing .board-zmanim{padding-block:10px}
+.stable-board.compact-zmanim-spacing .board-zmanim h2{margin-bottom:5px}
+.stable-board.compact-zmanim-spacing .board-zmanim>div{padding-block:2px;line-height:1.08}
