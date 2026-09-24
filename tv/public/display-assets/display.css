@@ -724,24 +724,37 @@ button {
 .right-column-board.week-extended .board-zmanim>div span{font-size:19px}
 .right-column-board.week-extended .board-zmanim h2{font-size:26px;margin-bottom:5px}
 
-/* Ordinary weeks show every complete notice together. Compact the surrounding
+/* Every schedule shows all complete notices together. Compact the surrounding
    spacing and put exception scopes beside their times to preserve all entries. */
-.tv-stage.ordinary-notices{grid-template-rows:80px minmax(0,1fr) var(--notice-height) 26px;gap:12px}
-.ordinary-notices .tv-head{height:80px}
-.ordinary-notices .announcement-group{padding:10px 12px}
-.ordinary-notices .announcement-section p,.ordinary-notices .announcement-section h3{font-size:16px}
-.ordinary-notices .announcement-group>h2{font-size:20px}
-.ordinary-notices .board-shabbos .board-schedule-row{padding:1px 0;grid-template-columns:1.4fr 1fr;gap:8px}
-.ordinary-notices .board-shabbos .board-long-label{grid-template-columns:1fr}
-.ordinary-notices .board-shabbos .board-prayer-label,.ordinary-notices .board-shabbos .board-times{font-size:26px}
-.ordinary-notices .board-shabbos .board-times{gap:5px 14px}
-.ordinary-notices .board-shabbos .board-row-note{font-size:18px}
-.ordinary-notices .board-weekly .board-service{padding:4px 0}
-.ordinary-notices .board-weekly .board-times{font-size:26px;gap:5px 14px}
-.ordinary-notices .board-weekly .board-service>h3,.ordinary-notices .board-weekly .board-exception h4{font-size:26px;margin-bottom:4px}
-.ordinary-notices .board-weekly .board-exception{padding:4px;margin-top:5px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}
-.ordinary-notices .board-exception>h4{grid-column:2;grid-row:1;margin:0!important}
-.ordinary-notices .board-exception>.board-times{grid-column:1;grid-row:1}
-.ordinary-notices .board-exception>p{grid-column:1/-1}
-.ordinary-notices .board-shabbos>h2{font-size:28px}
-.ordinary-notices .board-range{margin-bottom:8px}
+.tv-stage.all-notices{grid-template-rows:80px minmax(0,1fr) var(--notice-height) 26px;gap:12px}
+.all-notices .tv-head{height:80px}
+.all-notices .announcement-group{padding:10px 12px}
+.all-notices .announcement-section p,.all-notices .announcement-section h3{font-size:16px}
+.all-notices .announcement-group>h2{font-size:20px}
+.all-notices .board-shabbos .board-schedule-row{padding:1px 0;grid-template-columns:1.4fr 1fr;gap:8px}
+.all-notices .board-shabbos .board-long-label{grid-template-columns:1fr}
+.all-notices .board-shabbos .board-prayer-label,.all-notices .board-shabbos .board-times{font-size:26px}
+.all-notices .board-shabbos .board-times{gap:5px 14px}
+.all-notices .board-shabbos .board-row-note{font-size:18px}
+.all-notices .board-weekly .board-service{padding:4px 0}
+.all-notices .board-weekly .board-times{font-size:26px;gap:5px 14px}
+.all-notices .board-weekly .board-service>h3,.all-notices .board-weekly .board-exception h4{font-size:26px;margin-bottom:4px}
+.all-notices .board-weekly .board-exception{padding:4px;margin-top:5px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}
+.all-notices .board-exception>h4{grid-column:2;grid-row:1;margin:0!important}
+.all-notices .board-exception>.board-times{grid-column:1;grid-row:1}
+.all-notices .board-exception>p{grid-column:1/-1}
+.all-notices .board-shabbos>h2{font-size:28px}
+.all-notices .board-range{margin-bottom:8px}
+
+/* Once the weekday reference ends, the whole special chart stays tall on the
+   right; a wider left rail holds daily zmanim and all four announcement areas. */
+.tv-stage.sheet-wide-notices{grid-template-columns:860px minmax(0,1fr) minmax(0,1fr)}
+.right-column-board.sheet-wide-notices .board-notices{grid-column:1;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto}
+.sheet-wide-notices .board-zmanim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-content:start}
+.sheet-wide-notices .board-zmanim h2{grid-column:1/-1;font-size:26px;margin-bottom:5px}
+.sheet-wide-notices .board-zmanim>div{font-size:20px;padding:2px 0}
+.sheet-wide-notices .board-zmanim>div span{font-size:20px}
+.sheet-wide-notices .announcement-group{padding:8px 12px}
+.sheet-wide-notices .announcement-group>h2{margin-bottom:5px}
+.sheet-wide-notices .announcement-group-sections{gap:5px}
+.sheet-wide-notices .announcement-section+.announcement-section{padding-top:4px}

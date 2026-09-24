@@ -318,14 +318,14 @@ times. Special sheets use the taller right-hand area down to the footer;
 the original page remains complete and keeps its own two source columns. The
 existing timed expansion across both schedule areas still applies.
 
-When a special sheet uses the lower space, complete announcement groups rotate in
-the remaining slots (at least 60 seconds, longer for longer groups). Messages are
-never divided into fragments. Dense weekday exception weeks can also extend the
-center reference alongside a special sheet, leaving the left rail for zmanim and
-full announcement groups. After the special sheet ends, all ordinary announcement
-groups automatically return together; they never rotate on ordinary weeks. Empty notice
-areas are reclaimed. All sizes are measured before display and remain steady
-while notices, clock, connection state or themes change.
+All published announcement groups remain visible together on every schedule.
+While the weekday reference is relevant, four complete areas fit beneath it and
+daily zmanim, beside the tall special chart. After the weekday reference ends,
+the chart expands and a wider left rail holds daily zmanim above a two-by-two
+announcement grid. Messages never rotate, split into fragments, or disappear to
+make room for the chart. Empty notice areas are reclaimed. All sizes are measured
+before display and remain steady while the clock, connection state or theme changes.
+Archived/hidden/draft items remain private; layout changes do not republish them.
 
 Browser regression: `node tests/right-column-browser.mjs`; set
 `DISPLAY_TEST_SCALE=2` for 4K. This supersedes earlier assertions that Shabbos can

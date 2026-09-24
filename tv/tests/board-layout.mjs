@@ -111,7 +111,7 @@ try {
      check(sameIds(result.weeklyServices,[...schedule.presentation.weekly.services.map(s=>s.name),...(schedule.presentation.weekly.posterSections||[]).map(s=>s.heading)]),`${name}: weekday prayer sections remain complete`,result.weeklyServices);
     }else{
      check(!result.weeklyRect,`${name}: weekday box is covered once its schedule finishes`);
-     check(result.sheetRect.left>=result.zmanimRect.right-2&&result.sheetRect.width>result.stageRect.width*0.6,`${name}: active original sheet spans both schedule columns beside daily zmanim`,{sheet:result.sheetRect,zmanim:result.zmanimRect});
+     check(result.sheetRect.left>=result.zmanimRect.right-2&&result.sheetRect.width>result.stageRect.width*0.5,`${name}: active original sheet spans both schedule columns beside the complete announcement rail`,{sheet:result.sheetRect,zmanim:result.zmanimRect});
     }
    }else{
     check(!result.sheetPresent,`${name}: ordinary schedule panels used`);

@@ -43,7 +43,7 @@ for (const [key,title,build] of [
   const rows=s=>s.sections.flatMap(section=>section.rows);
   const scores=[s=>rows(s).reduce((n,r)=>n+1+(r.extra?1:0),0),s=>JSON.stringify(s.sections).length,s=>Math.max(...rows(s).map(r=>JSON.stringify(r).length))];
   const selected=new Set([years[0],years.at(-1),...scores.map(score=>years.reduce((best,s)=>score(s)>score(best)?s:best))]);
-  for(const sheet of selected)cases.push({date:sheet.sourceId,sheet,sizes:[[704,884],[764,884],[1424,884]],themes:['dark']});
+  for(const sheet of selected)cases.push({date:sheet.sourceId,sheet,sizes:[[704,884],[764,884],[1424,884],[764,900],[988,900]],themes:['dark']});
 }
 const browser = await chromium.launch({ channel:'chrome', headless:true });
 try {

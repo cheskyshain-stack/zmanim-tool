@@ -121,9 +121,9 @@ export class DisplayView {
     const layoutKey = scheduleKey + groupsKey;
     if (this.layoutKey !== layoutKey) {
       this.layoutKey = layoutKey;
-      this.layoutBoard(groups, sheet, placement, now);
+      this.layoutBoard(groups, sheet, placement);
     }
-    this.renderNotices(now);
+    this.renderNotices();
     const next = s.next && s.next.at >= instant ? s.next : null;
     setHTML(this.next, `<span class="next-label">Next minyan</span>${next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : '<strong>No further minyan in the loaded schedule</strong>'}`);
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
@@ -145,59 +145,29 @@ export class DisplayView {
     measure.remove();
     return height;
   }
-  layoutBoard(groups, sheet, placement, now) {
-    // Reserve the right column before laying out notices. Neither the clock nor
-    // notice rotation reruns this measurement or changes the schedule geometry.
+  layoutBoard(groups, sheet, placement) {
+    // Every published announcement stays visible together, including beside a
+    // special chart. Clock ticks and theme changes never rerun this measurement.
     this.stage.classList.remove('right-extended','special-expanded','week-extended');
     this.stage.classList.toggle('without-notices', !groups.length);
-    this.stage.classList.toggle('ordinary-notices', !sheet && !!groups.length);
-    this.stage.style.setProperty('--notice-height', groups.length ? '340px' : '0px');
-    let pages = groups.length ? [groups] : [];
-    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(sheet ? 340 : 280,this.noticeHeight(pages))+'px');
-    // Ordinary weeks keep every announcement together in the full-width band.
-    // Only the original special page can reclaim that area and rotate groups.
-    if (sheet) {
-      this.stage.classList.add('right-extended');
-      this.stage.classList.toggle('special-expanded', !!sheet && placement === 'both');
-      const perPage = sheet && placement === 'both' ? 1 : 2;
-      pages = [];
-      for (let i = 0; i < groups.length; i += perPage) pages.push(groups.slice(i,i+perPage));
-      if (groups.length) {
-        const minimum = sheet && placement === 'both' ? 460 : 340;
-        this.stage.style.setProperty('--notice-height', Math.max(minimum,this.noticeHeight(pages))+'px');
-      }
-    }
-    let fitted = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    // A dense weekday reference beside a special sheet can also need height.
-    // This exception never rotates announcements on ordinary weeks.
-    if (sheet && fitted.weekly?.overflow) {
-      this.stage.classList.add('right-extended','week-extended');
-      pages = groups.map(group => [group]);
-      if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(460,this.noticeHeight(pages))+'px');
-      fitted = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    }
-    const previous = this.noticePages?.[this.noticePage || 0]?.map(g => g.id).join('|');
-    this.noticePages = pages;
-    const current = pages.findIndex(page => page.map(g => g.id).join('|') === previous);
-    this.noticePage = current < 0 ? 0 : current;
-    if (current < 0) this.noticeStarted = now;
+    this.stage.classList.toggle('all-notices', !!groups.length);
+    this.stage.classList.toggle('sheet-notices', !!sheet && !!groups.length);
+    this.stage.classList.toggle('sheet-wide-notices', !!sheet && !!groups.length && placement === 'both');
+    this.stage.style.setProperty('--notice-height', groups.length ? '280px' : '0px');
+    this.noticePages = groups.length ? [groups] : [];
+    this.noticePage = 0;
+    if (sheet) this.stage.classList.add('right-extended');
+    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(280,this.noticeHeight(this.noticePages))+'px');
+    fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
     if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);
   }
-  renderNotices(now) {
-    let groups = this.noticePages?.[this.noticePage || 0] || [];
-    if (now < this.noticeStarted) this.noticeStarted = now;
-    // A whole group stays together. Longer pages get longer reading time.
-    const duration = Math.max(60000, groups.reduce((n,g) => n+g.charCount,0)/14*1000);
-    if (this.noticePages?.length > 1 && now-this.noticeStarted >= duration) {
-      this.noticePage = (this.noticePage+1)%this.noticePages.length;
-      this.noticeStarted = now;
-      groups = this.noticePages[this.noticePage];
-    }
+  renderNotices() {
+    const groups = this.noticePages?.[0] || [];
     setHTML(this.notices, groups.map(renderAnnouncementGroup).join(''));
     this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
     this.notices.dataset.page = String((this.noticePage || 0)+1);
     this.notices.dataset.pages = String(this.noticePages?.length || 0);
-    this.notices.setAttribute('aria-label', `Announcements ${this.notices.dataset.page} of ${this.notices.dataset.pages}`);
+    this.notices.setAttribute('aria-label', 'All current announcements');
   }
   checkCapacity() {
     this.warning = [...this.stage.querySelectorAll('.announcement-group,.board-dedication,.board-weekly,.board-shabbos')]

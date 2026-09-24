@@ -85,6 +85,7 @@ try{
   const check=(ok,what)=>{if(!ok)failures.push({name,what,result:r});};
   check(!r.overflow.length&&!r.warnings.length,'all content stays inside its panel');
   check(r.shabbosColumns===0,'Shabbos never splits into columns');
+  check(r.pages===(withNotices?1:0),'all announcements remain visible together, including special schedules');
   check(!r.weekly||r.weekly.left>=r.zmanim.right&&r.right.left>=r.weekly.right,'weekday center, Shabbos/special right');
   check(r.right.right<=1893*scale&&r.right.bottom<=r.footer.top,'right panel inside screen');
   if(withNotices&&r.classes.includes('right-extended'))check(r.right.bottom>r.notices.top&&r.notices.right<=r.right.left,'right panel reclaims lower area without covering notices');
