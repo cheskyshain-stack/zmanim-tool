@@ -1980,7 +1980,7 @@ function splitColumns(cols, groups, atDayOnly = false) {
  *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
  *  line over there, and one line over is a block off the sheet. */
 const OP_ROOM = 11;
-function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false } = {}) {
+function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false, columnCount = 2 } = {}) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelectorAll(':scope > .onepage-col');
@@ -2008,7 +2008,19 @@ function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, p
       rows: [...box.querySelectorAll(':scope > .onepage-row')],
       carried: null,
     })));
-    const layout = () => splitColumns(col, groups, dayBreakOnly || chosenBreak === 'day');
+    const layout = () => {
+      if (columnCount !== 1) return splitColumns(col, groups, dayBreakOnly || chosenBreak === 'day');
+      // A screen adapter can keep the entire schedule in one continuous column.
+      // Restore the original groups first, including rows carried by an earlier
+      // two-column fit, so resizing never loses or duplicates schedule content.
+      for (const g of groups) {
+        for (const r of g.rows) if (r.parentElement !== g.box) g.box.appendChild(r);
+        if (g.carried) { g.carried.remove(); g.carried = null; }
+        if (g.box.parentElement !== col[0]) col[0].appendChild(g.box);
+      }
+      const first = groups[0].box, last = groups[groups.length - 1].box;
+      return last.offsetTop + last.offsetHeight - first.offsetTop;
+    };
     const fits = () => {
       if (layout() > cols.clientHeight - OP_ROOM) return false;
       // The boxed screen view can be narrower than a printed page. Its optional

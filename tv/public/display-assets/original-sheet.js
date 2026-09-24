@@ -1,6 +1,7 @@
 import { renderOnePagePoster, layoutPosters } from '../../../js/ui/posters-view.js';
 
-// Use the original public schedule page's markup, stylesheet and two-column fit.
+// Use the original public schedule page's markup and stylesheet. Rosh Hashanah
+// reads down one continuous column; longer seasonal sheets retain two columns.
 // A shadow root contains its print styles so they cannot affect the Shul View.
 const ASSET_BASE = new URL('./original/', import.meta.url);
 const STYLE_URL = new URL('css/app.css', ASSET_BASE).href;
@@ -23,7 +24,8 @@ export function originalSheetHTML(sheet) {
     own: true, title: sheet.title, hebrewYear: sheet.year,
     sections: sheet.sections || [], legend: [],
   }, SHEET_SETTINGS);
-  return `<div class="original-sheet-host"><template class="original-sheet-content">${html}</template></div>`;
+  const columns = sheet.sourceId?.startsWith('rh:') ? 1 : 2;
+  return `<div class="original-sheet-host" data-sheet-columns="${columns}"><template class="original-sheet-content">${html}</template></div>`;
 }
 
 const hostStyles = `
@@ -61,6 +63,7 @@ const hostStyles = `
   .onepage-times,.onepage-note,.zman-pair-time { color:var(--sheet-text); }
   .onepage-times u { text-decoration-color:currentColor; }
   .page-header,.poster-legend { display:none!important; }
+  :host([data-sheet-columns="1"]) .onepage-col + .onepage-col { display:none; }
 `;
 
 /** Returns a promise for the first fitted page. Later size/font changes refit the
@@ -103,8 +106,8 @@ export function fitOriginalSheet(box) {
     if (size === lastSize) return;
     // Printer margins/minimum type were designed for an eleven-inch sheet.
     // Reclaim those margins inside this shorter screen box, retaining the
-    // original rows and two-column fitting algorithm for every calendar year.
-    layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, observeResize: false });
+    // original rows and full-day boundaries for every calendar year.
+    layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, columnCount: Number(host.dataset.sheetColumns), observeResize: false });
     lastSize = size;
     host.originalSheetFitCount = (host.originalSheetFitCount || 0) + 1;
     host.dataset.sheetReady = 'true';

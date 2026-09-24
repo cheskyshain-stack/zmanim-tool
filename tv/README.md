@@ -389,3 +389,20 @@ date membership; no times or source notes are discarded. Existing original
 special-page timing is unchanged. `tests/weekday-groups.test.mjs` checks grouping
 and preservation, and the annual browser audit additionally checks Gedalya weeks
 in 2026, 2029 and 2032 plus Rosh Chodesh in 2028.
+
+## Continuous Rosh Hashanah chart
+
+Shul View keeps Erev Rosh Hashanah and both days in one continuous column,
+under one holiday title. The original source rows, labels, marks and order are
+retained; the same column fits the tall right box and its expanded placement.
+Other seasonal charts and the printable poster defaults retain their existing
+two-column layout. No data, timing or next-minyan calculation changes.
+
+The original-sheet browser check covers every Rosh Hashanah year from 5787 to
+5806 at five panel sizes, plus both themes and placement changes. The full-screen
+check includes the preceding Selichos week and both holiday days.
+
+When a dense Selichos week still exceeds its panel after compact spacing, plain
+services may place their full-size prayer name on the right of the centered time
+run. Date-specific exceptions retain separate headings and their spacing. This
+fallback is measured afresh and removed whenever the ordinary layout fits.

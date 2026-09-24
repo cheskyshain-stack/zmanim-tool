@@ -26,7 +26,7 @@ const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 // Existing public text, rendered only in private development previews. No saves.
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
   .map(i=>({...i,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
-const cases=['2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-15'];
+const cases=['2026-09-08','2026-09-12','2026-09-13','2027-09-28','2027-10-02','2027-10-03','2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-15'];
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const failures=[],results=[];
 try{
@@ -74,16 +74,20 @@ try{
    for(let minute=1;minute<=5;minute++)view.update({...snapshot,at:new Date(Date.parse(snapshot.at)+minute*60000).toISOString(),appearance:{mode:minute%2?'light':'dark'},schedule:{...snapshot.schedule,clock:'changed'}},{preview:true,now:2000000+minute*60000});
    view.update(snapshot,{preview:true,now:2400000});
    const stable=!host||(host===root.querySelector('.original-sheet-host')&&originalPage===host.shadowRoot.querySelector('.original-page')&&fitCount===host.originalSheetFitCount);
-   let sheetRows=0,expectedRows=0;
+   let sheetRows=0,expectedRows=0,rhTogether=true;
    if(host){
     sheetRows=host.shadowRoot.querySelectorAll('.onepage-row').length;
     const {originalSheetHTML}=await import('/display-assets/original-sheet.js');
     const t=document.createElement('template');t.innerHTML=originalSheetHTML(snapshot.schedule.specialSheet);
     expectedRows=t.content.querySelector('template').content.querySelectorAll('.onepage-row').length;
+    if(snapshot.schedule.specialSheet.sourceId.startsWith('rh:')) {
+     const cols=[...host.shadowRoot.querySelectorAll('.onepage-col')];
+     rhTogether=cols[0].querySelectorAll('.onepage-row').length===expectedRows&&cols[1].children.length===0;
+    }
     for(const e of host.shadowRoot.querySelectorAll('.onepage-row,.onepage-sec-head,.onepage-title'))if(outside(e,host))overflow.push({sheet:e.className});
    }
    const weekly=root.querySelector('.board-weekly'),right=root.querySelector('.board-shabbos,.original-sheet-box'),z=root.querySelector('.board-zmanim');
-   return {classes:root.className,overflow,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,
+   return {classes:root.className,overflow,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,rhTogether,
     shabbosColumns:root.querySelectorAll('.board-static-column').length,sourceIds:[...root.querySelectorAll('.board-schedule-row')].map(e=>e.dataset.sourceId),theme:root.dataset.theme};
   },{snapshot});
   const name=`${date} ${theme} notices=${withNotices}`;
@@ -102,6 +106,7 @@ try{
   }
   check(JSON.stringify(r.seen)===JSON.stringify(snapshot.items.map(i=>i.id).sort()),'all notices shown as complete groups across slots');
   check(r.theme===theme,'saved theme');
+  check(r.rhTogether,'Erev and both Rosh Hashanah days stay in one continuous column');
   results.push({name,extended:r.classes.includes('right-extended'),rightHeight:r.right.height,pages:r.pages,overflow:r.overflow.length});
   if(screenshots&&withNotices&&theme==='dark')await page.screenshot({path:`${screenshots}/right-column-${date}${scale===2?'-4k':''}.png`});
  }

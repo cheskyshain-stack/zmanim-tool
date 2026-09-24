@@ -48,13 +48,22 @@ function panelFit(panel,bodySelector){
 export function fitBoardSchedules(root,p,{allowCompact=false,compactWeekly=true}={}){
  const special=root.querySelector('.board-shabbos'),weekly=root.querySelector('.board-weekly');
  special?.classList.remove('board-compact');
- weekly?.classList.remove('board-compact');
+ weekly?.classList.remove('board-compact','board-inline-services');
  const naturalSpecial=panelFit(special,'.board-shabbos-body');
  const naturalWeekly=panelFit(weekly,'.board-week-body');
  if(allowCompact&&naturalSpecial?.overflow){
   special.classList.add('board-compact');
  }
  if(compactWeekly&&naturalWeekly?.overflow)weekly.classList.add('board-compact');
+ // A dense Selichos week can still need more space beside a full special
+ // chart. Use the spare width of plain services before reducing any type.
+ // Exception headings and their separation always retain their own lines.
+ const compactWeeklyFit=panelFit(weekly,'.board-week-body');
+ if(compactWeekly&&compactWeeklyFit?.overflow){
+  weekly.classList.add('board-inline-services');
+  if(panelFit(weekly,'.board-week-body').requiredHeight>=compactWeeklyFit.requiredHeight)
+   weekly.classList.remove('board-inline-services');
+ }
  return {
   special:naturalSpecial?{...panelFit(special,'.board-shabbos-body'),naturalRequiredHeight:naturalSpecial.requiredHeight}:null,
   weekly:naturalWeekly?{...panelFit(weekly,'.board-week-body'),naturalRequiredHeight:naturalWeekly.requiredHeight}:null

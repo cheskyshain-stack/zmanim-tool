@@ -42,7 +42,7 @@ for (const [key,title,build] of [
   }));
   const rows=s=>s.sections.flatMap(section=>section.rows);
   const scores=[s=>rows(s).reduce((n,r)=>n+1+(r.extra?1:0),0),s=>JSON.stringify(s.sections).length,s=>Math.max(...rows(s).map(r=>JSON.stringify(r).length))];
-  const selected=new Set([years[0],years.at(-1),...scores.map(score=>years.reduce((best,s)=>score(s)>score(best)?s:best))]);
+  const selected=new Set(key==='rh'?years:[years[0],years.at(-1),...scores.map(score=>years.reduce((best,s)=>score(s)>score(best)?s:best))]);
   for(const sheet of selected)cases.push({date:sheet.sourceId,sheet,sizes:[[704,884],[764,884],[1424,884],[764,900],[988,900]],themes:['dark']});
 }
 const browser = await chromium.launch({ channel:'chrome', headless:true });
@@ -126,7 +126,10 @@ try {
         const label=`${date} ${width}x${height}px ${theme}`;
         assert.equal(result.beforeReady,'hidden',`${label}: only reveal fitted sheet`);
         assert.equal(result.ready,'true',`${label}: full sheet is visible`);
-        assert.equal(result.columns,2,`${label}: original two-column shape`);
+        assert.equal(result.columns,2,`${label}: original column containers retained`);
+        if(sheet.sourceId.startsWith('rh:')) {
+          assert.deepEqual(result.columnHeadings,[sheet.sections.map(s=>s.title),[]],`${label}: Erev and both RH days remain together in one continuous column`);
+        }
         assert.equal(result.unheadedSections,0,`${label}: complete days stay with their headings in one column`);
         if(sheet.sourceId==='sukkos:5787') {
           assert.match(result.columnHeadings[0].at(-1),/הושענא רבה/,`${label}: Hoshana Rabbah ends the right column`);
@@ -147,7 +150,7 @@ try {
         assert.equal(result.heading,theme==='dark'?'rgb(216, 183, 106)':'rgb(146, 118, 56)',`${label}: title is gold`);
         assert.equal(result.label,result.heading,`${label}: prayer names are gold`);
         assert.equal(result.dayHeading,result.heading,`${label}: day headings are gold`);
-        if(screenshots&&date==='2026-09-26')await page.screenshot({path:path.join(screenshots,`sheet-${width}-${theme}.png`)});
+        if(screenshots&&['2026-09-12','2026-09-26'].includes(date))await page.screenshot({path:path.join(screenshots,`sheet-${date}-${width}-${theme}.png`)});
         console.log(`${label}: complete and stable (${result.fontSize}, scale ${result.scale})`);
       }
     }
