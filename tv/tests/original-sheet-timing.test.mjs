@@ -4,10 +4,20 @@ import { scheduleSnapshot, sunset, settings } from '../src/schedules.js';
 import { validate } from '../src/model.js';
 import { localToISO, localStamp } from '../public/display-assets/time.js';
 import { buildSukkosPoster } from '../../js/posters/sukkos.js';
+import { buildRoshHashanaPoster } from '../../js/posters/roshhashana.js';
+import { buildYomKippurPoster } from '../../js/posters/yomkippur.js';
+import { buildPesachPoster } from '../../js/posters/pesach.js';
+import { buildTzomGedaliaPoster } from '../../js/posters/tzomgedalia.js';
+import { dateFromHebrew, excelWeekday } from '../../js/hebrew-calendar.js';
 import { dateFromSerial } from '../../js/zmanim/solar.js';
+import { publicPosterSections } from '../../js/ui/posters-view.js';
+import { groupWeekdayPresentation } from '../public/display-assets/weekday-groups.js';
 
 const before = at => new Date(Date.parse(at) - 1).toISOString();
 const atLocal = localToISO;
+const civil = serial => dateFromSerial(serial).toISOString().slice(0, 10);
+const snapshotOn = (serial, time = '12:00') => scheduleSnapshot(atLocal(civil(serial) + 'T' + time));
+const sameMinyan = (actual, expected) => actual.name === expected.name && actual.mins === expected.mins && actual.place === (expected.place || 'בית מדרש');
 
 test('original pages wait for the preceding Shabbos closing events, not civil midnight', () => {
   const yk = scheduleSnapshot(atLocal('2026-09-20T02:00')).specialSheet;
@@ -46,17 +56,29 @@ test('an upcoming sheet cannot replace an earlier active holy day before its clo
   assert.equal(localStamp(yk.endsAt), '2026-09-21T22:35');
 });
 
-test('the original Sukkos page retains all its dated source span and then resumes ordinary schedules', () => {
+test('Sukkos keeps its full printed page but stops displaying it when Simchas Torah closes', () => {
   const sheet = scheduleSnapshot(atLocal('2026-09-26T12:00')).specialSheet;
   const poster = buildSukkosPoster(5787, settings);
   assert.equal(sheet.to, dateFromSerial(poster.span.to).toISOString().slice(0, 10));
+  assert.deepEqual(sheet.sections, publicPosterSections('sukkos', poster));
+  assert.equal(sheet.displayThrough, '2026-10-04');
+  assert.ok(sheet.to > sheet.displayThrough, 'The following-week times remain on the printed page');
+  assert.equal(localStamp(sheet.endsAt).slice(0, 10), sheet.displayThrough);
   assert.equal(scheduleSnapshot(before(sheet.endsAt)).specialSheet.sourceId, sheet.sourceId);
   assert.equal(scheduleSnapshot(sheet.endsAt).specialSheet, null);
+  const monday = snapshotOn(dateFromHebrew(24, 7, 5787));
+  assert.equal(monday.specialSheet, null);
+  const weekdayEvents = monday.presentation.weekly.services.flatMap(service => service.groups
+    .filter(group => group.days.some(day => day.date === monday.date)).flatMap(group => group.events));
+  assert.ok(weekdayEvents.length, 'The following Monday is represented in the weekday panel');
+  for (const event of monday.today.events.filter(event => !event.auxiliary)) {
+    assert.ok(weekdayEvents.some(actual => sameMinyan(actual, event)), event.name + ' ' + event.mins);
+  }
 });
 
 test('each supported original source uses its own page without inventing Shavuos times', () => {
   for (const [date, id] of [
-    ['2026-09-12', 'rh:5787'], ['2026-09-14', 'gedalia:5787'],
+    ['2026-09-12', 'rh:5787'],
     ['2026-09-21', 'yk:5787'], ['2026-09-26', 'sukkos:5787'],
     ['2027-04-22', 'pesach:5787']
   ]) {
@@ -65,6 +87,75 @@ test('each supported original source uses its own page without inventing Shavuos
     assert.ok(sheet.sections.length, date);
   }
   assert.equal(scheduleSnapshot(atLocal('2027-06-11T12:00')).specialSheet, null);
+});
+
+test('every original holiday page closes after its final holy-day events for the next twenty years', () => {
+  const sources = [
+    { key:'rh', build:buildRoshHashanaPoster, month:7, last:2 },
+    { key:'yk', build:buildYomKippurPoster, month:7, last:10 },
+    { key:'sukkos', build:buildSukkosPoster, month:7, last:23 },
+    { key:'pesach', build:buildPesachPoster, month:1, last:22 },
+  ];
+  let attachedShabbosCases = 0;
+  for (let year = 5787; year < 5807; year++) {
+    for (const { key, build, month, last } of sources) {
+      const id = key + ':' + year;
+      const poster = build(year, settings);
+      let lastDay = dateFromHebrew(last, month, year);
+      // Sukkos also prints the Shabbos immediately after a Friday Simchas Torah.
+      if (lastDay < poster.span.to && excelWeekday(lastDay + 1) === 7) {
+        lastDay++;
+        attachedShabbosCases++;
+      }
+      const finalDay = snapshotOn(lastDay);
+      const sheet = finalDay.specialSheet;
+      assert.equal(sheet?.sourceId, id, id + ' must remain on its final holy day');
+      assert.equal(sheet.placement, 'both', id);
+      assert.equal(sheet.displayThrough, civil(lastDay), id);
+      const closing = Math.max(Date.parse(sunset(civil(lastDay))) + 72 * 60000,
+        ...finalDay.today.events.map(e => Date.parse(e.at)));
+      const end = new Date(closing + 5 * 60000).toISOString();
+      assert.equal(sheet.endsAt, end, id + ' includes the last closing minyan and five-minute retention');
+      const retained = scheduleSnapshot(before(end));
+      const resumed = scheduleSnapshot(end);
+      assert.equal(retained.specialSheet?.sourceId, id, id);
+      assert.equal(retained.nextChangeAt, end, id + ' exposes the precise expiry boundary');
+      assert.notEqual(resumed.specialSheet?.sourceId, id, id + ' expires exactly at its closing boundary');
+      assert.deepEqual(resumed.today.events, retained.today.events, id + ' expiry cannot change daily events');
+      assert.deepEqual(resumed.next, retained.next, id + ' expiry cannot change the next minyan');
+      for (let offset = 1; offset <= 7; offset++) {
+        const after = snapshotOn(lastDay + offset);
+        assert.notEqual(after.specialSheet?.sourceId, id, id + ' cannot return during the following week');
+        assert.ok(after.today.events.length, id + ' following daily schedule remains available');
+      }
+    }
+  }
+  assert.ok(attachedShabbosCases > 0, 'The range must exercise a printed Shabbos after Simchas Torah');
+});
+
+test('Gedalya stays in the weekday schedule and never automatically takes over a full chart for twenty years', () => {
+  let postponedCases = 0;
+  for (let year = 5787; year < 5807; year++) {
+    const poster = buildTzomGedaliaPoster(year, settings);
+    const fastDay = poster.span.from;
+    if (fastDay !== dateFromHebrew(3, 7, year)) postponedCases++;
+    for (const time of ['00:00', '07:00', '12:00', '17:00', '23:00']) {
+      const snapshot = snapshotOn(fastDay, time);
+      assert.notEqual(snapshot.specialSheet?.sourceId, 'gedalia:' + year, year + ' ' + time);
+      assert.notEqual(snapshot.specialSheet?.placement, 'both', year + ' ' + time + ' must leave the weekday panel visible');
+      for (const event of poster.minyanim) {
+        assert.ok(snapshot.today.events.some(actual => sameMinyan(actual, event)), year + ' ' + event.name + ' ' + event.mins);
+      }
+      const instant = atLocal(civil(fastDay) + 'T' + time);
+      const upcoming = snapshot.today.events.find(e => !e.auxiliary && e.at >= instant);
+      if (upcoming) assert.deepEqual(snapshot.next, upcoming, year + ' ' + time);
+    }
+    const grouped = groupWeekdayPresentation(snapshotOn(fastDay).presentation.weekly.services);
+    const fast = grouped.daySections.find(section => section.days.some(day => day.date === civil(fastDay)));
+    assert.ok(fast, year + ' fast details remain in the weekday panel');
+    assert.deepEqual(fast.services.map(service => [service.name, service.events.length]), [['סליחות',5],['מנחה',5],['מעריב',2]], String(year));
+  }
+  assert.ok(postponedCases > 0, 'The range must include a postponed Sunday fast');
 });
 
 test('publication controls retain precedence and return their next visibility boundary', () => {

@@ -284,6 +284,12 @@ This section supersedes the earlier rotating/paged screen layout notes above.
   after its fonts/styles load, then refits only when its actual box changes size.
   Light and Dark use the same rows and geometry, with themed backgrounds, times,
   headings and location marks. The existing Shabbos-box / both-box timing remains.
+- Automatic special charts end after the closing events of the final holy day
+  covered by the source, including its attached Shabbos. Printed following-week
+  schedules no longer keep the large chart on screen. Those times and Tzom
+  Gedalya remain in the weekday panel; Gedalya never starts a large chart.
+  `specialSheet.to` retains the printed source span, while `displayThrough` and
+  `endsAt` describe the screen cutoff. Live and offline engines share this rule.
 - Ten uploaded notices are grouped into four complete areas: Simcha Hall, the Rav,
   Community, and Support & services. Titles, messages, contacts and phone numbers
   are preserved. Stored records remain separate and editable. The announcement

@@ -26,7 +26,7 @@ const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 // Existing public text, rendered only in private development previews. No saves.
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
   .map(i=>({...i,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
-const cases=['2026-09-08','2026-09-12','2026-09-13','2027-09-28','2027-10-02','2027-10-03','2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-15'];
+const cases=['2026-09-08','2026-09-12','2026-09-13','2026-09-14','2027-09-28','2027-10-02','2027-10-03','2026-09-17','2026-11-10','2027-06-22','2028-04-26','2026-09-24','2026-09-26','2026-10-05','2026-10-15','2029-09-12','2032-09-08'];
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const failures=[],results=[];
 try{
@@ -58,7 +58,18 @@ try{
    }
    for(const panel of root.querySelectorAll('.board-weekly,.board-shabbos,.board-zmanim,.announcement-group')){
     if(panel.scrollHeight>panel.clientHeight+2||panel.scrollWidth>panel.clientWidth+2)overflow.push({panel:panel.className,extra:panel.scrollHeight-panel.clientHeight});
-    for(const text of panel.querySelectorAll('.board-service,.board-schedule-row,.board-zmanim>div,h2,h3,p'))if(outside(text,panel))overflow.push({text:text.className||text.tagName,content:text.textContent.slice(0,45)});
+    for(const text of panel.querySelectorAll('.board-service,.board-day-section,.board-day-service,.board-schedule-row,.board-zmanim>div,h2,h3,h4,p'))if(outside(text,panel))overflow.push({text:text.className||text.tagName,content:text.textContent.slice(0,45)});
+   }
+   const weekdayIssues=[],normalize=value=>String(value||'').replace(/[\uE000\uE001]/g,'').replace(/\s+/g,' ').trim();
+   if(!snapshot.schedule.specialSheet){
+    const patterns=[...root.querySelectorAll('[data-weekday-service]')];
+    for(const service of snapshot.schedule.presentation.weekly.services)for(const group of service.groups.filter(g=>g.events.length))for(const day of group.days){
+     const matches=patterns.filter(e=>e.dataset.weekdayService===service.name&&e.dataset.weekdayDates.split(',').includes(day.date));
+     if(matches.length!==1)weekdayIssues.push({service:service.name,date:day.date,matches:matches.length});
+     const source=group.events.find(e=>e.sourceText),fields=source?[source.sourceText]:group.events.flatMap(e=>[e.time,e.note]);
+     for(const field of fields.filter(Boolean))if(!normalize(matches[0]?.textContent).includes(normalize(field)))weekdayIssues.push({service:service.name,date:day.date,missing:field});
+     if(day.fastDay&&/גדליה/.test(day.label)&&!matches[0]?.closest('.board-day-section'))weekdayIssues.push({fastDayOutsideDailySection:day.date,service:service.name});
+    }
    }
    const seen=new Map(),pages=Number(view.notices.dataset.pages)||0;
    const originalHost=host,originalPage=host?.shadowRoot.querySelector('.original-page'),fitCount=host?.originalSheetFitCount;
@@ -87,12 +98,15 @@ try{
     for(const e of host.shadowRoot.querySelectorAll('.onepage-row,.onepage-sec-head,.onepage-title'))if(outside(e,host))overflow.push({sheet:e.className});
    }
    const weekly=root.querySelector('.board-weekly'),right=root.querySelector('.board-shabbos,.original-sheet-box'),z=root.querySelector('.board-zmanim');
-   return {classes:root.className,overflow,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,rhTogether,
+   return {classes:root.className,overflow,weekdayIssues,warnings:view.warning,weekly:weekly&&rect(weekly),right:right&&rect(right),zmanim:rect(z),notices:rect(view.notices),footer:rect(root.querySelector('.tv-footer')),pages,seen:[...seen.keys()].sort(),stable,sheetRows,expectedRows,rhTogether,
     shabbosColumns:root.querySelectorAll('.board-static-column').length,sourceIds:[...root.querySelectorAll('.board-schedule-row')].map(e=>e.dataset.sourceId),theme:root.dataset.theme};
   },{snapshot});
   const name=`${date} ${theme} notices=${withNotices}`;
   const check=(ok,what)=>{if(!ok)failures.push({name,what,result:r});};
   check(!r.overflow.length&&!r.warnings.length,'all content stays inside its panel');
+  check(!r.weekdayIssues.length,'weekday dates and prayers match their source, with Gedalya in its daily section');
+  if(['2026-09-14','2029-09-12','2032-09-08'].includes(date))check(!schedule.specialSheet&&!!r.weekly,'Gedalya uses the regular weekly panel');
+  if(date==='2026-10-05')check(!schedule.specialSheet&&!!r.weekly,'the post-Sukkos weekday uses the regular weekly panel');
   check(r.shabbosColumns===0,'Shabbos never splits into columns');
   check(r.pages===(withNotices?1:0),'all announcements remain visible together, including special schedules');
   check(!r.weekly||r.weekly.left>=r.zmanim.right&&r.right.left>=r.weekly.right,'weekday center, Shabbos/special right');
@@ -117,6 +131,6 @@ try{
  });
  assert.ok(rotation,'Complete dedications still rotate');
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({results,failures:failures.map(f=>({name:f.name,what:f.what,overflow:f.result.overflow,warnings:f.result.warnings,seen:f.result.seen}))},null,2));
+ console.log(JSON.stringify({results,failures:failures.map(f=>({name:f.name,what:f.what,overflow:f.result.overflow,weekdayIssues:f.result.weekdayIssues,warnings:f.result.warnings,seen:f.result.seen}))},null,2));
  assert.equal(failures.length,0,'Right-column layout has failures listed above');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

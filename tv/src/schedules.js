@@ -57,12 +57,20 @@ let cachedYear, cachedState;
 const eventInstant = e => localToISO(`${civil(e.serial + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2,'0')}:${String(e.mins % 60).padStart(2,'0')}`);
 function sheetCatalog(year) {
   if (sheetCatalogs.has(year)) return sheetCatalogs.get(year);
-  const result = Object.entries(builders).map(([key,[,build]]) => {
+  // Gedalya's complete dated changes belong in the weekly panel. Keep its
+  // builder available for daily times and admin controls, without a large sheet.
+  const result = Object.entries(builders).filter(([key])=>key!=='gedalia').map(([key,[,build]]) => {
     const poster = build(year,settings);
     const {from,to} = poster.span;
-    const events = (poster.minyanim || []).filter(e=>e.serial>=from&&e.serial<=to);
-    return {key,sourceId:`${key}:${year}`,title:sheetTitles[key],year,yearLabel:hebrewYear(year),from,to,events,sections:publicPosterSections(key,poster)};
-  }).filter(sheet=>sheet.events.length&&sheet.sections.length);
+    // Printed sheets may finish with next week's regular times. They remain
+    // printed in the chart, but do not extend its screen takeover past the last
+    // holy day it covers (including an attached Shabbos on the source sheet).
+    let displayTo = to;
+    while(displayTo>=from&&!agendaDayKind(displayTo,settings).holy)displayTo--;
+    if(displayTo<from)return null;
+    const events = (poster.minyanim || []).filter(e=>e.serial>=from&&e.serial<=displayTo);
+    return {key,sourceId:`${key}:${year}`,title:sheetTitles[key],year,yearLabel:hebrewYear(year),from,to,displayTo,events,sections:publicPosterSections(key,poster)};
+  }).filter(sheet=>sheet?.events.length&&sheet.sections.length);
   if(sheetCatalogs.size>=4)sheetCatalogs.delete(sheetCatalogs.keys().next().value);
   sheetCatalogs.set(year,result);
   return result;
@@ -107,7 +115,7 @@ function originalSheetState(instant,year,day,controls,controlKey) {
         ? Math.max(...preceding.map(e=>e.at))+RETAIN_MS : firstEvent;
       const both=Math.max(preview,Math.min(firstEvent,ordinaryEnd));
       const finalSource=Math.max(...sheet.events.map(e=>Date.parse(eventInstant(e))))+RETAIN_MS;
-      const end=Math.max(closing(sheet.to),finalSource);
+      const end=Math.max(closing(sheet.displayTo),finalSource);
       return {...sheet,preview,both,end,firstEvent,previousShabbos};
     }).sort((a,b)=>a.firstEvent-b.firstEvent);
     if(sheetTimelines.size>=8)sheetTimelines.delete(sheetTimelines.keys().next().value);
@@ -123,7 +131,7 @@ function originalSheetState(instant,year,day,controls,controlKey) {
   if(!selected||overridden)return {specialSheet:null,nextChangeAt};
   const s=selected;
   return {specialSheet:{sourceId:s.sourceId,title:s.title,year:s.year,yearLabel:s.yearLabel,
-    from:civil(s.from),to:civil(s.to),previousShabbos:civil(s.previousShabbos),
+    from:civil(s.from),to:civil(s.to),displayThrough:civil(s.displayTo),previousShabbos:civil(s.previousShabbos),
     placement:instantMs<s.both?'shabbos':'both',
     previewStartsAt:new Date(s.preview).toISOString(),coversBothAt:new Date(s.both).toISOString(),
     endsAt:new Date(s.end).toISOString(),nextChangeAt,sections:s.sections},nextChangeAt};
