@@ -1,7 +1,7 @@
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=d=>new Date(d+'T12:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
 const rich=v=>esc(String(v??'').replace(/\uE000\s*/g,'\uE000').replace(/\s*\uE001/g,'\uE001')).replace(/\uE000/g,'<u>').replace(/\uE001/g,'</u>').replace(/\n/g,'<br>').replace(/\u00a0/g,' ');
-function times(ts,sep=""){return ts.flatMap(t=>String(t.text??'').includes('/')?String(t.text).split('/').map(text=>({...t,text:text.trim()})):[t]).map(t=>`<span class="source-time"><bdi dir="ltr">${t.underlined?'<u>':''}${rich(String(t.text??'').replace(/\s*\/\s*/g,'\u2003'))}${t.underlined?'</u>':''}${esc(t.mark)}</bdi>${t.name?`<small dir="rtl">${esc(t.name)}</small>`:''}</span>`).join(` <span class="time-sep">${esc(sep.replace(/\//g,'').trim())}</span> `);}
+function times(ts,sep=""){return ts.flatMap(t=>String(t.text??'').split(/\s*\/\s*|\n(?=\s*[\uE000\s]*\d{1,2}:)/).map(text=>({...t,text:text.trim()}))).map(t=>`<span class="source-time"><bdi dir="ltr">${t.underlined?'<u>':''}${rich(String(t.text??'').replace(/\s*\/\s*/g,'\u2003'))}${t.underlined?'</u>':''}${esc(t.mark)}</bdi>${t.name?`<small dir="rtl">${esc(t.name)}</small>`:''}</span>`).join(` <span class="time-sep">${esc(sep.replace(/\//g,'').trim())}</span> `);}
 export function sourceRow(row){
  let entries=row.times||[],note=row.note;
  if(row.plagDetail&&note){const match=note.match(/(\d{1,2}:\d{2})/);if(match){entries=[...entries,{text:match[1],name:note.replace(match[1],'').trim()}];note='';}}
