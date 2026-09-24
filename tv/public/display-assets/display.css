@@ -574,3 +574,9 @@ button {
 .weekly-compact .source-row{padding-top:2px;padding-bottom:2px}
 .static-dense .source-times{row-gap:12px}
 
+/* Long labels use the full row above their times, rather than a narrow word stack. */
+.source-row.label-above,.weekly-pattern.label-above{grid-template-columns:minmax(0,1fr);row-gap:8px}
+.label-above>.source-label,.label-above>.weekly-row-label{grid-column:1;grid-row:1;text-align:right;width:100%}
+.label-above>.source-times{grid-column:1;grid-row:2}
+.label-above>.source-note{grid-column:1;grid-row:3}
+.label-above>.source-times:empty{display:none}

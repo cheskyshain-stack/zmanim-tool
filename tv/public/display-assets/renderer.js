@@ -1,4 +1,4 @@
-import { fullSchedules, paginateSpecial } from './schedule-renderer.js';
+import { fullSchedules, paginateSpecial, fitScheduleLabels } from './schedule-renderer.js';
 import { themeAt } from './appearance.js';
 import { localStamp } from "./time.js";
 export const escapeHTML = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -104,6 +104,7 @@ export class DisplayView {
       const columns=chartOnly?2:Math.max(2,dayCount);
       if(center&&sections.length)center.style.gridTemplateColumns=`minmax(0,1fr) minmax(0,${columns}fr)`;
 
+      fitScheduleLabels(this.stage);
       if(center&&weekly){
         if(weekly.scrollHeight>weekly.clientHeight+2) weekly.parentElement.classList.add('weekly-compact');
 
@@ -111,6 +112,7 @@ export class DisplayView {
       const special=this.stage.querySelector('.complete-special');
       if(special) special._sections=[...special.querySelectorAll('.source-section')].map(e=>e.cloneNode(true));
       this.schedulePages=paginateSpecial(this.stage);
+      fitScheduleLabels(weekly);
     }
     if(this.schedulePages?.pages.length){
       const id=s.presentation.special.id;
@@ -127,3 +129,4 @@ export class DisplayView {
     this.observer.disconnect();
   }
 }
+
