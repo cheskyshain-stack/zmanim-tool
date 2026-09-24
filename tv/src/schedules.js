@@ -1,4 +1,5 @@
-import { schedulePresentation } from './presentation.js';
+import * as dailyZmanim from '../../js/zmanim/zmanim.js';
+import { schedulePresentation, posterRows } from './presentation.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
 import parshaEY from "../../data/parsha_ey.json" with { type: "json" };
@@ -9,7 +10,7 @@ import { resolveSettings, DEFAULT_SETTINGS } from "../../js/settings.js";
 import { minyanimForDay, candleLightingForDay, clock } from "../../js/upcoming.js";
 import { dateFromSerial, excelSerial, shulNow } from "../../js/zmanim/solar.js";
 import { sunsetElev } from "../../js/zmanim/zmanim.js";
-import { hebrewDateExtended, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
+import { hebrewDateExtended, hebrewYear, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
 import { agendaDayKind } from "../../js/ui/weekly-agenda.js";
 import { buildRoshHashanaPoster } from "../../js/posters/roshhashana.js";
 import { buildYomKippurPoster } from "../../js/posters/yomkippur.js";
@@ -132,7 +133,17 @@ export function scheduleSnapshot(instant, controls = []) {
     cursor=last;
   }
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
-  return { presentation: schedulePresentation({serial,state,settings,tables,day,instant,sunset}), week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+  const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
+  // Show the complete approved Sukkos sheet while that season is the applicable
+  // or upcoming display group. Explicit admin overrides retain the normal renderer.
+  const sukkos = presentation.special?.sections.some(section=>section.rows.some(row=>row.id.startsWith('sk:'))) || presentation.weekly.posterSections.some(section=>section.rows.some(row=>row.id.startsWith('hoshana:') || row.id.startsWith('chm:'+h.year+':7')));
+  const poster = sukkos ? buildSukkosPoster(h.year,settings) : null;
+  const posterFrom = poster && civil(Math.min(...poster.minyanim.map(e=>e.serial)));
+  const posterTo = poster && civil(Math.max(...poster.minyanim.map(e=>e.serial)));
+  const overridesPoster = poster && active.some(c=>c.data.appliesFrom<=posterTo && c.data.appliesTo>=posterFrom);
+  const fullSheet = poster && !overridesPoster ? {title:'סוכות',year:h.year,yearLabel:hebrewYear(h.year),blocks:poster.blocks.map((block,i)=>({heading:block.heading,rows:posterRows(block.lines,'full-sk:'+h.year+':'+i)}))} : null;
+  const zmanim = [['זמן ציצית','misheyakir10_2'],['הנץ החמה','sunrise'],['סוף זמן ק״ש · מ״א','sofZmanShmaMGA72'],['סוף זמן ק״ש · גר״א','sofZmanShmaGRA'],['סוף זמן תפילה · גר״א','sofZmanTfilaGRA'],['חצות היום','solarNoon'],['מנחה גדולה','minchaGedola'],['פלג המנחה','plagHamincha'],['שקיעת החמה','sunset'],['צאת הכוכבים','tzaisGeonim8_5'],['לילה · 72 דקות','tzais72']].map(([label,key])=>{const f=dailyZmanim[key](dateFromSerial(serial),settings);const total=Math.round((((f%1)+1)%1)*86400);return {label,time:(Math.floor(total/3600)%12||12)+':'+String(Math.floor(total/60)%60).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};});
+  return { presentation, fullSheet, zmanim, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
 }
 
 

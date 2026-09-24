@@ -1,4 +1,6 @@
 import { fullSchedules, paginateSpecial, fitScheduleLabels } from './schedule-renderer.js';
+import { fullSheetHTML, fitSheetColumns } from './full-sheet.js';
+import { boardSchedules, fitBoardSchedules } from './board-schedules.js';
 import { themeAt } from './appearance.js';
 import { localStamp } from "./time.js";
 export const escapeHTML = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -146,8 +148,37 @@ export class DisplayView {
       if(body.dataset.page!==String(page)){body.innerHTML=pages[page];body.dataset.page=String(page);}
       label.textContent=pages.length>1?` · ${page+1} / ${pages.length}`:'';
     }
-    this.stage.querySelector(".tv-clock").textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
-    this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card")].filter((e) => e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");
+    // Keep the approved outer layout intact. The special sheet lives only in
+    // the schedule box, never as an overlay on the entire stage.
+    this.stage.classList.add('board-layout');
+    const boardCards=announcements.map(item=>cardHTML(this.choose('board-'+item.id,[item],now,item.data.contact||item.data.phone?55:95))).join('');
+    const hall=announcements.find(i=>/Simcha Hall/i.test(i.title));
+    const hallCard=hall?cardHTML(this.choose('board-hall',[hall],now,95)):'';
+    const boardKey=JSON.stringify([s,boardCards,hallCard,dedication,stale,preview]);
+    if(boardKey!==this.boardKey || !this.stage.querySelector('.board-notices')){
+      this.boardKey=boardKey;
+      this.stage.querySelectorAll('.board-notices,.board-zmanim,.board-community,.board-dedication,.schedule-sheet-box').forEach(e=>e.remove());
+      const layout=this.stage.querySelector('.tv-layout');
+      layout.querySelectorAll(':scope > .tv-side').forEach(e=>e.remove());
+      const community=document.createElement('aside');community.className='board-community';
+      community.innerHTML=hallCard+this.stage.querySelector('.shul-donate').outerHTML;
+      layout.prepend(community);
+      const z=document.createElement('section');z.className='board-zmanim';z.innerHTML='<h2 dir="rtl">זמני היום</h2>'+ (s.zmanim||[]).map(z=>`<div><bdi>${esc(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join('');community.after(z);
+      const notices=document.createElement('section');notices.className='board-notices';notices.innerHTML=boardCards;this.stage.append(notices);
+      if(dedication){const d=document.createElement('section');d.className='board-dedication';d.innerHTML=cardHTML(dedication);this.stage.append(d);}
+      const scheduleArea=this.stage.querySelector('.tv-center');
+      scheduleArea.innerHTML=s.fullSheet?'':boardSchedules(s.presentation,upcoming);
+      if(s.fullSheet){const box=document.createElement('section');box.className='schedule-sheet-box';box.innerHTML=fullSheetHTML(s.fullSheet,s,{preview,stale});scheduleArea.append(box);}
+      if(s.fullSheet){
+        if(!fitSheetColumns(scheduleArea).fits){
+          scheduleArea.querySelector('.full-sheet').classList.add('sheet-dense');
+          fitSheetColumns(scheduleArea);
+        }
+      }
+      else fitBoardSchedules(scheduleArea,s.presentation);
+    }
+    for(const clock of this.stage.querySelectorAll('.tv-clock'))clock.textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
+    this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card,.board-weekly,.board-shabbos,.sheet-column")].filter((e) => e.getClientRects().length && e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");
   }
   destroy() {
     this.observer.disconnect();
