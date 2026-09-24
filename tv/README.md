@@ -348,3 +348,26 @@ Optional `YEAR_LAYOUT_REPORT` and `YEAR_LAYOUT_SCREENSHOT_DIR` save the audit
 report and representative screenshots. The source-sheet test separately covers
 20-year chart extrema. Future changes to announcement text or schedule overrides
 can change screen capacity; the shared admin preview continues to flag overflow.
+
+## Edit announcements on the screen
+
+`/admin/display/` opens in **Screen layout**. It renders the actual DisplayView
+using a protected current-time preview. Click a notice to open its exact saved
+record, or click an area heading and choose **Add announcement here**. The new
+draft receives that area's explicit `displayGroup`. Full-size area and notice
+controls below the screen provide the same workflow on phones and keyboards.
+The selected area is remembered when returning from the editor. The top
+dedication area also links to permitted dedication edits.
+
+**Saved items** retains the existing status filters, search, duplicate, hide and
+archive actions. The existing editor still controls dates, drafts and publication.
+Nothing is published by selecting an area. Edits use capability-filtered records
+with their original version/timing; server permissions and validation are unchanged.
+The admin interaction module is excluded from the public offline asset cache.
+No configuration or database migration is required.
+
+Run `node tests/admin-screen-browser.mjs` after building. It checks the built
+admin against an in-memory API with the real data validator and calendar, covering
+exact notice selection, area preselection, draft saves, version/timing retention,
+restricted capabilities, empty areas, mobile controls and stale preview responses.
+It makes no database writes. `ADMIN_SCREEN_SCREENSHOT_DIR` saves private previews.

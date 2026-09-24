@@ -1,9 +1,11 @@
 import {previewCalendar} from './preview-calendar.js';
+import {mountScreenEditor} from './admin.screen.js';
 import { validateAppearance, appearanceSummary } from './appearance.js';
 import { DisplayView, cardHTML, escapeHTML as esc, announcementPages } from "./renderer.js";
 import { localStamp, localToISO, formatInstant, addDays, phase } from "./time.js";
 const app = document.querySelector("#admin"), dialog = document.querySelector("#confirm");
 let me, currentHebrewYear, items = [], filter = "showing", search = "", dirty = false, previewView = null, previewTimer = null;
+let screenEditor = null, selectedScreenArea = null, dashboardMode = 'screen', navigation = 0, dashboardLoad = 0;
 const categories = ["Rav’s hours", "Simcha hall information", "Donation appeals", "Shiurim and events", "Simcha announcements", "Community services", "General reminders"];
 const kindCap = { announcement: "announcements", dedication: "dedications", schedule: "schedules" };
 const can = (kind) => me.capabilities.includes("full") || me.capabilities.includes(kindCap[kind] || kind);
@@ -26,6 +28,9 @@ function showError(e) {
   } else toast(e.message);
 }
 function page(html) {
+  navigation++;
+  screenEditor?.destroy();
+  screenEditor = null;
   previewView?.destroy();
   previewView = null;
   clearInterval(previewTimer);
@@ -60,9 +65,17 @@ addEventListener("beforeunload", (e) => {
 });
 async function dashboard() {
   dirty = false;
+  const request = ++dashboardLoad, startedOn = navigation;
   try {
-    items = await api("items");
-    page(`<h1>Manage Shul View</h1><p class="subtitle">Keep the shul informed. Set the dates once, and the screen takes care of the rest.</p>${me.local ? '<div class="notice">LOCAL DEVELOPMENT · Nothing here has been deployed to the public website.</div>' : ""}<div class="toolbar">${can("announcement") ? '<button class="primary" data-new="announcement">+ Add announcement</button>' : ""}${can("dedication") ? '<button class="primary" data-new="dedication">+ Add פרנס היום</button>' : ""}${can("schedule") ? '<button data-new="schedule">Manage display schedules</button>' : ""}<button id="preview-screen">Preview screen</button>${can("full") ? '<button id="appearance">Appearance</button><button id="permissions">Permissions</button>' : ""}</div><div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => phase(i, (/* @__PURE__ */ new Date()).toISOString()) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="error" class="error" role="alert"></div><div id="list"></div><p class="identity">${esc(me.email)} · All scheduling uses America/New_York · <a href="/cdn-cgi/access/logout">Sign out</a></p>`);
+    const loaded = await api("items");
+    if (request !== dashboardLoad || startedOn !== navigation) return;
+    items = loaded;
+    const saved = dashboardMode === 'saved';
+    page(`<h1>Manage Shul View</h1><p class="subtitle">Choose an area on the screen to edit its announcements or add something there.</p>${me.local ? '<div class="notice">LOCAL DEVELOPMENT · Nothing here has been deployed to the public website.</div>' : ""}<div class="toolbar">${can("announcement") ? '<button data-new="announcement">+ Add announcement</button>' : ""}${can("dedication") ? '<button data-new="dedication">+ Add פרנס היום</button>' : ""}${can("schedule") ? '<button data-new="schedule">Manage display schedules</button>' : ""}<button id="preview-screen">Preview calendar</button>${can("full") ? '<button id="appearance">Appearance</button><button id="permissions">Permissions</button>' : ""}</div>
+      <div class="screen-mode-switch" role="group" aria-label="Display management view"><button id="screen-layout" aria-pressed="${!saved}">Screen layout</button><button id="saved-items" aria-pressed="${saved}">Saved items</button>${!saved ? '<button id="refresh-screen">Refresh screen</button>' : ''}</div>
+      <div id="error" class="error" role="alert"></div>
+      ${saved ? `<div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => phase(i, new Date().toISOString()) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="list"></div>` : '<section id="screen-editor" aria-label="Edit announcements on the screen"><p class="notice" role="status">Loading your screen…</p></section>'}
+      <p class="identity">${esc(me.email)} · All scheduling uses America/New_York · <a href="/cdn-cgi/access/logout">Sign out</a></p>`);
     document.querySelectorAll("[data-new]").forEach((b) => b.onclick = () => edit({ kind: b.dataset.new, status: "draft", data: {} }));
     document.querySelectorAll("[data-filter]").forEach((b) => b.onclick = () => {
       filter = b.dataset.filter;
@@ -71,11 +84,24 @@ async function dashboard() {
     document.querySelector("#preview-screen").onclick = () => preview();
     document.querySelector("#appearance")?.addEventListener("click", appearance);
     document.querySelector("#permissions")?.addEventListener("click", permissions);
-    document.querySelector("#search").oninput = (e) => {
-      search = e.target.value;
+    document.querySelector('#screen-layout').onclick = () => {dashboardMode = 'screen';dashboard();};
+    document.querySelector('#saved-items').onclick = () => {dashboardMode = 'saved';dashboard();};
+    document.querySelector('#refresh-screen')?.addEventListener('click',dashboard);
+    if (saved) {
+      document.querySelector("#search").oninput = (e) => {search = e.target.value;renderList();};
       renderList();
-    };
-    renderList();
+    } else {
+      const host = document.querySelector('#screen-editor');
+      try {
+        const snapshot = await api('preview','POST',{at:new Date().toISOString()});
+        if (!host.isConnected || request !== dashboardLoad) return;
+        screenEditor = mountScreenEditor(host,{snapshot,items,can,onEdit:edit,onAdd:edit,selectedArea:selectedScreenArea,onSelect:id => {selectedScreenArea=id;}});
+      } catch (error) {
+        if (!host.isConnected || request !== dashboardLoad) return;
+        host.innerHTML = '<p class="notice">The screen could not load. Try Refresh screen, or open Saved items to manage your content.</p>';
+        showError(error);
+      }
+    }
   } catch (e) {
     showError(e);
   }
