@@ -53,20 +53,10 @@ const hostStyles = `
     padding:7px;
     box-shadow:none; background:var(--sheet-background); color:var(--sheet-text);
   }
-  /* Paper's inch-based whitespace and four-times-per-line wrapping spend most
-     of a short screen box on padding. Keep its two columns and source rows,
-     while allowing the wider screen to use the room beside each prayer. */
-  .poster .onepage-title { margin:0 0 4px; padding-bottom:4px; line-height:1.1; }
-  .poster .onepage-cols { gap:16px; }
-  .poster .onepage-col + .onepage-col { padding-inline-start:16px; }
-  .poster .onepage-sec-head { padding:1px 4px; margin:0; line-height:1.1; }
-  .original-page .poster.is-onepage .onepage-row {
-    padding:calc(0.6px + var(--op-gap, 0px) / 2) 4px; gap:8px; line-height:1.1;
-  }
-  .poster .onepage-line + .onepage-line { margin-top:1px; }
-  .poster.is-screen-wide .onepage-times { direction:ltr; unicode-bidi:isolate; }
-  .poster.is-screen-wide .onepage-line { display:inline; }
-  .poster.is-screen-wide .onepage-line + .onepage-line::before { content:"\\00a0/\\00a0"; }
+  /* The source stylesheet owns row padding, leading, column spacing and the
+     extra air around multiline prayers. Keep its balanced time runs as separate
+     lines at every screen width; the fitter sizes the whole chart to this box.
+     Only the outer paper margin is reduced above for the screen. */
   .poster .onepage-title,.poster .onepage-sec-head,.onepage-label,.zman-pair-name { color:var(--sheet-gold); }
   .onepage-times,.onepage-note,.zman-pair-time { color:var(--sheet-text); }
   .onepage-times u { text-decoration-color:currentColor; }
@@ -114,7 +104,6 @@ export function fitOriginalSheet(box) {
     // Printer margins/minimum type were designed for an eleven-inch sheet.
     // Reclaim those margins inside this shorter screen box, retaining the
     // original rows and two-column fitting algorithm for every calendar year.
-    page.querySelector('.poster').classList.toggle('is-screen-wide', host.clientWidth >= 1100);
     layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, observeResize: false });
     lastSize = size;
     host.originalSheetFitCount = (host.originalSheetFitCount || 0) + 1;

@@ -5,6 +5,10 @@ import { themeAt } from './appearance.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
+const zmanTime = value => {
+  const parts = String(value ?? '').match(/^(\d{1,2}:\d{2})(:\d{2})$/);
+  return parts ? `${esc(parts[1])}<span class="zman-seconds">${esc(parts[2])}</span>` : esc(value);
+};
 const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
 // Kept for existing editor imports. A notice is always one complete card.
 export function announcementPages(item) { return [item]; }
@@ -76,7 +80,7 @@ export class DisplayView {
     const dedication = this.choose('dedication', items.filter(i => i.kind === 'dedication'), now);
     setHTML(this.dedication, dedication ? cardHTML(dedication) : '');
     this.dedication.hidden = !dedication;
-    setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${esc(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
+    setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${zmanTime(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
 
     const groups = groupAnnouncements(items), groupsKey = JSON.stringify(groups);
     const upcoming = (snapshot.upcoming || []).filter(i => i.startsAt > instant).map(i => `<div class="tv-upcoming"><strong>${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} – ${dateLabel(i.data.appliesTo)}</div>`).join('');

@@ -31,7 +31,7 @@ const screenshots = process.env.SHEET_SCREENSHOT_DIR;
 // Select calendar content extrema rather than exercising the same shape twenty
 // times. Include each source's first/last year and most rows/longest text.
 const cases = ['2026-09-12','2026-09-14','2026-09-21','2026-09-26','2027-04-22','2028-10-07']
-  .map(date => ({date,sheet:scheduleSnapshot(date+'T16:00:00Z').specialSheet,sizes:[[764,555],[1544,555]],themes:['dark','light']}));
+  .map(date => ({date,sheet:scheduleSnapshot(date+'T16:00:00Z').specialSheet,sizes:[[764,900],[988,900],[1544,900]],themes:['dark','light']}));
 for (const [key,title,build] of [
   ['rh','ראש השנה',buildRoshHashanaPoster], ['yk','יום כיפור',buildYomKippurPoster],
   ['sukkos','סוכות',buildSukkosPoster], ['pesach','פסח',buildPesachPoster],
@@ -107,6 +107,10 @@ try {
           }
           const color=selector=>getComputedStyle(shadow.querySelector(selector)).color;
           const background=getComputedStyle(shadow.querySelector('.poster')).backgroundColor;
+          const runSpacing=[...shadow.querySelectorAll('.onepage-line + .onepage-line')].map(line=>{
+            const style=getComputedStyle(line),previous=line.previousElementSibling.getBoundingClientRect(),current=line.getBoundingClientRect();
+            return {display:style.display,gap:parseFloat(style.marginTop),separateLine:current.top>=previous.bottom-1};
+          });
           const afterFitCount=host.originalSheetFitCount;
           box.style.width=(width===764?1544:764)+'px';
           await fitOriginalSheet(box);
@@ -117,7 +121,7 @@ try {
           box.style.width=width+'px';
           await fitOriginalSheet(box);
           await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-          return {originalRows,fittedRows,resizedRows,overflow,resizedOverflow,restoredOverflow:checkInk(),reversedTimes,beforeReady,ready:host.dataset.sheetReady,sameNode,sameMarkup,fitCount,afterFitCount,resizeCount,columns:shadow.querySelectorAll('.onepage-col').length,unheadedSections:shadow.querySelectorAll('.onepage-sec:not(:has(.onepage-sec-head))').length,columnHeadings:[...shadow.querySelectorAll('.onepage-col')].map(c=>[...c.querySelectorAll('.onepage-sec-head')].map(h=>h.textContent)),background,heading:color('.onepage-title'),dayHeading:color('.onepage-sec-head'),label:color('.onepage-label'),times:color('.onepage-times'),fontSize:getComputedStyle(firstRow).fontSize,scale:shadow.querySelector('.poster').style.getPropertyValue('--op-scale')};
+          return {originalRows,fittedRows,resizedRows,overflow,resizedOverflow,restoredOverflow:checkInk(),reversedTimes,runSpacing,beforeReady,ready:host.dataset.sheetReady,sameNode,sameMarkup,fitCount,afterFitCount,resizeCount,columns:shadow.querySelectorAll('.onepage-col').length,unheadedSections:shadow.querySelectorAll('.onepage-sec:not(:has(.onepage-sec-head))').length,columnHeadings:[...shadow.querySelectorAll('.onepage-col')].map(c=>[...c.querySelectorAll('.onepage-sec-head')].map(h=>h.textContent)),background,heading:color('.onepage-title'),dayHeading:color('.onepage-sec-head'),label:color('.onepage-label'),times:color('.onepage-times'),fontSize:getComputedStyle(firstRow).fontSize,scale:shadow.querySelector('.poster').style.getPropertyValue('--op-scale')};
         },{sheet,width,height,theme});
         const label=`${date} ${width}x${height}px ${theme}`;
         assert.equal(result.beforeReady,'hidden',`${label}: only reveal fitted sheet`);
@@ -133,6 +137,7 @@ try {
         assert.deepEqual(result.resizedOverflow,[],`${label}: all text fits after placement resize`);
         assert.deepEqual(result.restoredOverflow,[],`${label}: all text fits after restoring placement`);
         assert.deepEqual(result.reversedTimes,[],`${label}: times keep their left-to-right source order`);
+        assert.ok(result.runSpacing.every(run=>run.display==='block'&&run.gap>0&&run.separateLine),`${label}: original time runs keep their line breaks and spacing`);
         assert.ok(result.sameNode&&result.sameMarkup,`${label}: polls and themes never replace or repartition the sheet`);
         assert.equal(result.afterFitCount,result.fitCount,`${label}: unchanged geometry never refits`);
         assert.equal(result.resizeCount,result.fitCount+1,`${label}: placement width change fits exactly once`);

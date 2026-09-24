@@ -313,8 +313,9 @@ This section supersedes the earlier rotating/paged screen layout notes above.
 Weekday schedules now occupy the center, with Shabbos on the right. Shabbos is
 always one continuous column: no duplicated headings, split columns or changing
 pages. Ordinary weeks keep all complete announcements together in a full-width
-bottom band, with compact schedule spacing and exception scopes beside their
-times. Special sheets use the taller right-hand area down to the footer;
+bottom band. Exception headings have their own centered line above their times.
+Shabbos rows share the available height, using compact spacing only when the
+normal size does not fit. Special sheets use the taller right-hand area down to the footer;
 the original page remains complete and keeps its own two source columns. The
 existing timed expansion across both schedule areas still applies.
 
@@ -330,3 +331,20 @@ Archived/hidden/draft items remain private; layout changes do not republish them
 Browser regression: `node tests/right-column-browser.mjs`; set
 `DISPLAY_TEST_SCALE=2` for 4K. This supersedes earlier assertions that Shabbos can
 be split into two columns or that the upcoming special page is on the left.
+
+## Schedule spacing audit
+
+Daily zmanim keep hours and minutes bold while seconds use regular weight.
+The special page retains its original row padding, separate time runs, heading
+spacing and column gutter; only the outer paper margins, branding and colors
+are adapted to the screen. No schedule data is changed.
+
+`node tests/year-layout-browser.mjs` checks every date from September 24, 2026
+through September 23, 2027 using the real calendar and saved public-announcement
+fixture, then checks each distinct layout in Light. It verifies all source rows,
+the complete original special chart, all ten notices, actual text bounds,
+centered exception times, seconds weight and use of Shabbos panel height.
+Optional `YEAR_LAYOUT_REPORT` and `YEAR_LAYOUT_SCREENSHOT_DIR` save the audit
+report and representative screenshots. The source-sheet test separately covers
+20-year chart extrema. Future changes to announcement text or schedule overrides
+can change screen capacity; the shared admin preview continues to flag overflow.
