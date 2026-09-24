@@ -94,12 +94,12 @@ export class DisplayView {
     const sheet = s.specialSheet && instant >= s.specialSheet.previewStartsAt && instant < s.specialSheet.endsAt ? s.specialSheet : null;
     const placement = sheet && instant >= sheet.coversBothAt ? 'both' : 'shabbos';
     // Deliberately omit the clock, next minyan, generatedAt and connection state.
-    const scheduleKey = JSON.stringify([sheet ? [sheet.sourceId,sheet.title,sheet.year,sheet.sections,placement] : null, sheet && placement === 'both' ? null : s.presentation,upcoming]);
+    const scheduleKey = JSON.stringify([sheet ? [sheet.sourceId,sheet.title,sheet.year,sheet.sections,sheet.columnBreakAt,placement] : null, sheet && placement === 'both' ? null : s.presentation,upcoming]);
     if (scheduleKey !== this.scheduleKey) {
       this.scheduleKey = scheduleKey;
       let box = null;
       if (sheet) {
-        const sourceKey = JSON.stringify([sheet.sourceId,sheet.title,sheet.year,sheet.sections]);
+        const sourceKey = JSON.stringify([sheet.sourceId,sheet.title,sheet.year,sheet.sections,sheet.columnBreakAt]);
         if (this.originalSheetKey !== sourceKey) {
           this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
           box = document.createElement('section');
@@ -180,7 +180,8 @@ export class DisplayView {
   layoutBoard(groups, sheet, placement) {
     // Every published announcement stays visible together, including beside a
     // special chart. Clock ticks and theme changes never rerun this measurement.
-    this.stage.classList.remove('right-extended','special-expanded','week-extended','compact-notice-spacing','compact-zmanim-spacing');
+    this.stage.classList.remove('right-extended','special-expanded','week-extended','week-wide-notices','compact-notice-spacing','compact-zmanim-spacing');
+    this.stage.style.removeProperty('--week-notice-rail');
     this.stage.classList.toggle('without-notices', !groups.length);
     this.stage.classList.toggle('all-notices', !!groups.length);
     this.stage.classList.toggle('sheet-notices', !!sheet && !!groups.length);
@@ -221,7 +222,29 @@ export class DisplayView {
       const balancedHeight = Math.max(280,this.noticeHeight(balanced));
       this.noticePages = balancedHeight < extendedHeight ? balanced : extended;
       this.stage.style.setProperty('--notice-height',Math.min(extendedHeight,balancedHeight)+'px');
-      fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+    }
+    if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
+    if (groups.length && (fit.weekly?.overflow || zmanimOverflows())) {
+      // A Selichos or Chol Hamoed week can need the full height as well. Keep
+      // both schedules intact and move the four complete announcement areas
+      // into a measured two-by-two left rail, beneath the daily zmanim. A
+      // taller dedication can need this same rail for the daily zmanim alone.
+      this.stage.classList.add('week-extended','week-wide-notices','right-extended','compact-notice-spacing');
+      this.noticePages = [groups];
+      let best = null;
+      for (const width of [600,640,680,720,760,800,840,880]) {
+        this.stage.style.setProperty('--week-notice-rail',width+'px');
+        const height = Math.max(280,this.noticeHeight(this.noticePages));
+        this.stage.style.setProperty('--notice-height',height+'px');
+        const trial = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
+        const overflow = (trial.weekly?.overflow || 0) + (trial.special?.overflow || 0) + Math.max(0,this.zmanim.scrollHeight-this.zmanim.clientHeight-2);
+        if (!best || overflow < best.overflow) best = {width,height,overflow};
+        if (!overflow) break;
+      }
+      this.stage.style.setProperty('--week-notice-rail',best.width+'px');
+      this.stage.style.setProperty('--notice-height',best.height+'px');
+      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
     }
     if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
     if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);

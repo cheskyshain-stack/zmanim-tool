@@ -185,6 +185,14 @@ export function minyanimForDay(serial, state, settings) {
   const special = specialMinyanim(serial, settings);
   if (special.length) return special;
 
+  return chartMinyanimForDay(serial, state, settings);
+}
+
+/** Read the saved regular chart using the same validated cell parser. A caller
+ * joining a holiday to Shabbos can request only the evening chart columns,
+ * without substituting ordinary weekday services for the holiday's daytime. */
+export function chartMinyanimForDay(serial, state, settings, { onlyColumns = null, includeFridayMorning = true } = {}) {
+
   const dow = excelWeekday(serial);
   const found = entryForDay(serial, state);
   if (!found) return [];
@@ -202,6 +210,7 @@ export function minyanimForDay(serial, state, settings) {
     // there its column I is a פלג מנחה rather than the ערב שבת one.
     const cells = columns === KAYITZ_COLUMNS ? SEASON_CELLS.kayitz : SEASON_CELLS.choref;
     for (const column of columns) {
+      if (onlyColumns && !onlyColumns.includes(column.key)) continue;
       const cell = cells[column.key];
       if (!cell || cell.day !== dow) continue;
       const name = nameFromHeader(column.header);
@@ -224,7 +233,7 @@ export function minyanimForDay(serial, state, settings) {
     // Adding it is not an assumption about the schedule. שחרית is one fixed list, the same
     // every weekday, which is exactly why the chart prints it once as a merged cell rather
     // than working it out day by day.
-    if (dow === FRIDAY) {
+    if (dow === FRIDAY && includeFridayMorning) {
       const name = nameFromHeader(WEEKDAY_COLUMNS.find((c) => c.key === 'E').header);
       // Through the סליחות season the morning is the sheet's, not the chart's: see below.
       const morning = specialShacharis(serial, settings);

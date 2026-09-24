@@ -83,7 +83,7 @@ export function holySource(s,settings) {
  if(b){const before=p.blocks.filter(b=>b.serial===s-1&&d===15&&excelWeekday(s-1)!==7&&/ערב/.test(b.heading));return {sections:[...before.map(b=>({heading:b.heading,date:civil(s-1),rows:posterRows(b.lines,'ps:'+year+':erev')})),...splitPoster({...b,heading:[15,16].includes(d)?b.heading.split(' · ').map((part,i)=>i===0?part+' דפסח':part).join(' · '):b.heading},s,'ps:'+year+':'+d)],poster:p};}}
  return null;
 }
-function ordinaryShabbos(s,state,settings) {
+export function ordinaryShabbos(s,state,settings) {
  const entry=weekIndex(state).get(s);
  if(!entry?.sheet)return [{heading:hebrewDay(s,settings),date:civil(s),rows:[{id:'missing:'+s,label:'הלוח המלא אינו זמין במקור שפורסם. יש לברר בבית המדרש.',times:[]}]}];
  const built=rowFor(entry.week,entry.sheet,state,settings);

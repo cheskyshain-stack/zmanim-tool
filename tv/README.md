@@ -346,9 +346,17 @@ and גר"א Shema deadlines, the מ"א and גר"א tefila deadlines, חצות, �
 צאת ג' כוכבים and צאת 72. עלות uses the site's 72-minute reckoning; the added
 מ"א tefila deadline uses the same MGA day and astronomical-chatzos setting as
 its Shema deadline. The list is shared by live, future-preview and offline views.
+Prayer labels stay on the right with their time runs immediately beside them
+on the left, rather than at opposite chart edges. Shabbos uses a 16px gap and a
+content-sized label column. Wrapped labels align toward their adjacent times,
+avoiding a blank gutter inside the label itself. Long labels remain above centered times; ordinary
+weekday prayer groups remain centered. Daily zmanim keep their aligned time
+column with labels directly beside it.
 The special page retains its original row padding, separate time runs, heading
-spacing and column gutter; only the outer paper margins, branding and colors
-are adapted to the screen. No schedule data is changed.
+spacing and column gutter. Its existing label/time gap is kept without stretching
+across the column; shorter continuation lines align toward their prayer label.
+Outer paper margins, branding and colors are adapted to the screen. No schedule
+data is changed.
 Its full palette inherits from the selected display theme across the shadow
 root, without relying on `:host-context`, so Safari receives the same schedule
 ink, heading bands, gold labels and borders. Theme changes keep the fitted page.
@@ -363,8 +371,24 @@ fixture, then checks each distinct layout in Light. It verifies all source rows,
 the complete original special chart, all ten notices, actual text bounds,
 centered exception times, seconds weight and use of Shabbos panel height.
 Optional `YEAR_LAYOUT_REPORT` and `YEAR_LAYOUT_SCREENSHOT_DIR` save the audit
-report and representative screenshots. The source-sheet test separately covers
-20-year chart extrema. Future changes to announcement text or schedule overrides
+report and representative screenshots.
+
+`node tests/twenty-year-layout.mjs` checks all 7,305 dates from September 24, 2026
+through September 23, 2046. Each date is calculated and mapped to its exact
+rendered chart variant; every distinct variant is measured in both themes.
+The audit checks label/time gaps, aligned daily zmanim, source coverage,
+underlines and notes, all ten saved notices, clipping, and stable geometry.
+`AUDIT_START`, `AUDIT_END`, and `AUDIT_OUT` can change the inclusive range and
+report directory. Dates without a saved holiday chart are reported separately
+as source gaps; the audit does not fabricate missing times.
+
+For unusually dense Selichos or Chol Hamoed weeks, the weekday panel can use
+the full screen height alongside the right schedule. All announcements remain
+visible in four complete boxes beneath a two-column daily-zmanim rail. The
+layout measures available width and height while retaining the existing text
+sizes. This fallback is removed as soon as the ordinary layout fits.
+
+Future changes to announcement text or schedule overrides
 can change screen capacity; the shared admin preview continues to flag overflow.
 
 ## Edit announcements on the screen
@@ -424,7 +448,21 @@ Shul View keeps Erev Rosh Hashanah and both days in one continuous column,
 under one holiday title. The original source rows, labels, marks and order are
 retained; the same column fits the tall right box and its expanded placement.
 Other seasonal charts and the printable poster defaults retain their existing
-two-column layout. No data, timing or next-minyan calculation changes.
+two-column layout. Saved schedule times remain authoritative.
+
+When Rosh Hashanah ends on Friday, the screen appends the saved Shabbos chart
+to the same holiday page. Erev and both RH days stay together in one column;
+the attached Shabbos occupies the second, keeping the whole group legible.
+The complete connected group remains
+through Shabbos closing events, including the existing five-minute retention,
+instead of falling back to an overflowing regular panel on its last day.
+The standalone printed RH source is unchanged. In this connected view its
+weekday Motzei Yom Tov row is excluded using the source calculation identifier;
+the saved Shabbos evening entries take its place. Shul View's actual Friday
+events and next-minyan calculation read those same F/G chart cells through the
+existing validated calendar reader. RH daytime services and explicit admin
+overrides remain in force. The public website's reader defaults are unchanged.
+The offline engine revision is v5 so cached calculations use the same boundary.
 
 The original-sheet browser check covers every Rosh Hashanah year from 5787 to
 5806 at five panel sizes, plus both themes and placement changes. The full-screen

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {scheduleSnapshot} from '../src/schedules.js';
+import {boardSchedules} from '../public/display-assets/board-schedules.js';
+import {originalSheetHTML} from '../public/display-assets/original-sheet.js';
 
 // Run after `npm run build`. This serves only local built assets and injects
 // calculated snapshots into a private preview; it never calls the live API.
-const {chromium} = createRequire(import.meta.url)('playwright');
+const {chromium,webkit} = createRequire(import.meta.url)('playwright');
+const browserName=process.env.YEAR_LAYOUT_BROWSER||'chromium';
 const dist = path.resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
 const types = {'.js':'text/javascript', '.css':'text/css', '.woff2':'font/woff2', '.png':'image/png'};
 const server = createServer(async (req, res) => {
@@ -26,9 +30,25 @@ const server = createServer(async (req, res) => {
   } catch { res.writeHead(404).end(); }
 });
 
-const firstDate = '2026-09-24', lastDate = '2027-09-23';
-const dates = Array.from({length:365}, (_, i) => new Date(Date.parse(firstDate + 'T16:00:00Z') + i * 86400000).toISOString().slice(0, 10));
+const firstDate = process.env.YEAR_LAYOUT_START||'2026-09-24', lastDate = process.env.YEAR_LAYOUT_END||'2027-09-23';
+const dayCount=(Date.parse(lastDate+'T16:00:00Z')-Date.parse(firstDate+'T16:00:00Z'))/86400000+1;
+assert.ok(Number.isInteger(dayCount)&&dayCount>0,'Audit dates must form a valid inclusive range');
+const dates = Array.from({length:dayCount}, (_, i) => new Date(Date.parse(firstDate + 'T16:00:00Z') + i * 86400000).toISOString().slice(0, 10));
 assert.equal(dates.at(-1), lastDate);
+const deduplicate=process.env.YEAR_LAYOUT_DEDUP==='1';
+// Match exact rendered chart content, including every label, actual time,
+// underline, multiline run, date heading and long-label variant. Source IDs
+// and date attributes do not affect layout. The daily rail has fixed time
+// cells; retain every label and hour-width format without creating a new
+// chart case merely because its seconds or the header's current date changed.
+function chartFingerprint(schedule,at){
+ const sheet=schedule.specialSheet&&at>=schedule.specialSheet.previewStartsAt&&at<schedule.specialSheet.endsAt?schedule.specialSheet:null;
+ const both=sheet&&at>=sheet.coversBothAt;
+ const markup=both?'':boardSchedules({...schedule.presentation,special:sheet?null:schedule.presentation.special});
+ const exactMarkup=markup.replace(/ data-(?:source-id|weekday-dates|day-dates)="[^"]*"/g,'');
+ const shape=JSON.stringify({placement:both?'both':'shabbos',chart:exactMarkup,sheet:sheet?originalSheetHTML(sheet):'',zmanim:schedule.zmanim.map(zman=>[zman.label,zman.time.replace(/\d/g,'0')])});
+ return createHash('sha256').update(shape).digest('hex').slice(0,20);
+}
 // Keep all ten current public notices active throughout the private audit year.
 const notices = JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json', import.meta.url), 'utf8')).replace(/^\uFEFF/, ''))
   .map(item => ({...item, startsAt:'2020-01-01T00:00:00.000Z', endsAt:null}));
@@ -36,12 +56,13 @@ assert.equal(notices.length, 10, 'The public fixture includes all ten announceme
 const screenshots = process.env.YEAR_LAYOUT_SCREENSHOT_DIR || process.env.BOARD_SCREENSHOT_DIR;
 const scale = Number(process.env.DISPLAY_TEST_SCALE) || 1;
 const results = [], failures = [], shapes = new Map(), capture = new Map();
+const sourceShapes=new Map(),dateCoverage=[],dataErrors=[];
 const began = Date.now();
 let browser;
 
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
-  browser = await chromium.launch({channel:'chrome', headless:true});
+  browser = browserName==='webkit'?await webkit.launch({headless:true}):await chromium.launch({channel:'chrome', headless:true});
   const page = await browser.newPage({viewport:{width:1920 * scale, height:1080 * scale}});
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -73,6 +94,44 @@ try {
       const outside = (a, b) => a.left < b.left - 2 || a.right > b.right + 2 || a.top < b.top - 2 || a.bottom > b.bottom + 2;
       const add = (code, details = {}) => issues.push({code, ...details});
       const identify = e => e.dataset.sourceId || e.className || e.tagName;
+      const pairing={rows:0,stacked:0,maximumGap:0,maximumGapEm:0};
+      function ink(element){
+        if(!element?.textContent.trim())return null;
+        const boxes=[],walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);
+        for(let text;(text=walker.nextNode());)if(text.textContent.trim()){
+          const range=document.createRange();range.selectNodeContents(text);
+          boxes.push(...[...range.getClientRects()].filter(box=>box.width&&box.height));
+        }
+        if(!boxes.length)return null;
+        return {left:Math.min(...boxes.map(box=>box.left))/scale,right:Math.max(...boxes.map(box=>box.right))/scale,top:Math.min(...boxes.map(box=>box.top))/scale,bottom:Math.max(...boxes.map(box=>box.bottom))/scale};
+      }
+      function auditPairing(row,labelSelector,timesSelector){
+        const label=row.querySelector(labelSelector),times=row.querySelector(timesSelector),a=ink(label),b=ink(times);
+        if(!a||!b)return; // Notes without a printed time have no pair to align.
+        pairing.rows++;
+        const em=Math.max(parseFloat(getComputedStyle(label).fontSize),parseFloat(getComputedStyle(times).fontSize));
+        const limit=Math.min(40,1.5*em),details={element:identify(row),label:short(label.textContent),times:short(times.textContent)};
+        if(a.bottom<=b.top+2){
+          pairing.stacked++;
+          const gap=b.top-a.bottom;
+          if(gap>limit+2)add('pair-stacked-gap',{...details,gap:Math.round(gap*10)/10,limit});
+        }else if(b.bottom<a.top-2){
+          add('pair-label-below-times',details);
+        }else{
+          const gap=a.left-b.right;
+          pairing.maximumGap=Math.max(pairing.maximumGap,gap);
+          pairing.maximumGapEm=Math.max(pairing.maximumGapEm,gap/em);
+          if(gap< -2)add('pair-label-times-overlap',{...details,gap:Math.round(gap*10)/10});
+          if(gap>limit+2)add('pair-label-times-too-far',{...details,gap:Math.round(gap*10)/10,limit:Math.round(limit*10)/10});
+        }
+        // Adjacent printed time cells must not collide on the same line.
+        const entries=[...times.querySelectorAll('.board-time,.onepage-t,.zman-pair')].map(ink).filter(Boolean);
+        for(let i=0;i<entries.length;i++)for(let j=i+1;j<entries.length;j++){
+          const x=entries[i],y=entries[j];
+          if(Math.min(x.right,y.right)-Math.max(x.left,y.left)>2&&Math.min(x.bottom,y.bottom)-Math.max(x.top,y.top)>2)
+            add('pair-time-cells-overlap',details);
+        }
+      }
       function auditPanel(panel, selector) {
         const bounds = rect(panel);
         if (outside(bounds, rect(root))) add('panel-outside-screen', {element:identify(panel), bounds:rounded(bounds)});
@@ -112,6 +171,7 @@ try {
       const both = activeSheet && snapshot.at >= snapshot.schedule.specialSheet.coversBothAt;
       const expectedRows = [...(!both ? p.weekly.posterSections || [] : []), ...(!activeSheet ? p.special?.sections || [] : [])].flatMap(section => section.rows);
       const actualRows = [...root.querySelectorAll('.board-schedule-row')];
+      for(const row of actualRows)auditPairing(row,'.board-prayer-label','.board-times');
       const expectedIds = expectedRows.map(row => row.id).sort(), actualIds = actualRows.map(row => row.dataset.sourceId).sort();
       if (JSON.stringify(expectedIds) !== JSON.stringify(actualIds)) add('source-ids', {expected:expectedIds, actual:actualIds});
       for (const row of expectedRows) {
@@ -168,6 +228,10 @@ try {
         }
       }
       const zmanim = [...root.querySelectorAll('.board-zmanim>div')];
+      for(const row of zmanim)auditPairing(row,':scope > span',':scope > bdi');
+      const zmanimColumns=new Map();
+      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[];edges.push(rect(row.querySelector(':scope > bdi')).right);zmanimColumns.set(column,edges);}
+      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-edges-not-aligned');
       if (zmanim.length !== snapshot.schedule.zmanim.length) add('zmanim-count');
       for (const [i, zman] of snapshot.schedule.zmanim.entries()) {
         const el = zmanim[i];
@@ -177,7 +241,7 @@ try {
       for (const seconds of root.querySelectorAll('.time-seconds,.board-seconds,.zman-seconds'))
         if (Number(getComputedStyle(seconds).fontWeight) > 400) add('seconds-bold', {text:seconds.textContent, weight:getComputedStyle(seconds).fontWeight});
 
-      let sheetRows = 0, sheetColumns = 0;
+      let sheetRows = 0, sheetColumns = 0, sheetMinimumTimeFontSize = null;
       if (activeSheet) {
         if (!host || host.dataset.sheetReady !== 'true') add('special-sheet-not-ready');
         else {
@@ -186,9 +250,21 @@ try {
           const signature = row => JSON.stringify({label:normalize(row.querySelector('.onepage-label')?.textContent), times:normalize(row.querySelector('.onepage-times')?.textContent), underlines:[...row.querySelectorAll('u')].map(u => normalize(u.textContent))});
           const expected = [...template.content.querySelector('template').content.querySelectorAll('.onepage-row')].map(signature).sort();
           const shadow = host.shadowRoot, actual = [...shadow.querySelectorAll('.onepage-row')].map(signature).sort();
+          sheetMinimumTimeFontSize=Math.min(...[...shadow.querySelectorAll('.onepage-times')].filter(element=>element.textContent.trim()).map(element=>parseFloat(getComputedStyle(element).fontSize)));
+          for(const row of shadow.querySelectorAll('.onepage-row'))auditPairing(row,'.onepage-label','.onepage-times');
           if (getComputedStyle(shadow.querySelector('.original-page')).visibility !== 'visible') add('special-sheet-hidden');
           sheetRows = actual.length; sheetColumns = shadow.querySelectorAll('.onepage-col').length;
           if (JSON.stringify(expected) !== JSON.stringify(actual)) add('special-source-rows', {expected:expected.length, actual:actual.length});
+          if(snapshot.schedule.specialSheet.columnBreakAt){
+            const sectionSignature=section=>JSON.stringify({heading:normalize(section.querySelector('.onepage-sec-head')?.textContent),rows:[...section.querySelectorAll('.onepage-row')].map(signature)});
+            const sourceSections=[...template.content.querySelector('template').content.querySelectorAll('.onepage-sec')].map(sectionSignature);
+            const columns=[...shadow.querySelectorAll('.onepage-col')],split=snapshot.schedule.specialSheet.columnBreakAt;
+            const expectedColumns=[sourceSections.slice(0,split),sourceSections.slice(split)];
+            for(let index=0;index<2;index++){
+              const actualSections=[...columns[index].querySelectorAll(':scope > .onepage-sec')].map(sectionSignature);
+              if(JSON.stringify(actualSections)!==JSON.stringify(expectedColumns[index]))add('connected-sheet-column-boundary',{column:index,expectedSections:expectedColumns[index].length,actualSections:actualSections.length});
+            }
+          }
           if (sheetColumns !== 2) add('special-columns', {actual:sheetColumns});
           if (shadow.querySelectorAll('.onepage-sec:not(:has(.onepage-sec-head))').length) add('special-orphaned-days');
           // The shadow page, including every actual text line, must fit its host.
@@ -230,7 +306,7 @@ try {
         serviceHeights:[...root.querySelectorAll('.board-service')].map(e => Math.round(rect(e).height)),
         exceptionHeights:exceptions.map(e => Math.round(rect(e).height)), sheetRows,
       });
-      return {issues,geometry,special:activeSheet ? snapshot.schedule.specialSheet.sourceId : null,placement:both?'both':'shabbos',rows:actualRows.length,sourceGaps:expectedIds.filter(id => id.startsWith('missing:')),sheetRows,sheetColumns,exceptions:exceptions.length,shabbosRows:shabbosRows.length,trailingSpace:trailingSpace===null?null:Math.round(trailingSpace),pages:Number(view.notices.dataset.pages),notices:seen.length};
+      return {issues,geometry,pairing:{...pairing,maximumGap:Math.round(pairing.maximumGap*10)/10,maximumGapEm:Math.round(pairing.maximumGapEm*100)/100},special:activeSheet ? snapshot.schedule.specialSheet.sourceId : null,placement:both?'both':'shabbos',rows:actualRows.length,sourceGaps:expectedIds.filter(id => id.startsWith('missing:')),sheetRows,sheetColumns,sheetMinimumTimeFontSize,exceptions:exceptions.length,shabbosRows:shabbosRows.length,trailingSpace:trailingSpace===null?null:Math.round(trailingSpace),pages:Number(view.notices.dataset.pages),notices:seen.length};
     }, {snapshot, scale});
   }
 
@@ -239,13 +315,35 @@ try {
     results.push({date, theme, ...metrics});
     if (issues.length) failures.push({date, theme, issues});
   }
+  async function checkpoint(phase){
+    if(process.env.YEAR_LAYOUT_REPORT)await writeFile(process.env.YEAR_LAYOUT_REPORT.replace(/\.json$/,'.progress.json'),JSON.stringify({phase,from:firstDate,to:lastDate,sourceDatesChecked:dateCoverage.length,lastDate:dateCoverage.at(-1)?.date,exactChartVariants:sourceShapes.size,browserChecks:results.length,elapsedSeconds:Math.round((Date.now()-began)/1000),failures,dataErrors},null,2)+'\n');
+  }
   let densest = null;
   for (const date of dates) {
-    const schedule = scheduleSnapshot(date+'T16:00:00.000Z');
+    const at=date+'T16:00:00.000Z';
+    let schedule,sourceShape;
+    try{
+      schedule=scheduleSnapshot(at);
+      assert.equal(schedule.date,date,'The generated schedule retains its requested date');
+      sourceShape=chartFingerprint(schedule,at);
+      const rows=[...(schedule.presentation.special?.sections||[]),...(schedule.presentation.weekly.posterSections||[])].flatMap(section=>section.rows);
+      assert.equal(new Set(rows.map(row=>row.id)).size,rows.length,'Every source row has a unique identity');
+      for(const row of rows)assert.ok(typeof row.label==='string'&&Array.isArray(row.times),`Invalid source row ${row.id}`);
+      for(const zman of schedule.zmanim)assert.match(zman.time,/^\d{1,2}:\d{2}:\d{2}$/,'Every daily zman retains its complete clock value');
+      const existing=sourceShapes.get(sourceShape);
+      dateCoverage.push({date,sourceShape,representative:existing?.date||date,sourceRows:rows.length,sourceGaps:rows.filter(row=>row.id.startsWith('missing:')).map(row=>row.id),sourceNote:schedule.today.note||null,special:schedule.specialSheet?.sourceId||null});
+      if(existing&&deduplicate){
+        existing.dates++;
+        if(dateCoverage.length%365===0){console.error(`Layout audit: ${dateCoverage.length}/${dates.length} source dates, ${sourceShapes.size} exact chart variants (${Math.round((Date.now()-began)/1000)}s).`);await checkpoint('dark');}
+        continue;
+      }
+      if(!existing)sourceShapes.set(sourceShape,{date,dates:1});
+    }catch(error){dataErrors.push({date,error:error.stack});continue;}
     const result = await inspect(date, schedule, 'dark');
     record(date, 'dark', result);
-    if (!shapes.has(result.geometry)) shapes.set(result.geometry, {date,schedule});
-    const representative = result.special ? `special-${result.special}-${result.placement}` : 'ordinary';
+    const themeShape=deduplicate?sourceShape:result.geometry;
+    if (!shapes.has(themeShape)) shapes.set(themeShape, {date,schedule,geometry:result.geometry});
+    const representative = result.special ? `special-${result.special.split(':')[0]}-${result.placement}` : 'ordinary';
     if (!capture.has(representative)) capture.set(representative,{date,schedule,theme:'dark'});
     const density = result.rows + result.sheetRows + result.exceptions*3;
     if (!densest || density > densest.density) densest = {date,schedule,theme:'dark',density};
@@ -253,16 +351,18 @@ try {
       const key = 'failure-' + result.issues[0].code;
       if (!capture.has(key)) capture.set(key,{date,schedule,theme:'dark'});
     }
-    if (results.length % 60 === 0) console.error(`Year layout audit: ${results.length}/365 dates checked (${Math.round((Date.now()-began)/1000)}s).`);
+    if (results.length % 60 === 0){console.error(`Layout audit: ${dateCoverage.length}/${dates.length} source dates, ${results.length} browser cases, ${failures.length} failing cases (${Math.round((Date.now()-began)/1000)}s).`);await checkpoint('dark');}
   }
-  for (const [geometry,{date,schedule}] of shapes) {
+  await checkpoint('light');
+  for (const {geometry,date,schedule} of shapes.values()) {
     const result = await inspect(date,schedule,'light');
     if (result.geometry !== geometry) result.issues.push({code:'theme-changed-geometry'});
     record(date,'light',result);
+    if(results.length%60===0){console.error(`Layout audit: ${dateCoverage.length}/${dates.length} source dates, ${results.length} browser cases, ${failures.length} failing cases (${Math.round((Date.now()-began)/1000)}s).`);await checkpoint('light');}
   }
   // Tzom Gedalya this year precedes the rolling annual window; include short
   // future weeks where the fast and ordinary patterns are tied in frequency.
-  const extraDates=['2026-09-14','2026-09-17','2029-09-12','2029-09-13','2032-09-08','2032-09-09','2028-04-26'];
+  const extraDates=['2026-09-14','2026-09-17','2029-09-12','2029-09-13','2032-09-08','2032-09-09','2028-04-26'].filter(date=>date<firstDate||date>lastDate);
   for (const date of extraDates) for (const theme of ['dark','light']) {
     const schedule=scheduleSnapshot(date+'T16:00:00.000Z');
     record(date,theme,await inspect(date,schedule,theme));
@@ -280,21 +380,27 @@ try {
     grouped.get(key).cases.add(failure.date+' '+failure.theme);
   }
   const report = {
-    from:firstDate,to:lastDate,days:dates.length,darkChecks:dates.length,lightChecks:shapes.size,extraDates,
+    from:firstDate,to:lastDate,days:dates.length,sourceDatesChecked:dateCoverage.length,exactChartVariants:sourceShapes.size,deduplicated:deduplicate,browser:browserName,darkChecks:results.filter(result=>result.theme==='dark').length,lightChecks:results.filter(result=>result.theme==='light').length,extraDates,
     elapsedSeconds:Math.round((Date.now()-began)/1000),
     specialDays:results.filter(r => r.theme==='dark' && r.special).length,
     maximumSourceRows:Math.max(...results.map(r => r.rows+r.sheetRows)),
     maximumExceptions:Math.max(...results.map(r => r.exceptions)),
     noticesPerScreen:[...new Set(results.map(r => r.notices))],
-    publishedSourceGapDates:results.filter(r => r.theme==='dark' && r.sourceGaps.length).map(r => r.date),
+    publishedSourceGapDates:dateCoverage.filter(result=>result.sourceGaps.length||result.sourceNote).map(result=>result.date),
+    pairedRowsChecked:results.reduce((sum,result)=>sum+result.pairing.rows,0),
+    maximumPairGap:Math.max(...results.map(result=>result.pairing.maximumGap)),
+    maximumPairGapEm:Math.max(...results.map(result=>result.pairing.maximumGapEm)),
     screenshots:screenshots ? [...capture].map(([kind,value]) => ({kind,date:value.date})) : [],
     failingCases:failures.length,
     failures:[...grouped.values()].map(({code,cases,sample}) => ({code,count:cases.size,first:[...cases][0],last:[...cases].at(-1),sample})),
     browserErrors:errors,
+    dataErrors,
   };
-  if (process.env.YEAR_LAYOUT_REPORT) await writeFile(process.env.YEAR_LAYOUT_REPORT,JSON.stringify({summary:report,results,failures},null,2)+'\n');
+  if (process.env.YEAR_LAYOUT_REPORT) await writeFile(process.env.YEAR_LAYOUT_REPORT,JSON.stringify({summary:report,dateCoverage,results,failures},null,2)+'\n');
   console.log(JSON.stringify(report,null,2));
   assert.deepEqual(errors,[], 'No browser errors during the annual audit');
+  assert.deepEqual(dataErrors,[],'Every requested date produces a valid source snapshot');
+  assert.equal(dateCoverage.length,dates.length,'Every requested date is covered by a measured exact chart variant');
   assert.equal(failures.length,0, 'Year layout failures are summarized above');
 } finally {
   if (browser) await browser.close();

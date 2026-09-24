@@ -53,8 +53,9 @@ try{
    document.body.innerHTML='<div id="audit" style="width:100vw;height:100vh"></div>';
    window.audit=new DisplayView(document.querySelector('#audit'));
   });
-  // Exercise two-column Sukkos in both placements, plus the one-column RH page.
-  for(const date of ['2026-09-24','2026-09-26','2026-09-12']){
+  // Exercise two-column Sukkos in both placements, the one-column RH page,
+  // and connected RH + Shabbos before it starts and on its final day.
+  for(const date of ['2026-09-24','2026-09-26','2026-09-12','2028-09-20','2028-09-23']){
    const at=date+'T16:00:00.000Z',schedule=scheduleSnapshot(at);
    assert.ok(schedule.specialSheet,`${date} must exercise an original special sheet`);
    const snapshot={at,schedule,items:notices,upcoming:[],appearance:{mode:'light'}};
@@ -101,15 +102,35 @@ try{
      checkColor('titleRule',all('.onepage-title'),'borderBottomColor',palette.gold);
      const ruledRows=all('.onepage-row').filter(row=>parseFloat(getComputedStyle(row).borderBottomWidth)>0);
      checkColor('rowBorders',ruledRows,'borderBottomColor',palette.border);
+     // The transparent Light footer must use readable navy ink rather than
+     // inheriting the old white-on-navy footer colors. Check the shared screen
+     // after each live theme switch, alongside its isolated original chart.
+     const screen=selector=>[...view.stage.querySelectorAll(selector)];
+     checkColor('footerText',screen('.tv-footer,.tv-footer .next-minyan strong,.tv-footer .next-place'),'color',palette.text);
+     checkColor('footerHeading',screen('.tv-footer .next-label'),'color',palette.gold);
+     checkColor('footerLegend',screen('.tv-footer .key'),'color',theme==='light'?palette.text:'rgb(197, 206, 219)');
      const stable=host===baseline.host&&originalPage===baseline.page&&host.originalSheetFitCount===baseline.fitCount&&shadow.querySelectorAll('.onepage-row').length===baseline.rows;
      if(!stable)issues.push({themeSwitchChangedPage:true,fitCount:host.originalSheetFitCount,originalFitCount:baseline.fitCount});
      if(host.dataset.sheetReady!=='true')issues.push({sheetNotReady:true});
-     return {theme,stable,fitCount:host.originalSheetFitCount,removedHostContextRules,counts,colors,issues};
+     const columnHeadings=all('.onepage-col').map(column=>[...column.querySelectorAll('.onepage-sec-head')].map(heading=>heading.textContent.trim()));
+     const split=snapshot.schedule.specialSheet.columnBreakAt;
+     if(Number.isInteger(split)){
+      const titles=snapshot.schedule.specialSheet.sections.map(section=>section.title.trim());
+      const expected=[titles.slice(0,split),titles.slice(split)];
+      if(host.dataset.sheetColumns!=='2'||Number(host.dataset.sheetBreak)!==split||JSON.stringify(columnHeadings)!==JSON.stringify(expected))issues.push({connectedDaysSplitIncorrectly:true,columnHeadings,expected});
+      const bounds=host.getBoundingClientRect();
+      for(const row of all('.onepage-row,.onepage-sec-head')){
+       const r=row.getBoundingClientRect();
+       if(r.left<bounds.left-2||r.right>bounds.right+2||r.top<bounds.top-2||r.bottom>bounds.bottom+2)issues.push({connectedRowClipped:row.textContent.trim()});
+      }
+     }
+     return {theme,stable,fitCount:host.originalSheetFitCount,removedHostContextRules,columnHeadings,counts,colors,issues};
     },{snapshot,theme,step,disableHostContext:!hasWebKit,palette:palettes[theme]});
     const name=`${device} ${date} ${theme} switch=${step}`;
     results.push({name,...result});
     if(result.issues.length)failures.push({name,issues:result.issues});
     if(screenshots&&date==='2026-09-24'&&step<2)await page.screenshot({path:path.join(screenshots,`sheet-theme-${device}-${theme}.png`)});
+    if(screenshots&&date.startsWith('2028-')&&step<2)await page.screenshot({path:path.join(screenshots,`sheet-theme-connected-${date}-${device}-${theme}.png`)});
    }
   }
   await context.close();

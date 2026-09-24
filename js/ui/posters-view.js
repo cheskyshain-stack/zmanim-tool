@@ -1980,7 +1980,7 @@ function splitColumns(cols, groups, atDayOnly = false) {
  *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
  *  line over there, and one line over is a block off the sheet. */
 const OP_ROOM = 11;
-function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false, columnCount = 2 } = {}) {
+function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false, columnCount = 2, columnBreakAt = null } = {}) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelectorAll(':scope > .onepage-col');
@@ -2009,6 +2009,21 @@ function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, p
       carried: null,
     })));
     const layout = () => {
+      // A screen can keep a connected holiday intact in the first column and
+      // its attached Shabbos intact in the second. The print view does not set
+      // this option and retains its normal measured column balancing.
+      if (columnCount !== 1 && Number.isInteger(columnBreakAt) && columnBreakAt > 0 && columnBreakAt < groups.length) {
+        groups.forEach((g, index) => {
+          for (const r of g.rows) if (r.parentElement !== g.box) g.box.appendChild(r);
+          if (g.carried) { g.carried.remove(); g.carried = null; }
+          const target = col[index < columnBreakAt ? 0 : 1];
+          if (g.box.parentElement !== target) target.appendChild(g.box);
+        });
+        return Math.max(...[...col].map(c => {
+          const sections = [...c.querySelectorAll(':scope > .onepage-sec')];
+          return sections.at(-1).offsetTop + sections.at(-1).offsetHeight - sections[0].offsetTop;
+        }));
+      }
       if (columnCount !== 1) return splitColumns(col, groups, dayBreakOnly || chosenBreak === 'day');
       // A screen adapter can keep the entire schedule in one continuous column.
       // Restore the original groups first, including rows carried by an earlier

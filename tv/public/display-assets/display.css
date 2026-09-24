@@ -774,6 +774,20 @@ button {
 .tv-stage .board-zmanim .zman-seconds{font:inherit;font-size:.82em;font-weight:400}
 .stable-board .tv-footer .key{line-height:1.15}
 
+/* Keep each prayer and its time run together, rather than against opposite
+   edges of a wide chart. Digits still read left to right; labels stay on the
+   right. Only the regular centered weekday services use their own layout. */
+.tv-stage :is(.board-weekly,.board-shabbos) .board-schedule-row{grid-template-columns:minmax(0,1fr) fit-content(46%);column-gap:16px;direction:ltr}
+.tv-stage .board-schedule-row>.board-times{justify-content:flex-end;text-align:right}
+.tv-stage .board-schedule-row>.board-prayer-label{text-align:left}
+.tv-stage .board-schedule-row.board-long-label{grid-template-columns:minmax(0,1fr)}
+.tv-stage .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:center}
+.tv-stage .board-schedule-row.board-long-label>.board-times{justify-content:center;text-align:center}
+.tv-stage .board-zmanim>div{justify-content:flex-start}
+.tv-stage.stable-board[data-theme=light] .tv-footer,
+.tv-stage.stable-board[data-theme=light] .tv-footer .key{color:var(--screen-text)}
+.tv-stage.stable-board[data-theme=light] .tv-footer .next-label{color:var(--screen-gold)}
+
 /* Whole-day changes belong beneath the ordinary reference, with one date
    heading. Each prayer keeps centered times and its own full-size label. */
 .board-weekly .board-exception{margin-top:18px;padding:8px}
@@ -837,3 +851,13 @@ button {
 .stable-board.compact-zmanim-spacing .board-zmanim{padding-block:10px}
 .stable-board.compact-zmanim-spacing .board-zmanim h2{margin-bottom:5px}
 .stable-board.compact-zmanim-spacing .board-zmanim>div{padding-block:2px;line-height:1.08}
+
+/* Dense weekday references use the height below both schedule panels. The
+   complete notice areas share a measured two-by-two rail at the left. */
+.tv-stage.right-column-board.week-wide-notices{grid-template-columns:var(--week-notice-rail,600px) minmax(0,1fr) minmax(0,1fr)}
+.right-column-board.week-extended.week-wide-notices .board-weekly{grid-row:2/4}
+.right-column-board.week-wide-notices .board-notices{grid-column:1;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto}
+.week-wide-notices .board-zmanim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-content:start}
+.week-wide-notices .board-zmanim h2{grid-column:1/-1;font-size:26px;margin-bottom:5px}
+.week-wide-notices .board-zmanim>div{font-size:22px;padding:2px 0}
+.week-wide-notices .board-zmanim>div span{font-size:20px}

@@ -24,8 +24,9 @@ export function originalSheetHTML(sheet) {
     own: true, title: sheet.title, hebrewYear: sheet.year,
     sections: sheet.sections || [], legend: [],
   }, SHEET_SETTINGS);
-  const columns = sheet.sourceId?.startsWith('rh:') ? 1 : 2;
-  return `<div class="original-sheet-host" data-sheet-columns="${columns}"><template class="original-sheet-content">${html}</template></div>`;
+  const columnBreak = Number.isInteger(sheet.columnBreakAt) && sheet.columnBreakAt > 0 && sheet.columnBreakAt < (sheet.sections || []).length ? sheet.columnBreakAt : null;
+  const columns = sheet.sourceId?.startsWith('rh:') && columnBreak === null ? 1 : 2;
+  return `<div class="original-sheet-host" data-sheet-columns="${columns}"${columnBreak === null ? '' : ` data-sheet-break="${columnBreak}"`}><template class="original-sheet-content">${html}</template></div>`;
 }
 
 const hostStyles = `
@@ -56,6 +57,12 @@ const hostStyles = `
      Only the outer paper margin is reduced above for the screen. */
   .poster .onepage-title,.poster .onepage-sec-head,.onepage-label,.zman-pair-name { color:var(--sheet-gold); }
   .onepage-times,.onepage-note,.zman-pair-time { color:var(--sheet-text); }
+  /* The printed page spreads names and times to its outer edges. A wide
+     screen needs each pair together: Hebrew on the right, LTR times beside it.
+     Keep the source line breaks, row padding and complete chart geometry. */
+  .onepage-row { justify-content:flex-start; }
+  .onepage-label { text-align:left; }
+  .onepage-times { text-align:right; }
   .onepage-times u { text-decoration-color:currentColor; }
   .page-header,.poster-legend { display:none!important; }
   :host([data-sheet-columns="1"]) .onepage-col + .onepage-col { display:none; }
@@ -102,7 +109,7 @@ export function fitOriginalSheet(box) {
     // Printer margins/minimum type were designed for an eleven-inch sheet.
     // Reclaim those margins inside this shorter screen box, retaining the
     // original rows and full-day boundaries for every calendar year.
-    layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, columnCount: Number(host.dataset.sheetColumns), observeResize: false });
+    layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, columnCount: Number(host.dataset.sheetColumns), columnBreakAt: host.dataset.sheetBreak ? Number(host.dataset.sheetBreak) : null, observeResize: false });
     lastSize = size;
     host.originalSheetFitCount = (host.originalSheetFitCount || 0) + 1;
     host.dataset.sheetReady = 'true';

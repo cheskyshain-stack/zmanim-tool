@@ -102,8 +102,9 @@ test('every original holiday page closes after its final holy-day events for the
       const id = key + ':' + year;
       const poster = build(year, settings);
       let lastDay = dateFromHebrew(last, month, year);
-      // Sukkos also prints the Shabbos immediately after a Friday Simchas Torah.
-      if (lastDay < poster.span.to && excelWeekday(lastDay + 1) === 7) {
+      // Sukkos prints its attached Shabbos; RH appends the authoritative saved
+      // Shabbos chart when its original printed page finishes on Friday.
+      if ((lastDay < poster.span.to || key==='rh') && excelWeekday(lastDay + 1) === 7) {
         lastDay++;
         attachedShabbosCases++;
       }
@@ -130,7 +131,7 @@ test('every original holiday page closes after its final holy-day events for the
       }
     }
   }
-  assert.ok(attachedShabbosCases > 0, 'The range must exercise a printed Shabbos after Simchas Torah');
+  assert.ok(attachedShabbosCases > 0, 'The range must exercise Shabbos attached to a holiday');
 });
 
 test('Gedalya stays in the weekday schedule and never automatically takes over a full chart for twenty years', () => {

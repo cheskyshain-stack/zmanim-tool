@@ -1,5 +1,5 @@
 import * as dailyZmanim from '../../js/zmanim/zmanim.js';
-import { schedulePresentation } from './presentation.js';
+import { schedulePresentation, ordinaryShabbos } from './presentation.js';
 import { publicPosterSections } from '../../js/ui/posters-view.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
@@ -8,7 +8,7 @@ import parshaNames from "../../data/parsha_names.json" with { type: "json" };
 import specialDays from "../../data/special_days.json" with { type: "json" };
 import { buildAutomaticCharts, withoutRetiredDrasha } from "../../js/publish.js";
 import { resolveSettings, DEFAULT_SETTINGS } from "../../js/settings.js";
-import { minyanimForDay, candleLightingForDay, clock } from "../../js/upcoming.js";
+import { minyanimForDay, chartMinyanimForDay, candleLightingForDay, clock } from "../../js/upcoming.js";
 import { dateFromSerial, excelSerial, shulNow } from "../../js/zmanim/solar.js";
 import { sunsetElev } from "../../js/zmanim/zmanim.js";
 import { hebrewDateExtended, hebrewYear, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
@@ -68,8 +68,18 @@ function sheetCatalog(year) {
     let displayTo = to;
     while(displayTo>=from&&!agendaDayKind(displayTo,settings).holy)displayTo--;
     if(displayTo<from)return null;
+    // A Thursday/Friday Rosh Hashanah continues directly into Shabbos. Its
+    // printed poster ends on Friday; the saved Shabbos chart supplies the rest.
+    const attachedShabbos=key==='rh'&&excelWeekday(displayTo+1)===7?displayTo+1:null;
+    if(attachedShabbos)displayTo=attachedShabbos;
+    // The standalone RH closing Maariv is inapplicable when Friday continues
+    // into Shabbos. Use the same explicit source calculation identifiers as
+    // the connected-group presentation, with that night's saved Shabbos rows.
+    const displayPoster=attachedShabbos?{...poster,blocks:poster.blocks.map(block=>({...block,
+      lines:block.lines.filter(row=>!['motzeiMaariv','shabbosMotzei'].includes(row.calc)),
+    }))}:poster;
     const events = (poster.minyanim || []).filter(e=>e.serial>=from&&e.serial<=displayTo);
-    return {key,sourceId:`${key}:${year}`,title:sheetTitles[key],year,yearLabel:hebrewYear(year),from,to,displayTo,events,sections:publicPosterSections(key,poster)};
+    return {key,sourceId:`${key}:${year}`,title:sheetTitles[key],year,yearLabel:hebrewYear(year),from,to,displayTo,attachedShabbos,events,sections:publicPosterSections(key,displayPoster)};
   }).filter(sheet=>sheet?.events.length&&sheet.sections.length);
   if(sheetCatalogs.size>=4)sheetCatalogs.delete(sheetCatalogs.keys().next().value);
   sheetCatalogs.set(year,result);
@@ -79,7 +89,7 @@ function sheetCatalog(year) {
 /** The original page first replaces the Shabbos box, then the weekday box as well.
  * Publication controls still take precedence. This metadata changes presentation only;
  * live minyan selection continues to use the actual daily schedule below. */
-function originalSheetState(instant,year,day,controls,controlKey) {
+function originalSheetState(instant,year,day,controls,controlKey,state) {
   const instantMs=Date.parse(instant);
   const closing=s=>{
     const actual=day(s).events.map(e=>Date.parse(e.at));
@@ -127,14 +137,37 @@ function originalSheetState(instant,year,day,controls,controlKey) {
   const future=candidates.flatMap(s=>[s.preview,s.both,s.end]).filter(t=>t>instantMs);
   for(const c of controls)if(c.status==='published')for(const at of [c.startsAt,c.endsAt,c.data.previewAt])if(at&&Date.parse(at)>instantMs)future.push(Date.parse(at));
   const nextChangeAt=future.length?new Date(Math.min(...future)).toISOString():null;
-  const overridden=selected&&controls.some(c=>visible(c,instant)&&c.data.appliesFrom<=civil(selected.to)&&c.data.appliesTo>=civil(selected.from));
+  const overridden=selected&&controls.some(c=>visible(c,instant)&&c.data.appliesFrom<=civil(Math.max(selected.to,selected.displayTo))&&c.data.appliesTo>=civil(selected.from));
   if(!selected||overridden)return {specialSheet:null,nextChangeAt};
   const s=selected;
+  const sections=s.attachedShabbos?[...s.sections,...attachedShabbosSections(s.attachedShabbos,state)]:s.sections;
   return {specialSheet:{sourceId:s.sourceId,title:s.title,year:s.year,yearLabel:s.yearLabel,
-    from:civil(s.from),to:civil(s.to),displayThrough:civil(s.displayTo),previousShabbos:civil(s.previousShabbos),
+    ...(s.attachedShabbos?{columnBreakAt:s.sections.length}:{}),
+    from:civil(s.from),to:civil(Math.max(s.to,s.displayTo)),displayThrough:civil(s.displayTo),previousShabbos:civil(s.previousShabbos),
     placement:instantMs<s.both?'shabbos':'both',
     previewStartsAt:new Date(s.preview).toISOString(),coversBothAt:new Date(s.both).toISOString(),
-    endsAt:new Date(s.end).toISOString(),nextChangeAt,sections:s.sections},nextChangeAt};
+    endsAt:new Date(s.end).toISOString(),nextChangeAt,sections},nextChangeAt};
+}
+/** Convert the saved chart's presentation text to the public poster row shape.
+ * Keep every printed value and underline; no replacement time is calculated. */
+function attachedShabbosSections(serial,state){
+  const times=entries=>(entries||[]).flatMap(entry=>{
+    let underlined=false;
+    return String(entry.text??'').split(/\s*\/\s*|\n/).flatMap(piece=>{
+      const marked=underlined||piece.includes('\uE000');
+      for(const mark of piece.match(/[\uE000\uE001]/g)||[])underlined=mark==='\uE000';
+      const text=piece.replace(/[\uE000\uE001]/g,'').trim();
+      return text?[{text,underlined:Boolean(entry.underlined||marked),mark:entry.mark||'',...(entry.name?{name:entry.name}:{})}]:[];
+    });
+  });
+  return ordinaryShabbos(serial,state,settings).map(section=>({
+    title:section.heading,
+    // Friday is already Rosh Hashanah: its poster owns the early/Plag entries,
+    // exactly as in the connected-group presentation below the original page.
+    rows:section.rows.filter(row=>!/:([IJKL])$/.test(row.id)).map(row=>({
+      label:row.label,times:times(row.times),...(row.note?{note:row.note}:{}),
+    })),
+  })).filter(section=>section.rows.length);
 }
 export function catalog(year) {
   if (catalogs.has(year)) return catalogs.get(year);
@@ -169,6 +202,14 @@ export function scheduleSnapshot(instant, controls = []) {
     let events = minyanimForDay(s, state, settings);
     let note = "";
     const hd = hebrewDateExtended(s);
+    if (hd.month === 7 && hd.dayOfMonth === 2 && excelWeekday(s) === 6) {
+      // RH's standalone poster ends with weekday Motzei Yom Tov Maariv.
+      // On Friday the connected Shabbos chart owns the evening instead.
+      // Read its actual F/G minyan cells, keeping RH's daytime services and
+      // excluding the ordinary early/Plag and weekday-morning entries.
+      const evening = chartMinyanimForDay(s, state, settings, {onlyColumns:['F','G'],includeFridayMorning:false});
+      if (evening.length) events = [...events.filter(e => category(e) !== 'maariv'), ...evening];
+    }
     if (hd.month === 1) {
       const ps = buildPesachPoster(hd.year, settings).minyanim.filter((e) => e.serial === s);
       if (ps.length) {
@@ -224,7 +265,7 @@ export function scheduleSnapshot(instant, controls = []) {
   }
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
   const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
-  const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey);
+  const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey,state);
   const zmanim = [
     ['עלות','alos72'],
     ['טלית ותפילין','misheyakir10_2'],
