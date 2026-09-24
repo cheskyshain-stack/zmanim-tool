@@ -51,6 +51,11 @@ try{
    const root=view.stage,rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
    const outside=(e,p)=>{const a=rect(e),b=rect(p);return a.left<b.left-2||a.top<b.top-2||a.right>b.right+2||a.bottom>b.bottom+2;};
    const overflow=[];
+   const zoom=root.getBoundingClientRect().width/1920;
+   for(const exception of root.querySelectorAll('.board-exception')){
+    const previous=exception.previousElementSibling;
+    if(previous&&rect(exception).top-rect(previous).bottom<13*zoom)overflow.push({exceptionGap:exception.textContent.slice(0,45)});
+   }
    for(const panel of root.querySelectorAll('.board-weekly,.board-shabbos,.board-zmanim,.announcement-group')){
     if(panel.scrollHeight>panel.clientHeight+2||panel.scrollWidth>panel.clientWidth+2)overflow.push({panel:panel.className,extra:panel.scrollHeight-panel.clientHeight});
     for(const text of panel.querySelectorAll('.board-service,.board-schedule-row,.board-zmanim>div,h2,h3,p'))if(outside(text,panel))overflow.push({text:text.className||text.tagName,content:text.textContent.slice(0,45)});

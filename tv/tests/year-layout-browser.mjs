@@ -120,16 +120,16 @@ try {
         for (const field of fields) if (!text.includes(normalize(field)) && !(row.plagDetail && field === row.note)) add('source-text', {id:row.id, missing:short(field)});
       }
       if (!both) {
-        const services = [...root.querySelectorAll('.board-week-body>.board-service')];
-        for (const [index, service] of p.weekly.services.entries()) {
-          const actual = services[index], groups = service.groups.filter(group => group.events.length);
-          if (!actual || normalize(actual.querySelector('h3')?.textContent) !== normalize(service.name)) add('weekday-service', {index, name:service.name});
-          const patterns = [...(actual?.querySelectorAll('.board-pattern') || [])];
-          if (patterns.length !== groups.length) add('weekday-groups', {service:service.name, expected:groups.length, actual:patterns.length});
-          for (const [i, group] of groups.entries()) {
-            const text = normalize(patterns[i]?.textContent), source = group.events.find(event => event.sourceText);
+        // Check every source date/prayer independently of how it is visually
+        // grouped. A date may appear in a shared line or a separate full day.
+        const patterns = [...root.querySelectorAll('[data-weekday-service]')];
+        for (const service of p.weekly.services) {
+          for (const group of service.groups.filter(group => group.events.length)) for (const day of group.days) {
+            const matches = patterns.filter(el => el.dataset.weekdayService === service.name && el.dataset.weekdayDates.split(',').includes(day.date));
+            if (matches.length !== 1) add('weekday-date-coverage', {service:service.name,date:day.date,count:matches.length});
+            const text = normalize(matches[0]?.textContent), source = group.events.find(event => event.sourceText);
             const fields = source ? [source.sourceText] : group.events.flatMap(event => [event.time, event.note]);
-            for (const field of fields.filter(Boolean)) if (!text.includes(normalize(field))) add('weekday-time', {service:service.name, group:i, missing:short(field)});
+            for (const field of fields.filter(Boolean)) if (!text.includes(normalize(field))) add('weekday-time', {service:service.name,date:day.date,missing:short(field)});
           }
         }
       }
@@ -144,6 +144,11 @@ try {
       }
       const exceptions = [...root.querySelectorAll('.board-exception')];
       for (const exception of exceptions) {
+        const previous = exception.previousElementSibling;
+        if (previous && rect(exception).top - rect(previous).bottom < 13)
+          add('exception-too-close', {label:short(exception.textContent),gap:rect(exception).top-rect(previous).bottom});
+      }
+      for (const exception of exceptions) {
         const heading = rect(exception.querySelector('h4')), times = exception.querySelector('.board-times'), timeBox = rect(times);
         if (heading.bottom > timeBox.top + 2) add('exception-label-not-above', {label:short(exception.querySelector('h4').textContent), heading:rounded(heading), times:rounded(timeBox)});
         const lines = new Map();
@@ -154,6 +159,13 @@ try {
         }
         for (const line of lines.values()) if (Math.abs((line.left+line.right-timeBox.left-timeBox.right)/2) > 3)
           add('exception-times-not-centered', {label:short(exception.querySelector('h4').textContent), centerOffset:Math.round((line.left+line.right-timeBox.left-timeBox.right)/2)});
+      }
+      for (const section of root.querySelectorAll('.board-day-section')) {
+        const previous=section.previousElementSibling;
+        if(previous && rect(section).top-rect(previous).bottom<15)add('day-section-too-close');
+        for(const service of section.querySelectorAll('.board-day-service')) {
+          if(rect(service.querySelector('h4')).bottom>rect(service.querySelector('.board-times')).top)add('day-prayer-label-not-above');
+        }
       }
       const zmanim = [...root.querySelectorAll('.board-zmanim>div')];
       if (zmanim.length !== snapshot.schedule.zmanim.length) add('zmanim-count');
@@ -248,6 +260,14 @@ try {
     if (result.geometry !== geometry) result.issues.push({code:'theme-changed-geometry'});
     record(date,'light',result);
   }
+  // Tzom Gedalya this year precedes the rolling annual window; include short
+  // future weeks where the fast and ordinary patterns are tied in frequency.
+  const extraDates=['2026-09-14','2026-09-17','2029-09-12','2029-09-13','2032-09-08','2032-09-09','2028-04-26'];
+  for (const date of extraDates) for (const theme of ['dark','light']) {
+    const schedule=scheduleSnapshot(date+'T16:00:00.000Z');
+    record(date,theme,await inspect(date,schedule,theme));
+    if(theme==='dark')capture.set('weekday-exceptions-'+date,{date,schedule,theme});
+  }
   if (densest) capture.set('densest',densest);
   if (screenshots) for (const [label,{date,schedule,theme}] of capture) {
     await inspect(date,schedule,theme);
@@ -260,7 +280,7 @@ try {
     grouped.get(key).cases.add(failure.date+' '+failure.theme);
   }
   const report = {
-    from:firstDate,to:lastDate,days:dates.length,darkChecks:dates.length,lightChecks:shapes.size,
+    from:firstDate,to:lastDate,days:dates.length,darkChecks:dates.length,lightChecks:shapes.size,extraDates,
     elapsedSeconds:Math.round((Date.now()-began)/1000),
     specialDays:results.filter(r => r.theme==='dark' && r.special).length,
     maximumSourceRows:Math.max(...results.map(r => r.rows+r.sheetRows)),

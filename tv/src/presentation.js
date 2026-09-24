@@ -80,7 +80,7 @@ export function consolidateWeek(days) {
  const names=[...new Set(days.flatMap(d=>d.events.map(e=>e.name)))];
  return names.map(name=>{
   const groups=[];
-  for(const d of days){const events=d.events.filter(e=>e.name===name);const signature=JSON.stringify(events.map(({at,serial,...e})=>Object.fromEntries(Object.entries(e).sort(([a],[b])=>a.localeCompare(b)))));let g=groups.find(x=>x.signature===signature);if(!g){g={signature,events,days:[]};groups.push(g);}g.days.push({date:d.date,label:d.label});}
+  for(const d of days){const events=d.events.filter(e=>e.name===name);const signature=JSON.stringify(events.map(({at,serial,...e})=>Object.fromEntries(Object.entries(e).sort(([a],[b])=>a.localeCompare(b)))));let g=groups.find(x=>x.signature===signature);if(!g){g={signature,events,days:[]};groups.push(g);}g.days.push({date:d.date,label:d.label,...(typeof d.fastDay==='boolean'?{fastDay:d.fastDay}:{})});}
   groups.sort((a,b)=>b.days.length-a.days.length);
   return {name,groups:groups.map(({signature,...g})=>g)};
  });
@@ -154,7 +154,7 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
       }
     }
   }
-  weekdaysData.push({...d,label:hebrewDay(s,settings),events:events.filter(e=>!ownsErev||e.mins<720)});
+  weekdaysData.push({...d,label:hebrewDay(s,settings),fastDay:Boolean(hasTaanis(s,settings)),events:events.filter(e=>!ownsErev||e.mins<720)});
   if(ownsErev)references.push({date:civil(s),label:hebrewDay(s,settings),text:'אחר הצהריים והערב: ראה לוח '+hebrewDay(s+1,settings)});
  }
  let title=hasParsha(sat,{...settings,english:false},tables)||hebrewDay(sat,settings);

@@ -371,3 +371,21 @@ admin against an in-memory API with the real data validator and calendar, coveri
 exact notice selection, area preselection, draft saves, version/timing retention,
 restricted capabilities, empty areas, mobile controls and stale preview responses.
 It makes no database writes. `ADMIN_SCREEN_SCREENSHOT_DIR` saves private previews.
+
+## Complete weekday exceptions
+
+When all saved morning services, Mincha and Maariv differ for a date, the weekday
+reference places that complete date in a separate block beneath the regular
+services. Each prayer retains its centered times, location marks and notes. A
+single-prayer change stays directly below its prayer with at least 14px of clear
+space above it, including in compact layouts. Whole-day blocks have at least
+16px separation. This is presentation only; actual daily events and next-minyan
+calculations are unchanged.
+
+The calendar supplies a public `fastDay` boolean on grouped dates so short weeks
+can choose an ordinary baseline without interpreting holiday names. No stored
+schedule or database migration is needed. Shared exceptions retain their complete
+date membership; no times or source notes are discarded. Existing original
+special-page timing is unchanged. `tests/weekday-groups.test.mjs` checks grouping
+and preservation, and the annual browser audit additionally checks Gedalya weeks
+in 2026, 2029 and 2032 plus Rosh Chodesh in 2028.

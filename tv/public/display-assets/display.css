@@ -742,13 +742,13 @@ button {
 .all-notices .board-weekly .board-service{padding:4px 0}
 .all-notices .board-weekly .board-times{font-size:26px;gap:5px 14px}
 .all-notices .board-weekly .board-service>h3,.all-notices .board-weekly .board-exception h4{font-size:26px;margin-bottom:4px}
-.all-notices .board-weekly .board-exception{padding:4px;margin-top:5px;display:block}
+.all-notices .board-weekly .board-exception{padding:8px;margin-top:18px;display:block}
 .all-notices .board-weekly .board-exception>h4{margin:0 0 4px;text-align:center}
 .all-notices .board-weekly .board-exception>.board-times{justify-content:center}
 .all-notices .board-weekly.board-compact{padding-block:12px}
 .all-notices .board-weekly.board-compact .board-service{padding:1px 0}
 .all-notices .board-weekly.board-compact .board-service>h3{margin-bottom:2px}
-.all-notices .board-weekly.board-compact .board-exception{padding:2px;margin-top:3px}
+.all-notices .board-weekly.board-compact .board-exception{padding:6px;margin-top:14px}
 .all-notices .board-weekly.board-compact .board-exception>h4{margin-bottom:2px}
 .all-notices .board-weekly.board-compact .board-range{margin-bottom:2px}
 .all-notices .board-shabbos>h2{font-size:28px}
@@ -770,3 +770,20 @@ button {
 /* Keep seconds readable but visually secondary to hours and minutes. */
 .tv-stage .board-zmanim .zman-seconds{font:inherit;font-weight:400}
 .stable-board .tv-footer .key{line-height:1.15}
+
+/* Whole-day changes belong beneath the ordinary reference, with one date
+   heading. Each prayer keeps centered times and its own full-size label. */
+.board-weekly .board-exception{margin-top:18px;padding:8px}
+.board-weekly.board-compact .board-exception{margin-top:14px;padding:6px}
+.board-day-section{flex:0 0 auto;margin-top:20px;padding:12px 10px 10px;border-top:2px solid var(--screen-gold);border-radius:7px;background:var(--screen-card)}
+.board-day-section>h3{font:700 28px David;text-align:center;color:var(--screen-gold);margin:0 0 3px}
+.board-day-date{font:15px Arial;text-align:center;margin:0 0 10px;color:inherit;opacity:.8}
+.board-day-services{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));direction:rtl;gap:16px}
+.board-day-service{min-width:0;text-align:center}
+.board-day-service+ .board-day-service{border-right:1px solid var(--screen-border);padding-right:12px}
+.board-day-service>h4{font:700 26px David;margin:0 0 8px;color:var(--screen-gold)}
+.board-weekly .board-day-service>.board-times{justify-content:center;font-size:26px;gap:8px 14px}
+.board-day-service>p{font:20px David;margin:8px 0 0}
+.board-weekly.board-compact .board-day-section{margin-top:16px;padding-top:10px}
+.board-weekly.board-compact .board-day-date{margin-bottom:8px}
+.board-weekly.board-compact .board-day-service>h4{margin-bottom:6px}
