@@ -27,10 +27,49 @@ export function originalSheetHTML(sheet) {
 }
 
 const hostStyles = `
-  :host { display:block; position:relative; width:100%; height:100%; overflow:hidden; background:#fff; color:#000; }
+  :host {
+    --sheet-background: var(--shul-sheet-background, #faf7ef);
+    --sheet-text: var(--shul-sheet-text, #142a42);
+    --sheet-gold: var(--shul-sheet-gold, #927638);
+    --sheet-band: var(--shul-sheet-band, #eee5d0);
+    --sheet-border: var(--shul-sheet-border, #d6cbb4);
+    display:block; position:relative; width:100%; height:100%; overflow:hidden;
+    background:var(--sheet-background); color:var(--sheet-text);
+  }
+  :host-context(.tv-stage[data-theme="dark"]) {
+    --sheet-background:var(--shul-sheet-background, #0b1423);
+    --sheet-text:var(--shul-sheet-text, #f5f2ea);
+    --sheet-gold:var(--shul-sheet-gold, #d8b76a);
+    --sheet-band:var(--shul-sheet-band, #142238);
+    --sheet-border:var(--shul-sheet-border, #34445c);
+  }
   *,*::before,*::after { box-sizing:border-box; }
-  .original-page { position:absolute; inset:0; min-width:0; min-height:0; overflow:hidden; }
-  .original-page .poster.is-onepage { width:100%; height:100%; min-height:0; margin:0; zoom:1!important; box-shadow:none; background:#fff; color:#000; }
+  .original-page { position:absolute; inset:0; min-width:0; min-height:0; overflow:hidden; visibility:hidden; }
+  :host([data-sheet-ready="true"]) .original-page { visibility:visible; }
+  .original-page .poster.is-onepage {
+    --op-ink:var(--sheet-text); --op-band:var(--sheet-band);
+    --op-rule:var(--sheet-gold); --op-hair:var(--sheet-border);
+    width:100%; height:100%; min-height:0; margin:0; zoom:1!important;
+    padding:7px;
+    box-shadow:none; background:var(--sheet-background); color:var(--sheet-text);
+  }
+  /* Paper's inch-based whitespace and four-times-per-line wrapping spend most
+     of a short screen box on padding. Keep its two columns and source rows,
+     while allowing the wider screen to use the room beside each prayer. */
+  .poster .onepage-title { margin:0 0 4px; padding-bottom:4px; line-height:1.1; }
+  .poster .onepage-cols { gap:16px; }
+  .poster .onepage-col + .onepage-col { padding-inline-start:16px; }
+  .poster .onepage-sec-head { padding:1px 4px; margin:0; line-height:1.1; }
+  .original-page .poster.is-onepage .onepage-row {
+    padding:calc(0.6px + var(--op-gap, 0px) / 2) 4px; gap:8px; line-height:1.1;
+  }
+  .poster .onepage-line + .onepage-line { margin-top:1px; }
+  .poster.is-screen-wide .onepage-times { direction:ltr; unicode-bidi:isolate; }
+  .poster.is-screen-wide .onepage-line { display:inline; }
+  .poster.is-screen-wide .onepage-line + .onepage-line::before { content:"\\00a0/\\00a0"; }
+  .poster .onepage-title,.poster .onepage-sec-head,.onepage-label,.zman-pair-name { color:var(--sheet-gold); }
+  .onepage-times,.onepage-note,.zman-pair-time { color:var(--sheet-text); }
+  .onepage-times u { text-decoration-color:currentColor; }
   .page-header,.poster-legend { display:none!important; }
 `;
 
@@ -54,20 +93,40 @@ export function fitOriginalSheet(box) {
   content.remove();
   const loaded = new Promise((resolve) => { stylesheet.onload = resolve; stylesheet.onerror = resolve; });
   shadow.append(stylesheet, styles, page);
+  let lastSize = '';
+  let assetsReady = false;
+  let disposed = false;
+  let resize;
+  let frame = 0;
+  host.disconnectOriginalSheet = () => {
+    disposed = true;
+    cancelAnimationFrame(frame);
+    resize?.disconnect();
+  };
   const fit = () => {
+    if (!assetsReady || disposed) return;
     if (!host.isConnected || !host.clientWidth || !host.clientHeight) return;
+    const size = `${host.clientWidth}:${host.clientHeight}`;
+    // Polls, clock ticks, theme switches, and a ResizeObserver's initial callback
+    // do not change the page. Repeatedly running the print fitter moves rows
+    // between columns and needlessly exposes intermediate layout to the reader.
+    if (size === lastSize) return;
     // Printer margins/minimum type were designed for an eleven-inch sheet.
     // Reclaim those margins inside this shorter screen box, retaining the
     // original rows and two-column fitting algorithm for every calendar year.
-    layoutPosters(page, { minimumScale: 0.4, paddingInches: 0.08 });
+    page.querySelector('.poster').classList.toggle('is-screen-wide', host.clientWidth >= 1100);
+    layoutPosters(page, { minimumScale: 0.4, maximumScale: 2, paddingInches: 0.08, fitWidth: true, dayBreakOnly: true, observeResize: false });
+    lastSize = size;
+    host.originalSheetFitCount = (host.originalSheetFitCount || 0) + 1;
     host.dataset.sheetReady = 'true';
     host.dispatchEvent(new CustomEvent('original-sheet-fitted', { bubbles: true }));
   };
   host.refitOriginalSheet = fit;
   host.originalSheetReady = Promise.all([loaded, loadFonts()]).then(() => {
+    if (disposed) return host;
+    assetsReady = true;
     fit();
-    let frame = 0;
-    const resize = new ResizeObserver(() => {
+    resize = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (!host.isConnected) { resize.disconnect(); return; }
@@ -75,7 +134,6 @@ export function fitOriginalSheet(box) {
       });
     });
     resize.observe(host);
-    host.disconnectOriginalSheet = () => { cancelAnimationFrame(frame); resize.disconnect(); };
     return host;
   });
   return host.originalSheetReady;

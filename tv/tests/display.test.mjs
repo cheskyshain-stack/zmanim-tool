@@ -12,7 +12,7 @@ async function api(path, method = "GET", data, expected = 200) {
   assert.equal(r.status, expected, JSON.stringify(body));
   return body;
 }
-const announcement = { kind: "announcement", status: "published", title: "DEVELOPMENT SAMPLE", internalName: "PRIVATE INTERNAL NAME", startLocal: "2026-09-23T09:00", endLocal: "2026-09-23T10:00", data: { message: "DEVELOPMENT SAMPLE. Test announcement.", placement: "left", priority: "normal", behavior: "rotating" } };
+const announcement = { kind: "announcement", status: "published", title: "DEVELOPMENT SAMPLE", internalName: "PRIVATE INTERNAL NAME", startLocal: "2026-09-23T09:00", endLocal: "2026-09-23T10:00", data: { message: "DEVELOPMENT SAMPLE. Test announcement.", displayGroup: "hall", placement: "left", priority: "normal", behavior: "rotating" } };
 test("NY boundaries, DST ambiguity and Hebrew sunset conversion", () => {
   assert.equal(localToISO("2026-09-23T09:00"), "2026-09-23T13:00:00.000Z");
   assert.throws(() => localToISO("2026-03-08T02:30"), /does not exist/);
@@ -69,8 +69,11 @@ test("D1 create, edit, duplication, hiding, expiry, fresh sessions and schedule 
     let item = await api("items", "POST", announcement, 201);
     saved.push(item.id);
     assert.ok((await api("items")).find((x) => x.id === item.id));
+    assert.equal((await api("items")).find((x) => x.id === item.id).data.displayGroup, "hall");
+    assert.throws(() => validate({...announcement, data:{...announcement.data,displayGroup:"unrecognized"}}), /valid option/);
     let preview = await api("preview", "POST", { at: item.startsAt });
     assert.ok(preview.items.find((x) => x.id === item.id));
+    assert.equal(preview.items.find((x) => x.id === item.id).data.displayGroup, "hall");
     assert.ok(!JSON.stringify(preview.items).includes("PRIVATE INTERNAL NAME"));
     preview = await api("preview", "POST", { at: item.endsAt });
     assert.ok(!preview.items.find((x) => x.id === item.id));

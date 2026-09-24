@@ -1,0 +1,172 @@
+[
+  {
+    "id": "uploaded-poster-hall-booking",
+    "kind": "announcement",
+    "title": "Lakewood Commons Simcha Hall",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "For bookings, please text or call the Hauers.",
+      "contact": "The Hauers",
+      "phone": "732-674-2425",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-hall-bar-mitzvah",
+    "kind": "announcement",
+    "title": "Bar Mitzvah hall bookings",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "You may reserve the hall a year in advance. Two families making a Bar Mitzvah Kiddush on the same Shabbos must make a joint Kiddush, unless the second family reserved less than eight months (32 weeks) before their Bar Mitzvah. Non-members may book six months before their simcha.",
+      "contact": "",
+      "phone": "",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-hall-bris",
+    "kind": "announcement",
+    "title": "Bris hall bookings",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "Please call right away. Non-members may book six days in advance.",
+      "contact": "The Hauers",
+      "phone": "732-674-2425",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-yom-tov-appeal",
+    "kind": "announcement",
+    "title": "Please help your neighbors",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "Donations for צרכי יום טוב are urgently needed. Give through the pushka next to the coffee, the kiosk in the lobby under צרכי יום טוב, or one of the Vaad members. Thank you. תזכו למצוות",
+      "contact": "",
+      "phone": "",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-text-messages",
+    "kind": "announcement",
+    "title": "Shul text messages",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "$10 per number to receive the shul texts for the year. Pay one of the Vaad members or through the kiosk in the lobby. Please include your name and number.",
+      "contact": "",
+      "phone": "",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-coffee-sponsors",
+    "kind": "announcement",
+    "title": "Coffee room sponsorships",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "Additional sponsorships are available for the coffee room expenses. Please speak to one of the Vaad members.",
+      "contact": "",
+      "phone": "",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-belongings",
+    "kind": "announcement",
+    "title": "Please take home all belongings",
+    "startsAt": "2026-09-23T20:42:34.881Z",
+    "endsAt": null,
+    "data": {
+      "message": "Any items left in the building more than 30 days will become property of the בית מדרש.",
+      "contact": "",
+      "phone": "",
+      "category": "Community",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-rav-appointments",
+    "kind": "announcement",
+    "title": "Rav’s appointments",
+    "startsAt": "2026-09-23T20:46:00Z",
+    "endsAt": null,
+    "data": {
+      "message": "Short appointments: Tuesday nights, 9:00–10:30 PM. Please call R’ Pinchos Englander at 848-226-7186",
+      "contact": "",
+      "phone": "",
+      "category": "Rav’s hours",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-rav-messages",
+    "kind": "announcement",
+    "title": "Contact the Rav",
+    "startsAt": "2026-09-23T20:48:00Z",
+    "endsAt": null,
+    "data": {
+      "message": "To leave a message for the Rav שליט״א, please call 732-806-1369. For urgent matters or longer appointments, please call the Rebbitzen at 848-300-3565.",
+      "contact": "",
+      "phone": "",
+      "category": "Rav’s hours",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  },
+  {
+    "id": "uploaded-poster-simcha-gemach",
+    "kind": "announcement",
+    "title": "Lakewood Commons Simcha Gemach",
+    "startsAt": "2026-09-23T20:49:00Z",
+    "endsAt": null,
+    "data": {
+      "message": "For simcha and non-routine expenses. Please call Chananya Miller. 347-404-3494",
+      "contact": "",
+      "phone": "",
+      "category": "Rav’s hours",
+      "placement": "left",
+      "priority": "normal",
+      "behavior": "rotating",
+      "duration": 35
+    }
+  }
+]

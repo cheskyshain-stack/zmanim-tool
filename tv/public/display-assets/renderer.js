@@ -1,199 +1,151 @@
-import { fullSchedules, paginateSpecial, fitScheduleLabels } from './schedule-renderer.js';
 import { originalSheetHTML, fitOriginalSheet } from './original-sheet.js';
 import { boardSchedules, fitBoardSchedules } from './board-schedules.js';
+import { groupAnnouncements, renderAnnouncementGroup } from './announcements.js';
 import { themeAt } from './appearance.js';
-import { localStamp } from "./time.js";
-export const escapeHTML = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
-const dateLabel = (s) => (/* @__PURE__ */ new Date(s + "T12:00:00Z")).toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short", timeZone: "UTC" });
-export function announcementPages(item, limit = 260) {
-  const message = item.kind === "dedication" ? [item.data.dedicationText, item.data.message].filter(Boolean).join("\n") : item.data.message || "";
-  const words = message.split(/\s+/), pages = [];
-  let part = "";
-  for (const word of words) {
-    if ((part + " " + word).length > limit && part) {
-      pages.push(part);
-      part = "";
-    }
-    part += (part ? " " : "") + word;
-  }
-  pages.push(part);
-  return pages.map((message2, i) => ({ ...item, page: i, pageCount: pages.length, pageMessage: message2 }));
-}
+const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
+// Kept for existing editor imports. A notice is always one complete card.
+export function announcementPages(item) { return [item]; }
 export function cardHTML(item) {
-  const d = item.data, page = item.pageCount > 1 ? `<p class="card-page">${item.page + 1} / ${item.pageCount}</p>` : "";
-  if (item.kind === "dedication") return `<article class="tv-card dedication"><h2 lang="he" dir="rtl">פרנס היום</h2><p class="dedication-type" dir="auto">${esc(d.dedicationType === "Custom" ? "" : d.dedicationType)}</p><p class="dedication-name" dir="auto">${esc(d.dedicationName)}</p><p dir="auto">${esc(item.pageMessage ?? d.dedicationText)}</p><p class="sponsor" dir="auto">${d.anonymous ? "Sponsored anonymously" : esc(d.sponsor)}</p><p class="card-page" dir="auto">${esc(d.hebrewLabel || "")}</p>${page}</article>`;
-  return `<article class="tv-card ${esc(d.priority)}"><p class="eyebrow">${esc(d.category || "Community")}</p><h2 dir="auto">${esc(item.title)}</h2><p dir="auto">${esc(item.pageMessage ?? d.message)}</p>${d.contact || d.phone ? `<p class="contact"><bdi dir="auto">${esc(d.contact)}</bdi><bdi dir="ltr">${esc(d.phone)}</bdi></p>` : ""}${page}</article>`;
+  const d = item.data || {};
+  if (item.kind === 'dedication') return `<article class="tv-card dedication"><h2 lang="he" dir="rtl">פרנס היום</h2><p class="dedication-type" dir="auto">${esc(d.dedicationType === 'Custom' ? '' : d.dedicationType)}</p><p class="dedication-name" dir="auto">${esc(d.dedicationName)}</p><p dir="auto">${esc(d.dedicationText)}</p>${d.message ? `<p dir="auto">${esc(d.message)}</p>` : ''}<p class="sponsor" dir="auto">${d.anonymous ? 'Sponsored anonymously' : esc(d.sponsor)}</p><p class="card-page" dir="auto">${esc(d.hebrewLabel)}</p></article>`;
+  return `<article class="tv-card ${esc(d.priority)}"><p class="eyebrow">${esc(d.category || 'Community')}</p><h2 dir="auto">${esc(item.title)}</h2><p dir="auto" style="white-space:pre-wrap">${esc(d.message)}</p>${d.contact || d.phone ? `<p class="contact"><bdi dir="auto">${esc(d.contact)}</bdi><bdi dir="ltr">${esc(d.phone)}</bdi></p>` : ''}</article>`;
 }
-const timeHTML = (e) => `<span class="tv-time" title="${esc(e.place)}">${/למטה/.test(e.place) ? "<u>" : ""}${esc(e.time)}${/למטה/.test(e.place) ? "</u>" : ""}${/אולם/.test(e.place) ? "<sup>**</sup>" : /בעזר/.test(e.place) ? "<sup>*</sup>" : ""}</span>`;
-function dayRows(day, friday = false) {
-  const groups = [];
-  for (const e of day.events) {
-    if (friday && e.mins < 720) continue;
-    let g = groups.find((g2) => g2.name === e.name);
-    if (!g) {
-      g = { name: e.name, events: [] };
-      groups.push(g);
-    }
-    g.events.push(e);
-  }
-  return groups.map((g) => `<div class="tv-schedule-row"><h3 dir="rtl">${esc(g.name)}</h3><div class="tv-times">${g.events.map(timeHTML).join("")}</div></div>`).join("") + (day.note ? `<p class="tv-note">${esc(day.note)}</p>` : "");
+function setHTML(node, html) {
+  if (node._html === html) return false;
+  node.innerHTML = html;
+  node._html = html;
+  return true;
 }
+
+/** The shell and schedule host stay mounted. Clock ticks, fetches, theme changes
+ * and dedication rotation update their own nodes, never rebuild the chart. */
 export class DisplayView {
   constructor(host) {
     this.host = host;
-    this.slots = /* @__PURE__ */ new Map();
-    this.lastRender = "";
+    this.slots = new Map();
     this.warning = [];
-    this.host.innerHTML = '<div class="tv-stage"></div>';
-    this.stage = this.host.firstElementChild;
+    host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><a class="shul-donate" href="https://baismedrashoflakewoodcommons.org/donate/"><img src="/display-assets/donate-qr.png" alt="Scan to donate to the shul"><div><strong>Support our shul</strong><small>baismedrashof<wbr>lakewoodcommons.org</small></div></a><section class="board-dedication"></section><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><section class="board-zmanim"></section><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
+    this.stage = host.firstElementChild;
+    for (const [key, selector] of Object.entries({brand:'.tv-brand',date:'.tv-date',clock:'.tv-clock',dedication:'.board-dedication',zmanim:'.board-zmanim',schedules:'.tv-center',notices:'.board-notices',next:'.next-minyan',connection:'.connection-state'})) this[key] = this.stage.querySelector(selector);
     this.resize = () => {
       const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
       const scale = Math.min(w / 1920, h / 1080);
       this.stage.style.transform = `scale(${scale})`;
-      this.stage.style.left = (w - 1920 * scale) / 2 + "px";
-      this.stage.style.top = (h - 1080 * scale) / 2 + "px";
+      this.stage.style.left = (w - 1920 * scale) / 2 + 'px';
+      this.stage.style.top = (h - 1080 * scale) / 2 + 'px';
     };
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(host);
     this.resize();
-    if(document.fonts?.status!=="loaded") document.fonts?.ready.then(()=>{this.lastRender="";});
+    const fontsReady = document.fonts ? Promise.all([document.fonts.ready, document.fonts.load('700 28px David')]).catch(() => {}) : Promise.resolve();
+    fontsReady.then(() => {
+      if (this.destroyed) return;
+      // Regular panels also measure the final Hebrew font, once at startup.
+      if (this.snapshot && !this.originalSheetBox) {
+        this.scheduleKey = null;
+        this.update(this.snapshot, this.options);
+      }
+      this.checkCapacity();
+    });
   }
-  choose(key, items, now, limit = 260) {
-    if (!items.length) {
-      this.slots.delete(key);
-      return null;
-    }
-    const all = items.flatMap((item) => announcementPages(item, limit));
-    let state = this.slots.get(key);
-    let selected = all.find((i) => i.id + ":" + i.page === state?.id);
-    if (!selected || now - state.at >= (selected.data.duration || 25) * 1e3) {
-      const index = selected ? (all.indexOf(selected) + 1) % all.length : 0;
-      selected = all[index];
-      state = { id: selected.id + ":" + selected.page, at: now };
-      this.slots.set(key, state);
+  choose(key, items, now) {
+    if (!items.length) { this.slots.delete(key); return null; }
+    let state = this.slots.get(key), selected = items.find(i => i.id === state?.id);
+    if (!selected || now - state.at >= (selected.data.duration || 35) * 1000) {
+      selected = items[selected ? (items.indexOf(selected) + 1) % items.length : 0];
+      this.slots.set(key, {id:selected.id, at:now});
     }
     return selected;
   }
-  update(snapshot, { now = Date.now(), stale = false, preview = false, theme = null } = {}) {
+  update(snapshot, {now = Date.now(), stale = false, preview = false, theme = null, connection = 'live', lastSyncAt = null} = {}) {
     this.snapshot = snapshot;
-    const instant = preview ? snapshot.at : new Date(now).toISOString();
+    this.options = {now,stale,preview,theme,connection,lastSyncAt};
+    const instant = preview ? snapshot.at : new Date(now).toISOString(), s = snapshot.schedule;
     this.stage.dataset.theme = theme || themeAt(snapshot.appearance, instant);
-    const items = snapshot.items.filter((i) => i.startsAt <= instant && (!i.endsAt || instant < i.endsAt));
-    const ranks = { urgent: 3, important: 2, normal: 1 };
-    const announcements = items.filter((i) => i.kind === "announcement").sort((a, b) => (ranks[b.data.priority] || 1) - (ranks[a.data.priority] || 1) || a.id.localeCompare(b.id));
-    const side = (name) => {
-      const all = announcements.filter((i) => (i.data.placement === "automatic" ? "left" : i.data.placement) === name);
-      const pin = all.find((i) => i.data.behavior === "pinned");
-      const rotating = all.filter((i) => i !== pin);
-      const limit = pin && rotating.length ? 80 : 220;
-      return [pin ? this.choose(name + "-pin", [pin], now, limit) : null, this.choose(name, rotating, now, limit)].filter(Boolean).map(cardHTML).join("");
-    };
-    const left = side("left"), dedications = items.filter((i) => i.kind === "dedication"), rightItems = announcements.filter((i) => i.data.placement === "right");
-    const dedication = this.choose("dedication", dedications, now, 180);
-    const right = side("right");
-    const s = snapshot.schedule;
-    const next = s.next && s.next.at >= instant ? s.next : null;
-    const upcoming = [this.choose("upcoming", snapshot.upcoming.filter((i) => i.startsAt > instant), now)].filter(Boolean).map((i) => `<div class="tv-upcoming"><strong>Upcoming: ${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} to ${dateLabel(i.data.appliesTo)}</div>`).join("");
-    const html = `${preview ? '<div class="tv-preview-label">PRIVATE PREVIEW · NOT THE LIVE SCREEN</div>' : ""}<header class="tv-head"><div class="tv-brand" lang="he" dir="rtl">${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small></div><div class="tv-date"><b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.presentation ? ' · <bdi dir="rtl">' + esc(s.presentation.currentDay) + "</bdi>" : ""}</div><div class="tv-clock"></div></header>${stale ? '<div class="tv-stale">Connection lost · Schedule may be out of date. Please confirm times.</div>' : ""}<div class="tv-layout">${left ? `<aside class="tv-side">${left}</aside>` : ""}<main class="tv-center">${s.presentation ? fullSchedules(s.presentation,upcoming) : '<p>Schedule presentation unavailable</p>'}</main>${right ? `<aside class="tv-side">${right}</aside>` : ""}</div><section class="shul-bottom"><div class="bottom-dedication">${dedication ? cardHTML(dedication) : ""}</div><a class="shul-donate" href="https://baismedrashoflakewoodcommons.org/donate/"><div><strong>Support our shul</strong><p>Scan to donate</p><small>baismedrashoflakewoodcommons.org</small></div><img src="/display-assets/donate-qr.png" alt="Scan to donate to the shul"></a></section><footer class="tv-footer ${stale ? "stale-next" : ""}"><span class="next-label">Next minyan</span>${!stale && next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : `<strong>${stale ? "Confirm times while connection is unavailable" : "Checking the next minyan…"}</strong>`}<span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer>`;
-    if (html !== this.lastRender) {
-      this.stage.classList.remove('schedule-wide');
-      this.stage.innerHTML = html;
-      this.lastRender = html;
-      const center=this.stage.querySelector('.tv-center'),weekly=this.stage.querySelector('.weekly-body');
-      const sections=s.presentation?.special?.sections||[];
-      const dayCount=new Set(sections.map(section=>section.groupDay||section.date)).size;
-      const chartOnly=sections.length&&sections.every(section=>section.rows.every(row=>row.id.startsWith('chart:')));
-      const columns=chartOnly?2:Math.max(2,dayCount);
-      if(center&&sections.length)center.style.gridTemplateColumns=`minmax(0,1fr) minmax(0,${columns}fr)`;
+    this.stage.querySelector('.tv-preview-label').hidden = !preview;
+    const items = (snapshot.items || []).filter(i => i.startsAt <= instant && (!i.endsAt || instant < i.endsAt));
+    setHTML(this.brand, `${esc(s.shulName)}<small dir="ltr">LAKEWOOD COMMONS</small>`);
+    setHTML(this.date, `<b dir="rtl">${esc(s.hebrewDate)}</b><br>${dateLabel(s.date)}${s.presentation ? ' · <bdi dir="rtl">' + esc(s.presentation.currentDay) + '</bdi>' : ''}`);
+    const clock = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',minute:'2-digit'}).format(new Date(instant));
+    if (this.clock.textContent !== clock) this.clock.textContent = clock;
+    const dedication = this.choose('dedication', items.filter(i => i.kind === 'dedication'), now);
+    setHTML(this.dedication, dedication ? cardHTML(dedication) : '');
+    this.dedication.hidden = !dedication;
+    setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${esc(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
 
-      fitScheduleLabels(this.stage);
-      if(center&&weekly){
-        if(weekly.scrollHeight>weekly.clientHeight+2) weekly.parentElement.classList.add('weekly-compact');
-
-      }
-      const special=this.stage.querySelector('.complete-special');
-      if(special) special._sections=[...special.querySelectorAll('.source-section')].map(e=>e.cloneNode(true));
-      this.schedulePages=paginateSpecial(this.stage);
-      fitScheduleLabels(weekly);
-      if(weekly&&weekly.scrollHeight>weekly.clientHeight+2){
-        weekly.parentElement.classList.add('weekly-tight');
-        fitScheduleLabels(weekly);
-      }
-      if((weekly&&weekly.scrollHeight>weekly.clientHeight+2)||(special&&special.querySelector('.special-body').scrollHeight>special.querySelector('.special-body').clientHeight+2)){
-        const notices=[...this.stage.querySelectorAll('.tv-layout>.tv-side')];
-        if(notices.length){
-          this.stage.classList.add('schedule-wide');
-          const bottom=this.stage.querySelector('.shul-bottom');
-          for(const notice of notices)bottom.prepend(notice);
-          fitScheduleLabels(weekly);
-          if(special){special.classList.remove('static-dense');this.schedulePages=paginateSpecial(this.stage);}
-        }
-      }
-      if(weekly&&weekly.scrollHeight>weekly.clientHeight+2){
-        weekly.parentElement.classList.add('weekly-split');
-        center.style.gridTemplateColumns=`minmax(0,2fr) minmax(0,${columns}fr)`;
-        fitScheduleLabels(weekly);
-        if(special){special.classList.remove('static-dense');this.schedulePages=paginateSpecial(this.stage);}
-      }
-      const specialBody=special?.querySelector('.special-body');
-      if(specialBody&&specialBody.scrollHeight>specialBody.clientHeight+2){special.classList.add('special-tight');this.schedulePages=paginateSpecial(this.stage);}
-      fitScheduleLabels(weekly);
+    const groups = groupAnnouncements(items);
+    if (setHTML(this.notices, groups.map(renderAnnouncementGroup).join(''))) {
+      this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
+      this.stage.classList.toggle('without-notices', !groups.length);
+      this.stage.style.setProperty('--notice-height', groups.length ? '340px' : '0px');
+      this.fitNotices();
     }
-    if(this.schedulePages?.pages.length){
-      const id=s.presentation.special.id;
-      if(this.scheduleGroup!==id){this.scheduleGroup=id;this.scheduleStarted=now;}
-      const {pages,body,label}=this.schedulePages;
-      const page=Math.floor(Math.max(0,now-this.scheduleStarted)/35000)%pages.length;
-      if(body.dataset.page!==String(page)){body.innerHTML=pages[page];body.dataset.page=String(page);}
-      label.textContent=pages.length>1?` · ${page+1} / ${pages.length}`:'';
-    }
-    // Keep the approved outer layout intact. The special sheet lives only in
-    // the schedule box, never as an overlay on the entire stage.
-    this.stage.classList.add('board-layout');
-    const boardCards=announcements.map(item=>cardHTML(this.choose('board-'+item.id,[item],now,item.data.contact||item.data.phone?55:95))).join('');
-    const hall=announcements.find(i=>/Simcha Hall/i.test(i.title));
-    const hallCard=hall?cardHTML(this.choose('board-hall',[hall],now,95)):'';
-    const sheet=s.specialSheet && instant>=s.specialSheet.previewStartsAt && instant<s.specialSheet.endsAt ? s.specialSheet : null;
-    const sheetPlacement=sheet && instant>=sheet.coversBothAt ? 'both' : 'shabbos';
-    const boardKey=JSON.stringify([s,boardCards,hallCard,dedication,stale,preview,sheet?.sourceId,sheetPlacement]);
-    if(boardKey!==this.boardKey || !this.stage.querySelector('.board-notices')){
-      this.boardKey=boardKey;
-      this.stage.querySelectorAll('.board-notices,.board-zmanim,.board-community,.board-dedication,.schedule-sheet-box').forEach(e=>e.remove());
-      const layout=this.stage.querySelector('.tv-layout');
-      layout.querySelectorAll(':scope > .tv-side').forEach(e=>e.remove());
-      const community=document.createElement('aside');community.className='board-community';
-      community.innerHTML=hallCard+this.stage.querySelector('.shul-donate').outerHTML;
-      layout.prepend(community);
-      const z=document.createElement('section');z.className='board-zmanim';z.innerHTML='<h2 dir="rtl">זמני היום</h2>'+ (s.zmanim||[]).map(z=>`<div><bdi>${esc(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join('');community.after(z);
-      const notices=document.createElement('section');notices.className='board-notices';notices.innerHTML=boardCards;this.stage.append(notices);
-      if(dedication){const d=document.createElement('section');d.className='board-dedication';d.innerHTML=cardHTML(dedication);this.stage.append(d);}
-      const scheduleArea=this.stage.querySelector('.tv-center');
-      scheduleArea.innerHTML=sheet&&sheetPlacement==='both'?'':boardSchedules(s.presentation,upcoming);
-      if(sheet){
-        const sheetKey=JSON.stringify([sheet.sourceId,sheet.title,sheet.year,sheet.sections]);
-        let box=this.originalSheetBox;
-        if(!box||this.originalSheetKey!==sheetKey){
-          box?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
-          box=document.createElement('section');
-          box.className='schedule-sheet-box original-sheet-box';
-          box.innerHTML=originalSheetHTML(sheet);
-          this.originalSheetBox=box;
-          this.originalSheetKey=sheetKey;
-        }
-        box.dataset.placement=sheetPlacement;
-        box.setAttribute('aria-label',`${sheet.title} ${sheet.yearLabel}`);
-        const shabbos=scheduleArea.querySelector('.board-shabbos');
-        if(shabbos)shabbos.replaceWith(box);else scheduleArea.prepend(box);
+    const upcoming = (snapshot.upcoming || []).filter(i => i.startsAt > instant).map(i => `<div class="tv-upcoming"><strong>${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} – ${dateLabel(i.data.appliesTo)}</div>`).join('');
+    const sheet = s.specialSheet && instant >= s.specialSheet.previewStartsAt && instant < s.specialSheet.endsAt ? s.specialSheet : null;
+    const placement = sheet && instant >= sheet.coversBothAt ? 'both' : 'shabbos';
+    // Deliberately omit the clock, next minyan, generatedAt and connection state.
+    const scheduleKey = JSON.stringify([sheet ? [sheet.sourceId,sheet.title,sheet.year,sheet.sections,placement] : null, sheet && placement === 'both' ? null : s.presentation,upcoming]);
+    if (scheduleKey !== this.scheduleKey) {
+      this.scheduleKey = scheduleKey;
+      let box = null;
+      if (sheet) {
+        const sourceKey = JSON.stringify([sheet.sourceId,sheet.title,sheet.year,sheet.sections]);
+        if (this.originalSheetKey !== sourceKey) {
+          this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
+          box = document.createElement('section');
+          box.className = 'schedule-sheet-box original-sheet-box';
+          box.innerHTML = originalSheetHTML(sheet);
+          this.originalSheetBox = box;
+          this.originalSheetKey = sourceKey;
+        } else box = this.originalSheetBox;
+        box.dataset.placement = placement;
+        box.setAttribute('aria-label', `${sheet.title} ${sheet.yearLabel}`);
+      }
+      // Preserve the connected original page even when an adjacent weekly
+      // reference changes or the page expands into both schedule columns.
+      for (const child of [...this.schedules.children]) if (child !== box) child.remove();
+      this.schedules.style.removeProperty('grid-template-columns');
+      if (!(sheet && placement === 'both') && s.presentation) {
+        const template = document.createElement('template');
+        template.innerHTML = boardSchedules(s.presentation, upcoming);
+        if (sheet) template.content.querySelector('.board-shabbos')?.remove();
+        this.schedules.append(template.content);
+      }
+      if (box) {
+        if (box.parentElement !== this.schedules) this.schedules.prepend(box);
         fitOriginalSheet(box);
-        const weekly=scheduleArea.querySelector('.board-weekly');
-        if(weekly&&weekly.scrollHeight>weekly.clientHeight+2)weekly.classList.add('board-compact');
-      }else fitBoardSchedules(scheduleArea,s.presentation);
+        const weekly = this.schedules.querySelector('.board-weekly');
+        if (weekly && weekly.scrollHeight > weekly.clientHeight + 2) weekly.classList.add('board-compact');
+      } else {
+        this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
+        this.originalSheetBox = null;
+        this.originalSheetKey = null;
+        fitBoardSchedules(this.schedules, s.presentation);
+      }
     }
-    for(const clock of this.stage.querySelectorAll('.tv-clock'))clock.textContent = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(instant));
-    this.warning = [...this.stage.querySelectorAll(".tv-panel,.tv-card,.board-weekly,.board-shabbos,.sheet-column")].filter((e) => e.getClientRects().length && e.scrollHeight > e.clientHeight + 2).map(() => "Screen content exceeds its panel. Shorten text or reduce pinned cards.");
+    const next = s.next && s.next.at >= instant ? s.next : null;
+    setHTML(this.next, `<span class="next-label">Next minyan</span>${next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : '<strong>No further minyan in the loaded schedule</strong>'}`);
+    const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
+    if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;
+    this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';
+    this.checkCapacity();
+  }
+  fitNotices() {
+    // Grow the band before sacrificing any wording. Larger notices get more
+    // width. Beyond physical screen capacity, preview reports the exact issue.
+    const required = Math.max(0, ...[...this.notices.children].map(card => card.scrollHeight + 4));
+    if (required > 340) this.stage.style.setProperty('--notice-height', `${Math.min(430, required)}px`);
+  }
+  checkCapacity() {
+    this.warning = [...this.stage.querySelectorAll('.announcement-group,.board-dedication,.board-weekly,.board-shabbos')]
+      .filter(e => e.getClientRects().length && e.scrollHeight > e.clientHeight + 2)
+      .map(e => e.classList.contains('announcement-group') ? `The ${e.querySelector('h2')?.textContent || 'announcement'} area needs more space. Review the full screen before publishing.` : 'Screen content exceeds its panel. Review the full screen before publishing.');
   }
   destroy() {
+    this.destroyed = true;
     this.observer.disconnect();
     this.originalSheetBox?.querySelector('.original-sheet-host')?.disconnectOriginalSheet?.();
   }

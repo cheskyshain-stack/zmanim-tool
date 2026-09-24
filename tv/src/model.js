@@ -22,7 +22,7 @@ export function validate(raw) {
   let title = text(raw.title);
   const internalName = text(raw.internalName);
   if (kind === "announcement") {
-    Object.assign(data, { message: text(d.message, 1200), contact: text(d.contact, 100), phone: text(d.phone, 40), category: text(d.category, 60), placement: choice(d.placement, ["automatic", "left", "right"], "automatic"), priority: choice(d.priority, ["normal", "important", "urgent"], "normal"), behavior: choice(d.behavior, ["pinned", "rotating"], "rotating"), duration: Math.min(120, Math.max(15, Number(d.duration) || 25)) });
+    Object.assign(data, { message: text(d.message, 1200), contact: text(d.contact, 100), phone: text(d.phone, 40), category: text(d.category, 60), displayGroup: choice(d.displayGroup, ["automatic", "hall", "rav", "community", "support", "separate"], "automatic"), placement: choice(d.placement, ["automatic", "left", "right"], "automatic"), priority: choice(d.priority, ["normal", "important", "urgent"], "normal"), behavior: choice(d.behavior, ["pinned", "rotating"], "rotating"), duration: Math.min(120, Math.max(15, Number(d.duration) || 25)) });
     if (status === "published" && (!title || !data.message)) throw new ApiError(422, "Enter a visible title and message.");
   }
   if (kind === "dedication") {
@@ -70,9 +70,7 @@ export function publicItems(items, instant) {
 export function warnings(items, instant) {
   const active = items.filter((i) => visible(i, instant));
   const out = [];
-  if (active.some((i) => i.kind === "dedication") && active.some((i) => i.kind === "announcement" && i.data.placement === "right" && i.data.behavior === "pinned") && active.filter((i) => i.kind === "announcement" && i.data.placement === "right").length > 1) out.push("The dedication shares the right column. Its announcements, including pinned cards, will rotate in the remaining slot. Move a pinned announcement to the left to keep it steady.");
-  if (["left", "right"].some((side) => active.filter((i) => i.kind === "announcement" && i.data.behavior === "pinned" && (i.data.placement === "automatic" ? "left" : i.data.placement) === side).length > 1)) out.push("Only one pinned announcement fits in each column. Extra pinned cards rotate so schedules remain readable.");
-  if (active.some((i) => (i.data.message || "").length > 320 || (i.data.dedicationText || "").length > 250 || (i.title || "").length > 70 || (i.data.dedicationName || "").length > 70 || (i.data.sponsor || "").length > 70)) out.push("Long text may not fit comfortably. Shorten the title, name or message before publishing.");
+  if (active.some((i) => (i.data.message || "").length > 600 || (i.data.dedicationText || "").length > 250)) out.push("Long notices stay complete. Check the full screen preview for space before publishing.");
   if (active.some((i) => conflicts(i, active).length)) out.push("Overlapping schedules: the higher precedence wins for each affected portion.");
   return out;
 }

@@ -1980,7 +1980,7 @@ function splitColumns(cols, groups, atDayOnly = false) {
  *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
  *  line over there, and one line over is a block off the sheet. */
 const OP_ROOM = 11;
-function fitOnePage(container, { minimumScale = OP_MIN, paddingInches = chosenMargin } = {}) {
+function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false } = {}) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelectorAll(':scope > .onepage-col');
@@ -2008,15 +2008,21 @@ function fitOnePage(container, { minimumScale = OP_MIN, paddingInches = chosenMa
       rows: [...box.querySelectorAll(':scope > .onepage-row')],
       carried: null,
     })));
-    const layout = () => splitColumns(col, groups, chosenBreak === 'day');
-    const fits = () => layout() <= cols.clientHeight - OP_ROOM;
+    const layout = () => splitColumns(col, groups, dayBreakOnly || chosenBreak === 'day');
+    const fits = () => {
+      if (layout() > cols.clientHeight - OP_ROOM) return false;
+      // The boxed screen view can be narrower than a printed page. Its optional
+      // width check keeps every long time/note inside the same original columns.
+      // Printed pages retain their established fitting behavior.
+      return !fitWidth || [...cols.querySelectorAll('.onepage-row')].every((r) => r.scrollWidth <= r.clientWidth + 1);
+    };
     // Cleared before the search, not after it: this runs again when a phone is turned, and a
     // gap left over from the last pass would be part of what the type is fitted against.
     sheet.style.setProperty('--op-gap-1', '0px');
     sheet.style.setProperty('--op-gap-2', '0px');
     let best = minimumScale;
     for (const step of [0.05, OP_STEP]) {
-      for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
+      for (let v = best; v <= maximumScale + 1e-9; v = Math.round((v + step) * 100) / 100) {
         set(v);
         if (!fits()) break;
         best = v;
@@ -2401,6 +2407,9 @@ export function fitPoster(container, options) {
     fitSukkos(container);
   };
   decide();
+  // Embedded views observe their actual box instead of the whole window. Avoid
+  // replacing the print page's global resize listener when fitting one of them.
+  if (options?.observeResize === false) return;
   // Rotating a phone changes what fits. One listener, replaced each render so it always
   // points at the posters currently on screen.
   if (fitHandler) window.removeEventListener('resize', fitHandler);

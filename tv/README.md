@@ -275,3 +275,35 @@ is required. The newest HTML design concepts remain separate from the integrated
 DisplayView; this calendar uses the actual integrated renderer, not the static
 photo-based mockups. Future previews reflect currently saved data and may change
 when administrators publish new content or schedules.
+
+## Current Shul View: stable sheets, complete notices, offline use
+
+This section supersedes the earlier rotating/paged screen layout notes above.
+
+- `/display/` keeps the original two-column special page mounted. It fits once
+  after its fonts/styles load, then refits only when its actual box changes size.
+  Light and Dark use the same rows and geometry, with themed backgrounds, times,
+  headings and location marks. The existing Shabbos-box / both-box timing remains.
+- Ten uploaded notices are grouped into four complete areas: Simcha Hall, the Rav,
+  Community, and Support & services. Titles, messages, contacts and phone numbers
+  are preserved. Stored records remain separate and editable. The announcement
+  editor's **Announcement area** field overrides the automatic grouping. There
+  are no announcement continuation pages. Longer areas receive more space; the
+  shared preview warns if content exceeds the physical screen capacity.
+- `/api/display/offline` supplies an explicit public-field allowlist of published
+  current/future items and saved appearance. Drafts, hidden/archived items,
+  internal names, audit details and anonymous sponsor names are excluded.
+- After one successful connection, IndexedDB stores that public data, and a
+  service worker scoped to `/display/` saves the public screen assets. No admin
+  pages, private previews, credentials or API responses enter the asset cache.
+- The browser bundles the same calendar and saved schedule calculations as the
+  Worker. Offline, the clock, New York day/date, next minyan, daily zmanim, special
+  schedule placement, published content windows and theme schedule keep running.
+  This is a calculated display rather than a frozen saved screenshot. Browser
+  storage must remain available. Clearing site storage requires reconnecting.
+- Brief failures do not interrupt the screen. After five minutes without a sync,
+  a quiet footer says **Using saved information**; it does not suppress minyanim.
+  Saved data is replaced automatically on reconnection. Backend edits cannot be
+  received offline. Revised calendar-engine deployments can require reopening
+  the screen; the version check prevents applying incompatible calendar settings.
+- No database migration is required. Existing display permissions remain in force.

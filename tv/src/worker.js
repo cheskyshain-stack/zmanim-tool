@@ -1,4 +1,5 @@
 import { readAppearance, saveAppearance } from './appearance.js';
+import {createOfflineSeed} from './offline-seed.js';
 import { themeAt } from '../public/display-assets/appearance.js';
 import { actor, allow, ApiError, CAPABILITIES } from "./auth.js";
 import { validate, conflicts, publicItem, publicItems, warnings, text } from "./model.js";
@@ -46,6 +47,11 @@ async function snapshot(items, at, preview = false, appearance) {
 }
 async function handle(req, env) {
   const url = new URL(req.url), path = url.pathname;
+  if (path === '/api/display/offline' && req.method === 'GET') {
+    const at=new Date().toISOString();
+    const items=(await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
+    return json(createOfflineSeed(items,await readAppearance(env.DB),at));
+  }
   if (path === "/api/display/public" && req.method === "GET") {
     const at = new Date().toISOString();
     const items = (await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
@@ -161,6 +167,7 @@ export default { async fetch(req, env) {
   }
   const r = new Response(response.body, response);
   r.headers.set("Cache-Control", "no-store");
+  if(new URL(req.url).pathname==='/display/sw.js')r.headers.set('Service-Worker-Allowed','/display/');
   r.headers.set("X-Content-Type-Options", "nosniff");
   r.headers.set("X-Robots-Tag", "noindex");
   r.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'");
