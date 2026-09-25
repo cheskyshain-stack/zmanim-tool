@@ -115,7 +115,7 @@ export function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const L = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js

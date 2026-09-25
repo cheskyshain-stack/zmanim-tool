@@ -34,6 +34,7 @@ import * as Z from '../zmanim/zmanim.js';
 import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
+import { weekLatestMinchaGedola } from './common.js';
 import { formatTime, underlineTime } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
@@ -141,16 +142,30 @@ function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
 
-  // 12:45 and 1:15 only run on standard time. DST always flips on a Sunday, so all five
-  // days agree; .every() is just being explicit about which way a split week would go.
+  // 12:45 only runs on standard time. DST always flips on a Sunday, so all five days
+  // agree; .every() is just being explicit about which way a split week would go.
   const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
   const bmg = isBmgWeek(week.serial, settings);
 
+  /* 1:15/1:20 and 1:35/1:40 are both weighed against the same value: מנחה גדולה לחומרא's
+     latest reach Sunday through Friday, not just the five days this row schedules for
+     (see weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row
+     on the שבת chart weighs its own early מנחה the same way, against the same six days,
+     so the two charts cannot answer this question differently about days that sit right
+     next to each other). */
+  const latestMinchaGedola = toMinutes(weekLatestMinchaGedola(week.serial, settings));
+
   // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
-  // Never anything else. The workbook makes the same call the same way for its ערב שבת
-  // מנחה menu (common.js), against the same MINCHA_GEDOLA_LECHUMRA.
-  const latestMinchaGedola = Math.max(...dates.map((d) => toMinutes(Z.minchaGedolaLechumra(d, settings))));
+  // Never anything else.
   const earlyAfternoon = latestMinchaGedola > HM(13, 35) ? HM(13, 40) : HM(13, 35);
+
+  /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
+     neither if it creeps past 1:20 too. Used to read the clock (DST) instead of מנחה
+     גדולה, the same rule 12:45 above still runs on; sheets/common.js's own note on
+     weekLatestMinchaGedola has the week that rule got wrong. */
+  const earlyMincha = latestMinchaGedola <= HM(13, 15) ? HM(13, 15)
+    : latestMinchaGedola <= HM(13, 20) ? HM(13, 20)
+    : null;
 
   // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
   // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
@@ -167,12 +182,22 @@ function minchaParts(week, settings) {
   const clocksBack = 'offered only while the clocks are back';
   const slots = [
     { mins: HM(12, 45), place: LMATA, offSeason: standardTime ? null : clocksBack },
-    { mins: HM(13, 15), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    /* 1:15, 1:20, or neither, and which one turns on a number, the same reason the 1:35
+       line below does. */
+    { mins: earlyMincha ?? HM(13, 15), place: LMATA,
+      offSeason: earlyMincha == null
+        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past even 1:20`
+        : null,
+      label: earlyMincha === HM(13, 20)
+        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
+        : earlyMincha === HM(13, 15)
+          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it`
+          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past both` },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
-      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },

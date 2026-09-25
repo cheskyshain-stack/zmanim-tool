@@ -57,7 +57,7 @@ export function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
-  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const I = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
