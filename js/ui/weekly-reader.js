@@ -293,6 +293,16 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
   }
   for(const section of displaySections) {
     if(section.combined && section.dayTitles.length===1) section.title=section.dayTitles[0];
+    /* A combined card's events were appended one whole agenda-section at a time, not
+       merged by clock time - so a candle-lighting זמן, deliberately filed under the
+       day it opens (agendaSection's own holy-${serial+1} rule, matching the "what is on
+       next" card's own convention) rather than under Erev, could still land after a
+       later Erev event that stayed in Erev's own bucket: הדלקת נרות 6:31 printed under
+       Sukkos's own heading, below a 6:34 ערב סוכות מנחה that is chronologically three
+       minutes earlier. Sorted back into real order here; which heading a row falls
+       under is unaffected; that is still whatever agendaSection said each event's day
+       is called. */
+    if(section.combined) section.events.sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
@@ -318,14 +328,27 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
          sitting between them they were kept apart only by that accident: with it gone, 5:29
          and 6:05 ran into one row carrying one of the two פלג. */
       if (!sameWhere(row,event) || row.name!==rowName(event) || (row.cell!==(event.cell||'') && !(row.name==='מעריב' && /^מעריב\s+ג['׳’]?$/.test(event.name)))) row=null;
-      if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
+      if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[],auxiliary:!!event.auxiliary};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
     const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
+    /* A heading names a real day's own minyanim, so a lone זמן like הדלקת נרות - sorted back
+       into its true clock position just above, ahead of a real event still counted as the
+       day before it - never starts one on its own. It prints under whichever heading is
+       already showing and lets the next real event decide if that heading has changed. */
+    let lastRealTitle=null;
+    const rowsHtml=rows.map((row)=>{
+      let heading='';
+      if(!row.auxiliary){
+        if(row.sectionTitle && row.sectionTitle!==lastRealTitle) heading=`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`;
+        lastRealTitle=row.sectionTitle;
+      }
+      return `${heading}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span></div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`;
+    }).join('');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
       <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span></div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`).join('')}</div>
+      <div class="reader-agenda-rows">${rowsHtml}</div>
     </details>`;
   }).join('');
   /* Previous is live only where there is a week behind this one worth opening: not simply one
