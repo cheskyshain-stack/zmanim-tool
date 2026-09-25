@@ -340,11 +340,17 @@ function maarivParts(week, settings) {
      and none of them are the printed chart, so none of them should ever show the tag. Only
      sheet-view.js's own cell rendering reaches for `printOverrides`, and only when this
      week's own column has not been typed over by hand. */
+  /* One fewer plain item on the tagged line than the even count split would give it
+     (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
+     line reading visibly wider than the other. 11:30 is always the last kept slot whenever
+     the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
+     already requires), so it always falls on the second line and ceil rather than floor is
+     always the direction that shortens it. */
   const printText = showNewBadge
     ? splitLinesInHalf(kept.map((slot) => {
         const rendered = renderTime(slot.mins, placeOf(slot));
         return slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
-      }))
+      }), undefined, Math.ceil(kept.length / 2))
     : null;
 
   return {

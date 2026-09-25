@@ -98,9 +98,14 @@ export function flattenNonEmpty(parts) {
 }
 
 /** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
-export function splitLinesInHalf(items, delim = SLASH) {
-  const cut = Math.floor(items.length / 2);
+ *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...).
+ *
+ *  `cut` overrides where the split falls, item-count-wise, for a caller whose items are
+ *  not all the same width - the Weekday chart's "NEW" tag (sheets/weekday.js) widens
+ *  whichever item it sits on by roughly one more item's worth of room, so it asks for one
+ *  fewer plain item on that item's own line rather than the even count split, to keep the
+ *  two printed lines close in width instead of the tagged line reading visibly wider. */
+export function splitLinesInHalf(items, delim = SLASH, cut = Math.floor(items.length / 2)) {
   const line1 = items.slice(0, cut).join(delim);
   const line2 = items.slice(cut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');

@@ -695,9 +695,14 @@ function flattenNonEmpty(parts) {
 }
 
 /** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
-function splitLinesInHalf(items, delim = SLASH) {
-  const cut = Math.floor(items.length / 2);
+ *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...).
+ *
+ *  `cut` overrides where the split falls, item-count-wise, for a caller whose items are
+ *  not all the same width - the Weekday chart's "NEW" tag (sheets/weekday.js) widens
+ *  whichever item it sits on by roughly one more item's worth of room, so it asks for one
+ *  fewer plain item on that item's own line rather than the even count split, to keep the
+ *  two printed lines close in width instead of the tagged line reading visibly wider. */
+function splitLinesInHalf(items, delim = SLASH, cut = Math.floor(items.length / 2)) {
   const line1 = items.slice(0, cut).join(delim);
   const line2 = items.slice(cut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
@@ -7077,11 +7082,17 @@ function maarivParts(week, settings) {
      and none of them are the printed chart, so none of them should ever show the tag. Only
      sheet-view.js's own cell rendering reaches for `printOverrides`, and only when this
      week's own column has not been typed over by hand. */
+  /* One fewer plain item on the tagged line than the even count split would give it
+     (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
+     line reading visibly wider than the other. 11:30 is always the last kept slot whenever
+     the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
+     already requires), so it always falls on the second line and ceil rather than floor is
+     always the direction that shortens it. */
   const printText = showNewBadge
     ? splitLinesInHalf(kept.map((slot) => {
         const rendered = renderTime(slot.mins, placeOf(slot));
         return slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
-      }))
+      }), undefined, Math.ceil(kept.length / 2))
     : null;
 
   return {
