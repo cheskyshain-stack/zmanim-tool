@@ -267,11 +267,14 @@ function maarivParts(week, settings) {
   const clears = 'at least 50 minutes after the latest שקיעה of the five days';
 
   // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
-  // (ui/settings-view.js), and only for the season it was pinned to the moment that
-  // happened (publish.js's firstPageRangeForCurrentSeason), never whatever season happens
-  // to be current when the chart is later printed. See settings.js's newMinyanBadge.
+  // (ui/settings-view.js), only for the season it was pinned to the moment that happened
+  // (publish.js's firstWeekdayPageRangeForWinter), never whatever season happens to be
+  // current when the chart is later printed, and only on a week `bmg` is holding true:
+  // that is the actual, only reason 11:30 was not printing here before this change, so a
+  // week BMG is already out of session had 11:30 all along and calling it new would be
+  // wrong. See settings.js's newMinyanBadge.
   const badge = settings.newMinyanBadge;
-  const showNewBadge = !!(badge?.on && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+  const showNewBadge = !!(badge?.on && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
 
   const slots = [
     { mins: HM(18, 35) },

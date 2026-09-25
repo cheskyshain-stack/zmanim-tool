@@ -1527,10 +1527,13 @@ const DEFAULT_SETTINGS = {
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
   /* Not a time default like the ones above, and not a per-cell override either: the Weekday
      chart's 11:30 מעריב itself always runs now (sheets/weekday.js), regardless of this flag.
-     This only controls whether it prints with a "NEW" tag, and only on page 1 of whichever
-     season was current the moment the admin turned it on (ui/settings-view.js), so the tag
-     can't drift forward onto a season nobody asked it to. Turning it back off just hides the
-     tag; it does not touch the minyan itself. See publish.js's firstPageRangeForCurrentSeason. */
+     This only controls whether it prints with a "NEW" tag, and only where it actually is
+     new: page 1 of the winter (חורף) season current the moment the admin turned it on
+     (ui/settings-view.js, publish.js's firstWeekdayPageRangeForWinter - always חורף, since
+     BMG being in session is the only reason 11:30 was ever off the board and BMG's own
+     middle range is what a חורף season is), further narrowed to the weeks on that page BMG
+     is actually in session on. A week BMG is already out of session had 11:30 all along.
+     Turning it back off just hides the tag; it does not touch the minyan itself. */
   newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
 };
 
@@ -2728,18 +2731,27 @@ async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
 }
 
-/** Page 1 of the Weekday chart for whichever season contains today, as a Shabbos-anchored
- *  serial range (its first week through its last). The only caller is settings-view.js,
- *  the moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js): it
- *  captures which weeks were page 1 right then, so the badge stays pinned to that season
- *  even once a later season becomes "current" - not whichever season happens to be on
- *  the wall whenever the chart is next printed, which would walk the badge forward every
- *  time a new season starts. Mirrors buildAutomaticCharts's own page-1 arithmetic
- *  (defaultPageSizes, alignPageSizesTo) rather than a size guessed independently, so the
- *  range matches the real printed chart's actual first page. */
-function firstPageRangeForCurrentSeason(settings, tables) {
+/** Page 1 of the Weekday chart for the soonest חורף season, as a Shabbos-anchored serial
+ *  range (its first week through its last). The only caller is settings-view.js, the
+ *  moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js).
+ *
+ *  Always חורף, never קיץ: the badge only ever marks a week where BMG being in session
+ *  actually kept 11:30 off the board before (see the bmg check in maarivParts), and BMG's
+ *  own middle range (ר"ח חשון -> ז' ניסן) is what a חורף season is. `nextAvailableYearFor`
+ *  rather than "whichever season contains today" so a switch flipped on the last day of a
+ *  קיץ season pins to the חורף about to start, not a קיץ page that already went to print
+ *  months ago and has nothing to do with BMG at all.
+ *
+ *  Captures which weeks were page 1 right when the switch was turned on, so the badge
+ *  stays pinned to that one season even once a later one becomes current - not whichever
+ *  season happens to be on the wall whenever the chart is next printed, which would walk
+ *  the badge forward every time a new season starts. Mirrors buildAutomaticCharts's own
+ *  page-1 arithmetic (defaultPageSizes, alignPageSizesTo) rather than a size guessed
+ *  independently, so the range matches the real printed chart's actual first page. */
+function firstWeekdayPageRangeForWinter(settings, tables) {
   const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
-  const { season, hebrewYear } = currentSeasonAndYear(resolved);
+  const season = 'choref';
+  const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
   const sizes = defaultPageSizes(weeks.length, 3, season);
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
@@ -6992,11 +7004,14 @@ function maarivParts(week, settings) {
   const clears = 'at least 50 minutes after the latest שקיעה of the five days';
 
   // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
-  // (ui/settings-view.js), and only for the season it was pinned to the moment that
-  // happened (publish.js's firstPageRangeForCurrentSeason), never whatever season happens
-  // to be current when the chart is later printed. See settings.js's newMinyanBadge.
+  // (ui/settings-view.js), only for the season it was pinned to the moment that happened
+  // (publish.js's firstWeekdayPageRangeForWinter), never whatever season happens to be
+  // current when the chart is later printed, and only on a week `bmg` is holding true:
+  // that is the actual, only reason 11:30 was not printing here before this change, so a
+  // week BMG is already out of session had 11:30 all along and calling it new would be
+  // wrong. See settings.js's newMinyanBadge.
   const badge = settings.newMinyanBadge;
-  const showNewBadge = !!(badge?.on && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+  const showNewBadge = !!(badge?.on && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
 
   const slots = [
     { mins: HM(18, 35) },
@@ -16590,7 +16605,7 @@ function renderSettings(container, state, tables, onSave, onStateReplaced, onRul
       <details class="panel">
         <summary>Weekday chart</summary>
         <div class="panel-body">
-        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart - and only on page 1 of whichever season is current the moment you turn it on. Later pages, and every season after, print 11:30 plain. Turning it back off just hides the tag.</p>
+        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart, and only on weeks where it actually is new: page 1 of the winter (חורף) season current the moment you turn it on, and only the weeks on it where BMG is in session, since those are the only weeks 11:30 was not already printing. Later pages, every season after, and any week BMG is out of session print 11:30 plain. Turning it back off just hides the tag.</p>
         <label><input type="checkbox" name="newMinyanBadgeOn" ${badge.on ? 'checked' : ''}> Show the "NEW" tag on 11:30 מעריב</label>
         ${badge.on && badge.firstSerial != null
           ? `<p class="hint">Pinned to ${escAttr(dateFromSerial(badge.firstSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))} through ${escAttr(dateFromSerial(badge.lastSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))}.</p>`
@@ -16701,7 +16716,7 @@ function renderSettings(container, state, tables, onSave, onStateReplaced, onRul
 function nextNewMinyanBadge(badge, nowOn, settings, tables) {
   if (!nowOn) return { on: false, firstSerial: badge.firstSerial ?? null, lastSerial: badge.lastSerial ?? null };
   if (badge.on) return { ...badge }; // already on - keep the range it was pinned to
-  const range = firstPageRangeForCurrentSeason(settings, tables);
+  const range = firstWeekdayPageRangeForWinter(settings, tables);
   return range ? { on: true, firstSerial: range.firstSerial, lastSerial: range.lastSerial } : { on: false, firstSerial: null, lastSerial: null };
 }
 

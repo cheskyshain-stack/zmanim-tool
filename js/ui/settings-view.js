@@ -15,7 +15,7 @@
 import { TIMEZONES } from '../settings.js';
 import { exportStateToFile, importStateFromText, isSheetFile, importSheetFromText } from '../storage.js';
 import { renderImageCropper } from './image-crop.js';
-import { clearLegacyPublishToken, firstPageRangeForCurrentSeason } from '../publish.js';
+import { clearLegacyPublishToken, firstWeekdayPageRangeForWinter } from '../publish.js';
 import { renderRules } from './rules-view.js';
 import { escAttr } from '../util.js';
 import { switchHtml } from './switch.js';
@@ -71,7 +71,7 @@ export function renderSettings(container, state, tables, onSave, onStateReplaced
       <details class="panel">
         <summary>Weekday chart</summary>
         <div class="panel-body">
-        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart - and only on page 1 of whichever season is current the moment you turn it on. Later pages, and every season after, print 11:30 plain. Turning it back off just hides the tag.</p>
+        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart, and only on weeks where it actually is new: page 1 of the winter (חורף) season current the moment you turn it on, and only the weeks on it where BMG is in session, since those are the only weeks 11:30 was not already printing. Later pages, every season after, and any week BMG is out of session print 11:30 plain. Turning it back off just hides the tag.</p>
         <label><input type="checkbox" name="newMinyanBadgeOn" ${badge.on ? 'checked' : ''}> Show the "NEW" tag on 11:30 מעריב</label>
         ${badge.on && badge.firstSerial != null
           ? `<p class="hint">Pinned to ${escAttr(dateFromSerial(badge.firstSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))} through ${escAttr(dateFromSerial(badge.lastSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))}.</p>`
@@ -182,7 +182,7 @@ export function renderSettings(container, state, tables, onSave, onStateReplaced
 function nextNewMinyanBadge(badge, nowOn, settings, tables) {
   if (!nowOn) return { on: false, firstSerial: badge.firstSerial ?? null, lastSerial: badge.lastSerial ?? null };
   if (badge.on) return { ...badge }; // already on - keep the range it was pinned to
-  const range = firstPageRangeForCurrentSeason(settings, tables);
+  const range = firstWeekdayPageRangeForWinter(settings, tables);
   return range ? { on: true, firstSerial: range.firstSerial, lastSerial: range.lastSerial } : { on: false, firstSerial: null, lastSerial: null };
 }
 

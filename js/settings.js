@@ -164,10 +164,13 @@ export const DEFAULT_SETTINGS = {
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
   /* Not a time default like the ones above, and not a per-cell override either: the Weekday
      chart's 11:30 מעריב itself always runs now (sheets/weekday.js), regardless of this flag.
-     This only controls whether it prints with a "NEW" tag, and only on page 1 of whichever
-     season was current the moment the admin turned it on (ui/settings-view.js), so the tag
-     can't drift forward onto a season nobody asked it to. Turning it back off just hides the
-     tag; it does not touch the minyan itself. See publish.js's firstPageRangeForCurrentSeason. */
+     This only controls whether it prints with a "NEW" tag, and only where it actually is
+     new: page 1 of the winter (חורף) season current the moment the admin turned it on
+     (ui/settings-view.js, publish.js's firstWeekdayPageRangeForWinter - always חורף, since
+     BMG being in session is the only reason 11:30 was ever off the board and BMG's own
+     middle range is what a חורף season is), further narrowed to the weeks on that page BMG
+     is actually in session on. A week BMG is already out of session had 11:30 all along.
+     Turning it back off just hides the tag; it does not touch the minyan itself. */
   newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
 };
 
