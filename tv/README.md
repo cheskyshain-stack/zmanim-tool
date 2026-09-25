@@ -424,7 +424,7 @@ It makes no database writes. `ADMIN_SCREEN_SCREENSHOT_DIR` saves private preview
 When all saved morning services, Mincha and Maariv differ for a date, the weekday
 reference places that complete date in a separate block beneath the regular
 services. Each prayer retains its centered times, location marks and notes. A
-single-prayer change stays directly below its prayer with at least 14px of clear
+single-prayer change stays directly below its prayer with at least 10px of clear
 space above it, including in compact layouts. Whole-day blocks have at least
 16px separation. This is presentation only; actual daily events and next-minyan
 calculations are unchanged.
@@ -447,38 +447,30 @@ special-page timing is unchanged. `tests/weekday-groups.test.mjs` checks groupin
 and preservation, and the annual browser audit additionally checks Gedalya weeks
 in 2026, 2029 and 2032 plus Rosh Chodesh in 2028.
 
-## Continuous Rosh Hashanah chart
+## Combined Yamim Noraim chart and compact schedule layout
 
-Shul View keeps Erev Rosh Hashanah and both days in one continuous column,
-under one holiday title. The original source rows, labels, marks and order are
-retained; the same column fits the tall right box and its expanded placement.
-Other seasonal charts and the printable poster defaults retain their existing
-two-column layout. Saved schedule times remain authoritative.
+Rosh Hashanah and Yom Kippur share the original complete ימים נוראים page,
+including its Selichos, Shabbos Shuva and following-week information. The two
+equal-width columns use the original public poster rows and order. The chart
+narrows only when its full-width fitted text size can be preserved.
 
-When Rosh Hashanah ends on Friday, the screen appends the saved Shabbos chart
-to the same holiday page. Erev and both RH days stay together in one column;
-the attached Shabbos occupies the second, keeping the whole group legible.
-The complete connected group remains
-through Shabbos closing events, including the existing five-minute retention,
-instead of falling back to an overflowing regular panel on its last day.
-The standalone printed RH source is unchanged. In this connected view its
-weekday Motzei Yom Tov row is excluded using the source calculation identifier;
-the saved Shabbos evening entries take its place. Shul View's actual Friday
-events and next-minyan calculation read those same F/G chart cells through the
-existing validated calendar reader. RH daytime services and explicit admin
-overrides remain in force. The public website's reader defaults are unchanged.
-The offline engine revision is v5 so cached calculations use the same boundary.
+The existing RH and YK display windows remain separate. Printed Gedalya and
+following-week rows do not extend a full chart's visibility into those ordinary
+days. An attached Shabbos remains through its actual closing events and the
+existing five-minute retention. Publication controls and actual daily/next-minyan
+calculations keep their original dated sources. The offline engine revision is
+v6 so newly loaded offline and server views use the same combined page.
 
-The original-sheet browser check covers every Rosh Hashanah year from 5787 to
-5806 at five panel sizes, plus both themes and placement changes. The full-screen
-check includes the preceding Selichos week and both holiday days.
+The weekday heading is one line, such as חול פרשת ויצא, with its date range below.
+Seasonal names remain שבוע של ראש השנה, שבוע של סוכות, or חול המועד as applicable.
+Weekday prayer headings stay above centered times. Equally common Selichos
+patterns and partial-week Shacharis explicitly name their applicable days;
+the first Selichos night uses the saved source heading. Shabbos rows share
+compact time/name tracks, centered within their panel. Daily zmanim remain one
+column, with the time values on the left and their right edges aligned; seconds
+remain slightly smaller and lighter.
 
-When a dense Selichos week still exceeds its panel after compact spacing, plain
-services may place their full-size prayer name on the right of the centered time
-run. Date-specific exceptions retain separate headings and their spacing. This
-fallback is measured afresh and removed whenever the ordinary layout fits.
-
-## Parnas Hayom header
+## Permanent Parnas Hayom area
 
 Sponsor and dedication names are optional. Publishing requires a sponsorship
 date and at least a dedication name, dedication text, or additional message.
@@ -487,17 +479,26 @@ Leaving the sponsor blank creates neither a sponsor row nor an anonymous label.
 
 The screen's left header reads Bais Medrash of Lakewood Commons and קהל לב מנחם.
 Both languages use centered 28px lettering; the English name stays on two lines.
-An active dedication gets a gold-bordered card centered on the full screen, with
-at least three readable lines of space. Optional fields render only when filled;
-Hebrew/English text and intentional line breaks are preserved. The header reserves
-enough height for the tallest active dedication so rotation does not move the
-schedules. When no dedication is active, the smaller header returns that space.
-The card starts at half the central header width and expands only as needed to
-avoid additional text wrapping. All active dedications share that measured width
-so rotation and theme changes keep its size steady.
+The gold-bordered פרנס היום card always appears directly below זמני היום.
+It displays the active dedication, or a sponsorship-availability message when
+none is active. Optional fields render only when filled; Hebrew/English text
+and intentional line breaks are preserved. The area reserves enough height for
+the tallest active dedication so rotation and theme changes keep its size steady.
+The on-screen admin can click the existing dedication to edit it, or the
+availability message to add a new draft, including using Enter or Space.
 Long copy remains complete and the shared admin preview flags capacity problems.
 
 Validation: `tests/dedication-model.test.mjs`, `tests/admin-screen-browser.mjs`,
 and `tests/dedication-header-browser.mjs` (set `DISPLAY_TEST_SCALE=2` for 4K).
 Development dedication fixtures are never written to a database or published.
 No migration or configuration change is needed.
+
+The dedication editor starts with the same English/Hebrew holiday calendar used
+by future previews. New drafts have no preselected sponsorship date. Selecting
+a day updates the Hebrew equivalent and exact New York display window using the
+existing sunset calculation; direct English and Hebrew entry remain available.
+The screen dashboard lists current and scheduled dedications with an immediate
+Remove from screen action, also available at the top of a published dedication's
+editor. It uses the existing protected, version-checked hide endpoint and keeps
+the record under Hidden for reuse. Unsaved editor changes require a discard
+confirmation; no dedication is permanently deleted by this action.

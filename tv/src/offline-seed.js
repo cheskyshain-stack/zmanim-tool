@@ -5,7 +5,7 @@ import {validateAppearance} from '../public/display-assets/appearance.js';
 // Change the prefix when the seed schema or calendar calculation contract changes.
 let revision=2166136261;
 for(const character of JSON.stringify(published)) revision=Math.imul(revision^character.charCodeAt(0),16777619)>>>0;
-export const OFFLINE_ENGINE='shul-calendar-v5-'+revision.toString(16);
+export const OFFLINE_ENGINE='shul-calendar-v6-'+revision.toString(16);
 const fields={
   announcement:['message','contact','phone','category','displayGroup','placement','priority','behavior','duration'],
   dedication:['sponsor','anonymous','dedicationType','dedicationName','dedicationText','message','sponsorshipDate','timing','duration','hebrewLabel'],

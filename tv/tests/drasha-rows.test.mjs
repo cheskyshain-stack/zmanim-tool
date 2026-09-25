@@ -183,8 +183,15 @@ test('Rosh Hashana, Yom Kippur, Pesach, and Sukkos keep their full original post
     ['2026-09-26', 'sukkos', buildSukkosPoster],
   ]) {
     const snapshot = snapshotOn(date);
-    assert.equal(snapshot.specialSheet.sourceId, `${key}:5787`);
-    assert.deepEqual(snapshot.specialSheet.sections, publicPosterSections(key, build(5787, settings)), key);
+    const sheet=snapshot.specialSheet,expected=publicPosterSections(key,build(5787,settings));
+    if(['rh','yk'].includes(key)){
+      assert.equal(sheet.sourceId,'high-holidays:5787');
+      assert.equal(sheet.windowSourceId,`${key}:5787`);
+      for(const section of expected)assert.deepEqual(sheet.sections.find(saved=>saved.title===section.title),section,key+': '+section.title);
+    }else{
+      assert.equal(sheet.sourceId,`${key}:5787`);
+      assert.deepEqual(sheet.sections,expected,key);
+    }
     const posterRows = rowsOf(snapshot).filter(row => !row.id.startsWith('chart:'));
     assert.ok(posterRows.length, key);
     for (const row of posterRows) assert.deepEqual(splitChartDrashas(row), [row], key + ': ' + row.label);

@@ -9,8 +9,16 @@ function events(g){const source=g.events.find(e=>e.sourceText);return source?[{t
 const weekdaySource=(name,days)=>`data-weekday-service="${esc(name)}" data-weekday-dates="${esc(days.map(day=>day.date).join(','))}"`;
 const notes=g=>g.events.some(e=>e.note)?`<p dir="auto">${[...new Set(g.events.map(e=>e.note).filter(Boolean))].map(esc).join(' · ')}</p>`:'';
 function weeklyService(service){
- if(!service.groups.some(g=>g.events.length&&g.days.length))return '';
- return `<section class="board-service"><h3 dir="rtl">${esc(service.name)}</h3>${service.groups.filter(g=>g.events.length&&g.days.length).map((g,i)=>`<div class="board-pattern ${i?'board-exception':''}" ${weekdaySource(service.name,g.days)}>${i?`<h4 dir="rtl">${esc(scope(g.days))}</h4>`:''}<div class="board-times">${times(events(g))}</div>${notes(g)}</div>`).join('')}</section>`;
+ const groups=service.groups.filter(g=>g.events.length&&g.days.length);
+ if(!groups.length)return '';
+ // Equally common patterns have no unqualified "regular" list. A morning
+ // service present on only some dates (such as first-Sunday Shacharis) also
+ // needs its days named. Empty Friday afternoon groups simply hand over to
+ // the Shabbos chart, so they do not add day headings to ordinary weeks.
+ const noCommonPattern=groups.length>1&&groups[0].days.length*2<=groups.reduce((n,g)=>n+g.days.length,0);
+ const partialMorning=['שחרית','סליחות'].includes(service.name)&&service.groups.some(g=>g.days.length&&!g.events.length);
+ const heading=[service.name,...(noCommonPattern||partialMorning?[scope(groups[0].days)]:[])].join(' · ');
+ return `<section class="board-service"><h3 dir="rtl">${esc(heading)}</h3>${groups.map((g,i)=>`<div class="board-pattern ${i?'board-exception':''}" ${weekdaySource(service.name,g.days)}>${i?`<h4 dir="rtl">${esc(scope(g.days))}</h4>`:''}<div class="board-times">${times(events(g))}</div>${notes(g)}</div>`).join('')}</section>`;
 }
 function daySection(section){
  return `<section class="board-day-section" data-day-dates="${esc(section.days.map(day=>day.date).join(','))}"><h3 dir="rtl">${esc(scope(section.days))}</h3><p class="board-day-date" dir="ltr">${section.days.map(day=>date(day.date)).join(' · ')}</p><div class="board-day-services">${section.services.map(service=>`<section class="board-day-service" ${weekdaySource(service.name,section.days)}><h4 dir="rtl">${esc(service.name)}</h4><div class="board-times">${times(events(service))}</div>${notes(service)}</section>`).join('')}</div></section>`;
@@ -19,7 +27,7 @@ export function boardSchedules(p,upcoming=''){
  const w=p.weekly,s=p.special;
  const weekday=groupWeekdayPresentation(w.services);
  const ordinary=s?.sections.every(s=>s.rows.every(r=>r.id.startsWith('chart:')));
- const weekly=`<section class="board-weekly"><h2 dir="rtl">זמני חול</h2><h3 class="board-week-title" dir="rtl">${esc(w.title.replace(/^חול /,''))}</h3><p class="board-range">${date(w.from)} – ${date(w.to)}</p><div class="board-week-body">${weekday.services.map(weeklyService).join('')}${(w.posterSections||[]).map(section=>`<section class="board-service"><h3 dir="rtl">${esc(section.heading)}</h3>${section.rows.map(row).join('')}${section.morningExclusion?`<p dir="rtl">${esc(section.morningExclusion)}</p>`:''}</section>`).join('')}${weekday.daySections.map(daySection).join('')}${upcoming}</div></section>`;
+ const weekly=`<section class="board-weekly"><h2 dir="rtl">${esc(w.title)}</h2><p class="board-range">${date(w.from)} – ${date(w.to)}</p><div class="board-week-body">${weekday.services.map(weeklyService).join('')}${(w.posterSections||[]).map(section=>`<section class="board-service"><h3 dir="rtl">${esc(section.heading)}</h3>${section.rows.map(row).join('')}${section.morningExclusion?`<p dir="rtl">${esc(section.morningExclusion)}</p>`:''}</section>`).join('')}${weekday.daySections.map(daySection).join('')}${upcoming}</div></section>`;
  const special=s?`<section class="board-shabbos"><h2 dir="rtl">${esc(s.title)}</h2><p class="board-range">${date(s.from)} – ${date(s.to)}</p><div class="board-shabbos-body">${s.sections.map(section=>`${!ordinary?`<h3 dir="rtl">${esc(section.heading)}</h3>`:''}${section.rows.map(row).join('')}`).join('')}</div></section>`:'';
  return weekly+special;
 }
@@ -44,7 +52,7 @@ function panelFit(panel,bodySelector){
 // Every row in a table shares one compact time column. Measure the saved
 // tokens, not their displayed text, so underlines, names and marks stay intact.
 function alignTimeColumns(panel,limit=4){
- if(!panel)return;
+ if(!panel||panel.classList.contains('board-weekly'))return;
  const style=getComputedStyle(panel);
  const innerWidth=panel.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
  const rows=[...panel.querySelectorAll('.board-schedule-row')];
@@ -130,16 +138,9 @@ export function fitBoardSchedules(root,p,{allowCompact=false,compactWeekly=true}
  // the current lettering size; use this only after balanced runs need no room.
  if(allowCompact&&special?.closest('.right-extended')&&panelFit(special,'.board-shabbos-body').overflow)
   special.classList.add('board-tight-spacing');
- // A dense Selichos week can still need more space beside a full special
- // chart. Use the spare width of plain services before reducing any type.
- // Exception headings and their separation always retain their own lines.
- const compactWeeklyFit=panelFit(weekly,'.board-week-body');
- if(compactWeekly&&compactWeeklyFit?.overflow){
-  weekly.classList.add('board-inline-services');
-  alignTimeColumns(weekly,6);
-  if(panelFit(weekly,'.board-week-body').requiredHeight>=compactWeeklyFit.requiredHeight)
-   {weekly.classList.remove('board-inline-services');alignTimeColumns(weekly,6);}
- }
+ // Weekday prayer headings always stay above their centered times. Report
+ // any remaining height requirement to the board layout rather than switching
+ // just some prayers into a second, inline presentation.
  return {
   special:naturalSpecial?{...panelFit(special,'.board-shabbos-body'),naturalRequiredHeight:naturalSpecial.requiredHeight}:null,
   weekly:naturalWeekly?{...panelFit(weekly,'.board-week-body'),naturalRequiredHeight:naturalWeekly.requiredHeight}:null

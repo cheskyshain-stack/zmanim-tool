@@ -384,3 +384,23 @@ dialog::backdrop {
 #appearance-form label {display:block;margin:16px 0}
 #appearance-form select {width:100%}
 .calendar-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.calendar-toolbar h2{margin:0;min-width:190px}.calendar-toolbar label{margin-left:auto}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.calendar-weekday{text-align:center;padding:8px;font-weight:700;color:#59687b}.calendar-day{display:flex;flex-direction:column;align-items:stretch;text-align:left;min-height:112px;padding:10px;border-radius:10px;border:1px solid #dce1e6;background:#fff;color:#142a42;gap:5px}.calendar-day strong{font-size:21px}.calendar-day .hebrew-date{font-size:15px;line-height:1.3}.calendar-holiday{font-size:15px;color:#6e5623;font-weight:700}.calendar-day[aria-pressed="true"]{background:#f2ead7;outline:2px solid #9c8249;outline-offset:-2px}.calendar-day[aria-current="date"] strong{text-decoration:underline;text-underline-offset:4px}.calendar-day:focus-visible{outline:3px solid #2868ad}.calendar-day:hover{background:#f3f5f7}@media(max-width:650px){.month-grid{gap:3px}.calendar-day{min-height:96px;padding:6px 3px;border-radius:5px}.calendar-day strong{font-size:18px}.calendar-day .hebrew-date,.calendar-holiday{font-size:12px}.calendar-toolbar h2{min-width:0;font-size:20px}.calendar-toolbar label{margin-left:0;width:100%}.calendar-weekday{font-size:12px;padding:5px 0}}
+
+/* The sponsorship picker uses the same protected Hebrew/holiday calendar as preview. */
+.dedication-date-calendar{grid-column:1/-1;min-width:0;border-block:1px solid #ddd7c9;padding-block:20px;margin-block:4px}
+.calendar-day{min-width:0;overflow-wrap:anywhere}
+.calendar-feedback:not(:empty){display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 0;color:#526276}
+.calendar-toolbar button:disabled{cursor:default}
+.dedication-date-picker summary{cursor:pointer;font-weight:600;min-height:44px;padding-block:12px}
+.dedication-date-picker details[open]>summary{margin-bottom:12px}
+.dedication-remove-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 22px}
+.dedication-remove-bar span{font-size:14px;color:#526276}
+button.remove-from-screen{border-color:#ad6661;color:#7b2c27;background:#fff8f6}
+button.remove-from-screen:hover{background:#f6e5e1}
+.screen-dedication-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.screen-dedication-items h3{margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:700px){
+ .screen-dedication-items{grid-template-columns:1fr}
+ .screen-dedication-items .actions{width:100%}
+ .dedication-date-picker{padding:16px 10px}
+ .dedication-remove-bar button{width:100%}
+}

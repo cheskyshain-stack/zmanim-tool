@@ -5,6 +5,7 @@ import { themeAt } from './appearance.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
+const availableDedicationHTML = '<article class="tv-card dedication dedication-available"><h2 lang="he" dir="rtl">פרנס היום</h2><div class="dedication-copy"><p class="availability-title">Sponsorship available</p><p class="availability-copy">Dedicate a day of Torah &amp; tefillah</p></div></article>';
 const zmanTime = value => {
   const parts = String(value ?? '').match(/^(\d{1,2}:\d{2})(:\d{2})$/);
   return parts ? `${esc(parts[1])}<span class="zman-seconds">${esc(parts[2])}</span>` : esc(value);
@@ -35,7 +36,7 @@ export class DisplayView {
     this.host = host;
     this.slots = new Map();
     this.warning = [];
-    host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><section class="board-dedication"></section><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><section class="board-zmanim"></section><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
+    host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><aside class="board-left-rail"><section class="board-zmanim"></section><section class="board-dedication" aria-label="פרנס היום"></section></aside><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
     this.stage = host.firstElementChild;
     this.stage.classList.add('right-column-board');
     for (const [key, selector] of Object.entries({brand:'.tv-brand',date:'.tv-date',clock:'.tv-clock',dedication:'.board-dedication',zmanim:'.board-zmanim',schedules:'.tv-center',notices:'.board-notices',next:'.next-minyan',connection:'.connection-state'})) this[key] = this.stage.querySelector(selector);
@@ -55,7 +56,7 @@ export class DisplayView {
       // Regular panels also measure the final Hebrew font, once at startup.
       if (this.snapshot) {
         if (!this.originalSheetBox) this.scheduleKey = null;
-        this.headerKey = null;
+        this.dedicationKey = null;
         this.layoutKey = null;
         this.update(this.snapshot, this.options);
       }
@@ -84,9 +85,8 @@ export class DisplayView {
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
     const dedications = items.filter(i => i.kind === 'dedication');
     const dedication = this.choose('dedication', dedications, now);
-    setHTML(this.dedication, dedication ? cardHTML(dedication) : '');
-    this.dedication.hidden = !dedication;
-    this.fitDedicationHeader(dedications);
+    setHTML(this.dedication, dedication ? cardHTML(dedication) : availableDedicationHTML);
+    this.fitDedicationSlot(dedications);
     setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${zmanTime(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
 
     const groups = groupAnnouncements(items), groupsKey = JSON.stringify(groups);
@@ -129,7 +129,7 @@ export class DisplayView {
         this.originalSheetKey = null;
       }
     }
-    const layoutKey = scheduleKey + groupsKey + this.headerKey;
+    const layoutKey = scheduleKey + groupsKey + this.dedicationKey;
     if (this.layoutKey !== layoutKey) {
       this.layoutKey = layoutKey;
       this.layoutBoard(groups, sheet, placement);
@@ -142,49 +142,23 @@ export class DisplayView {
     this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';
     this.checkCapacity();
   }
-  fitDedicationHeader(items) {
+  fitDedicationSlot(items) {
     const key = JSON.stringify(items.map(item=>[item.id,item.data]));
-    if (key === this.headerKey) return;
-    this.headerKey = key;
-    this.stage.classList.toggle('has-dedication',!!items.length);
-    this.stage.style.removeProperty('--board-head-height');
-    this.stage.style.removeProperty('--dedication-card-width');
-    if (!items.length) return;
-    // Start at half the available width. Expand only when saved copy would
-    // wrap into extra lines; reserve one size for every active dedication so
-    // rotation, clock ticks and theme changes never move the schedules.
-    const fullWidth = this.dedication.offsetWidth;
+    if (key === this.dedicationKey) return;
+    this.dedicationKey = key;
+    // This slot always remains below the daily zmanim. Reserve the tallest
+    // active copy so dedication rotation never moves the surrounding panels.
     const measure = document.createElement('section');
     measure.className = 'board-dedication dedication-measure';
-    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',height:'auto',visibility:'hidden',pointerEvents:'none'});
-    measure.style.setProperty('--dedication-card-width','100%');
+    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',width:'300px',height:'auto',visibility:'hidden',pointerEvents:'none'});
     this.stage.append(measure);
-    const copies = items.map(item=>({html:cardHTML(item)}));
-    const size = (copy,width) => {
-      measure.style.width = width+'px';
-      measure.innerHTML = copy.html;
-      return {height:measure.scrollHeight,overflow:measure.scrollWidth>width+1};
-    };
-    for (const copy of copies) copy.fullHeight = size(copy,fullWidth).height;
-    const fits = width => copies.every(copy=>{
-      const measured = size(copy,width);
-      return !measured.overflow && measured.height<=copy.fullHeight+1;
-    });
-    let width = Math.ceil(fullWidth/2);
-    if (!fits(width)) {
-      let low = width, high = fullWidth;
-      while (high-low>1) {
-        const middle = Math.floor((low+high)/2);
-        if (fits(middle)) high=middle;
-        else low=middle;
-      }
-      width=high;
+    let height = 128;
+    for (const html of items.length ? items.map(cardHTML) : [availableDedicationHTML]) {
+      measure.innerHTML = html;
+      height = Math.max(height,measure.scrollHeight);
     }
-    let height = 104;
-    for (const copy of copies) height=Math.max(height,size(copy,width).height);
     measure.remove();
-    this.stage.style.setProperty('--dedication-card-width',width+'px');
-    this.stage.style.setProperty('--board-head-height',Math.ceil(height+14)+'px');
+    this.stage.style.setProperty('--dedication-slot-height',Math.ceil(height)+'px');
   }
   noticeHeight(pages) {
     const measure = document.createElement('section');
@@ -205,8 +179,9 @@ export class DisplayView {
   layoutBoard(groups, sheet, placement) {
     // Every published announcement stays visible together, including beside a
     // special chart. Clock ticks and theme changes never rerun this measurement.
-    this.stage.classList.remove('right-extended','special-expanded','week-extended','week-wide-notices','compact-notice-spacing','compact-zmanim-spacing');
+    this.stage.classList.remove('right-extended','left-extended','special-expanded','week-extended','week-wide-notices','compact-notice-spacing','compact-zmanim-spacing');
     this.stage.style.removeProperty('--week-notice-rail');
+    this.stage.style.removeProperty('--board-special-width');
     this.stage.classList.toggle('without-notices', !groups.length);
     this.stage.classList.toggle('all-notices', !!groups.length);
     this.stage.classList.toggle('sheet-notices', !!sheet && !!groups.length);
@@ -250,7 +225,36 @@ export class DisplayView {
       fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
     }
     if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
-    if (groups.length && (fit.weekly?.overflow || zmanimOverflows())) {
+    if (groups.length && (zmanimOverflows() || fit.weekly?.overflow)) {
+      // Keep a tall dedication below all eleven daily zmanim. This rail can
+      // use the space beneath it; complete announcements remain in the other
+      // columns instead of squeezing the daily times behind the card.
+      this.stage.classList.add('left-extended','compact-notice-spacing');
+      if (sheet && placement === 'both') {
+        // With no weekday panel, the neighboring column can hold every notice
+        // while the original complete holiday page stays on the right.
+        this.stage.style.setProperty('--notice-height','0px');
+      } else {
+        const alternatives=[groups,groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
+        let best;
+        for (const width of sheet ? [680,660,640,620,600,580,560,540,520] : [680,640,600,560,520,480,460,440]) {
+          if (width) this.stage.style.setProperty('--board-special-width',width+'px');
+          for (const candidate of alternatives) {
+            const height=Math.max(280,this.noticeHeight([candidate]));
+            this.stage.style.setProperty('--notice-height',height+'px');
+            const trial=fitBoardSchedules(this.schedules,this.snapshot.schedule.presentation,{allowCompact:true});
+            const overflow=(trial.weekly?.overflow||0)+(trial.special?.overflow||0);
+            if (!best || overflow<best.overflow || overflow===best.overflow&&height<best.height) best={width,height,candidate,overflow};
+          }
+          if (!best.overflow) break;
+        }
+        this.noticePages=[best.candidate];
+        this.stage.style.setProperty('--notice-height',best.height+'px');
+        if (best.width) this.stage.style.setProperty('--board-special-width',best.width+'px');
+        fit=fitBoardSchedules(this.schedules,this.snapshot.schedule.presentation,{allowCompact:true});
+      }
+    }
+    if (groups.length && !this.stage.classList.contains('left-extended') && (fit.weekly?.overflow || zmanimOverflows())) {
       // A Selichos or Chol Hamoed week can need the full height as well. Keep
       // both schedules intact and move the four complete announcement areas
       // into a measured two-by-two left rail, beneath the daily zmanim. A

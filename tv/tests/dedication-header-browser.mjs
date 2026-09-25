@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {readFile,mkdir} from 'node:fs/promises';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -29,9 +29,6 @@ const origin=`http://127.0.0.1:${server.address().port}`;
 const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 assert.ok([1,2].includes(scale),'DISPLAY_TEST_SCALE must be 1 (1080p) or 2 (4K)');
 const screenshots=process.env.BOARD_SCREENSHOT_DIR;
-// At the logical 1920px display size the prior center card was 980px wide.
-// Short dedications now use half of that width; longer copy may reclaim it.
-const compactDedicationWidth=490,availableDedicationWidth=980;
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
  .map(item=>({...item,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
 assert.equal(notices.length,10,'Exercise all ten current public announcement fixtures');
@@ -51,7 +48,7 @@ const fixtures=[
  }),
  makeDedication('anonymous',{anonymous:true,sponsor:'PRIVATE SPONSOR MUST NEVER APPEAR',dedicationType:'לע״נ',dedicationName:'תצוגה פרטית לדוגמה',message:'Development preview only.'}),
 ];
-const dates=['2026-09-08','2026-09-24','2026-09-26','2026-11-10'];
+const dates=(process.env.DISPLAY_TEST_DATES||'2026-09-08,2026-09-12,2026-09-21,2026-09-24,2026-09-26,2026-11-10').split(',');
 const browser=await (engine==='webkit'?webkit.launch({headless:true}):chromium.launch({channel:'chrome',headless:true}));
 const failures=[],results=[];
 try{
@@ -73,7 +70,7 @@ try{
   const unchanged=JSON.stringify(snapshot);
   for(const fixture of fixtures){
    const name=`${date} ${theme} ${fixture.id} ${1920*scale}x${1080*scale}`;
-   const r=await page.evaluate(async({snapshot,fixture})=>{
+   const r=await page.evaluate(async({snapshot,fixture,diagnostics})=>{
     const view=window.audit;
     const input={...snapshot,items:[...snapshot.items,fixture]},original=JSON.stringify(input);
     view.slots.clear();view.update(input,{preview:true,now:100000});
@@ -81,16 +78,29 @@ try{
     const host=view.stage.querySelector('.original-sheet-host');if(host)await host.originalSheetReady;
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const root=view.stage,head=root.querySelector('.tv-head'),card=root.querySelector('.board-dedication .dedication');
+    const rail=root.querySelector('.board-left-rail'),zmanim=root.querySelector('.board-zmanim');
     const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
     const outside=(e,p)=>{const a=rect(e),b=rect(p);return a.left<b.left-2||a.top<b.top-2||a.right>b.right+2||a.bottom>b.bottom+2;};
     const overlap=(a,b)=>a.left<b.right-2&&a.right>b.left+2&&a.top<b.bottom-2&&a.bottom>b.top+2;
     const overflow=[],missing=[];
-    for(const panel of root.querySelectorAll('.board-weekly,.board-shabbos,.board-zmanim,.announcement-group,.board-dedication,.board-dedication .dedication')){
+    for(const panel of root.querySelectorAll('.board-left-rail,.board-weekly,.board-shabbos,.board-zmanim,.announcement-group,.board-dedication,.board-dedication .dedication')){
      if(panel.scrollHeight>panel.clientHeight+2||panel.scrollWidth>panel.clientWidth+2)overflow.push({panel:panel.className,height:panel.scrollHeight-panel.clientHeight,width:panel.scrollWidth-panel.clientWidth});
      const texts=panel.querySelectorAll('.board-service,.board-schedule-row,.board-zmanim>div,h2,h3,p,bdi');
      for(const text of texts)if(text.getClientRects().length&&outside(text,panel))overflow.push({panel:panel.className,text:text.textContent.slice(0,80)});
     }
-    if(host)for(const row of host.shadowRoot.querySelectorAll('.onepage-row,.onepage-sec-head,.onepage-title'))if(outside(row,host))overflow.push({sheet:row.className,text:row.textContent.slice(0,80)});
+    if(host){
+     for(const row of host.shadowRoot.querySelectorAll('.onepage-row,.onepage-sec-head,.onepage-title'))if(outside(row,host))overflow.push({sheet:row.className,text:row.textContent.slice(0,80)});
+     const expected=snapshot.schedule.specialSheet.sections.flatMap(section=>section.rows.flatMap(row=>[row,...(row.extra?[row.extra]:[])]));
+     const actual=[...host.shadowRoot.querySelectorAll('.onepage-row')];
+     const normalized=value=>String(value||'').replace(/\s+/g,' ').trim();
+     if(actual.length!==expected.length)missing.push({sheetRows:actual.length,expectedRows:expected.length});
+     expected.forEach((row,index)=>{
+      const text=normalized(actual[index]?.textContent);
+      for(const value of [row.label,row.sub,row.note,...(row.times||[]).flatMap(time=>[time.text,time.name,time.mark])].filter(Boolean))if(!text.includes(normalized(value)))missing.push({sheetRow:index,value});
+      const underlines=(row.times||[]).filter(time=>time.underlined).length;
+      if((actual[index]?.querySelectorAll('u').length||0)!==underlines)missing.push({sheetRow:index,underlines});
+     });
+    }
     const shown=[...root.querySelectorAll('.announcement-section')];
     for(const notice of snapshot.items){
      const section=shown.find(el=>el.dataset.sourceId===notice.id);
@@ -128,37 +138,55 @@ try{
     const peers=[brand,...root.querySelectorAll('.tv-head .shul-donate,.tv-date,.tv-clock')].filter(e=>e.getClientRects().length);
     const collisions=card?peers.filter(e=>overlap(rect(card),rect(e))).map(e=>e.className):[];
     const panels=[...root.querySelectorAll('.board-zmanim,.board-weekly,.board-shabbos,.original-sheet-box')];
+    const weeklyHeading=root.querySelector('.board-weekly>h2');
+    let weekly=null;
+    if(weeklyHeading){const range=document.createRange();range.selectNodeContents(weeklyHeading);weekly={text:weeklyHeading.textContent,expected:snapshot.schedule.presentation.weekly.title,lines:new Set([...range.getClientRects()].filter(rect=>rect.width>0).map(rect=>Math.round(rect.top))).size,subheadings:root.querySelectorAll('.board-weekly>.board-title').length};}
     const times=[...root.querySelectorAll('.board-zmanim>div')].map(e=>e.textContent);
     const expectedTimes=snapshot.schedule.zmanim.map(z=>z.time+z.label);
-    return {overflow,missing,warnings:view.warning,card:card&&rect(card),head:rect(head),brand:brand.textContent,brandParts,brandInHeader:!outside(brand,head),content,
+    let diagnostic=null;
+    if(diagnostics&&fixture.id.endsWith('multiline')){
+     const {fitBoardSchedules}=await import('/display-assets/board-schedules.js');
+     const metrics=selector=>{const node=root.querySelector(selector);if(!node)return null;const style=getComputedStyle(node);return {rect:rect(node),offsetHeight:node.offsetHeight,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,paddingTop:style.paddingTop,paddingBottom:style.paddingBottom,lineHeight:style.lineHeight,display:style.display,overflow:style.overflow,children:[...node.children].map(child=>({className:child.className,tag:child.tagName,rect:rect(child),scrollHeight:child.scrollHeight,clientHeight:child.clientHeight}))};};
+     diagnostic={width:root.style.getPropertyValue('--board-special-width'),noticeHeight:root.style.getPropertyValue('--notice-height'),before:{panel:metrics('.board-weekly'),body:metrics('.board-week-body')}};
+     diagnostic.fit=fitBoardSchedules(view.schedules,snapshot.schedule.presentation,{allowCompact:true});
+     diagnostic.after={panel:metrics('.board-weekly'),body:metrics('.board-week-body')};
+     const {groupAnnouncements}=await import('/display-assets/announcements.js');
+     const groups=groupAnnouncements(input.items),alternatives=[groups,groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
+     diagnostic.trials=[];
+     for(const width of [680,660,640,620,600,580,560])for(const [candidateIndex,candidate] of alternatives.entries()){
+      root.style.setProperty('--board-special-width',width+'px');
+      const noticeHeight=Math.max(280,view.noticeHeight([candidate]));
+      root.style.setProperty('--notice-height',noticeHeight+'px');
+      const fit=fitBoardSchedules(view.schedules,snapshot.schedule.presentation,{allowCompact:true});
+      const panel=root.querySelector('.board-weekly');
+      diagnostic.trials.push({width,candidateIndex,noticeHeight,fit:fit.weekly,panelWidth:panel.offsetWidth,panelHeight:panel.offsetHeight,panelScrollHeight:panel.scrollHeight});
+     }
+     root.style.setProperty('--board-special-width',diagnostic.width);
+     root.style.setProperty('--notice-height',diagnostic.noticeHeight);
+     fitBoardSchedules(view.schedules,snapshot.schedule.presentation,{allowCompact:true});
+    }
+    return {overflow,missing,warnings:view.warning,card:card&&rect(card),rail:rect(rail),zmanim:rect(zmanim),head:rect(head),brand:brand.textContent,brandParts,brandInHeader:!outside(brand,head),content,
      title:card?.querySelector('h2')?.textContent,contentHeight,lineHeights,fonts,multilineRows,collisions,
      emptyRows:ps.filter(p=>!p.textContent.trim()&&getComputedStyle(p).display!=='none').map(p=>p.className),
      sponsorRows:card?.querySelectorAll('.sponsor').length||0,anonymous:content.includes('Sponsored anonymously'),
-     privateSponsorVisible:d.anonymous&&root.innerHTML.includes(d.sponsor),cardInHeader:!!card&&!outside(card,head),
+     privateSponsorVisible:d.anonymous&&root.innerHTML.includes(d.sponsor),cardInRail:!!card&&!outside(card,rail),cardInHeader:!!card&&!outside(card,head),
      panelsBelowHeader:panels.every(panel=>rect(panel).top>=rect(head).bottom-2),
      noticeIds:shown.map(e=>e.dataset.sourceId).sort(),pages:Number(view.notices.dataset.pages),times,expectedTimes,
-     theme:root.dataset.theme,sheetPlacement:root.querySelector('.original-sheet-box')?.dataset.placement||null,
-     width:rect(root).width,height:rect(root).height,snapshotUnchanged:JSON.stringify(input)===original};
-   },{snapshot,fixture});
+     theme:root.dataset.theme,weekly,sheetSource:host?snapshot.schedule.specialSheet.sourceId:null,sheetColumns:host?Number(host.dataset.sheetColumns):null,sheetPlacement:root.querySelector('.original-sheet-box')?.dataset.placement||null,
+     diagnostic,width:rect(root).width,height:rect(root).height,snapshotUnchanged:JSON.stringify(input)===original};
+   },{snapshot,fixture,diagnostics:!!process.env.DISPLAY_TEST_DIAGNOSTICS});
    const check=(ok,what)=>{if(!ok)failures.push({name,what,result:r});};
-   check(!!r.card&&r.title==='פרנס היום','active dedication has its own labeled header card');
-   check(r.cardInHeader&&r.panelsBelowHeader&&!r.collisions.length,'dedication fits in header without colliding with brand, donation, date, clock or times');
-   check(!!r.card&&Math.abs((r.card.left+r.card.right-r.head.left-r.head.right)/2)<=2*scale,'dedication card is centered in the full header');
-   const logicalCardWidth=r.card?.width/scale;
-   check(fixture.id.endsWith('multiline')
-    ?logicalCardWidth>compactDedicationWidth+16&&logicalCardWidth<=availableDedicationWidth+2
-    :Math.abs(logicalCardWidth-compactDedicationWidth)<=2,
-    'short dedication uses half the former card width and only long copy widens it');
+   check(!!r.card&&r.title==='פרנס היום','active dedication has its own labeled rail card');
+   check(r.cardInRail&&!r.cardInHeader&&r.panelsBelowHeader&&!r.collisions.length,'dedication fits in the left rail without colliding with the header');
+   check(!!r.card&&r.card.top>=r.zmanim.bottom&&r.card.top-r.zmanim.bottom<=16*scale,'dedication is directly below daily zmanim');
+   check(!!r.card&&Math.abs(r.card.left-r.zmanim.left)<=2*scale&&Math.abs(r.card.right-r.zmanim.right)<=2*scale,'daily zmanim and dedication share the same rail width');
    check(r.fonts.length>0&&Math.min(...r.fonts)>=20,'main dedication text stays readable at 1080p');
-   check(r.lineHeights.length>0&&r.contentHeight>=3*Math.max(...r.lineHeights)-2,'active dedication reserves at least three readable lines');
+   check(r.card.height>=128*scale,'dedication retains its permanent card size');
    check(r.emptyRows.length===0,'optional empty fields do not produce empty rows');
    check(r.sponsorRows===(fixture.data.sponsor||fixture.data.anonymous?1:0),'blank sponsor creates no sponsor row');
    check(r.anonymous===fixture.data.anonymous&&!r.privateSponsorVisible,'anonymous label is explicit and private sponsor stays hidden');
    check(!r.missing.length,'all dedication and public announcement fields are retained');
-   const longStress=fixture.id.endsWith('multiline');
-   const onlyScheduleOverflow=r.overflow.every(o=>/^board-(zmanim|weekly|shabbos)(?: |$)/.test(o.panel||''));
-   check(!r.overflow.length&&!r.warnings.length||longStress&&onlyScheduleOverflow&&r.warnings.length>0,
-    longStress?'long dedication stays complete and any schedule capacity limit is reported':'header, times and all notice panels remain unclipped');
+   check(!r.overflow.length&&!r.warnings.length,'dedication, times, charts and all notice panels remain unclipped');
    check(!fixture.data.dedicationText.includes('\n')||r.multilineRows>=3,'three-line Hebrew dedication retains three visible lines');
    check(r.brand.includes('Bais Medrash of Lakewood Commons')&&r.brand.includes('קהל לב מנחם'),'both full English and Hebrew shul names remain visible');
    check(r.brandInHeader&&r.brandParts.length===2&&r.brandParts.every(part=>part.fontSize===28&&part.align==='center'&&part.centered),
@@ -168,8 +196,10 @@ try{
    check(JSON.stringify(r.times)===JSON.stringify(r.expectedTimes),'all original zmanim labels and times are retained');
    check(r.theme===theme&&r.width===1920*scale&&r.height===1080*scale,'saved theme and full display dimensions remain correct');
    check(r.snapshotUnchanged,'rendering preserves the input schedule and announcement data');
+   check(!r.weekly||r.weekly.text===r.weekly.expected&&r.weekly.lines===1&&r.weekly.subheadings===0,'weekday chart uses one complete single-line heading');
    check(date!=='2026-09-26'||r.sheetPlacement==='both','both-column special schedule case is exercised');
-   results.push({name,headerHeight:r.head.height,cardHeight:r.card?.height,cardWidth:r.card?.width,brandParts:r.brandParts,bodyLines:r.multilineRows,issues:failures.filter(f=>f.name===name).length});
+   check(!['2026-09-12','2026-09-21'].includes(date)||r.sheetSource?.startsWith('high-holidays:')&&r.sheetColumns===2,'RH and YK use the real combined original two-column page');
+   results.push({name,headerHeight:r.head.height,railHeight:r.rail.height,cardHeight:r.card?.height,cardWidth:r.card?.width,brandParts:r.brandParts,bodyLines:r.multilineRows,diagnostic:r.diagnostic,issues:failures.filter(f=>f.name===name).length});
    if(screenshots&&(fixture.id.endsWith('multiline')||date==='2026-09-24'&&['development-header-optional-sponsor','development-header-text-only'].includes(fixture.id))){
     const variant=fixture.id.replace('development-header-','');
     await page.screenshot({path:path.join(screenshots,`dedication-header-${date}-${theme}-${variant}${scale===2?'-4k':''}.png`)});
@@ -186,26 +216,32 @@ try{
    view.slots.clear();view.update(active,{preview:true,now:3000000});await frame();
    const host=root.querySelector('.original-sheet-host');if(host)await host.originalSheetReady;
    const page=host?.shadowRoot.querySelector('.original-page'),fits=host?.originalSheetFitCount;
-   const first=view.slots.get('dedication').id,before={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature()};
+   const geometry=()=>JSON.stringify([...root.querySelectorAll('.board-left-rail,.board-zmanim,.board-dedication,.board-weekly,.board-shabbos,.original-sheet-box,.board-notices')].map(node=>{const r=node.getBoundingClientRect();return [node.className,r.x,r.y,r.width,r.height];}));
+   const first=view.slots.get('dedication').id,before={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature(),geometry:geometry()};
    view.update(active,{preview:true,now:3036000});await frame();
-   const second=view.slots.get('dedication').id,after={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature()};
+   const second=view.slots.get('dedication').id,after={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature(),geometry:geometry()};
    const stable=!host||(root.querySelector('.original-sheet-host')===host&&host.shadowRoot.querySelector('.original-page')===page&&fits===host.originalSheetFitCount);
    view.update(active,{preview:true,theme:snapshot.appearance.mode==='dark'?'light':'dark',now:3037000});await frame();
    const themeStable=view.slots.get('dedication').id===second&&height('.tv-head')===after.head&&height('.board-dedication .dedication')===after.card&&width('.board-dedication .dedication')===after.cardWidth;
    const inactive={...snapshot,items:[...snapshot.items,{...fixtures[0],startsAt:'2030-01-01T00:00:00.000Z'},{...fixtures[2],endsAt:'2020-01-02T00:00:00.000Z'}]};
    view.update(inactive,{preview:true,now:3038000});await frame();
    const inactiveSection=root.querySelector('.board-dedication'),inactiveStyle=getComputedStyle(inactiveSection);
-   return {first,second,before,after,stable,themeStable,inactiveHead:height('.tv-head'),inactiveHeight:height('.board-dedication'),inactiveHidden:inactiveSection.hidden&&(inactiveStyle.display==='none'||inactiveStyle.visibility==='hidden'),inactiveCards:root.querySelectorAll('.board-dedication .dedication').length,inactiveSlot:view.slots.has('dedication')};
+   const inactiveOverflow=[...root.querySelectorAll('.board-left-rail,.board-zmanim,.board-dedication,.board-weekly,.board-shabbos,.announcement-group')].filter(node=>node.scrollHeight>node.clientHeight+2||node.scrollWidth>node.clientWidth+2).map(node=>({panel:node.className,height:node.scrollHeight-node.clientHeight,width:node.scrollWidth-node.clientWidth}));
+   return {first,second,before,after,stable,themeStable,inactiveOverflow,inactiveHead:height('.tv-head'),inactiveHeight:height('.board-dedication'),inactiveVisible:!inactiveSection.hidden&&inactiveStyle.display!=='none'&&inactiveStyle.visibility!=='hidden',inactiveCards:root.querySelectorAll('.board-dedication .dedication-available').length,inactiveCopy:inactiveSection.textContent,inactiveSlot:view.slots.has('dedication')};
   },{snapshot,fixtures});
   const check=(ok,what)=>{if(!ok)failures.push({name:`${date} ${theme} rotation/inactive`,what,result:transition});};
   check(transition.first!==transition.second,'two active dedications rotate');
-  check(transition.before.head===transition.after.head&&transition.before.card===transition.after.card&&transition.before.cardWidth===transition.after.cardWidth&&transition.themeStable,'rotation and theme changes keep card width and card/header heights stable');
+  check(transition.before.geometry===transition.after.geometry&&transition.before.head===transition.after.head&&transition.themeStable,'rotation and theme changes keep card and all schedule geometry stable');
   check(transition.before.times===transition.after.times&&transition.stable,'dedication rotation preserves every schedule time and the mounted special sheet');
-  check(transition.inactiveHidden&&transition.inactiveCards===0&&!transition.inactiveSlot&&transition.inactiveHead<transition.before.head,'inactive dedication collapses and returns header space to the schedules');
+  check(transition.inactiveVisible&&transition.inactiveCards===1&&!transition.inactiveSlot&&transition.inactiveHead===transition.before.head&&transition.inactiveCopy.includes('Sponsorship available'),'inactive dedication becomes the permanent sponsorship-availability card without changing the header');
+  check(!transition.inactiveOverflow.length,'empty sponsorship card and all neighboring panels remain unclipped');
+  if(screenshots)await page.screenshot({path:path.join(screenshots,`dedication-rail-${date}-${theme}-available${scale===2?'-4k':''}.png`)});
   assert.equal(JSON.stringify(snapshot),unchanged,'Preview rendering must not mutate original schedule or announcement fixtures');
  }
  assert.deepEqual(errors,[],'Browser has no runtime errors');
  assert.deepEqual(writes,[],'Private fixtures are never saved');
- console.log(JSON.stringify({engine,scale,results,failures},null,2));
- assert.equal(failures.length,0,'Dedication header failures are listed above');
+ const report={engine,scale,results,failures,errors,writes};
+ if(process.env.DISPLAY_TEST_REPORT){await mkdir(path.dirname(process.env.DISPLAY_TEST_REPORT),{recursive:true});await writeFile(process.env.DISPLAY_TEST_REPORT,JSON.stringify(report,null,2));}
+ console.log(JSON.stringify(report,null,2));
+ assert.equal(failures.length,0,'Dedication rail failures are listed above');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

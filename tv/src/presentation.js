@@ -11,6 +11,7 @@ import { buildSukkosPoster, SK_TEXT } from '../../js/posters/sukkos.js';
 import { buildPesachPoster } from '../../js/posters/pesach.js';
 import { buildRoshHashanaPoster } from '../../js/posters/roshhashana.js';
 import { buildYomKippurPoster } from '../../js/posters/yomkippur.js';
+import { slichosMornings } from '../../js/posters/slichos.js';
 export const civil = s => dateFromSerial(s).toISOString().slice(0,10);
 const weekdays=['יום א׳','יום ב׳','יום ג׳','יום ד׳','יום ה׳','יום ו׳','שבת קודש'];
 export function hebrewDay(s,settings) {
@@ -157,6 +158,14 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
   sections.push(...parts.map(part=>({...part,groupDay:civil(s)})));covered.push(hebrewDay(s,settings));
  }
  const weekdaysData=[],references=[],posterSections=[];
+ // The first night's Selichos belongs to Sunday civil time, but the source
+ // explicitly calls it Motzei Shabbos. Retain that distinction only in the
+ // weekly reference; the actual event name, instant and next-minyan list stay
+ // untouched. Never infer a night service by parsing its displayed clock.
+ const nightSources=new Map();
+ const weekYear=hebrewDateExtended(start).year;
+ for(const year of [weekYear,weekYear+1])for(const morning of slichosMornings(year))
+  if(morning.night&&morning.serial>=start&&morning.serial<sat)nightSources.set(morning.serial,morning);
  for(let s=start;s<sat;s++){
   if(holy(s)){references.push({date:civil(s),label:hebrewDay(s,settings),text:'ראה לוח '+hebrewDay(s,settings)});continue;}
   const h=hebrewDateExtended(s);
@@ -191,14 +200,18 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
       }
     }
   }
-  weekdaysData.push({...d,label:hebrewDay(s,settings),fastDay:Boolean(hasTaanis(s,settings)),events:events.filter(e=>!ownsErev||e.mins<720)});
+  const night=nightSources.get(s);
+  const referenceEvents=events.filter(e=>!ownsErev||e.mins<720).map(e=>
+   night&&e.name===night.name?{...e,name:night.from}:e);
+  weekdaysData.push({...d,label:hebrewDay(s,settings),fastDay:Boolean(hasTaanis(s,settings)),events:referenceEvents});
   if(ownsErev)references.push({date:civil(s),label:hebrewDay(s,settings),text:'אחר הצהריים והערב: ראה לוח '+hebrewDay(s+1,settings)});
  }
  let title=hasParsha(sat,{...settings,english:false},tables)||hebrewDay(sat,settings);
  if(title&&!/פרשת|שבת|סוכות|פסח|ראש השנה|שבועות|כיפור/.test(title))title='פרשת '+title;
  const parshaFor=s=>{let name=hasParsha(s,{...settings,english:false},tables)||'';return name.replace(/^פרשת\s*/, '').replace(/^שבת\s*/, '');};
  const headingDate=hebrewDateExtended(sat);
- if(headingDate.month===7&&[15,16].includes(headingDate.dayOfMonth))title='שבוע של סוכות';
+ if(headingDate.month===7&&[1,2].includes(headingDate.dayOfMonth))title='שבוע של ראש השנה';
+ else if(headingDate.month===7&&[15,16].includes(headingDate.dayOfMonth))title='שבוע של סוכות';
  else if(posterSections.length)title='חול המועד';
  else if(title.startsWith('פרשת '))title='חול '+title;
  let specialTitle=[...new Set(covered)].join(' · ');
@@ -210,5 +223,10 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
      const name=parshaFor(group.first);specialTitle=/חול המועד/.test(name)?'שבת חול המועד':name?'שבת פרשת '+name:'שבת קודש';
    }
  }
- return {currentDay:hebrewDay(serial,settings),weekly:{title,from:civil(start),to:civil(sat),services:consolidateWeek(weekdaysData),references,posterSections},special:group?{id:civil(group.first),title:specialTitle,from:civil(group.first-1),to:civil(group.last),endsAt:end(group),sections}:null};
+ const morningNames=new Set(['שחרית','סליחות',...[...nightSources.values()].map(source=>source.from)]);
+ const services=consolidateWeek(weekdaysData);
+ // Splitting the first night into its own named service must not push the
+ // following mornings below Mincha and Maariv just because Sunday has none.
+ services.sort((a,b)=>Number(morningNames.has(b.name))-Number(morningNames.has(a.name)));
+ return {currentDay:hebrewDay(serial,settings),weekly:{title,from:civil(start),to:civil(sat),services,references,posterSections},special:group?{id:civil(group.first),title:specialTitle,from:civil(group.first-1),to:civil(group.last),endsAt:end(group),sections}:null};
 }

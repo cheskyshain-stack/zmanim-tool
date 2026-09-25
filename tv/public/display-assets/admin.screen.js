@@ -1,19 +1,20 @@
 import {DisplayView, escapeHTML as esc} from './renderer.js';
 import {ANNOUNCEMENT_GROUPS, groupAnnouncements} from './announcements.js';
-import {formatInstant} from './time.js';
+import {formatInstant,phase} from './time.js';
 
 const categoryFor = {hall:'Simcha hall information',rav:'Rav’s hours',community:'Community services',support:'Donation appeals'};
 
 /** Admin-only interaction layer around the same components used by /display/.
  * Never inserts controls into measured schedule/card content. Edits always use
  * protected records, including their version and timing, not public snapshots. */
-export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAdd, selectedArea, onSelect = () => {}}) {
+export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAdd, onRemoveDedication, selectedArea, onSelect = () => {}}) {
   const records = new Map(items.map(item => [item.id,item]));
   const groups = groupAnnouncements(snapshot.items);
   const areas = [...ANNOUNCEMENT_GROUPS, ...groups.filter(group => !ANNOUNCEMENT_GROUPS.some(area => area.id === group.id))];
   let selected = areas.some(area => area.id === selectedArea) ? selectedArea : groups[0]?.id || 'community';
-  const visibleDedications = (snapshot.items || []).filter(item => item.kind === 'dedication' && records.has(item.id));
-  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Tap an announcement to edit it. Tap an area heading to add information there.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with editable announcement areas"></div>${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose an announcement area">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} showing</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}${can('dedication') ? `<section class="panel screen-dedication-controls"><h2 dir="auto">פרנס היום · Top of screen</h2><div class="actions">${visibleDedications.map(item => `<button type="button" data-screen-edit="${esc(item.id)}">Edit ${esc(item.data?.dedicationName || 'dedication')}</button>`).join('')}<button type="button" id="screen-add-dedication">+ Add פרנס היום</button></div></section>` : ''}`;
+  const dedications = items.filter(item => item.kind === 'dedication' && ['showing','scheduled'].includes(phase(item,snapshot.at))).sort((a,b) => (a.startsAt || '').localeCompare(b.startsAt || ''));
+  const dedicationControls = can('dedication') ? `<section class="panel screen-dedication-controls"><div class="screen-area-heading"><h2 dir="auto">פרנס היום · Below זמני היום</h2><button type="button" id="screen-add-dedication">+ Add פרנס היום</button></div><p class="muted">Remove from screen stops a dedication from appearing and keeps it saved under Hidden.</p><div class="screen-dedication-items">${dedications.map(item => `<article class="screen-item"><div><span class="tag">${phase(item,snapshot.at) === 'showing' ? 'Showing now' : 'Scheduled'}</span><h3 dir="auto">${esc(item.data?.dedicationName || item.internalName || item.data?.dedicationText || 'פרנס היום')}</h3><p>${formatInstant(item.startsAt)} → ${formatInstant(item.endsAt)}</p></div><div class="actions"><button type="button" data-screen-edit="${esc(item.id)}">Edit dedication</button>${onRemoveDedication ? `<button type="button" class="remove-from-screen" data-screen-remove="${esc(item.id)}">Remove from screen</button>` : ''}</div></article>`).join('') || '<p class="muted">No active or upcoming dedications.</p>'}</div></section>` : '';
+  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Tap an announcement to edit it. Tap an area heading to add information there.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with editable announcement areas"></div>${dedicationControls}${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose an announcement area">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} showing</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}`;
   const warning = document.createElement('p');
   warning.className = 'notice';warning.hidden = true;warning.setAttribute('role','status');
   const host = container.querySelector('.preview-host');
@@ -45,11 +46,12 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       group.classList.toggle('screen-selected-area',group.dataset.announcementGroup === selected);
     }
     const dedication = host.querySelector('.board-dedication');
-    if (can('dedication') && !dedication.hidden && visibleDedications.length) {
+    if (dedication && can('dedication') && !dedication.hidden) {
+      const current = records.get(view.slots.get('dedication')?.id);
       dedication.classList.add('screen-edit-target');
       dedication.setAttribute('role','button');
       dedication.tabIndex = 0;
-      dedication.setAttribute('aria-label','Edit displayed פרנס היום');
+      dedication.setAttribute('aria-label',current ? 'Edit displayed פרנס היום' : 'Add פרנס היום sponsorship');
     }
   }
 
@@ -66,6 +68,12 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
   }
 
   function activate(target) {
+    const remove = target.closest('[data-screen-remove]');
+    if (remove) {
+      const item = records.get(remove.dataset.screenRemove);
+      if (!remove.disabled && item?.kind === 'dedication' && item.status === 'published' && can('dedication')) onRemoveDedication?.(item,remove);
+      return;
+    }
     const section = target.closest('.announcement-section');
     const editButton = target.closest('[data-screen-edit]');
     const id = section?.dataset.sourceId || editButton?.dataset.screenEdit;
@@ -87,6 +95,7 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
     if (target.closest('.board-dedication') && can('dedication')) {
       const current = records.get(view.slots.get('dedication')?.id);
       if (current) onEdit(current);
+      else onAdd({kind:'dedication',status:'draft',data:{}});
       return;
     }
     const group = target.closest('.announcement-group');

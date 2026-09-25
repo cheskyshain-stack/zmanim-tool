@@ -1677,6 +1677,11 @@ export function publicPosterSections(sourceKey, poster) {
   const key = ({ rh: 'roshhashana', yk: 'yomkippur', gedalia: 'tzomgedalia' })[sourceKey] || sourceKey;
   const cut = ONEPAGE_SECTIONS[key];
   if (!cut || !poster) return [];
+  return publicSections(cut(poster));
+}
+
+/** Only fields already printed on the public schedule page may leave the builder. */
+function publicSections(sections) {
   const publicTime = (time) => ({
     text: String(time.text ?? ''),
     underlined: Boolean(time.underlined),
@@ -1690,7 +1695,21 @@ export function publicPosterSections(sourceKey, poster) {
     if (row.extra) result.extra = { label: String(row.extra.label ?? ''), times: (row.extra.times || []).map(publicTime) };
     return result;
   };
-  return cut(poster).map((section) => ({ title: String(section.title ?? ''), rows: section.rows.map(publicRow) }));
+  return sections.map((section) => ({ title: String(section.title ?? ''), rows: section.rows.map(publicRow) }));
+}
+
+/** The original admin's whole-occasion sheet, using its source order and moved
+ * Selichos blocks. This exposes public page content only; it does not choose
+ * when the sheet should appear or change the actual daily schedule. */
+export function publicOccasionSheet(state, settings, year, group = POSTER_GROUP_DEFAULT) {
+  const built = buildEveryPoster(state, settings, year, { combined: false, group }).poster;
+  if (!built) return null;
+  return {
+    title: String(built.title || ONEPAGE_TEXT.title),
+    year: Number(built.hebrewYear),
+    span: { from: Number(built.span.from), to: Number(built.span.to) },
+    sections: publicSections(onePageSections(built)),
+  };
 }
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
@@ -1746,15 +1765,8 @@ function onePageRows(r) {
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }
 
-/** The whole season on one sheet.
- *
- *  Two columns by CSS rather than by handing blocks out between two boxes here. The browser
- *  balances them, which means a year that runs long or short does not need this file to know
- *  about it, and the blocks stay in one list in date order however they fall. Columns run
- *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
- *
- *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
-export function renderOnePagePoster(built, settings) {
+/** Every public block on the original whole-season sheet, in its source order. */
+function onePageSections(built) {
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
    * On the סליחות sheet it is a line among the rest, being a stretch of ordinary mornings
@@ -1810,6 +1822,21 @@ export function renderOnePagePoster(built, settings) {
     // what is said at those mornings, which is the same word the סליחות sheet is titled with.
     if (moved.length && index === aseresAfter) pushMoved();
   }
+  return sections;
+}
+
+/** The whole season on one sheet.
+ *
+ *  Two columns by CSS rather than by handing blocks out between two boxes here. The browser
+ *  balances them, which means a year that runs long or short does not need this file to know
+ *  about it, and the blocks stay in one list in date order however they fall. Columns run
+ *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
+ *
+ *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
+export function renderOnePagePoster(built, settings) {
+  const own = built.own === true && Array.isArray(built.sections);
+  const items = own ? [] : built.items;
+  const sections = onePageSections(built);
   /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
      Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
      **באולם השמחות" and one using only the first writes "*בעזרת נשים", which are two

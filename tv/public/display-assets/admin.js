@@ -95,7 +95,7 @@ async function dashboard() {
       try {
         const snapshot = await api('preview','POST',{at:new Date().toISOString()});
         if (!host.isConnected || request !== dashboardLoad) return;
-        screenEditor = mountScreenEditor(host,{snapshot,items,can,onEdit:edit,onAdd:edit,selectedArea:selectedScreenArea,onSelect:id => {selectedScreenArea=id;}});
+        screenEditor = mountScreenEditor(host,{snapshot,items,can,onEdit:edit,onAdd:edit,onRemoveDedication:removeDedication,selectedArea:selectedScreenArea,onSelect:id => {selectedScreenArea=id;}});
       } catch (error) {
         if (!host.isConnected || request !== dashboardLoad) return;
         host.innerHTML = '<p class="notice">The screen could not load. Try Refresh screen, or open Saved items to manage your content.</p>';
@@ -104,6 +104,21 @@ async function dashboard() {
     }
   } catch (e) {
     showError(e);
+  }
+}
+async function removeDedication(item, button) {
+  if (!can('dedication') || item.kind !== 'dedication' || item.status !== 'published' || button?.disabled) return;
+  const startedOn = navigation;
+  const buttons = [...app.querySelectorAll('[data-screen-remove],#remove-dedication,#editor button')];
+  buttons.forEach(control => control.disabled = true);
+  try {
+    await api(`items/${item.id}/hide`, 'POST', {version:item.version});
+    toast('Removed from the screen. It remains saved under Hidden.');
+    if (startedOn === navigation) { dirty = false; await dashboard(); }
+  } catch (error) {
+    if (startedOn === navigation) showError(error); else toast(error.message);
+  } finally {
+    buttons.forEach(control => {if (control.isConnected) control.disabled = false;});
   }
 }
 function renderList() {
@@ -158,18 +173,20 @@ async function edit(s, unsaved = false) {
   const d = s.data, kind = s.kind;
   let fields = "";
   if (kind === "announcement") fields = `${select("Start with a template", "template", [["", "Choose a template"], ...categories], d.category || "")}${input("Internal name (private)", "internalName", s.internalName)}${input("Visible title", "title", s.title, "text", 'maxlength="200" dir="auto"')}${select("Category", "category", categories, d.category || categories[6])}${area("Message", "message", d.message)}${input("Contact name (optional)", "contact", d.contact, "text", 'dir="auto"')}${input("Phone number (optional)", "phone", d.phone, "tel", 'dir="ltr"')}${select("Placement", "placement", [["automatic", "Automatic"], ["left", "Left"], ["right", "Right"]], d.placement || "automatic")}${select("Priority", "priority", [["normal", "Normal"], ["important", "Important"], ["urgent", "Urgent"]], d.priority || "normal")}${select("Announcement area", "displayGroup", [["automatic", "Automatic"], ["hall", "Simcha Hall"], ["rav", "The Rav"], ["community", "Community"], ["support", "Support & services"], ["separate", "Separate area"]], d.displayGroup || "automatic")}<p class="muted wide">Related notices share one larger area. Each notice stays complete and remains editable separately.</p>`;
-  if (kind === "dedication") fields = `${input("Internal name (private)", "internalName", s.internalName)}${input("Sponsor name / family (optional)", "sponsor", d.sponsor, "text", 'dir="auto"')}${check("Keep an entered sponsor name private (optional)", "anonymous", d.anonymous)}${select("Dedication type", "dedicationType", ["לע״נ", "לרפואה שלמה", "לזכות", "Custom"], d.dedicationType || "לע״נ")}${input("Dedication name (optional)", "dedicationName", d.dedicationName, "text", 'dir="auto"')}${area("Dedication text (optional)", "dedicationText", d.dedicationText, 500)}${area("Additional message (optional)", "message", d.message, 600)}<p class="muted wide">Names are optional. Add a dedication name, dedication text or an additional message, and choose a sponsorship date. Leave the sponsor blank without selecting the privacy checkbox. Dedication text and messages can contain multiple lines.</p>${input("Sponsorship date (English)", "sponsorshipDate", d.sponsorshipDate, "date")}<div><p class="muted">Or choose the Hebrew date:</p><div class="grid">${input("Day", "hebrewDay", "", "number", 'min="1" max="30"')}${select("Month", "hebrewMonth", [[7, "Tishrei"], [8, "Cheshvan"], [9, "Kislev"], [10, "Teves"], [11, "Shevat"], [12, "Adar"], [13, "Adar I"], [14, "Adar II"], [1, "Nissan"], [2, "Iyar"], [3, "Sivan"], [4, "Tammuz"], [5, "Av"], [6, "Elul"]], 7)}${input("Hebrew year", "hebrewYear", currentHebrewYear, "number", 'min="5700" max="5900"')}<button id="convert-date" type="button">Use Hebrew date</button></div></div>${select("Display window", "timing", [["evening", "Evening before through selected day"], ["civil", "Selected civil calendar day"], ["custom", "Custom start and end"]], d.timing || "evening")}<p class="muted wide">Evening: local sunset the preceding day until sunset on the selected date. Civil day: midnight to the next midnight in New York. The Hebrew date is the daytime date shown.</p><p id="date-equivalent" class="wide exact"></p>`;
+  if (kind === "dedication") fields = `${input("Internal name (private)", "internalName", s.internalName)}${input("Sponsor name / family (optional)", "sponsor", d.sponsor, "text", 'dir="auto"')}${check("Keep an entered sponsor name private (optional)", "anonymous", d.anonymous)}${select("Dedication type", "dedicationType", ["לע״נ", "לרפואה שלמה", "לזכות", "Custom"], d.dedicationType || "לע״נ")}${input("Dedication name (optional)", "dedicationName", d.dedicationName, "text", 'dir="auto"')}${area("Dedication text (optional)", "dedicationText", d.dedicationText, 500)}${area("Additional message (optional)", "message", d.message, 600)}<p class="muted wide">Names are optional. Add a dedication name, dedication text or an additional message. Dedication text and messages can contain multiple lines.</p>${select("Display window", "timing", [["evening", "Evening before through selected day"], ["civil", "Selected civil calendar day"], ["custom", "Custom start and end"]], d.timing || "evening")}<p class="muted wide">Evening: local sunset the preceding day until sunset on the selected date. Civil day: midnight to the next midnight in New York. The Hebrew date is the daytime date shown.</p><p id="date-equivalent" class="wide exact"></p>`;
   if (kind === "schedule") fields = `${input("Schedule name", "title", s.title)}${input("Internal name (private)", "internalName", s.internalName)}${input("Source Hebrew year", "sourceYear", d.source?.split(":")[1] || currentHebrewYear, "number", 'min="5700" max="5900"')}<label>Existing source schedule<select name="source" id="source"><option value="">Loading sources…</option></select></label>${input("Applies from (date)", "appliesFrom", d.appliesFrom, "date")}${input("Applies through (date)", "appliesTo", d.appliesTo, "date")}${input("Upcoming preview begins", "previewLocal", d.previewAt ? localStamp(d.previewAt) : "", "datetime-local")}${fold("previewFold", savedFold(d.previewAt))}${select("Portion replaced", "portion", [["all", "All portions provided by this source"], ["morning", "Shacharis / morning"], ["mincha", "Mincha"], ["maariv", "Maariv"]], d.portion || "all")}${input("Precedence (higher number wins)", "precedence", d.precedence || "", "number", 'min="1" max="999"')}${check("I reviewed overlaps and chose which schedule takes precedence", "overlapAcknowledged", false)}<div class="notice wide">Times come from the existing special schedule, not from this form. Applicable dates are separate from preview and activation dates. Built-in holiday rules still apply when this display rule ends.</div><p id="conflicts" class="warn wide"></p>`;
-  page(`<button id="back">← Display dashboard</button><h1>${s.id ? "Edit" : "Add"} ${kind === "dedication" ? "פרנס היום" : kind === "schedule" ? "display schedule" : "announcement"}</h1><p class="subtitle">Only Publish makes an item eligible to appear. All times are America/New_York.</p><div id="error" class="error" role="alert"></div><div class="form-layout"><form id="editor"><section class="panel"><h2>${kind === "schedule" ? "Schedule source" : "Content"}</h2><div class="grid">${fields}</div></section>${timing(s)}<div class="form-footer"><button type="button" id="cancel">Cancel</button><button type="button" id="draft">Save draft</button><button type="button" id="preview">Preview</button><button type="submit" class="primary">Publish</button></div></form><aside class="card-preview"><h2>Card preview</h2><div id="card-preview"></div><p id="length-warning" class="warn"></p><p class="muted">All published announcements stay visible together, including during special schedules. The complete special chart stays in its own area. Use the screen preview to check the layout.</p></aside></div>`);
+  const datePicker = kind === 'dedication' ? `<section class="panel dedication-date-picker"><h2>Choose the sponsorship date</h2><div id="dedication-calendar" class="dedication-date-calendar wide"></div><p id="dedication-selection" class="exact" aria-live="polite">${d.sponsorshipDate ? esc(d.sponsorshipDate) : 'Choose a day from the calendar.'}</p><details id="dedication-manual-date"><summary>Enter an English or Hebrew date directly</summary><div class="grid">${input("Sponsorship date (English)", "sponsorshipDate", d.sponsorshipDate, "date")}<div><p class="muted">Or enter the Hebrew date:</p><div class="grid">${input("Day", "hebrewDay", "", "number", 'min="1" max="30"')}${select("Month", "hebrewMonth", [[7, "Tishrei"], [8, "Cheshvan"], [9, "Kislev"], [10, "Teves"], [11, "Shevat"], [12, "Adar"], [13, "Adar I"], [14, "Adar II"], [1, "Nissan"], [2, "Iyar"], [3, "Sivan"], [4, "Tammuz"], [5, "Av"], [6, "Elul"]], 7)}${input("Hebrew year", "hebrewYear", currentHebrewYear, "number", 'min="5700" max="5900"')}<button id="convert-date" type="button">Use Hebrew date</button></div></div></div></details></section>` : '';
+  page(`<button id="back">← Display dashboard</button><h1>${s.id ? "Edit" : "Add"} ${kind === "dedication" ? "פרנס היום" : kind === "schedule" ? "display schedule" : "announcement"}</h1><p class="subtitle">Only Publish makes an item eligible to appear. All times are America/New_York.</p>${kind === 'dedication' && s.id && s.status === 'published' && can('dedication') ? '<div class="dedication-remove-bar"><button type="button" id="remove-dedication" class="remove-from-screen">Remove from screen</button><span>Stops this dedication from appearing. Keeps it saved under Hidden.</span></div>' : ''}<div id="error" class="error" role="alert"></div><div class="form-layout"><form id="editor">${datePicker}<section class="panel"><h2>${kind === "schedule" ? "Schedule source" : "Content"}</h2><div class="grid">${fields}</div></section>${timing(s)}<div class="form-footer"><button type="button" id="cancel">Cancel</button><button type="button" id="draft">Save draft</button><button type="button" id="preview">Preview</button><button type="submit" class="primary">Publish</button></div></form><aside class="card-preview"><h2>Card preview</h2><div id="card-preview"></div><p id="length-warning" class="warn"></p><p class="muted">All published announcements stay visible together, including during special schedules. The complete special chart stays in its own area. Use the screen preview to check the layout.</p></aside></div>`);
   const form = document.querySelector("#editor"), el = (n) => form.elements[n];
-  let dateRequest = 0, syncedCivilDate = null;
+  let dateRequest = 0, syncedCivilDate = null, dedicationCalendar = null;
   const value = () => {
     const fd = new FormData(form), data = {};
     for (const [key, val] of fd) data[key] = val;
     for (const c of form.querySelectorAll("[type=checkbox]")) data[c.name] = c.checked;
-    return { id: s.id, version: s.version, kind, title: fd.get("title") || s.title || "", internalName: fd.get("internalName") || "", startLocal: fd.get("startLocal") || "", endLocal: fd.get("untilOff") ? "" : fd.get("endLocal") || "", startFold: fd.get("startFold"), endFold: fd.get("endFold"), data };
+    return { id: s.id, version: s.version, kind, title: fd.get("title") || s.title || "", internalName: fd.get("internalName") || "", startLocal: el('startLocal')?.value || "", endLocal: fd.get("untilOff") ? "" : el('endLocal')?.value || "", startFold: fd.get("startFold"), endFold: fd.get("endFold"), data };
   };
   const update = async () => {
+    const request = ++dateRequest;
     const v = value();
     for (const [field, choice] of [["startLocal", "startFold"], ["endLocal", "endFold"], ["previewLocal", "previewFold"]]) {
       if (!el(choice)) continue;
@@ -183,19 +200,21 @@ async function edit(s, unsaved = false) {
     }
     if (kind === "dedication" && el("untilOff")) el("untilOff").closest("label").hidden = el("timing").value !== "custom";
     el("endLocal").disabled = !!el("untilOff")?.checked;
+    if (kind === 'dedication' && el('timing').value === 'custom') el('startLocal').disabled = false;
     try {
       let start = v.startLocal ? localToISO(v.startLocal, v.startFold) : null, end = v.endLocal ? localToISO(v.endLocal, v.endFold) : null;
       if (kind === "dedication" && v.data.sponsorshipDate) {
-        const request = ++dateRequest;
         const info = await api("date", "POST", { date: v.data.sponsorshipDate });
-        if (request !== dateRequest) return;
+        if (request !== dateRequest || !form.isConnected) return;
         if (syncedCivilDate !== v.data.sponsorshipDate) {
           el("hebrewDay").value = info.hebrew.dayOfMonth;
           el("hebrewMonth").value = info.hebrew.month;
           el("hebrewYear").value = info.hebrew.year;
           syncedCivilDate = v.data.sponsorshipDate;
         }
-        document.querySelector("#date-equivalent").textContent = info.label + " · " + info.date;
+        const chosenDate = info.label + " · " + info.date;
+        document.querySelector("#date-equivalent").textContent = chosenDate;
+        document.querySelector("#dedication-selection").textContent = 'Selected: ' + chosenDate;
         v.data.hebrewLabel = info.label;
         if (v.data.timing !== "custom") {
           start = v.data.timing === "evening" ? info.previousSunset : info.civilStart;
@@ -206,11 +225,22 @@ async function edit(s, unsaved = false) {
           el("endLocal").disabled = true;
         } else {
           el("startLocal").disabled = false;
-          el("endLocal").disabled = false;
+          el("endLocal").disabled = !!el('untilOff')?.checked;
         }
       }
-      document.querySelector("#exact-times").textContent = `Starts: ${start ? formatInstant(start) : "Not set"} (New York) · Ends: ${end ? formatInstant(end) : "Until turned off"}`;
+      if (kind === 'dedication' && !v.data.sponsorshipDate) {
+        document.querySelector('#dedication-selection').textContent = 'Choose a day from the calendar.';
+        document.querySelector('#date-equivalent').textContent = '';
+        syncedCivilDate = null;
+        if (v.data.timing !== 'custom') {
+          start = end = null;
+          el('startLocal').value = el('endLocal').value = '';
+          el('startLocal').disabled = el('endLocal').disabled = true;
+        }
+      }
+      document.querySelector("#exact-times").textContent = kind === 'dedication' && !v.data.sponsorshipDate && v.data.timing !== 'custom' ? 'Choose a sponsorship date to see the exact New York timestamps.' : `Starts: ${start ? formatInstant(start) : "Not set"} (New York) · Ends: ${end ? formatInstant(end) : "Until turned off"}`;
     } catch (e) {
+      if (request !== dateRequest || !form.isConnected) return;
       document.querySelector("#exact-times").textContent = e.message;
     }
     if (kind !== "schedule") {
@@ -221,19 +251,36 @@ async function edit(s, unsaved = false) {
       document.querySelector("#conflicts").textContent = items.some((i) => i.id !== s.id && i.kind === "schedule" && i.status === "published" && i.data.appliesFrom <= v.data.appliesTo && v.data.appliesFrom <= i.data.appliesTo) ? "Another published display schedule covers these dates. Review the overlap and assign a distinct precedence." : "";
     }
   };
-  form.oninput = () => {
+  form.oninput = event => {
+    if (event.target.closest('#dedication-calendar')) return;
+    if (event.target.name === 'sponsorshipDate') dedicationCalendar?.select(event.target.value);
     dirty = true;
     update();
   };
-  form.onchange = () => {
+  form.onchange = event => {
+    if (event.target.closest('#dedication-calendar')) return;
+    if (event.target.name === 'sponsorshipDate') dedicationCalendar?.select(event.target.value);
     dirty = true;
     update();
   };
+  if (kind === 'dedication') {
+    dedicationCalendar = previewCalendar(document.querySelector('#dedication-calendar'),api,date => {
+      el('sponsorshipDate').value = date;
+      dirty = true;
+      update();
+    },{initialDate:d.sponsorshipDate || '',description:'Choose a day for פרנס היום. Each day shows its English date, Hebrew date and holidays. Hebrew dates refer to daytime; the Evening option starts at sunset the day before.'});
+    document.querySelector('#remove-dedication')?.addEventListener('click',async event => {
+      const button = event.currentTarget;
+      if (dirty && !await confirm('Remove this dedication without saving edits?', 'It will stop appearing and remain saved under Hidden. The unsaved edits will be discarded.', 'Remove from screen')) return;
+      removeDedication(s,button);
+    });
+  }
   document.querySelector("#back").onclick = () => leave(dashboard);
   document.querySelector("#cancel").onclick = () => leave(dashboard);
   form.querySelectorAll("[data-shortcut]").forEach((b) => b.onclick = () => {
     const now = localStamp(), date = now.slice(0, 10);
     if (b.dataset.shortcut === "custom") {
+      if (kind === 'dedication') { el('timing').value = 'custom'; dirty = true; update(); }
       el("startLocal").focus();
       return;
     }
@@ -261,13 +308,16 @@ async function edit(s, unsaved = false) {
     }
   };
   if (kind === "dedication") document.querySelector("#convert-date").onclick = async () => {
+    const request = ++dateRequest;
     try {
       const info = await api("date", "POST", { hebrew: { day: el("hebrewDay").value, month: el("hebrewMonth").value, year: el("hebrewYear").value } });
+      if (request !== dateRequest || !form.isConnected) return;
       el("sponsorshipDate").value = info.date;
+      dedicationCalendar.select(info.date);
       dirty = true;
       update();
     } catch (e) {
-      showError(e);
+      if (request === dateRequest && form.isConnected) showError(e);
     }
   };
   if (kind === "schedule") {
@@ -294,9 +344,10 @@ async function edit(s, unsaved = false) {
     await loadSources();
   }
   async function save(status) {
-    const buttons = [...form.querySelectorAll("button")];
+    const buttons = [...form.querySelectorAll("button"),...app.querySelectorAll('#remove-dedication')];
     buttons.forEach((b) => b.disabled = true);
     try {
+      await update();
       const v = value();
       v.status = status;
       if (status === "published") {

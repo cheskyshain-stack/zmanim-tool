@@ -216,14 +216,14 @@ try {
       const exceptions = [...root.querySelectorAll('.board-exception')];
       for (const exception of exceptions) {
         const previous = exception.previousElementSibling;
-        if (previous && rect(exception).top - rect(previous).bottom < 13)
+        const minimumGap=exception.closest('.board-compact')?9:13;
+        if (previous && rect(exception).top - rect(previous).bottom < minimumGap)
           add('exception-too-close', {label:short(exception.textContent),gap:rect(exception).top-rect(previous).bottom});
       }
       for (const exception of exceptions) {
         const heading = rect(exception.querySelector('h4')), times = exception.querySelector('.board-times'), timeBox = rect(times);
         if (heading.bottom > timeBox.top + 2) add('exception-label-not-above', {label:short(exception.querySelector('h4').textContent), heading:rounded(heading), times:rounded(timeBox)});
-        // The full time column remains centered under its heading; shorter
-        // balanced lines share its left edge rather than centering separately.
+        // The weekday flex run remains centered below its separate heading.
         const box=rect(exception),centerOffset=(timeBox.left+timeBox.right-box.left-box.right)/2;
         if(Math.abs(centerOffset)>3)add('exception-time-column-not-centered',{label:short(exception.querySelector('h4').textContent),centerOffset});
       }
@@ -235,10 +235,12 @@ try {
         }
       }
       const zmanim = [...root.querySelectorAll('.board-zmanim>div')];
-      for(const row of zmanim)auditPairing(row,':scope > span',':scope > bdi');
+      // The single daily rail keeps clocks on a common right edge and labels
+      // on the opposite edge; individual short labels do not set its width.
+      for(const row of zmanim)auditPairing(row,':scope > span',':scope > bdi',true);
       const zmanimColumns=new Map();
-      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[],timeInk=ink(row.querySelector(':scope > bdi'));if(timeInk)edges.push(timeInk.left);zmanimColumns.set(column,edges);}
-      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-left-edges-not-aligned');
+      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[],timeInk=ink(row.querySelector(':scope > bdi'));if(timeInk)edges.push(timeInk.right);zmanimColumns.set(column,edges);}
+      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-right-edges-not-aligned');
       if (zmanim.length !== snapshot.schedule.zmanim.length) add('zmanim-count');
       for (const [i, zman] of snapshot.schedule.zmanim.entries()) {
         const el = zmanim[i];

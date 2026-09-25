@@ -759,8 +759,9 @@ button {
 /* Once the weekday reference ends, the whole special chart stays tall on the
    right; a wider left rail holds daily zmanim and all four announcement areas. */
 .tv-stage.sheet-wide-notices{grid-template-columns:860px minmax(0,1fr) minmax(0,1fr)}
+.tv-stage.right-column-board.sheet-notices:not(.sheet-wide-notices):not(.week-wide-notices){grid-template-columns:300px minmax(0,1fr) var(--board-special-width,680px)}
 .right-column-board.sheet-wide-notices .board-notices{grid-column:1;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto}
-.sheet-wide-notices .board-zmanim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-content:start}
+.sheet-wide-notices .board-zmanim{display:flex;flex-direction:column}
 .sheet-wide-notices .board-zmanim h2{grid-column:1/-1;font-size:26px;margin-bottom:5px}
 .sheet-wide-notices .board-zmanim>div{font-size:20px;padding:2px 0}
 .sheet-wide-notices .board-zmanim>div span{font-size:20px}
@@ -769,27 +770,35 @@ button {
 .sheet-wide-notices .announcement-group-sections{gap:5px}
 .sheet-wide-notices .announcement-section+.announcement-section{padding-top:4px}
 
-/* A shared left edge keeps one- and two-digit hours in the same time column.
+/* A shared right edge keeps one- and two-digit hours in the same time column.
    Seconds stay on the baseline, slightly smaller and lighter than HH:MM. */
-.tv-stage .board-zmanim>div>bdi{flex:0 0 7ch;text-align:left;font-variant-numeric:tabular-nums}
+.tv-stage .board-zmanim>div>bdi{flex:0 0 7ch;text-align:right;font-variant-numeric:tabular-nums}
 .tv-stage .board-zmanim .zman-seconds{font:inherit;font-size:.82em;font-weight:400}
 .stable-board .tv-footer .key{line-height:1.15}
 
 /* Keep each prayer and its time run together, rather than against opposite
    edges of a wide chart. Digits still read left to right; labels stay on the
    right. Only the regular centered weekday services use their own layout. */
-.tv-stage :is(.board-weekly,.board-shabbos) .board-schedule-row{grid-template-columns:var(--board-time-column,minmax(0,1fr)) var(--board-label-column,40%);justify-content:end;column-gap:16px;direction:ltr}
-.tv-stage .board-times{flex-direction:column;align-items:flex-start;text-align:left}
+.tv-stage .board-shabbos .board-shabbos-body{width:min(100%,calc(var(--board-time-column,55%) + var(--board-label-column,40%) + 16px));align-self:center}
+.tv-stage .board-shabbos .board-schedule-row{grid-template-columns:var(--board-time-column,minmax(0,1fr)) var(--board-label-column,40%);justify-content:center;column-gap:16px;direction:ltr}
+.tv-stage .board-shabbos .board-times{flex-direction:column;align-items:flex-start;text-align:left}
 .tv-stage .board-times .board-time-line{display:flex;width:max-content;flex-wrap:nowrap;align-items:flex-end;gap:0 var(--board-line-gap,14px);direction:ltr}
-.tv-stage .board-time>bdi{align-self:flex-start}
-.tv-stage .board-weekly .board-times{margin-inline:auto}
-.tv-stage .board-schedule-row>.board-times{justify-content:flex-start;margin-inline:0}
-.tv-stage .board-schedule-row>.board-prayer-label{text-align:right;overflow-wrap:break-word;grid-row:1;grid-column:2}
-.tv-stage .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:right}
+.tv-stage .board-shabbos .board-time>bdi{align-self:flex-start}
+.tv-stage .board-shabbos .board-schedule-row>.board-times{justify-content:flex-start;margin-inline:0}
+.tv-stage .board-shabbos .board-schedule-row>.board-prayer-label{text-align:right;overflow-wrap:break-word;grid-row:1;grid-column:2}
+.tv-stage .board-shabbos .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:right}
+.tv-stage .board-weekly .board-schedule-row{grid-template-columns:minmax(0,1fr) fit-content(46%);column-gap:16px;direction:ltr}
+.tv-stage .board-weekly .board-schedule-row>.board-times{justify-content:flex-end;text-align:right}
+.tv-stage .board-weekly .board-schedule-row>.board-prayer-label{text-align:left}
+.tv-stage .board-weekly .board-schedule-row.board-long-label{grid-template-columns:minmax(0,1fr)}
+.tv-stage .board-weekly .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:center}
+.tv-stage .board-weekly .board-schedule-row.board-long-label>.board-times{justify-content:center;text-align:center}
 .tv-stage .board-schedule-row:has(>.board-times:empty){grid-template-columns:minmax(0,1fr)}
 .tv-stage .board-schedule-row:has(>.board-times:empty)>.board-prayer-label{grid-column:1/-1}
 .tv-stage .board-schedule-row>.board-times:empty{display:none}
 .tv-stage .board-zmanim>div{justify-content:flex-start}
+.tv-stage .board-zmanim>div{width:100%;max-width:300px;margin-inline:auto}
+.tv-stage .board-zmanim>div>span{flex:1;text-align:right}
 .tv-stage.stable-board[data-theme=light] .tv-footer,
 .tv-stage.stable-board[data-theme=light] .tv-footer .key{color:var(--screen-text)}
 .tv-stage.stable-board[data-theme=light] .tv-footer .next-label{color:var(--screen-gold)}
@@ -798,6 +807,12 @@ button {
    heading. Each prayer keeps centered times and its own full-size label. */
 .board-weekly .board-exception{margin-top:18px;padding:8px}
 .board-weekly.board-compact .board-exception{margin-top:14px;padding:6px}
+/* Dense dated mornings keep their headings above their times and remain in
+   the existing weekday box. Use one readable size for names and clock values. */
+.all-notices .board-weekly.board-compact .board-times,
+.all-notices .board-weekly.board-compact .board-service>h3,
+.all-notices .board-weekly.board-compact .board-exception h4{font-size:24px}
+.all-notices .board-weekly.board-compact .board-exception{margin-top:10px;padding:4px}
 .board-day-section{flex:0 0 auto;margin-top:20px;padding:12px 10px 10px;border-top:2px solid var(--screen-gold);border-radius:7px;background:var(--screen-card)}
 .board-day-section>h3{font:700 28px David;text-align:center;color:var(--screen-gold);margin:0 0 3px}
 .board-day-date{font:15px Arial;text-align:center;margin:0 0 10px;color:inherit;opacity:.8}
@@ -818,8 +833,7 @@ button {
 .board-weekly.board-inline-services .board-service:has(>.board-pattern:last-child):not(:has(.board-exception))>h3{grid-column:2;grid-row:1;margin:0;text-align:right}
 .board-weekly.board-inline-services .board-service:has(>.board-pattern:last-child):not(:has(.board-exception))>.board-pattern{grid-column:1;grid-row:1}
 
-/* The bilingual shul name anchors the left; the dedication stays centered on
-   the screen and grows to hold its full copy, with three lines as a minimum. */
+/* The bilingual shul name anchors the left; date and clock remain at right. */
 .tv-stage.stable-board{--board-head-height:104px;--screen-text:#142a42;--screen-background:#f7f3eb;grid-template-rows:var(--board-head-height) minmax(0,1fr) var(--notice-height,224px) 26px}
 .tv-stage.stable-board[data-theme=dark]{--screen-text:#f5f2ea;--screen-background:#0b1423}
 .tv-stage.stable-board.all-notices{--board-head-height:104px}
@@ -832,8 +846,17 @@ button {
 .stable-board .shul-donate img{width:58px;height:58px}
 .stable-board .shul-donate strong{font-size:14px}
 .stable-board .shul-donate small{font-size:10px;max-width:108px;margin-top:4px}
-.stable-board .board-dedication{grid-column:3;height:100%;align-self:stretch;display:flex;align-items:stretch;justify-content:center;min-width:0}
-.stable-board .board-dedication .tv-card{width:var(--dedication-card-width,50%);max-width:100%;flex-shrink:0;height:auto;min-height:104px;padding:8px 18px;display:flex;flex-direction:column;justify-content:center;gap:4px;overflow:visible;background:var(--screen-card);border:1px solid var(--screen-gold);border-radius:12px;box-shadow:inset 0 0 0 3px var(--screen-background)}
+.right-column-board .board-left-rail{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0}
+.right-column-board .board-left-rail>.board-zmanim{flex:1;min-height:0}
+.right-column-board.left-extended .board-left-rail{grid-row:2/4}
+.tv-stage.right-column-board.left-extended{grid-template-columns:300px minmax(0,1fr) var(--board-special-width,680px)}
+.right-column-board.left-extended .board-notices{grid-column:2/4}
+.right-column-board.left-extended.right-extended .board-notices{grid-column:2}
+.tv-stage.right-column-board.left-extended.sheet-wide-notices{grid-template-columns:300px 620px minmax(0,1fr)}
+.right-column-board.left-extended.sheet-wide-notices .board-notices{grid-column:2;grid-row:2/4;grid-template-columns:1fr 1fr!important;grid-auto-rows:1fr}
+.right-column-board.left-extended.sheet-wide-notices .original-sheet-box{grid-column:3;grid-row:2/4}
+.stable-board .board-dedication{height:var(--dedication-slot-height,128px);flex:none;align-self:stretch;display:flex;align-items:stretch;justify-content:center;min-width:0}
+.stable-board .board-dedication .tv-card{width:100%;max-width:100%;flex-shrink:0;height:auto;min-height:128px;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;gap:8px;overflow:visible;background:var(--screen-card);border:1px solid var(--screen-gold);border-radius:12px;box-shadow:inset 0 0 0 3px var(--screen-background)}
 .stable-board .board-dedication .tv-card h2{font:700 28px/1.08 David,serif;color:var(--screen-gold);margin:0}
 .stable-board .dedication-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
 .stable-board .board-dedication .tv-card p{display:block;font:700 25px/1.12 David,serif;margin:0;white-space:pre-wrap;overflow-wrap:break-word}
@@ -841,6 +864,9 @@ button {
 .stable-board .board-dedication .tv-card .dedication-name{font-size:28px}
 .stable-board .board-dedication .tv-card .sponsor{font-size:18px;font-weight:400}
 .stable-board .board-dedication .tv-card .card-page{display:none}
+.stable-board .board-dedication .tv-card .availability-title{font:700 21px/1.18 Arial,sans-serif}
+.stable-board .board-dedication .tv-card .availability-copy{font:18px/1.25 Arial,sans-serif;margin-top:4px}
+.stable-board .board-dedication.dedication-measure{height:auto}
 .stable-board .tv-date{grid-column:4;margin-left:0;min-width:0;font-size:15px}
 .stable-board .tv-clock{grid-column:5;text-align:right}
 
@@ -854,16 +880,16 @@ button {
 .stable-board.compact-notice-spacing .announcement-section h3{margin-bottom:1px;line-height:1.1}
 .stable-board.compact-notice-spacing .announcement-section p{line-height:1.1}
 .stable-board.compact-notice-spacing .announcement-contact{margin-top:2px!important}
-.stable-board.compact-zmanim-spacing .board-zmanim{padding-block:10px}
-.stable-board.compact-zmanim-spacing .board-zmanim h2{margin-bottom:5px}
-.stable-board.compact-zmanim-spacing .board-zmanim>div{padding-block:2px;line-height:1.08}
+.stable-board.compact-zmanim-spacing .board-zmanim{padding-block:8px}
+.stable-board.compact-zmanim-spacing .board-zmanim h2{margin-bottom:4px}
+.stable-board.compact-zmanim-spacing .board-zmanim>div{padding-block:1px;line-height:1.08;font-size:22px}
 
 /* Dense weekday references use the height below both schedule panels. The
    complete notice areas share a measured two-by-two rail at the left. */
 .tv-stage.right-column-board.week-wide-notices{grid-template-columns:var(--week-notice-rail,600px) minmax(0,1fr) minmax(0,1fr)}
 .right-column-board.week-extended.week-wide-notices .board-weekly{grid-row:2/4}
 .right-column-board.week-wide-notices .board-notices{grid-column:1;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:auto}
-.week-wide-notices .board-zmanim{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-content:start}
+.week-wide-notices .board-zmanim{display:flex;flex-direction:column}
 .week-wide-notices .board-zmanim h2{grid-column:1/-1;font-size:26px;margin-bottom:5px}
 .week-wide-notices .board-zmanim>div{font-size:22px;padding:2px 0}
 .week-wide-notices .board-zmanim>div span{font-size:20px}

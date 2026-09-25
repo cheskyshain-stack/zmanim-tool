@@ -18,10 +18,12 @@ const atLocal = localToISO;
 const civil = serial => dateFromSerial(serial).toISOString().slice(0, 10);
 const snapshotOn = (serial, time = '12:00') => scheduleSnapshot(atLocal(civil(serial) + 'T' + time));
 const sameMinyan = (actual, expected) => actual.name === expected.name && actual.mins === expected.mins && actual.place === (expected.place || 'בית מדרש');
+const windowId = sheet => sheet?.windowSourceId || sheet?.sourceId;
 
 test('original pages wait for the preceding Shabbos closing events, not civil midnight', () => {
   const yk = scheduleSnapshot(atLocal('2026-09-20T02:00')).specialSheet;
-  assert.equal(yk.sourceId, 'yk:5787');
+  assert.equal(yk.sourceId, 'high-holidays:5787');
+  assert.equal(windowId(yk), 'yk:5787');
   assert.equal(yk.previousShabbos, '2026-09-19');
   assert.equal(scheduleSnapshot(before(yk.previewStartsAt)).specialSheet, null);
   assert.equal(scheduleSnapshot(yk.previewStartsAt).specialSheet.placement, 'shabbos');
@@ -48,8 +50,8 @@ test('Sukkos retains ordinary erev Shacharis until the last minyan is finished',
 
 test('an upcoming sheet cannot replace an earlier active holy day before its closing events', () => {
   const yk = scheduleSnapshot(atLocal('2026-09-21T20:00')).specialSheet;
-  assert.equal(yk.sourceId, 'yk:5787');
-  assert.equal(scheduleSnapshot(before(yk.endsAt)).specialSheet.sourceId, 'yk:5787');
+  assert.equal(windowId(yk), 'yk:5787');
+  assert.equal(windowId(scheduleSnapshot(before(yk.endsAt)).specialSheet), 'yk:5787');
   const sukkos = scheduleSnapshot(yk.endsAt).specialSheet;
   assert.equal(sukkos.sourceId, 'sukkos:5787');
   assert.equal(sukkos.placement, 'shabbos');
@@ -76,10 +78,10 @@ test('Sukkos keeps its full printed page but stops displaying it when Simchas To
   }
 });
 
-test('each supported original source uses its own page without inventing Shavuos times', () => {
+test('each supported occasion uses its original page without inventing Shavuos times', () => {
   for (const [date, id] of [
-    ['2026-09-12', 'rh:5787'],
-    ['2026-09-21', 'yk:5787'], ['2026-09-26', 'sukkos:5787'],
+    ['2026-09-12', 'high-holidays:5787'],
+    ['2026-09-21', 'high-holidays:5787'], ['2026-09-26', 'sukkos:5787'],
     ['2027-04-22', 'pesach:5787']
   ]) {
     const sheet = scheduleSnapshot(atLocal(date + 'T12:00')).specialSheet;
@@ -110,7 +112,7 @@ test('every original holiday page closes after its final holy-day events for the
       }
       const finalDay = snapshotOn(lastDay);
       const sheet = finalDay.specialSheet;
-      assert.equal(sheet?.sourceId, id, id + ' must remain on its final holy day');
+      assert.equal(windowId(sheet), id, id + ' must remain on its final holy day');
       assert.equal(sheet.placement, 'both', id);
       assert.equal(sheet.displayThrough, civil(lastDay), id);
       const closing = Math.max(Date.parse(sunset(civil(lastDay))) + 72 * 60000,
@@ -119,14 +121,14 @@ test('every original holiday page closes after its final holy-day events for the
       assert.equal(sheet.endsAt, end, id + ' includes the last closing minyan and five-minute retention');
       const retained = scheduleSnapshot(before(end));
       const resumed = scheduleSnapshot(end);
-      assert.equal(retained.specialSheet?.sourceId, id, id);
+      assert.equal(windowId(retained.specialSheet), id, id);
       assert.equal(retained.nextChangeAt, end, id + ' exposes the precise expiry boundary');
-      assert.notEqual(resumed.specialSheet?.sourceId, id, id + ' expires exactly at its closing boundary');
+      assert.notEqual(windowId(resumed.specialSheet), id, id + ' expires exactly at its closing boundary');
       assert.deepEqual(resumed.today.events, retained.today.events, id + ' expiry cannot change daily events');
       assert.deepEqual(resumed.next, retained.next, id + ' expiry cannot change the next minyan');
       for (let offset = 1; offset <= 7; offset++) {
         const after = snapshotOn(lastDay + offset);
-        assert.notEqual(after.specialSheet?.sourceId, id, id + ' cannot return during the following week');
+        assert.notEqual(windowId(after.specialSheet), id, id + ' cannot return during the following week');
         assert.ok(after.today.events.length, id + ' following daily schedule remains available');
       }
     }

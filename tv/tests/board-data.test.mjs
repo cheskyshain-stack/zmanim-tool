@@ -36,8 +36,10 @@ test('the original sheet contains public fields only, without calculation traces
   }
 });
 
-test('ordinary weeks do not acquire a special sheet; Yom Kippur has its own page', () => {
-  assert.equal(scheduleSnapshot('2026-09-21T16:00:00Z').specialSheet.sourceId, 'yk:5787');
+test('ordinary weeks do not acquire a special sheet; Yom Kippur uses the combined occasion page', () => {
+  const sheet=scheduleSnapshot('2026-09-21T16:00:00Z').specialSheet;
+  assert.equal(sheet.sourceId, 'high-holidays:5787');
+  assert.equal(sheet.windowSourceId, 'yk:5787');
   for (const at of ['2026-10-15T16:00:00Z', '2027-01-15T16:00:00Z']) {
     assert.equal(scheduleSnapshot(at).specialSheet, null, at);
   }

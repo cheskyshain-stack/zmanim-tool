@@ -22,16 +22,23 @@ export function inspectTimeColumns(root, scale=1, {includeSheets=true}={}) {
   }
   return lines.sort((a,b)=>a.bottom-b.bottom);
  };
- function balanced(times,selector){
+ function timeLines(times,selector,{balanced=false,centered=false}={}){
   const units=[...times.querySelectorAll(selector)].filter(el=>el.getClientRects().length);
   if(!units.length)return;
   const lines=lineBoxes(units),counts=lines.map(line=>line.items.length),details={times:text(times),counts};
   metrics.balancedGroups++;metrics.timeCounts.push(units.length);
   if(lines.length>1){
    metrics.wrappedGroups++;
-   if(Math.max(...counts)-Math.min(...counts)>1)issues.push({code:'unbalanced-time-lines',...details});
-   const starts=lines.map(line=>line.left);
-   if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'time-lines-different-left-start',...details,starts});
+   if(balanced){
+    if(Math.max(...counts)-Math.min(...counts)>1)issues.push({code:'unbalanced-time-lines',...details});
+    const starts=lines.map(line=>line.left);
+    if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'time-lines-different-left-start',...details,starts});
+   }
+  }
+  if(centered){
+   const box=rect(times),center=(box.left+box.right)/2;
+   for(const line of lines)if(Math.abs((line.left+line.right)/2-center)>3)
+    issues.push({code:'weekday-time-line-not-centered',...details,offset:(line.left+line.right)/2-center});
   }
   // DOM order must still read left-to-right, then onto the next full line.
   const actual=lines.flatMap(line=>[...line.items].sort((a,b)=>rect(a).left-rect(b).left));
@@ -75,32 +82,43 @@ export function inspectTimeColumns(root, scale=1, {includeSheets=true}={}) {
   const used=Math.max(...records.map(r=>r.ti.right-r.ti.left)),available=Math.max(...records.map(r=>r.t.width)),font=Math.max(...records.map(r=>r.font));
   if(available-used>Math.max(60,2*font))issues.push({code:'schedule-time-column-too-wide',table:container.className,available,used});
  }
- for(const panel of root.querySelectorAll('.board-shabbos,.board-weekly'))
+ // Shabbos uses the approved compact, centered table. The weekday panel uses
+ // centered flex runs, and the original special page retains its own layout.
+ for(const panel of root.querySelectorAll('.board-shabbos')){
   table(panel,'.board-schedule-row','.board-prayer-label','.board-times','.board-time');
- for(const times of root.querySelectorAll('.board-times'))balanced(times,'.board-time');
+  const body=panel.querySelector('.board-shabbos-body');
+  if(body){const p=rect(panel),b=rect(body);if(Math.abs((p.left+p.right-b.left-b.right)/2)>3)issues.push({code:'shabbos-table-not-centered'});}
+ }
+ for(const times of root.querySelectorAll('.board-times'))timeLines(times,'.board-time',{
+  balanced:!!times.closest('.board-shabbos'),
+  centered:!!times.closest('.board-weekly')&&!times.closest('.board-schedule-row'),
+ });
  const dailyColumns=new Map();
  for(const row of root.querySelectorAll('.board-zmanim>div')){
   const time=row.querySelector(':scope > bdi'),value=time&&ink(time);if(!value)continue;
   const column=Math.round(rect(row).left),starts=dailyColumns.get(column)||[];
-  starts.push(value.left);dailyColumns.set(column,starts);
-  if(Math.abs(value.left-rect(time).left)>2)issues.push({code:'daily-time-not-left-aligned',time:text(time)});
+  starts.push(value.right);dailyColumns.set(column,starts);
+  if(Math.abs(value.right-rect(time).right)>2)issues.push({code:'daily-time-not-right-aligned',time:text(time)});
  }
- for(const starts of dailyColumns.values())if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'daily-time-left-starts-differ',starts});
+ if(dailyColumns.size>1)issues.push({code:'daily-zmanim-not-one-column',columns:dailyColumns.size});
+ for(const starts of dailyColumns.values())if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'daily-time-right-edges-differ',edges:starts});
  for(const heading of root.querySelectorAll('.board-service>h3,.board-pattern>h4,.board-day-service>h4')){
   if(!heading.getClientRects().length)continue;
-  if(heading.matches('.board-service>h3')&&heading.closest('.board-inline-services')&&getComputedStyle(heading.parentElement).display==='grid')continue;
   if(getComputedStyle(heading).textAlign!=='center')issues.push({code:'weekday-heading-not-centered',label:text(heading)});
  }
  const shadow=includeSheets&&root.querySelector('.original-sheet-host')?.shadowRoot;
  if(shadow){
-  for(const column of shadow.querySelectorAll('.onepage-col'))if(column.getClientRects().length)
-   table(column,'.onepage-row','.onepage-label','.onepage-times','.onepage-t,.zman-pair');
-  for(const times of shadow.querySelectorAll('.onepage-times'))balanced(times,'.onepage-t,.zman-pair');
-  for(const note of shadow.querySelectorAll('.sheet-time-note')){
-   const times=note.closest('.onepage-times'),first=times?.querySelector('.onepage-t');
-   if(!first)continue; // A source note without any clock is not a qualified time.
+  const columns=[...shadow.querySelectorAll('.onepage-col')].filter(column=>column.getClientRects().length),widths=columns.map(column=>rect(column).width);
+  if(columns.length!==2)issues.push({code:'original-sheet-visible-columns',columns:columns.length});
+  if(widths.length&&Math.max(...widths)-Math.min(...widths)>2)issues.push({code:'original-sheet-columns-not-equal',widths});
+  // The source page balances long runs by their printed width, not by item
+  // count. Preserve that algorithm while still checking order and collisions.
+  for(const times of shadow.querySelectorAll('.onepage-times'))timeLines(times,'.onepage-t,.zman-pair');
+  for(const note of shadow.querySelectorAll('.onepage-note')){
+   const times=note.closest('.onepage-times'),firstLine=times?.querySelector('.onepage-line');
+   if(!firstLine)continue;
    metrics.firstTimeNotes++;
-   if(note.closest('.onepage-t')!==first)issues.push({code:'source-note-not-attached-to-first-time',note:text(note)});
+   if(note.closest('.onepage-line')!==firstLine)issues.push({code:'source-note-not-on-first-time-line',note:text(note)});
   }
  }
  metrics.timeCounts=[...new Set(metrics.timeCounts)].sort((a,b)=>a-b);

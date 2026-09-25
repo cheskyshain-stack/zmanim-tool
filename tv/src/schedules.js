@@ -1,6 +1,6 @@
 import * as dailyZmanim from '../../js/zmanim/zmanim.js';
 import { schedulePresentation, ordinaryShabbos } from './presentation.js';
-import { publicPosterSections } from '../../js/ui/posters-view.js';
+import { publicPosterSections, publicOccasionSheet } from '../../js/ui/posters-view.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
 import parshaEY from "../../data/parsha_ey.json" with { type: "json" };
@@ -48,6 +48,7 @@ export function dateInfo(date, hebrew) {
 const catalogs = /* @__PURE__ */ new Map(), dayCache = /* @__PURE__ */ new Map();
 const sheetCatalogs = /* @__PURE__ */ new Map();
 const sheetTimelines = /* @__PURE__ */ new Map();
+const highHolidaySheets = /* @__PURE__ */ new WeakMap();
 const sheetTitles = {rh:'ראש השנה',yk:'יום כיפור',sukkos:'סוכות',pesach:'פסח',gedalia:'צום גדליה'};
 const RETAIN_MS = 5 * 60000;
 let cachedYear, cachedState;
@@ -140,10 +141,20 @@ function originalSheetState(instant,year,day,controls,controlKey,state) {
   const overridden=selected&&controls.some(c=>visible(c,instant)&&c.data.appliesFrom<=civil(Math.max(selected.to,selected.displayTo))&&c.data.appliesTo>=civil(selected.from));
   if(!selected||overridden)return {specialSheet:null,nextChangeAt};
   const s=selected;
-  const sections=s.attachedShabbos?[...s.sections,...attachedShabbosSections(s.attachedShabbos,state)]:s.sections;
-  return {specialSheet:{sourceId:s.sourceId,title:s.title,year:s.year,yearLabel:s.yearLabel,
-    ...(s.attachedShabbos?{columnBreakAt:s.sections.length}:{}),
-    from:civil(s.from),to:civil(Math.max(s.to,s.displayTo)),displayThrough:civil(s.displayTo),previousShabbos:civil(s.previousShabbos),
+  // RH and YK are two visibility windows for the same original ימים נוראים
+  // page. Its Selichos, Gedalya and following-week rows remain on the page,
+  // but never extend either window: ordinary days still regain the schedules.
+  let occasion;
+  if(s.key==='rh'||s.key==='yk'){
+    let years=highHolidaySheets.get(state);
+    if(!years){years=new Map();highHolidaySheets.set(state,years);}
+    if(!years.has(s.year))years.set(s.year,publicOccasionSheet(state,settings,s.year));
+    occasion=years.get(s.year);
+  }
+  const sections=occasion?.sections||(s.attachedShabbos?[...s.sections,...attachedShabbosSections(s.attachedShabbos,state)]:s.sections);
+  return {specialSheet:{sourceId:occasion?`high-holidays:${s.year}`:s.sourceId,title:occasion?.title||s.title,year:s.year,yearLabel:s.yearLabel,
+    ...(occasion?{windowSourceId:s.sourceId}:s.attachedShabbos?{columnBreakAt:s.sections.length}:{}),
+    from:civil(occasion?.span.from??s.from),to:civil(occasion?.span.to??Math.max(s.to,s.displayTo)),displayThrough:civil(s.displayTo),previousShabbos:civil(s.previousShabbos),
     placement:instantMs<s.both?'shabbos':'both',
     previewStartsAt:new Date(s.preview).toISOString(),coversBothAt:new Date(s.both).toISOString(),
     endsAt:new Date(s.end).toISOString(),nextChangeAt,sections},nextChangeAt};

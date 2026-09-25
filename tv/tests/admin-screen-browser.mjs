@@ -40,10 +40,10 @@ const schedules=new Map();
 function schedule(instant){if(!schedules.has(instant))schedules.set(instant,scheduleSnapshot(instant));return schedules.get(instant);}
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 
-async function scenario({capabilities=['full'],records=[...initial,dedication],mobile=false,delayPreview=false}={}){
+async function scenario({capabilities=['full'],records=[...initial,dedication],mobile=false,delayPreview=false,hideConflict=false}={}){
   const context=await browser.newContext({viewport:mobile?{width:393,height:852}:{width:1440,height:1100}});
   await context.addInitScript(instant=>{const NativeDate=Date;window.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[instant]));}static now(){return NativeDate.parse(instant);}};},at);
-  const state={records:structuredClone(records),writes:[],previewCalls:0,previewStarted:deferred(),previewRelease:deferred()};
+  const state={records:structuredClone(records),writes:[],hideAttempts:[],previewCalls:0,previewStarted:deferred(),previewRelease:deferred()};
   const permitted=item=>capabilities.includes('full')||capabilities.includes(kindCapability[item.kind]);
   await context.route('**/api/display/admin/**',async route=>{
     const req=route.request(),url=new URL(req.url()),name=url.pathname.slice('/api/display/admin/'.length),method=req.method(),raw=req.postDataJSON();
@@ -60,6 +60,18 @@ async function scenario({capabilities=['full'],records=[...initial,dedication],m
         const instant=new Date(raw.at).toISOString();let rows=state.records;
         if(raw.item){assert.ok(permitted(raw.item));rows=rows.filter(item=>item.id!==raw.item.id).concat({...validate({...raw.item,status:'published'}),id:raw.item.id||'unsaved-preview'});}
         body={at:instant,generatedAt:at,items:publicItems(rows,instant),schedule:schedule(instant),appearance:{mode:'dark'},upcoming:[],warnings:warnings(rows,instant),timeline:rows.filter(permitted).map(item=>({id:item.id,title:item.internalName||item.title,phase:phase(item,instant)}))};
+      }else if(/^items\/[\w-]+\/hide$/.test(name)&&method==='POST'){
+        const id=name.split('/')[1],old=state.records.find(item=>item.id===id);
+        assert.ok(old,'The removal must address a saved item');
+        assert.ok(permitted(old),'UI attempted an unauthorized removal');
+        assert.deepEqual(raw,{version:old.version},'Removal uses the saved version without replacing content');
+        state.hideAttempts.push({name,raw:structuredClone(raw)});
+        if(hideConflict){status=409;body={error:'This item changed. Reopen it first.'};}
+        else{
+          const saved={...old,status:'hidden',version:old.version+1,updatedAt:at,updatedBy:'test@example.com'};
+          state.writes.push({method,name,raw:structuredClone(raw),saved});
+          state.records=state.records.map(item=>item.id===id?saved:item);body={ok:true};
+        }
       }else if(/^items(?:\/[\w-]+)?$/.test(name)&&['POST','PUT'].includes(method)){
         const id=name.split('/')[1],old=state.records.find(item=>item.id===id);
         assert.ok(permitted(raw),'UI attempted an unauthorized mutation');
@@ -78,6 +90,7 @@ async function scenario({capabilities=['full'],records=[...initial,dedication],m
 async function screen(page){await page.locator('#screen-editor .tv-stage').waitFor();await page.locator('#screen-add-announcement').waitFor();}
 async function cancel(page){await page.locator('#cancel').click();if(await page.locator('#confirm[open]').count())await page.locator('#confirm #yes').click();await screen(page);}
 async function shot(page,name){if(screenshots){await mkdir(screenshots,{recursive:true});await page.screenshot({path:path.join(screenshots,name),fullPage:true});}}
+async function crop(page,selector,name){if(screenshots){await mkdir(screenshots,{recursive:true});await page.locator(selector).screenshot({path:path.join(screenshots,name)});}}
 
 try{
   const sw=await readFile(path.join(dist,'display/sw.js'),'utf8');
@@ -146,13 +159,20 @@ try{
   const nameless=await scenario({records:initial}),namelessPage=nameless.page;
   const dedicationText='לזכות כל לומדי בית המדרש\nולהצלחת כל הקהילה\nבברכת שנה טובה';
   await screen(namelessPage);
-  await namelessPage.locator('#screen-add-dedication').click();await namelessPage.locator('#editor').waitFor();
+  const available=namelessPage.locator('.board-left-rail>.board-dedication');
+  assert.equal(await available.getAttribute('role'),'button');
+  assert.equal(await available.getAttribute('aria-label'),'Add פרנס היום sponsorship');
+  assert.match(await available.textContent(),/Sponsorship available/);
+  await available.click();await namelessPage.locator('#editor').waitFor();
   assert.equal(await namelessPage.locator('[name=sponsor]').inputValue(),'');
   assert.equal(await namelessPage.locator('[name=dedicationName]').inputValue(),'');
   assert.equal(await namelessPage.locator('[name=anonymous]').isChecked(),false);
+  assert.equal(await namelessPage.locator('[name=sponsorshipDate]').inputValue(),'','New dedication must not automatically choose today');
+  assert.equal(await namelessPage.locator('#dedication-calendar [aria-pressed=true]').count(),0);
+  assert.equal(await namelessPage.locator('#dedication-manual-date').getAttribute('open'),null,'Manual date entry is secondary');
   await namelessPage.locator('[name=dedicationText]').fill(dedicationText);
   await namelessPage.locator('[name=timing]').selectOption('civil');
-  await namelessPage.locator('[name=sponsorshipDate]').fill('2026-09-24');
+  await namelessPage.locator('#dedication-calendar [data-date="2026-09-24"]').click();
   await namelessPage.waitForFunction(start=>document.querySelector('[name=startLocal]')?.value===start,localStamp(dateInfo('2026-09-24').civilStart));
   await namelessPage.locator('#preview').click();await namelessPage.locator('#preview-host .dedication-text').waitFor();
   assert.equal(await namelessPage.locator('#preview-host .dedication-text').textContent(),dedicationText);
@@ -182,6 +202,126 @@ try{
   assert.doesNotMatch(await namelessPublic.locator('.board-dedication').textContent(),/anonymous/i,'blank sponsor must not create an anonymous placeholder');
   await nameless.context.close();
 
+  // Calendar selection, manual English dates and Hebrew conversion all update
+  // one sponsorship date and the same existing evening-window calculation.
+  const calendar=await scenario({records:initial}),cp=calendar.page;
+  await screen(cp);await cp.locator('#screen-add-dedication').click();await cp.locator('#editor').waitFor();
+  await cp.locator('#dedication-calendar [data-date="2026-09-26"]').waitFor();
+  assert.equal(await cp.locator('[name=sponsorshipDate]').inputValue(),'');
+  assert.equal(await cp.locator('[name=startLocal]').inputValue(),'');
+  assert.equal(await cp.locator('[name=endLocal]').inputValue(),'');
+  assert.match(await cp.locator('#dedication-selection').textContent(),/Choose a day/);
+  await cp.locator('[name=timing]').selectOption('custom');
+  assert.equal(await cp.locator('[name=startLocal]').isEditable(),true,'Custom timing is editable before choosing a sponsorship date');
+  assert.equal(await cp.locator('[name=endLocal]').isEditable(),true);
+  await cp.locator('[name=untilOff]').check();
+  assert.equal(await cp.locator('[name=endLocal]').isDisabled(),true,'Until turned off disables the custom end date');
+  await cp.locator('[name=untilOff]').uncheck();
+  await cp.locator('[name=timing]').selectOption('evening');
+  await cp.locator('[data-shortcut=custom]').click();
+  assert.equal(await cp.locator('[name=timing]').inputValue(),'custom');
+  assert.equal(await cp.locator('[name=startLocal]').evaluate(node=>node===document.activeElement),true,'Choose dates focuses the editable custom start');
+  await cp.locator('[name=timing]').selectOption('evening');
+  const holiday=cp.locator('#dedication-calendar [data-date="2026-09-26"]');
+  assert.ok(await holiday.locator('.hebrew-date').textContent());
+  assert.match(await holiday.locator('.calendar-holiday').allTextContents().then(x=>x.join(' ')),/סוכות|Sukkos/i);
+  await holiday.click();
+  await cp.waitForFunction(start=>document.querySelector('[name=startLocal]').value===start,localStamp(dateInfo('2026-09-26').previousSunset));
+  assert.equal(await cp.locator('[name=sponsorshipDate]').inputValue(),'2026-09-26');
+  assert.equal(await cp.locator('[name=timing]').inputValue(),'evening');
+  assert.equal(await cp.locator('[name=endLocal]').inputValue(),localStamp(dateInfo('2026-09-26').sunset));
+  assert.equal(await holiday.getAttribute('aria-pressed'),'true');
+  assert.match(await cp.locator('#dedication-selection').textContent(),/2026-09-26/);
+  assert.equal(await cp.locator('[name=hebrewDay]').inputValue(),String(dateInfo('2026-09-26').hebrew.dayOfMonth));
+  await cp.locator('#dedication-manual-date summary').click();
+  await cp.locator('[name=sponsorshipDate]').fill('2026-10-02');
+  await cp.locator('#dedication-calendar [data-date="2026-10-02"][aria-pressed=true]').waitFor();
+  await cp.waitForFunction(start=>document.querySelector('[name=startLocal]').value===start,localStamp(dateInfo('2026-10-02').previousSunset));
+  assert.equal(await cp.locator('[name=hebrewDay]').inputValue(),'21');
+  await cp.locator('[name=hebrewDay]').fill('1');
+  await cp.locator('[name=hebrewMonth]').selectOption('7');
+  await cp.locator('[name=hebrewYear]').fill('5787');
+  await cp.locator('#convert-date').click();
+  await cp.locator('#dedication-calendar [data-date="2026-09-12"][aria-pressed=true]').waitFor();
+  await cp.waitForFunction(()=>document.querySelector('[name=sponsorshipDate]').value==='2026-09-12');
+  assert.equal(await cp.locator('[name=hebrewDay]').inputValue(),'1');
+  await cp.locator('#dedication-calendar [data-date="2026-09-26"]').click();
+  await cp.locator('[name=dedicationText]').fill('Calendar-selected evening dedication for this private test.');
+  await cp.waitForFunction(start=>document.querySelector('[name=startLocal]').value===start,localStamp(dateInfo('2026-09-26').previousSunset));
+  await cp.locator('#dedication-manual-date summary').click();
+  await shot(cp,'admin-dedication-calendar-desktop.png');
+  await crop(cp,'.dedication-date-picker','admin-dedication-calendar-crop.png');
+  await cp.locator('#editor button[type=submit]').click();await cp.locator('#confirm[open]').waitFor();
+  assert.equal(calendar.state.writes.length,0);
+  await cp.locator('#confirm #yes').click();await screen(cp);
+  const evening=calendar.state.writes.at(-1).saved;
+  assert.equal(evening.data.sponsorshipDate,'2026-09-26');
+  assert.equal(evening.startsAt,dateInfo('2026-09-26').previousSunset);
+  assert.equal(evening.endsAt,dateInfo('2026-09-26').sunset);
+  assert.equal(evening.status,'published');
+  assert.equal(await cp.locator(`[data-screen-remove="${evening.id}"]`).count(),1,'Future published dedication has a removal action');
+  await cp.reload();await screen(cp);
+  await cp.locator(`[data-screen-edit="${evening.id}"]`).click();
+  await cp.locator('#dedication-calendar [data-date="2026-09-26"][aria-pressed=true]').waitFor();
+  assert.equal(await cp.locator('[name=sponsorshipDate]').inputValue(),'2026-09-26','Saved date survives reopening');
+  await calendar.context.close();
+
+  // An undated draft remains undated; opening a new calendar must not activate it.
+  const undated=await scenario({records:[]}),up=undated.page;
+  await screen(up);await up.locator('.board-dedication').focus();await up.keyboard.press('Enter');await up.locator('#editor').waitFor();
+  await up.locator('[name=dedicationText]').fill('Undated private draft.');
+  await up.locator('#draft').click();await screen(up);
+  const draft=undated.state.writes.at(-1).saved;
+  assert.equal(draft.status,'draft');assert.equal(draft.data.sponsorshipDate,'');
+  assert.equal(draft.startsAt,null);assert.equal(draft.endsAt,null);
+  assert.equal(await up.locator(`[data-screen-remove="${draft.id}"]`).count(),0);
+  await undated.context.close();
+
+  // Both active and upcoming removal actions hide the saved record, retain its
+  // complete contents, and remain effective after a fresh dashboard load.
+  const future={...evening,id:'development-future-dedication',version:5};
+  const removal=await scenario({records:[...initial,dedication,future]}),rp=removal.page;
+  await screen(rp);
+  assert.equal(await rp.locator('[data-screen-remove]').count(),2);
+  await shot(rp,'admin-dedication-removal-controls.png');
+  await crop(rp,'.screen-dedication-controls','admin-dedication-removal-crop.png');
+  await rp.locator(`[data-screen-edit="${dedication.id}"]`).click();
+  await rp.locator('#remove-dedication').click();await screen(rp);
+  assert.equal(removal.state.writes.length,1);
+  assert.equal(removal.state.writes[0].name,`items/${dedication.id}/hide`);
+  assert.equal(removal.state.writes[0].raw.version,3);
+  const hidden=removal.state.records.find(item=>item.id===dedication.id);
+  assert.equal(hidden.status,'hidden');assert.equal(hidden.version,4);
+  assert.deepEqual(hidden.data,dedication.data);assert.equal(hidden.startsAt,dedication.startsAt);
+  assert.equal(await rp.locator('#screen-editor .board-dedication .dedication-text').count(),0);
+  assert.equal(await rp.locator('#screen-editor .board-dedication .dedication-available').count(),1,'Removing the active dedication restores the availability card');
+  await rp.reload();await screen(rp);
+  assert.equal(await rp.locator(`[data-screen-remove="${dedication.id}"]`).count(),0);
+  await rp.locator(`[data-screen-remove="${future.id}"]`).click();
+  await rp.locator(`[data-screen-remove="${future.id}"]`).waitFor({state:'detached'});
+  await rp.reload();await screen(rp);
+  assert.equal(await rp.locator('[data-screen-remove]').count(),0);
+  assert.equal(removal.state.records.length,initial.length+2,'Removal must not delete the saved record');
+  assert.equal(removal.state.records.find(item=>item.id===future.id).status,'hidden');
+  assert.deepEqual(removal.state.records.find(item=>item.id===future.id).data,future.data);
+  assert.ok(removal.state.writes.every(write=>write.method==='POST'&&write.name.endsWith('/hide')));
+  await removal.context.close();
+
+  // A concurrent edit rejects the saved version. The UI must keep the
+  // dedication visible, show the actionable error, and re-enable controls.
+  const conflict=await scenario({hideConflict:true}),xp=conflict.page;
+  await screen(xp);await xp.locator(`[data-screen-remove="${dedication.id}"]`).click();
+  await xp.waitForFunction(()=>document.querySelector('#error')?.textContent.includes('This item changed. Reopen it first.'));
+  await xp.waitForFunction(id=>!document.querySelector(`[data-screen-remove="${id}"]`)?.disabled,dedication.id);
+  assert.equal(conflict.state.writes.length,0);
+  assert.deepEqual(conflict.state.hideAttempts,[{name:`items/${dedication.id}/hide`,raw:{version:3}}]);
+  assert.equal(conflict.state.records.find(item=>item.id===dedication.id).status,'published');
+  assert.equal(await xp.locator('#screen-editor .board-dedication .dedication-text').textContent(),dedication.data.dedicationText);
+  await xp.reload();await screen(xp);
+  assert.equal(await xp.locator(`[data-screen-remove="${dedication.id}"]`).count(),1);
+  assert.equal(conflict.state.records.find(item=>item.id===dedication.id).version,3);
+  await conflict.context.close();
+
   // Mobile users can choose/edit content with full-size controls below the screen.
   const mobile=await scenario({mobile:true});await screen(mobile.page);
   assert.equal(await mobile.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -190,6 +330,15 @@ try{
   await mobile.page.locator('[data-screen-area="rav"]').click();await mobile.page.locator('#screen-add-announcement').click();
   assert.equal(await mobile.page.locator('[name=displayGroup]').inputValue(),'rav');await cancel(mobile.page);
   assert.equal(await mobile.page.locator('[data-screen-area="rav"]').getAttribute('aria-pressed'),'true');
+  await mobile.page.locator('#screen-add-dedication').click();
+  await mobile.page.locator('#dedication-calendar [data-date="2026-09-26"]').waitFor();
+  assert.equal(await mobile.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'393px calendar must not create horizontal overflow');
+  await mobile.page.locator('#dedication-calendar [data-date="2026-09-26"]').click();
+  await mobile.page.waitForFunction(()=>document.querySelector('[name=sponsorshipDate]').value==='2026-09-26');
+  await shot(mobile.page,'admin-dedication-calendar-mobile.png');
+  await mobile.page.locator('#dedication-manual-date summary').click();
+  assert.equal(await mobile.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Expanded manual English/Hebrew fields fit a phone');
+  await cancel(mobile.page);
   await shot(mobile.page,'admin-screen-mobile.png');await mobile.context.close();
 
   // Restricted admins see the whole public screen but can edit only their kinds.
@@ -197,17 +346,23 @@ try{
   await restricted.page.locator('#screen-editor .tv-stage').waitFor();
   assert.equal(await restricted.page.locator('#screen-add-announcement').count(),0);
   assert.equal(await restricted.page.locator('.announcement-section[role=button]').count(),0);
+  assert.equal(await restricted.page.locator(`[data-screen-remove="${dedication.id}"]`).count(),1);
   assert.deepEqual(await restricted.page.locator('[data-screen-edit]').evaluateAll(nodes=>nodes.map(node=>node.dataset.screenEdit)),[dedication.id]);
   await restricted.page.locator('#screen-add-dedication').click();await restricted.page.locator('[name=sponsor]').waitFor();
   assert.equal(restricted.state.writes.length,0);await restricted.context.close();
   const announcementsOnly=await scenario({capabilities:['announcements']});await screen(announcementsOnly.page);
   assert.equal(await announcementsOnly.page.locator('#screen-add-dedication').count(),0);
   assert.equal(await announcementsOnly.page.locator('.board-dedication[role=button]').count(),0);
+  assert.equal(await announcementsOnly.page.locator('[data-screen-remove],#remove-dedication').count(),0,'Announcement-only admins cannot remove dedications');
   await announcementsOnly.context.close();
 
   // Empty areas are still usable and never require fake publicly visible notices.
   const empty=await scenario({records:[]});await screen(empty.page);
   assert.equal(await empty.page.locator('#screen-editor .announcement-section').count(),0);
+  await empty.page.locator('.board-dedication').focus();await empty.page.keyboard.press('Space');
+  await empty.page.locator('#dedication-calendar').waitFor();
+  assert.equal(await empty.page.locator('[name=sponsorshipDate]').inputValue(),'','Keyboard activation opens an undated dedication draft');
+  await cancel(empty.page);
   await empty.page.locator('[data-screen-area="support"]').click();await empty.page.locator('#screen-add-announcement').click();
   assert.equal(await empty.page.locator('[name=displayGroup]').inputValue(),'support');assert.equal(empty.state.writes.length,0);await empty.context.close();
 
@@ -218,5 +373,5 @@ try{
   assert.equal(await delayed.page.locator('#screen-editor').count(),0);assert.equal(await delayed.page.locator('#list').isVisible(),true);
   await delayed.context.close();
   assert.deepEqual(errors,[]);
-  console.log('PASS: screen-shaped admin, exact notice editing, persistent area selection, draft/version/timing preservation, nameless dedication preview and confirmed publishing, mobile controls, restricted capabilities, empty areas, stale-response navigation, public display unchanged, and admin modules excluded from public offline cache. No database writes.');
+  console.log('PASS: screen-shaped admin, exact notice editing, persistent area selection, nameless publishing, sponsorship calendar/Hebrew/manual sync, undated drafts, evening/custom timing, versioned active/future dedication removal with reload and conflict preservation, mobile calendar/controls, restricted capabilities, empty areas, stale-response navigation, public display unchanged, and admin modules excluded from public offline cache. No database writes.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
