@@ -5026,11 +5026,18 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 }
 
 .reader-schedule-links { display:flex; gap:10px; margin:0 0 12px; }
-.reader-schedule-links a { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #c9b681; border-radius:14px; background:#f0e7d0; color:#15283f; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 2px 5px rgb(21 40 63 / 5%); }
-.reader-schedule-links a:hover { background:#e9ddbd; }
-.reader-schedule-links a:active { background:#e2d3ad; }
-.reader-schedule-links a:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
-.reader-schedule-links span { font-size:22px; color:#826b37; line-height:1; }
+.reader-schedule-links .schedule-link { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #c9b681; border-radius:14px; background:#f0e7d0; color:#15283f; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 2px 5px rgb(21 40 63 / 5%); }
+.reader-schedule-links a.schedule-link:hover { background:#e9ddbd; }
+.reader-schedule-links a.schedule-link:active { background:#e2d3ad; }
+.reader-schedule-links a.schedule-link:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
+.reader-schedule-links .chevron { font-size:22px; color:#826b37; line-height:1; }
+/* Greyed rather than removed, the same call made on the Previous button just below
+   (.reader-nav button:disabled) and for the same reason: the row keeps its shape from
+   week to week rather than the button disappearing and the other one jumping under the
+   thumb. A span, not a disabled <a> - an anchor stays focusable and "clickable" to
+   assistive tech with only aria-disabled set, and there is nowhere for its href to go. */
+.reader-schedule-links .schedule-link.is-disabled { color:#8b9098; background:#f4f4f2; border-color:#ddd; box-shadow:none; cursor:default; }
+.reader-schedule-links .schedule-link.is-disabled .chevron { color:#8b9098; }
 
 
 
