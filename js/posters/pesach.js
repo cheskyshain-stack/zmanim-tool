@@ -577,6 +577,13 @@ export function buildPesachPoster(year, settings) {
     // the only one that renderer knew.
     title: PS_TEXT.title,
     // From the night of בדיקת חמץ to אחרון של פסח, which is every date on the sheet.
+    // If a trailing "after פסח" block is ever added here the way סוכות and יום כיפור both
+    // carry one, its own last day must not be folded into this span: those two kept the
+    // congregation's site saying the sheet was still needed through a week the Weekday chart
+    // already covers, once as this span reaching past אחרון and once as a same-name poster
+    // defaulting into the ר"ה/יו"כ group (see buildSukkosPoster's own note, and `extra` on
+    // the afteryk entry in ui/posters-view.js). Either fixed shape works; folding the new
+    // block's days in here unchecked repeats the same bug a third time.
     span: { from: bedikaOn, to: day(PS_ACHRON) },
     blocks: blocks.map(({ at, ...b }) => b),
     minyanim: M.out,

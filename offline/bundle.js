@@ -1148,9 +1148,27 @@ function validatePageSizes(total, sizes) {
   return null;
 }
 
-/** Even default split across `numPages` pages (earlier pages absorb the remainder one
- *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
-function defaultPageSizes(total, numPages) {
+/** Even default split across `numPages` pages, used to pre-fill the page-size inputs before
+ *  the user adjusts them, and to size a season chart's own three pages when nobody has typed
+ *  a custom split.
+ *
+ *  A season's three pages split unevenly on purpose when the weeks do not divide by three,
+ *  and the short page sits at whichever end the shul asked for rather than being spread a
+ *  week at a time across all three. A 28 week חורף season is 10, 10, 8: the last page is the
+ *  short one. A 28 week קיץ season is the same three numbers reversed, 8, 10, 10, the first
+ *  page short. Each is two full pages of `ceil(total / 3)` and one page of whatever is left,
+ *  which is never more than two weeks shorter than a full page.
+ *
+ *  Only for a season's own three pages: `season` has to be 'kayitz' or 'choref' and
+ *  `numPages` has to be exactly 3, or this falls back to the plain even split, remainder
+ *  absorbed by the earlier pages one at a time, which is what any other page count still
+ *  uses (nobody has asked for a rule about four or five pages, only about a season's three). */
+function defaultPageSizes(total, numPages, season) {
+  if (numPages === 3 && (season === 'kayitz' || season === 'choref')) {
+    const full = Math.ceil(total / 3);
+    const short = total - full * 2;
+    return season === 'choref' ? [full, full, short] : [short, full, full];
+  }
   const base = Math.floor(total / numPages);
   const rem = total % numPages;
   return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
@@ -2687,7 +2705,7 @@ function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3, s.season);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
@@ -4844,6 +4862,13 @@ function buildPesachPoster(year, settings) {
     // the only one that renderer knew.
     title: PS_TEXT.title,
     // From the night of בדיקת חמץ to אחרון של פסח, which is every date on the sheet.
+    // If a trailing "after פסח" block is ever added here the way סוכות and יום כיפור both
+    // carry one, its own last day must not be folded into this span: those two kept the
+    // congregation's site saying the sheet was still needed through a week the Weekday chart
+    // already covers, once as this span reaching past אחרון and once as a same-name poster
+    // defaulting into the ר"ה/יו"כ group (see buildSukkosPoster's own note, and `extra` on
+    // the afteryk entry in ui/posters-view.js). Either fixed shape works; folding the new
+    // block's days in here unchecked repeats the same bug a third time.
     span: { from: bedikaOn, to: day(PS_ACHRON) },
     blocks: blocks.map(({ at, ...b }) => b),
     minyanim: M.out,
@@ -6178,7 +6203,6 @@ function buildSukkosPoster(year, settings) {
      with times of its own, and these are a week of ordinary days that the wall chart already
      carries in full: adding them here would put the same week in twice, once off the chart
      and once off a poster, with nothing to keep the two the same. */
-  const afterDays = sukkosAfterDays(rh, settings);
   {
     const after = buildSukkosAfter(rh, settings);
     blocks.push({
@@ -6200,17 +6224,18 @@ function buildSukkosPoster(year, settings) {
 
   return {
     hebrewYear: year,
-    /* From the afternoon of ערב סוכות to the last day the sheet speaks for.
-       That used to be שמחת תורה, or the שבת בראשית after it in a year that has one, and it is
-       the last day of the week after it now: the sheet carries the schedule that starts the
-       morning after שמחת תורה, and while that block still has days ahead of it the sheet has
-       something to say. Which is what decides how long it stays up on the congregation's own
-       page as well as what the date line under the picker reads. The last day counted rather
-       than the last day of the week: the Friday and the Shabbos after it run on schedules of
-       their own and this sheet does not give them. */
+    /* From the afternoon of ערב סוכות to שמחת תורה, or the שבת בראשית after it in a year that
+       has one - the last day the sheet is actually about. The schedule that starts the morning
+       after שמחת תורה is printed at the foot of the same sheet (blocks.afterTitle above) so
+       whoever kept it on the wall has something to read that week without a new sheet yet, and
+       for a while that block's own last day was let stretch this span and so decide how long
+       the sheet stayed up on the congregation's own page. Reversed for the same reason the
+       יום כיפור sheet's own after-block was: it is the same week the Weekday chart already
+       carries, and a page reading "Special Schedules" through a week that is not special is
+       the wrong answer, whatever the printed sheet still has to say for itself. */
     span: {
       from: day(SK_EREV),
-      to: Math.max(bereishis || day(SK_SIMCHAS), afterDays[afterDays.length - 1] ?? 0),
+      to: bereishis || day(SK_SIMCHAS),
     },
     blocks,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster
@@ -10331,6 +10356,16 @@ const POSTERS = [
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     starts: (y, settings) => buildAfterYomKippurPoster(y, settings)?.span.from ?? null,
+    /* Printed as its own section at the foot of the ראש השנה יום כיפור sheet (see
+       ONEPAGE_SECTIONS.afteryk) so whoever kept that sheet on the wall still has a schedule to
+       read the week after יו"כ, without it the sheet would have a morning and nothing after it
+       - but that stretch is not why the sheet stays up on the congregation's own site. It is
+       the same days the Weekday chart already prints (afterYomKippurRow in sheets/weekday.js),
+       and the shul asked for the site to stop counting it: a page reading "Special Schedules"
+       through ערב סוכות when the actual special schedule ended at יו"כ is the wrong answer,
+       since the ordinary weekly page already has that week. See buildEveryPoster's own span,
+       which skips an `extra` poster's dates rather than folding them into the occasion's. */
+    extra: true,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -10619,12 +10654,21 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
         // Whether this one reads the Page picker, which is what decides if it has to be
         // turned on its side to sit in the run.
         orientations: Boolean(p.orientations),
+        // A section printed on the combined sheet for its own sake (afteryk, so far) rather
+        // than a date this occasion is actually about. Kept in `items` so it still prints; left
+        // out of the span below so it cannot keep the occasion "needed" on the congregation's
+        // site past its own last real day. See the note on afteryk above.
+        extra: Boolean(p.extra),
       });
     }
     else missing.push(p.label);
   }
   if (!items.length) return { missing: 'Nothing to build for this year.' };
-  const spans = items.map((i) => i.poster.span).filter(Boolean);
+  const real = items.filter((i) => !i.extra).map((i) => i.poster.span).filter(Boolean);
+  // An occasion built only from extra sections (should not happen; every occasion so far has a
+  // real sheet of its own) still needs a span, so the extra ones answer rather than leave the
+  // occasion with no window to speak of at all.
+  const spans = real.length ? real : items.map((i) => i.poster.span).filter(Boolean);
   return {
     poster: {
       hebrewYear: year,
@@ -15245,7 +15289,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages);
+    const defaults = defaultPageSizes(weeks.length, numPages, season);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }

@@ -306,6 +306,16 @@ const POSTERS = [
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     starts: (y, settings) => buildAfterYomKippurPoster(y, settings)?.span.from ?? null,
+    /* Printed as its own section at the foot of the ראש השנה יום כיפור sheet (see
+       ONEPAGE_SECTIONS.afteryk) so whoever kept that sheet on the wall still has a schedule to
+       read the week after יו"כ, without it the sheet would have a morning and nothing after it
+       - but that stretch is not why the sheet stays up on the congregation's own site. It is
+       the same days the Weekday chart already prints (afterYomKippurRow in sheets/weekday.js),
+       and the shul asked for the site to stop counting it: a page reading "Special Schedules"
+       through ערב סוכות when the actual special schedule ended at יו"כ is the wrong answer,
+       since the ordinary weekly page already has that week. See buildEveryPoster's own span,
+       which skips an `extra` poster's dates rather than folding them into the occasion's. */
+    extra: true,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -594,12 +604,21 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
         // Whether this one reads the Page picker, which is what decides if it has to be
         // turned on its side to sit in the run.
         orientations: Boolean(p.orientations),
+        // A section printed on the combined sheet for its own sake (afteryk, so far) rather
+        // than a date this occasion is actually about. Kept in `items` so it still prints; left
+        // out of the span below so it cannot keep the occasion "needed" on the congregation's
+        // site past its own last real day. See the note on afteryk above.
+        extra: Boolean(p.extra),
       });
     }
     else missing.push(p.label);
   }
   if (!items.length) return { missing: 'Nothing to build for this year.' };
-  const spans = items.map((i) => i.poster.span).filter(Boolean);
+  const real = items.filter((i) => !i.extra).map((i) => i.poster.span).filter(Boolean);
+  // An occasion built only from extra sections (should not happen; every occasion so far has a
+  // real sheet of its own) still needs a span, so the extra ones answer rather than leave the
+  // occasion with no window to speak of at all.
+  const spans = real.length ? real : items.map((i) => i.poster.span).filter(Boolean);
   return {
     poster: {
       hebrewYear: year,

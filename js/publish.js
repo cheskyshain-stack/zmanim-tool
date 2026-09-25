@@ -182,7 +182,7 @@ export function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3, s.season);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
