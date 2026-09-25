@@ -14,7 +14,7 @@ import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
 import { announcedWeekCell } from '../announced.js';
 import { shacharisGridHtml } from './shacharis-grid.js';
-import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
+import { UL_START, UL_END, NEW_TAG_START, NEW_TAG_MID, NEW_TAG_END, normalizeRichText, markHeaderRoom } from '../format.js';
 import { applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
@@ -477,8 +477,14 @@ ${special}` : '');
         // holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const value = announced ? announcedWeekCell(row[c.key] ?? '', c.key, week.serial) : row[c.key] ?? '';
-          const html = overriddenKeys.has(c.key) ? value : nl2br(value);
+          // The 11:30 "NEW" tag lives only here: a hand-typed override already wins
+          // outright and is never printed through printOverrides, and every other reader
+          // of this column (the week card, "what is on next", the messages page) reads
+          // row[c.key] directly and never sees the tag either. See sheets/weekday.js.
+          const overridden = overriddenKeys.has(c.key);
+          const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
+          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial) : computedValue;
+          const html = overridden ? value : nl2br(value);
           return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -614,6 +620,14 @@ function nl2br(str) {
   // matched as whitespace rather than written out.
   const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
-  return escaped.replace(/\n/g, '<br>');
+  // The "NEW" tag (see NEW_TAG_START/MID/END in format.js): same after-escaping swap as
+  // the underline sentinels just above, so a literal "<" typed by the shul can never be
+  // read back as this markup - only the three PUA characters newMinyanTag() itself wrote
+  // in sheets/weekday.js can trigger it.
+  const tagged = escaped
+    .split(NEW_TAG_START).join('<span class="new-minyan-tag">')
+    .split(NEW_TAG_MID).join('<span class="tag-word">')
+    .split(NEW_TAG_END).join('</span></span>');
+  return tagged.replace(/\n/g, '<br>');
 }
 

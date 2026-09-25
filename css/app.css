@@ -993,6 +993,24 @@ td.ruled .cell { background: var(--ruled); }
    syncHeaderRowHeight() in sheet-view.js - see there for why that can't be pure CSS. */
 .weekday-table tbody tr { height: calc(var(--sheet-font-size) * 2.6); }
 
+/* The "NEW" tag on the Weekday chart's 11:30 מעריב (sheets/weekday.js, on only while
+   ui/settings-view.js's admin switch is on). Filled with --sheet-accent/--sheet-head-ink,
+   the same two variables the chart's own header is painted in (see applyStyle in
+   sheet-view.js) rather than a colour picked for this alone, so the tag inherits whatever
+   contrast the header already has, and turns to grayscale exactly the way the header does
+   under the chart's own Ink: Black and white switch - it never depends on a colour a
+   photocopier would drop. Small enough that a stray extra pixel or two of row height (see
+   .weekday-table tbody tr above, a floor rather than a cap) stays sub-pixel in practice. */
+.new-minyan-tag {
+  display: inline-flex; align-items: baseline; gap: 0.3em;
+  background: var(--sheet-accent, var(--accent)); color: var(--sheet-head-ink, #fff);
+  border-radius: 3pt; padding: 0 0.35em; font-weight: 700;
+}
+.new-minyan-tag .tag-word {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-size: 0.62em; font-weight: 700; letter-spacing: 0.04em;
+}
+
 .col-width-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.5rem 0 0.9rem; align-items: flex-end; }
 .col-width-input { display: flex; flex-direction: column; font-size: var(--fs-xs); color: var(--muted); gap: 0.2rem; }
 .col-width-input input { width: 74px; padding: 0.25rem 0.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; }

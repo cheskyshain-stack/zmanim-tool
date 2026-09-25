@@ -41,6 +41,21 @@ export function underlineTime(value) {
   return UL_START + ' ' + text + UL_END;
 }
 
+// Same PUA mechanism as UL_START/UL_END, for the Weekday chart's "NEW" tag on 11:30
+// מעריב (sheets/weekday.js, ui/sheet-view.js's nl2br). Three markers rather than two:
+// the tag wraps the whole time *and* carries a second, inner span around the literal
+// word "NEW" (see .new-minyan-tag/.tag-word in app.css), so nl2br needs a seam between
+// them as well as an open and a close.
+export const NEW_TAG_START = '';
+export const NEW_TAG_MID = '';
+export const NEW_TAG_END = '';
+
+/** Wraps an already-formatted cell value (which may itself carry underline sentinels -
+ *  the time can be both למטה and new at once) so it renders inside the "NEW" tag. */
+export function newMinyanTag(text) {
+  return NEW_TAG_START + text + NEW_TAG_MID + 'NEW' + NEW_TAG_END;
+}
+
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
  *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
  *  the caller can leave those digits untouched rather than mangle them. */

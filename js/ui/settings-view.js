@@ -15,13 +15,15 @@
 import { TIMEZONES } from '../settings.js';
 import { exportStateToFile, importStateFromText, isSheetFile, importSheetFromText } from '../storage.js';
 import { renderImageCropper } from './image-crop.js';
-import { clearLegacyPublishToken } from '../publish.js';
+import { clearLegacyPublishToken, firstPageRangeForCurrentSeason } from '../publish.js';
 import { renderRules } from './rules-view.js';
 import { escAttr } from '../util.js';
 import { switchHtml } from './switch.js';
+import { dateFromSerial } from '../zmanim/solar.js';
 
-export function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
+export function renderSettings(container, state, tables, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
+  const badge = s.newMinyanBadge || { on: false, firstSerial: null, lastSerial: null };
   container.innerHTML = `
     <h2>Settings</h2>
     <p class="hint">Mirrors the workbook's SETTINGS sheet. Saved in this browser.</p>
@@ -64,6 +66,16 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
           { value: 'en', label: 'English', on: s.language !== 'he' },
         ])}</div>
         <label><input type="checkbox" name="inIsrael" ${s.inIsrael ? 'checked' : ''}> Zmanim used in Eretz Yisroel</label>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Weekday chart</summary>
+        <div class="panel-body">
+        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart - and only on page 1 of whichever season is current the moment you turn it on. Later pages, and every season after, print 11:30 plain. Turning it back off just hides the tag.</p>
+        <label><input type="checkbox" name="newMinyanBadgeOn" ${badge.on ? 'checked' : ''}> Show the "NEW" tag on 11:30 מעריב</label>
+        ${badge.on && badge.firstSerial != null
+          ? `<p class="hint">Pinned to ${escAttr(dateFromSerial(badge.firstSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))} through ${escAttr(dateFromSerial(badge.lastSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))}.</p>`
+          : ''}
       </div>
       </details>
       <details class="panel">
@@ -153,10 +165,25 @@ export function renderSettings(container, state, onSave, onStateReplaced, onRule
       useAstronomicalChatzos: fd.get('useAstronomicalChatzos') === 'on',
       useElevation: fd.get('useElevation') === 'on',
       useGregorianBefore1582: fd.get('useGregorianBefore1582') === 'on',
+      newMinyanBadge: nextNewMinyanBadge(badge, fd.get('newMinyanBadgeOn') === 'on', s, tables),
     };
     onSave(next);
     showToast('Settings saved');
   });
+}
+
+/** The season is captured only on the off-to-on transition, never on a save that leaves
+ *  it on or off - a save made while it's already on must not walk the pinned range
+ *  forward to whatever season happens to be current that day. Turning it off keeps
+ *  whatever range was captured (harmless, since `on: false` hides the tag regardless)
+ *  so switching it back on later without an intervening season change doesn't need to
+ *  ask again - though it does, because "current" is asked fresh on every transition, which
+ *  only matters once a season boundary has actually passed in between. */
+function nextNewMinyanBadge(badge, nowOn, settings, tables) {
+  if (!nowOn) return { on: false, firstSerial: badge.firstSerial ?? null, lastSerial: badge.lastSerial ?? null };
+  if (badge.on) return { ...badge }; // already on - keep the range it was pinned to
+  const range = firstPageRangeForCurrentSeason(settings, tables);
+  return range ? { on: true, firstSerial: range.firstSerial, lastSerial: range.lastSerial } : { on: false, firstSerial: null, lastSerial: null };
 }
 
 /** Saving re-renders this whole view, so any "saved!" state put on the button itself is

@@ -1,6 +1,6 @@
 import { loadTables } from './data-loader.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
-import { computeSeasonWeeks, computeWeekdayWeeks } from './sheets/weeks.js';
+import { computeSeasonWeeks, computeWeekdayWeeks, currentSeasonAndYear } from './sheets/weeks.js';
 import { defaultPageSizes, alignPageSizesTo } from './pagination.js';
 import { hebrewDateExtended } from './hebrew-calendar.js';
 import { excelSerial } from './zmanim/solar.js';
@@ -156,6 +156,27 @@ export async function publishToSite() {
 
 export async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
+}
+
+/** Page 1 of the Weekday chart for whichever season contains today, as a Shabbos-anchored
+ *  serial range (its first week through its last). The only caller is settings-view.js,
+ *  the moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js): it
+ *  captures which weeks were page 1 right then, so the badge stays pinned to that season
+ *  even once a later season becomes "current" - not whichever season happens to be on
+ *  the wall whenever the chart is next printed, which would walk the badge forward every
+ *  time a new season starts. Mirrors buildAutomaticCharts's own page-1 arithmetic
+ *  (defaultPageSizes, alignPageSizesTo) rather than a size guessed independently, so the
+ *  range matches the real printed chart's actual first page. */
+export function firstPageRangeForCurrentSeason(settings, tables) {
+  const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
+  const { season, hebrewYear } = currentSeasonAndYear(resolved);
+  const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
+  const sizes = defaultPageSizes(weeks.length, 3, season);
+  const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
+  const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
+  const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
+  if (!firstPage.length) return null;
+  return { season, hebrewYear, firstSerial: firstPage[0].serial, lastSerial: firstPage[firstPage.length - 1].serial };
 }
 
 /** Regenerate three Hebrew years before and after the current year from shared formulas.

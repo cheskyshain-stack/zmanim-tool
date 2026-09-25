@@ -1525,6 +1525,13 @@ const DEFAULT_SETTINGS = {
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
+  /* Not a time default like the ones above, and not a per-cell override either: the Weekday
+     chart's 11:30 מעריב itself always runs now (sheets/weekday.js), regardless of this flag.
+     This only controls whether it prints with a "NEW" tag, and only on page 1 of whichever
+     season was current the moment the admin turned it on (ui/settings-view.js), so the tag
+     can't drift forward onto a season nobody asked it to. Turning it back off just hides the
+     tag; it does not touch the minyan itself. See publish.js's firstPageRangeForCurrentSeason. */
+  newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
@@ -1691,6 +1698,21 @@ const UL_END = '';
 function underlineTime(value) {
   const text = typeof value === 'number' ? formatTime(value) : value;
   return UL_START + ' ' + text + UL_END;
+}
+
+// Same PUA mechanism as UL_START/UL_END, for the Weekday chart's "NEW" tag on 11:30
+// מעריב (sheets/weekday.js, ui/sheet-view.js's nl2br). Three markers rather than two:
+// the tag wraps the whole time *and* carries a second, inner span around the literal
+// word "NEW" (see .new-minyan-tag/.tag-word in app.css), so nl2br needs a seam between
+// them as well as an open and a close.
+const NEW_TAG_START = '';
+const NEW_TAG_MID = '';
+const NEW_TAG_END = '';
+
+/** Wraps an already-formatted cell value (which may itself carry underline sentinels -
+ *  the time can be both למטה and new at once) so it renders inside the "NEW" tag. */
+function newMinyanTag(text) {
+  return NEW_TAG_START + text + NEW_TAG_MID + 'NEW' + NEW_TAG_END;
 }
 
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
@@ -2525,33 +2547,30 @@ function nextAvailableYearFor(season, settings) {
   return y;
 }
 
-/** Which season+year the Generate form should default to: the *next* season
- *  chronologically after whichever one contains today - a schedule is always being
- *  prepared ahead of time for the upcoming season, not the one currently in progress.
- *  E.g. if today falls within a קיץ season, default to the חורף season right after it
- *  (never the קיץ season itself, and never a season that's already over). */
-function defaultSeasonAndYear(settings) {
+/** Which season+year today itself falls in. Factored out of defaultSeasonAndYear
+ *  (below), which wants the *next* season instead, and reused by
+ *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
+ *  the wall right now" asks this rather than working the boundaries out again. */
+function currentSeasonAndYear(settings) {
   const today = excelSerial(new Date());
   const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);
   const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
 
-  let currentSeason, currentYear;
-  if (today < sukkosY0) {
-    currentSeason = 'kayitz';
-    currentYear = y0 - 1; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
-  } else if (today < pesachY0) {
-    currentSeason = 'choref';
-    currentYear = y0;
-  } else if (today < sukkosY0plus1) {
-    currentSeason = 'kayitz';
-    currentYear = y0;
-  } else {
-    currentSeason = 'choref';
-    currentYear = y0 + 1;
-  }
+  if (today < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
+  if (today < pesachY0) return { season: 'choref', hebrewYear: y0 };
+  if (today < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
+  return { season: 'choref', hebrewYear: y0 + 1 };
+}
 
+/** Which season+year the Generate form should default to: the *next* season
+ *  chronologically after whichever one contains today - a schedule is always being
+ *  prepared ahead of time for the upcoming season, not the one currently in progress.
+ *  E.g. if today falls within a קיץ season, default to the חורף season right after it
+ *  (never the קיץ season itself, and never a season that's already over). */
+function defaultSeasonAndYear(settings) {
+  const { season: currentSeason, hebrewYear: currentYear } = currentSeasonAndYear(settings);
   return currentSeason === 'choref' ? { season: 'kayitz', hebrewYear: currentYear } : { season: 'choref', hebrewYear: currentYear + 1 };
 }
 
@@ -2707,6 +2726,27 @@ async function publishToSite() {
 
 async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
+}
+
+/** Page 1 of the Weekday chart for whichever season contains today, as a Shabbos-anchored
+ *  serial range (its first week through its last). The only caller is settings-view.js,
+ *  the moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js): it
+ *  captures which weeks were page 1 right then, so the badge stays pinned to that season
+ *  even once a later season becomes "current" - not whichever season happens to be on
+ *  the wall whenever the chart is next printed, which would walk the badge forward every
+ *  time a new season starts. Mirrors buildAutomaticCharts's own page-1 arithmetic
+ *  (defaultPageSizes, alignPageSizesTo) rather than a size guessed independently, so the
+ *  range matches the real printed chart's actual first page. */
+function firstPageRangeForCurrentSeason(settings, tables) {
+  const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
+  const { season, hebrewYear } = currentSeasonAndYear(resolved);
+  const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
+  const sizes = defaultPageSizes(weeks.length, 3, season);
+  const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
+  const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
+  const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
+  if (!firstPage.length) return null;
+  return { season, hebrewYear, firstSerial: firstPage[0].serial, lastSerial: firstPage[firstPage.length - 1].serial };
 }
 
 /** Regenerate three Hebrew years before and after the current year from shared formulas.
@@ -6939,7 +6979,7 @@ function place845(mins) {
  *
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
+ *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs every week. */
 function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
@@ -6951,6 +6991,13 @@ function maarivParts(week, settings) {
   const earliestAllowed = latestShkia + 50;
   const clears = 'at least 50 minutes after the latest שקיעה of the five days';
 
+  // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
+  // (ui/settings-view.js), and only for the season it was pinned to the moment that
+  // happened (publish.js's firstPageRangeForCurrentSeason), never whatever season happens
+  // to be current when the chart is later printed. See settings.js's newMinyanBadge.
+  const badge = settings.newMinyanBadge;
+  const showNewBadge = !!(badge?.on && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+
   const slots = [
     { mins: HM(18, 35) },
     { mins: HM(19, 0) },
@@ -6961,7 +7008,9 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    { mins: HM(23, 30), offSeason: bmg ? 'offered only while BMG is out of session' : null },
+    // No longer BMG-gated like 12:00 below it: this one runs every week now. See the
+    // note over newMinyanBadge in settings.js for the "NEW" tag it can carry.
+    { mins: HM(23, 30), isNewMinyan: true },
     { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
@@ -6999,13 +7048,30 @@ function maarivParts(week, settings) {
 
   const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
   const trace = (slot) => slotTrace(slot, {
-    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it' : 'one of the standing מעריב times'),
+    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it'
+      : slot.isNewMinyan ? 'the 11:30 מנין, which now runs every week rather than only while BMG is out of session'
+      : 'one of the standing מעריב times'),
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
   });
+  const text = splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot))));
+  /* The tag is a *second*, print-only rendering of the same kept slots, never mixed into
+     `text` above. `text` is what every other reader of this column reads too - the week
+     card, the "what is on next" card, the messages page (js/week-text.js parses these
+     cells for their room letters and would choke on an extra word stitched into a time) -
+     and none of them are the printed chart, so none of them should ever show the tag. Only
+     sheet-view.js's own cell rendering reaches for `printOverrides`, and only when this
+     week's own column has not been typed over by hand. */
+  const printText = showNewBadge
+    ? splitLinesInHalf(kept.map((slot) => {
+        const rendered = renderTime(slot.mins, placeOf(slot));
+        return slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
+      }))
+    : null;
 
   return {
-    text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
+    text,
+    printText,
     times: kept.map(trace),
     dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
@@ -7113,6 +7179,10 @@ function buildWeekdayRow(week, settings) {
     traces: { B: maariv.times, C: mincha.times },
     notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
+    /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
+       itself, which stays the plain text every other reader - the week card, "what is
+       on next", the messages page - reads). See the note on maariv.printText above. */
+    printOverrides: maariv.printText != null ? { B: maariv.printText } : undefined,
   };
 }
 
@@ -9963,8 +10033,14 @@ ${special}` : '');
         // holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const value = announced ? announcedWeekCell(row[c.key] ?? '', c.key, week.serial) : row[c.key] ?? '';
-          const html = overriddenKeys.has(c.key) ? value : nl2br(value);
+          // The 11:30 "NEW" tag lives only here: a hand-typed override already wins
+          // outright and is never printed through printOverrides, and every other reader
+          // of this column (the week card, "what is on next", the messages page) reads
+          // row[c.key] directly and never sees the tag either. See sheets/weekday.js.
+          const overridden = overriddenKeys.has(c.key);
+          const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
+          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial) : computedValue;
+          const html = overridden ? value : nl2br(value);
           return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -10100,7 +10176,15 @@ function nl2br(str) {
   // matched as whitespace rather than written out.
   const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
-  return escaped.replace(/\n/g, '<br>');
+  // The "NEW" tag (see NEW_TAG_START/MID/END in format.js): same after-escaping swap as
+  // the underline sentinels just above, so a literal "<" typed by the shul can never be
+  // read back as this markup - only the three PUA characters newMinyanTag() itself wrote
+  // in sheets/weekday.js can trigger it.
+  const tagged = escaped
+    .split(NEW_TAG_START).join('<span class="new-minyan-tag">')
+    .split(NEW_TAG_MID).join('<span class="tag-word">')
+    .split(NEW_TAG_END).join('</span></span>');
+  return tagged.replace(/\n/g, '<br>');
 }
 
 // ==== ui/posters-view.js ====
@@ -16455,8 +16539,10 @@ function conditionSummary(condition) {
 
 
 
-function renderSettings(container, state, onSave, onStateReplaced, onRulesChange = () => {}) {
+
+function renderSettings(container, state, tables, onSave, onStateReplaced, onRulesChange = () => {}) {
   const s = state.settings;
+  const badge = s.newMinyanBadge || { on: false, firstSerial: null, lastSerial: null };
   container.innerHTML = `
     <h2>Settings</h2>
     <p class="hint">Mirrors the workbook's SETTINGS sheet. Saved in this browser.</p>
@@ -16499,6 +16585,16 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
           { value: 'en', label: 'English', on: s.language !== 'he' },
         ])}</div>
         <label><input type="checkbox" name="inIsrael" ${s.inIsrael ? 'checked' : ''}> Zmanim used in Eretz Yisroel</label>
+      </div>
+      </details>
+      <details class="panel">
+        <summary>Weekday chart</summary>
+        <div class="panel-body">
+        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart - and only on page 1 of whichever season is current the moment you turn it on. Later pages, and every season after, print 11:30 plain. Turning it back off just hides the tag.</p>
+        <label><input type="checkbox" name="newMinyanBadgeOn" ${badge.on ? 'checked' : ''}> Show the "NEW" tag on 11:30 מעריב</label>
+        ${badge.on && badge.firstSerial != null
+          ? `<p class="hint">Pinned to ${escAttr(dateFromSerial(badge.firstSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))} through ${escAttr(dateFromSerial(badge.lastSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))}.</p>`
+          : ''}
       </div>
       </details>
       <details class="panel">
@@ -16588,10 +16684,25 @@ function renderSettings(container, state, onSave, onStateReplaced, onRulesChange
       useAstronomicalChatzos: fd.get('useAstronomicalChatzos') === 'on',
       useElevation: fd.get('useElevation') === 'on',
       useGregorianBefore1582: fd.get('useGregorianBefore1582') === 'on',
+      newMinyanBadge: nextNewMinyanBadge(badge, fd.get('newMinyanBadgeOn') === 'on', s, tables),
     };
     onSave(next);
     showToast('Settings saved');
   });
+}
+
+/** The season is captured only on the off-to-on transition, never on a save that leaves
+ *  it on or off - a save made while it's already on must not walk the pinned range
+ *  forward to whatever season happens to be current that day. Turning it off keeps
+ *  whatever range was captured (harmless, since `on: false` hides the tag regardless)
+ *  so switching it back on later without an intervening season change doesn't need to
+ *  ask again - though it does, because "current" is asked fresh on every transition, which
+ *  only matters once a season boundary has actually passed in between. */
+function nextNewMinyanBadge(badge, nowOn, settings, tables) {
+  if (!nowOn) return { on: false, firstSerial: badge.firstSerial ?? null, lastSerial: badge.lastSerial ?? null };
+  if (badge.on) return { ...badge }; // already on - keep the range it was pinned to
+  const range = firstPageRangeForCurrentSeason(settings, tables);
+  return range ? { on: true, firstSerial: range.firstSerial, lastSerial: range.lastSerial } : { on: false, firstSerial: null, lastSerial: null };
 }
 
 /** Saving re-renders this whole view, so any "saved!" state put on the button itself is
@@ -20729,6 +20840,7 @@ function paint() {
     renderSettings(
       main,
       state,
+      tables,
       (next) => {
         state.settings = next;
         persist();

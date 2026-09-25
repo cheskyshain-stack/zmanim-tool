@@ -168,32 +168,29 @@ export function nextAvailableYearFor(season, settings) {
   return y;
 }
 
-/** Which season+year the Generate form should default to: the *next* season
- *  chronologically after whichever one contains today - a schedule is always being
- *  prepared ahead of time for the upcoming season, not the one currently in progress.
- *  E.g. if today falls within a קיץ season, default to the חורף season right after it
- *  (never the קיץ season itself, and never a season that's already over). */
-export function defaultSeasonAndYear(settings) {
+/** Which season+year today itself falls in. Factored out of defaultSeasonAndYear
+ *  (below), which wants the *next* season instead, and reused by
+ *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
+ *  the wall right now" asks this rather than working the boundaries out again. */
+export function currentSeasonAndYear(settings) {
   const today = excelSerial(new Date());
   const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);
   const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
 
-  let currentSeason, currentYear;
-  if (today < sukkosY0) {
-    currentSeason = 'kayitz';
-    currentYear = y0 - 1; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
-  } else if (today < pesachY0) {
-    currentSeason = 'choref';
-    currentYear = y0;
-  } else if (today < sukkosY0plus1) {
-    currentSeason = 'kayitz';
-    currentYear = y0;
-  } else {
-    currentSeason = 'choref';
-    currentYear = y0 + 1;
-  }
+  if (today < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
+  if (today < pesachY0) return { season: 'choref', hebrewYear: y0 };
+  if (today < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
+  return { season: 'choref', hebrewYear: y0 + 1 };
+}
 
+/** Which season+year the Generate form should default to: the *next* season
+ *  chronologically after whichever one contains today - a schedule is always being
+ *  prepared ahead of time for the upcoming season, not the one currently in progress.
+ *  E.g. if today falls within a קיץ season, default to the חורף season right after it
+ *  (never the קיץ season itself, and never a season that's already over). */
+export function defaultSeasonAndYear(settings) {
+  const { season: currentSeason, hebrewYear: currentYear } = currentSeasonAndYear(settings);
   return currentSeason === 'choref' ? { season: 'kayitz', hebrewYear: currentYear } : { season: 'choref', hebrewYear: currentYear + 1 };
 }

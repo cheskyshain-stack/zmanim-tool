@@ -162,6 +162,13 @@ export const DEFAULT_SETTINGS = {
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
+  /* Not a time default like the ones above, and not a per-cell override either: the Weekday
+     chart's 11:30 מעריב itself always runs now (sheets/weekday.js), regardless of this flag.
+     This only controls whether it prints with a "NEW" tag, and only on page 1 of whichever
+     season was current the moment the admin turned it on (ui/settings-view.js), so the tag
+     can't drift forward onto a season nobody asked it to. Turning it back off just hides the
+     tag; it does not touch the minyan itself. See publish.js's firstPageRangeForCurrentSeason. */
+  newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */

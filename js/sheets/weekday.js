@@ -35,7 +35,7 @@ import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '.
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
-import { formatTime, underlineTime } from '../format.js';
+import { formatTime, underlineTime, newMinyanTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
 
@@ -254,7 +254,7 @@ function place845(mins) {
  *
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
+ *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs every week. */
 function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
@@ -266,6 +266,13 @@ function maarivParts(week, settings) {
   const earliestAllowed = latestShkia + 50;
   const clears = 'at least 50 minutes after the latest שקיעה of the five days';
 
+  // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
+  // (ui/settings-view.js), and only for the season it was pinned to the moment that
+  // happened (publish.js's firstPageRangeForCurrentSeason), never whatever season happens
+  // to be current when the chart is later printed. See settings.js's newMinyanBadge.
+  const badge = settings.newMinyanBadge;
+  const showNewBadge = !!(badge?.on && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+
   const slots = [
     { mins: HM(18, 35) },
     { mins: HM(19, 0) },
@@ -276,7 +283,9 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    { mins: HM(23, 30), offSeason: bmg ? 'offered only while BMG is out of session' : null },
+    // No longer BMG-gated like 12:00 below it: this one runs every week now. See the
+    // note over newMinyanBadge in settings.js for the "NEW" tag it can carry.
+    { mins: HM(23, 30), isNewMinyan: true },
     { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
@@ -314,13 +323,30 @@ function maarivParts(week, settings) {
 
   const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
   const trace = (slot) => slotTrace(slot, {
-    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it' : 'one of the standing מעריב times'),
+    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it'
+      : slot.isNewMinyan ? 'the 11:30 מנין, which now runs every week rather than only while BMG is out of session'
+      : 'one of the standing מעריב times'),
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
   });
+  const text = splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot))));
+  /* The tag is a *second*, print-only rendering of the same kept slots, never mixed into
+     `text` above. `text` is what every other reader of this column reads too - the week
+     card, the "what is on next" card, the messages page (js/week-text.js parses these
+     cells for their room letters and would choke on an extra word stitched into a time) -
+     and none of them are the printed chart, so none of them should ever show the tag. Only
+     sheet-view.js's own cell rendering reaches for `printOverrides`, and only when this
+     week's own column has not been typed over by hand. */
+  const printText = showNewBadge
+    ? splitLinesInHalf(kept.map((slot) => {
+        const rendered = renderTime(slot.mins, placeOf(slot));
+        return slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
+      }))
+    : null;
 
   return {
-    text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
+    text,
+    printText,
     times: kept.map(trace),
     dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
@@ -428,6 +454,10 @@ export function buildWeekdayRow(week, settings) {
     traces: { B: maariv.times, C: mincha.times },
     notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
+    /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
+       itself, which stays the plain text every other reader - the week card, "what is
+       on next", the messages page - reads). See the note on maariv.printText above. */
+    printOverrides: maariv.printText != null ? { B: maariv.printText } : undefined,
   };
 }
 

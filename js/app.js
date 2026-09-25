@@ -248,6 +248,7 @@ function paint() {
     renderSettings(
       main,
       state,
+      tables,
       (next) => {
         state.settings = next;
         persist();
