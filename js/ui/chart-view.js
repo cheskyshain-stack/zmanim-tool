@@ -24,14 +24,25 @@ import { dateFromSerial } from '../zmanim/solar.js';
  *
  *  The page breaks of the two charts fall on the same dates (alignPageSizesTo at
  *  generation time), so one index picks the matching pair. Seasons are ordered by the
- *  week they start on, so paging forward runs קיץ into חורף the way the year does. */
+ *  week they start on, so paging forward runs קיץ into חורף the way the year does.
+ *
+ *  `serials` carries both pages' own weeks, not just the שבת side's - the Weekday page can
+ *  run a week or more past it, its trailing-gap or Chol Hamoed row anchored on a Yom Tov
+ *  that has no שבת row of its own (see sheets/weeks.js). Left out, spreadLabel's printed
+ *  date range undersold what was actually on the page: a שבוע של סוכות row hanging off the
+ *  bottom of a page labelled "... to September 19" when that row's own days ran to
+ *  September 26. Math.min (a page's own start) never moves for this, since the Weekday
+ *  page starts on the same date the שבת page does; only Math.max can. */
 export function chartSpreads(state) {
   const spreads = [];
   for (const sheet of state.sheets.filter((s) => s.season !== 'weekday')) {
     const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
+    const weekdayPages = weekday ? splitWeeksIntoPages(weekday.weeks, weekday.pageSizes) : [];
     splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).forEach((weeks, index) => {
       if (!weeks.length) return;
-      spreads.push({ sheet, weekday, index, serials: weeks.map((w) => w.serial) });
+      const weekdayWeeks = weekdayPages[index] || [];
+      const serials = [...weeks, ...weekdayWeeks].map((w) => w.serial);
+      spreads.push({ sheet, weekday, index, serials });
     });
   }
   return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
