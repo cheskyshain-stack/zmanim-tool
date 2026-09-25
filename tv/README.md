@@ -346,15 +346,19 @@ and גר"א Shema deadlines, the מ"א and גר"א tefila deadlines, חצות, �
 צאת ג' כוכבים and צאת 72. עלות uses the site's 72-minute reckoning; the added
 מ"א tefila deadline uses the same MGA day and astronomical-chatzos setting as
 its Shema deadline. The list is shared by live, future-preview and offline views.
-Prayer labels stay on the right with their time runs immediately beside them
-on the left, rather than at opposite chart edges. Shabbos uses a 16px gap and a
-content-sized label column. Wrapped labels align toward their adjacent times,
-avoiding a blank gutter inside the label itself. Long labels remain above centered times; ordinary
-weekday prayer groups remain centered. Daily zmanim keep their aligned time
-column with labels directly beside it.
-The special page retains its original row padding, separate time runs, heading
-spacing and column gutter. Its existing label/time gap is kept without stretching
-across the column; shorter continuation lines align toward their prayer label.
+Prayer labels stay on the right. Each chart column has one shared, left-aligned
+time column, measured from its widest balanced time run and anchored close to
+the labels. Long labels wrap within a bounded shared label column instead of
+pushing every time farther left. Shabbos keeps a 16px gap between the columns.
+Multiple times use balanced lines, such as 3+2 or 4+3. More values fit on each
+line only when the complete schedule needs the height. Weekday headings remain
+centered above their balanced time blocks. Daily zmanim use the same left edge
+for one- and two-digit hours, retaining smaller seconds and adjacent labels.
+The special page retains its original row padding, heading spacing and column
+gutter. Its screen-only adapter balances structured public time values and
+measures the same compact shared columns; the printable source is unchanged.
+Notes about a particular minyan remain attached above that time, so balancing
+does not make the note appear to apply to the other minyanim in its row.
 Outer paper margins, branding and colors are adapted to the screen. No schedule
 data is changed.
 Its full palette inherits from the selected display theme across the shadow
@@ -376,7 +380,8 @@ report and representative screenshots.
 `node tests/twenty-year-layout.mjs` checks all 7,305 dates from September 24, 2026
 through September 23, 2046. Each date is calculated and mapped to its exact
 rendered chart variant; every distinct variant is measured in both themes.
-The audit checks label/time gaps, aligned daily zmanim, source coverage,
+The audit checks shared time-column alignment, balanced rows, compact label/time
+gaps, aligned daily zmanim, source coverage,
 underlines and notes, all ten saved notices, clipping, and stable geometry.
 `AUDIT_START`, `AUDIT_END`, and `AUDIT_OUT` can change the inclusive range and
 report directory. Dates without a saved holiday chart are reported separately

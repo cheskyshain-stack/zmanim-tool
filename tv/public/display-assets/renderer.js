@@ -195,7 +195,9 @@ export class DisplayView {
     for (const groups of pages) {
       measure.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
       measure.innerHTML = groups.map(renderAnnouncementGroup).join('');
-      height = Math.max(height, measure.scrollHeight + 4);
+      // Leave one small line of fitting room for subpixel font/grid rounding
+      // in Safari as well as Chromium, so a final contact line stays visible.
+      height = Math.max(height, measure.scrollHeight + 18);
     }
     measure.remove();
     return height;

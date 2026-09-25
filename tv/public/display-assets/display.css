@@ -718,6 +718,7 @@ button {
 .right-column-board.special-expanded .board-zmanim>div span{font-size:19px}
 .right-column-board.special-expanded .board-zmanim h2{font-size:26px;margin-bottom:5px}
 .right-column-board.right-extended .board-shabbos.board-compact .board-schedule-row{padding:4px 0}
+.right-column-board.right-extended .board-shabbos.board-compact.board-tight-spacing .board-schedule-row{padding:3px 0}
 .right-column-board .notice-measure{grid-column:auto;grid-row:auto}
 .tv-stage.right-column-board.week-extended{grid-template-columns:420px minmax(0,1fr) minmax(0,1fr)}
 .right-column-board.week-extended .board-weekly{grid-row:2/4}
@@ -768,21 +769,26 @@ button {
 .sheet-wide-notices .announcement-group-sections{gap:5px}
 .sheet-wide-notices .announcement-section+.announcement-section{padding-top:4px}
 
-/* A shared right edge keeps one- and two-digit hours in the same time column.
+/* A shared left edge keeps one- and two-digit hours in the same time column.
    Seconds stay on the baseline, slightly smaller and lighter than HH:MM. */
-.tv-stage .board-zmanim>div>bdi{flex:0 0 7ch;text-align:right;font-variant-numeric:tabular-nums}
+.tv-stage .board-zmanim>div>bdi{flex:0 0 7ch;text-align:left;font-variant-numeric:tabular-nums}
 .tv-stage .board-zmanim .zman-seconds{font:inherit;font-size:.82em;font-weight:400}
 .stable-board .tv-footer .key{line-height:1.15}
 
 /* Keep each prayer and its time run together, rather than against opposite
    edges of a wide chart. Digits still read left to right; labels stay on the
    right. Only the regular centered weekday services use their own layout. */
-.tv-stage :is(.board-weekly,.board-shabbos) .board-schedule-row{grid-template-columns:minmax(0,1fr) fit-content(46%);column-gap:16px;direction:ltr}
-.tv-stage .board-schedule-row>.board-times{justify-content:flex-end;text-align:right}
-.tv-stage .board-schedule-row>.board-prayer-label{text-align:left}
-.tv-stage .board-schedule-row.board-long-label{grid-template-columns:minmax(0,1fr)}
-.tv-stage .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:center}
-.tv-stage .board-schedule-row.board-long-label>.board-times{justify-content:center;text-align:center}
+.tv-stage :is(.board-weekly,.board-shabbos) .board-schedule-row{grid-template-columns:var(--board-time-column,minmax(0,1fr)) var(--board-label-column,40%);justify-content:end;column-gap:16px;direction:ltr}
+.tv-stage .board-times{flex-direction:column;align-items:flex-start;text-align:left}
+.tv-stage .board-times .board-time-line{display:flex;width:max-content;flex-wrap:nowrap;align-items:flex-end;gap:0 var(--board-line-gap,14px);direction:ltr}
+.tv-stage .board-time>bdi{align-self:flex-start}
+.tv-stage .board-weekly .board-times{margin-inline:auto}
+.tv-stage .board-schedule-row>.board-times{justify-content:flex-start;margin-inline:0}
+.tv-stage .board-schedule-row>.board-prayer-label{text-align:right;overflow-wrap:break-word;grid-row:1;grid-column:2}
+.tv-stage .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:right}
+.tv-stage .board-schedule-row:has(>.board-times:empty){grid-template-columns:minmax(0,1fr)}
+.tv-stage .board-schedule-row:has(>.board-times:empty)>.board-prayer-label{grid-column:1/-1}
+.tv-stage .board-schedule-row>.board-times:empty{display:none}
 .tv-stage .board-zmanim>div{justify-content:flex-start}
 .tv-stage.stable-board[data-theme=light] .tv-footer,
 .tv-stage.stable-board[data-theme=light] .tv-footer .key{color:var(--screen-text)}

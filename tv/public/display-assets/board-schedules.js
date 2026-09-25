@@ -41,28 +41,104 @@ function panelFit(panel,bodySelector){
  return {requiredHeight,availableHeight,overflow:Math.max(0,requiredHeight-availableHeight-2),compact:panel.classList.contains('board-compact')};
 }
 
+// Every row in a table shares one compact time column. Measure the saved
+// tokens, not their displayed text, so underlines, names and marks stay intact.
+function alignTimeColumns(panel,limit=4){
+ if(!panel)return;
+ const style=getComputedStyle(panel);
+ const innerWidth=panel.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+ const rows=[...panel.querySelectorAll('.board-schedule-row')];
+ const labels=rows.filter(row=>row.querySelector('.board-time')).map(row=>row.querySelector('.board-prayer-label'));
+ let labelWidth=0;
+ for(const label of labels){
+  const copy=label.cloneNode(true);
+  Object.assign(copy.style,{position:'absolute',visibility:'hidden',width:'max-content',maxWidth:'none',whiteSpace:'nowrap'});
+  panel.append(copy);
+  labelWidth=Math.max(labelWidth,Math.min(copy.offsetWidth,parseFloat(getComputedStyle(label).fontSize)*7,innerWidth*.4));
+  copy.remove();
+ }
+ panel.style.setProperty('--board-label-column',Math.ceil(labelWidth)+'px');
+ panel.style.setProperty('--board-time-column',Math.max(1,innerWidth-labelWidth-16)+'px');
+ const tables=[],centered=[];
+ for(const container of panel.querySelectorAll('.board-times')){
+  container.style.removeProperty('width');
+  const tokens=[...container.querySelectorAll('.board-time')];
+  if(!tokens.length)continue;
+  const paired=container.parentElement.classList.contains('board-schedule-row');
+  const available=paired?innerWidth-labelWidth-16:container.clientWidth;
+  const gap=parseFloat(getComputedStyle(container).columnGap)||14;
+  container.style.setProperty('--board-line-gap',gap+'px');
+  const widths=tokens.map(token=>token.offsetWidth);
+  let count=Math.ceil(tokens.length/limit),lengths;
+  const distribute=()=>Array.from({length:count},(_,i)=>Math.floor(tokens.length/count)+(i<tokens.length%count?1:0));
+  const widest=lengths=>{
+   let index=0;
+   return Math.max(...lengths.map(length=>{
+    const line=widths.slice(index,index+length);index+=length;
+    return line.reduce((sum,width)=>sum+width,0)+gap*(length-1);
+   }));
+  };
+  lengths=distribute();
+  while(count<tokens.length&&widest(lengths)>available){count++;lengths=distribute();}
+  const fragment=document.createDocumentFragment();
+  let index=0;
+  for(const length of lengths){
+   const line=document.createElement('span');line.className='board-time-line';
+   for(let n=0;n<length;n++)line.append(tokens[index++]);
+   fragment.append(line);
+  }
+  container.replaceChildren(fragment);
+  const width=Math.ceil(widest(lengths));
+  (paired?tables:centered).push({container,width,available});
+ }
+ if(tables.length)panel.style.setProperty('--board-time-column',Math.max(...tables.map(row=>row.width))+'px');
+ if(centered.length){
+  const width=Math.min(Math.max(...centered.map(row=>row.width)),...centered.map(row=>row.available));
+  for(const row of centered)row.container.style.width=Math.ceil(width)+'px';
+ }
+}
+
 /** Always keep Shabbos as one continuous column, in saved source order.
  * First measure at the normal type size so the screen can make the panel
  * taller. Compact spacing is an explicit second pass after space is reclaimed.
- * This function never rebuilds rows, paginates, or changes column widths. */
+ * Saved rows stay in order; only their intact time tokens are balanced across
+ * lines and aligned in compact shared columns. There is no pagination. */
 export function fitBoardSchedules(root,p,{allowCompact=false,compactWeekly=true}={}){
  const special=root.querySelector('.board-shabbos'),weekly=root.querySelector('.board-weekly');
- special?.classList.remove('board-compact');
+ special?.classList.remove('board-compact','board-tight-spacing');
  weekly?.classList.remove('board-compact','board-inline-services');
+ alignTimeColumns(special);alignTimeColumns(weekly);
  const naturalSpecial=panelFit(special,'.board-shabbos-body');
  const naturalWeekly=panelFit(weekly,'.board-week-body');
  if(allowCompact&&naturalSpecial?.overflow){
   special.classList.add('board-compact');
+  alignTimeColumns(special);
  }
- if(compactWeekly&&naturalWeekly?.overflow)weekly.classList.add('board-compact');
+ if(compactWeekly&&naturalWeekly?.overflow){weekly.classList.add('board-compact');alignTimeColumns(weekly);}
+ // Prefer compact balanced runs. Only use more entries per row if the full
+ // schedule needs the height; keep the same shared left edge at every size.
+ for(const [panel,selector,canCompact] of [[special,'.board-shabbos-body',allowCompact],[weekly,'.board-week-body',compactWeekly]]){
+  if(!panel||!canCompact)continue;
+  const fullHeight=panel===special?panel.closest('.right-extended'):panel.closest('.week-extended');
+  for(const limit of (fullHeight?[5,6,7,8]:[5,6])){
+   if(!panelFit(panel,selector).overflow)break;
+   alignTimeColumns(panel,limit);
+  }
+ }
+ // A full-height connected schedule may still need a little less row padding,
+ // especially with complete source-availability notices. Preserve all text and
+ // the current lettering size; use this only after balanced runs need no room.
+ if(allowCompact&&special?.closest('.right-extended')&&panelFit(special,'.board-shabbos-body').overflow)
+  special.classList.add('board-tight-spacing');
  // A dense Selichos week can still need more space beside a full special
  // chart. Use the spare width of plain services before reducing any type.
  // Exception headings and their separation always retain their own lines.
  const compactWeeklyFit=panelFit(weekly,'.board-week-body');
  if(compactWeekly&&compactWeeklyFit?.overflow){
   weekly.classList.add('board-inline-services');
+  alignTimeColumns(weekly,6);
   if(panelFit(weekly,'.board-week-body').requiredHeight>=compactWeeklyFit.requiredHeight)
-   weekly.classList.remove('board-inline-services');
+   {weekly.classList.remove('board-inline-services');alignTimeColumns(weekly,6);}
  }
  return {
   special:naturalSpecial?{...panelFit(special,'.board-shabbos-body'),naturalRequiredHeight:naturalSpecial.requiredHeight}:null,

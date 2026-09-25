@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {scheduleSnapshot} from '../src/schedules.js';
 import {boardSchedules} from '../public/display-assets/board-schedules.js';
 import {originalSheetHTML} from '../public/display-assets/original-sheet.js';
+import {inspectTimeColumns} from './helpers/time-column-checks.mjs';
 
 // Run after `npm run build`. This serves only local built assets and injects
 // calculated snapshots into a private preview; it never calls the live API.
@@ -74,6 +75,7 @@ try {
     document.body.innerHTML = '<div id="year-audit" style="width:100vw;height:100vh"></div>';
     window.yearAudit = new DisplayView(document.querySelector('#year-audit'));
   });
+  await page.evaluate(source=>{window.inspectTimeColumns=Function('return ('+source+')')();},inspectTimeColumns.toString());
   if (screenshots) await mkdir(screenshots, {recursive:true});
 
   async function inspect(date, schedule, theme) {
@@ -105,7 +107,7 @@ try {
         if(!boxes.length)return null;
         return {left:Math.min(...boxes.map(box=>box.left))/scale,right:Math.max(...boxes.map(box=>box.right))/scale,top:Math.min(...boxes.map(box=>box.top))/scale,bottom:Math.max(...boxes.map(box=>box.bottom))/scale};
       }
-      function auditPairing(row,labelSelector,timesSelector){
+      function auditPairing(row,labelSelector,timesSelector,sharedColumn=false){
         const label=row.querySelector(labelSelector),times=row.querySelector(timesSelector),a=ink(label),b=ink(times);
         if(!a||!b)return; // Notes without a printed time have no pair to align.
         pairing.rows++;
@@ -122,7 +124,7 @@ try {
           pairing.maximumGap=Math.max(pairing.maximumGap,gap);
           pairing.maximumGapEm=Math.max(pairing.maximumGapEm,gap/em);
           if(gap< -2)add('pair-label-times-overlap',{...details,gap:Math.round(gap*10)/10});
-          if(gap>limit+2)add('pair-label-times-too-far',{...details,gap:Math.round(gap*10)/10,limit:Math.round(limit*10)/10});
+          if(!sharedColumn&&gap>limit+2)add('pair-label-times-too-far',{...details,gap:Math.round(gap*10)/10,limit:Math.round(limit*10)/10});
         }
         // Adjacent printed time cells must not collide on the same line.
         const entries=[...times.querySelectorAll('.board-time,.onepage-t,.zman-pair')].map(ink).filter(Boolean);
@@ -171,13 +173,22 @@ try {
       const both = activeSheet && snapshot.at >= snapshot.schedule.specialSheet.coversBothAt;
       const expectedRows = [...(!both ? p.weekly.posterSections || [] : []), ...(!activeSheet ? p.special?.sections || [] : [])].flatMap(section => section.rows);
       const actualRows = [...root.querySelectorAll('.board-schedule-row')];
-      for(const row of actualRows)auditPairing(row,'.board-prayer-label','.board-times');
+      for(const row of actualRows)auditPairing(row,'.board-prayer-label','.board-times',true);
       const expectedIds = expectedRows.map(row => row.id).sort(), actualIds = actualRows.map(row => row.dataset.sourceId).sort();
       if (JSON.stringify(expectedIds) !== JSON.stringify(actualIds)) add('source-ids', {expected:expectedIds, actual:actualIds});
       for (const row of expectedRows) {
         const actual = actualRows.find(el => el.dataset.sourceId === row.id), text = normalize(actual?.textContent);
         const fields = [row.label, ...(row.times || []).flatMap(t => [t.text, t.name, t.mark]), ...String(row.note || '').split('\n')].filter(Boolean);
         for (const field of fields) if (!text.includes(normalize(field)) && !(row.plagDetail && field === row.note)) add('source-text', {id:row.id, missing:short(field)});
+      }
+      // The fitter may regroup intact time cells, but must preserve their text,
+      // ordering, location underlines, asterisks and named zmanim.
+      if(!both){
+        const {boardSchedules}=await import('/display-assets/board-schedules.js');
+        const source=document.createElement('template');source.innerHTML=boardSchedules({...p,special:activeSheet?null:p.special});
+        const signature=times=>JSON.stringify([...times.querySelectorAll('.board-time')].map(time=>({text:normalize(time.textContent),underlines:[...time.querySelectorAll('u')].map(u=>normalize(u.textContent))})));
+        const before=[...source.content.querySelectorAll('.board-times')].map(signature),after=[...root.querySelectorAll('.board-times')].map(signature);
+        if(JSON.stringify(before)!==JSON.stringify(after))add('board-time-units-changed');
       }
       if (!both) {
         // Check every source date/prayer independently of how it is visually
@@ -211,14 +222,10 @@ try {
       for (const exception of exceptions) {
         const heading = rect(exception.querySelector('h4')), times = exception.querySelector('.board-times'), timeBox = rect(times);
         if (heading.bottom > timeBox.top + 2) add('exception-label-not-above', {label:short(exception.querySelector('h4').textContent), heading:rounded(heading), times:rounded(timeBox)});
-        const lines = new Map();
-        for (const child of times.children) {
-          const b = rect(child), key = Math.round(b.bottom/3)*3;
-          const line = lines.get(key) || {left:Infinity, right:-Infinity};
-          line.left = Math.min(line.left,b.left); line.right = Math.max(line.right,b.right); lines.set(key,line);
-        }
-        for (const line of lines.values()) if (Math.abs((line.left+line.right-timeBox.left-timeBox.right)/2) > 3)
-          add('exception-times-not-centered', {label:short(exception.querySelector('h4').textContent), centerOffset:Math.round((line.left+line.right-timeBox.left-timeBox.right)/2)});
+        // The full time column remains centered under its heading; shorter
+        // balanced lines share its left edge rather than centering separately.
+        const box=rect(exception),centerOffset=(timeBox.left+timeBox.right-box.left-box.right)/2;
+        if(Math.abs(centerOffset)>3)add('exception-time-column-not-centered',{label:short(exception.querySelector('h4').textContent),centerOffset});
       }
       for (const section of root.querySelectorAll('.board-day-section')) {
         const previous=section.previousElementSibling;
@@ -230,8 +237,8 @@ try {
       const zmanim = [...root.querySelectorAll('.board-zmanim>div')];
       for(const row of zmanim)auditPairing(row,':scope > span',':scope > bdi');
       const zmanimColumns=new Map();
-      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[];edges.push(rect(row.querySelector(':scope > bdi')).right);zmanimColumns.set(column,edges);}
-      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-edges-not-aligned');
+      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[],timeInk=ink(row.querySelector(':scope > bdi'));if(timeInk)edges.push(timeInk.left);zmanimColumns.set(column,edges);}
+      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-left-edges-not-aligned');
       if (zmanim.length !== snapshot.schedule.zmanim.length) add('zmanim-count');
       for (const [i, zman] of snapshot.schedule.zmanim.entries()) {
         const el = zmanim[i];
@@ -251,7 +258,7 @@ try {
           const expected = [...template.content.querySelector('template').content.querySelectorAll('.onepage-row')].map(signature).sort();
           const shadow = host.shadowRoot, actual = [...shadow.querySelectorAll('.onepage-row')].map(signature).sort();
           sheetMinimumTimeFontSize=Math.min(...[...shadow.querySelectorAll('.onepage-times')].filter(element=>element.textContent.trim()).map(element=>parseFloat(getComputedStyle(element).fontSize)));
-          for(const row of shadow.querySelectorAll('.onepage-row'))auditPairing(row,'.onepage-label','.onepage-times');
+          for(const row of shadow.querySelectorAll('.onepage-row'))auditPairing(row,'.onepage-label','.onepage-times',true);
           if (getComputedStyle(shadow.querySelector('.original-page')).visibility !== 'visible') add('special-sheet-hidden');
           sheetRows = actual.length; sheetColumns = shadow.querySelectorAll('.onepage-col').length;
           if (JSON.stringify(expected) !== JSON.stringify(actual)) add('special-source-rows', {expected:expected.length, actual:actual.length});
@@ -297,6 +304,8 @@ try {
       const right = root.querySelector('.board-shabbos,.original-sheet-box');
       if (right && rect(right).bottom > rect(footer).top+2) add('right-overlaps-footer');
       if (right && rect(right).bottom > noticeBox.top+2 && rect(right).left < noticeBox.right-2) add('right-overlaps-notices');
+      const timeColumns=window.inspectTimeColumns(root,scale);
+      issues.push(...timeColumns.issues);
       // Theme changes are tested for each distinct layout, not all repetitions
       // of a week. Content is nevertheless measured on every date in dark mode.
       const geometry = JSON.stringify({
@@ -306,7 +315,7 @@ try {
         serviceHeights:[...root.querySelectorAll('.board-service')].map(e => Math.round(rect(e).height)),
         exceptionHeights:exceptions.map(e => Math.round(rect(e).height)), sheetRows,
       });
-      return {issues,geometry,pairing:{...pairing,maximumGap:Math.round(pairing.maximumGap*10)/10,maximumGapEm:Math.round(pairing.maximumGapEm*100)/100},special:activeSheet ? snapshot.schedule.specialSheet.sourceId : null,placement:both?'both':'shabbos',rows:actualRows.length,sourceGaps:expectedIds.filter(id => id.startsWith('missing:')),sheetRows,sheetColumns,sheetMinimumTimeFontSize,exceptions:exceptions.length,shabbosRows:shabbosRows.length,trailingSpace:trailingSpace===null?null:Math.round(trailingSpace),pages:Number(view.notices.dataset.pages),notices:seen.length};
+      return {issues,geometry,timeColumns:timeColumns.metrics,pairing:{...pairing,maximumGap:Math.round(pairing.maximumGap*10)/10,maximumGapEm:Math.round(pairing.maximumGapEm*100)/100},special:activeSheet ? snapshot.schedule.specialSheet.sourceId : null,placement:both?'both':'shabbos',rows:actualRows.length,sourceGaps:expectedIds.filter(id => id.startsWith('missing:')),sheetRows,sheetColumns,sheetMinimumTimeFontSize,exceptions:exceptions.length,shabbosRows:shabbosRows.length,trailingSpace:trailingSpace===null?null:Math.round(trailingSpace),pages:Number(view.notices.dataset.pages),notices:seen.length};
     }, {snapshot, scale});
   }
 
@@ -390,6 +399,10 @@ try {
     pairedRowsChecked:results.reduce((sum,result)=>sum+result.pairing.rows,0),
     maximumPairGap:Math.max(...results.map(result=>result.pairing.maximumGap)),
     maximumPairGapEm:Math.max(...results.map(result=>result.pairing.maximumGapEm)),
+    sharedTimeTablesChecked:results.reduce((sum,result)=>sum+result.timeColumns.tables,0),
+    maximumSharedTimeLeftSpread:Math.max(...results.map(result=>result.timeColumns.maximumLeftSpread)),
+    maximumSharedColumnGap:Math.max(...results.map(result=>result.timeColumns.maximumBoundaryGap)),
+    balancedTimeGroupsChecked:results.reduce((sum,result)=>sum+result.timeColumns.balancedGroups,0),
     screenshots:screenshots ? [...capture].map(([kind,value]) => ({kind,date:value.date})) : [],
     failingCases:failures.length,
     failures:[...grouped.values()].map(({code,cases,sample}) => ({code,count:cases.size,first:[...cases][0],last:[...cases].at(-1),sample})),
