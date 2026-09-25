@@ -1148,9 +1148,27 @@ function validatePageSizes(total, sizes) {
   return null;
 }
 
-/** Even default split across `numPages` pages (earlier pages absorb the remainder one
- *  at a time), used to pre-fill the page-size inputs before the user adjusts them. */
-function defaultPageSizes(total, numPages) {
+/** Even default split across `numPages` pages, used to pre-fill the page-size inputs before
+ *  the user adjusts them, and to size a season chart's own three pages when nobody has typed
+ *  a custom split.
+ *
+ *  A season's three pages split unevenly on purpose when the weeks do not divide by three,
+ *  and the short page sits at whichever end the shul asked for rather than being spread a
+ *  week at a time across all three. A 28 week חורף season is 10, 10, 8: the last page is the
+ *  short one. A 28 week קיץ season is the same three numbers reversed, 8, 10, 10, the first
+ *  page short. Each is two full pages of `ceil(total / 3)` and one page of whatever is left,
+ *  which is never more than two weeks shorter than a full page.
+ *
+ *  Only for a season's own three pages: `season` has to be 'kayitz' or 'choref' and
+ *  `numPages` has to be exactly 3, or this falls back to the plain even split, remainder
+ *  absorbed by the earlier pages one at a time, which is what any other page count still
+ *  uses (nobody has asked for a rule about four or five pages, only about a season's three). */
+function defaultPageSizes(total, numPages, season) {
+  if (numPages === 3 && (season === 'kayitz' || season === 'choref')) {
+    const full = Math.ceil(total / 3);
+    const short = total - full * 2;
+    return season === 'choref' ? [full, full, short] : [short, full, full];
+  }
   const base = Math.floor(total / numPages);
   const rem = total % numPages;
   return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
@@ -2687,7 +2705,7 @@ function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3, s.season);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
@@ -15297,7 +15315,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages);
+    const defaults = defaultPageSizes(weeks.length, numPages, season);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }

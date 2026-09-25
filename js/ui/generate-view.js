@@ -194,7 +194,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages);
+    const defaults = defaultPageSizes(weeks.length, numPages, season);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
