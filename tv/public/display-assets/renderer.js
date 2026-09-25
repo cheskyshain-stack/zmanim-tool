@@ -148,19 +148,42 @@ export class DisplayView {
     this.headerKey = key;
     this.stage.classList.toggle('has-dedication',!!items.length);
     this.stage.style.removeProperty('--board-head-height');
+    this.stage.style.removeProperty('--dedication-card-width');
     if (!items.length) return;
-    // Reserve the tallest active dedication once. Rotation and clock ticks do
-    // not move the schedules; short dedications still get a three-line area.
+    // Start at half the available width. Expand only when saved copy would
+    // wrap into extra lines; reserve one size for every active dedication so
+    // rotation, clock ticks and theme changes never move the schedules.
+    const fullWidth = this.dedication.offsetWidth;
     const measure = document.createElement('section');
     measure.className = 'board-dedication dedication-measure';
-    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',width:this.dedication.offsetWidth+'px',height:'auto',visibility:'hidden',pointerEvents:'none'});
+    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',height:'auto',visibility:'hidden',pointerEvents:'none'});
+    measure.style.setProperty('--dedication-card-width','100%');
     this.stage.append(measure);
-    let height = 104;
-    for (const item of items) {
-      measure.innerHTML = cardHTML(item);
-      height = Math.max(height,measure.scrollHeight);
+    const copies = items.map(item=>({html:cardHTML(item)}));
+    const size = (copy,width) => {
+      measure.style.width = width+'px';
+      measure.innerHTML = copy.html;
+      return {height:measure.scrollHeight,overflow:measure.scrollWidth>width+1};
+    };
+    for (const copy of copies) copy.fullHeight = size(copy,fullWidth).height;
+    const fits = width => copies.every(copy=>{
+      const measured = size(copy,width);
+      return !measured.overflow && measured.height<=copy.fullHeight+1;
+    });
+    let width = Math.ceil(fullWidth/2);
+    if (!fits(width)) {
+      let low = width, high = fullWidth;
+      while (high-low>1) {
+        const middle = Math.floor((low+high)/2);
+        if (fits(middle)) high=middle;
+        else low=middle;
+      }
+      width=high;
     }
+    let height = 104;
+    for (const copy of copies) height=Math.max(height,size(copy,width).height);
     measure.remove();
+    this.stage.style.setProperty('--dedication-card-width',width+'px');
     this.stage.style.setProperty('--board-head-height',Math.ceil(height+14)+'px');
   }
   noticeHeight(pages) {

@@ -481,11 +481,15 @@ The optional privacy checkbox still hides an entered sponsor name publicly.
 Leaving the sponsor blank creates neither a sponsor row nor an anonymous label.
 
 The screen's left header reads Bais Medrash of Lakewood Commons and קהל לב מנחם.
+Both languages use centered 28px lettering; the English name stays on two lines.
 An active dedication gets a gold-bordered card centered on the full screen, with
 at least three readable lines of space. Optional fields render only when filled;
 Hebrew/English text and intentional line breaks are preserved. The header reserves
 enough height for the tallest active dedication so rotation does not move the
 schedules. When no dedication is active, the smaller header returns that space.
+The card starts at half the central header width and expands only as needed to
+avoid additional text wrapping. All active dedications share that measured width
+so rotation and theme changes keep its size steady.
 Long copy remains complete and the shared admin preview flags capacity problems.
 
 Validation: `tests/dedication-model.test.mjs`, `tests/admin-screen-browser.mjs`,

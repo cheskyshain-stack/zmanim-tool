@@ -6,8 +6,10 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {scheduleSnapshot} from '../src/schedules.js';
 
-const {chromium}=createRequire(import.meta.url)('playwright');
-const dist=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
+const {chromium,webkit}=createRequire(import.meta.url)('playwright');
+const engine=process.env.DISPLAY_TEST_BROWSER||'chromium';
+assert.ok(['chromium','webkit'].includes(engine),'DISPLAY_TEST_BROWSER must be chromium or webkit');
+const dist=path.resolve(process.env.DISPLAY_TEST_DIST||fileURLToPath(new URL('../dist/',import.meta.url)));
 const types={'.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.png':'image/png'};
 const writes=[];
 // Static, private browser previews only. This server has no API, database or save
@@ -27,6 +29,9 @@ const origin=`http://127.0.0.1:${server.address().port}`;
 const scale=Number(process.env.DISPLAY_TEST_SCALE)||1;
 assert.ok([1,2].includes(scale),'DISPLAY_TEST_SCALE must be 1 (1080p) or 2 (4K)');
 const screenshots=process.env.BOARD_SCREENSHOT_DIR;
+// At the logical 1920px display size the prior center card was 980px wide.
+// Short dedications now use half of that width; longer copy may reclaim it.
+const compactDedicationWidth=490,availableDedicationWidth=980;
 const notices=JSON.parse((await readFile(new URL('./fixtures/current-public-announcements.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''))
  .map(item=>({...item,startsAt:'2020-01-01T00:00:00.000Z',endsAt:null}));
 assert.equal(notices.length,10,'Exercise all ten current public announcement fixtures');
@@ -47,7 +52,7 @@ const fixtures=[
  makeDedication('anonymous',{anonymous:true,sponsor:'PRIVATE SPONSOR MUST NEVER APPEAR',dedicationType:'לע״נ',dedicationName:'תצוגה פרטית לדוגמה',message:'Development preview only.'}),
 ];
 const dates=['2026-09-08','2026-09-24','2026-09-26','2026-11-10'];
-const browser=await chromium.launch({channel:'chrome',headless:true});
+const browser=await (engine==='webkit'?webkit.launch({headless:true}):chromium.launch({channel:'chrome',headless:true}));
 const failures=[],results=[];
 try{
  const page=await browser.newPage({viewport:{width:1920*scale,height:1080*scale}});
@@ -106,12 +111,26 @@ try{
     const lineHeights=mainText.map(p=>{const s=getComputedStyle(p);return parseFloat(s.lineHeight)||parseFloat(s.fontSize)*1.2;});
     const contentHeight=card?card.clientHeight-parseFloat(cardStyle.paddingTop)-parseFloat(cardStyle.paddingBottom):0;
     const brand=root.querySelector('.tv-brand');
+    const brandRect=rect(brand);
+    const brandParts=[...brand.querySelectorAll('.brand-english,.brand-hebrew')].map(part=>{
+     const style=getComputedStyle(part),lines=[];
+     const walker=document.createTreeWalker(part,NodeFilter.SHOW_TEXT);
+     for(let node=walker.nextNode();node;node=walker.nextNode()){
+      const start=node.textContent.search(/\S/);if(start<0)continue;
+      const end=node.textContent.trimEnd().length,range=document.createRange();
+      range.setStart(node,start);range.setEnd(node,end);
+      for(const r of range.getClientRects())if(r.width)lines.push({top:r.top,left:r.left,right:r.right});
+     }
+     return {name:part.className,text:part.textContent.replace(/\s+/g,' ').trim(),fontSize:parseFloat(style.fontSize),align:style.textAlign,
+      lines:new Set(lines.map(line=>Math.round(line.top))).size,
+      centered:lines.every(line=>Math.abs((line.left+line.right-brandRect.left-brandRect.right)/2)<=5*rect(root).width/1920)};
+    });
     const peers=[brand,...root.querySelectorAll('.tv-head .shul-donate,.tv-date,.tv-clock')].filter(e=>e.getClientRects().length);
     const collisions=card?peers.filter(e=>overlap(rect(card),rect(e))).map(e=>e.className):[];
     const panels=[...root.querySelectorAll('.board-zmanim,.board-weekly,.board-shabbos,.original-sheet-box')];
     const times=[...root.querySelectorAll('.board-zmanim>div')].map(e=>e.textContent);
     const expectedTimes=snapshot.schedule.zmanim.map(z=>z.time+z.label);
-    return {overflow,missing,warnings:view.warning,card:card&&rect(card),head:rect(head),brand:brand.textContent,content,
+    return {overflow,missing,warnings:view.warning,card:card&&rect(card),head:rect(head),brand:brand.textContent,brandParts,brandInHeader:!outside(brand,head),content,
      title:card?.querySelector('h2')?.textContent,contentHeight,lineHeights,fonts,multilineRows,collisions,
      emptyRows:ps.filter(p=>!p.textContent.trim()&&getComputedStyle(p).display!=='none').map(p=>p.className),
      sponsorRows:card?.querySelectorAll('.sponsor').length||0,anonymous:content.includes('Sponsored anonymously'),
@@ -125,6 +144,11 @@ try{
    check(!!r.card&&r.title==='פרנס היום','active dedication has its own labeled header card');
    check(r.cardInHeader&&r.panelsBelowHeader&&!r.collisions.length,'dedication fits in header without colliding with brand, donation, date, clock or times');
    check(!!r.card&&Math.abs((r.card.left+r.card.right-r.head.left-r.head.right)/2)<=2*scale,'dedication card is centered in the full header');
+   const logicalCardWidth=r.card?.width/scale;
+   check(fixture.id.endsWith('multiline')
+    ?logicalCardWidth>compactDedicationWidth+16&&logicalCardWidth<=availableDedicationWidth+2
+    :Math.abs(logicalCardWidth-compactDedicationWidth)<=2,
+    'short dedication uses half the former card width and only long copy widens it');
    check(r.fonts.length>0&&Math.min(...r.fonts)>=20,'main dedication text stays readable at 1080p');
    check(r.lineHeights.length>0&&r.contentHeight>=3*Math.max(...r.lineHeights)-2,'active dedication reserves at least three readable lines');
    check(r.emptyRows.length===0,'optional empty fields do not produce empty rows');
@@ -137,13 +161,16 @@ try{
     longStress?'long dedication stays complete and any schedule capacity limit is reported':'header, times and all notice panels remain unclipped');
    check(!fixture.data.dedicationText.includes('\n')||r.multilineRows>=3,'three-line Hebrew dedication retains three visible lines');
    check(r.brand.includes('Bais Medrash of Lakewood Commons')&&r.brand.includes('קהל לב מנחם'),'both full English and Hebrew shul names remain visible');
+   check(r.brandInHeader&&r.brandParts.length===2&&r.brandParts.every(part=>part.fontSize===28&&part.align==='center'&&part.centered),
+    'English and Hebrew branding are both 28px and centered without overflowing the header');
+   check(r.brandParts.find(part=>part.name==='brand-english')?.lines===2,'English branding remains Bais Medrash of / Lakewood Commons on exactly two lines');
    check(JSON.stringify(r.noticeIds)===JSON.stringify(notices.map(i=>i.id).sort())&&r.pages===1,'all ten public announcements remain visible together');
    check(JSON.stringify(r.times)===JSON.stringify(r.expectedTimes),'all original zmanim labels and times are retained');
    check(r.theme===theme&&r.width===1920*scale&&r.height===1080*scale,'saved theme and full display dimensions remain correct');
    check(r.snapshotUnchanged,'rendering preserves the input schedule and announcement data');
    check(date!=='2026-09-26'||r.sheetPlacement==='both','both-column special schedule case is exercised');
-   results.push({name,headerHeight:r.head.height,cardHeight:r.card?.height,bodyLines:r.multilineRows,issues:failures.filter(f=>f.name===name).length});
-   if(screenshots&&(fixture.id.endsWith('multiline')||date==='2026-09-24'&&theme==='dark'&&['development-header-optional-sponsor','development-header-text-only'].includes(fixture.id))){
+   results.push({name,headerHeight:r.head.height,cardHeight:r.card?.height,cardWidth:r.card?.width,brandParts:r.brandParts,bodyLines:r.multilineRows,issues:failures.filter(f=>f.name===name).length});
+   if(screenshots&&(fixture.id.endsWith('multiline')||date==='2026-09-24'&&['development-header-optional-sponsor','development-header-text-only'].includes(fixture.id))){
     const variant=fixture.id.replace('development-header-','');
     await page.screenshot({path:path.join(screenshots,`dedication-header-${date}-${theme}-${variant}${scale===2?'-4k':''}.png`)});
    }
@@ -152,18 +179,19 @@ try{
    const view=window.audit,root=view.stage,active={...snapshot,items:[...snapshot.items,fixtures[0],fixtures[2]]};
    const frame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    const height=selector=>root.querySelector(selector)?.getBoundingClientRect().height||0;
+   const width=selector=>root.querySelector(selector)?.getBoundingClientRect().width||0;
    const signature=()=>JSON.stringify({zmanim:root.querySelector('.board-zmanim').textContent,
     times:[...root.querySelectorAll('.board-times')].map(e=>e.textContent),
     sheet:[...root.querySelector('.original-sheet-host')?.shadowRoot.querySelectorAll('.onepage-row')||[]].map(e=>e.textContent)});
    view.slots.clear();view.update(active,{preview:true,now:3000000});await frame();
    const host=root.querySelector('.original-sheet-host');if(host)await host.originalSheetReady;
    const page=host?.shadowRoot.querySelector('.original-page'),fits=host?.originalSheetFitCount;
-   const first=view.slots.get('dedication').id,before={head:height('.tv-head'),card:height('.board-dedication .dedication'),times:signature()};
+   const first=view.slots.get('dedication').id,before={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature()};
    view.update(active,{preview:true,now:3036000});await frame();
-   const second=view.slots.get('dedication').id,after={head:height('.tv-head'),card:height('.board-dedication .dedication'),times:signature()};
+   const second=view.slots.get('dedication').id,after={head:height('.tv-head'),card:height('.board-dedication .dedication'),cardWidth:width('.board-dedication .dedication'),times:signature()};
    const stable=!host||(root.querySelector('.original-sheet-host')===host&&host.shadowRoot.querySelector('.original-page')===page&&fits===host.originalSheetFitCount);
    view.update(active,{preview:true,theme:snapshot.appearance.mode==='dark'?'light':'dark',now:3037000});await frame();
-   const themeStable=view.slots.get('dedication').id===second&&height('.tv-head')===after.head&&height('.board-dedication .dedication')===after.card;
+   const themeStable=view.slots.get('dedication').id===second&&height('.tv-head')===after.head&&height('.board-dedication .dedication')===after.card&&width('.board-dedication .dedication')===after.cardWidth;
    const inactive={...snapshot,items:[...snapshot.items,{...fixtures[0],startsAt:'2030-01-01T00:00:00.000Z'},{...fixtures[2],endsAt:'2020-01-02T00:00:00.000Z'}]};
    view.update(inactive,{preview:true,now:3038000});await frame();
    const inactiveSection=root.querySelector('.board-dedication'),inactiveStyle=getComputedStyle(inactiveSection);
@@ -171,13 +199,13 @@ try{
   },{snapshot,fixtures});
   const check=(ok,what)=>{if(!ok)failures.push({name:`${date} ${theme} rotation/inactive`,what,result:transition});};
   check(transition.first!==transition.second,'two active dedications rotate');
-  check(transition.before.head===transition.after.head&&transition.before.card===transition.after.card&&transition.themeStable,'rotation and theme changes keep card and header heights stable');
+  check(transition.before.head===transition.after.head&&transition.before.card===transition.after.card&&transition.before.cardWidth===transition.after.cardWidth&&transition.themeStable,'rotation and theme changes keep card width and card/header heights stable');
   check(transition.before.times===transition.after.times&&transition.stable,'dedication rotation preserves every schedule time and the mounted special sheet');
   check(transition.inactiveHidden&&transition.inactiveCards===0&&!transition.inactiveSlot&&transition.inactiveHead<transition.before.head,'inactive dedication collapses and returns header space to the schedules');
   assert.equal(JSON.stringify(snapshot),unchanged,'Preview rendering must not mutate original schedule or announcement fixtures');
  }
  assert.deepEqual(errors,[],'Browser has no runtime errors');
  assert.deepEqual(writes,[],'Private fixtures are never saved');
- console.log(JSON.stringify({scale,results,failures},null,2));
+ console.log(JSON.stringify({engine,scale,results,failures},null,2));
  assert.equal(failures.length,0,'Dedication header failures are listed above');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

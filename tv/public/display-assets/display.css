@@ -814,20 +814,20 @@ button {
 
 /* The bilingual shul name anchors the left; the dedication stays centered on
    the screen and grows to hold its full copy, with three lines as a minimum. */
-.tv-stage.stable-board{--board-head-height:92px;--screen-text:#142a42;--screen-background:#f7f3eb;grid-template-rows:var(--board-head-height) minmax(0,1fr) var(--notice-height,224px) 26px}
+.tv-stage.stable-board{--board-head-height:104px;--screen-text:#142a42;--screen-background:#f7f3eb;grid-template-rows:var(--board-head-height) minmax(0,1fr) var(--notice-height,224px) 26px}
 .tv-stage.stable-board[data-theme=dark]{--screen-text:#f5f2ea;--screen-background:#0b1423}
-.tv-stage.stable-board.all-notices{--board-head-height:80px}
+.tv-stage.stable-board.all-notices{--board-head-height:104px}
 .tv-stage.stable-board.without-notices{grid-template-rows:var(--board-head-height) minmax(0,1fr) 0 26px}
-.stable-board .tv-head{height:var(--board-head-height);display:grid;grid-template-columns:230px 175px minmax(0,1fr) 240px 165px;gap:18px;padding-bottom:8px}
-.stable-board .tv-brand{grid-column:1;max-width:none;min-width:0;text-align:left}
-.stable-board .brand-english{display:block;font:700 18px/1.04 Arial,sans-serif;letter-spacing:0;color:var(--screen-text)}
-.stable-board .brand-hebrew{display:block;font:700 28px/1.04 David,serif;margin-top:2px;color:var(--screen-gold);text-align:left}
+.stable-board .tv-head{height:var(--board-head-height);display:grid;grid-template-columns:310px 95px minmax(0,1fr) 240px 165px;gap:18px;padding-bottom:8px}
+.stable-board .tv-brand{grid-column:1;max-width:none;min-width:0;text-align:center}
+.stable-board .brand-english{display:block;font:700 28px/1.04 Arial,sans-serif;letter-spacing:0;color:var(--screen-text)}
+.stable-board .brand-hebrew{display:block;font:700 28px/1.04 David,serif;margin-top:2px;color:var(--screen-gold);text-align:center}
 .stable-board .tv-head .shul-donate{grid-column:2;min-width:0;gap:8px}
 .stable-board .shul-donate img{width:58px;height:58px}
 .stable-board .shul-donate strong{font-size:14px}
 .stable-board .shul-donate small{font-size:10px;max-width:108px;margin-top:4px}
-.stable-board .board-dedication{grid-column:3;height:100%;align-self:stretch;display:flex;align-items:stretch;min-width:0}
-.stable-board .board-dedication .tv-card{width:100%;height:auto;min-height:104px;padding:8px 18px;display:flex;flex-direction:column;justify-content:center;gap:4px;overflow:visible;background:var(--screen-card);border:1px solid var(--screen-gold);border-radius:12px;box-shadow:inset 0 0 0 3px var(--screen-background)}
+.stable-board .board-dedication{grid-column:3;height:100%;align-self:stretch;display:flex;align-items:stretch;justify-content:center;min-width:0}
+.stable-board .board-dedication .tv-card{width:var(--dedication-card-width,50%);max-width:100%;flex-shrink:0;height:auto;min-height:104px;padding:8px 18px;display:flex;flex-direction:column;justify-content:center;gap:4px;overflow:visible;background:var(--screen-card);border:1px solid var(--screen-gold);border-radius:12px;box-shadow:inset 0 0 0 3px var(--screen-background)}
 .stable-board .board-dedication .tv-card h2{font:700 28px/1.08 David,serif;color:var(--screen-gold);margin:0}
 .stable-board .dedication-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
 .stable-board .board-dedication .tv-card p{display:block;font:700 25px/1.12 David,serif;margin:0;white-space:pre-wrap;overflow-wrap:break-word}
