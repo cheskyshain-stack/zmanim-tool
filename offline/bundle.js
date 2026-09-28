@@ -15078,22 +15078,34 @@ function chartSpreads(state) {
   return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
 }
 
+/** How many days early a chart goes up: a page is "now" from a week before its own first
+ *  week starts. Shared with chartStretchSerials in week-view.js, which the doc comment on
+ *  spreadIndexForNow below explains has to agree with this one. */
+const CHART_EARLY_DAYS = 7;
+
 /** The spread covering now.
  *
- *  A chart page owns from its own first week until the next page begins, which is the span
- *  chartStretchSerials already gives the week view, and a span rather than a list of rows for
- *  one reason: a Shabbos that is yom tov has no parsha and so no row on either chart, and the
- *  summer chart is what is hanging on the wall through it.
+ *  A chart page owns from seven days before its own first week until seven days before the
+ *  next page's first week, which is the span chartStretchSerials already gives the week
+ *  view (CHART_EARLY_DAYS, shared so the two can't drift). A span rather than a list of
+ *  rows for one reason: a Shabbos that is yom tov has no parsha and so no row on either
+ *  chart, and the summer chart is what is hanging on the wall through it.
  *
- *  So this asks every Shabbos of the year which week it is now, not just the ones that have a
- *  row. Asked of the rows it was three weeks out: after שבת האזינו the next row there is is
- *  שבת בראשית, so the winter chart went up on the congregation's page on מוצאי שבת שובה, while
- *  the week card beside it was still showing סוכות. The shul asked for the chart to wait until
- *  the Sunday of בראשית, which is the end of the Shabbos before it, and this is that: the last
- *  page whose first week has already started.
+ *  So this asks every Shabbos of the year which week it is now, not just the ones that have
+ *  a row, and looks for the last page whose first week starts within the next
+ *  CHART_EARLY_DAYS days (or has already started).
  *
- *  Both views now read the turn the same way, off the same list of page starts, so neither can
- *  be on a different chart from the other.
+ *  The shul asked for a chart to post a week before its own first date, everywhere,
+ *  including the turn into בראשית: asked of the rows it was three weeks out before this,
+ *  since after שבת האזינו the next row there is is שבת בראשית, so the winter chart used to
+ *  wait for the Sunday of בראשית before it would show at all. It now goes up on the
+ *  Shabbos of שובה instead, a week ahead of its own first Shabbos, same as every other
+ *  season boundary - the week card can show סוכות a week longer than the chart does over
+ *  that one transition, which is the accepted cost of one rule holding everywhere rather
+ *  than a special case for this turn alone.
+ *
+ *  Both views now read the turn the same way, off the same list of page starts, so neither
+ *  can be on a different chart from the other.
  *
  *  Exported so the admin's own status panel can say which chart is up without drawing the
  *  page: see js/ui/status-view.js. A third reader of the same number rather than a second
@@ -15108,7 +15120,7 @@ function spreadIndexForNow(spreads, state, settings) {
   const target = currentSerial(everyWeek, settings, (s) => weekEndsMins(s, state, settings));
   const starts = spreads.map((s) => Math.min(...s.serials));
   let found = -1;
-  for (let n = 0; n < starts.length; n++) if (starts[n] <= target) found = n;
+  for (let n = 0; n < starts.length; n++) if (starts[n] - CHART_EARLY_DAYS <= target) found = n;
   return found === -1 ? 0 : found;
 }
 
@@ -19302,21 +19314,23 @@ function weekCardsHtml(showing, index, state, settings) {
  *  after, and could not reach ראש השנה the week before either, which sits inside the very
  *  dates the chart covers.
  *
- *  So a chart owns from its own first week until the next chart begins, and the last one
- *  owns everything after it. That is the honest span: the summer chart is what is on the
- *  wall through Sukkos, because the winter chart does not start until בראשית.
+ *  So a chart owns from CHART_EARLY_DAYS before its own first week until the same point
+ *  before the next chart begins, and the last one owns everything after it: a chart posts
+ *  a week ahead of its own first date everywhere, including the turn into בראשית, so the
+ *  summer chart's own stretch ends a week before שבת בראשית rather than running through it.
  *
  *  chartSpreads is the chart browser's own list, already in date order across the seasons,
- *  so the two views cannot disagree about where one chart ends and the next starts. */
+ *  and CHART_EARLY_DAYS is shared from there too, so the two views cannot disagree about
+ *  where one chart ends and the next starts. */
 function chartStretchSerials(showing, index, state) {
   const spreads = chartSpreads(state);
   if (!spreads.length) return null;
   const starts = spreads.map((s) => Math.min(...s.serials));
   let i = -1;
-  for (let n = 0; n < starts.length; n++) if (starts[n] <= showing) i = n;
+  for (let n = 0; n < starts.length; n++) if (starts[n] - CHART_EARLY_DAYS <= showing) i = n;
   if (i === -1) return null; // before the first chart there is: nothing to be held to
-  const from = starts[i];
-  const until = i + 1 < starts.length ? starts[i + 1] : Infinity;
+  const from = starts[i] - CHART_EARLY_DAYS;
+  const until = i + 1 < starts.length ? starts[i + 1] - CHART_EARLY_DAYS : Infinity;
   const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
   return within.length ? within : null;
 }

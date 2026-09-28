@@ -36,7 +36,7 @@ import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { weekEndsMins } from '../upcoming.js';
 import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
-import { chartSpreads } from './chart-view.js';
+import { chartSpreads, CHART_EARLY_DAYS } from './chart-view.js';
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -1478,21 +1478,23 @@ function weekCardsHtml(showing, index, state, settings) {
  *  after, and could not reach ראש השנה the week before either, which sits inside the very
  *  dates the chart covers.
  *
- *  So a chart owns from its own first week until the next chart begins, and the last one
- *  owns everything after it. That is the honest span: the summer chart is what is on the
- *  wall through Sukkos, because the winter chart does not start until בראשית.
+ *  So a chart owns from CHART_EARLY_DAYS before its own first week until the same point
+ *  before the next chart begins, and the last one owns everything after it: a chart posts
+ *  a week ahead of its own first date everywhere, including the turn into בראשית, so the
+ *  summer chart's own stretch ends a week before שבת בראשית rather than running through it.
  *
  *  chartSpreads is the chart browser's own list, already in date order across the seasons,
- *  so the two views cannot disagree about where one chart ends and the next starts. */
+ *  and CHART_EARLY_DAYS is shared from there too, so the two views cannot disagree about
+ *  where one chart ends and the next starts. */
 function chartStretchSerials(showing, index, state) {
   const spreads = chartSpreads(state);
   if (!spreads.length) return null;
   const starts = spreads.map((s) => Math.min(...s.serials));
   let i = -1;
-  for (let n = 0; n < starts.length; n++) if (starts[n] <= showing) i = n;
+  for (let n = 0; n < starts.length; n++) if (starts[n] - CHART_EARLY_DAYS <= showing) i = n;
   if (i === -1) return null; // before the first chart there is: nothing to be held to
-  const from = starts[i];
-  const until = i + 1 < starts.length ? starts[i + 1] : Infinity;
+  const from = starts[i] - CHART_EARLY_DAYS;
+  const until = i + 1 < starts.length ? starts[i + 1] - CHART_EARLY_DAYS : Infinity;
   const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
   return within.length ? within : null;
 }
