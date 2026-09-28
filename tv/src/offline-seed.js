@@ -7,7 +7,7 @@ let revision=2166136261;
 for(const character of JSON.stringify(published)) revision=Math.imul(revision^character.charCodeAt(0),16777619)>>>0;
 export const OFFLINE_ENGINE='shul-calendar-v6-'+revision.toString(16);
 const fields={
-  announcement:['message','contact','phone','category','displayGroup','placement','priority','behavior','duration'],
+  announcement:['message','contact','phone','category','displayGroup','sectionPosition','placement','priority','behavior','duration'],
   dedication:['sponsor','anonymous','dedicationType','dedicationName','dedicationText','message','sponsorshipDate','timing','duration','hebrewLabel'],
   schedule:['source','appliesFrom','appliesTo','portion','precedence','previewAt'],
 };

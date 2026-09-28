@@ -4,6 +4,7 @@ import {createOfflineSeed,OFFLINE_ENGINE} from '../src/offline-seed.js';
 import {offlineSnapshot,validSeed} from '../public/display-assets/offline-engine.js';
 import {scheduleSnapshot} from '../src/schedules.js';
 import {localToISO} from '../public/display-assets/time.js';
+import {groupAnnouncements} from '../public/display-assets/announcements.js';
 import worker from '../src/worker.js';
 const appearance={mode:'scheduled',darkStart:'19:00',lightStart:'07:00'};
 const entry=(status='published',data={message:'DEVELOPMENT SAMPLE complete message'})=>({id:'fixture-'+status,kind:'announcement',status,title:'DEVELOPMENT SAMPLE',internalName:'PRIVATE NAME',createdBy:'PRIVATE EMAIL',startsAt:'2026-09-25T12:00:00.000Z',endsAt:'2026-09-26T12:00:00.000Z',data:{...data,privateNotes:'PRIVATE NOTES'}});
@@ -16,6 +17,18 @@ test('offline seed includes only explicit public fields from published items',()
  assert.equal(createOfflineSeed(items,appearance,'2026-09-27T12:00:00.000Z').items.length,0);
  assert.equal(seed.items[0].data.displayGroup,'hall');
  assert.equal(validSeed({...seed,engine:'old-engine'}),false);
+});
+test('offline reconstruction retains first placement for an announcement with a server UUID',()=>{
+ const shiur={...entry('published',{message:'DEVELOPMENT shiur notice',displayGroup:'rav',sectionPosition:'first'}),id:'4f90a498-8f28-4510-9a87-b44532d6d119'};
+ const appointments={...entry('published',{message:'DEVELOPMENT appointment notice',displayGroup:'rav'}),id:'uploaded-poster-rav-appointments'};
+ const messages={...entry('published',{message:'DEVELOPMENT contact notice',displayGroup:'rav'}),id:'uploaded-poster-rav-messages'};
+ const items=[appointments,messages,shiur],original=structuredClone(items);
+ const cached=JSON.parse(JSON.stringify(createOfflineSeed(items,appearance,'2026-09-24T12:00:00.000Z')));
+ assert.equal(cached.items.find(item=>item.id===shiur.id).data.sectionPosition,'first');
+ const snapshot=offlineSnapshot(cached,'2026-09-25T13:00:00.000Z');
+ assert.deepEqual(groupAnnouncements(snapshot.items).find(group=>group.id==='rav').sourceIds,[shiur.id,appointments.id,messages.id]);
+ assert.deepEqual(items,original,'building the offline seed must not change saved announcement records');
+ assert.ok(!JSON.stringify(cached).includes('PRIVATE'),'the added public ordering field must not expose private metadata');
 });
 test('cached published content appears and expires offline with scheduled NY theme',()=>{
  const seed=createOfflineSeed([entry()],appearance,'2026-09-24T12:00:00.000Z');
