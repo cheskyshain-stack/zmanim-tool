@@ -1,0 +1,19 @@
+{
+  "id": "uploaded-poster-rav-derech-hashem",
+  "kind": "announcement",
+  "status": "draft",
+  "internalName": "Uploaded poster: Rav’s Derech Hashem shiur",
+  "title": "שיעורים בספר דרך ה׳",
+  "data": {
+    "message": "מאת הרב שליט״א, בכל יום ג׳ בערב (Tuesday night), בשעה 11:00 בלילה, בעזרת נשים.\nבעזהשי״ת עכשיו מתחילים חלק ד׳, שבו דברים נפלאים הנוגעים למעשה בהבנת והעמקת עניני סדרי התפילה ושבת ומועדים.\nבאו ותחי נפשכם!!!",
+    "contact": "",
+    "phone": "",
+    "category": "Shiurim",
+    "displayGroup": "rav",
+    "sectionPosition": "first",
+    "placement": "automatic",
+    "priority": "normal",
+    "behavior": "pinned",
+    "duration": 35
+  }
+}

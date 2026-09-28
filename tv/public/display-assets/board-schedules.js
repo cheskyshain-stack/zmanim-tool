@@ -8,7 +8,7 @@ function scope(days){const byOccasion=new Map();for(const d of days){const bits=
 function events(g){const source=g.events.find(e=>e.sourceText);return source?[{text:source.sourceText}]:g.events.map(e=>({text:e.time,underlined:/למטה/.test(e.place),mark:/אולם/.test(e.place)?'**':/בעזר/.test(e.place)?'*':'',name:!['בית מדרש','למטה','בעזר״נ','באולם השמחות',''].includes(e.place)?e.place:''}));}
 const weekdaySource=(name,days)=>`data-weekday-service="${esc(name)}" data-weekday-dates="${esc(days.map(day=>day.date).join(','))}"`;
 const notes=g=>g.events.some(e=>e.note)?`<p dir="auto">${[...new Set(g.events.map(e=>e.note).filter(Boolean))].map(esc).join(' · ')}</p>`:'';
-function weeklyService(service){
+function weeklyService(service,{showDays=false}={}){
  const groups=service.groups.filter(g=>g.events.length&&g.days.length);
  if(!groups.length)return '';
  // Equally common patterns have no unqualified "regular" list. A morning
@@ -17,17 +17,50 @@ function weeklyService(service){
  // the Shabbos chart, so they do not add day headings to ordinary weeks.
  const noCommonPattern=groups.length>1&&groups[0].days.length*2<=groups.reduce((n,g)=>n+g.days.length,0);
  const partialMorning=['שחרית','סליחות'].includes(service.name)&&service.groups.some(g=>g.days.length&&!g.events.length);
- const heading=[service.name,...(noCommonPattern||partialMorning?[scope(groups[0].days)]:[])].join(' · ');
+ const heading=[service.name,...(showDays||noCommonPattern||partialMorning?[scope(groups[0].days)]:[])].join(' · ');
  return `<section class="board-service"><h3 dir="rtl">${esc(heading)}</h3>${groups.map((g,i)=>`<div class="board-pattern ${i?'board-exception':''}" ${weekdaySource(service.name,g.days)}>${i?`<h4 dir="rtl">${esc(scope(g.days))}</h4>`:''}<div class="board-times">${times(events(g))}</div>${notes(g)}</div>`).join('')}</section>`;
 }
 function daySection(section){
  return `<section class="board-day-section" data-day-dates="${esc(section.days.map(day=>day.date).join(','))}"><h3 dir="rtl">${esc(scope(section.days))}</h3><p class="board-day-date" dir="ltr">${section.days.map(day=>date(day.date)).join(' · ')}</p><div class="board-day-services">${section.services.map(service=>`<section class="board-day-service" ${weekdaySource(service.name,section.days)}><h4 dir="rtl">${esc(service.name)}</h4><div class="board-times">${times(events(service))}</div>${notes(service)}</section>`).join('')}</div></section>`;
 }
-export function boardSchedules(p,upcoming=''){
+function posterSection(section,{hideHeading=false}={}){
+ const dates=[...(section.dates||[])].sort();
+ const range=dates.length?`${date(dates[0])}${dates.length>1?' – '+date(dates.at(-1)):''}`:'';
+ // These are the same saved poster rows, shown like the weekday services:
+ // prayer above times. Untimed instructions and first-time notes remain intact.
+ return `<section class="board-service board-poster-section" data-poster-dates="${esc(dates.join(','))}">${hideHeading?'':`<h3 dir="rtl">${esc(section.heading)}</h3>`}${range?`<p class="board-range">${range}</p>`:''}${section.rows.map(r=>`<section class="board-service" data-source-id="${esc(r.id)}"><h3 dir="rtl">${rich(r.label)}</h3>${r.times?.length?`<div class="board-times">${times(r.times)}</div>`:''}${r.note?`<p class="board-row-note" dir="auto">${rich(r.note)}</p>`:''}</section>`).join('')}${section.morningExclusion?`<p dir="rtl">${esc(section.morningExclusion)}</p>`:''}</section>`;
+}
+function weeklyContent(w,weekday){
+ const posters=w.posterSections||[];
+ if(!posters.length)return weekday.services.map(service=>weeklyService(service)).join('')+weekday.daySections.map(daySection).join('');
+ // A single regular group can belong only to the Friday after Chol Hamoed.
+ // Give every such group its dates, then order it beside the dated poster
+ // blocks; its times must not read as an unqualified Chol Hamoed schedule.
+ const blocks=[
+  ...weekday.services.flatMap(service=>service.groups.filter(group=>group.events.length&&group.days.length).map(group=>({
+   first:group.days[0].date,html:weeklyService({...service,groups:[group]},{showDays:true}),
+  }))),
+  ...posters.map((section,index)=>({first:[...(section.dates||[])].sort()[0]||w.from,html:posterSection(section,{hideHeading:index===0&&section.heading===w.title})})),
+  ...weekday.daySections.map(section=>({first:section.days[0].date,html:daySection(section)})),
+ ];
+ return blocks.sort((a,b)=>a.first.localeCompare(b.first)).map(block=>block.html).join('');
+}
+// The original holiday chart owns this period's times. Use its saved source
+// identity and dated poster blocks, never the current day's display heading.
+// Ordinary weekly references return when the chart ends or the week advances.
+export function usesCholHamoedAnnouncementArea(p,sheet){
+ if(!sheet?.sections?.length||sheet.placement!=='both')return false;
+ const posters=p?.weekly?.posterSections||[];
+ const id=posters.flatMap(section=>section.rows||[]).map(row=>row.id?.match(/^chm:(\d+):(1|7):/)).find(Boolean);
+ if(!id||sheet.sourceId!==`${id[2]==='7'?'sukkos':'pesach'}:${id[1]}`)return false;
+ return posters.every(section=>section.dates?.length&&section.dates.every(date=>date>=sheet.from&&date<=(sheet.displayThrough||sheet.to))
+  &&sheet.sections.some(saved=>saved.title===section.heading&&saved.rows?.length));
+}
+export function boardSchedules(p,upcoming='',{reserveCholHamoed=false}={}){
  const w=p.weekly,s=p.special;
  const weekday=groupWeekdayPresentation(w.services);
  const ordinary=s?.sections.every(s=>s.rows.every(r=>r.id.startsWith('chart:')));
- const weekly=`<section class="board-weekly"><h2 dir="rtl">${esc(w.title)}</h2><p class="board-range">${date(w.from)} – ${date(w.to)}</p><div class="board-week-body">${weekday.services.map(weeklyService).join('')}${(w.posterSections||[]).map(section=>`<section class="board-service"><h3 dir="rtl">${esc(section.heading)}</h3>${section.rows.map(row).join('')}${section.morningExclusion?`<p dir="rtl">${esc(section.morningExclusion)}</p>`:''}</section>`).join('')}${weekday.daySections.map(daySection).join('')}${upcoming}</div></section>`;
+ const weekly=reserveCholHamoed?'<section class="board-chol-hamoed-announcements" aria-label="Chol Hamoed announcements"></section>':`<section class="board-weekly"><h2 dir="rtl">${esc(w.title)}</h2><p class="board-range">${date(w.from)} – ${date(w.to)}</p><div class="board-week-body">${weeklyContent(w,weekday)}${upcoming}</div></section>`;
  const special=s?`<section class="board-shabbos"><h2 dir="rtl">${esc(s.title)}</h2><p class="board-range">${date(s.from)} – ${date(s.to)}</p><div class="board-shabbos-body">${s.sections.map(section=>`${!ordinary?`<h3 dir="rtl">${esc(section.heading)}</h3>`:''}${section.rows.map(row).join('')}`).join('')}</div></section>`:'';
  return weekly+special;
 }

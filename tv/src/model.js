@@ -22,7 +22,7 @@ export function validate(raw) {
   let title = text(raw.title);
   const internalName = text(raw.internalName);
   if (kind === "announcement") {
-    Object.assign(data, { message: text(d.message, 1200), contact: text(d.contact, 100), phone: text(d.phone, 40), category: text(d.category, 60), displayGroup: choice(d.displayGroup, ["automatic", "hall", "rav", "community", "support", "separate"], "automatic"), placement: choice(d.placement, ["automatic", "left", "right"], "automatic"), priority: choice(d.priority, ["normal", "important", "urgent"], "normal"), behavior: choice(d.behavior, ["pinned", "rotating"], "rotating"), duration: Math.min(120, Math.max(15, Number(d.duration) || 25)) });
+    Object.assign(data, { message: text(d.message, 1200), contact: text(d.contact, 100), phone: text(d.phone, 40), category: text(d.category, 60), displayGroup: choice(d.displayGroup, ["automatic", "hall", "rav", "community", "support", "separate"], "automatic"), sectionPosition: choice(d.sectionPosition, ["automatic", "first"], "automatic"), placement: choice(d.placement, ["automatic", "left", "right", "chol-hamoed"], "automatic"), priority: choice(d.priority, ["normal", "important", "urgent"], "normal"), behavior: choice(d.behavior, ["pinned", "rotating"], "rotating"), duration: Math.min(120, Math.max(15, Number(d.duration) || 25)) });
     if (status === "published" && (!title || !data.message)) throw new ApiError(422, "Enter a visible title and message.");
   }
   if (kind === "dedication") {

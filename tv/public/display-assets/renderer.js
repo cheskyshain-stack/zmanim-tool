@@ -1,14 +1,23 @@
-import { originalSheetHTML, fitOriginalSheet } from './original-sheet.js';
-import { boardSchedules, fitBoardSchedules } from './board-schedules.js';
-import { groupAnnouncements, renderAnnouncementGroup } from './announcements.js';
+import { originalSheetHTML } from './original-sheet.js';
+import { boardSchedules, usesCholHamoedAnnouncementArea } from './board-schedules.js';
+import { groupAnnouncements, groupCholHamoedAnnouncements, renderAnnouncementGroup } from './announcements.js';
 import { themeAt } from './appearance.js';
+import { layoutFixedBoard } from './board-layout.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
-const availableDedicationHTML = '<article class="tv-card dedication dedication-available"><h2 lang="he" dir="rtl">פרנס היום</h2><div class="dedication-copy"><p class="availability-title">Sponsorship available</p><p class="availability-copy">Dedicate a day of Torah &amp; tefillah</p></div></article>';
+const availableDedicationHTML = `<article class="tv-card dedication dedication-available" aria-label="Parnes Hayom — sponsorship available">
+  <h2 lang="he" dir="rtl">פרנס היום</h2>
+  <p class="availability-copy">Dedicate the <bdi lang="he">לימוד התורה</bdi> &amp; <bdi lang="he">תפילות</bdi><br>in our <bdi lang="he">בית מדרש</bdi> and share in the <bdi lang="he">זכות</bdi>:</p>
+  <p class="availability-benefits">9 daily <bdi lang="he">מנינים</bdi> · 5 <bdi lang="he">כוללים</bdi><br>Close to 18 hours of learning</p>
+  <dl class="availability-rates" aria-label="Sponsorship options">
+    <div><dt>Day</dt><dd>$36</dd></div><div><dt>Shabbos</dt><dd>$50</dd></div>
+    <div><dt>Week</dt><dd>$180</dd></div><div><dt>Month</dt><dd>$500</dd></div>
+  </dl>
+</article>`;
 const zmanTime = value => {
-  const parts = String(value ?? '').match(/^(\d{1,2}:\d{2})(:\d{2})$/);
-  return parts ? `${esc(parts[1])}<span class="zman-seconds">${esc(parts[2])}</span>` : esc(value);
+  const parts = String(value ?? '').match(/^(\d{1,2}:\d{2})(:\d{2})?$/);
+  return `<span class="zman-minutes">${esc(parts ? parts[1] : value)}</span>${parts?.[2] ? `<span class="zman-seconds">${esc(parts[2])}</span>` : ''}`;
 };
 const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
 // Kept for existing editor imports. A notice is always one complete card.
@@ -38,7 +47,7 @@ export class DisplayView {
     this.warning = [];
     host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><aside class="board-left-rail"><section class="board-zmanim"></section><section class="board-dedication" aria-label="פרנס היום"></section></aside><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
     this.stage = host.firstElementChild;
-    this.stage.classList.add('right-column-board');
+    this.stage.classList.add('right-column-board','fixed-bottom-board');
     for (const [key, selector] of Object.entries({brand:'.tv-brand',date:'.tv-date',clock:'.tv-clock',dedication:'.board-dedication',zmanim:'.board-zmanim',schedules:'.tv-center',notices:'.board-notices',next:'.next-minyan',connection:'.connection-state'})) this[key] = this.stage.querySelector(selector);
     this.resize = () => {
       const w = host.clientWidth || innerWidth, h = host.clientHeight || innerHeight;
@@ -85,6 +94,7 @@ export class DisplayView {
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
     const dedications = items.filter(i => i.kind === 'dedication');
     const dedication = this.choose('dedication', dedications, now);
+    this.stage.classList.toggle('sponsorship-available', !dedication);
     setHTML(this.dedication, dedication ? cardHTML(dedication) : availableDedicationHTML);
     this.fitDedicationSlot(dedications);
     setHTML(this.zmanim, '<h2 dir="rtl">זמני היום</h2>' + (s.zmanim || []).map(z => `<div><bdi dir="ltr">${zmanTime(z.time)}</bdi><span dir="rtl">${esc(z.label)}</span></div>`).join(''));
@@ -93,8 +103,10 @@ export class DisplayView {
     const upcoming = (snapshot.upcoming || []).filter(i => i.startsAt > instant).map(i => `<div class="tv-upcoming"><strong>${esc(i.title)}</strong><br>${dateLabel(i.data.appliesFrom)} – ${dateLabel(i.data.appliesTo)}</div>`).join('');
     const sheet = s.specialSheet && instant >= s.specialSheet.previewStartsAt && instant < s.specialSheet.endsAt ? s.specialSheet : null;
     const placement = sheet && instant >= sheet.coversBothAt ? 'both' : 'shabbos';
+    const reserveCholHamoed = usesCholHamoedAnnouncementArea(s.presentation,sheet && {...sheet,placement});
+    const holidayGroups = reserveCholHamoed ? groupCholHamoedAnnouncements(items) : [];
     // Deliberately omit the clock, next minyan, generatedAt and connection state.
-    const scheduleKey = JSON.stringify([sheet ? [sheet.sourceId,sheet.title,sheet.year,sheet.sections,sheet.columnBreakAt,placement] : null, sheet && placement === 'both' ? null : s.presentation,upcoming]);
+    const scheduleKey = JSON.stringify([sheet ? [sheet.sourceId,sheet.title,sheet.year,sheet.sections,sheet.columnBreakAt,placement] : null,s.presentation,upcoming,reserveCholHamoed]);
     if (scheduleKey !== this.scheduleKey) {
       this.scheduleKey = scheduleKey;
       let box = null;
@@ -115,9 +127,9 @@ export class DisplayView {
       // reference changes or the page expands into both schedule columns.
       for (const child of [...this.schedules.children]) if (child !== box) child.remove();
       this.schedules.style.removeProperty('grid-template-columns');
-      if (!(sheet && placement === 'both') && s.presentation) {
+      if (s.presentation) {
         const template = document.createElement('template');
-        template.innerHTML = boardSchedules(s.presentation, upcoming);
+        template.innerHTML = boardSchedules(s.presentation, upcoming, {reserveCholHamoed});
         if (sheet) template.content.querySelector('.board-shabbos')?.remove();
         this.schedules.append(template.content);
       }
@@ -129,10 +141,12 @@ export class DisplayView {
         this.originalSheetKey = null;
       }
     }
-    const layoutKey = scheduleKey + groupsKey + this.dedicationKey;
+    const holidayArea = this.schedules.querySelector('.board-chol-hamoed-announcements');
+    if (holidayArea) setHTML(holidayArea,holidayGroups.map(renderAnnouncementGroup).join(''));
+    const layoutKey = scheduleKey + groupsKey + JSON.stringify(holidayGroups) + this.dedicationKey;
     if (this.layoutKey !== layoutKey) {
       this.layoutKey = layoutKey;
-      this.layoutBoard(groups, sheet, placement);
+      layoutFixedBoard(this, groups, sheet);
     }
     this.renderNotices();
     const next = s.next && s.next.at >= instant ? s.next : null;
@@ -150,7 +164,7 @@ export class DisplayView {
     // active copy so dedication rotation never moves the surrounding panels.
     const measure = document.createElement('section');
     measure.className = 'board-dedication dedication-measure';
-    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',width:'300px',height:'auto',visibility:'hidden',pointerEvents:'none'});
+    Object.assign(measure.style,{position:'absolute',left:'-10000px',top:'0',width:this.dedication.clientWidth+'px',height:'auto',visibility:'hidden',pointerEvents:'none'});
     this.stage.append(measure);
     let height = 128;
     for (const html of items.length ? items.map(cardHTML) : [availableDedicationHTML]) {
@@ -160,128 +174,10 @@ export class DisplayView {
     measure.remove();
     this.stage.style.setProperty('--dedication-slot-height',Math.ceil(height)+'px');
   }
-  noticeHeight(pages) {
-    const measure = document.createElement('section');
-    measure.className = 'board-notices notice-measure';
-    Object.assign(measure.style, {position:'absolute',left:'0',top:'-10000px',width:this.notices.offsetWidth+'px',height:'auto',gridAutoRows:'auto',visibility:'hidden',pointerEvents:'none'});
-    this.stage.append(measure);
-    let height = 0;
-    for (const groups of pages) {
-      measure.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
-      measure.innerHTML = groups.map(renderAnnouncementGroup).join('');
-      // Leave one small line of fitting room for subpixel font/grid rounding
-      // in Safari as well as Chromium, so a final contact line stays visible.
-      height = Math.max(height, measure.scrollHeight + 18);
-    }
-    measure.remove();
-    return height;
-  }
-  layoutBoard(groups, sheet, placement) {
-    // Every published announcement stays visible together, including beside a
-    // special chart. Clock ticks and theme changes never rerun this measurement.
-    this.stage.classList.remove('right-extended','left-extended','special-expanded','week-extended','week-wide-notices','compact-notice-spacing','compact-zmanim-spacing');
-    this.stage.style.removeProperty('--week-notice-rail');
-    this.stage.style.removeProperty('--board-special-width');
-    this.stage.classList.toggle('without-notices', !groups.length);
-    this.stage.classList.toggle('all-notices', !!groups.length);
-    this.stage.classList.toggle('sheet-notices', !!sheet && !!groups.length);
-    this.stage.classList.toggle('sheet-wide-notices', !!sheet && !!groups.length && placement === 'both');
-    this.stage.style.setProperty('--notice-height', groups.length ? '280px' : '0px');
-    this.noticePages = groups.length ? [groups] : [];
-    this.noticePage = 0;
-    if (sheet) this.stage.classList.add('right-extended');
-    if (groups.length) this.stage.style.setProperty('--notice-height', Math.max(280,this.noticeHeight(this.noticePages))+'px');
-    let fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    const zmanimOverflows = () => this.zmanim.scrollHeight > this.zmanim.clientHeight + 2;
-    if (groups.length && (fit.weekly?.overflow || fit.special?.overflow || zmanimOverflows())) {
-      // Preserve the full dedication and schedule type sizes by reclaiming
-      // surplus notice spacing only when the panels above actually need it.
-      this.stage.classList.add('compact-notice-spacing');
-      this.stage.style.setProperty('--notice-height', Math.max(280,this.noticeHeight(this.noticePages))+'px');
-      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-      if (fit.weekly?.overflow || fit.special?.overflow || zmanimOverflows()) {
-        // Narrow notice columns can dictate the whole row's height. Try a
-        // modest width balance and keep it only when every complete card fits
-        // in less height. The saved groups and their order remain untouched.
-        const balanced = [groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
-        const balancedHeight = Math.max(280,this.noticeHeight(balanced));
-        if (balancedHeight < parseFloat(this.stage.style.getPropertyValue('--notice-height'))) {
-          this.noticePages = balanced;
-          this.stage.style.setProperty('--notice-height',balancedHeight+'px');
-          fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-        }
-      }
-    }
-    if (groups.length && !sheet && fit.special?.overflow) {
-      // A long Shabbos keeps reading down the right column. Measure the whole
-      // announcement row again at its narrower width before fitting the left
-      // panels, so every saved notice remains visible on the same screen.
-      this.stage.classList.add('right-extended');
-      const extended = [groups], balanced = [groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
-      const extendedHeight = Math.max(280,this.noticeHeight(extended));
-      const balancedHeight = Math.max(280,this.noticeHeight(balanced));
-      this.noticePages = balancedHeight < extendedHeight ? balanced : extended;
-      this.stage.style.setProperty('--notice-height',Math.min(extendedHeight,balancedHeight)+'px');
-      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    }
-    if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
-    if (groups.length && (zmanimOverflows() || fit.weekly?.overflow)) {
-      // Keep a tall dedication below all eleven daily zmanim. This rail can
-      // use the space beneath it; complete announcements remain in the other
-      // columns instead of squeezing the daily times behind the card.
-      this.stage.classList.add('left-extended','compact-notice-spacing');
-      if (sheet && placement === 'both') {
-        // With no weekday panel, the neighboring column can hold every notice
-        // while the original complete holiday page stays on the right.
-        this.stage.style.setProperty('--notice-height','0px');
-      } else {
-        const alternatives=[groups,groups.map(group=>({...group,slotSpan:Math.sqrt(group.slotSpan)}))];
-        let best;
-        for (const width of sheet ? [680,660,640,620,600,580,560,540,520] : [680,640,600,560,520,480,460,440]) {
-          if (width) this.stage.style.setProperty('--board-special-width',width+'px');
-          for (const candidate of alternatives) {
-            const height=Math.max(280,this.noticeHeight([candidate]));
-            this.stage.style.setProperty('--notice-height',height+'px');
-            const trial=fitBoardSchedules(this.schedules,this.snapshot.schedule.presentation,{allowCompact:true});
-            const overflow=(trial.weekly?.overflow||0)+(trial.special?.overflow||0);
-            if (!best || overflow<best.overflow || overflow===best.overflow&&height<best.height) best={width,height,candidate,overflow};
-          }
-          if (!best.overflow) break;
-        }
-        this.noticePages=[best.candidate];
-        this.stage.style.setProperty('--notice-height',best.height+'px');
-        if (best.width) this.stage.style.setProperty('--board-special-width',best.width+'px');
-        fit=fitBoardSchedules(this.schedules,this.snapshot.schedule.presentation,{allowCompact:true});
-      }
-    }
-    if (groups.length && !this.stage.classList.contains('left-extended') && (fit.weekly?.overflow || zmanimOverflows())) {
-      // A Selichos or Chol Hamoed week can need the full height as well. Keep
-      // both schedules intact and move the four complete announcement areas
-      // into a measured two-by-two left rail, beneath the daily zmanim. A
-      // taller dedication can need this same rail for the daily zmanim alone.
-      this.stage.classList.add('week-extended','week-wide-notices','right-extended','compact-notice-spacing');
-      this.noticePages = [groups];
-      let best = null;
-      for (const width of [600,640,680,720,760,800,840,880]) {
-        this.stage.style.setProperty('--week-notice-rail',width+'px');
-        const height = Math.max(280,this.noticeHeight(this.noticePages));
-        this.stage.style.setProperty('--notice-height',height+'px');
-        const trial = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-        const overflow = (trial.weekly?.overflow || 0) + (trial.special?.overflow || 0) + Math.max(0,this.zmanim.scrollHeight-this.zmanim.clientHeight-2);
-        if (!best || overflow < best.overflow) best = {width,height,overflow};
-        if (!overflow) break;
-      }
-      this.stage.style.setProperty('--week-notice-rail',best.width+'px');
-      this.stage.style.setProperty('--notice-height',best.height+'px');
-      fit = fitBoardSchedules(this.schedules, this.snapshot.schedule.presentation, {allowCompact:true});
-    }
-    if (zmanimOverflows()) this.stage.classList.add('compact-zmanim-spacing');
-    if (this.originalSheetBox) fitOriginalSheet(this.originalSheetBox);
-  }
   renderNotices() {
     const groups = this.noticePages?.[0] || [];
     setHTML(this.notices, groups.map(renderAnnouncementGroup).join(''));
-    this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
+    if(!this.stage.classList.contains('fixed-bottom-board'))this.notices.style.gridTemplateColumns = groups.map(g => `${g.slotSpan}fr`).join(' ');
     this.notices.dataset.page = String((this.noticePage || 0)+1);
     this.notices.dataset.pages = String(this.noticePages?.length || 0);
     this.notices.setAttribute('aria-label', 'All current announcements');

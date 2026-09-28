@@ -11,6 +11,7 @@ const uploadedGroups = Object.freeze({
   'uploaded-poster-hall-booking': 'hall',
   'uploaded-poster-hall-bar-mitzvah': 'hall',
   'uploaded-poster-hall-bris': 'hall',
+  'uploaded-poster-rav-derech-hashem': 'rav',
   'uploaded-poster-rav-appointments': 'rav',
   'uploaded-poster-rav-messages': 'rav',
   'uploaded-poster-simcha-gemach': 'community',
@@ -30,11 +31,12 @@ const priority = value => Object.hasOwn(ranks, value) ? value : 'normal';
  * remain with the existing caller/server; this only changes their presentation.
  * An explicit admin group wins over the known uploaded poster mapping. Unknown
  * automatic notices stay distinct sections in Community, never guessed by words
- * in their titles. No notice is paginated, shortened or silently deduplicated. */
+ * in their titles. No notice is paginated or shortened. Repeated Hall contact
+ * lines are consolidated only when rendered; source fields stay intact. */
 export function groupAnnouncements(items = []) {
   const groups = new Map();
   for (const item of items) {
-    if (item.kind !== 'announcement') continue;
+    if (item.kind !== 'announcement' || item.data?.placement === 'chol-hamoed') continue;
     const data = item.data || {}, sourceId = text(item.id);
     const selected = data.displayGroup;
     const id = selected === 'separate' ? `announcement:${sourceId}`
@@ -46,13 +48,15 @@ export function groupAnnouncements(items = []) {
       sourceId, title: text(item.title), message: text(data.message),
       contact: text(data.contact), phone: text(data.phone),
       category: text(data.category), priority: priority(data.priority),
+      sectionPosition: data.sectionPosition === 'first' ? 'first' : 'automatic',
     };
     group.sections.push(section);
     group.charCount += [section.title, section.message, section.contact, section.phone].reduce((sum, value) => sum + value.length, 0);
     if (ranks[section.priority] > ranks[group.priority]) group.priority = section.priority;
   }
   for (const group of groups.values()) {
-    group.sections.sort((a, b) => (uploadedOrder.get(a.sourceId) ?? Infinity) - (uploadedOrder.get(b.sourceId) ?? Infinity) || compare(a.sourceId, b.sourceId));
+    group.sections.sort((a, b) => Number(b.sectionPosition === 'first') - Number(a.sectionPosition === 'first')
+      || (uploadedOrder.get(a.sourceId) ?? Infinity) - (uploadedOrder.get(b.sourceId) ?? Infinity) || compare(a.sourceId, b.sourceId));
     group.sourceIds = group.sections.map(section => section.sourceId);
     // A separate/new notice may need the larger footprint as its saved text grows.
     if (group.charCount > 400) group.slotSpan = 4;
@@ -61,6 +65,16 @@ export function groupAnnouncements(items = []) {
   return [...groups.values()].sort((a, b) => ranks[b.priority] - ranks[a.priority]
     || (order(a.id) < 0 ? 99 : order(a.id)) - (order(b.id) < 0 ? 99 : order(b.id))
     || compare(a.id, b.id));
+}
+
+/** Explicitly placed holiday notices never spill into the regular bottom band. */
+export function groupCholHamoedAnnouncements(items = []) {
+  const selected = items.filter(item => item.kind === 'announcement' && item.data?.placement === 'chol-hamoed');
+  const groups = groupAnnouncements(selected.map(item => ({...item,data:{...item.data,placement:'automatic',displayGroup:'separate'}})));
+  if (!groups.length) return [];
+  const sections = groups.flatMap(group => group.sections);
+  return [{id:'chol-hamoed',title:'חול המועד',slotSpan:4,priority:groups[0].priority,sections,
+    sourceIds:sections.map(section => section.sourceId),charCount:groups.reduce((sum,group) => sum+group.charCount,0)}];
 }
 
 export const escapeAnnouncementHTML = value => text(value).replace(/[&<>"']/g, character => ({
@@ -78,5 +92,13 @@ function messageHTML(value) {
  * numbers. CSS may lay these out, but the model never supplies truncated pages. */
 export function renderAnnouncementGroup(group) {
   const esc = escapeAnnouncementHTML;
-  return `<article class="announcement-group ${esc(group.priority)}" data-announcement-group="${esc(group.id)}" data-slot-span="${group.slotSpan}" data-character-count="${group.charCount}"><h2 dir="auto">${esc(group.title)}</h2><div class="announcement-group-sections">${group.sections.map(section => `<section class="announcement-section" data-source-id="${esc(section.sourceId)}"><h3 dir="auto">${esc(section.title)}</h3>${section.message ? `<p class="announcement-message" dir="auto" style="white-space:pre-wrap">${messageHTML(section.message)}</p>` : ''}${section.contact || section.phone ? `<p class="announcement-contact">${section.contact ? `<bdi dir="auto">${esc(section.contact)}</bdi>` : ''}${section.phone ? `<bdi dir="ltr">${esc(section.phone)}</bdi>` : ''}</p>` : ''}</section>`).join('')}</div></article>`;
+  const contacts = new Set();
+  const contactHTML = section => {
+    if (!section.contact && !section.phone) return '';
+    const key = JSON.stringify([section.contact.trim(), section.phone.trim()]);
+    if (group.id === 'hall' && contacts.has(key)) return '';
+    contacts.add(key);
+    return `<p class="announcement-contact">${section.contact ? `<bdi dir="auto">${esc(section.contact)}</bdi>` : ''}${section.phone ? `<bdi dir="ltr">${esc(section.phone)}</bdi>` : ''}</p>`;
+  };
+  return `<article class="announcement-group ${esc(group.priority)}" aria-label="${esc(group.title)}" data-announcement-group="${esc(group.id)}" data-slot-span="${group.slotSpan}" data-character-count="${group.charCount}"><h2 dir="auto">${esc(group.title)}</h2><div class="announcement-group-sections">${group.sections.map(section => `<section class="announcement-section" dir="auto" data-source-id="${esc(section.sourceId)}"><h3 dir="auto">${esc(section.title)}</h3>${section.message ? `<p class="announcement-message" dir="auto" style="white-space:pre-wrap">${messageHTML(section.message)}</p>` : ''}${contactHTML(section)}</section>`).join('')}</div></article>`;
 }

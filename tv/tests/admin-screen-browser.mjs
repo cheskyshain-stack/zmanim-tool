@@ -129,20 +129,22 @@ try{
   await page.locator('[data-screen-area="hall"]').click();
   await page.locator('#screen-add-announcement').click();await page.locator('#editor').waitFor();
   assert.equal(await page.locator('[name=displayGroup]').inputValue(),'hall');
+  await page.locator('[name=sectionPosition]').selectOption('first');
   await page.locator('[name=title]').fill('DEVELOPMENT DRAFT FROM SCREEN');
   await page.locator('[name=message]').fill('Created in a selected screen area for a private automated test.');
   await page.locator('#draft').click();await screen(page);
   assert.equal(state.writes.at(-1).raw.data.displayGroup,'hall');assert.equal(state.writes.at(-1).raw.status,'draft');
+  assert.equal(state.writes.at(-1).raw.data.sectionPosition,'first');assert.equal(state.writes.at(-1).saved.data.sectionPosition,'first');
   assert.equal(await page.locator('[data-screen-area="hall"]').getAttribute('aria-pressed'),'true','selected area must persist after saving');
   assert.equal(state.writes.at(-1).saved.startsAt,null,'new draft must not gain a live start time');
   assert.ok(state.writes.every(write=>write.raw.status==='draft'));
 
-  // Normal-size keyboard controls and group-heading clicks are equivalent.
+  // Normal-size keyboard controls and area-button clicks are equivalent.
   await page.locator('[data-screen-area="community"]').focus();await page.keyboard.press('Enter');
   await page.locator('#screen-add-announcement').click();assert.equal(await page.locator('[name=displayGroup]').inputValue(),'community');
   await cancel(page);
   assert.equal(await page.locator('[data-screen-area="community"]').getAttribute('aria-pressed'),'true','selected area must persist after cancel');
-  await page.locator('.announcement-group[data-announcement-group="rav"] h2').click();
+  await page.locator('[data-screen-area="rav"]').click();
   await page.locator('#screen-add-announcement').click();assert.equal(await page.locator('[name=displayGroup]').inputValue(),'rav');
   await cancel(page);
   assert.equal(await page.locator('[data-screen-area="rav"]').getAttribute('aria-pressed'),'true');
@@ -162,7 +164,7 @@ try{
   const available=namelessPage.locator('.board-left-rail>.board-dedication');
   assert.equal(await available.getAttribute('role'),'button');
   assert.equal(await available.getAttribute('aria-label'),'Add פרנס היום sponsorship');
-  assert.match(await available.textContent(),/Sponsorship available/);
+  assert.deepEqual(await available.locator('.availability-rates dd').allTextContents(),['$36','$50','$180','$500']);
   await available.click();await namelessPage.locator('#editor').waitFor();
   assert.equal(await namelessPage.locator('[name=sponsor]').inputValue(),'');
   assert.equal(await namelessPage.locator('[name=dedicationName]').inputValue(),'');

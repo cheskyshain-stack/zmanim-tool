@@ -1,8 +1,9 @@
 import {DisplayView, escapeHTML as esc} from './renderer.js';
-import {ANNOUNCEMENT_GROUPS, groupAnnouncements} from './announcements.js';
+import {ANNOUNCEMENT_GROUPS, groupAnnouncements, groupCholHamoedAnnouncements} from './announcements.js';
 import {formatInstant,phase} from './time.js';
 
 const categoryFor = {hall:'Simcha hall information',rav:'Rav’s hours',community:'Community services',support:'Donation appeals'};
+const cholHamoedArea = {id:'chol-hamoed',title:'Chol Hamoed announcements'};
 
 /** Admin-only interaction layer around the same components used by /display/.
  * Never inserts controls into measured schedule/card content. Edits always use
@@ -14,13 +15,20 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
   let selected = areas.some(area => area.id === selectedArea) ? selectedArea : groups[0]?.id || 'community';
   const dedications = items.filter(item => item.kind === 'dedication' && ['showing','scheduled'].includes(phase(item,snapshot.at))).sort((a,b) => (a.startsAt || '').localeCompare(b.startsAt || ''));
   const dedicationControls = can('dedication') ? `<section class="panel screen-dedication-controls"><div class="screen-area-heading"><h2 dir="auto">פרנס היום · Below זמני היום</h2><button type="button" id="screen-add-dedication">+ Add פרנס היום</button></div><p class="muted">Remove from screen stops a dedication from appearing and keeps it saved under Hidden.</p><div class="screen-dedication-items">${dedications.map(item => `<article class="screen-item"><div><span class="tag">${phase(item,snapshot.at) === 'showing' ? 'Showing now' : 'Scheduled'}</span><h3 dir="auto">${esc(item.data?.dedicationName || item.internalName || item.data?.dedicationText || 'פרנס היום')}</h3><p>${formatInstant(item.startsAt)} → ${formatInstant(item.endsAt)}</p></div><div class="actions"><button type="button" data-screen-edit="${esc(item.id)}">Edit dedication</button>${onRemoveDedication ? `<button type="button" class="remove-from-screen" data-screen-remove="${esc(item.id)}">Remove from screen</button>` : ''}</div></article>`).join('') || '<p class="muted">No active or upcoming dedications.</p>'}</div></section>` : '';
-  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Tap an announcement to edit it. Tap an area heading to add information there.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with editable announcement areas"></div>${dedicationControls}${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose an announcement area">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} showing</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}`;
+  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Tap an announcement to edit it. Choose an announcement area below to add information there.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with editable announcement areas"></div>${dedicationControls}${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose an announcement area">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} showing</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}`;
   const warning = document.createElement('p');
   warning.className = 'notice';warning.hidden = true;warning.setAttribute('role','status');
   const host = container.querySelector('.preview-host');
   host.before(warning);
   const view = new DisplayView(host);
   view.update(snapshot, {preview:true});
+  const cholHamoedSlot = host.querySelector('.board-chol-hamoed-announcements:not([hidden])');
+  if (cholHamoedSlot) {
+    groups.push(...groupCholHamoedAnnouncements(snapshot.items));
+    areas.push(cholHamoedArea);
+    if (selectedArea === cholHamoedArea.id) selected = selectedArea;
+    container.querySelector('.screen-area-picker')?.insertAdjacentHTML('beforeend', `<button type="button" data-screen-area="chol-hamoed" aria-pressed="false"><strong>${cholHamoedArea.title}</strong><span>${groups.find(group => group.id === cholHamoedArea.id)?.sections.length || 0} showing</span></button>`);
+  }
   const detail = container.querySelector('.screen-area-detail');
 
   function decorate() {
@@ -45,6 +53,16 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       heading.setAttribute('aria-label',`Manage ${heading.textContent} area`);
       group.classList.toggle('screen-selected-area',group.dataset.announcementGroup === selected);
     }
+    const specialArea = host.querySelector('.board-chol-hamoed-announcements:not([hidden])');
+    if (specialArea && can('announcement')) {
+      const empty = !specialArea.querySelector('.announcement-section');
+      specialArea.classList.add('screen-edit-target','screen-chol-hamoed-target');
+      specialArea.classList.toggle('screen-chol-hamoed-empty',empty);
+      specialArea.setAttribute('role','button');
+      specialArea.tabIndex = 0;
+      specialArea.setAttribute('aria-label',empty ? 'Add Chol Hamoed announcement' : 'Manage Chol Hamoed announcements');
+      specialArea.classList.toggle('screen-selected-area',selected === cholHamoedArea.id);
+    }
     const dedication = host.querySelector('.board-dedication');
     if (dedication && can('dedication') && !dedication.hidden) {
       const current = records.get(view.slots.get('dedication')?.id);
@@ -53,6 +71,16 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       dedication.tabIndex = 0;
       dedication.setAttribute('aria-label',current ? 'Edit displayed פרנס היום' : 'Add פרנס היום sponsorship');
     }
+  }
+
+  function addAnnouncement(id) {
+    if (!can('announcement')) return;
+    if (id === cholHamoedArea.id) {
+      onAdd({kind:'announcement',status:'draft',data:{placement:'chol-hamoed',displayGroup:'separate',category:'General reminders'}});
+      return;
+    }
+    const group = ANNOUNCEMENT_GROUPS.some(area => area.id === id) ? id : 'separate';
+    onAdd({kind:'announcement',status:'draft',data:{displayGroup:group,category:categoryFor[group] || 'General reminders'}});
   }
 
   function chooseArea(id, scroll = false) {
@@ -87,8 +115,7 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
     const areaButton = target.closest('[data-screen-area]');
     if (heading || areaButton) { chooseArea(heading?.dataset.screenGroup || areaButton.dataset.screenArea,!!heading);return; }
     if (target.closest('#screen-add-announcement') && can('announcement')) {
-      const group = ANNOUNCEMENT_GROUPS.some(area => area.id === selected) ? selected : 'separate';
-      onAdd({kind:'announcement',status:'draft',data:{displayGroup:group,category:categoryFor[group] || 'General reminders'}});
+      addAnnouncement(selected);
       return;
     }
     if (target.closest('#screen-add-dedication') && can('dedication')) { onAdd({kind:'dedication',status:'draft',data:{}});return; }
@@ -96,6 +123,11 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       const current = records.get(view.slots.get('dedication')?.id);
       if (current) onEdit(current);
       else onAdd({kind:'dedication',status:'draft',data:{}});
+      return;
+    }
+    if (target.closest('.board-chol-hamoed-announcements') && can('announcement')) {
+      chooseArea(cholHamoedArea.id);
+      if (!target.closest('.board-chol-hamoed-announcements').querySelector('.announcement-section')) addAnnouncement(cholHamoedArea.id);
       return;
     }
     const group = target.closest('.announcement-group');

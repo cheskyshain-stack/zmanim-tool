@@ -360,6 +360,8 @@ dialog::backdrop {
 .screen-edit-preview .screen-edit-target{cursor:pointer;outline-offset:4px}
 .screen-edit-preview .screen-edit-target:hover,.screen-edit-preview .screen-edit-target:focus-visible{outline:3px solid var(--screen-gold);border-radius:3px}
 .screen-edit-preview .screen-selected-area{box-shadow:0 0 0 3px var(--screen-gold)}
+.screen-edit-preview .screen-chol-hamoed-target{position:relative}
+.screen-edit-preview .screen-chol-hamoed-empty::after{content:'Chol Hamoed announcements\A+ Add announcement here';white-space:pre-line;position:absolute;inset:20px;display:grid;place-content:center;text-align:center;font:24px/1.6 Arial,sans-serif;color:var(--screen-gold);border:2px dashed currentColor;border-radius:10px;pointer-events:none}
 .screen-area-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
 .screen-area-picker button{display:flex;flex-direction:column;align-items:start;text-align:left;gap:6px;min-width:0;overflow-wrap:anywhere}
 .screen-area-picker span{font-size:13px;font-weight:400;color:#526276}

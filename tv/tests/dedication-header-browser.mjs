@@ -233,7 +233,7 @@ try{
   check(transition.first!==transition.second,'two active dedications rotate');
   check(transition.before.geometry===transition.after.geometry&&transition.before.head===transition.after.head&&transition.themeStable,'rotation and theme changes keep card and all schedule geometry stable');
   check(transition.before.times===transition.after.times&&transition.stable,'dedication rotation preserves every schedule time and the mounted special sheet');
-  check(transition.inactiveVisible&&transition.inactiveCards===1&&!transition.inactiveSlot&&transition.inactiveHead===transition.before.head&&transition.inactiveCopy.includes('Sponsorship available'),'inactive dedication becomes the permanent sponsorship-availability card without changing the header');
+  check(transition.inactiveVisible&&transition.inactiveCards===1&&!transition.inactiveSlot&&transition.inactiveHead===transition.before.head&&['$36','$50','$180','$500'].every(price=>transition.inactiveCopy.includes(price)),'inactive dedication becomes the permanent sponsorship-availability card without changing the header');
   check(!transition.inactiveOverflow.length,'empty sponsorship card and all neighboring panels remain unclipped');
   if(screenshots)await page.screenshot({path:path.join(screenshots,`dedication-rail-${date}-${theme}-available${scale===2?'-4k':''}.png`)});
   assert.equal(JSON.stringify(snapshot),unchanged,'Preview rendering must not mutate original schedule or announcement fixtures');
