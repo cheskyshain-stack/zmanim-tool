@@ -149,11 +149,12 @@ function minchaParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
 
   /* 1:15/1:20 and 1:35/1:40 are both weighed against the same value: מנחה גדולה לחומרא's
-     latest reach Sunday through Friday, not just the five days this row schedules for
-     (see weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row
-     on the שבת chart weighs its own early מנחה the same way, against the same six days,
-     so the two charts cannot answer this question differently about days that sit right
-     next to each other). */
+     latest reach across the week's own regular days, Sunday through Friday with any full
+     יום טוב day among them left out, not just the five days this row schedules for (see
+     weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row on the
+     שבת chart weighs its own early מנחה the same way, against the same days, so the two
+     charts cannot answer this question differently about days that sit right next to
+     each other). */
   const latestMinchaGedola = toMinutes(weekLatestMinchaGedola(week.serial, settings));
 
   // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
@@ -187,18 +188,18 @@ function minchaParts(week, settings) {
        line below does. */
     { mins: earlyMincha ?? HM(13, 15), place: LMATA,
       offSeason: earlyMincha == null
-        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past even 1:20`
+        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past even 1:20`
         : null,
       label: earlyMincha === HM(13, 20)
-        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
+        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
         : earlyMincha === HM(13, 15)
-          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it`
-          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past both` },
+          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it`
+          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past both` },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
-      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it` },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },

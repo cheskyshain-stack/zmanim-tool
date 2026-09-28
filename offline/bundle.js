@@ -2133,6 +2133,25 @@ function inPlagWindow(serial, settings) {
  *  instead of a real one, the same reason sheets/weekday.js's own sundayThroughThursday
  *  walks back to the Sunday rather than just subtracting a fixed number of days.
  *
+ *  **A day of the six that is itself full יום טוב is left out.** Nobody is davening this
+ *  board's ערב שבת or weekday afternoon on that day, so its own מנחה גדולה has no business
+ *  setting how early the *other* days of the week may print. שבת בראשית's own Sunday is
+ *  שמחת תורה, and counting it pushed the whole week's answer later for a מנין that was
+ *  never being decided by it. isAssurMelacha alone, with no special-days table: a full
+ *  יום טוב day is fixed by day-of-year regardless of the table, and the case this guards
+ *  is always a full יום טוב rather than חול המועד, which already gets its own row
+ *  elsewhere (afterSukkosRow, afterYomKippurRow, or a שבוע-של-חול-המועד block) rather than
+ *  reaching this function's Sun-Fri window at all.
+ *
+ *  **Rounded to the minute, the way every board here is.** The callers weigh this against
+ *  round clock times (1:15, 1:20, 1:35, 1:40) and the boards themselves say "all zmanim
+ *  are rounded off, please be מחמיר two minutes" - so a day whose exact מנחה גדולה is
+ *  twenty seconds past 1:15 is still 1:15 by the board's own stated precision, and ought
+ *  to be read as 1:15 here too rather than as a fraction of a minute nobody is holding
+ *  the printed time to. Left unrounded, בראשית תשפ"ז stayed at 1:20 even once שמחת תורה
+ *  was excluded above: the next latest day, Monday, sits at 1:15 and twenty seconds, which
+ *  is 1:15 on the board and was still failing an exact <= 1:15 test.
+ *
  *  One answer for the whole week, asked once and used by both charts' early מנחה slots -
  *  sheets/weekday.js's own early מנחה and this file's Erev Shabbos one - so the two cannot
  *  look at two different windows and land on two different answers about days that sit
@@ -2140,7 +2159,9 @@ function inPlagWindow(serial, settings) {
 function weekLatestMinchaGedola(anchorSerial, settings) {
   const sunday = anchorSerial - (excelWeekday(anchorSerial) - 1);
   const days = [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
-  return Math.max(...days.map((d) => Z.minchaGedolaLechumra(dateFromSerial(d), settings)));
+  const regular = days.filter((d) => !isAssurMelacha(d, settings));
+  const latest = Math.max(...(regular.length ? regular : days).map((d) => Z.minchaGedolaLechumra(dateFromSerial(d), settings)));
+  return Math.round(latest * 1440) / 1440;
 }
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
@@ -2172,7 +2193,7 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
 
   const weekMgl = weekLatestMinchaGedola(shabbosSerial, settings);
   const weekMglText = formatTime(weekMgl);
-  const sundayFriday = 'somewhere Sunday through Friday';
+  const sundayFriday = "somewhere in the week's own regular days";
 
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
@@ -6900,11 +6921,12 @@ function minchaParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
 
   /* 1:15/1:20 and 1:35/1:40 are both weighed against the same value: מנחה גדולה לחומרא's
-     latest reach Sunday through Friday, not just the five days this row schedules for
-     (see weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row
-     on the שבת chart weighs its own early מנחה the same way, against the same six days,
-     so the two charts cannot answer this question differently about days that sit right
-     next to each other). */
+     latest reach across the week's own regular days, Sunday through Friday with any full
+     יום טוב day among them left out, not just the five days this row schedules for (see
+     weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row on the
+     שבת chart weighs its own early מנחה the same way, against the same days, so the two
+     charts cannot answer this question differently about days that sit right next to
+     each other). */
   const latestMinchaGedola = toMinutes(weekLatestMinchaGedola(week.serial, settings));
 
   // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
@@ -6938,18 +6960,18 @@ function minchaParts(week, settings) {
        line below does. */
     { mins: earlyMincha ?? HM(13, 15), place: LMATA,
       offSeason: earlyMincha == null
-        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past even 1:20`
+        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past even 1:20`
         : null,
       label: earlyMincha === HM(13, 20)
-        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
+        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
         : earlyMincha === HM(13, 15)
-          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it`
-          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, past both` },
+          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it`
+          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past both` },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the six days`
-      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the six days, which is not past it` },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },
