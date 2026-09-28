@@ -41,7 +41,7 @@ for (const font of ['david-libre-400.woff2', 'david-libre-700.woff2', 'frank-ruh
 }
 // An explicit allowlist prevents offline caches from ever including admin pages,
 // protected preview responses, credentials, or internal item metadata.
-const assets=['/display/'];
+const assets=[];
 async function publicAssets(relative='display-assets'){
   for(const entry of await readdir(join(root,'dist',relative),{withFileTypes:true})){
     if(entry.isDirectory())await publicAssets(relative+'/'+entry.name);
@@ -49,8 +49,12 @@ async function publicAssets(relative='display-assets'){
   }
 }
 await publicAssets();assets.sort();
-const version=createHash('sha256');
-for(const asset of assets)version.update(await readFile(join(root,'dist',asset==='/display/'?'display/index.html':asset.slice(1))));
-const sw=(await readFile(join(root,'public/display/sw.js'),'utf8')).replace('__CACHE_VERSION__',version.digest('hex').slice(0,16)).replace('__PUBLIC_ASSETS__',JSON.stringify(assets));
-await writeFile(join(root,'dist/display/sw.js'),(await transform(sw,{loader:'js',minify:true,target:'es2022'})).code);
+const swTemplate=await readFile(join(root,'public/display/sw.js'),'utf8');
+for(const [scope,cachePrefix] of [['tv','shul-view-tv-shell-'],['display','shul-view-shell-']]){
+  const scopedAssets=[`/${scope}/`,...assets];
+  const version=createHash('sha256').update(swTemplate).update(JSON.stringify(scopedAssets));
+  for(const asset of scopedAssets)version.update(await readFile(join(root,'dist',asset===`/${scope}/`?`${scope}/index.html`:asset.slice(1))));
+  const sw=swTemplate.replace('__CACHE_PREFIX__',cachePrefix).replace('__CACHE_VERSION__',version.digest('hex').slice(0,16)).replace('__PUBLIC_ASSETS__',JSON.stringify(scopedAssets));
+  await writeFile(join(root,`dist/${scope}/sw.js`),(await transform(sw,{loader:'js',minify:true,target:'es2022'})).code);
+}
 console.log("TV assets built in tv/dist. No deployment performed.");

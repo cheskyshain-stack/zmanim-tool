@@ -47,6 +47,12 @@ async function snapshot(items, at, preview = false, appearance) {
 }
 async function handle(req, env) {
   const url = new URL(req.url), path = url.pathname;
+  // Keep saved screen bookmarks working without touching admin/API/asset paths.
+  if (['/display', '/display/', '/display/index.html', '/tv', '/tv/index.html'].includes(path)) {
+    if (!["GET", "HEAD"].includes(req.method)) throw new ApiError(405, "Method not allowed.");
+    url.pathname = '/tv/';
+    return Response.redirect(url.href, 308);
+  }
   if (path === '/api/display/offline' && req.method === 'GET') {
     const at=new Date().toISOString();
     const items=(await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
@@ -168,6 +174,7 @@ export default { async fetch(req, env) {
   const r = new Response(response.body, response);
   r.headers.set("Cache-Control", "no-store");
   if(new URL(req.url).pathname==='/display/sw.js')r.headers.set('Service-Worker-Allowed','/display/');
+  if(new URL(req.url).pathname==='/tv/sw.js')r.headers.set('Service-Worker-Allowed','/tv/');
   r.headers.set("X-Content-Type-Options", "nosniff");
   r.headers.set("X-Robots-Tag", "noindex");
   r.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'");

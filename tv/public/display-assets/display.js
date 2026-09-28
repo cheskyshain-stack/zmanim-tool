@@ -52,7 +52,7 @@ async function start(){
   }catch{/* Browsers with storage disabled still support the live display. */}
   if('serviceWorker' in navigator){
     // New Workers wait for a normal close/reopen. Never reload a live screen.
-    void navigator.serviceWorker.register('/display/sw.js',{scope:'/display/',updateViaCache:'none'}).catch(()=>{});
+    void navigator.serviceWorker.register('/tv/sw.js',{scope:'/tv/',updateViaCache:'none'}).catch(()=>{});
   }
   void refresh();setInterval(refresh,15000);setInterval(draw,1000);
   addEventListener('online',refresh);

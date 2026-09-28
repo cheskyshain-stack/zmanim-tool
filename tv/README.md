@@ -1,12 +1,12 @@
 # TV display
 
-Implemented on `feature/tv-display`. **Not deployed.** Production resources have not been created or changed.
+Implemented on `feature/tv-display` and deployed. The public screen is `/tv/`; old `/display/` links redirect there. Admin and API paths remain unchanged. The original setup instructions below describe initial provisioning; do not recreate existing production resources.
 
 ## Routes and workflow
 
 | Route | Purpose |
 | --- | --- |
-| `/display/` | Public 16:9 TV screen |
+| `/tv/` | Public 16:9 TV screen |
 | `/admin/display/` | Server-protected dashboard, editors, future and unsaved previews, permissions |
 | `/api/display/public` | Public projection of currently published content and applicable schedules |
 | `/api/display/admin/*` | Authenticated administration APIs |
@@ -33,7 +33,7 @@ npm run db:local
 npm run dev
 ```
 
-Open `http://127.0.0.1:8795/admin/display/` and `http://127.0.0.1:8795/display/`.
+Open `http://127.0.0.1:8795/admin/display/` and `http://127.0.0.1:8795/tv/`.
 
 The local config binds only to loopback and enables `local-admin`. It is deliberately separate from production. Do not deploy `wrangler.local.jsonc`, expose the local server to the internet, or set `LOCAL_DEVELOPMENT=true` online. Local D1 persists in `tv/.wrangler/state`, independent of cookies and browser storage.
 
@@ -63,11 +63,12 @@ No production database, routes, Access application, or Worker deployment was mad
 | `LOCAL_DEVELOPMENT` | Must be absent in production |
 
 4. Protect both `/admin/display*` and `/api/display/admin/*` with Cloudflare Access under the same application's audience, using the existing organization's sign-in. Add only authorized admin emails to its policy. Additional display capabilities are granted inside the TV dashboard. Access admission alone does not grant management permissions.
-5. Keep `/display*`, `/display-assets/*`, and `/api/display/public` public. In particular, do not protect the entire `/api/display/*` tree with Access, because that would block the TV's read-only endpoint.
+5. Keep `/tv*`, `/display*`, `/display-assets/*`, and `/api/display/public` public. In particular, do not protect the entire `/api/display/*` tree with Access, because that would block the TV's read-only endpoint.
 6. Route only these new paths to this Worker on the existing hostname:
 
 ```json
 "routes": [
+  { "pattern": "baismedrashoflakewoodcommons.org/tv*", "zone_name": "baismedrashoflakewoodcommons.org" },
   { "pattern": "baismedrashoflakewoodcommons.org/display*", "zone_name": "baismedrashoflakewoodcommons.org" },
   { "pattern": "baismedrashoflakewoodcommons.org/admin/display*", "zone_name": "baismedrashoflakewoodcommons.org" },
   { "pattern": "baismedrashoflakewoodcommons.org/api/display/*", "zone_name": "baismedrashoflakewoodcommons.org" }
@@ -197,7 +198,7 @@ special overrides; it never reads exception captions.
   upcoming special group.
 
 No database migration or new permissions are required for this correction.
-Both admin previews use the same presentation and renderer as `/display/`.
+Both admin previews use the same presentation and renderer as `/tv/`.
 
 Source limitations: the existing catalog has no complete Shavuos schedule or
 complete Tisha B'Av day schedule. Missing schedules are explicitly marked for
@@ -216,7 +217,7 @@ Production deployment remains pending review.
 User request: once the TV feature is deployed, add two links to the existing main
 website's protected admin page:
 
-- **View TV Display**: the deployed public `/display/` screen.
+- **View TV Display**: the deployed public `/tv/` screen.
 - **Manage TV Display**: the deployed protected `/admin/display/` management area.
 
 Use the actual deployed URLs and existing admin navigation styling. Preserve
@@ -280,7 +281,7 @@ when administrators publish new content or schedules.
 
 This section supersedes the earlier rotating/paged screen layout notes above.
 
-- `/display/` keeps the original two-column special page mounted. It fits once
+- `/tv/` keeps the original two-column special page mounted. It fits once
   after its fonts/styles load, then refits only when its actual box changes size.
   Light and Dark use the same rows and geometry, with themed backgrounds, times,
   headings and location marks. The existing Shabbos-box / both-box timing remains.
@@ -300,7 +301,7 @@ This section supersedes the earlier rotating/paged screen layout notes above.
   current/future items and saved appearance. Drafts, hidden/archived items,
   internal names, audit details and anonymous sponsor names are excluded.
 - After one successful connection, IndexedDB stores that public data, and a
-  service worker scoped to `/display/` saves the public screen assets. No admin
+  service worker scoped to `/tv/` saves the public screen assets. No admin
   pages, private previews, credentials or API responses enter the asset cache.
 - The browser bundles the same calendar and saved schedule calculations as the
   Worker. Offline, the clock, New York day/date, next minyan, daily zmanim, special
