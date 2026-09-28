@@ -2501,11 +2501,22 @@ function holidayNameFor(day, settings, specialDaysTable) {
 
 /** Week list for a Weekday chart covering the same season date range as
  *  computeSeasonWeeks, but with a different inclusion rule: a week is included as long
- *  as at least one of its Sun-Fri days (the days a Weekday chart actually schedules) is
- *  a normal day - not Yom Tov, not Chol Hamoed. That's a superset of the Shabbos
- *  chart's own week list: a week whose Shabbos falls on Yom Tov (and so has no parsha,
- *  excluded from computeSeasonWeeks) can still need a Weekday-chart row if, say, only
- *  Thursday and Friday of that week are Yom Tov and the rest are regular days.
+ *  as at least one of its Sunday-through-Thursday days - the days a Weekday-chart row
+ *  actually prints times for; Friday's own schedule is the Erev Shabbos row on the
+ *  Shabbos chart, never this one - is a normal day, not Yom Tov, not Chol Hamoed.
+ *  That's a superset of the Shabbos chart's own week list: a week whose Shabbos falls on
+ *  Yom Tov (and so has no parsha, excluded from computeSeasonWeeks) can still need a
+ *  Weekday-chart row if, say, only Thursday of that week is Yom Tov and the rest are
+ *  regular days.
+ *
+ *  **Friday is deliberately left out of this test.** A week where אחרון של פסח runs
+ *  Sunday through Thursday and only Friday is a regular day used to get a row anyway,
+ *  because the test used to ask Sunday through Friday - a superset of the days the row
+ *  actually schedules, so Friday alone being ordinary was enough to print a row with
+ *  nothing real behind it (April 2026's own שמיני and April 2030's own אחרי מות are two
+ *  such weeks). Asking only about the days this row schedules is what keeps the chart
+ *  from carrying a menu for a week that has none.
+ *
  *  Each week is still anchored to its Shabbos `serial` (Saturday) for consistency with
  *  the Shabbos weeks list; `parsha` falls back to that Shabbos's own Yom Tov name (e.g.
  *  "ראש השנה") when there's no regular parsha to label the row with.
@@ -2539,7 +2550,7 @@ function computeWeekdayWeeks(season, hebrewYear, settings, tables) {
     // within the *outgoing* season's territory, already covered by its own trailing-gap
     // row below. Without this, both seasons would independently print an identical row.
     const isOwnStartBoundary = d === startSerial;
-    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 1, settings, tables.specialDays)) {
+    if (!isOwnStartBoundary && !isCholHamoedAnchor(d, settings, tables.specialDays) && anyRegularDay(d - 6, d - 2, settings, tables.specialDays)) {
       const parsha = hasParsha(d, settings, tables) || hasYomTov(d, settings, tables.specialDays);
       weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
     }
