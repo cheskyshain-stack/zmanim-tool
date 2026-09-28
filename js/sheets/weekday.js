@@ -31,7 +31,7 @@
 // per-cell override and rendered instead of anything computed here (see overrides.js).
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
+import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana, isAssurMelacha } from '../hebrew-calendar.js';
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
@@ -73,6 +73,19 @@ function renderTime(mins, place) {
 function sundayThroughThursday(serial) {
   const sunday = serial - (excelWeekday(serial) - 1);
   return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+/** `days`, minus any that are themselves full יום טוב - never all of them, since a run of
+ *  five weekdays cannot be entirely יום טוב. Nobody davens this board's schedule on a יום
+ *  טוב day, so it has no business setting how early or how late the *other* days of the
+ *  week may print (see weekLatestMinchaGedola in sheets/common.js, which this mirrors, for
+ *  the week שבת בראשית found it on). minchaParts's earliestShkia and maarivParts's
+ *  latestShkia both weigh their own extreme against every day of the week the same way, so
+ *  a שבועות or a יום כיפור sitting inside an otherwise ordinary week's Sunday-Thursday
+ *  cannot quietly set either bound merely by being the earliest or the latest day counted. */
+function regularDays(days, settings) {
+  const regular = days.filter((d) => !isAssurMelacha(d, settings));
+  return regular.length ? regular : days;
 }
 
 function shkiaMinutes(serial, settings) {
@@ -169,12 +182,13 @@ function minchaParts(week, settings) {
     : latestMinchaGedola <= HM(13, 20) ? HM(13, 20)
     : null;
 
-  // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
-  // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
-  // can never leave a zman a few seconds short of the 15.
-  const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
+  // The evening מנחה must clear שקיעה by 15 minutes on every one of the week's own regular
+  // days, so it is the *earliest* שקיעה of those that binds - a full יום טוב day left out
+  // (regularDays), the same reason weekLatestMinchaGedola leaves one out. Rounded down, so
+  // a stray fraction of a minute can never leave a zman a few seconds short of the 15.
+  const earliestShkia = Math.floor(Math.min(...regularDays(days, settings).map((d) => shkiaMinutes(d, settings))));
   const latestAllowed = earliestShkia - 15;
-  const clears = 'at least 15 minutes before the earliest שקיעה of the five days';
+  const clears = "at least 15 minutes before the earliest שקיעה of the week's own regular days";
 
   /* **A time that does not run this week stays in the list, marked, rather than being taken
      out of it.** Removed, the column simply had no 12:45 and nothing to say about it, which
@@ -264,11 +278,13 @@ function maarivParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
   const kayitz = isKayitzWeek(week.serial, settings);
 
-  // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
-  // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
-  const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
+  // A מעריב must be 50 minutes after שקיעה on every one of the week's own regular days, so
+  // here it is the *latest* שקיעה of those that binds - a full יום טוב day left out
+  // (regularDays), the same reason weekLatestMinchaGedola leaves one out. Rounded up, for
+  // the same reason מנחה rounds down.
+  const latestShkia = Math.ceil(Math.max(...regularDays(days, settings).map((d) => shkiaMinutes(d, settings))));
   const earliestAllowed = latestShkia + 50;
-  const clears = 'at least 50 minutes after the latest שקיעה of the five days';
+  const clears = "at least 50 minutes after the latest שקיעה of the week's own regular days";
 
   // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
   // (ui/settings-view.js), only for the season it was pinned to the moment that happened
