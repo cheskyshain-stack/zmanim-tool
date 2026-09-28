@@ -32,14 +32,14 @@ import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
-import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
-import { buildPesachPoster } from '../posters/pesach.js';
-import { buildSukkosPoster } from '../posters/sukkos.js';
+import { buildPesachPoster, pesachChmDays, PS_TEXT } from '../posters/pesach.js';
+import { buildSukkosPoster, sukkosChmDays, SK_TEXT } from '../posters/sukkos.js';
 import { nextRoshChodesh, roshChodeshText, roshChodeshMonthName } from '../rosh-chodesh-text.js';
-import { hebrewYear, dateFromHebrew } from '../hebrew-calendar.js';
+import { hebrewYear, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -374,6 +374,32 @@ function txErevShminiAtzeres(year, settings, today) {
   };
 }
 
+/** The חול המועד סוכות message.
+ *
+ *  Windowed on the everyday חול המועד days themselves (sukkosChmDays - the same days the
+ *  message's own מנחה and מעריב are computed from), not on the sheet's span, for the same
+ *  reason ערב סוכות is windowed on ערב rather than the sheet: a card that is still up before
+ *  Yom Tov even begins, or after the last day is back to ordinary weekdays, is not what
+ *  TX_AHEAD_DAYS is for. */
+function txCholHamoedSukkos(year, settings, today) {
+  const poster = buildSukkosPoster(year, settings);
+  if (!poster) return null;
+  const days = sukkosChmDays(roshHashana(year - 3761));
+  if (!days.length) return null;
+  const from = Math.min(...days), to = Math.max(...days);
+  if (!txDaysInWindow(from, to, today)) return null;
+  const text = cholHamoedText(poster, SK_TEXT.cholHamoed);
+  if (!text) return null;
+  return {
+    id: `chm-sukkos-${year}`,
+    kind: 'yomtov',
+    serial: from,
+    name: 'Chol Hamoed',
+    when: hebrewYear(year),
+    text,
+  };
+}
+
 /** The ערב פסח message.
  *
  *  Its own Hebrew year rather than ראש השנה's: פסח is in ניסן, half a year along, so the year
@@ -418,6 +444,35 @@ function txErevShviiShelPesach(rhYear, settings, today) {
       kind: 'yomtov',
       serial: shvii - 1,
       name: "Erev Shevii Shel Pesach",
+      when: hebrewYear(y),
+      text,
+    };
+  }
+  return null;
+}
+
+/** The חול המועד פסח message.
+ *
+ *  Same shape as the סוכות one: windowed on the everyday חול המועד days themselves
+ *  (pesachChmDays), not the sheet's span, and asked of both candidate years for the same
+ *  reason ערב פסח and ערב שביעי ask both - פסח's own Hebrew year runs half a year behind
+ *  ראש השנה's. `dateFromHebrew(1, 1, y)` is 1 ניסן, the same rh pesachChmDays wants
+ *  internally (buildPesachPoster works it out as pesach - 14, which is the same day). */
+function txCholHamoedPesach(rhYear, settings, today) {
+  for (const y of [rhYear - 1, rhYear]) {
+    const poster = buildPesachPoster(y, settings);
+    if (!poster) continue;
+    const days = pesachChmDays(dateFromHebrew(1, 1, y));
+    if (!days.length) continue;
+    const from = Math.min(...days), to = Math.max(...days);
+    if (!txDaysInWindow(from, to, today)) continue;
+    const text = cholHamoedText(poster, PS_TEXT.cholHamoed);
+    if (!text) continue;
+    return {
+      id: `chm-pesach-${y}`,
+      kind: 'yomtov',
+      serial: from,
+      name: 'Chol Hamoed',
       when: hebrewYear(y),
       text,
     };
@@ -635,8 +690,10 @@ export function renderTexts(container, state, settings, tables) {
       txErevRoshHashana(year, settings, today),
       txErevYomKippur(year, settings, today),
       txErevSukkos(year, settings, today),
+      txCholHamoedSukkos(year, settings, today),
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
+      txCholHamoedPesach(year, settings, today),
       txErevShviiShelPesach(year, settings, today),
       ...txTaanis(year, settings, today, txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS + 1),
       ...txNetz(year, settings, today),

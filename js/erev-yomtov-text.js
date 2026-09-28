@@ -402,6 +402,50 @@ export function erevShminiAtzeresText(poster) {
 }
 
 
+/** The fixed note after the חול המועד שחרית line, as the shul writes it. Not a time and not
+ *  on either sheet - a room, the same kind of fixed wording the sign-off lines above are - so
+ *  it is a constant here rather than something asked of the board. If the shul moves where
+ *  תפילין are put on, this is the one line to change. */
+const CHM_TEFILLIN_NOTE = ' (TEFILLIN in Simcha Hall)';
+
+/** The חול המועד message, off either the סוכות or the פסח sheet.
+ *
+ *  The two sheets build the same three calcs for their own middle days - chmShacharis,
+ *  chmMincha, chmMaariv - off the same shape (see sukkosChmMincha/sukkosChmMaariv in
+ *  posters/sukkos.js and their פסח namesakes), so one reader serves both rather than one
+ *  copy of this per sheet.
+ *
+ *  What the shul sends:
+ *
+ *    Chol Hamoed
+ *    Shacharis 7:00d, 8:00m, 8:40d (TEFILLIN in Simcha Hall)
+ *    Mincha 1:35d, 1:50m, 4:15d, 6:00d, 6:35d, 6:55d, 7:10d
+ *    Mariv 8:15d, 8:45m, 9:30d, 10:00d, 10:30m, 11:00d, 11:30d, 12:00d
+ *
+ *  שחרית is fixed (SK_TEXT.chmShacharis / PS_TEXT.chmShacharis, the same three times every
+ *  year), while מנחה and מעריב move with the week's own שקיעה - reading them off the block
+ *  rather than typing the fixed line and computing the other two separately keeps all three
+ *  honestly off the one sheet the board itself prints them from.
+ *
+ *  @param poster - buildSukkosPoster or buildPesachPoster.
+ *  @param headingText - SK_TEXT.cholHamoed or PS_TEXT.cholHamoed, so the right block is found
+ *    on a sheet that carries more than one heading. */
+export function cholHamoedText(poster, headingText) {
+  const block = ytBlock(poster, headingText);
+  if (!block) return '';
+  const shacharis = ytLine(block, 'chmShacharis')?.times;
+  const mincha = ytLine(block, 'chmMincha')?.times;
+  const maariv = ytLine(block, 'chmMaariv')?.times;
+  if (!shacharis?.length && !mincha?.length && !maariv?.length) return '';
+
+  const lines = ['Chol Hamoed'];
+  if (shacharis?.length) lines.push(`Shacharis ${ytList(shacharis)}${CHM_TEFILLIN_NOTE}`);
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+  if (maariv?.length) lines.push(`Mariv ${ytList(maariv)}`);
+  return lines.join('\n');
+}
+
+
 /** The three early מנחה lines of an evening somebody can bring in early, as the messages write
  *  them, off a block's own מנחה / פלג rows.
  *
