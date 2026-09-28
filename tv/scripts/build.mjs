@@ -1,4 +1,4 @@
-import { readdir, readFile, mkdir, writeFile, copyFile } from "node:fs/promises";
+import { readdir, readFile, mkdir, writeFile, copyFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {createHash} from 'node:crypto';
@@ -20,6 +20,8 @@ async function build(relative = "") {
   }
 }
 await build();
+// Remove the retired page from incremental builds as well as fresh builds.
+await rm(join(root, 'dist/display/index.html'), {force:true});
 // The special schedule is the site's original page inside an isolated shadow
 // root. Bundle its renderer and copy its own stylesheet/font dependencies.
 await bundle({
@@ -49,12 +51,10 @@ async function publicAssets(relative='display-assets'){
   }
 }
 await publicAssets();assets.sort();
-const swTemplate=await readFile(join(root,'public/display/sw.js'),'utf8');
-for(const [scope,cachePrefix] of [['tv','shul-view-tv-shell-'],['display','shul-view-shell-']]){
-  const scopedAssets=[`/${scope}/`,...assets];
-  const version=createHash('sha256').update(swTemplate).update(JSON.stringify(scopedAssets));
-  for(const asset of scopedAssets)version.update(await readFile(join(root,'dist',asset===`/${scope}/`?`${scope}/index.html`:asset.slice(1))));
-  const sw=swTemplate.replace('__CACHE_PREFIX__',cachePrefix).replace('__CACHE_VERSION__',version.digest('hex').slice(0,16)).replace('__PUBLIC_ASSETS__',JSON.stringify(scopedAssets));
-  await writeFile(join(root,`dist/${scope}/sw.js`),(await transform(sw,{loader:'js',minify:true,target:'es2022'})).code);
-}
+const swTemplate=await readFile(join(root,'public/tv/sw.js'),'utf8');
+const publicFiles=['/tv/',...assets];
+const version=createHash('sha256').update(swTemplate).update(JSON.stringify(publicFiles));
+for(const asset of publicFiles)version.update(await readFile(join(root,'dist',asset==='/tv/'?'tv/index.html':asset.slice(1))));
+const sw=swTemplate.replace('__CACHE_VERSION__',version.digest('hex').slice(0,16)).replace('__PUBLIC_ASSETS__',JSON.stringify(publicFiles));
+await writeFile(join(root,'dist/tv/sw.js'),(await transform(sw,{loader:'js',minify:true,target:'es2022'})).code);
 console.log("TV assets built in tv/dist. No deployment performed.");

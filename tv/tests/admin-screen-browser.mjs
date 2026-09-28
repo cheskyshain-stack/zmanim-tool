@@ -93,7 +93,7 @@ async function shot(page,name){if(screenshots){await mkdir(screenshots,{recursiv
 async function crop(page,selector,name){if(screenshots){await mkdir(screenshots,{recursive:true});await page.locator(selector).screenshot({path:path.join(screenshots,name)});}}
 
 try{
-  const sw=await readFile(path.join(dist,'display/sw.js'),'utf8');
+  const sw=await readFile(path.join(dist,'tv/sw.js'),'utf8');
   assert.ok(sw.includes('/display-assets/renderer.js'),'public renderer remains in offline manifest');
   for(const asset of ['admin.screen.js','admin.js','admin.css'])assert.ok(!sw.includes('/display-assets/'+asset),`${asset} must remain out of public offline manifest`);
   const publicPage=await browser.newPage({viewport:{width:1920,height:1080}});

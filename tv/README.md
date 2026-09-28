@@ -1,6 +1,6 @@
 # TV display
 
-Implemented on `feature/tv-display` and deployed. The public screen is `/tv/`; old `/display/` links redirect there. Admin and API paths remain unchanged. The original setup instructions below describe initial provisioning; do not recreate existing production resources.
+Implemented on `feature/tv-display` and deployed. The public screen is `/tv/`; the old `/display/` page is removed (HTTP 410, no redirect). A retirement service worker clears only the old screen's offline cache on its next update. Admin and API paths remain unchanged. The original setup instructions below describe initial provisioning; do not recreate existing production resources.
 
 ## Routes and workflow
 

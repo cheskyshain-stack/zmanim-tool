@@ -57,8 +57,8 @@ try{
  assert.ok(await recovery.locator('.tv-clock').textContent());
  assert.equal(await recovery.locator('.boot').isVisible(),false);
  console.log(JSON.stringify({firstConnectionFailureRecovered:true,attempts}));await fresh.close();
- // An existing legacy installation and the canonical scope must keep separate
- // caches. Old bookmarks still open offline and follow the server redirect online.
+ // Retire only the old screen cache/registration. The canonical screen and
+ // unrelated origin caches must remain usable, with no forced navigation.
  const migration=await browser.newContext({viewport:{width:1920,height:1080}}),legacy=await migration.newPage();
  const migrationErrors=[];legacy.on('pageerror',error=>migrationErrors.push(error.message));
  await legacy.route(origin+'/api/display/offline',route=>route.fulfill({json:seed}));
@@ -66,32 +66,29 @@ try{
  await legacy.evaluate(async()=>{await navigator.serviceWorker.ready;});
  await legacy.waitForFunction(()=>navigator.serviceWorker.controller);
  await legacy.evaluate(async()=>{
-  const registration=await navigator.serviceWorker.register('/display/sw.js',{scope:'/display/',updateViaCache:'none'});
-  if(registration.active?.state==='activated')return;
-  await new Promise((resolve,reject)=>{
-   const worker=registration.installing||registration.waiting;
-   if(!worker){reject(Error('The legacy service worker did not install.'));return;}
-   worker.addEventListener('statechange',()=>{if(worker.state==='activated')resolve();else if(worker.state==='redundant')reject(Error('The legacy service worker failed to install.'));});
-  });
+  await (await caches.open('shul-view-shell-development-obsolete')).put('/display/',new Response('DEVELOPMENT legacy shell'));
+  await (await caches.open('development-other-app-cache')).put('/development-unrelated',new Response('DEVELOPMENT unrelated cache'));
+  window.retirementSentinel='the existing screen stays open';
+  await navigator.serviceWorker.register('/display/sw.js',{scope:'/display/',updateViaCache:'none'});
  });
+ await legacy.waitForFunction(async()=>
+  !(await caches.keys()).some(name=>name.startsWith('shul-view-shell-'))&&
+  !(await navigator.serviceWorker.getRegistrations()).some(registration=>registration.scope.endsWith('/display/')));
  const shells=await legacy.evaluate(async()=>{
-  const names=await caches.keys(),found={};
-  for(const [prefix,shell] of [['shul-view-tv-shell-','/tv/'],['shul-view-shell-','/display/']]){
-   const name=names.find(value=>value.startsWith(prefix));
-   const response=name&&await (await caches.open(name)).match(shell);
-   found[shell]={cached:!!response,redirected:response?.redirected};
-  }
-  return found;
+  const names=await caches.keys(),name=names.find(value=>value.startsWith('shul-view-tv-shell-'));
+  const response=name&&await (await caches.open(name)).match('/tv/');
+  return {canonicalCached:!!response,redirected:response?.redirected,oldCaches:names.filter(value=>value.startsWith('shul-view-shell-')),
+   unrelatedPreserved:names.includes('development-other-app-cache'),sentinel:window.retirementSentinel};
  });
- assert.deepEqual(shells,{'/tv/':{cached:true,redirected:false},'/display/':{cached:true,redirected:false}});
- await migration.setOffline(true);await legacy.unroute(origin+'/api/display/offline');
- await legacy.goto(origin+'/display/');await legacy.waitForFunction(()=>document.querySelector('.board-zmanim'));
- assert.equal(new URL(legacy.url()).pathname,'/display/');
- assert.ok((await legacy.evaluate(()=>navigator.serviceWorker.controller.scriptURL)).endsWith('/display/sw.js'));
- await migration.setOffline(false);await legacy.goto(origin+'/display/');await legacy.waitForURL(origin+'/tv/');
- await legacy.waitForFunction(()=>document.querySelector('.board-zmanim'));
+ assert.deepEqual(shells,{canonicalCached:true,redirected:false,oldCaches:[],unrelatedPreserved:true,sentinel:'the existing screen stays open'});
+ assert.equal(new URL(legacy.url()).pathname,'/tv/');
  assert.ok((await legacy.evaluate(()=>navigator.serviceWorker.controller.scriptURL)).endsWith('/tv/sw.js'));
+ for(const method of ['GET','HEAD']){
+  const response=await migration.request.fetch(origin+'/display/',{method,maxRedirects:0});
+  assert.equal(response.status(),410);assert.equal(response.headers().location,undefined);
+ }
+ await legacy.unroute(origin+'/api/display/offline');
  await migration.setOffline(true);await legacy.reload();await legacy.waitForFunction(()=>document.querySelector('.board-zmanim'));
- assert.deepEqual(migrationErrors,[]);console.log(JSON.stringify({canonicalOfflineReload:true,legacyOfflineReload:true,legacyOnlineRedirect:true,separateShellCaches:true}));
+ assert.deepEqual(migrationErrors,[]);console.log(JSON.stringify({canonicalOfflineReload:true,legacyCachesRetired:true,legacyRegistrationRemoved:true,legacyURLGone:true,unrelatedCachesPreserved:true,noForcedNavigation:true}));
  await migration.close();
 }finally{await browser.close();}

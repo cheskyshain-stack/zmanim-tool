@@ -47,8 +47,13 @@ async function snapshot(items, at, preview = false, appearance) {
 }
 async function handle(req, env) {
   const url = new URL(req.url), path = url.pathname;
-  // Keep saved screen bookmarks working without touching admin/API/asset paths.
-  if (['/display', '/display/', '/display/index.html', '/tv', '/tv/index.html'].includes(path)) {
+  // The previous public address is retired; assets and protected admin/API
+  // paths keep their existing URLs. Its SW remains only to retire old caches.
+  if ((path === '/display' || path.startsWith('/display/')) && path !== '/display/sw.js') {
+    if (!["GET", "HEAD"].includes(req.method)) throw new ApiError(405, "Method not allowed.");
+    return new Response(req.method === 'HEAD' ? null : 'This page has been removed.', {status:410, headers:{'Content-Type':'text/plain; charset=utf-8'}});
+  }
+  if (['/tv', '/tv/index.html'].includes(path)) {
     if (!["GET", "HEAD"].includes(req.method)) throw new ApiError(405, "Method not allowed.");
     url.pathname = '/tv/';
     return Response.redirect(url.href, 308);
