@@ -694,18 +694,40 @@ function flattenNonEmpty(parts) {
   return flat.filter((x) => x !== '' && x != null);
 }
 
-/** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...).
+/** Splits a list of time options across two printed lines, choosing whichever near-middle
+ *  cut leaves the two lines closest in width - not always the plain item-count half, since
+ *  10:00 is a whole item wider than 7:00 and a board full of one but not the other (later
+ *  evening times run longer than earlier afternoon ones) split lopsided under a fixed
+ *  floor(n/2): a בראשית מעריב line of 7:30/8:00/8:30/8:45/9:00 against
+ *  9:30/10:00/10:30/11:00/11:30/12:00 read as five short items over six longer ones, the
+ *  bottom line fifteen characters wider than the top (measured), against five once the cut
+ *  moves one item over. Only the two candidates nearest the middle are ever
+ *  weighed (floor(n/2) and ceil(n/2)), never a lopsided count-wise split in the name of a
+ *  closer width - that would read stranger than the few characters of width it is meant to
+ *  fix. Character count is the width proxy rather than a measured pixel width: this runs
+ *  while the sheet is being built, before there is a rendered cell to measure at all.
  *
- *  `cut` overrides where the split falls, item-count-wise, for a caller whose items are
- *  not all the same width - the Weekday chart's "NEW" tag (sheets/weekday.js) widens
- *  whichever item it sits on by roughly one more item's worth of room, so it asks for one
- *  fewer plain item on that item's own line rather than the even count split, to keep the
- *  two printed lines close in width instead of the tagged line reading visibly wider. */
-function splitLinesInHalf(items, delim = SLASH, cut = Math.floor(items.length / 2)) {
-  const line1 = items.slice(0, cut).join(delim);
-  const line2 = items.slice(cut).join(delim);
+ *  `cut` overrides the choice outright, for a caller with its own reason to want a specific
+ *  split regardless of what balances best - see the Weekday chart's "NEW" tag
+ *  (sheets/weekday.js), which is not plain text and so is not honestly weighed by counting
+ *  its characters. */
+function splitLinesInHalf(items, delim = SLASH, cut = null) {
+  const resolvedCut = cut ?? bestSplitCut(items, delim);
+  const line1 = items.slice(0, resolvedCut).join(delim);
+  const line2 = items.slice(resolvedCut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
+}
+
+/** The narrower of the two near-middle cuts, by how close the two resulting lines' lengths
+ *  land - see splitLinesInHalf, which this exists only to serve. */
+function bestSplitCut(items, delim) {
+  const lo = Math.floor(items.length / 2);
+  const hi = Math.ceil(items.length / 2);
+  if (lo === hi) return lo;
+  const widthDiff = (cut) => Math.abs(
+    items.slice(0, cut).join(delim).length - items.slice(cut).join(delim).length
+  );
+  return widthDiff(hi) < widthDiff(lo) ? hi : lo;
 }
 
 /** HTML escaping, in the two shapes this codebase actually uses.
