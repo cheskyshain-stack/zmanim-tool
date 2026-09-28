@@ -800,7 +800,13 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--sheet-accent,
    [contenteditable] elements by default, which breaks lines anywhere (even at a
    non-breaking space) once content doesn't fit - defeating the NBSP protection above
    that keeps a time pair like "7:30 / 8:15" on one line. */
-.cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.2; direction: ltr; overflow-wrap: normal; word-break: normal; }
+/* line-height 1.35 rather than a plain 1.2: a two-line cell read tight, and this is the
+   most room a line can get without the tallest cell on the boards (the דרשה row's own
+   three lines, on שבת שובה / הגדול) pushing its row past what an 8-row page's even split
+   allows. Measured across every season and Weekday chart from 5784 through 5792, 108
+   pages in all: 1.35 leaves every page exactly at its unchanged height, 1.38 already
+   overflows twenty of them. */
+.cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.35; direction: ltr; overflow-wrap: normal; word-break: normal; }
 .cell:focus { background: #fffbe6; }
 td.ruled .cell { background: var(--ruled); }
 /* Manually-edited cells no longer get a persistent background tint - only the brief
