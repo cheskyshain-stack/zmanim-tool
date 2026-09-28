@@ -94,6 +94,29 @@ export function spreadIndexForNow(spreads, state, settings) {
   return found === -1 ? 0 : found;
 }
 
+/** The span of weeks the chart that is live right now actually reaches: from
+ *  CHART_EARLY_DAYS before its own first week to CHART_EARLY_DAYS before the next page's
+ *  first week, or forever on the last page there is. Anchored on real now, the same target
+ *  spreadIndexForNow asks, rather than on whatever week a caller happens to be looking at -
+ *  a week browsed away from today must not borrow "is a chart live" from whichever season
+ *  was live back then, which would send someone to today's chart under the belief it was
+ *  showing the week they were reading.
+ *
+ *  See hasChart in weekly-reader.js: a Yom Tov week with no row of its own is still worth
+ *  a live "Zmanim Chart" link once the next chart has come up seven days early and is
+ *  already showing something, rather than staying greyed out on a technicality now that
+ *  the chart itself no longer waits for that week to end. */
+export function liveChartRange(state, settings) {
+  const spreads = chartSpreads(state);
+  if (!spreads.length) return null;
+  const starts = spreads.map((s) => Math.min(...s.serials));
+  const at = spreadIndexForNow(spreads, state, settings);
+  return {
+    from: starts[at] - CHART_EARLY_DAYS,
+    until: at + 1 < starts.length ? starts[at + 1] - CHART_EARLY_DAYS : Infinity,
+  };
+}
+
 /** What a spread covers, for the line above the buttons: the first and last Shabbos on
  *  it, in both calendars, the way the week view names its week.
  *

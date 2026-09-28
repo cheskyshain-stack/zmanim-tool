@@ -1593,7 +1593,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
           <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
         </button>
-        <button type="button" id="week-today">Today</button>
+        <button type="button" id="week-today">This week</button>
         <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>

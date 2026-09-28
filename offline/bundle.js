@@ -15124,6 +15124,29 @@ function spreadIndexForNow(spreads, state, settings) {
   return found === -1 ? 0 : found;
 }
 
+/** The span of weeks the chart that is live right now actually reaches: from
+ *  CHART_EARLY_DAYS before its own first week to CHART_EARLY_DAYS before the next page's
+ *  first week, or forever on the last page there is. Anchored on real now, the same target
+ *  spreadIndexForNow asks, rather than on whatever week a caller happens to be looking at -
+ *  a week browsed away from today must not borrow "is a chart live" from whichever season
+ *  was live back then, which would send someone to today's chart under the belief it was
+ *  showing the week they were reading.
+ *
+ *  See hasChart in weekly-reader.js: a Yom Tov week with no row of its own is still worth
+ *  a live "Zmanim Chart" link once the next chart has come up seven days early and is
+ *  already showing something, rather than staying greyed out on a technicality now that
+ *  the chart itself no longer waits for that week to end. */
+function liveChartRange(state, settings) {
+  const spreads = chartSpreads(state);
+  if (!spreads.length) return null;
+  const starts = spreads.map((s) => Math.min(...s.serials));
+  const at = spreadIndexForNow(spreads, state, settings);
+  return {
+    from: starts[at] - CHART_EARLY_DAYS,
+    until: at + 1 < starts.length ? starts[at + 1] - CHART_EARLY_DAYS : Infinity,
+  };
+}
+
 /** What a spread covers, for the line above the buttons: the first and last Shabbos on
  *  it, in both calendars, the way the week view names its week.
  *
@@ -17808,15 +17831,19 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
   const canNext = at >= 0 && at < serials.length - 1;
   let hasSpecialSchedules = false;
   try { hasSpecialSchedules = currentOnePageSheets(state, settings).length > 0; } catch { /* Keep the weekly schedule available if a poster cannot be built. */ }
-  /* Whether /chart/ has anything at all for the week on screen - a row on the Shabbos
+  /* Whether /chart/ has anything worth sending this reader to - a row on the Shabbos
      season chart (entry.sheet) or, failing that, a row of its own on the Weekday chart
      (readerWeekIndex still carries that week's real parsha/label even with sheet:null;
-     see weekIndex in sheets/rows.js). A week neither chart has anything for is one
-     readerWeekIndex had to fill in itself to keep the run of Saturdays unbroken - parsha
-     '' and sheet null both - which is the one case worth telling apart from a genuine gap
-     week like שבוע של סוכות, itself carried by the Weekday chart alone. */
+     see weekIndex in sheets/rows.js), or, lacking either, a week the chart that is live
+     right now already reaches: the chart posts CHART_EARLY_DAYS before its own first date
+     (see liveChartRange in chart-view.js), so a Yom Tov week just ahead of a season's turn
+     can have the next chart already up even with no row of its own. Anchored on real now,
+     not on the week being read, so a week browsed away from today does not borrow "is a
+     chart live" from whichever season was live back then. */
   const showingEntry = index.get(showing);
-  const hasChart = !!(showingEntry && (showingEntry.sheet || showingEntry.week?.parsha));
+  const live = liveChartRange(state, settings);
+  const hasChart = !!(showingEntry && (showingEntry.sheet || showingEntry.week?.parsha))
+    || !!(live && showing >= live.from && showing < live.until);
   container.innerHTML=`<div class="weekly-reader">
     <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week of ${escAttr(date)}</p></header>
     <nav class="reader-schedule-links no-print" aria-label="Other schedules">
@@ -17826,7 +17853,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
       ${hasSpecialSchedules ? '<a class="schedule-link" href="/schedules/">Special Schedules <span class="chevron" aria-hidden="true">&rsaquo;</span></a>' : ''}
     </nav>
     <nav class="reader-nav no-print" aria-label="Other weeks">
-      <button id="reader-prev" ${canPrev?'':'disabled'}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${canNext?'':'disabled'}>Next →</button>
+      <button id="reader-prev" ${canPrev?'':'disabled'}>← Previous</button><button id="reader-today">This week</button><button id="reader-next" ${canNext?'':'disabled'}>Next →</button>
     </nav>
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
@@ -19429,7 +19456,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
           <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
         </button>
-        <button type="button" id="week-today">Today</button>
+        <button type="button" id="week-today">This week</button>
         <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
