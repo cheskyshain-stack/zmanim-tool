@@ -1531,13 +1531,14 @@ const DEFAULT_SETTINGS = {
   // whatever was last set, instead of resetting to a hardcoded default every time.
   sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
   /* Not a time default like the ones above, and not a per-cell override either: the Weekday
-     chart's 11:30 מעריב itself always runs now (sheets/weekday.js), regardless of this flag.
-     This only controls whether it prints with a "NEW" tag, and only where it actually is
-     new: page 1 of the winter (חורף) season current the moment the admin turned it on
-     (ui/settings-view.js, publish.js's firstWeekdayPageRangeForWinter - always חורף, since
-     BMG being in session is the only reason 11:30 was ever off the board and BMG's own
-     middle range is what a חורף season is), further narrowed to the weeks on that page BMG
-     is actually in session on. A week BMG is already out of session had 11:30 all along.
+     chart's 11:30 מעריב runs every week of קיץ now (sheets/weekday.js), regardless of BMG,
+     and not at all in חורף - this flag never touches that. It only controls whether 11:30
+     prints with a "NEW" tag, and only where it actually is new: page 1 of the summer (קיץ)
+     season current the moment the admin turned it on (ui/settings-view.js, publish.js's
+     firstWeekdayPageRangeForSummer - always קיץ, since BMG being in session is the only
+     reason a קיץ week would not already have had 11:30 and BMG's own middle range reaches
+     into קיץ too, ר"ח אייר -> ט' באב), further narrowed to the weeks on that page BMG is
+     actually in session on. A week BMG is already out of session had 11:30 all along.
      Turning it back off just hides the tag; it does not touch the minyan itself. */
   newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
 };
@@ -2559,17 +2560,25 @@ function nextAvailableYearFor(season, settings) {
  *  (below), which wants the *next* season instead, and reused by
  *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
  *  the wall right now" asks this rather than working the boundaries out again. */
-function currentSeasonAndYear(settings) {
-  const today = excelSerial(new Date());
-  const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+function currentSeasonAndYear(settings, anchor = excelSerial(new Date())) {
+  const y0 = hebrewDateExtended(anchor, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);
   const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
 
-  if (today < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
-  if (today < pesachY0) return { season: 'choref', hebrewYear: y0 };
-  if (today < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
+  if (anchor < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
+  if (anchor < pesachY0) return { season: 'choref', hebrewYear: y0 };
+  if (anchor < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
   return { season: 'choref', hebrewYear: y0 + 1 };
+}
+
+/** Whether a given date's own week is inside a קיץ season's span (Pesach through the day
+ *  before the Sukkos after it) rather than a חורף one - a week's own date decides this,
+ *  not which sheet happens to be printing it. Used by sheets/weekday.js's own 11:30 מעריב,
+ *  which runs in קיץ only (see settings.js's newMinyanBadge): the Weekday chart has no
+ *  קיץ/חורף variants of its own, so this is how it can still tell the two apart. */
+function isKayitzWeek(serial, settings) {
+  return currentSeasonAndYear(settings, serial).season === 'kayitz';
 }
 
 /** Which season+year the Generate form should default to: the *next* season
@@ -2736,16 +2745,16 @@ async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
 }
 
-/** Page 1 of the Weekday chart for the soonest חורף season, as a Shabbos-anchored serial
+/** Page 1 of the Weekday chart for the soonest קיץ season, as a Shabbos-anchored serial
  *  range (its first week through its last). The only caller is settings-view.js, the
  *  moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js).
  *
- *  Always חורף, never קיץ: the badge only ever marks a week where BMG being in session
- *  actually kept 11:30 off the board before (see the bmg check in maarivParts), and BMG's
- *  own middle range (ר"ח חשון -> ז' ניסן) is what a חורף season is. `nextAvailableYearFor`
- *  rather than "whichever season contains today" so a switch flipped on the last day of a
- *  קיץ season pins to the חורף about to start, not a קיץ page that already went to print
- *  months ago and has nothing to do with BMG at all.
+ *  Always קיץ, never חורף: 11:30 runs in קיץ only now (sheets/weekday.js), and the badge
+ *  only ever marks a week BMG being in session kept it off the board before that (see the
+ *  bmg check in maarivParts) - BMG's own middle range reaches into קיץ too, ר"ח אייר ->
+ *  ט' באב. `nextAvailableYearFor` rather than "whichever season contains today" so a
+ *  switch flipped on the last day of a חורף season pins to the קיץ about to start, not a
+ *  חורף page that already went to print months ago.
  *
  *  Captures which weeks were page 1 right when the switch was turned on, so the badge
  *  stays pinned to that one season even once a later one becomes current - not whichever
@@ -2753,9 +2762,9 @@ async function unpublishFromSite() {
  *  the badge forward every time a new season starts. Mirrors buildAutomaticCharts's own
  *  page-1 arithmetic (defaultPageSizes, alignPageSizesTo) rather than a size guessed
  *  independently, so the range matches the real printed chart's actual first page. */
-function firstWeekdayPageRangeForWinter(settings, tables) {
+function firstWeekdayPageRangeForSummer(settings, tables) {
   const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
-  const season = 'choref';
+  const season = 'kayitz';
   const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
   const sizes = defaultPageSizes(weeks.length, 3, season);
@@ -6781,6 +6790,7 @@ function buildVasikinPoster(year, settings, which = 'rh') {
 
 
 
+
 /** Times are handled in whole minutes after midnight rather than Excel day-fractions,
  *  because every zman on this chart sits on a 5-minute grid and the moves below are
  *  defined in minutes. It also lets מעריב 12:00 be 1440 (end of day) instead of 0, which
@@ -6996,11 +7006,13 @@ function place845(mins) {
  *
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs every week. */
+ *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs in קיץ only,
+ *  regardless of BMG (see isKayitzWeek below), and not at all in חורף. */
 function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
   const bmg = isBmgWeek(week.serial, settings);
+  const kayitz = isKayitzWeek(week.serial, settings);
 
   // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
   // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
@@ -7010,13 +7022,14 @@ function maarivParts(week, settings) {
 
   // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
   // (ui/settings-view.js), only for the season it was pinned to the moment that happened
-  // (publish.js's firstWeekdayPageRangeForWinter), never whatever season happens to be
+  // (publish.js's firstWeekdayPageRangeForSummer), never whatever season happens to be
   // current when the chart is later printed, and only on a week `bmg` is holding true:
-  // that is the actual, only reason 11:30 was not printing here before this change, so a
-  // week BMG is already out of session had 11:30 all along and calling it new would be
-  // wrong. See settings.js's newMinyanBadge.
+  // BMG being in session is the only reason a קיץ week would not already have had 11:30
+  // before this change (BMG's own middle range reaches into קיץ too, ר"ח אייר -> ט' באב),
+  // so a week BMG is already out of session had 11:30 all along and calling it new would
+  // be wrong. See settings.js's newMinyanBadge.
   const badge = settings.newMinyanBadge;
-  const showNewBadge = !!(badge?.on && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+  const showNewBadge = !!(badge?.on && kayitz && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
 
   const slots = [
     { mins: HM(18, 35) },
@@ -7028,9 +7041,9 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    // No longer BMG-gated like 12:00 below it: this one runs every week now. See the
-    // note over newMinyanBadge in settings.js for the "NEW" tag it can carry.
-    { mins: HM(23, 30), isNewMinyan: true },
+    // קיץ only, regardless of BMG; off entirely in חורף. See the note over
+    // newMinyanBadge in settings.js for the "NEW" tag this slot can carry in קיץ.
+    { mins: HM(23, 30), isNewMinyan: true, offSeason: kayitz ? null : 'offered only in the summer (קיץ) months' },
     { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
@@ -7069,7 +7082,7 @@ function maarivParts(week, settings) {
   const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
   const trace = (slot) => slotTrace(slot, {
     label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it'
-      : slot.isNewMinyan ? 'the 11:30 מנין, which now runs every week rather than only while BMG is out of session'
+      : slot.isNewMinyan ? 'the 11:30 מנין, which runs every week of קיץ regardless of BMG and not at all in חורף'
       : 'one of the standing מעריב times'),
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
@@ -16627,7 +16640,7 @@ function renderSettings(container, state, tables, onSave, onStateReplaced, onRul
       <details class="panel">
         <summary>Weekday chart</summary>
         <div class="panel-body">
-        <p class="hint">The 11:30 מעריב always runs now, every week, regardless of BMG. This only controls the "NEW" tag that flags it on the chart, and only on weeks where it actually is new: page 1 of the winter (חורף) season current the moment you turn it on, and only the weeks on it where BMG is in session, since those are the only weeks 11:30 was not already printing. Later pages, every season after, and any week BMG is out of session print 11:30 plain. Turning it back off just hides the tag.</p>
+        <p class="hint">The 11:30 מעריב runs every week of the summer (קיץ) chart now, regardless of BMG, and not at all in winter (חורף). This only controls the "NEW" tag that flags it on the chart, and only on weeks where it actually is new: page 1 of the summer season current the moment you turn it on, and only the weeks on it where BMG is in session, since those are the only weeks 11:30 was not already printing. Later pages, every season after, and any week BMG is out of session print 11:30 plain. Turning it back off just hides the tag.</p>
         <label><input type="checkbox" name="newMinyanBadgeOn" ${badge.on ? 'checked' : ''}> Show the "NEW" tag on 11:30 מעריב</label>
         ${badge.on && badge.firstSerial != null
           ? `<p class="hint">Pinned to ${escAttr(dateFromSerial(badge.firstSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))} through ${escAttr(dateFromSerial(badge.lastSerial).toLocaleDateString('en-US', { timeZone: 'UTC' }))}.</p>`
@@ -16738,7 +16751,7 @@ function renderSettings(container, state, tables, onSave, onStateReplaced, onRul
 function nextNewMinyanBadge(badge, nowOn, settings, tables) {
   if (!nowOn) return { on: false, firstSerial: badge.firstSerial ?? null, lastSerial: badge.lastSerial ?? null };
   if (badge.on) return { ...badge }; // already on - keep the range it was pinned to
-  const range = firstWeekdayPageRangeForWinter(settings, tables);
+  const range = firstWeekdayPageRangeForSummer(settings, tables);
   return range ? { on: true, firstSerial: range.firstSerial, lastSerial: range.lastSerial } : { on: false, firstSerial: null, lastSerial: null };
 }
 

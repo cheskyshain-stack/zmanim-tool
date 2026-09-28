@@ -158,16 +158,16 @@ export async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
 }
 
-/** Page 1 of the Weekday chart for the soonest חורף season, as a Shabbos-anchored serial
+/** Page 1 of the Weekday chart for the soonest קיץ season, as a Shabbos-anchored serial
  *  range (its first week through its last). The only caller is settings-view.js, the
  *  moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js).
  *
- *  Always חורף, never קיץ: the badge only ever marks a week where BMG being in session
- *  actually kept 11:30 off the board before (see the bmg check in maarivParts), and BMG's
- *  own middle range (ר"ח חשון -> ז' ניסן) is what a חורף season is. `nextAvailableYearFor`
- *  rather than "whichever season contains today" so a switch flipped on the last day of a
- *  קיץ season pins to the חורף about to start, not a קיץ page that already went to print
- *  months ago and has nothing to do with BMG at all.
+ *  Always קיץ, never חורף: 11:30 runs in קיץ only now (sheets/weekday.js), and the badge
+ *  only ever marks a week BMG being in session kept it off the board before that (see the
+ *  bmg check in maarivParts) - BMG's own middle range reaches into קיץ too, ר"ח אייר ->
+ *  ט' באב. `nextAvailableYearFor` rather than "whichever season contains today" so a
+ *  switch flipped on the last day of a חורף season pins to the קיץ about to start, not a
+ *  חורף page that already went to print months ago.
  *
  *  Captures which weeks were page 1 right when the switch was turned on, so the badge
  *  stays pinned to that one season even once a later one becomes current - not whichever
@@ -175,9 +175,9 @@ export async function unpublishFromSite() {
  *  the badge forward every time a new season starts. Mirrors buildAutomaticCharts's own
  *  page-1 arithmetic (defaultPageSizes, alignPageSizesTo) rather than a size guessed
  *  independently, so the range matches the real printed chart's actual first page. */
-export function firstWeekdayPageRangeForWinter(settings, tables) {
+export function firstWeekdayPageRangeForSummer(settings, tables) {
   const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
-  const season = 'choref';
+  const season = 'kayitz';
   const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
   const sizes = defaultPageSizes(weeks.length, 3, season);

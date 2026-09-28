@@ -172,17 +172,25 @@ export function nextAvailableYearFor(season, settings) {
  *  (below), which wants the *next* season instead, and reused by
  *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
  *  the wall right now" asks this rather than working the boundaries out again. */
-export function currentSeasonAndYear(settings) {
-  const today = excelSerial(new Date());
-  const y0 = hebrewDateExtended(today, settings.useGregorianBefore1582).year;
+export function currentSeasonAndYear(settings, anchor = excelSerial(new Date())) {
+  const y0 = hebrewDateExtended(anchor, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);
   const sukkosY0plus1 = dateFromHebrew(15, 7, y0 + 1);
 
-  if (today < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
-  if (today < pesachY0) return { season: 'choref', hebrewYear: y0 };
-  if (today < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
+  if (anchor < sukkosY0) return { season: 'kayitz', hebrewYear: y0 - 1 }; // still in last cycle's קיץ - Sukkos(y0) hasn't happened yet
+  if (anchor < pesachY0) return { season: 'choref', hebrewYear: y0 };
+  if (anchor < sukkosY0plus1) return { season: 'kayitz', hebrewYear: y0 };
   return { season: 'choref', hebrewYear: y0 + 1 };
+}
+
+/** Whether a given date's own week is inside a קיץ season's span (Pesach through the day
+ *  before the Sukkos after it) rather than a חורף one - a week's own date decides this,
+ *  not which sheet happens to be printing it. Used by sheets/weekday.js's own 11:30 מעריב,
+ *  which runs in קיץ only (see settings.js's newMinyanBadge): the Weekday chart has no
+ *  קיץ/חורף variants of its own, so this is how it can still tell the two apart. */
+export function isKayitzWeek(serial, settings) {
+  return currentSeasonAndYear(settings, serial).season === 'kayitz';
 }
 
 /** Which season+year the Generate form should default to: the *next* season

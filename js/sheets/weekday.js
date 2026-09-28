@@ -35,6 +35,7 @@ import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '.
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
+import { isKayitzWeek } from './weeks.js';
 import { formatTime, underlineTime, newMinyanTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
@@ -254,11 +255,13 @@ function place845(mins) {
  *
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs every week. */
+ *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs in קיץ only,
+ *  regardless of BMG (see isKayitzWeek below), and not at all in חורף. */
 function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
   const bmg = isBmgWeek(week.serial, settings);
+  const kayitz = isKayitzWeek(week.serial, settings);
 
   // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
   // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
@@ -268,13 +271,14 @@ function maarivParts(week, settings) {
 
   // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
   // (ui/settings-view.js), only for the season it was pinned to the moment that happened
-  // (publish.js's firstWeekdayPageRangeForWinter), never whatever season happens to be
+  // (publish.js's firstWeekdayPageRangeForSummer), never whatever season happens to be
   // current when the chart is later printed, and only on a week `bmg` is holding true:
-  // that is the actual, only reason 11:30 was not printing here before this change, so a
-  // week BMG is already out of session had 11:30 all along and calling it new would be
-  // wrong. See settings.js's newMinyanBadge.
+  // BMG being in session is the only reason a קיץ week would not already have had 11:30
+  // before this change (BMG's own middle range reaches into קיץ too, ר"ח אייר -> ט' באב),
+  // so a week BMG is already out of session had 11:30 all along and calling it new would
+  // be wrong. See settings.js's newMinyanBadge.
   const badge = settings.newMinyanBadge;
-  const showNewBadge = !!(badge?.on && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
+  const showNewBadge = !!(badge?.on && kayitz && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
 
   const slots = [
     { mins: HM(18, 35) },
@@ -286,9 +290,9 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    // No longer BMG-gated like 12:00 below it: this one runs every week now. See the
-    // note over newMinyanBadge in settings.js for the "NEW" tag it can carry.
-    { mins: HM(23, 30), isNewMinyan: true },
+    // קיץ only, regardless of BMG; off entirely in חורף. See the note over
+    // newMinyanBadge in settings.js for the "NEW" tag this slot can carry in קיץ.
+    { mins: HM(23, 30), isNewMinyan: true, offSeason: kayitz ? null : 'offered only in the summer (קיץ) months' },
     { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
@@ -327,7 +331,7 @@ function maarivParts(week, settings) {
   const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
   const trace = (slot) => slotTrace(slot, {
     label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it'
-      : slot.isNewMinyan ? 'the 11:30 מנין, which now runs every week rather than only while BMG is out of session'
+      : slot.isNewMinyan ? 'the 11:30 מנין, which runs every week of קיץ regardless of BMG and not at all in חורף'
       : 'one of the standing מעריב times'),
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
