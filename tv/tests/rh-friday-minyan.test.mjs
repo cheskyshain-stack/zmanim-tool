@@ -60,10 +60,14 @@ test('2028 Friday next-minyan uses 6:37 Mincha and downstairs 7:42 Maariv at exa
  const cases=[
   ['2028-09-22T22:36:59.999Z','6:37','2028-09-22T22:37:00.000Z','בית מדרש'],
   ['2028-09-22T22:37:00.000Z','6:37','2028-09-22T22:37:00.000Z','בית מדרש'],
-  ['2028-09-22T22:37:00.001Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
+  ['2028-09-22T22:37:00.001Z','6:37','2028-09-22T22:37:00.000Z','בית מדרש'],
+  ['2028-09-22T22:42:00.000Z','6:37','2028-09-22T22:37:00.000Z','בית מדרש'],
+  ['2028-09-22T22:42:00.001Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
   ['2028-09-22T23:41:59.999Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
   ['2028-09-22T23:42:00.000Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
-  ['2028-09-22T23:42:00.001Z','7:30','2028-09-23T11:30:00.000Z','למטה'],
+  ['2028-09-22T23:42:00.001Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
+  ['2028-09-22T23:47:00.000Z','7:42','2028-09-22T23:42:00.000Z','למטה'],
+  ['2028-09-22T23:47:00.001Z','7:30','2028-09-23T11:30:00.000Z','למטה'],
  ];
  const seed=createOfflineSeed([],{mode:'dark',darkStart:'19:00',lightStart:'07:00'},at(friday));
  for(const [instant,time,eventAt,place] of cases){
@@ -90,7 +94,9 @@ test('an explicit published Maariv selection still overrides the connected Frida
    assert.equal(controlled.next.time,'7:53');
    assert.equal(controlled.next.at,'2028-09-22T23:53:00.000Z');
    assert.equal(controlled.next.place,'בית מדרש');
-   const second=scheduleSnapshot('2028-09-22T23:53:00.001Z',[control]).next;
+   for(const at of ['2028-09-22T23:53:00.001Z','2028-09-22T23:58:00.000Z'])
+    assert.deepEqual(scheduleSnapshot(at,[control]).next,controlled.next,'The published override remains selected through its five-minute grace');
+   const second=scheduleSnapshot('2028-09-22T23:58:00.001Z',[control]).next;
    assert.deepEqual({time:second.time,at:second.at,place:second.place},{time:'8:05',at:'2028-09-23T00:05:00.000Z',place:'למטה'});
   }
  }

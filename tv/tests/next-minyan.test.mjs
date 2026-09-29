@@ -9,7 +9,14 @@ test('next minyan preserves schedule time and location with a New York period an
   assert.doesNotMatch(html,/<svg|<img|⏳/);
   assert.ok(nextMinyanHTML(next,'2026-09-29T01:59:00Z').includes('in 1 hour 1 minute'));
   assert.ok(nextMinyanHTML(next,'2026-09-29T02:59:01Z').includes('in 1 minute'));
-  assert.ok(nextMinyanHTML(next,next.at).includes('Starting now'));
+  assert.ok(nextMinyanHTML(next,next.at).includes('>now</p>'));
+});
+test('a just-started minyan retains its name, location and time through five minutes',()=>{
+  for(const elapsed of [1,60000,299999,300000]){
+    const html=nextMinyanHTML(next,new Date(Date.parse(next.at)+elapsed).toISOString());
+    for(const text of ['מעריב','למטה','11:00','PM','>now</p>'])assert.ok(html.includes(text),`${elapsed}: ${text}`);
+    assert.doesNotMatch(html,/in -|No further minyan/);
+  }
 });
 test('midnight, noon and daylight saving use the actual instant for AM/PM',()=>{
   for(const [at,period] of [['2026-09-29T04:00:00Z','AM'],['2026-09-29T16:00:00Z','PM'],['2026-11-01T06:30:00Z','AM']]) {
@@ -18,7 +25,7 @@ test('midnight, noon and daylight saving use the actual instant for AM/PM',()=>{
 });
 test('missing and expired minyan times do not display a stale countdown',()=>{
   for(const value of [null,{...next,at:'invalid'},next]){
-    const html=nextMinyanHTML(value,'2026-09-29T03:00:01Z');
+    const html=nextMinyanHTML(value,'2026-09-29T03:05:00.001Z');
     assert.match(html,/No further minyan/);
     assert.doesNotMatch(html,/next-countdown|NaN/);
   }

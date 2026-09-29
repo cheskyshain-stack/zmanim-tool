@@ -46,7 +46,7 @@ test('the combined occasion page retains the connected RH and Shabbos window thr
 
 test('offline and server snapshots agree across the attached Shabbos retention boundary',()=>{
  const at='2028-09-23T16:00:00.000Z',seed=createOfflineSeed([],{mode:'dark',darkStart:'19:00',lightStart:'07:00'},at);
- assert.match(seed.engine,/^shul-calendar-v6-/);
+ assert.match(seed.engine,/^shul-calendar-v7-/);
  const sheet=scheduleSnapshot(at).specialSheet;
  for(const instant of [sheet.previewStartsAt,at,new Date(Date.parse(sheet.endsAt)-1).toISOString(),sheet.endsAt])
   assert.deepEqual(offlineSnapshot(seed,instant).schedule,scheduleSnapshot(instant));

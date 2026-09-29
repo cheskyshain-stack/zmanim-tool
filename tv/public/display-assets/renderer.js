@@ -3,6 +3,7 @@ import { boardSchedules, usesCholHamoedAnnouncementArea } from './board-schedule
 import { groupAnnouncements, groupCholHamoedAnnouncements, renderAnnouncementGroup } from './announcements.js';
 import { themeAt } from './appearance.js';
 import { layoutFixedBoard } from './board-layout.js';
+import { MINYAN_HOLD_MS } from './minyan-timing.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
@@ -25,9 +26,9 @@ const nextPeriod = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York'
 export function nextMinyanHTML(next, instant) {
   const remaining = Date.parse(next?.at) - Date.parse(instant);
   const label = '<div class="next-label">NEXT MINYAN</div>';
-  if (!Number.isFinite(remaining) || remaining < 0) return label + '<p class="next-empty">No further minyan in the loaded schedule</p>';
+  if (!Number.isFinite(remaining) || remaining < -MINYAN_HOLD_MS) return label + '<p class="next-empty">No further minyan in the loaded schedule</p>';
   const minutes = Math.ceil(remaining / 60000), hours = Math.floor(minutes / 60), rest = minutes % 60;
-  const countdown = !minutes ? 'Starting now' : hours
+  const countdown = remaining <= 0 ? 'now' : hours
     ? `in ${hours} hour${hours === 1 ? '' : 's'}${rest ? ` ${rest} minute${rest === 1 ? '' : 's'}` : ''}`
     : `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
   const period = nextPeriod.formatToParts(new Date(next.at)).find(part => part.type === 'dayPeriod')?.value || '';

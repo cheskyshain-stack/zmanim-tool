@@ -49,8 +49,9 @@ test('offline calendar matches authoritative next minyan, midnight and sheet pla
  assert.equal(offlineSnapshot(seed,localToISO('2026-09-26T00:00')).schedule.date,'2026-09-26');
  const at=offlineSnapshot(seed,localToISO('2026-09-25T08:00')).schedule.next.at;
  const onBoundary=offlineSnapshot(seed,at);
- assert.equal(onBoundary.nextChangeAt,new Date(Date.parse(at)+1).toISOString());
- assert.notEqual(offlineSnapshot(seed,Date.parse(at)+1000).schedule.next.at,at);
+ assert.equal(onBoundary.nextChangeAt,new Date(Date.parse(at)+300001).toISOString());
+ assert.equal(offlineSnapshot(seed,Date.parse(at)+300000).schedule.next.at,at);
+ assert.notEqual(offlineSnapshot(seed,Date.parse(at)+300001).schedule.next.at,at);
 });
 test('offline seed endpoint remains public but never exposes drafts or credentials',async()=>{
  const at=new Date().toISOString(),future=new Date(Date.now()+86400000).toISOString();

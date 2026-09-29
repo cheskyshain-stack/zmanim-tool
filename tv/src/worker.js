@@ -5,6 +5,7 @@ import { actor, allow, ApiError, CAPABILITIES } from "./auth.js";
 import { validate, conflicts, publicItem, publicItems, warnings, text } from "./model.js";
 import { scheduleSnapshot, catalog, dateInfo, previewMonth } from "./schedules.js";
 import { phase, localStamp } from "../public/display-assets/time.js";
+import {nextMinyanChangeAt} from '../public/display-assets/minyan-timing.js';
 const json = (x, status = 200) => Response.json(x, { status });
 const decode = (r) => ({ id: r.id, kind: r.kind, status: r.status, internalName: r.internal_name, title: r.title, startsAt: r.starts_at, endsAt: r.ends_at, data: JSON.parse(r.data_json), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by, updatedBy: r.updated_by });
 const list = async (db) => (await db.prepare("SELECT * FROM display_items ORDER BY updated_at DESC").all()).results.map(decode);
@@ -41,7 +42,8 @@ async function snapshot(items, at, preview = false, appearance) {
   const today = dateInfo(schedule.date);
   boundaries.push(today.civilEnd);
   if (today.sunset > at) boundaries.push(today.sunset);
-  if (schedule.next) boundaries.push(schedule.next.at);
+  const minyanChangeAt = nextMinyanChangeAt(schedule.next);
+  if (minyanChangeAt > at) boundaries.push(minyanChangeAt);
   if (schedule.nextChangeAt && schedule.nextChangeAt > at) boundaries.push(schedule.nextChangeAt);
   return { appearance, theme: themeAt(appearance, at), at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at) : [] };
 }

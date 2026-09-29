@@ -46,6 +46,36 @@ try{
  for(const asset of ['/tv/shortcut-small.webmanifest','/tv/icons/shortcut-small-icon-192.png','/tv/icons/shortcut-small-icon-512.png','/tv/icons/shortcut-small-apple-touch-icon.png'])assert.ok(data.paths.includes(asset),`${asset} stays available offline`);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({offlineReload:true,publishedTiming:true,themeTransition:true,midnight:true,sheetPlacement:true,publicFilesCached:data.paths.length,errors}));
  await context.close();
+ // The actual public page keeps a just-started minyan while disconnected, then
+ // changes on its five-minute boundary without blanking or waiting for a poll.
+ const retainedStart=Date.parse('2026-09-29T17:20:00.000Z');
+ const retainedAt=new Date(retainedStart-30000).toISOString();
+ const retainedSeed=createOfflineSeed([],{mode:'light',darkStart:'19:00',lightStart:'07:00'},retainedAt);
+ const retainedContext=await browser.newContext({viewport:{width:1920,height:1080}}),retainedPage=await retainedContext.newPage();
+ const retainedErrors=[];retainedPage.on('pageerror',error=>retainedErrors.push(error.message));
+ await retainedPage.clock.install({time:new Date(retainedAt)});
+ await retainedPage.route(origin+'/api/display/offline',route=>route.fulfill({json:retainedSeed}));
+ await retainedPage.goto(origin+'/tv/');
+ await retainedPage.waitForFunction(()=>document.querySelector('.next-time')?.textContent.includes('1:20'));
+ assert.equal(await retainedPage.locator('.next-countdown').textContent(),'in 1 minute');
+ const retainedTime=await retainedPage.locator('.next-time').textContent();
+ const retainedPlace=await retainedPage.locator('.next-place').textContent();
+ await retainedContext.setOffline(true);await retainedPage.unroute(origin+'/api/display/offline');
+ for(const elapsed of [0,120000,298000]){
+   await retainedPage.clock.setSystemTime(new Date(retainedStart+elapsed));
+   await retainedPage.clock.runFor(1100);
+   assert.equal(await retainedPage.locator('.next-time').textContent(),retainedTime,`${elapsed}: original time stays`);
+   assert.equal(await retainedPage.locator('.next-place').textContent(),retainedPlace,`${elapsed}: original location stays`);
+   assert.equal(await retainedPage.locator('.next-countdown').textContent(),'now');
+ }
+ await retainedPage.clock.setSystemTime(new Date(retainedStart+300001));
+ await retainedPage.clock.runFor(1100);
+ assert.notEqual(await retainedPage.locator('.next-time').textContent(),retainedTime);
+ assert.ok((await retainedPage.locator('.next-time').textContent()).includes('1:35'));
+ assert.equal(await retainedPage.locator('.next-empty').count(),0);
+ assert.deepEqual(retainedErrors,[]);
+ console.log(JSON.stringify({offlineFiveMinuteHold:true,advancesOnNextTick:true}));
+ await retainedContext.close();
  // A first visit with no cache must recover without replacing the stable
  // renderer's nodes, even when the initial endpoint request fails.
  const fresh=await browser.newContext({viewport:{width:1920,height:1080}}),recovery=await fresh.newPage();

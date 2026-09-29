@@ -19,6 +19,7 @@ import { buildSukkosPoster } from "../../js/posters/sukkos.js";
 import { buildPesachPoster } from "../../js/posters/pesach.js";
 import { buildTzomGedaliaPoster } from "../../js/posters/tzomgedalia.js";
 import { localToISO, localStamp, visible } from "../public/display-assets/time.js";
+import { MINYAN_HOLD_MS } from '../public/display-assets/minyan-timing.js';
 export const settings = resolveSettings({ ...DEFAULT_SETTINGS, ...config.settings, timezoneId: "America/New_York" });
 const tables = { parshaChutz, parshaEY, parshaNames, specialDays };
 const builders = { rh: ["Rosh Hashana", buildRoshHashanaPoster], yk: ["Yom Kippur", buildYomKippurPoster], sukkos: ["Sukkos", buildSukkosPoster], pesach: ["Pesach", buildPesachPoster], gedalia: ["Tzom Gedalia", buildTzomGedaliaPoster] };
@@ -50,7 +51,7 @@ const sheetCatalogs = /* @__PURE__ */ new Map();
 const sheetTimelines = /* @__PURE__ */ new Map();
 const highHolidaySheets = /* @__PURE__ */ new WeakMap();
 const sheetTitles = {rh:'ראש השנה',yk:'יום כיפור',sukkos:'סוכות',pesach:'פסח',gedalia:'צום גדליה'};
-const RETAIN_MS = 5 * 60000;
+const RETAIN_MS = MINYAN_HOLD_MS;
 let cachedYear, cachedState;
 
 // Calendar dates and resolved minyan events are the source of display boundaries.
@@ -261,7 +262,10 @@ export function scheduleSnapshot(instant, controls = []) {
     return result;
   };
   const days = Array.from({ length: 9 }, (_, i) => day(serial + i));
-  const next = days.flatMap((d) => d.events).filter((e) => !e.auxiliary && e.at >= instant).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
+  // Yesterday can own a midnight Maariv. Its hold continues across the date
+  // change without changing today's schedule or any resolved special overrides.
+  const earliest = Date.parse(instant) - MINYAN_HOLD_MS;
+  const next = [day(serial - 1), ...days].flatMap((d) => d.events).filter((e) => !e.auxiliary && Date.parse(e.at) >= earliest).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
   // Keep the full civil week and extend each sacred block across week boundaries.
   const weekStart = serial - (excelWeekday(serial) - 1);
   const week = Array.from({length:7}, (_,i)=>day(weekStart+i));

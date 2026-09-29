@@ -2,6 +2,7 @@ import {scheduleSnapshot,dateInfo} from '../../src/schedules.js';
 import {OFFLINE_ENGINE} from '../../src/offline-seed.js';
 import {themeAt} from './appearance.js';
 import {visible} from './time.js';
+import {nextMinyanChangeAt} from './minyan-timing.js';
 
 export {OFFLINE_ENGINE};
 export function validSeed(seed){
@@ -14,9 +15,9 @@ export function offlineSnapshot(seed,now=Date.now()){
   const boundaries=seed.items.flatMap(i=>[i.startsAt,i.endsAt,i.data.previewAt]).filter(x=>x&&x>at);
   boundaries.push(today.civilEnd);
   if(today.sunset>at)boundaries.push(today.sunset);
-  // At the exact scheduled instant the shared engine still includes that minyan.
-  // Recompute just after it, so the next-minyan strip never waits another minute.
-  if(schedule.next?.at>=at)boundaries.push(new Date(Date.parse(schedule.next.at)+1).toISOString());
+  // The congregation card keeps the current minyan through its five-minute hold.
+  const minyanChangeAt=nextMinyanChangeAt(schedule.next);
+  if(minyanChangeAt>at)boundaries.push(minyanChangeAt);
   if(schedule.nextChangeAt>at)boundaries.push(schedule.nextChangeAt);
   const publicItem=({status,...item})=>item;
   return {appearance:seed.appearance,theme:themeAt(seed.appearance,at),at,generatedAt:seed.generatedAt,nextChangeAt:boundaries.sort()[0]||null,
