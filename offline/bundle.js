@@ -8343,7 +8343,7 @@ function hoshanaRabbaText(poster) {
   const morning = ytLine(block, 'hoshanaShacharis');
   const times = (morning?.times || []).filter((time) => time?.text)
     .map((time) => time.text + ytWhere(time));
-  if (times.length && morning?.netz) times.splice(1, 0, `NETZ ${morning.netz}`);
+  if (times.length && morning?.netz) times[0] += ` [NETZ ${morning.netz}]`;
   if (times.length) lines.push(`Shacharis: ${times.join(', ')}`);
   return lines.length > 1 ? lines.join('\n') : '';
 }

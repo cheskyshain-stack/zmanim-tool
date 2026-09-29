@@ -13,9 +13,9 @@ const row = (p, calc) => rows(p).find((r) => r.calc === calc);
 test('the sample matches the 5786 sheet, while 5787 uses its own morning times', () => {
   const night = 'MISHNA TORAH in the Ezras Nashim at 8:00 PM, followed by Maariv';
   assert.equal(hoshanaRabbaText(poster(5786)),
-    `Hoshana Rabba\n${night}\nShacharis: 6:30d, NETZ 7:06, 7:30m, 8:20sh`);
+    `Hoshana Rabba\n${night}\nShacharis: 6:30d [NETZ 7:06], 7:30m, 8:20sh`);
   assert.equal(hoshanaRabbaText(poster()),
-    `Hoshana Rabba\n${night}\nShacharis: 6:18d, NETZ 6:54, 7:30m, 8:20sh`);
+    `Hoshana Rabba\n${night}\nShacharis: 6:18d [NETZ 6:54], 7:30m, 8:20sh`);
 });
 
 test('changed sheet times and room marks reach the message', () => {
@@ -27,7 +27,7 @@ test('changed sheet times and room marks reach the message', () => {
   assert.equal(hoshanaRabbaText(p), [
     'Hoshana Rabba',
     'MISHNA TORAH in the Simcha Hall at 8:15 PM, followed by Maariv',
-    'Shacharis: 6:25d, NETZ 7:01, 7:45en',
+    'Shacharis: 6:25d [NETZ 7:01], 7:45en',
   ].join('\n'));
 });
 
@@ -53,7 +53,7 @@ test('NETZ metadata stays identical to the printed note across twenty years', ()
     const p = poster(year);
     const morning = row(p, 'hoshanaShacharis');
     assert.equal(morning.note, `(${SK_TEXT.netz} ${morning.netz})`, String(year));
-    assert.ok(hoshanaRabbaText(p).includes(`NETZ ${morning.netz}`), String(year));
+    assert.ok(hoshanaRabbaText(p).includes(`[NETZ ${morning.netz}]`), String(year));
     assert.equal((hoshanaRabbaText(p).match(/followed by Maariv/g) || []).length, 1);
   }
 });

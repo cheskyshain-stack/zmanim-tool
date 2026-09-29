@@ -39,7 +39,7 @@ const server = http.createServer((req, res) => {
         assert.equal(await message.inputValue(), [
           'Hoshana Rabba',
           'MISHNA TORAH in the Ezras Nashim at 8:00 PM, followed by Maariv',
-          'Shacharis: 6:18d, NETZ 6:54, 7:30m, 8:20sh',
+          'Shacharis: 6:18d [NETZ 6:54], 7:30m, 8:20sh',
         ].join('\n'));
       }
       assert.deepEqual(errors, [], date);
