@@ -32,7 +32,7 @@ import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildWeekdayRow } from '../sheets/weekday.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
-import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText, hoshanaRabbaText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
@@ -374,6 +374,22 @@ function txErevShminiAtzeres(year, settings, today) {
   };
 }
 
+/** Hoshana Rabba starts the previous evening and remains through its own morning/day. */
+function txHoshanaRabba(year, settings, today) {
+  const day = dateFromHebrew(21, 7, year);
+  if (!txDaysInWindow(day - 1, day, today)) return null;
+  const text = hoshanaRabbaText(buildSukkosPoster(year, settings));
+  if (!text) return null;
+  return {
+    id: `hoshana-rabba-${year}`,
+    kind: 'yomtov',
+    serial: day - 1,
+    name: 'Hoshana Rabba',
+    when: hebrewYear(year),
+    text,
+  };
+}
+
 /** The חול המועד סוכות message.
  *
  *  Windowed on the everyday חול המועד days themselves (sukkosChmDays - the same days the
@@ -691,6 +707,7 @@ export function renderTexts(container, state, settings, tables) {
       txErevYomKippur(year, settings, today),
       txErevSukkos(year, settings, today),
       txCholHamoedSukkos(year, settings, today),
+      txHoshanaRabba(year, settings, today),
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
       txCholHamoedPesach(year, settings, today),

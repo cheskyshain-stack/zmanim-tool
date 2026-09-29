@@ -755,8 +755,10 @@ export function buildSukkosPoster(year, settings) {
      rather than a ruled box at the foot of a column, which is where it was and which put the
      one part of the sheet that is a week rather than a day into a frame of its own. */
   const hoshana = day(SK_HOSHANA);
+  const hoshanaSunrise = skNetz(hoshana, settings);
+  const hoshanaNetz = formatTime(hoshanaSunrise);
   const hoshanaTimes = [
-    tmT(zman('נץ', skNetz(hoshana, settings), 'הושענא רבה\'s own sunrise')
+    tmT(zman('נץ', hoshanaSunrise, 'הושענא רבה\'s own sunrise')
       .minus(36, 'שחרית starts thirty six minutes in front of it')
       .round('to the minute the sheet prints')
       .underline(), true),
@@ -820,7 +822,7 @@ export function buildSukkosPoster(year, settings) {
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.
       line(SK_TEXT.shacharis, hoshanaTimes,
-        { calc: 'hoshanaShacharis', note: `(${SK_TEXT.netz} ${formatTime(skNetz(hoshana, settings))})` }),
+        { calc: 'hoshanaShacharis', netz: hoshanaNetz, note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
     ],
   });
 

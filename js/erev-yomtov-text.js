@@ -458,6 +458,26 @@ export function cholHamoedText(poster, headingText) {
   return lines.join('\n');
 }
 
+/** The night and morning of Hoshana Rabba, from its own block on the Sukkos sheet.
+ *  NETZ is the sheet's formatted sunrise, not another minyan or a new calculation. */
+export function hoshanaRabbaText(poster) {
+  const block = ytBlock(poster, SK_TEXT.hoshana);
+  if (!block) return '';
+  const lines = ['Hoshana Rabba'];
+  const mishna = ytLine(block, 'mishna')?.times?.[0];
+  if (mishna?.text) {
+    const rooms = { en: 'Ezras Nashim', sh: 'Simcha Hall', m: 'main Bais Medrash', d: 'downstairs Bais Medrash' };
+    const maariv = ytLine(block, 'mishnaMaariv') ? ', followed by Maariv' : '';
+    lines.push(`MISHNA TORAH in the ${rooms[ytWhere(mishna)]} at ${mishna.text} PM${maariv}`);
+  }
+  const morning = ytLine(block, 'hoshanaShacharis');
+  const times = (morning?.times || []).filter((time) => time?.text)
+    .map((time) => time.text + ytWhere(time));
+  if (times.length && morning?.netz) times.splice(1, 0, `NETZ ${morning.netz}`);
+  if (times.length) lines.push(`Shacharis: ${times.join(', ')}`);
+  return lines.length > 1 ? lines.join('\n') : '';
+}
+
 
 /** The three early מנחה lines of an evening somebody can bring in early, as the messages write
  *  them, off a block's own מנחה / פלג rows.
