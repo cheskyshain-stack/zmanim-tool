@@ -235,12 +235,12 @@ try {
         }
       }
       const zmanim = [...root.querySelectorAll('.board-zmanim>div')];
-      // The single daily rail keeps clocks on a common right edge and labels
+      // The single daily rail aligns clocks at their first colon and labels
       // on the opposite edge; individual short labels do not set its width.
       for(const row of zmanim)auditPairing(row,':scope > span',':scope > bdi',true);
       const zmanimColumns=new Map();
-      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[],timeInk=ink(row.querySelector(':scope > bdi'));if(timeInk)edges.push(timeInk.right);zmanimColumns.set(column,edges);}
-      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-right-edges-not-aligned');
+      for(const row of zmanim){const column=Math.round(rect(row).left),edges=zmanimColumns.get(column)||[],colonInk=ink(row.querySelector('.zman-colon'));if(colonInk)edges.push(colonInk.left);zmanimColumns.set(column,edges);}
+      for(const edges of zmanimColumns.values())if(Math.max(...edges)-Math.min(...edges)>2)add('zmanim-time-colons-not-aligned');
       if (zmanim.length !== snapshot.schedule.zmanim.length) add('zmanim-count');
       for (const [i, zman] of snapshot.schedule.zmanim.entries()) {
         const el = zmanim[i];

@@ -16,8 +16,9 @@ const availableDedicationHTML = `<article class="tv-card dedication dedication-a
   </dl>
 </article>`;
 const zmanTime = value => {
-  const parts = String(value ?? '').match(/^(\d{1,2}:\d{2})(:\d{2})?$/);
-  return `<span class="zman-minutes">${esc(parts ? parts[1] : value)}</span>${parts?.[2] ? `<span class="zman-seconds">${esc(parts[2])}</span>` : ''}`;
+  const parts = String(value ?? '').match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+  if (!parts) return `<span class="zman-minutes">${esc(value)}</span>`;
+  return `<span class="zman-minutes zman-clock"><span class="zman-hours">${parts[1]}</span><span class="zman-colon">:</span><span>${parts[2]}</span></span>${parts[3] ? `<span class="zman-seconds">${parts[3]}</span>` : ''}`;
 };
 const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
 const nextPeriod = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:true});

@@ -95,13 +95,12 @@ export function inspectTimeColumns(root, scale=1, {includeSheets=true}={}) {
  });
  const dailyColumns=new Map();
  for(const row of root.querySelectorAll('.board-zmanim>div')){
-  const time=row.querySelector(':scope > bdi'),value=time&&ink(time);if(!value)continue;
+  const time=row.querySelector(':scope > bdi'),colon=time?.querySelector('.zman-colon'),value=colon&&ink(colon);if(!value)continue;
   const column=Math.round(rect(row).left),starts=dailyColumns.get(column)||[];
-  starts.push(value.right);dailyColumns.set(column,starts);
-  if(Math.abs(value.right-rect(time).right)>2)issues.push({code:'daily-time-not-right-aligned',time:text(time)});
+  starts.push(value.left);dailyColumns.set(column,starts);
  }
  if(dailyColumns.size>1)issues.push({code:'daily-zmanim-not-one-column',columns:dailyColumns.size});
- for(const starts of dailyColumns.values())if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'daily-time-right-edges-differ',edges:starts});
+ for(const starts of dailyColumns.values())if(Math.max(...starts)-Math.min(...starts)>2)issues.push({code:'daily-time-colons-differ',positions:starts});
  for(const heading of root.querySelectorAll('.board-service>h3,.board-pattern>h4,.board-day-service>h4')){
   if(!heading.getClientRects().length)continue;
   if(getComputedStyle(heading).textAlign!=='center')issues.push({code:'weekday-heading-not-centered',label:text(heading)});

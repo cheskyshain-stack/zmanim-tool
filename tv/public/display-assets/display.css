@@ -772,10 +772,13 @@ button {
 
 /* A shared right edge keeps one- and two-digit hours in the same time column.
    Seconds stay on the baseline, slightly smaller and lighter than HH:MM. */
-/* Reserve seconds separately so the minute edge stays fixed, even when
-   seconds are hidden or their glyphs have different widths. */
-.tv-stage .board-zmanim>div>bdi{flex:0 0 7.5ch;display:grid;grid-template-columns:5ch 2.5ch;align-items:baseline;text-align:right;font-variant-numeric:tabular-nums}
-.tv-stage .board-zmanim .zman-minutes{font:inherit;text-align:right}
+/* Anchor the first colon with a fixed hour column. Minutes and smaller
+   seconds follow naturally, including when seconds are hidden. */
+.tv-stage .board-zmanim>div>bdi{flex:0 0 7.5ch;display:grid;grid-template-columns:max-content max-content;align-items:baseline;text-align:left;font-variant-numeric:tabular-nums}
+.tv-stage .board-zmanim>div>bdi .zman-minutes{font:inherit;text-align:left}
+.tv-stage .board-zmanim .zman-clock{display:inline-grid;grid-template-columns:2ch max-content max-content;align-items:baseline}
+.tv-stage .board-zmanim>div>bdi .zman-clock>span{font:inherit;text-align:left}
+.tv-stage .board-zmanim>div>bdi .zman-clock>.zman-hours{text-align:right}
 .tv-stage .board-zmanim .zman-seconds{font:inherit;font-size:.82em;font-weight:400;text-align:left}
 .stable-board .tv-footer .key{line-height:1.15}
 
