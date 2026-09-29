@@ -5,6 +5,8 @@ import { validate } from '../src/model.js';
 import { buildSukkosPoster, SK_TEXT } from '../../js/posters/sukkos.js';
 import { publicPosterSections } from '../../js/ui/posters-view.js';
 import * as zmanim from '../../js/zmanim/zmanim.js';
+import { dateFromHebrew } from '../../js/hebrew-calendar.js';
+import { dateFromSerial } from '../../js/zmanim/solar.js';
 
 const SUKKOS_PREVIEW = '2026-09-24T16:00:00Z';
 
@@ -64,10 +66,10 @@ test('the daily zmanim retain seconds and use the existing source calculations',
   const labels = ['עלות', 'טלית ותפילין', 'נץ', 'סזק"ש מ"א', 'סזק"ש גר"א',
     'סז"ת מ"א', 'סז"ת גר"א', 'חצות', 'שקיעה', "צאת ג' כוכבים", 'צאת 72'];
   // Include both sides of New York's spring and fall daylight-saving changes.
-  for (const date of ['2026-03-07', '2026-03-08', '2026-09-24', '2026-10-31', '2026-11-01']) {
+  for (const [date, tallisLabel] of [['2026-03-07','טלית'], ['2026-03-08','טלית ותפילין'], ['2026-09-24','טלית ותפילין'], ['2026-10-31','טלית'], ['2026-11-01','טלית ותפילין']]) {
     const rows = scheduleSnapshot(date + 'T16:00:00Z').zmanim;
     assert.equal(rows.length, 11, date);
-    assert.deepEqual(rows.map(r => r.label), labels, date);
+    assert.deepEqual(rows.map(r => r.label), labels.map((label,index)=>index===1?tallisLabel:label), date);
     assert.equal(new Set(rows.map(r => r.label)).size, 11, date);
     rows.forEach((row, index) => {
       assert.match(row.time, /^(?:[1-9]|1[0-2]):[0-5]\d:[0-5]\d$/, row.label);
@@ -76,6 +78,28 @@ test('the daily zmanim retain seconds and use the existing source calculations',
       assert.equal((hours % 12) * 3600 + minutes * 60 + seconds, ((sourceSeconds % 43200) + 43200) % 43200, `${date}: ${row.label}`);
     });
   }
+});
+
+test('tallis omits tefillin on every full Yom Tov, including second days and Yom Kippur', () => {
+  for (const year of [5787,5788,5806]) {
+    for (const [month,days] of [[7,[1,2,10,15,16,22,23]],[1,[15,16,21,22]],[3,[6,7]]]) {
+      for (const day of days) {
+        const date=dateFromSerial(dateFromHebrew(day,month,year)).toISOString().slice(0,10);
+        assert.equal(scheduleSnapshot(date+'T16:00:00Z').zmanim[1].label,'טלית',`${day}/${month}/${year}`);
+      }
+    }
+  }
+});
+
+test('tallis label follows the New York date of the daily times, not the upcoming chart', () => {
+  for (const [instant,label] of [
+    ['2026-09-25T16:00:00Z','טלית ותפילין'], // Erev Sukkos; the holiday chart is already visible.
+    ['2026-09-26T03:59:00Z','טלית ותפילין'], // Still Friday's daily zmanim in New York.
+    ['2026-09-26T04:00:00Z','טלית'], // Saturday and first day Sukkos.
+    ['2026-09-28T16:00:00Z','טלית ותפילין'], // Weekday Chol Hamoed retains its existing label.
+    ['2026-10-10T16:00:00Z','טלית'], // Ordinary Shabbos.
+    ['2026-10-11T16:00:00Z','טלית ותפילין'], // Ordinary Sunday.
+  ]) assert.equal(scheduleSnapshot(instant).zmanim[1].label,label,instant);
 });
 
 test('MGA72 tefila is 24 minutes before GRA in both existing proportional-day modes', () => {

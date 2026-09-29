@@ -279,7 +279,7 @@ export function scheduleSnapshot(instant, controls = []) {
   const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey,state);
   const zmanim = [
     ['עלות','alos72'],
-    ['טלית ותפילין','misheyakir10_2'],
+    [agendaDayKind(serial, settings).holy ? 'טלית' : 'טלית ותפילין','misheyakir10_2'],
     ['נץ','sunrise'],
     ['סזק"ש מ"א','sofZmanShmaMGA72'],
     ['סזק"ש גר"א','sofZmanShmaGRA'],
