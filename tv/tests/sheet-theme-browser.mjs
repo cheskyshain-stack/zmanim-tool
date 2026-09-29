@@ -106,8 +106,9 @@ try{
      // inheriting the old white-on-navy footer colors. Check the shared screen
      // after each live theme switch, alongside its isolated original chart.
      const screen=selector=>[...view.stage.querySelectorAll(selector)];
-     checkColor('footerText',screen('.tv-footer,.tv-footer .next-minyan strong,.tv-footer .next-place'),'color',palette.text);
-     checkColor('footerHeading',screen('.tv-footer .next-label'),'color',palette.gold);
+     checkColor('footerText',screen('.tv-footer'),'color',palette.text);
+     checkColor('nextMinyanText',screen('.next-minyan .next-service strong,.next-minyan .next-time'),'color',palette.text);
+     checkColor('nextMinyanGold',screen('.next-minyan .next-label,.next-minyan .next-place,.next-minyan .next-countdown'),'color',palette.gold);
      checkColor('footerLegend',screen('.tv-footer .key'),'color',theme==='light'?palette.text:'rgb(197, 206, 219)');
      const stable=host===baseline.host&&originalPage===baseline.page&&host.originalSheetFitCount===baseline.fitCount&&shadow.querySelectorAll('.onepage-row').length===baseline.rows;
      if(!stable)issues.push({themeSwitchChangedPage:true,fitCount:host.originalSheetFitCount,originalFitCount:baseline.fitCount});

@@ -135,7 +135,7 @@ try{
       lines:new Set(lines.map(line=>Math.round(line.top))).size,
       centered:lines.every(line=>Math.abs((line.left+line.right-brandRect.left-brandRect.right)/2)<=5*rect(root).width/1920)};
     });
-    const peers=[brand,...root.querySelectorAll('.tv-head .shul-donate,.tv-date,.tv-clock')].filter(e=>e.getClientRects().length);
+    const peers=[brand,...root.querySelectorAll('.tv-head .shul-donate,.next-minyan,.tv-date,.tv-clock')].filter(e=>e.getClientRects().length);
     const collisions=card?peers.filter(e=>overlap(rect(card),rect(e))).map(e=>e.className):[];
     const panels=[...root.querySelectorAll('.board-zmanim,.board-weekly,.board-shabbos,.original-sheet-box')];
     const weeklyHeading=root.querySelector('.board-weekly>h2');

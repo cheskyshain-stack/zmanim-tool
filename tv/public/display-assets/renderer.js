@@ -20,6 +20,18 @@ const zmanTime = value => {
   return `<span class="zman-minutes">${esc(parts ? parts[1] : value)}</span>${parts?.[2] ? `<span class="zman-seconds">${esc(parts[2])}</span>` : ''}`;
 };
 const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
+const nextPeriod = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:true});
+export function nextMinyanHTML(next, instant) {
+  const remaining = Date.parse(next?.at) - Date.parse(instant);
+  const label = '<div class="next-label">NEXT MINYAN</div>';
+  if (!Number.isFinite(remaining) || remaining < 0) return label + '<p class="next-empty">No further minyan in the loaded schedule</p>';
+  const minutes = Math.ceil(remaining / 60000), hours = Math.floor(minutes / 60), rest = minutes % 60;
+  const countdown = !minutes ? 'Starting now' : hours
+    ? `in ${hours} hour${hours === 1 ? '' : 's'}${rest ? ` ${rest} minute${rest === 1 ? '' : 's'}` : ''}`
+    : `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const period = nextPeriod.formatToParts(new Date(next.at)).find(part => part.type === 'dayPeriod')?.value || '';
+  return `${label}<div class="next-service" dir="rtl"><strong lang="he">${esc(next.name)}</strong>${next.place ? `<span class="next-place" lang="he">${esc(next.place)}</span>` : ''}</div><div class="next-time" dir="ltr"><bdi>${esc(next.time)}</bdi> <span class="next-period">${esc(period)}</span></div><p class="next-countdown">${countdown}</p>`;
+}
 // Kept for existing editor imports. A notice is always one complete card.
 export function announcementPages(item) { return [item]; }
 export function cardHTML(item) {
@@ -45,7 +57,7 @@ export class DisplayView {
     this.host = host;
     this.slots = new Map();
     this.warning = [];
-    host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><div class="tv-date"></div><div class="tv-clock"></div></header><div class="tv-layout"><aside class="board-left-rail"><section class="board-zmanim"></section><section class="board-dedication" aria-label="פרנס היום"></section></aside><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><div class="next-minyan"></div><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
+    host.innerHTML = `<div class="tv-stage board-layout stable-board"><div class="tv-preview-label" hidden>PRIVATE PREVIEW · NOT THE LIVE SCREEN</div><header class="tv-head"><div class="tv-brand" lang="he" dir="rtl"></div><section class="next-minyan" aria-label="Next minyan"></section><div class="tv-current"><div class="tv-date"></div><div class="tv-clock"></div></div></header><div class="tv-layout"><aside class="board-left-rail"><section class="board-zmanim"></section><section class="board-dedication" aria-label="פרנס היום"></section></aside><main class="tv-center"></main></div><section class="board-notices"></section><footer class="tv-footer"><span class="connection-state" role="status"></span><span class="key">Underlined: downstairs · * Ezras Nashim · ** Simcha hall<br>Times follow the shul’s published schedules</span></footer></div>`;
     this.stage = host.firstElementChild;
     this.stage.classList.add('right-column-board','fixed-bottom-board');
     for (const [key, selector] of Object.entries({brand:'.tv-brand',date:'.tv-date',clock:'.tv-clock',dedication:'.board-dedication',zmanim:'.board-zmanim',schedules:'.tv-center',notices:'.board-notices',next:'.next-minyan',connection:'.connection-state'})) this[key] = this.stage.querySelector(selector);
@@ -149,8 +161,7 @@ export class DisplayView {
       layoutFixedBoard(this, groups, sheet);
     }
     this.renderNotices();
-    const next = s.next && s.next.at >= instant ? s.next : null;
-    setHTML(this.next, `<span class="next-label">Next minyan</span>${next ? `<strong dir="auto">${esc(next.name)} <bdi dir="ltr">${esc(next.time)}</bdi></strong><span class="next-place" dir="auto">${esc(next.place)}</span>` : '<strong>No further minyan in the loaded schedule</strong>'}`);
+    setHTML(this.next, nextMinyanHTML(s.next, instant));
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
     if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;
     this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';
