@@ -26,8 +26,21 @@ button {
   cursor: pointer;
 }
 .tv-body {
-  overflow: hidden;
+  overflow: auto;
   background: #101f31;
+}
+.tv-body #screen {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  /* Contain the unscaled stage footprint, while the page itself can scroll. */
+  overflow: hidden;
+}
+@media (hover: none) and (pointer: coarse) {
+  .tv-body #screen {
+    /* Keep the board readable at full phone width, including in landscape. */
+    min-height: 56.25vw;
+  }
 }
 .tv-stage {
   width: 1920px;

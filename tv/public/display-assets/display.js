@@ -1,7 +1,7 @@
 import {DisplayView} from './renderer.js';
 import {offlineSnapshot,validSeed} from './offline-engine.js';
 import {readOfflineCache,saveOfflineCache} from './offline-cache.js';
-const host=document.querySelector('#screen');host.style.height='100vh';
+const host=document.querySelector('#screen');
 const view=new DisplayView(host);
 const connecting=document.createElement('p');connecting.className='boot';connecting.textContent='Connecting to load Shul View…';
 Object.assign(connecting.style,{position:'absolute',inset:'40% 0 auto',textAlign:'center'});host.append(connecting);
