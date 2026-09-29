@@ -8018,6 +8018,18 @@ const ytBlock = (poster, name) =>
   (poster?.blocks || []).find((b) => String(b.heading || '').startsWith(name)) || null;
 const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc) || null;
 
+/** Announce only the Yizkor times on the relevant holiday's saved sheet rows.
+ *  Keep explicit room marks; leave an unmarked time plain, as on the sheet. */
+function ytYizkorLines(rows, holiday) {
+  const times = (rows || []).filter((row) => row.calc === 'yizkor')
+    .flatMap((row) => row.times || []).filter((time) => time?.text)
+    .map((time) => time.text + (ytWhere(time) === 'm' ? '' : ytWhere(time)));
+  if (!times.length) return [];
+  const when = times.length === 1 ? times[0]
+    : `${times.slice(0, -1).join(', ')} and ${times[times.length - 1]}`;
+  return [`Yizkor on ${holiday}, approximately ${when}.`];
+}
+
 /** The ערב ראש השנה message.
  *
  *  @param poster - straight from buildRoshHashanaPoster, so this reads exactly what the
@@ -8100,6 +8112,7 @@ function erevYomKippurText(poster) {
   const drasha = timeFor('nightDrasha');
   if (drasha) lines.push(`Ravs Drasha ${drasha.text}`);
 
+  lines.push(...ytYizkorLines(poster?.dayLines, 'Yom Kippur'));
   lines.push(YT_SIGN_OFF_YK);
   return lines.join('\n');
 }
@@ -8229,9 +8242,8 @@ function erevSukkosText(poster) {
  *    Hadlakas Neiros 6:02
  *    Mincha 6:05m
  *
- *  **No sign-off, and that is what the sent message does.** Every other one of these ends on a
- *  fixed line and this one simply stops after the מנחה. Written the way it was sent rather than
- *  given a "Chag Kosher V'Sameiach" of its own to match its neighbours.
+ *  No fixed sign-off. The Yizkor announcement follows the evening Mincha and
+ *  reads its approximate times and room marks from this same day's sheet rows.
  *
  *  Off the שמיני עצרת block rather than the first block on the sheet: this evening is הושענא
  *  רבה's, five blocks in, and every block before it carries the same three calcs.
@@ -8266,6 +8278,7 @@ function erevShminiAtzeresText(poster) {
   const nightMincha = timeOf('candlesMincha');
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
+  lines.push(...ytYizkorLines(block.lines, 'Shemini Atzeres'));
   return lines.join('\n');
 }
 
@@ -8402,6 +8415,7 @@ function erevShviiShelPesachText(poster) {
   const nightMincha = timeOf('candlesMincha');
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
+  lines.push(...ytYizkorLines(ytBlock(poster, PS_TEXT.achron)?.lines, 'Acharon Shel Pesach'));
   lines.push(YT_SIGN_OFF_YOMTOV);
   return lines.join('\n');
 }
