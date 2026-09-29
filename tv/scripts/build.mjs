@@ -50,7 +50,10 @@ async function publicAssets(relative='display-assets'){
     else if(!/^(admin\.|preview-calendar\.)/.test(entry.name))assets.push('/'+relative+'/'+entry.name);
   }
 }
-await publicAssets();assets.sort();
+await publicAssets();
+await publicAssets('tv/icons');
+assets.push('/tv/site.webmanifest');
+assets.sort();
 const swTemplate=await readFile(join(root,'public/tv/sw.js'),'utf8');
 const publicFiles=['/tv/',...assets];
 const version=createHash('sha256').update(swTemplate).update(JSON.stringify(publicFiles));
