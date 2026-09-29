@@ -787,6 +787,9 @@ button {
 .tv-stage .board-shabbos .board-times{flex-direction:column;align-items:flex-start;text-align:left}
 .tv-stage .board-times .board-time-line{display:flex;width:max-content;flex-wrap:nowrap;align-items:flex-end;gap:0 var(--board-line-gap,14px);direction:ltr}
 .tv-stage .board-shabbos .board-time>bdi{align-self:flex-start}
+/* Underlining marks a location; it must not change the clock's line box.
+   Keep plain and underlined digits aligned, including below zman labels. */
+.tv-stage .board-shabbos .board-time u{display:inline;line-height:inherit;border-bottom:0;padding-bottom:0;text-decoration-line:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-skip-ink:none}
 .tv-stage .board-shabbos .board-schedule-row>.board-times{justify-content:flex-start;margin-inline:0}
 .tv-stage .board-shabbos .board-schedule-row>.board-prayer-label{text-align:right;overflow-wrap:break-word;grid-row:1;grid-column:2}
 .tv-stage .board-shabbos .board-schedule-row.board-long-label>.board-prayer-label{grid-row:1;text-align:right}
