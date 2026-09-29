@@ -1,0 +1,20 @@
+{
+  "name": "LC Shul Messages",
+  "short_name": "LC Shul Messages",
+  "description": "Messages and minyan announcements for Bais Medrash Lakewood Commons.",
+  "id": "/texts/",
+  "start_url": "/texts/",
+  "scope": "/texts/",
+  "display_override": ["standalone"],
+  "display": "browser",
+  "background_color": "#101f34",
+  "theme_color": "#101f34",
+  "dir": "auto",
+  "lang": "en",
+  "icons": [
+    { "src": "/texts/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/texts/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/texts/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/texts/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
