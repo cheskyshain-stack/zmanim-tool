@@ -22,13 +22,13 @@ test('Shemini Atzeres on Shabbos matches the requested message', () => {
     'Mincha 1:20d, 1:35d, 1:50d, 2:15d, 3:00d',
     'Hadlakas Neiros 6:19',
     'Mincha 6:22m',
-    'Yizkor on Shemini Atzeres, approximately 9:40d and 10:55.',
+    'Yizkor on Shemini Atzeres, approximately 9:40d 10:55m.',
   ].join('\n'));
 });
 
 test('weekday Shemini Atzeres uses its different saved Yizkor times', () => {
   assert.match(erevShminiAtzeresText(sukkos(5786)),
-    /Yizkor on Shemini Atzeres, approximately 9:10d and 10:25\.$/);
+    /Yizkor on Shemini Atzeres, approximately 9:10d 10:25m\.$/);
 });
 
 test('all three holiday messages follow changed sheet times and explicit room marks', () => {
@@ -47,16 +47,16 @@ test('all three holiday messages follow changed sheet times and explicit room ma
     ];
     const lines = format(poster).split('\n').filter((line) => line.startsWith('Yizkor'));
     assert.deepEqual(lines, [
-      `Yizkor on ${holiday}, approximately 9:23d, 10:17en, 10:42sh and 11:03.`,
+      `Yizkor on ${holiday}, approximately 9:23d 10:17en 10:42sh 11:03m.`,
     ]);
   }
 });
 
 test('Yom Kippur and last days Pesach use their own holiday names and saved times', () => {
   assert.ok(erevYomKippurText(buildYomKippurPoster(5787, settings))
-    .includes('Yizkor on Yom Kippur, approximately 11:55.'));
+    .includes('Yizkor on Yom Kippur, approximately 11:55m.'));
   assert.ok(erevShviiShelPesachText(buildPesachPoster(5787, settings))
-    .includes('Yizkor on Acharon Shel Pesach, approximately 10:20.'));
+    .includes('Yizkor on Acharon Shel Pesach, approximately 10:20m.'));
 });
 
 test('missing or empty Yizkor rows do not invent an announcement or borrow another day', () => {

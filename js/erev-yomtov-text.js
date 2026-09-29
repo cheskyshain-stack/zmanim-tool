@@ -151,14 +151,13 @@ const ytBlock = (poster, name) =>
 const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc) || null;
 
 /** Announce only the Yizkor times on the relevant holiday's saved sheet rows.
- *  Keep explicit room marks; leave an unmarked time plain, as on the sheet. */
+ *  Use the messages' room letters for every time, including the main Bais Medrash. */
 function ytYizkorLines(rows, holiday) {
   const times = (rows || []).filter((row) => row.calc === 'yizkor')
     .flatMap((row) => row.times || []).filter((time) => time?.text)
-    .map((time) => time.text + (ytWhere(time) === 'm' ? '' : ytWhere(time)));
+    .map((time) => time.text + ytWhere(time));
   if (!times.length) return [];
-  const when = times.length === 1 ? times[0]
-    : `${times.slice(0, -1).join(', ')} and ${times[times.length - 1]}`;
+  const when = times.join(' ');
   return [`Yizkor on ${holiday}, approximately ${when}.`];
 }
 
