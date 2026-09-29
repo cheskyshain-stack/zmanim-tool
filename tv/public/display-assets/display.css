@@ -662,6 +662,7 @@ button {
 .stable-board .board-weekly,.stable-board .board-shabbos{border-color:var(--screen-border)}
 .stable-board .board-week-body{flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
 .stable-board .board-service{padding:9px 0;border-color:var(--screen-border)}
+.stable-board .board-service,.stable-board .board-schedule-row{border-color:var(--screen-gold)}
 .stable-board .board-times{row-gap:13px}
 .stable-board .board-compact .board-times{row-gap:8px}
 .stable-board .original-sheet-box,.stable-board[data-theme=dark] .original-sheet-box{background:transparent;border-color:var(--screen-border)}
