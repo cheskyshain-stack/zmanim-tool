@@ -52,7 +52,7 @@ async function publicAssets(relative='display-assets'){
 }
 await publicAssets();
 await publicAssets('tv/icons');
-assets.push('/tv/site.webmanifest');
+assets.push('/tv/shortcut.webmanifest');
 assets.sort();
 const swTemplate=await readFile(join(root,'public/tv/sw.js'),'utf8');
 const publicFiles=['/tv/',...assets];
