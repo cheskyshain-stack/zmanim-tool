@@ -42,8 +42,8 @@ try{
   return {date:snapshot.schedule.date,placement:snapshot.schedule.specialSheet.placement,next:snapshot.schedule.next,paths,scope:(await navigator.serviceWorker.ready).scope};
  });
  assert.equal(data.date,'2026-09-26');assert.equal(data.placement,'both');assert.ok(data.next.at);assert.ok(data.scope.endsWith('/tv/'));
- assert.ok(data.paths.length>10);assert.ok(data.paths.every(p=>p==='/tv/'||p==='/tv/shortcut.webmanifest'||p.startsWith('/tv/icons/')||p.startsWith('/display-assets/')));assert.ok(data.paths.every(p=>!p.includes('admin')&&!p.includes('/api/')));
- for(const asset of ['/tv/shortcut.webmanifest','/tv/icons/shortcut-icon-192.png','/tv/icons/shortcut-icon-512.png','/tv/icons/shortcut-apple-touch-icon.png'])assert.ok(data.paths.includes(asset),`${asset} stays available offline`);
+ assert.ok(data.paths.length>10);assert.ok(data.paths.every(p=>p==='/tv/'||p==='/tv/shortcut-small.webmanifest'||p.startsWith('/tv/icons/')||p.startsWith('/display-assets/')));assert.ok(data.paths.every(p=>!p.includes('admin')&&!p.includes('/api/')));
+ for(const asset of ['/tv/shortcut-small.webmanifest','/tv/icons/shortcut-small-icon-192.png','/tv/icons/shortcut-small-icon-512.png','/tv/icons/shortcut-small-apple-touch-icon.png'])assert.ok(data.paths.includes(asset),`${asset} stays available offline`);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({offlineReload:true,publishedTiming:true,themeTransition:true,midnight:true,sheetPlacement:true,publicFilesCached:data.paths.length,errors}));
  await context.close();
  // A first visit with no cache must recover without replacing the stable
