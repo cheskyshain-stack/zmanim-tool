@@ -3135,9 +3135,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    that every other poster.poster-set sheet has - nine lines and up where the size above was
    set against four, so it is scaled down the same way is-dense already scales the ראש השנה
    rows, rather than given a size of its own with no relation to the rest of the run. */
-.poster.is-chanukah .poster-set-head { font-size: 15pt; margin: 0 0 0.05in; }
-.poster.is-chanukah .poster-set-line { font-size: 12.5pt; line-height: 1.25; }
-.poster.is-chanukah .poster-set { margin-bottom: 0.04in; }
+.poster.is-chanukah .poster-set-head { font-size: 19pt; margin: 0 0 0.14in; }
+.poster.is-chanukah .poster-set-line { font-size: 16pt; line-height: 1.6; }
+.poster.is-chanukah .poster-set { margin-bottom: 0.3in; }
 /* --- All of them, one after another -------------------------------------------------
    A way of looking through the season's sheets rather than a poster of its own: every one
    for the chosen year, stacked, each drawn by its own renderer so what is in the run is

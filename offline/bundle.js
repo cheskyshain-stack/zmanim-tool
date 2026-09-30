@@ -8432,6 +8432,7 @@ function erevShviiShelPesachText(poster) {
 
 
 
+
 const CH_MIN = 1 / 1440;
 const CH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
 const CH_FRIDAY = 6;
@@ -8442,9 +8443,6 @@ const CH_TEXT = {
   shacharis: 'שחרית',
   mincha: 'מנחה',
   maariv: 'מעריב',
-  erevShabbos: 'ערב שבת',
-  sunday: "יום א'",
-  candleLighting: 'הדלקת נרות',
 };
 
 /** The first ותיקין שחרית, in front of everything else the morning offers.
@@ -8605,6 +8603,74 @@ function chanukahShacharisDay(serial, settings) {
 
 const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.underlined), mark: t.flags.mark || '', trace: t });
 
+/** A cell built out of more than one day (or more than one Erev Shabbos) at the same
+ *  position: the shared value once, or every distinct value joined by the same slash the
+ *  boards write two live options with, when the group does not agree. The room comes off
+ *  the first instance, since every instance at one position is always the same room. */
+function mergedCell(traces) {
+  const texts = [...new Set(traces.map((t) => t.plain()))];
+  return { text: texts.join(SLASH), underlined: Boolean(traces[0].flags.underlined), mark: traces[0].flags.mark || '' };
+}
+
+const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
+const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
+
+/** Fewer lines than one per day: consecutive days whose whole morning matches print once,
+ *  under a day range rather than a day each, the same combining "יום ג'-ד'" already does on
+ *  the old sheets. Rosh Chodesh days combine on their own terms - grouped together whether
+ *  or not their own ותיקין time agrees, since that is the one thing that can differ between
+ *  them, labelled "ראש חודש" with every day's own נץ named beside its own letter rather than
+ *  buried in a time that is not always the same for both. */
+function combineShacharisRows(days) {
+  const lineKey = (d) => d.lines.map((t) => t.text()).join('|');
+  const rows = [];
+  let i = 0;
+  while (i < days.length) {
+    if (days[i].isRoshChodesh) {
+      let j = i + 1;
+      while (j < days.length && days[j].isRoshChodesh) j++;
+      const group = days.slice(i, j);
+      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}' (נץ ${formatTime(d.netz)})`).join(' ')}`;
+      const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
+      rows.push({ label, cells });
+      i = j;
+      continue;
+    }
+    let j = i + 1;
+    while (j < days.length && !days[j].isRoshChodesh && lineKey(days[j]) === lineKey(days[i])) j++;
+    const group = days.slice(i, j);
+    const first = dayLetter(group[0].serial);
+    const last = dayLetter(group[group.length - 1].serial);
+    rows.push({ label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`, cells: group[0].lines.map(toCell) });
+    i = j;
+  }
+  return rows;
+}
+
+/** One ערב שבת block rather than one per Friday: the eight days can touch two (see
+ *  `chanukahErevShabbosPairs`), and a reader does not need to be told the same menu twice
+ *  with only a night number between them. Headed by the parsha (or parshios) of the
+ *  Shabbos or Shabbosos that go with it - "חנוכה פרשת X" or "חנוכה פרשת X וY" - rather than
+ *  by which night of חנוכה it is, since that is what the shul calls these Fridays by.
+ *
+ *  Where the two Fridays' own menus agree position for position, printed once; anywhere they
+ *  do not (a later week's own מנחה גדולה can move the same slot a Friday differently from an
+ *  earlier one) that one position is both values, slash-joined - never two whole menus for
+ *  the sake of one differing minute. */
+function combineErevShabbos(erevShabbosList, settings, tables) {
+  if (!erevShabbosList.length) return null;
+  const parshaNames = tables
+    ? erevShabbosList.map((es) => hasParsha(es.shabbosSerial, settings, tables))
+    : [];
+  const title = parshaNames.length && parshaNames.every(Boolean)
+    ? `${CH_TEXT.title} פרשת ${parshaNames.join(' ו')}`
+    // The calendar tables have not loaded (only reachable when this poster is asked for
+    // without them): the sheet still has to say something rather than print nothing.
+    : erevShabbosList.map((es) => `${CH_TEXT.title} ${es.night}`).join(' / ');
+  const cells = erevShabbosList[0].times.map((_, k) => mergedCell(erevShabbosList.map((es) => es.times[k])));
+  return { title, cells };
+}
+
 /** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
  *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
@@ -8641,8 +8707,10 @@ function chanukahErevShabbosPairs(kislev25) {
   return pairs;
 }
 
-/** The finished poster for one Hebrew year. */
-function buildChanukahPoster(year, settings) {
+/** The finished poster for one Hebrew year. `tables` is the Hebrew-calendar parsha tables
+ *  (`{parshaChutz, parshaEY, parshaNames}`), only needed to head the ערב שבת block by its
+ *  own parsha; the sheet still builds and prints without it, just with a plainer heading. */
+function buildChanukahPoster(year, settings, tables) {
   if (!year) return null;
   const kislev25 = dateFromHebrew(25, 9, year);
   const M = minyanList();
@@ -8691,16 +8759,18 @@ function buildChanukahPoster(year, settings) {
     M.list(fridaySerial, CH_TEXT.mincha, times.map(toCell), AFTERNOON);
     // The night whose candle is lit after this Friday's own שקיעה: night 1 when 25 Kislev
     // falls on the Shabbos right after it, counting on from there.
-    return { serial: fridaySerial, night: fridaySerial - kislev25 + 2, times };
+    return { serial: fridaySerial, shabbosSerial, night: fridaySerial - kislev25 + 2, times };
   });
 
   return {
     hebrewYear: year,
     span: { from: erevShabbosPairs.some((p) => p.fridaySerial < kislev25) ? kislev25 - 1 : kislev25, to: kislev25 + 7 },
     days,
+    shacharisRows: combineShacharisRows(days),
     weekdayMincha,
     maariv,
     erevShabbosList,
+    erevShabbos: combineErevShabbos(erevShabbosList, settings, tables),
     sundayAfterShabbos,
     minyanim: M.out,
     legend: [
@@ -10895,7 +10965,7 @@ const POSTERS = [
     group: 'חנוכה',
     covers: (y) => `${CH_TEXT.title} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
-    starts: (y, settings) => buildChanukahPoster(y, settings)?.span.from ?? null,
+    starts: (y, settings) => buildChanukahPoster(y, settings, posterTables)?.span.from ?? null,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -10903,7 +10973,7 @@ const POSTERS = [
         year: y,
         label: yearLabel(y),
         preferred: y === preferred,
-        build: () => ({ poster: buildChanukahPoster(y, settings) }),
+        build: () => ({ poster: buildChanukahPoster(y, settings, posterTables) }),
       }));
     },
     render: renderChanukahPoster,
@@ -12121,37 +12191,24 @@ function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
 }
 
-/** The Hebrew weekday letter a שחרית row is headed with, יום א' through יום ו', the same way
- *  the old sheets label each day of the week rather than counting the eight days of חנוכה. */
-const CH_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
-function chanukahDayLabel(day) {
-  const letter = CH_DAY_LETTERS[excelWeekday(day.serial)] || '';
-  return `יום ${letter}'${day.isRoshChodesh ? ' (ר"ח)' : ''}`;
-}
-
-/** The חנוכה sheet: one row per weekday morning, then the standing weekday מנחה and מעריב,
- *  then ערב שבת's own menu (with its own candle lighting) where the eight days reach one. */
+/** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
+ *  standing weekday מנחה and מעריב, then the one ערב שבת block (see `combineErevShabbos`)
+ *  the eight days work out to, whether that is one Friday or two. */
 function chanukahBody(poster) {
-  const timeLine = (times) =>
-    `<p class="poster-set-line" lang="he"><bdi>${times.map((t) => timeHtml(toCell(t))).join(', ')}</bdi></p>`;
-  const dayRow = (day) => `
-    <p class="poster-set-line" lang="he"><bdi><strong>${escAttr(chanukahDayLabel(day))}</strong>
-      ${day.lines.map((t) => timeHtml(toCell(t))).join(', ')}</bdi></p>`;
+  const cellsLine = (cells) => `<p class="poster-set-line" lang="he"><bdi>${cells.map(timeHtml).join(', ')}</bdi></p>`;
+  const timeLine = (times) => cellsLine(times.map(toCell));
+  const dayRow = (row) => `
+    <p class="poster-set-line" lang="he"><bdi><strong>${escAttr(row.label)}</strong>
+      ${row.cells.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (head, inner) => `
     <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
-  // Usually one ערב שבת block; a year where 25 Kislev itself falls on Shabbos lights its
-  // first candle the Friday before the eight days start and gets a second one, so each is
-  // headed by which night's candle it goes with rather than a heading the sheet would then
-  // have to print twice with nothing to tell them apart.
-  const erevShabbosSections = (poster.erevShabbosList || []).map((es) =>
-    section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.title} ${es.night}`, timeLine(es.times)));
   const sections = [
-    section(CH_TEXT.shacharis, poster.days.map(dayRow).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map(dayRow).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
-    ...erevShabbosSections,
+    poster.erevShabbos ? section(poster.erevShabbos.title, cellsLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
   return `
