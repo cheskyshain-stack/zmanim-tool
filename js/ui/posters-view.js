@@ -1468,10 +1468,17 @@ function renderTzomGedaliaPoster(poster, settings) {
 /** One line of times, as a run `balanceRuns` can measure and cut evenly in two if it does
  *  not fit on one - the same mechanism the יום כיפור after-box uses, with the comma this
  *  sheet's own lists want rather than that box's own room-per-line shape. See app.css's
- *  .poster-chanukah-run rule and balanceRuns's own selector. */
-const chanukahRunLine = (cells) => `<p class="poster-set-line" lang="he">`
-  + `<bdi class="poster-chanukah-run">${cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')}</bdi>`
-  + `</p>`;
+ *  .poster-chanukah-run rule and balanceRuns's own selector.
+ *
+ *  `label`, where a row has one, is the run's own first item too rather than text set in
+ *  front of it, so a label long enough to need it (Rosh Chodesh's own, with a נץ named for
+ *  each day) is part of what balanceRuns measures and can be cut evenly along with the times
+ *  after it, not a fixed width the run's own share of the line has to fit around. */
+const chanukahRunLine = (cells, label) => `<p class="poster-set-line" lang="he">`
+  + `<bdi class="poster-chanukah-run">`
+  + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
+  + cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')
+  + `</bdi></p>`;
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
  *  standing weekday מנחה and מעריב, then the one ערב שבת block (see `combineErevShabbos`)
@@ -1483,12 +1490,8 @@ function chanukahBody(poster) {
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
-  // נץ is not a מנין, so where a row carries one (Rosh Chodesh only) it is its own smaller
-  // line under the row's own מנינים rather than riding along inside that line.
-  const shacharisRow = (row) => chanukahRunLine(row.cells)
-    + (row.netzNote ? `<p class="poster-set-note" lang="he"><bdi>${escAttr(row.netzNote)}</bdi></p>` : '');
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRow).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label)).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),

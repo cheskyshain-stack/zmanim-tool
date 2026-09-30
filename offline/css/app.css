@@ -3138,9 +3138,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-chanukah .poster-set-head { font-size: 19pt; margin: 0 0 0.14in; }
 .poster.is-chanukah .poster-set-line { font-size: 16pt; line-height: 1.6; }
 .poster.is-chanukah .poster-set { margin-bottom: 0.3in; }
-/* The Rosh Chodesh row's own נץ line, smaller than the מנינים above it since it is a note
-   about them rather than one of them. */
-.poster.is-chanukah .poster-set-note { font-size: 12pt; font-weight: 400; line-height: 1.4; margin: 0.05in 0 0; }
 /* --- All of them, one after another -------------------------------------------------
    A way of looking through the season's sheets rather than a poster of its own: every one
    for the chosen year, stacked, each drawn by its own renderer so what is in the run is
@@ -3488,11 +3485,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    neither the head of the run nor the head of its second half picks one up. */
 .poster-box-row .poster-t + .poster-t::before { content: ", "; }
 /* The חנוכה sheet's own runs: the same drawn-rather-than-written comma, so balanceRuns can
-   cut one of these in two the same way it cuts the יום כיפור box's own runs. nowrap because
-   this run's own items are not always a single time - "יום ד' 6:50 (נץ 7:07)" is one item
-   with spaces of its own, and without this the browser can wrap inside one rather than only
-   between two, which reads as the נץ landing on a line of its own. */
-.poster-chanukah-run .poster-t { white-space: nowrap; }
+   cut one of these in two the same way it cuts the יום כיפור box's own runs. Not nowrap: the
+   Rosh Chodesh row's own label ("ראש חודש יום ה' (נץ 7:08) וו' (נץ 7:09)") is one item with
+   several words of its own, wider than balanceRuns's own even split can make room for by
+   moving whole items alone, so it has to be free to wrap inside itself the way a plain time
+   never needs to. */
 .poster-chanukah-run .poster-t + .poster-t::before { content: ", "; }
 /* The second half of a run that has been cut in two. A block, which is what puts it on a line
    of its own and leaves the label sitting against the first half. */
