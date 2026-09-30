@@ -66,6 +66,15 @@ function renderTime(mins, place) {
   return text;
 }
 
+/** Which, if any, of this week's own five days fall inside חנוכה's eight - shared by
+ *  maarivParts below (whether the row runs חנוכה's own early מעריב at all) and by
+ *  sheet-view.js (whether the row's own שחרית is freed from the standing panel, and what
+ *  the panel's own חנוכה line says for a week only partly in it). One answer, asked once,
+ *  so the row and the panel can never disagree about which week is which. */
+export function chanukahDaysInWeek(serial, settings) {
+  return sundayThroughThursday(serial).filter((d) => chanukahYearFor(d, settings));
+}
+
 /** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
  *  like every other row, so Sunday is six days back. Two rows on a Weekday chart are
  *  anchored on a stand-in date instead of a real Saturday (the season's trailing gap
@@ -279,13 +288,18 @@ function maarivParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
   const kayitz = isKayitzWeek(week.serial, settings);
 
-  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), on
-  // any week that touches even one of the eight days - the same computed value the חנוכה
-  // poster prints, so the two can never disagree about it. Built and traced apart from the
-  // standing slots below: it does not walk later to clear שקיעה the way they do (it already
-  // is 50 minutes past the latest שקיעה of חנוכה's own nights) and it is never dropped for
-  // crowding its neighbour, being far earlier than anything else on this line.
-  const chanukahYear = days.map((d) => chanukahYearFor(d, settings)).find(Boolean) || null;
+  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), only
+  // on a week every one of whose five days falls inside the eight days - a week only partly
+  // חנוכה runs this line exactly as any ordinary week does (see chanukahDaysInWeek above,
+  // and sheet-view.js, which says what those particular nights run instead: once, on the
+  // page's own שחרית panel, rather than inside a cell five other readers - the week card,
+  // "what is on next", the messages page - also read as this week's own standing answer).
+  // Built and traced apart from the standing slots below: it does not walk later to clear
+  // שקיעה the way they do (it already is 50 minutes past the latest שקיעה of חנוכה's own
+  // nights) and it is never dropped for crowding its neighbour, being far earlier than
+  // anything else on this line.
+  const chanukahDays = chanukahDaysInWeek(week.serial, settings);
+  const chanukahYear = chanukahDays.length === 5 ? chanukahYearFor(chanukahDays[0], settings) : null;
   const chanukahEarly = chanukahYear ? chanukahEarlyMaariv(chanukahYear, settings).underline() : null;
 
   // A מעריב must be 50 minutes after שקיעה on every one of the week's own regular days, so

@@ -838,6 +838,14 @@ td.ruled .cell { background: var(--ruled); }
    is copying. */
 .shacharis-through { padding: 0; }
 .shacharis-through.is-panel { position: relative; }
+/* חנוכה's own row, the one week the panel does not cover (see sheet-view.js): its own real
+   morning, set the same way the panel's own schedule is - centred, ltr so the slashes read
+   left to right, and the same line-height - but in flow rather than laid over the row,
+   since this is the row's own cell and not a card floating above somebody else's. */
+.shacharis-own {
+  height: 100%; display: grid; place-content: center;
+  white-space: pre-line; line-height: 1.3; direction: ltr; text-align: center;
+}
 /* And the panel: the schedule said once, on a piece of white paper laid over the rows.
    Positioned out of one row's cell (the middle one, see panelRow in sheet-view.js), which is
    what lets it be a panel at all rather than a cell that swallows its column. Everything about

@@ -21,7 +21,7 @@ import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExte
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
-import { SLASH } from '../util.js';
+import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
@@ -278,6 +278,32 @@ export function combineShacharisRows(days) {
     i = j;
   }
   return rows;
+}
+
+/** `days`' own combined morning(s) (see combineShacharisRows), as the wall chart prints
+ *  them rather than as the poster does: plain lines of times, no label in front of them,
+ *  ready for shacharisGridHtml to set in columns. A wall-chart row is already dated by its
+ *  own parsha column, and the panel's own line already carries its own heading ("חנוכה"),
+ *  so the label combineShacharisRows builds ("יום א'-ד'", "ראש חודש ...") would only repeat
+ *  what is already said beside it. ותיקין prints inline, the first time of its own line,
+ *  matching every other row on this chart - the special schedules' own broken-out line is
+ *  that page's own choice, not this one's. More than one group (a run split by Rosh
+ *  Chodesh, say) prints as more than one two-line block, a blank line between them so
+ *  shacharisGridHtml reads them as separate blocks rather than one.
+ *
+ *  `includeRoshChodesh: false` drops any Rosh Chodesh day out of the group entirely rather
+ *  than printing its own block beside the regular days': asked for the one row a week every
+ *  one of whose five days is חנוכה gets (sheet-view.js), which has only the one row's own
+ *  height to spend and not the many the standing panel is free to run a second block down.
+ *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
+ *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks. */
+export function chanukahScheduleLines(days, settings, { includeRoshChodesh = true } = {}) {
+  const cellHtml = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
+  const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
+    .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
+  return combineShacharisRows(dayObjs)
+    .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
+    .join('\n\n');
 }
 
 /** One ערב שבת block rather than one per Friday: the eight days can touch two (see
