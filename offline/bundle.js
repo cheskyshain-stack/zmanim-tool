@@ -5447,14 +5447,16 @@ function chanukahYearFor(serial, settings) {
 }
 
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
- *  חנוכה, or is the שבת right in front of it (ערב חנוכה) - the שבת whose own week is not
- *  חנוכה but the very next שבת's is, which is always the שבת 25 Kislev opens or falls
- *  within, since the eight days can never reach a second שבת without already covering
- *  the one seven days on. Never both: a שבת inside חנוכה is answered by the first check
- *  before the second is ever asked. */
+ *  חנוכה, or is the שבת right in front of it (ערב חנוכה) - meaning חנוכה actually opens
+ *  the night this שבת ends, so the first candle is lit at מוצאי שבת. That is only true
+ *  when 25 Kislev itself is the Sunday right after this שבת: any other weekday for 25
+ *  Kislev puts a day or more of the week between this שבת and חנוכה's own start, and a
+ *  שבת that is not the one immediately before is not "ערב" anything. Never both: a שבת
+ *  inside חנוכה is answered by the first check before the second is ever asked. */
 function chanukahShabbosLabel(shabbosSerial, settings) {
   if (chanukahYearFor(shabbosSerial, settings)) return 'chanukah';
-  if (chanukahYearFor(shabbosSerial + 7, settings)) return 'erev';
+  const sunday = hebrewDateExtended(shabbosSerial + 1, settings.useGregorianBefore1582);
+  if (sunday.month === 9 && sunday.dayOfMonth === 25) return 'erev';
   return null;
 }
 
