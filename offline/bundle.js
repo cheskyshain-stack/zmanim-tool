@@ -5629,11 +5629,27 @@ function combineShacharisRows(days) {
  *  one of whose five days is חנוכה gets (sheet-view.js), which has only the one row's own
  *  height to spend and not the many the standing panel is free to run a second block down.
  *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
- *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks. */
-function chanukahScheduleLines(days, settings, { includeRoshChodesh = true } = {}) {
+ *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks.
+ *
+ *  `mergeAll: true` is that same one row's own reason again, reached a second way: even with
+ *  Rosh Chodesh out, the remaining days can still fail to share one exact line - נץ moves
+ *  daily, so ותיקין's own rounding can land a minute apart on two days that agree on
+ *  everything else, and combineShacharisRows still calls that two groups rather than one
+ *  (measured: a 45px row asked to hold both ran to 68px, the same overflow a Rosh Chodesh
+ *  day makes). Asked to merge, every day is one group regardless of where it agrees or not,
+ *  the disagreeing position slash-joined the way a live choice between two times is written
+ *  anywhere else on this sheet - one two-line block, always, whatever the days underneath
+ *  it are actually doing. The poster keeps the fuller day-by-day picture; this row does not
+ *  have the room for it. */
+function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, mergeAll = false } = {}) {
   const cellHtml = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
     .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
+  if (mergeAll) {
+    if (!dayObjs.length) return '';
+    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+    return splitLinesInHalf(cells.map(cellHtml));
+  }
   return combineShacharisRows(dayObjs)
     .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
     .join('\n\n');
@@ -10635,29 +10651,35 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // many weeks), it prints once on a panel laid over the whole column, matching how it
   // looks in the original printed chart. It comes off the program's own WEEKDAY_SHACHARIS
   // with no per-cell override, which is what puts the same list on every chart at once.
-  /* Which row's cell a panel hangs from, among `count` rows the panel covers. The middle
-     one, and that is arithmetic rather than taste: the panel is sized in multiples of the
-     cell it hangs from, and a cell is a hair shorter than a row (the collapsed border
-     between two rows is not part of it, see .shacharis-panel). At 100% that is made up
-     exactly, but under Fit to screen's zoom a hairline does not scale the way a percentage
-     does and a little is left over per row. Hung from the first row, all of it lands at the
-     foot: measured on a phone, 6px of chart above the panel against 12px below. Hung from
-     the middle, the half above and the half below carry the same error in opposite
-     directions and it cancels: 6.8px and 6.8px. */
-  const segmentPanelRow = (count) => Math.round((count - 0.7) / 2);
+  /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
+     than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
+     hair shorter than a row (the collapsed border between two rows is not part of it, see
+     .shacharis-panel). At 100% that is made up exactly, but under Fit to screen's zoom a
+     hairline does not scale the way a percentage does and a little is left over per row.
+     Hung from the first row, all of it lands at the foot: measured on a phone, 6px of chart
+     above the panel against 12px below. Hung from the middle, the half above and the half
+     below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
+  let panelRow = Math.round((pageWeeks.length - 0.7) / 2);
   /* חנוכה's own שחרית is the one week-specific exception to "one schedule for the page":
      a week every one of whose five days falls inside the eight days runs the ותיקין
-     morning instead, which the standing panel does not know and must not paper over. That
-     one row's cell is freed from the panel (see chanukahDaysInWeek in sheets/weekday.js)
-     and prints its own real content, the same combined day-by-day schedule the חנוכה
-     poster prints (combineShacharisRows), so the two can never disagree - and the panel
-     itself splits around it into the segment of rows above it and the segment below,
-     each hung from its own middle rather than the whole page's, since the excluded row is
-     no longer part of either span. At most one such row a page: חנוכה is eight days and a
-     page is many weeks apart from the next running of it. */
+     morning instead, which the standing panel does not know and must not paper over.
+     Splitting the panel into a segment above that row and a segment below it was tried
+     first and measured out badly: the panel's own content (the everyday two lines, and
+     often a ר"ח/בה"ב/תענית block beside it) is several lines tall, and a segment of only
+     one or two rows is nowhere near tall enough to hold it - the panel overflowed its own
+     tiny span and spilled across the very row it was meant to leave alone, on a page where
+     the excluded row sits near the top or the bottom. So the panel stays one piece, hung
+     exactly as it always was, and the excluded row's own cell is what changes instead: see
+     .shacharis-own below, which is given a higher stacking order than the panel so it
+     paints over whatever of the panel would otherwise show through its own row, rather than
+     the panel being asked to leave a hole shaped like a row it cannot fit around. */
   const chanukahFullIdx = isWeekday
     ? pageWeeks.findIndex((w) => chanukahDaysInWeek(w.serial, settings).length === 5)
     : -1;
+  // The panel cannot hang from the one row it must not cover - moved one row over when the
+  // two coincide, which is always possible on any page with more than one row (and a page
+  // with only one row cannot have both a חנוכה row and a standing schedule to show anyway).
+  if (chanukahFullIdx === panelRow) panelRow = panelRow === 0 ? 1 : panelRow - 1;
   /* A week that touches חנוכה without being made of it entirely keeps its own row exactly
      as any ordinary week's - the standing formulas already answer for its own regular
      days, and colouring the whole row for one or two nights out of five would misname the
@@ -10709,35 +10731,29 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
            nl2br/esc. */
         if (isWeekday && c.key === 'E') {
           /* A week made entirely of חנוכה is freed from the panel outright: its own real
-             morning, not the standing one, so this is the one row the panel must not cover. */
+             morning, not the standing one. shacharis-own is given a stacking order above the
+             panel's own (see app.css) so it paints over whatever of the panel would
+             otherwise show through this row - the panel itself is untouched, one piece,
+             hung exactly where it always was. */
           if (rowIndex === chanukahFullIdx) {
             const ownDays = chanukahDaysInWeek(week.serial, settings);
-            const ownHtml = chanukahScheduleLines(ownDays, settings, { includeRoshChodesh: false });
+            const ownHtml = chanukahScheduleLines(ownDays, settings, { includeRoshChodesh: false, mergeAll: true });
             const ownLaid = shacharisGridHtml(ownHtml) || ownHtml;
-            return `<td class="shacharis-through"><div class="shacharis-own">${ownLaid}</div></td>`;
+            return `<td class="shacharis-through shacharis-own-cell"><div class="shacharis-own">${ownLaid}</div></td>`;
           }
-          /* Every other row belongs to one of (up to) two spans the panel covers: the rows
-             above the excluded row and the rows below it, or the whole page when there is no
-             excluded row at all. Each is its own panel, hung from its own middle - see
-             segmentPanelRow above - since the excluded row is not part of either span and
-             must not be counted into whichever one's arithmetic. */
-          const segStart = chanukahFullIdx === -1 ? 0 : rowIndex < chanukahFullIdx ? 0 : chanukahFullIdx + 1;
-          const segEnd = chanukahFullIdx === -1 ? pageWeeks.length : rowIndex < chanukahFullIdx ? chanukahFullIdx : pageWeeks.length;
-          const segCount = segEnd - segStart;
-          const segAbove = segmentPanelRow(segCount);
-          // Every row of this span but the one its own panel hangs from is an empty cell
-          // carrying nothing but its own row.
-          if (rowIndex !== segStart + segAbove) return '<td class="shacharis-through"></td>';
+          // Every row but the one the panel hangs from is an empty cell carrying nothing
+          // but its own row.
+          if (rowIndex !== panelRow) return '<td class="shacharis-through"></td>';
           /* This row's cell is a row like the others and carries the panel, which is laid out
-             of it and over the whole span.
-             --rows is the span's own row count and --above is how many of the span's own rows
-             sit above this one, and the two are what let the panel be a panel with nothing
-             measured: this cell is one row tall and every row on the page is the same height
-             (see syncHeaderRowHeight), so a length in multiples of 100% of this cell is a
-             length in rows, on screen, on paper and under any zoom. See .shacharis-panel in
-             app.css for the arithmetic. */
+             of it and over the whole column.
+             --rows is the page's row count and --above is how many rows sit above this one,
+             and the two are what let the panel be a panel with nothing measured: this cell is
+             one row tall and every row on the page is the same height (see
+             syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
+             rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
+             the arithmetic. */
           return `<td class="shacharis-through is-panel"
-            style="--rows: ${segCount}; --above: ${segAbove}">
+            style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
             <div class="shacharis-panel"><div class="shacharis-panel-in">${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
