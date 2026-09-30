@@ -28,6 +28,7 @@ import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
 import { buildVasikinPoster, VS_TEXT } from '../posters/vasikin.js';
+import { buildChanukahPoster, CH_TEXT, toCell } from '../posters/chanukah.js';
 import { buildOwnPoster } from '../posters/own.js';
 import { renderOwnEditor, newOwnSheet } from './own-view.js';
 import { saveState } from '../storage.js';
@@ -231,6 +232,25 @@ const POSTERS = [
       }));
     },
     render: renderTzomGedaliaPoster,
+  },
+  {
+    key: 'chanukah',
+    label: 'חנוכה',
+    group: 'חנוכה',
+    covers: (y) => `${CH_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildChanukahPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildChanukahPoster(y, settings) }),
+      }));
+    },
+    render: renderChanukahPoster,
   },
   {
     key: 'shuva',
@@ -902,12 +922,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
     + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
-    + `${both ? ' is-both' : ''}`;
+    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -1443,6 +1463,42 @@ function tzomGedaliaBody(poster) {
 
 function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+/** The Hebrew weekday letter a שחרית row is headed with, יום א' through יום ו', the same way
+ *  the old sheets label each day of the week rather than counting the eight days of חנוכה. */
+const CH_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
+function chanukahDayLabel(day) {
+  const letter = CH_DAY_LETTERS[excelWeekday(day.serial)] || '';
+  return `יום ${letter}'${day.isRoshChodesh ? ' (ר"ח)' : ''}`;
+}
+
+/** The חנוכה sheet: one row per weekday morning, then the standing weekday מנחה and מעריב,
+ *  then ערב שבת's own menu (with its own candle lighting) where the eight days reach one. */
+function chanukahBody(poster) {
+  const timeLine = (times) =>
+    `<p class="poster-set-line" lang="he"><bdi>${times.map((t) => timeHtml(toCell(t))).join(', ')}</bdi></p>`;
+  const dayRow = (day) => `
+    <p class="poster-set-line" lang="he"><bdi><strong>${escAttr(chanukahDayLabel(day))}</strong>
+      ${day.lines.map((t) => timeHtml(toCell(t))).join(', ')}</bdi></p>`;
+  const section = (head, inner) => `
+    <div class="poster-set">
+      <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
+      ${inner}
+    </div>`;
+  const sections = [
+    section(CH_TEXT.shacharis, poster.days.map(dayRow).join('')),
+    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
+    poster.erevShabbos ? section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.mincha}`, timeLine(poster.erevShabbos.times)) : '',
+    section(CH_TEXT.maariv, timeLine(poster.maariv)),
+  ].filter(Boolean);
+  return `
+    <h2 class="poster-title" lang="he">${escAttr(CH_TEXT.title)}</h2>
+    <div class="poster-sets">${sections.join('')}</div>`;
+}
+
+function renderChanukahPoster(poster, settings) {
+  return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
