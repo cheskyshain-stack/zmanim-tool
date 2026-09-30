@@ -296,11 +296,27 @@ export function combineShacharisRows(days) {
  *  one of whose five days is חנוכה gets (sheet-view.js), which has only the one row's own
  *  height to spend and not the many the standing panel is free to run a second block down.
  *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
- *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks. */
-export function chanukahScheduleLines(days, settings, { includeRoshChodesh = true } = {}) {
+ *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks.
+ *
+ *  `mergeAll: true` is that same one row's own reason again, reached a second way: even with
+ *  Rosh Chodesh out, the remaining days can still fail to share one exact line - נץ moves
+ *  daily, so ותיקין's own rounding can land a minute apart on two days that agree on
+ *  everything else, and combineShacharisRows still calls that two groups rather than one
+ *  (measured: a 45px row asked to hold both ran to 68px, the same overflow a Rosh Chodesh
+ *  day makes). Asked to merge, every day is one group regardless of where it agrees or not,
+ *  the disagreeing position slash-joined the way a live choice between two times is written
+ *  anywhere else on this sheet - one two-line block, always, whatever the days underneath
+ *  it are actually doing. The poster keeps the fuller day-by-day picture; this row does not
+ *  have the room for it. */
+export function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, mergeAll = false } = {}) {
   const cellHtml = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
     .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
+  if (mergeAll) {
+    if (!dayObjs.length) return '';
+    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+    return splitLinesInHalf(cells.map(cellHtml));
+  }
   return combineShacharisRows(dayObjs)
     .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
     .join('\n\n');
