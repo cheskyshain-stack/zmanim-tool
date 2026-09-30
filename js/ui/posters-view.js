@@ -1486,10 +1486,16 @@ function chanukahBody(poster) {
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
+  // Usually one ערב שבת block; a year where 25 Kislev itself falls on Shabbos lights its
+  // first candle the Friday before the eight days start and gets a second one, so each is
+  // headed by which night's candle it goes with rather than a heading the sheet would then
+  // have to print twice with nothing to tell them apart.
+  const erevShabbosSections = (poster.erevShabbosList || []).map((es) =>
+    section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.title} ${es.night}`, timeLine(es.times)));
   const sections = [
     section(CH_TEXT.shacharis, poster.days.map(dayRow).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
-    poster.erevShabbos ? section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.mincha}`, timeLine(poster.erevShabbos.times)) : '',
+    ...erevShabbosSections,
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
   return `

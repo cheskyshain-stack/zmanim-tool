@@ -8546,18 +8546,29 @@ function chanukahMaariv(hebrewYear, settings) {
 
 /** One day of the morning: the ותיקין time first, then either the everyday board's own two
  *  lines (shifted ten minutes on the first) or, on Rosh Chodesh, the Rosh Chodesh schedule
- *  with the one 8:00 that prints as 8:05. */
+ *  with the one 8:00 that prints as 8:05.
+ *
+ *  On a day that is not Rosh Chodesh, the ותיקין time is never earlier than the everyday
+ *  board's own first minyan (7:00) moved ten minutes earlier - נץ minus 25 only when that is
+ *  the later of the two. Confirmed against a year (תשפ״ז) where נץ falls early enough in the
+ *  season that נץ minus 25 alone would print a morning earlier than 6:50, which the sheet does
+ *  not do: 6:50 is the floor. Rosh Chodesh carries no such floor - its own נץ minus 25 is the
+ *  ותיקין time outright, the same as every sampled Rosh Chodesh morning already confirmed. */
 function chanukahShacharisDay(serial, settings) {
   const netz = Z.sunriseElev(dateFromSerial(serial), settings);
   const rchLabel = hasRoshChodesh(serial, settings);
   const isRoshChodesh = Boolean(rchLabel);
 
-  const vasikin = zman('נץ', netz, 'on this day of חנוכה')
-    .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
-    .round('to the closer minute');
-
   const before10 = (h, m, why) => clockTime(h, m, why).minus(CH_REGULAR_SHIFT_MINUTES,
     `${CH_REGULAR_SHIFT_MINUTES} minutes earlier than the everyday board's own time, which is what the morning does on a day that is not Rosh Chodesh`);
+
+  const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
+    .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
+    .round('to the closer minute');
+  const vasikin = isRoshChodesh ? vasikinNetz
+    : vasikinNetz.laterOf(
+      before10(7, 0, "the everyday board's own first morning minyan"),
+      'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
 
   const lines = isRoshChodesh
     ? [
@@ -8605,22 +8616,39 @@ function chanukahErevShabbos(fridaySerial, shabbosSerial, settings, includeTwelv
   return [...moved, ...rest, candle];
 }
 
+/** The Friday/Shabbos pairs this year's eight days touch. Usually one: the Friday that falls
+ *  among the eight days, paired with the Shabbos right after it. When 25 Kislev is itself
+ *  Shabbos (חנוכה תשפ״ז is the next year like this) the very first candle is lit the evening
+ *  before, as part of that Friday's own Erev Shabbos - a day this poster otherwise never
+ *  reaches, since it is before the eight days start - so that pair is added too, and the year
+ *  prints two ערב שבת חנוכה menus rather than one. */
+function chanukahErevShabbosPairs(kislev25) {
+  const pairs = [];
+  if (excelWeekday(kislev25) === CH_SHABBOS) pairs.push({ fridaySerial: kislev25 - 1, shabbosSerial: kislev25 });
+  for (let d = 0; d < 8; d++) {
+    const serial = kislev25 + d;
+    if (excelWeekday(serial) === CH_FRIDAY) pairs.push({ fridaySerial: serial, shabbosSerial: serial + 1 });
+  }
+  return pairs;
+}
+
 /** The finished poster for one Hebrew year. */
 function buildChanukahPoster(year, settings) {
   if (!year) return null;
   const kislev25 = dateFromHebrew(25, 9, year);
   const M = minyanList();
 
+  const erevShabbosPairs = chanukahErevShabbosPairs(kislev25);
+  const fridaySerials = new Set(erevShabbosPairs.map((p) => p.fridaySerial));
+
   const days = [];
-  let fridaySerial = null;
-  let shabbosSerial = null;
+  let sawShabbos = erevShabbosPairs.some((p) => p.fridaySerial < kislev25);
   let sundayAfterShabbos = null;
   for (let d = 0; d < 8; d++) {
     const serial = kislev25 + d;
     const wd = excelWeekday(serial);
-    if (wd === CH_SHABBOS) { shabbosSerial = serial; continue; }
-    if (wd === CH_FRIDAY) fridaySerial = serial;
-    if (shabbosSerial != null && sundayAfterShabbos == null && wd === 1) sundayAfterShabbos = serial;
+    if (wd === CH_SHABBOS) { sawShabbos = true; continue; }
+    if (sawShabbos && sundayAfterShabbos == null && wd === 1) sundayAfterShabbos = serial;
     const day = chanukahShacharisDay(serial, settings);
     day.dayNumber = d + 1;
     days.push(day);
@@ -8629,7 +8657,7 @@ function buildChanukahPoster(year, settings) {
 
   const weekdayMincha = chanukahWeekdayMincha(days[0]?.serial ?? kislev25, settings, year >= 5786);
   for (const day of days) {
-    if (day.serial === fridaySerial || day.serial === sundayAfterShabbos) continue;
+    if (fridaySerials.has(day.serial) || day.serial === sundayAfterShabbos) continue;
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
   }
   /* The Sunday that opens the second week, where one falls inside the eight days, prints its
@@ -8645,24 +8673,25 @@ function buildChanukahPoster(year, settings) {
 
   const maariv = chanukahMaariv(year, settings);
   for (const day of days) {
-    if (day.serial === fridaySerial) continue;
+    if (fridaySerials.has(day.serial)) continue;
     M.list(day.serial, CH_TEXT.maariv, maariv.map(toCell), AFTERNOON);
   }
 
-  let erevShabbos = null;
-  if (fridaySerial != null && shabbosSerial != null) {
+  const erevShabbosList = erevShabbosPairs.map(({ fridaySerial, shabbosSerial }) => {
     const times = chanukahErevShabbos(fridaySerial, shabbosSerial, settings, year >= 5786);
-    erevShabbos = { serial: fridaySerial, times };
     M.list(fridaySerial, CH_TEXT.mincha, times.map(toCell), AFTERNOON);
-  }
+    // The night whose candle is lit after this Friday's own שקיעה: night 1 when 25 Kislev
+    // falls on the Shabbos right after it, counting on from there.
+    return { serial: fridaySerial, night: fridaySerial - kislev25 + 2, times };
+  });
 
   return {
     hebrewYear: year,
-    span: { from: kislev25, to: kislev25 + 7 },
+    span: { from: erevShabbosPairs.some((p) => p.fridaySerial < kislev25) ? kislev25 - 1 : kislev25, to: kislev25 + 7 },
     days,
     weekdayMincha,
     maariv,
-    erevShabbos,
+    erevShabbosList,
     sundayAfterShabbos,
     minyanim: M.out,
     legend: [
@@ -12104,10 +12133,16 @@ function chanukahBody(poster) {
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
+  // Usually one ערב שבת block; a year where 25 Kislev itself falls on Shabbos lights its
+  // first candle the Friday before the eight days start and gets a second one, so each is
+  // headed by which night's candle it goes with rather than a heading the sheet would then
+  // have to print twice with nothing to tell them apart.
+  const erevShabbosSections = (poster.erevShabbosList || []).map((es) =>
+    section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.title} ${es.night}`, timeLine(es.times)));
   const sections = [
     section(CH_TEXT.shacharis, poster.days.map(dayRow).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
-    poster.erevShabbos ? section(`${CH_TEXT.erevShabbos} · ${CH_TEXT.mincha}`, timeLine(poster.erevShabbos.times)) : '',
+    ...erevShabbosSections,
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
   return `
