@@ -5641,8 +5641,21 @@ function combineShacharisRows(days) {
  *  anywhere else on this sheet - one two-line block, always, whatever the days underneath
  *  it are actually doing. The poster keeps the fuller day-by-day picture; this row does not
  *  have the room for it. */
+/* A wall-chart cell is one column of shacharisGridHtml's own grid, and never two stacked
+   values in it: shacharisGridHtml counts every digit:digit run in a line to decide how many
+   columns the line needs, so a merged cell that disagrees ("6:49 / 6:50", two days a minute
+   apart) reads as two columns instead of one and throws the whole row's grid out of true -
+   measured live, on a Rosh Chodesh pair whose own נץ moves a minute between the two days: the
+   line came out four columns wide instead of three, jammed against the line below it. The
+   poster prints the same disagreement as a real choice (chanukahRunLine in posters-view.js,
+   which lists cells as plain text rather than gridding them, so it has no such limit); this
+   is the one context that cannot. The earlier of the two is kept, which the chart's own
+   footer already asks a reader to allow for ("All zmanim are rounded off. Please be מחמיר
+   two minutes.") - a day apart on ותיקין is well inside that. */
+const firstOf = (text) => text.split(SLASH)[0];
+
 function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, mergeAll = false } = {}) {
-  const cellHtml = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
+  const cellHtml = (c) => `${c.underlined ? `<u>${firstOf(c.text)}</u>` : firstOf(c.text)}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
     .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
   if (mergeAll) {
