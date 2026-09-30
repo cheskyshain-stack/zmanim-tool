@@ -37,7 +37,7 @@ import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
 import { isKayitzWeek } from './weeks.js';
 import { chanukahYearFor, chanukahEarlyMaariv } from '../posters/chanukah.js';
-import { formatTime, underlineTime, newMinyanTag } from '../format.js';
+import { formatTime, underlineTime, newMinyanTag, chanukahTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
 
@@ -288,18 +288,19 @@ function maarivParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
   const kayitz = isKayitzWeek(week.serial, settings);
 
-  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), only
-  // on a week every one of whose five days falls inside the eight days - a week only partly
-  // חנוכה runs this line exactly as any ordinary week does (see chanukahDaysInWeek above,
-  // and sheet-view.js, which says what those particular nights run instead: once, on the
-  // page's own שחרית panel, rather than inside a cell five other readers - the week card,
-  // "what is on next", the messages page - also read as this week's own standing answer).
+  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), on
+  // any week that touches any of the eight days at all - a week only partly חנוכה runs
+  // this same extra מנין on its own nights exactly as a week entirely inside חנוכה does,
+  // since it is genuinely that night's own מנין and not a stand-in for the whole week.
+  // It goes into `text` plainly, the same value every other reader of this column reads -
+  // the week card, "what is on next", the messages page - and is tagged "חנוכה" only in
+  // the print-only `printText` below, the same split the "NEW" tag already makes.
   // Built and traced apart from the standing slots below: it does not walk later to clear
   // שקיעה the way they do (it already is 50 minutes past the latest שקיעה of חנוכה's own
   // nights) and it is never dropped for crowding its neighbour, being far earlier than
   // anything else on this line.
   const chanukahDays = chanukahDaysInWeek(week.serial, settings);
-  const chanukahYear = chanukahDays.length === 5 ? chanukahYearFor(chanukahDays[0], settings) : null;
+  const chanukahYear = chanukahDays.length ? chanukahYearFor(chanukahDays[0], settings) : null;
   const chanukahEarly = chanukahYear ? chanukahEarlyMaariv(chanukahYear, settings).underline() : null;
 
   // A מעריב must be 50 minutes after שקיעה on every one of the week's own regular days, so
@@ -377,28 +378,35 @@ function maarivParts(week, settings) {
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
   });
+  const chanukahEarlyText = chanukahEarly ? chanukahEarly.text() : null;
   const text = splitLinesInHalf([
-    ...(chanukahEarly ? [chanukahEarly.text()] : []),
+    ...(chanukahEarlyText ? [chanukahEarlyText] : []),
     ...kept.map((slot) => renderTime(slot.mins, placeOf(slot))),
   ]);
-  /* The tag is a *second*, print-only rendering of the same kept slots, never mixed into
-     `text` above. `text` is what every other reader of this column reads too - the week
-     card, the "what is on next" card, the messages page (js/week-text.js parses these
-     cells for their room letters and would choke on an extra word stitched into a time) -
-     and none of them are the printed chart, so none of them should ever show the tag. Only
-     sheet-view.js's own cell rendering reaches for `printOverrides`, and only when this
-     week's own column has not been typed over by hand. */
+  /* The tag is a *second*, print-only rendering, never mixed into `text` above. `text` is
+     what every other reader of this column reads too - the week card, the "what is on
+     next" card, the messages page (js/week-text.js parses these cells for their room
+     letters and would choke on an extra word stitched into a time) - and none of them are
+     the printed chart, so none of them should ever show a tag. Only sheet-view.js's own
+     cell rendering reaches for `printOverrides`, and only when this week's own column has
+     not been typed over by hand.
+     showNewBadge (קיץ only) and chanukahEarly (חורף only) can never both be true the same
+     week, so the two tags never have to share one line and the "NEW" cut below only ever
+     has to answer for kept's own slots. */
   /* One fewer plain item on the tagged line than the even count split would give it
      (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
      line reading visibly wider than the other. 11:30 is always the last kept slot whenever
      the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
      already requires), so it always falls on the second line and ceil rather than floor is
      always the direction that shortens it. */
-  const printText = showNewBadge
-    ? splitLinesInHalf(kept.map((slot) => {
-        const rendered = renderTime(slot.mins, placeOf(slot));
-        return slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
-      }), undefined, Math.ceil(kept.length / 2))
+  const printText = (showNewBadge || chanukahEarlyText)
+    ? splitLinesInHalf([
+        ...(chanukahEarlyText ? [chanukahTag(chanukahEarlyText)] : []),
+        ...kept.map((slot) => {
+          const rendered = renderTime(slot.mins, placeOf(slot));
+          return showNewBadge && slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
+        }),
+      ], undefined, showNewBadge ? Math.ceil(kept.length / 2) : null)
     : null;
 
   return {

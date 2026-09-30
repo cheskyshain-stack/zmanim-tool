@@ -56,6 +56,20 @@ export function newMinyanTag(text) {
   return NEW_TAG_START + text + NEW_TAG_MID + 'NEW' + NEW_TAG_END;
 }
 
+// Same mechanism again, for חנוכה's own extra/different weekday מנחה/מעריב times
+// (sheets/weekday.js, ui/sheet-view.js's nl2br): a week that touches חנוכה gets these
+// values right on its own row, tagged, rather than a row or a panel line of their own.
+// The word is Hebrew, unlike "NEW", so it carries no separate font-family in app.css -
+// it sets in the chart's own serif like the rest of the row.
+export const CHANUKAH_TAG_START = '';
+export const CHANUKAH_TAG_MID = '';
+export const CHANUKAH_TAG_END = '';
+
+/** Wraps an already-formatted cell value so it renders inside the "חנוכה" tag. */
+export function chanukahTag(text) {
+  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + 'חנוכה' + CHANUKAH_TAG_END;
+}
+
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
  *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
  *  the caller can leave those digits untouched rather than mangle them. */

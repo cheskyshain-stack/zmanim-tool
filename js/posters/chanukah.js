@@ -159,11 +159,7 @@ const CH_MAARIV_LATE = [
   [9, 30], [10, 0], [10, 30], [11, 0], // underlined again except 10:30
 ];
 
-/** Exported for sheet-view.js's own use too: a week only partly inside חנוכה gets these
- *  same values on a row of their own rather than repeating the everyday board's own
- *  standing schedule, so the wall chart and this poster read the same מעריב for a night
- *  that is genuinely חנוכה's and nothing else. */
-export function chanukahMaariv(hebrewYear, settings) {
+function chanukahMaariv(hebrewYear, settings) {
   // למטה, the same as every other מעריב on this line: the old sheets' own ** on this one is
   // no different from the ** on 6:35 and the rest, and none of them means אולם השמחות.
   const early = chanukahEarlyMaariv(hebrewYear, settings).underline();
@@ -358,6 +354,26 @@ export function chanukahScheduleLines(days, settings, { includeRoshChodesh = tru
   return combineShacharisRows(dayObjs)
     .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
     .join('\n\n');
+}
+
+/** The Weekday chart's standing שחרית panel, חנוכה's own addition to it: up to two
+ *  two-line blocks, one for the eight days' ordinary mornings and one for ר"ח טבת's own
+ *  (which always falls entirely inside them), each of which the panel heads with its own
+ *  line the same way it already heads the standing ר"ח/בה"ב/תענית block. Either comes
+ *  back null where the page holds none of that kind.
+ *
+ *  Every day of a kind is merged into that one block regardless of whether its own line
+ *  agrees with the others (`chanukahScheduleLines`'s own `mergeAll`), the same trade the
+ *  page's standing special-schedule block already makes for בה"ב and Rosh Chodesh alike:
+ *  a page-wide panel says one thing about the whole run rather than a line per day, and a
+ *  day's own disagreement (נץ drifting a minute) is a live choice, slash-joined, the same
+ *  as anywhere else on this sheet. The day-by-day picture is the Special Schedules
+ *  poster's job, not this panel's. */
+export function chanukahPanelBlocks(days, settings) {
+  const regularDays = days.filter((d) => !hasRoshChodesh(d, settings));
+  const roshChodeshDays = days.filter((d) => hasRoshChodesh(d, settings));
+  const block = (list) => (list.length ? chanukahScheduleLines(list, settings, { mergeAll: true }) : null);
+  return { regular: block(regularDays), roshChodesh: block(roshChodeshDays) };
 }
 
 /** One ערב שבת block rather than one per Friday: the eight days can touch two (see
