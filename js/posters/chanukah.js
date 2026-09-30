@@ -238,13 +238,16 @@ export function combineShacharisRows(days) {
 function shacharisRow(group, isRC) {
   // "כנ״ל" once the printed ותיקין time repeats: the day list is read purely off what is
   // actually printed, not off the נץ behind it, which moves most days regardless.
+  // Rosh Chodesh gets its own leading word, once, so its row still reads as its own kind of
+  // row rather than one more day list that happens to keep going - the separation this sheet
+  // had before the day list replaced a plain "ראש חודש" heading, and is asked to keep.
   let prevVasikin = null;
-  const dayItems = group.map((d) => {
+  const dayItems = group.map((d, idx) => {
     const letter = dayLetter(d.serial);
     const vasikinText = d.lines[0].plain();
     const text = vasikinText === prevVasikin ? `יום ${letter}' כנ״ל` : `יום ${letter}' ${vasikinText}`;
     prevVasikin = vasikinText;
-    return { text, underlined: false, mark: '' };
+    return { text: idx === 0 && isRC ? `ראש חודש ${text}` : text, underlined: false, mark: '' };
   });
   // Every line after the ותיקין one is identical across the whole group by construction
   // (the morning only ever differs by whether it is Rosh Chodesh), so it is read off the
