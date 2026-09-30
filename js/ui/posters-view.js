@@ -1483,8 +1483,12 @@ function chanukahBody(poster) {
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
+  // נץ is not a מנין, so where a row carries one (Rosh Chodesh only) it is its own smaller
+  // line under the row's own מנינים rather than riding along inside that line.
+  const shacharisRow = (row) => chanukahRunLine(row.cells)
+    + (row.netzNote ? `<p class="poster-set-note" lang="he"><bdi>${escAttr(row.netzNote)}</bdi></p>` : '');
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells)).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRow).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),

@@ -212,10 +212,16 @@ const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
 /** One line per day is not asked for: every non-Rosh-Chodesh morning and every Rosh Chodesh
  *  morning are each their own group (Rosh Chodesh or not is the only thing that changes the
  *  morning's own shape), and within a group the ותיקין time - the one thing that can differ
- *  day to day - is named per day, "יום X h:mm (נץ h:mm)", collapsing to "יום X כנ״ל" the
- *  moment a day repeats the one in front of it. Everything after the ותיקין slot is the same
- *  for every day in a group by construction, so it is printed once, at the end of the day
- *  list rather than once per day. */
+ *  day to day - is named per day, "יום X h:mm", collapsing to "יום X כנ״ל" the moment a day
+ *  repeats the one in front of it. Everything after the ותיקין slot is the same for every day
+ *  in a group by construction, so it is printed once, at the end of the day list rather than
+ *  once per day.
+ *
+ *  נץ is not printed for every day - only Rosh Chodesh asked for it, since that is the one
+ *  place its own reader wants to see what the ותיקין time is being weighed against - and even
+ *  there it is not folded into the same line as the actual מנינים: נץ is not a מנין, so it
+ *  gets its own line under the row instead of a parenthetical riding along on one of the
+ *  times. */
 export function combineShacharisRows(days) {
   const rows = [];
   let i = 0;
@@ -223,21 +229,20 @@ export function combineShacharisRows(days) {
     const isRC = days[i].isRoshChodesh;
     let j = i + 1;
     while (j < days.length && days[j].isRoshChodesh === isRC) j++;
-    rows.push(shacharisRow(days.slice(i, j)));
+    rows.push(shacharisRow(days.slice(i, j), isRC));
     i = j;
   }
   return rows;
 }
 
-function shacharisRow(group) {
-  // "כנ״ל" once the printed ותיקין time repeats, not once the underlying נץ does: נץ moves a
-  // minute most days regardless, and it is the floored, printed time a reader is comparing
-  // day to day, not the sunrise behind it.
+function shacharisRow(group, isRC) {
+  // "כנ״ל" once the printed ותיקין time repeats: the day list is read purely off what is
+  // actually printed, not off the נץ behind it, which moves most days regardless.
   let prevVasikin = null;
   const dayItems = group.map((d) => {
     const letter = dayLetter(d.serial);
     const vasikinText = d.lines[0].plain();
-    const text = vasikinText === prevVasikin ? `יום ${letter}' כנ״ל` : `יום ${letter}' ${vasikinText} (נץ ${formatTime(d.netz)})`;
+    const text = vasikinText === prevVasikin ? `יום ${letter}' כנ״ל` : `יום ${letter}' ${vasikinText}`;
     prevVasikin = vasikinText;
     return { text, underlined: false, mark: '' };
   });
@@ -245,7 +250,10 @@ function shacharisRow(group) {
   // (the morning only ever differs by whether it is Rosh Chodesh), so it is read off the
   // first day and printed once rather than once per day.
   const restCells = group[0].lines.slice(1).map(toCell);
-  return { cells: [...dayItems, ...restCells] };
+  const netzNote = isRC
+    ? `נץ: ${group.map((d) => `${dayLetter(d.serial)}' ${formatTime(d.netz)}`).join(', ')}`
+    : null;
+  return { cells: [...dayItems, ...restCells], netzNote };
 }
 
 /** One ערב שבת block rather than one per Friday: the eight days can touch two (see
