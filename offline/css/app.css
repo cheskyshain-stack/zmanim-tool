@@ -3484,6 +3484,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    around the break. Only between: the first time on a line has no sibling in front of it, so
    neither the head of the run nor the head of its second half picks one up. */
 .poster-box-row .poster-t + .poster-t::before { content: ", "; }
+/* The חנוכה sheet's own runs: the same drawn-rather-than-written comma, so balanceRuns can
+   cut one of these in two the same way it cuts the יום כיפור box's own runs. nowrap because
+   this run's own items are not always a single time - "יום ד' 6:50 (נץ 7:07)" is one item
+   with spaces of its own, and without this the browser can wrap inside one rather than only
+   between two, which reads as the נץ landing on a line of its own. */
+.poster-chanukah-run .poster-t { white-space: nowrap; }
+.poster-chanukah-run .poster-t + .poster-t::before { content: ", "; }
 /* The second half of a run that has been cut in two. A block, which is what puts it on a line
    of its own and leaves the label sitting against the first half. */
 .poster-run-more { display: block; }

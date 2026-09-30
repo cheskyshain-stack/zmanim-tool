@@ -1226,7 +1226,7 @@ function balanceRuns(container) {
      keeps the break between the two: see .poster-run and the box in app.css. */
   const wrapped = (times) => times.length > 1 && times[times.length - 1].offsetTop > times[0].offsetTop;
   const cuts = [];
-  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run')) {
+  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run, .poster-chanukah-run')) {
     const times = [...run.querySelectorAll(':scope > .poster-t')];
     if (!wrapped(times)) continue;
     const cut = Math.floor(times.length / 2);
@@ -1465,24 +1465,28 @@ function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
 }
 
+/** One line of times, as a run `balanceRuns` can measure and cut evenly in two if it does
+ *  not fit on one - the same mechanism the יום כיפור after-box uses, with the comma this
+ *  sheet's own lists want rather than that box's own room-per-line shape. See app.css's
+ *  .poster-chanukah-run rule and balanceRuns's own selector. */
+const chanukahRunLine = (cells) => `<p class="poster-set-line" lang="he">`
+  + `<bdi class="poster-chanukah-run">${cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')}</bdi>`
+  + `</p>`;
+
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
  *  standing weekday מנחה and מעריב, then the one ערב שבת block (see `combineErevShabbos`)
  *  the eight days work out to, whether that is one Friday or two. */
 function chanukahBody(poster) {
-  const cellsLine = (cells) => `<p class="poster-set-line" lang="he"><bdi>${cells.map(timeHtml).join(', ')}</bdi></p>`;
-  const timeLine = (times) => cellsLine(times.map(toCell));
-  const dayRow = (row) => `
-    <p class="poster-set-line" lang="he"><bdi><strong>${escAttr(row.label)}</strong>
-      ${row.cells.map(timeHtml).join(', ')}</bdi></p>`;
+  const timeLine = (times) => chanukahRunLine(times.map(toCell));
   const section = (head, inner) => `
     <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map(dayRow).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells)).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
-    poster.erevShabbos ? section(poster.erevShabbos.title, cellsLine(poster.erevShabbos.cells)) : '',
+    poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
   return `
