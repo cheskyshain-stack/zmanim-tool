@@ -3131,6 +3131,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 /* The שקיעה on the צום גדליה sheet, which stands between מנחה and מעריב with no heading:
    set at the size of a line of times, since it reads as one. */
 .poster-set-note { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
+/* חנוכה carries a line per weekday morning on top of the standing מנחה/ערב שבת/מעריב blocks
+   that every other poster.poster-set sheet has - nine lines and up where the size above was
+   set against four, so it is scaled down the same way is-dense already scales the ראש השנה
+   rows, rather than given a size of its own with no relation to the rest of the run. */
+.poster.is-chanukah .poster-set-head { font-size: 19pt; margin: 0 0 0.14in; }
+.poster.is-chanukah .poster-set-line { font-size: 16pt; line-height: 1.6; }
+.poster.is-chanukah .poster-set { margin-bottom: 0.3in; }
 /* --- All of them, one after another -------------------------------------------------
    A way of looking through the season's sheets rather than a poster of its own: every one
    for the chosen year, stacked, each drawn by its own renderer so what is in the run is
@@ -3477,6 +3484,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    around the break. Only between: the first time on a line has no sibling in front of it, so
    neither the head of the run nor the head of its second half picks one up. */
 .poster-box-row .poster-t + .poster-t::before { content: ", "; }
+/* The חנוכה sheet's own runs: the same drawn-rather-than-written comma, so balanceRuns can
+   cut one of these in two the same way it cuts the יום כיפור box's own runs. Not nowrap: the
+   Rosh Chodesh row's own label ("ראש חודש יום ה' (נץ 7:08) וו' (נץ 7:09)") is one item with
+   several words of its own, wider than balanceRuns's own even split can make room for by
+   moving whole items alone, so it has to be free to wrap inside itself the way a plain time
+   never needs to. */
+.poster-chanukah-run .poster-t + .poster-t::before { content: ", "; }
 /* The second half of a run that has been cut in two. A block, which is what puts it on a line
    of its own and leaves the label sitting against the first half. */
 .poster-run-more { display: block; }
