@@ -17,7 +17,7 @@
 // The afternoon and evening never print a single star at all, so their own old ** already
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
-import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha } from '../hebrew-calendar.js';
+import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
@@ -99,6 +99,18 @@ export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveFo
   const all = includeTwelveForty5 ? [twelveForty5, earlyMincha, mainMincha, oneFifty, late]
     : [earlyMincha, mainMincha, oneFifty, late];
   return all;
+}
+
+/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
+ *  so the Hebrew year to build that חנוכה's own poster or extras from. Both months land in
+ *  the same AM year (Kislev and Teves both follow תשרי within one year's own count), so
+ *  there is no year-boundary to special-case. Shared by the weekday and שבת charts, so a
+ *  week or a Friday only ever asks this one place whether it is inside חנוכה. */
+export function chanukahYearFor(serial, settings) {
+  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (j.month === 9 && j.dayOfMonth >= 25) return j.year;
+  if (j.month === 10 && j.dayOfMonth <= 2) return j.year;
+  return null;
 }
 
 /** The weekday מעריב: the everyday board's own regular run (6:35 through 11:00 - see
