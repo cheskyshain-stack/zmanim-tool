@@ -55,7 +55,7 @@ const shEsc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '
 const shKnown = (el) => {
   const tag = el.tagName;
   if (tag === 'U' || tag === 'BR' || tag === 'DIV' || tag === 'P' || tag === 'B' || tag === 'I') return true;
-  return tag === 'SPAN' && (el.className === '' || el.className === 'big');
+  return tag === 'SPAN' && (el.className === '' || el.className === 'big' || el.className === 'chanukah-tag');
 };
 
 /** The block read as lines, each a run of pieces that know whether they are underlined.
@@ -66,14 +66,14 @@ const shKnown = (el) => {
 function shReadLines(root) {
   const lines = [[]];
   let ok = true;
-  const walk = (node, underlined, big) => {
+  const walk = (node, underlined, big, badge) => {
     if (!ok) return;
     for (const child of node.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
         const parts = String(child.nodeValue).split('\n');
         parts.forEach((text, i) => {
           if (i) lines.push([]);
-          if (text) lines[lines.length - 1].push({ text, underlined, big });
+          if (text) lines[lines.length - 1].push({ text, underlined, big, badge });
         });
         continue;
       }
@@ -83,11 +83,12 @@ function shReadLines(root) {
       const block = child.tagName === 'DIV' || child.tagName === 'P';
       // A block starts a line of its own, unless the line it would start is already empty.
       if (block && lines[lines.length - 1].length) lines.push([]);
-      walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'));
+      walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'),
+        badge || child.classList?.contains('chanukah-tag'));
       if (block) lines.push([]);
     }
   };
-  walk(root, false, false);
+  walk(root, false, false, false);
   return ok ? lines : null;
 }
 
@@ -133,9 +134,14 @@ function shReadTimes(line) {
   return ok && times.length ? { times, slashed } : null;
 }
 
-/** A line that is not a row of times, written back out with its underlines kept. */
+/** A line that is not a row of times, written back out with its underlines and badges
+ *  kept (see .chanukah-tag in app.css - the same pill the "חנוכה" tag on a touching
+ *  week's own מעריב row is set in, so the two read as one mark wherever they appear). */
 const shPlainHtml = (line) => line
-  .map((p) => (p.underlined ? `<u>${shEsc(p.text)}</u>` : shEsc(p.text)))
+  .map((p) => {
+    const inner = p.underlined ? `<u>${shEsc(p.text)}</u>` : shEsc(p.text);
+    return p.badge ? `<span class="chanukah-tag">${inner}</span>` : inner;
+  })
   .join('');
 
 /** The schedule as a grid, or null to leave it exactly as it came in.

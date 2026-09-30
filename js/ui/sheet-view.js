@@ -446,8 +446,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const heading = specialShacharisHeading(kinds);
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
     const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
-    const chanukahHtml = (chanukahBlocks.regular ? `\n\n<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
-      + (chanukahBlocks.roshChodesh ? `\n\n<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
+    // The heading reads "חנוכה" in the same pill the tag on a touching week's own מעריב
+    // row is set in (.chanukah-tag, see shacharis-grid.js), rather than the plain
+    // underlined heading every other block here uses - one mark for חנוכה wherever it
+    // shows on this chart, on a row or on the panel alike.
+    const chanukahBadge = '<span class="chanukah-tag">חנוכה</span>';
+    const chanukahHtml = (chanukahBlocks.regular ? `\n\n${chanukahBadge}\n${chanukahBlocks.regular}` : '')
+      + (chanukahBlocks.roshChodesh ? `\n\nר"ח טבת · ${chanukahBadge}\n${chanukahBlocks.roshChodesh}` : '');
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
