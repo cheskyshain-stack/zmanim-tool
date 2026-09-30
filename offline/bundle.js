@@ -5446,6 +5446,18 @@ function chanukahYearFor(serial, settings) {
   return null;
 }
 
+/** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
+ *  חנוכה, or is the שבת right in front of it (ערב חנוכה) - the שבת whose own week is not
+ *  חנוכה but the very next שבת's is, which is always the שבת 25 Kislev opens or falls
+ *  within, since the eight days can never reach a second שבת without already covering
+ *  the one seven days on. Never both: a שבת inside חנוכה is answered by the first check
+ *  before the second is ever asked. */
+function chanukahShabbosLabel(shabbosSerial, settings) {
+  if (chanukahYearFor(shabbosSerial, settings)) return 'chanukah';
+  if (chanukahYearFor(shabbosSerial + 7, settings)) return 'erev';
+  return null;
+}
+
 /** The weekday מעריב: the everyday board's own regular run (6:35 through 11:00 - see
  *  `maarivParts` in `js/sheets/weekday.js`) with one extra, earlier מנין of its own in front.
  *
@@ -5554,17 +5566,23 @@ function mergedCell(traces) {
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
 const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
 
+/** Every day's own נץ, joined to the ותיקין time it is worked from rather than sitting apart
+ *  in the row's label: the same "(נץ 6:54)" the הושענא רבה מנין on the סוכות sheet carries
+ *  beside its own מנין (`sukkosRow`'s own `note`, joined by a non-breaking space so the two
+ *  can never split across a line). ותיקין runs every day of חנוכה, not only Rosh Chodesh, so
+ *  every row gets one: the group's own distinct נץ values, slash-joined the same way a group
+ *  that does not agree on a time anywhere else on this sheet is written. */
+const netzNote = (group) => `(נץ ${[...new Set(group.map((d) => formatTime(d.netz)))].join(SLASH)})`;
+
 /** Fewer lines than one per day: consecutive days whose whole morning matches print once,
  *  under a day range rather than a day each ("יום א'-ד'"), the same combining "יום ג'-ד'"
  *  already does on the old sheets.
  *
  *  Rosh Chodesh days combine on their own terms - grouped together whether or not their own
- *  ותיקין time agrees, labelled "ראש חודש" with every day's own נץ named beside its own
- *  letter in that same label, since נץ is only ever asked for there and is not one of the
- *  מנינים: keeping it in the label rather than in the line of times is what keeps it apart
- *  from them. The ותיקין time itself still opens the line of times below the label, the
- *  same as every other day - both values are slash-joined when the group's own days do not
- *  agree, the same a live choice between two times is written anywhere else on this sheet. */
+ *  ותיקין time agrees, labelled "ראש חודש" with each day's own letter. The ותיקין time itself
+ *  still opens the line of times below the label, the same as every other day - both values
+ *  are slash-joined when the group's own days do not agree, the same a live choice between
+ *  two times is written anywhere else on this sheet. */
 function combineShacharisRows(days) {
   const rows = [];
   let i = 0;
@@ -5573,9 +5591,9 @@ function combineShacharisRows(days) {
       let j = i + 1;
       while (j < days.length && days[j].isRoshChodesh) j++;
       const group = days.slice(i, j);
-      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}' (נץ ${formatTime(d.netz)})`).join(' ')}`;
+      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`;
       const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-      rows.push({ label, cells });
+      rows.push({ label, cells, note: netzNote(group) });
       i = j;
       continue;
     }
@@ -5585,7 +5603,11 @@ function combineShacharisRows(days) {
     const group = days.slice(i, j);
     const first = dayLetter(group[0].serial);
     const last = dayLetter(group[group.length - 1].serial);
-    rows.push({ label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`, cells: group[0].lines.map(toCell) });
+    rows.push({
+      label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`,
+      cells: group[0].lines.map(toCell),
+      note: netzNote(group),
+    });
     i = j;
   }
   return rows;
@@ -10641,12 +10663,21 @@ ${special}` : '');
       // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
       // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
       // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // The שבת charts also say when the שבת itself is inside חנוכה, or is the שבת right in
+      // front of it - never on the Weekday chart, whose own חנוכה treatment is its own (see
+      // buildWeekdayRow), and חנוכה never falls in a קיץ week to begin with.
+      const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
+      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '')
+        + (chanukahLabel === 'chanukah' ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${nl2br(parshaCell)}</td>`;
+      // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
+      // week ahead rather than this one, so it does not belong beside the parsha at full
+      // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
+      const parshaHtml = nl2br(parshaCell) + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
+      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');
@@ -12242,12 +12273,18 @@ function renderTzomGedaliaPoster(poster, settings) {
  *  .poster-chanukah-run rule and balanceRuns's own selector.
  *
  *  `label`, where a row has one, is the run's own first item too rather than text set in
- *  front of it, so a label long enough to need it (Rosh Chodesh's own, with a נץ named for
- *  each day) is part of what balanceRuns measures and can be cut evenly along with the times
- *  after it, not a fixed width the run's own share of the line has to fit around. */
-const chanukahRunLine = (cells, label) => `<p class="poster-set-line" lang="he">`
+ *  front of it, so a label long enough to need it (Rosh Chodesh's own) is part of what
+ *  balanceRuns measures and can be cut evenly along with the times after it, not a fixed
+ *  width the run's own share of the line has to fit around.
+ *
+ *  `note`, where a row has one, is the נץ ותיקין is worked from (see `netzNote` in
+ *  posters/chanukah.js), joined to the first time - ותיקין itself - by a non-breaking space
+ *  rather than sitting ahead of the row in the label: the same pairing `sukkosRow`'s own
+ *  note gives הושענא רבה's מנין and its own נץ, so the two can never split across a line. */
+const chanukahRunLine = (cells, label, note) => `<p class="poster-set-line" lang="he">`
   + `<bdi class="poster-chanukah-run">`
   + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
+  + (note ? `<bdi class="poster-row-note">${escAttr(note)}</bdi> ` : '')
   + cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')
   + `</bdi></p>`;
 
@@ -12262,7 +12299,7 @@ function chanukahBody(poster) {
       ${inner}
     </div>`;
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label)).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label, row.note)).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),

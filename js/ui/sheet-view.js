@@ -7,6 +7,7 @@ import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebre
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
+import { chanukahShabbosLabel } from '../posters/chanukah.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { hebrewLang, escText, escAttr } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
@@ -501,12 +502,21 @@ ${special}` : '');
       // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
       // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
       // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // The שבת charts also say when the שבת itself is inside חנוכה, or is the שבת right in
+      // front of it - never on the Weekday chart, whose own חנוכה treatment is its own (see
+      // buildWeekdayRow), and חנוכה never falls in a קיץ week to begin with.
+      const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
+      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '')
+        + (chanukahLabel === 'chanukah' ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${nl2br(parshaCell)}</td>`;
+      // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
+      // week ahead rather than this one, so it does not belong beside the parsha at full
+      // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
+      const parshaHtml = nl2br(parshaCell) + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
+      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');

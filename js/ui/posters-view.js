@@ -1471,12 +1471,18 @@ function renderTzomGedaliaPoster(poster, settings) {
  *  .poster-chanukah-run rule and balanceRuns's own selector.
  *
  *  `label`, where a row has one, is the run's own first item too rather than text set in
- *  front of it, so a label long enough to need it (Rosh Chodesh's own, with a נץ named for
- *  each day) is part of what balanceRuns measures and can be cut evenly along with the times
- *  after it, not a fixed width the run's own share of the line has to fit around. */
-const chanukahRunLine = (cells, label) => `<p class="poster-set-line" lang="he">`
+ *  front of it, so a label long enough to need it (Rosh Chodesh's own) is part of what
+ *  balanceRuns measures and can be cut evenly along with the times after it, not a fixed
+ *  width the run's own share of the line has to fit around.
+ *
+ *  `note`, where a row has one, is the נץ ותיקין is worked from (see `netzNote` in
+ *  posters/chanukah.js), joined to the first time - ותיקין itself - by a non-breaking space
+ *  rather than sitting ahead of the row in the label: the same pairing `sukkosRow`'s own
+ *  note gives הושענא רבה's מנין and its own נץ, so the two can never split across a line. */
+const chanukahRunLine = (cells, label, note) => `<p class="poster-set-line" lang="he">`
   + `<bdi class="poster-chanukah-run">`
   + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
+  + (note ? `<bdi class="poster-row-note">${escAttr(note)}</bdi> ` : '')
   + cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')
   + `</bdi></p>`;
 
@@ -1491,7 +1497,7 @@ function chanukahBody(poster) {
       ${inner}
     </div>`;
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label)).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label, row.note)).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),

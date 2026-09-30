@@ -776,6 +776,9 @@ th {
    the table. The names still lead the row without it, being 2pt larger than everything
    else. */
 .parsha-cell { text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
+/* ערב חנוכה, on its own line under the parsha rather than at the parsha's own size: it
+   names the week ahead, not this one, so it reads as a note rather than a second title. */
+.parsha-note { font-size: 0.7em; font-weight: normal; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
