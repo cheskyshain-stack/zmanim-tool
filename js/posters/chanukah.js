@@ -159,7 +159,11 @@ const CH_MAARIV_LATE = [
   [9, 30], [10, 0], [10, 30], [11, 0], // underlined again except 10:30
 ];
 
-function chanukahMaariv(hebrewYear, settings) {
+/** Exported for sheet-view.js's own use too: a week only partly inside חנוכה gets these
+ *  same values on a row of their own rather than repeating the everyday board's own
+ *  standing schedule, so the wall chart and this poster read the same מעריב for a night
+ *  that is genuinely חנוכה's and nothing else. */
+export function chanukahMaariv(hebrewYear, settings) {
   // למטה, the same as every other מעריב on this line: the old sheets' own ** on this one is
   // no different from the ** on 6:35 and the rest, and none of them means אולם השמחות.
   const early = chanukahEarlyMaariv(hebrewYear, settings).underline();
@@ -198,6 +202,14 @@ function chanukahShacharisDay(serial, settings) {
     : vasikinNetz.laterOf(
       before10(7, 0, "the everyday board's own first morning minyan"),
       'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
+  /* Whether נץ is actually why this day's ותיקין prints when it does, asked for directly:
+     a day the floor wins is a day the shul's own everyday minyan is on the board same as
+     any other, and נץ had nothing to do with the printed time - naming it there is a fact
+     nobody asked for beside a time that needed no explaining. Read off vasikin's own last
+     step rather than compared again here, so this can never disagree with which candidate
+     laterOf actually kept. Rosh Chodesh has no floor to have won instead, so its own נץ is
+     always why. */
+  const netzBinding = isRoshChodesh || vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
   const lines = isRoshChodesh
     ? [
@@ -218,7 +230,7 @@ function chanukahShacharisDay(serial, settings) {
       clockTime(8, 40, "the everyday board's own morning minyan, unmoved").underline(),
     ];
 
-  return { serial, isRoshChodesh, netz, lines };
+  return { serial, isRoshChodesh, netz, netzBinding, lines };
 }
 
 export const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.underlined), mark: t.flags.mark || '', trace: t });
@@ -235,13 +247,24 @@ function mergedCell(traces) {
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
 const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
 
-/** Every day's own נץ, joined to the ותיקין time it is worked from rather than sitting apart
- *  in the row's label: the same "(נץ 6:54)" the הושענא רבה מנין on the סוכות sheet carries
- *  beside its own מנין (`sukkosRow`'s own `note`, joined by a non-breaking space so the two
- *  can never split across a line). ותיקין runs every day of חנוכה, not only Rosh Chodesh, so
- *  every row gets one: the group's own distinct נץ values, slash-joined the same way a group
- *  that does not agree on a time anywhere else on this sheet is written. */
-const netzNote = (group) => `(נץ ${[...new Set(group.map((d) => formatTime(d.netz)))].join(SLASH)})`;
+/** Every day's own נץ that is actually why its ותיקין prints when it does, joined to the
+ *  time it is worked from rather than sitting apart in the row's label - the same
+ *  "(נץ 6:54)" the הושענא רבה מנין on the סוכות sheet carries beside its own מנין
+ *  (`sukkosRow`'s own `note`, joined by a non-breaking space so the two can never split
+ *  across a line).
+ *
+ *  Asked for directly: a day whose own ותיקין sits at the everyday board's own floor
+ *  (`netzBinding` false, see chanukahShacharisDay) is a day נץ decided nothing, and naming
+ *  it beside a time that needed no explaining is a fact nobody asked for. Dropped from the
+ *  group entirely rather than printed anyway, and the note itself is dropped (null) when
+ *  the group has no day left that נץ actually explains - a group of only floor days has
+ *  nothing for this line to say. Rosh Chodesh has no floor to have won instead, so every
+ *  Rosh Chodesh day always keeps its own נץ here. */
+const netzNote = (group) => {
+  const bound = group.filter((d) => d.netzBinding);
+  if (!bound.length) return null;
+  return `(נץ ${[...new Set(bound.map((d) => formatTime(d.netz)))].join(SLASH)})`;
+};
 
 /** Fewer lines than one per day: consecutive days whose whole morning matches print once,
  *  under a day range rather than a day each ("יום א'-ד'"), the same combining "יום ג'-ד'"

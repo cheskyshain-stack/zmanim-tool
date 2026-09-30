@@ -7,9 +7,12 @@ import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebre
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek } from '../sheets/weekday.js';
-import { chanukahShabbosLabel, chanukahScheduleLines } from '../posters/chanukah.js';
+import {
+  chanukahShabbosLabel, chanukahScheduleLines, chanukahMaariv, chanukahWeekdayMincha,
+  chanukahYearFor, toCell,
+} from '../posters/chanukah.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang, escText, escAttr } from '../util.js';
+import { hebrewLang, escText, escAttr, splitLinesInHalf } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -399,6 +402,50 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   // many weeks), it prints once on a panel laid over the whole column, matching how it
   // looks in the original printed chart. It comes off the program's own WEEKDAY_SHACHARIS
   // with no per-cell override, which is what puts the same list on every chart at once.
+  const chanukahFullIdx = isWeekday
+    ? pageWeeks.findIndex((w) => chanukahDaysInWeek(w.serial, settings).length === 5)
+    : -1;
+  /* A week that touches חנוכה without being made of it entirely keeps its own row exactly
+     as any ordinary week's - the standing formulas already answer for its own regular
+     days, and colouring the whole row for one or two nights out of five would misname the
+     rest of it. What those particular nights and mornings actually run gets a row of its
+     own instead (chanukahRowHtml below), not just a note on the שחרית panel: a מעריב or a
+     מנחה is as much חנוכה's own as its שחרית is, and a reader should not have to find two
+     of a night's three תפילות on a panel and the third nowhere at all. */
+  const chanukahPartialDays = isWeekday
+    ? pageWeeks.flatMap((w, idx) => {
+        if (idx === chanukahFullIdx) return [];
+        const days = chanukahDaysInWeek(w.serial, settings);
+        return days.length > 0 && days.length < 5 ? days : [];
+      })
+    : [];
+  /* Where that row goes: right before the first real week whose own Sunday falls after
+     every residual day. That is the week straight after them in the ordinary case (the
+     residual days trailing the week before it, or opening the week after), or the very end
+     of the page when the eight days run past its last week. Every occurrence checked
+     (5784 through 5815) only ever has the residual days trail one week, lead the next, or
+     both at once across two adjacent weeks - never a week on both sides of a gap - so the
+     one insertion point this finds is always the right one. */
+  const chanukahInsertBefore = chanukahPartialDays.length
+    ? (() => {
+        const lastResidualDay = Math.max(...chanukahPartialDays);
+        const idx = pageWeeks.findIndex((w) => w.serial - 6 > lastResidualDay);
+        return idx === -1 ? pageWeeks.length : idx;
+      })()
+    : -1;
+  /* The page's own rows in the order they print, real weeks and (at most one) חנוכה's own
+     row interleaved - built once so the panel's own geometry and every row's own rendering
+     count rows the same way. */
+  const logicalRows = [];
+  pageWeeks.forEach((week, weekIdx) => {
+    if (weekIdx === chanukahInsertBefore) logicalRows.push({ type: 'chanukah' });
+    logicalRows.push({ type: 'week', week, weekIdx });
+  });
+  if (chanukahInsertBefore === pageWeeks.length) logicalRows.push({ type: 'chanukah' });
+  const chanukahFullAbsIdx = chanukahFullIdx === -1
+    ? -1 : logicalRows.findIndex((r) => r.type === 'week' && r.weekIdx === chanukahFullIdx);
+  const chanukahRowAbsIdx = logicalRows.findIndex((r) => r.type === 'chanukah');
+
   /* Which row's cell the panel hangs from. The middle one, and that is arithmetic rather
      than taste: the panel is sized in multiples of the cell it hangs from, and a cell is a
      hair shorter than a row (the collapsed border between two rows is not part of it, see
@@ -407,11 +454,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
      Hung from the first row, all of it lands at the foot: measured on a phone, 6px of chart
      above the panel against 12px below. Hung from the middle, the half above and the half
      below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
-  let panelRow = Math.round((pageWeeks.length - 0.7) / 2);
-  /* חנוכה's own שחרית is the one week-specific exception to "one schedule for the page":
-     a week every one of whose five days falls inside the eight days runs the ותיקין
+  let panelRow = Math.round((logicalRows.length - 0.7) / 2);
+  /* חנוכה's own שחרית is the one exception to "one schedule for the page", whether it is a
+     week every one of whose five days is חנוכה or חנוכה's own row: both run the ותיקין
      morning instead, which the standing panel does not know and must not paper over.
-     Splitting the panel into a segment above that row and a segment below it was tried
+     Splitting the panel into a segment above such a row and a segment below it was tried
      first and measured out badly: the panel's own content (the everyday two lines, and
      often a ר"ח/בה"ב/תענית block beside it) is several lines tall, and a segment of only
      one or two rows is nowhere near tall enough to hold it - the panel overflowed its own
@@ -420,41 +467,58 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
      exactly as it always was, and the excluded row's own cell is what changes instead: see
      .shacharis-own below, which is given a higher stacking order than the panel so it
      paints over whatever of the panel would otherwise show through its own row, rather than
-     the panel being asked to leave a hole shaped like a row it cannot fit around. */
-  const chanukahFullIdx = isWeekday
-    ? pageWeeks.findIndex((w) => chanukahDaysInWeek(w.serial, settings).length === 5)
-    : -1;
-  // The panel cannot hang from the one row it must not cover - moved one row over when the
-  // two coincide, which is always possible on any page with more than one row (and a page
-  // with only one row cannot have both a חנוכה row and a standing schedule to show anyway).
-  if (chanukahFullIdx === panelRow) panelRow = panelRow === 0 ? 1 : panelRow - 1;
-  /* A week that touches חנוכה without being made of it entirely keeps its own row exactly
-     as any ordinary week's - the standing formulas already answer for its own regular
-     days, and colouring the whole row for one or two nights out of five would misname the
-     rest of it. What those particular nights and mornings actually run is said once
-     instead, as one more line on the standing panel (see chanukahScheduleLines in
-     posters/chanukah.js) - the panel already carries the page's one ר"ח/בה"ב/תענית note
-     the same way, so a second note beside it is the same idea repeated, not a new one. */
-  const chanukahPartialDays = isWeekday
-    ? pageWeeks.flatMap((w, idx) => {
-        if (idx === chanukahFullIdx) return [];
-        const days = chanukahDaysInWeek(w.serial, settings);
-        return days.length > 0 && days.length < 5 ? days : [];
-      })
-    : [];
+     the panel being asked to leave a hole shaped like a row it cannot fit around. The panel
+     cannot hang from either excluded row itself, so it is moved one row over when it lands
+     on one - always possible on a page with more than one such row, and a page with only one
+     row cannot have both an excluded row and a standing schedule to show anyway. */
+  const panelExcluded = new Set([chanukahFullAbsIdx, chanukahRowAbsIdx].filter((i) => i !== -1));
+  while (panelExcluded.has(panelRow) && panelRow < logicalRows.length - 1) panelRow++;
+  while (panelExcluded.has(panelRow) && panelRow > 0) panelRow--;
+
   const panelHtml = (() => {
     if (!isWeekday) return '';
     const heading = specialShacharisHeading(specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
-    const chanukahNote = chanukahPartialDays.length
-      ? `\n\n<u>${escText('חנוכה')}</u>\n${chanukahScheduleLines(chanukahPartialDays, settings)}`
-      : '';
-    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahNote;
+    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '');
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
 
-  const rows = pageWeeks
-    .map((week, rowIndex) => {
+  /* חנוכה's own row, built from the same functions the Special Schedules poster itself
+     uses (chanukahMaariv, chanukahWeekdayMincha, chanukahScheduleLines) rather than the
+     standing weekday formulas, so the two can never disagree about a night that is
+     genuinely חנוכה's and nothing else. Not a real week - there is no serial of its own to
+     key an override to - so its cells are plain computed text, the same as the panel's. */
+  const chanukahRowHtml = (() => {
+    if (chanukahRowAbsIdx === -1) return '';
+    // Real <u> tags already, not the UL_START/UL_END sentinels nl2br expects - passing this
+    // through nl2br would escape them right back into literal text. .cell is already
+    // white-space: pre-line, so the \n splitLinesInHalf joined with is all a line break needs.
+    const cellText = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
+    const linesFor = (cells) => splitLinesInHalf(cells.map(cellText));
+    const year = chanukahYearFor(chanukahPartialDays[0], settings);
+    const referenceSerial = chanukahPartialDays[0];
+    const B = linesFor(chanukahMaariv(year, settings).map(toCell));
+    const C = linesFor(chanukahWeekdayMincha(referenceSerial, settings, year >= 5786).map(toCell));
+    // Rosh Chodesh dropped and every day merged into one, the same trade this row's own
+    // week-row cousin makes (see chanukahFullAbsIdx below): a day this row covers is one of
+    // several sharing the row's own height budget, not a week's worth of room to itself, and
+    // a Rosh Chodesh day within it still has its own morning on the Special Schedules poster.
+    const ownHtml = chanukahScheduleLines(chanukahPartialDays, settings, { includeRoshChodesh: false, mergeAll: true });
+    const ownLaid = shacharisGridHtml(ownHtml) || ownHtml;
+    const textFor = { B, C, E: `<div class="shacharis-own">${ownLaid}</div>` };
+    const cellHtmlFor = (c) => (c.key === 'E'
+      ? `<td class="shacharis-through shacharis-own-cell">${textFor.E}</td>`
+      : `<td><div class="cell">${textFor[c.key] ?? ''}</div></td>`);
+    const cells = orderedColumns.map(cellHtmlFor).join('');
+    const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
+    const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang('חנוכה')}>חנוכה</td>`;
+    return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
+  })();
+
+  const rows = logicalRows
+    .map((entry, absIdx) => {
+      if (entry.type === 'chanukah') return chanukahRowHtml;
+      const { week } = entry;
       // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
       // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
       // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
@@ -483,7 +547,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              panel's own (see app.css) so it paints over whatever of the panel would
              otherwise show through this row - the panel itself is untouched, one piece,
              hung exactly where it always was. */
-          if (rowIndex === chanukahFullIdx) {
+          if (absIdx === chanukahFullAbsIdx) {
             const ownDays = chanukahDaysInWeek(week.serial, settings);
             const ownHtml = chanukahScheduleLines(ownDays, settings, { includeRoshChodesh: false, mergeAll: true });
             const ownLaid = shacharisGridHtml(ownHtml) || ownHtml;
@@ -491,7 +555,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           }
           // Every row but the one the panel hangs from is an empty cell carrying nothing
           // but its own row.
-          if (rowIndex !== panelRow) return '<td class="shacharis-through"></td>';
+          if (absIdx !== panelRow) return '<td class="shacharis-through"></td>';
           /* This row's cell is a row like the others and carries the panel, which is laid out
              of it and over the whole column.
              --rows is the page's row count and --above is how many rows sit above this one,
@@ -501,7 +565,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
              the arithmetic. */
           return `<td class="shacharis-through is-panel"
-            style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
+            style="--rows: ${logicalRows.length}; --above: ${panelRow}">
             <div class="shacharis-panel"><div class="shacharis-panel-in">${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
@@ -536,13 +600,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
       // The שבת charts say when the שבת itself is inside חנוכה, or is the שבת right in front
       // of it (never in a קיץ week, which חנוכה cannot fall in to begin with). The Weekday
-      // chart says the same thing its own way: a week made entirely of חנוכה (rowIndex ===
-      // chanukahFullIdx, above) names it right in the parsha cell, "with the info" already
+      // chart says the same thing its own way: a week made entirely of חנוכה (absIdx ===
+      // chanukahFullAbsIdx, above) names it right in the parsha cell, "with the info" already
       // sitting in that row's own columns; a week only partly חנוכה keeps its plain name,
       // since it is not the week the eight days belong to on their own.
       const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
       const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '')
-        + (chanukahLabel === 'chanukah' || (isWeekday && rowIndex === chanukahFullIdx) ? ' · חנוכה' : '');
+        + (chanukahLabel === 'chanukah' || (isWeekday && absIdx === chanukahFullAbsIdx) ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
