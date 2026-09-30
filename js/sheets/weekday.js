@@ -36,6 +36,7 @@ import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
 import { isKayitzWeek } from './weeks.js';
+import { chanukahYearFor, chanukahEarlyMaariv } from '../posters/chanukah.js';
 import { formatTime, underlineTime, newMinyanTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
@@ -63,6 +64,15 @@ function renderTime(mins, place) {
   if (place === LMATA) return underlineTime(text);
   if (place === EZRAS) return `${text}*`;
   return text;
+}
+
+/** Which, if any, of this week's own five days fall inside חנוכה's eight - shared by
+ *  maarivParts below (whether the row runs חנוכה's own early מעריב at all) and by
+ *  sheet-view.js (whether the row's own שחרית is freed from the standing panel, and what
+ *  the panel's own חנוכה line says for a week only partly in it). One answer, asked once,
+ *  so the row and the panel can never disagree about which week is which. */
+export function chanukahDaysInWeek(serial, settings) {
+  return sundayThroughThursday(serial).filter((d) => chanukahYearFor(d, settings));
 }
 
 /** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
@@ -278,6 +288,20 @@ function maarivParts(week, settings) {
   const bmg = isBmgWeek(week.serial, settings);
   const kayitz = isKayitzWeek(week.serial, settings);
 
+  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), only
+  // on a week every one of whose five days falls inside the eight days - a week only partly
+  // חנוכה runs this line exactly as any ordinary week does (see chanukahDaysInWeek above,
+  // and sheet-view.js, which says what those particular nights run instead: once, on the
+  // page's own שחרית panel, rather than inside a cell five other readers - the week card,
+  // "what is on next", the messages page - also read as this week's own standing answer).
+  // Built and traced apart from the standing slots below: it does not walk later to clear
+  // שקיעה the way they do (it already is 50 minutes past the latest שקיעה of חנוכה's own
+  // nights) and it is never dropped for crowding its neighbour, being far earlier than
+  // anything else on this line.
+  const chanukahDays = chanukahDaysInWeek(week.serial, settings);
+  const chanukahYear = chanukahDays.length === 5 ? chanukahYearFor(chanukahDays[0], settings) : null;
+  const chanukahEarly = chanukahYear ? chanukahEarlyMaariv(chanukahYear, settings).underline() : null;
+
   // A מעריב must be 50 minutes after שקיעה on every one of the week's own regular days, so
   // here it is the *latest* שקיעה of those that binds - a full יום טוב day left out
   // (regularDays), the same reason weekLatestMinchaGedola leaves one out. Rounded up, for
@@ -353,7 +377,10 @@ function maarivParts(week, settings) {
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
   });
-  const text = splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot))));
+  const text = splitLinesInHalf([
+    ...(chanukahEarly ? [chanukahEarly.text()] : []),
+    ...kept.map((slot) => renderTime(slot.mins, placeOf(slot))),
+  ]);
   /* The tag is a *second*, print-only rendering of the same kept slots, never mixed into
      `text` above. `text` is what every other reader of this column reads too - the week
      card, the "what is on next" card, the messages page (js/week-text.js parses these
@@ -377,7 +404,7 @@ function maarivParts(week, settings) {
   return {
     text,
     printText,
-    times: kept.map(trace),
+    times: [...(chanukahEarly ? [chanukahEarly] : []), ...kept.map(trace)],
     dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };

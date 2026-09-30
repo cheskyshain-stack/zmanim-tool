@@ -17,11 +17,11 @@
 // The afternoon and evening never print a single star at all, so their own old ** already
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
-import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha } from '../hebrew-calendar.js';
+import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime } from '../format.js';
-import { SLASH } from '../util.js';
+import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
@@ -99,6 +99,30 @@ export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveFo
   const all = includeTwelveForty5 ? [twelveForty5, earlyMincha, mainMincha, oneFifty, late]
     : [earlyMincha, mainMincha, oneFifty, late];
   return all;
+}
+
+/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
+ *  so the Hebrew year to build that חנוכה's own poster or extras from. Both months land in
+ *  the same AM year (Kislev and Teves both follow תשרי within one year's own count), so
+ *  there is no year-boundary to special-case. Shared by the weekday and שבת charts, so a
+ *  week or a Friday only ever asks this one place whether it is inside חנוכה. */
+export function chanukahYearFor(serial, settings) {
+  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (j.month === 9 && j.dayOfMonth >= 25) return j.year;
+  if (j.month === 10 && j.dayOfMonth <= 2) return j.year;
+  return null;
+}
+
+/** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
+ *  חנוכה, or is the שבת right in front of it (ערב חנוכה) - the שבת whose own week is not
+ *  חנוכה but the very next שבת's is, which is always the שבת 25 Kislev opens or falls
+ *  within, since the eight days can never reach a second שבת without already covering
+ *  the one seven days on. Never both: a שבת inside חנוכה is answered by the first check
+ *  before the second is ever asked. */
+export function chanukahShabbosLabel(shabbosSerial, settings) {
+  if (chanukahYearFor(shabbosSerial, settings)) return 'chanukah';
+  if (chanukahYearFor(shabbosSerial + 7, settings)) return 'erev';
+  return null;
 }
 
 /** The weekday מעריב: the everyday board's own regular run (6:35 through 11:00 - see
@@ -209,17 +233,23 @@ function mergedCell(traces) {
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
 const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
 
+/** Every day's own נץ, joined to the ותיקין time it is worked from rather than sitting apart
+ *  in the row's label: the same "(נץ 6:54)" the הושענא רבה מנין on the סוכות sheet carries
+ *  beside its own מנין (`sukkosRow`'s own `note`, joined by a non-breaking space so the two
+ *  can never split across a line). ותיקין runs every day of חנוכה, not only Rosh Chodesh, so
+ *  every row gets one: the group's own distinct נץ values, slash-joined the same way a group
+ *  that does not agree on a time anywhere else on this sheet is written. */
+const netzNote = (group) => `(נץ ${[...new Set(group.map((d) => formatTime(d.netz)))].join(SLASH)})`;
+
 /** Fewer lines than one per day: consecutive days whose whole morning matches print once,
  *  under a day range rather than a day each ("יום א'-ד'"), the same combining "יום ג'-ד'"
  *  already does on the old sheets.
  *
  *  Rosh Chodesh days combine on their own terms - grouped together whether or not their own
- *  ותיקין time agrees, labelled "ראש חודש" with every day's own נץ named beside its own
- *  letter in that same label, since נץ is only ever asked for there and is not one of the
- *  מנינים: keeping it in the label rather than in the line of times is what keeps it apart
- *  from them. The ותיקין time itself still opens the line of times below the label, the
- *  same as every other day - both values are slash-joined when the group's own days do not
- *  agree, the same a live choice between two times is written anywhere else on this sheet. */
+ *  ותיקין time agrees, labelled "ראש חודש" with each day's own letter. The ותיקין time itself
+ *  still opens the line of times below the label, the same as every other day - both values
+ *  are slash-joined when the group's own days do not agree, the same a live choice between
+ *  two times is written anywhere else on this sheet. */
 export function combineShacharisRows(days) {
   const rows = [];
   let i = 0;
@@ -228,9 +258,9 @@ export function combineShacharisRows(days) {
       let j = i + 1;
       while (j < days.length && days[j].isRoshChodesh) j++;
       const group = days.slice(i, j);
-      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}' (נץ ${formatTime(d.netz)})`).join(' ')}`;
+      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`;
       const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-      rows.push({ label, cells });
+      rows.push({ label, cells, note: netzNote(group) });
       i = j;
       continue;
     }
@@ -240,10 +270,40 @@ export function combineShacharisRows(days) {
     const group = days.slice(i, j);
     const first = dayLetter(group[0].serial);
     const last = dayLetter(group[group.length - 1].serial);
-    rows.push({ label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`, cells: group[0].lines.map(toCell) });
+    rows.push({
+      label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`,
+      cells: group[0].lines.map(toCell),
+      note: netzNote(group),
+    });
     i = j;
   }
   return rows;
+}
+
+/** `days`' own combined morning(s) (see combineShacharisRows), as the wall chart prints
+ *  them rather than as the poster does: plain lines of times, no label in front of them,
+ *  ready for shacharisGridHtml to set in columns. A wall-chart row is already dated by its
+ *  own parsha column, and the panel's own line already carries its own heading ("חנוכה"),
+ *  so the label combineShacharisRows builds ("יום א'-ד'", "ראש חודש ...") would only repeat
+ *  what is already said beside it. ותיקין prints inline, the first time of its own line,
+ *  matching every other row on this chart - the special schedules' own broken-out line is
+ *  that page's own choice, not this one's. More than one group (a run split by Rosh
+ *  Chodesh, say) prints as more than one two-line block, a blank line between them so
+ *  shacharisGridHtml reads them as separate blocks rather than one.
+ *
+ *  `includeRoshChodesh: false` drops any Rosh Chodesh day out of the group entirely rather
+ *  than printing its own block beside the regular days': asked for the one row a week every
+ *  one of whose five days is חנוכה gets (sheet-view.js), which has only the one row's own
+ *  height to spend and not the many the standing panel is free to run a second block down.
+ *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
+ *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks. */
+export function chanukahScheduleLines(days, settings, { includeRoshChodesh = true } = {}) {
+  const cellHtml = (c) => `${c.underlined ? `<u>${c.text}</u>` : c.text}${c.mark || ''}`;
+  const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
+    .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
+  return combineShacharisRows(dayObjs)
+    .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
+    .join('\n\n');
 }
 
 /** One ערב שבת block rather than one per Friday: the eight days can touch two (see
