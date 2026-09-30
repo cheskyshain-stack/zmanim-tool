@@ -8,11 +8,15 @@
 // own answer, given directly, is what is here - a later year over an earlier one wherever the
 // two conflict and there is no calendar reason for the difference).
 //
-// The marks are this project's, not the old sheets'. Those used a plain time for the main בית
-// מדרש, one star for בעזרת נשים, two stars for בית מדרש למטה and three for אולם השמחות; here
-// plain is the main בית מדרש, an underline is למטה, one star is בעזר״נ and two stars is אולם
-// השמחות. The same translation the סוכות and צום גדליה sheets already make, so a mark means one
-// thing everywhere a reader holds this beside another sheet or the boards themselves.
+// The morning's marks are this project's, not the old sheets'. Those used a plain time for
+// the main בית מדרש, one star for בעזרת נשים, two stars for בית מדרש למטה and three for אולם
+// השמחות; here plain is the main בית מדרש, an underline is למטה, one star is בעזר״נ and two
+// stars is אולם השמחות. The same translation the סוכות and צום גדליה sheets already make, so a
+// mark means one thing everywhere a reader holds this beside another sheet or the boards
+// themselves - but only the morning ever needed three star levels to tell four rooms apart.
+// The afternoon and evening never print a single star at all, so their own old ** already
+// meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
+// already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
 import { dateFromHebrew, excelWeekday, hasRoshChodesh } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
@@ -65,9 +69,14 @@ const CH_ROSH_CHODESH_MIDDLE_SHIFT = 5;
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
  *  12:45 (only once the clocks are back, which every חנוכה is), 1:15 or 1:20, and 1:35 or 1:40,
  *  each weighed against the latest מנחה גדולה לחומרא reaches across the relevant week, exactly
- *  the way the everyday board decides them - then 1:50, unmarked, the same fixed close every
- *  year keeps. 12:45 is only on the sheet from תשפ״ו on; earlier years do not print it, the
- *  same way the everyday board did not carry it yet either. */
+ *  the way the everyday board decides them, in the same room (`LMATA` there) - then 1:50,
+ *  unmarked, the same fixed close every year keeps. 12:45 is only on the sheet from תשפ״ו on;
+ *  earlier years do not print it, the same way the everyday board did not carry it yet either.
+ *
+ *  The old sheets' own ** on these four is that room, not אולם השמחות: unlike the morning,
+ *  which needs three star levels to tell four rooms apart, nothing in this afternoon or the
+ *  Erev Shabbos menu below it is ever printed with a single star, so ** here is simply this
+ *  section's own way of writing למטה. The location does not move for חנוכה. */
 export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveForty5) {
   const weekMgl = weekLatestMinchaGedola(referenceSerial, settings);
   const mgl = () => zman('מנחה גדולה לחומרא', weekMgl,
@@ -75,13 +84,13 @@ export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveFo
   const notBefore = 'a מנחה is never offered before it';
 
   const twelveForty5 = clockTime(12, 45, 'the first of the early weekday מנחה מנינים')
-    .laterOf(mgl(), notBefore).mark('**');
+    .laterOf(mgl(), notBefore).underline();
   const earlyMincha = weekMgl <= T(13, 15)
-    ? clockTime(13, 15, 'the earlier of the two early weekday מנחה מנינים').mark('**')
-    : clockTime(13, 20, 'offered instead of 1:15, מנחה גדולה לחומרא reaching past it').mark('**');
+    ? clockTime(13, 15, 'the earlier of the two early weekday מנחה מנינים').underline()
+    : clockTime(13, 20, 'offered instead of 1:15, מנחה גדולה לחומרא reaching past it').underline();
   const mainMincha = weekMgl <= T(13, 35)
-    ? clockTime(13, 35, 'the earlier of the two main weekday מנחה מנינים').mark('**')
-    : clockTime(13, 40, 'offered instead of 1:35, מנחה גדולה לחומרא reaching past it').mark('**');
+    ? clockTime(13, 35, 'the earlier of the two main weekday מנחה מנינים').underline()
+    : clockTime(13, 40, 'offered instead of 1:35, מנחה גדולה לחומרא reaching past it').underline();
   const oneFifty = fixedTime('1:50', { label: 'the standing close of the early afternoon' });
   /* Not on any board the rest of the year: a late, fixed מנחה in front of candle lighting,
      identical across all six sampled years (תשפ״א-תשפ״ז) despite שקיעה itself moving several
@@ -126,7 +135,9 @@ const CH_MAARIV_LATE = [
 ];
 
 function chanukahMaariv(hebrewYear, settings) {
-  const early = chanukahEarlyMaariv(hebrewYear, settings).mark('**');
+  // למטה, the same as every other מעריב on this line: the old sheets' own ** on this one is
+  // no different from the ** on 6:35 and the rest, and none of them means אולם השמחות.
+  const early = chanukahEarlyMaariv(hebrewYear, settings).underline();
   const regular = CH_MAARIV_REGULAR.map(([h, m]) =>
     clockTime(h, m, 'one of the everyday board\'s own מעריב times').underline());
   const main = clockTime(...CH_MAARIV_MAIN, "the everyday board's own מעריב that stays upstairs");
@@ -188,9 +199,9 @@ function chanukahShacharisDay(serial, settings) {
 export const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.underlined), mark: t.flags.mark || '', trace: t });
 
 /** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
- *  with its early, underlined options moved from למטה to אולם השמחות for חנוכה's larger
- *  crowd - two stars rather than an underline - while the standing 1:50/2:15/3:00 stay put,
- *  and the Friday's own candle lighting (see `candleLightingParts`) appended after it.
+ *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
+ *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
+ *  lighting (see `candleLightingParts`) appended after it.
  *
  *  12:45, the same addition the weekday מנחה gained from תשפ״ו on, gets its own candidate
  *  here too: the everyday Friday menu does not carry one at all, so this is חנוכה's own,
@@ -198,15 +209,13 @@ export const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.und
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings, includeTwelveForty5) {
   const fridayDate = dateFromSerial(fridaySerial);
   const friday = fridayMainMinchaParts(fridayDate, settings, shabbosSerial);
-  const moved = friday.times.filter((t) => t.flags.underlined).map((t) =>
-    zman(CH_TEXT.mincha, t.value, "one of the everyday Friday's own early מנחה מנינים, moved to אולם השמחות for חנוכה").mark('**'));
+  const times = [...friday.times];
   // Between 12:30 and 1:00, the same place the weekday chart's own 12:45 sits ahead of 1:15.
   if (includeTwelveForty5) {
-    moved.splice(1, 0, clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").mark('**'));
+    times.splice(1, 0, clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").underline());
   }
-  const rest = friday.times.filter((t) => !t.flags.underlined);
   const candle = candleLightingParts(fridayDate, settings).times[0];
-  return [...moved, ...rest, candle];
+  return [...times, candle];
 }
 
 /** The Friday/Shabbos pairs this year's eight days touch. Usually one: the Friday that falls
