@@ -547,14 +547,15 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
-      // שבת מברכים is the same kind of note as ערב חנוכה below it: smaller, on a line of its
+      // The molad is the same kind of note as ערב חנוכה below it: smaller, on a line of its
       // own under the parsha rather than beside it at full size, and only on the שבת chart
-      // (week.mevarchim is not asked for the Weekday chart's own week list - see weeks.js).
-      // The molad itself, where week.molad carries one, prints as a second such line right
-      // under it - already a complete, language-matched sentence (weeks.js's own
+      // (week.mevarchim/week.molad are not asked for the Weekday chart's own week list -
+      // see weeks.js). Already a complete, language-matched sentence (weeks.js's own
       // moladLabel), not escaped again here any more than specialParsha or parsha are.
-      const mevarchimNote = !isWeekday && week.mevarchim
-        ? `<br><span class="parsha-note">שבת מברכים</span>${week.molad ? `<br><span class="parsha-note">${week.molad}</span>` : ''}`
+      // The "שבת מברכים" label itself was dropped - asked for directly - so the molad
+      // line, where there is one, is what says this Shabbos is מברכים.
+      const mevarchimNote = !isWeekday && week.mevarchim && week.molad
+        ? `<br><span class="parsha-note">${week.molad}</span>`
         : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
