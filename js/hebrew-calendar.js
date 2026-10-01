@@ -248,6 +248,41 @@ export function hasRoshChodesh(serial, settings) {
   return '';
 }
 
+/** Not in the workbook - asked for directly, since the workbook carries no column for
+ *  it: true on the Shabbos immediately before Rosh Chodesh of the coming month, "שבת
+ *  מברכים". A plain forward search over the six days after `serial`: Rosh Chodesh's own
+ *  first day (the 30th of a 30-day month, or the 1st where the month just ending has
+ *  none) always falls somewhere in the week this Shabbos opens, whichever weekday it
+ *  itself lands on - including the one case where that first day is the *next* Shabbos
+ *  (hasRoshChodesh falling at offset 7): this Shabbos is correctly that one's own
+ *  מברכים, and that Shabbos, being ראש חודש itself rather than the week before it, is
+ *  not asked to be מברכים for anything in turn - the search only ever looks forward from
+ *  a day, never at the day itself.
+ *
+ *  ראש השנה (1 תשרי) is skipped explicitly rather than left to hasRoshChodesh's own
+ *  exclusion of it, so this reads as its own stated rule rather than one borrowed by
+ *  accident: the Shabbos before ראש השנה is never called שבת מברכים (ראש השנה itself is
+ *  ברכו by הקב"ה, not by the congregation's own ברכת החודש), and ל' אלול, the only other
+ *  day that could have carried the exclusion instead, never exists - Elul is always 29
+ *  days. */
+export function isShabbosMevarchim(serial, settings) {
+  if (excelWeekday(serial) !== 7) return false;
+  // A Shabbos that is itself Rosh Chodesh (its first day, a 30th, or its second, a 1st)
+  // is ראש חודש, not שבת מברכים of the month after it - caught directly rather than left
+  // to the forward search below, which would otherwise find that same Shabbos's own
+  // second day (offset 1, on a 30th) or the next month's day one week later (offset 7,
+  // on a 1st that is itself a Shabbos) and call this Shabbos מברכים for a Rosh Chodesh it
+  // is already standing in.
+  if (hasRoshChodesh(serial, settings)) return false;
+  for (let offset = 1; offset <= 7; offset++) {
+    const day = serial + offset;
+    const j = hebrewDateExtended(day, settings.useGregorianBefore1582);
+    if (j.month === 7 && j.dayOfMonth === 1) continue;
+    if (hasRoshChodesh(day, settings)) return true;
+  }
+  return false;
+}
+
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
  *  Cheshvan, else "".
  *

@@ -1035,6 +1035,41 @@ function hasRoshChodesh(serial, settings) {
   return '';
 }
 
+/** Not in the workbook - asked for directly, since the workbook carries no column for
+ *  it: true on the Shabbos immediately before Rosh Chodesh of the coming month, "שבת
+ *  מברכים". A plain forward search over the six days after `serial`: Rosh Chodesh's own
+ *  first day (the 30th of a 30-day month, or the 1st where the month just ending has
+ *  none) always falls somewhere in the week this Shabbos opens, whichever weekday it
+ *  itself lands on - including the one case where that first day is the *next* Shabbos
+ *  (hasRoshChodesh falling at offset 7): this Shabbos is correctly that one's own
+ *  מברכים, and that Shabbos, being ראש חודש itself rather than the week before it, is
+ *  not asked to be מברכים for anything in turn - the search only ever looks forward from
+ *  a day, never at the day itself.
+ *
+ *  ראש השנה (1 תשרי) is skipped explicitly rather than left to hasRoshChodesh's own
+ *  exclusion of it, so this reads as its own stated rule rather than one borrowed by
+ *  accident: the Shabbos before ראש השנה is never called שבת מברכים (ראש השנה itself is
+ *  ברכו by הקב"ה, not by the congregation's own ברכת החודש), and ל' אלול, the only other
+ *  day that could have carried the exclusion instead, never exists - Elul is always 29
+ *  days. */
+function isShabbosMevarchim(serial, settings) {
+  if (excelWeekday(serial) !== 7) return false;
+  // A Shabbos that is itself Rosh Chodesh (its first day, a 30th, or its second, a 1st)
+  // is ראש חודש, not שבת מברכים of the month after it - caught directly rather than left
+  // to the forward search below, which would otherwise find that same Shabbos's own
+  // second day (offset 1, on a 30th) or the next month's day one week later (offset 7,
+  // on a 1st that is itself a Shabbos) and call this Shabbos מברכים for a Rosh Chodesh it
+  // is already standing in.
+  if (hasRoshChodesh(serial, settings)) return false;
+  for (let offset = 1; offset <= 7; offset++) {
+    const day = serial + offset;
+    const j = hebrewDateExtended(day, settings.useGregorianBefore1582);
+    if (j.month === 7 && j.dayOfMonth === 1) continue;
+    if (hasRoshChodesh(day, settings)) return true;
+  }
+  return false;
+}
+
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
  *  Cheshvan, else "".
  *
@@ -2495,7 +2530,7 @@ function seasonEndSerial(season, hebrewYear) {
  *   convention: Kayitz(Y) runs Pesach(Y) -> Sukkos(Y+1); Choref(Y) runs Sukkos(Y) -> Pesach(Y), both within AM year Y)
  * @param {object} settings
  * @param {object} tables {parshaChutz, parshaEY, parshaNames}
- * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string}>}}
+ * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string,mevarchim:boolean}>}}
  */
 function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   const startSerial = seasonStartSerial(season, hebrewYear);
@@ -2509,7 +2544,10 @@ function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   while (d <= endSerial && guard < MAX_WEEKS) {
     const parsha = hasParsha(d, settings, tables);
     if (parsha) {
-      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+      weeks.push({
+        serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings),
+        mevarchim: isShabbosMevarchim(d, settings),
+      });
     }
     d += 7;
     guard++;
@@ -10999,10 +11037,14 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
+      // שבת מברכים is the same kind of note as ערב חנוכה below it: smaller, on a line of its
+      // own under the parsha rather than beside it at full size, and only on the שבת chart
+      // (week.mevarchim is not asked for the Weekday chart's own week list - see weeks.js).
+      const mevarchimNote = !isWeekday && week.mevarchim ? '<br><span class="parsha-note">שבת מברכים</span>' : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
       // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
-      const parshaHtml = nl2br(parshaCell) + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
+      const parshaHtml = nl2br(parshaCell) + mevarchimNote + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
       const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
@@ -16670,7 +16712,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       season,
       hebrewYear,
       createdAt: new Date().toISOString(),
-      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
+      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha, mevarchim: w.mevarchim })),
       pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
