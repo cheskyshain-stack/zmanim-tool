@@ -1137,20 +1137,26 @@ function moladFor(year, month) {
   return { serial, hours, minutes, chalakim: remaining - minutes * CHALAKIM_PER_MINUTE };
 }
 
-const MOLAD_DAY_NAMES_HE = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'שבת'];
+// "יום ה'", the same single-letter day this project already writes elsewhere (the
+// חנוכה sheet's own row labels, HE_DAY_LETTERS in posters/chanukah.js) - index 0 unused,
+// 1-6 is Sunday through Friday, and 7 is שבת itself, written plainly rather than as a
+// seventh letter: a molad can fall on שבת, unlike the חנוכה rows this mirrors, which
+// never reach that day at all.
+const MOLAD_DAY_NAMES_HE = ['', "יום א'", "יום ב'", "יום ג'", "יום ד'", "יום ה'", "יום ו'", 'שבת'];
 
-/** "המולד: יום שלישי, 20:23 ו-6 חלקים" / "The molad: Tuesday, 20:23 and 6 chalakim" - a
- *  24-hour clock in both languages rather than this project's usual 12-hour one, on
- *  purpose: every other time on these boards is unambiguously morning or evening from
- *  its own place on the page, which is exactly what a molad is not - it is the one time
- *  here that can fall at any hour, and a reader is meant to tell day from night by the
- *  hour itself. */
+/** "מולד: יום ה' 12:54am 8 חלקים" / "Molad: Thursday 12:54am 8 chalakim" - a 12-hour
+ *  clock with am/pm said out loud, asked for directly in place of this project's usual
+ *  bare 12-hour clock (every other time on these boards is unambiguously morning or
+ *  evening from its own place on the page, which is exactly what a molad is not - so
+ *  here, alone, the am/pm has to be the one carrying that. */
 function moladLabel(molad, settings) {
-  const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial) - 1];
-  const hhmm = `${String(molad.hours).padStart(2, '0')}:${String(molad.minutes).padStart(2, '0')}`;
+  const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial)];
+  const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
+  const ampm = molad.hours < 12 ? 'am' : 'pm';
+  const time = `${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}`;
   return settings.english
-    ? `The molad: ${day}, ${hhmm} and ${molad.chalakim} chalakim`
-    : `המולד: ${day}, ${hhmm} ו-${molad.chalakim} חלקים`;
+    ? `Molad: ${day} ${time} ${molad.chalakim} chalakim`
+    : `מולד: ${day} ${time} ${molad.chalakim} חלקים`;
 }
 
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
