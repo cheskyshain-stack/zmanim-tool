@@ -80,7 +80,20 @@ function shReadLines(root) {
         const parts = String(child.nodeValue).split('\n');
         parts.forEach((text, i) => {
           if (i) { lines.push([]); groups.push(group); }
-          if (text) lines[lines.length - 1].push({ text, underlined, big });
+          if (text) {
+            lines[lines.length - 1].push({ text, underlined, big });
+            /* A line's own group can be decided before anything is known to belong to it: the
+               blank line "\n\n" leaves in front of <div class="chanukah-highlight"> is pushed
+               (group still false, the div not reached yet) and then, since that line is still
+               empty, the div recurses straight into it rather than starting a fresh one of its
+               own - so the חנוכה heading's own text landed on a line already recorded as
+               ungrouped and printed outside the box while the schedule under it, which only
+               ever opens fresh lines from inside the div, printed inside it. Checked again here,
+               at the one place text actually lands on a line, rather than only where a line is
+               opened: once content it is known to belong to belongs to the group, the line it is
+               sitting on does too, whichever line that turned out to be. */
+            groups[groups.length - 1] = groups[groups.length - 1] || group;
+          }
         });
         continue;
       }
