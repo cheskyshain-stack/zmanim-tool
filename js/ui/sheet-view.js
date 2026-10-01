@@ -211,6 +211,7 @@ export function renderSheet(container, state, sheet, onChange) {
         </div>
       </div>
     </div>
+    <div id="page-overflow-warning" class="error no-print" hidden></div>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
@@ -240,6 +241,36 @@ export function renderSheet(container, state, sheet, onChange) {
   syncHeaderRowHeight(pagesEl);
   autoFit(container);
 
+  // A page is supposed to be exactly 817px (11in x 8.5in at 100%, see the layout
+  // invariant) - syncHeaderRowHeight shares that out evenly, but it is a CSS minimum, not
+  // a cap, and a page whose own content genuinely needs more (most often the Weekday
+  // chart's שחרית panel, which has to print every schedule in play - the everyday one,
+  // ר"ח/בה"ב/תענית, and חנוכה's own two more on a week that is all three at once - stacked
+  // in one card, regardless of how many weeks share the page) renders taller anyway. Paper
+  // does not: a page over 11in x 8.5in is not one sheet any more, and the print engine
+  // splits it across two, repeating the header and leaving the שחרית panel's own position
+  // (calculated for the one tall page, not for wherever the split landed) sitting in the
+  // wrong place on whichever physical sheet it ends up on - measured directly, from a real
+  // print preview, as the confusing, overlapping-looking extra page this warns about here.
+  // Checked after the real pages are built and measured, not predicted, since what a page
+  // needs depends on which special weeks land on it together - the one thing nothing short
+  // of building it can know in advance. The threshold is 40px over 817px, well past the
+  // handful of px the molad note's own documented edge case can add (see its own comment
+  // in this file), so that known, accepted case never trips this warning, while a page
+  // that needs a second physical sheet always does.
+  const overflowWarningEl = container.querySelector('#page-overflow-warning');
+  const overflowPages = [...pagesEl.querySelectorAll('.page')]
+    .map((el) => ({ el, height: el.getBoundingClientRect().height }))
+    .filter(({ height }) => height > 857);
+  if (overflowPages.length) {
+    const items = overflowPages.map(({ el, height }) =>
+      `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`);
+    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, which prints as a confusing extra page rather than cleanly: ${items.join('; ')}. Go back to Print Layout and move some weeks to another page.`;
+    overflowWarningEl.hidden = false;
+  } else {
+    overflowWarningEl.textContent = '';
+    overflowWarningEl.hidden = true;
+  }
 
   const restyleOwnPages = () => {
     pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
