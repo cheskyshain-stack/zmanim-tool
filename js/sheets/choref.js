@@ -3,7 +3,7 @@
 // Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
+import { ceilToMinute, floorToMinute, formatTime, underlineTime, chanukahTag } from '../format.js';
 import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { chanukahFridayYear } from '../posters/chanukah.js';
 import { textjoin, SLASH, splitLinesInHalf, flattenNonEmpty } from '../util.js';
@@ -77,6 +77,16 @@ export function buildChorefRow(week, settings) {
   const I = erevTwelveForty5
     ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) => t.text())))
     : erevMincha.text;
+  /* The tag is a *second*, print-only rendering of the same 12:45, never mixed into I
+     above - the same split sheets/weekday.js's own early מעריב makes for the identical
+     reason: I is still what an override is diffed against and what any other reader of
+     this column would see, so it stays the plain time. Only sheet-view.js's own cell
+     rendering reaches for printOverrides, and only when this Friday's own column has not
+     been typed over by hand. */
+  const IPrint = erevTwelveForty5
+    ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) =>
+        t === erevTwelveForty5 ? chanukahTag(t.text()) : t.text())))
+    : null;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
      and carry their traces once that file is converted too; a column with no trace yet is
@@ -101,7 +111,7 @@ export function buildChorefRow(week, settings) {
     G: plagTimes.filter((t) => t.held === false),
   };
 
-  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
+  return { B, C, D, E, F, G, H, I, traces, notes, dropped, printOverrides: IPrint != null ? { I: IPrint } : undefined };
 }
 
 export const CHOREF_COLUMNS = [

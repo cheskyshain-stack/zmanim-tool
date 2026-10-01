@@ -1227,7 +1227,11 @@ function balanceRuns(container) {
   const wrapped = (times) => times.length > 1 && times[times.length - 1].offsetTop > times[0].offsetTop;
   const cuts = [];
   for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run, .poster-chanukah-run')) {
-    const times = [...run.querySelectorAll(':scope > .poster-t')];
+    // .poster-chanukah-run's own times sit one level deeper now, inside their own dir="ltr"
+    // bdi (see chanukahRunLine) rather than as this run's own direct children, so :scope >
+    // would find only its label (if any) and miss every time. A plain descendant search
+    // still finds exactly one .poster-t per time on the other two, flat, shapes too.
+    const times = [...run.querySelectorAll('.poster-t')];
     if (!wrapped(times)) continue;
     const cut = Math.floor(times.length / 2);
     if (cut) cuts.push({ run, rest: times.slice(cut) });
@@ -1478,12 +1482,25 @@ function renderTzomGedaliaPoster(poster, settings) {
  *  `note`, where a row has one, is the נץ ותיקין is worked from (see `netzNote` in
  *  posters/chanukah.js), joined to the first time - ותיקין itself - by a non-breaking space
  *  rather than sitting ahead of the row in the label: the same pairing `sukkosRow`'s own
- *  note gives הושענא רבה's מנין and its own נץ, so the two can never split across a line. */
+ *  note gives הושענא רבה's מנין and its own נץ, so the two can never split across a line.
+ *
+ *  The note and the times sit in a second, nested `dir="ltr"` bdi of their own, the same
+ *  way every other poster's own list of times already does (rhRow, the יום כיפור after-box)
+ *  - this one needed it more than they do and did not have it. A label sharing the *same*
+ *  bidi run as the times gives that run a strong Hebrew character of its own, so the
+ *  browser's own auto-direction read the whole run right to left and printed the times
+ *  backwards: last time nearest the label, first time run off the far end. A line with no
+ *  label never showed it - digits alone default to ltr with nothing to override - which is
+ *  why שחרית's own two labelled rows read backwards while מנחה and מעריב beneath them,
+ *  labelless, already read correctly. Measured directly before this: ראש חודש's own line
+ *  read 8:40, 8:20*, 8:05 … down to the label, the reverse of the order a reader wants. */
 const chanukahRunLine = (cells, label, note) => `<p class="poster-set-line" lang="he">`
   + `<bdi class="poster-chanukah-run">`
   + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
+  + `<bdi class="poster-row-times" dir="ltr">`
   + (note ? `<bdi class="poster-row-note">${escAttr(note)}</bdi> ` : '')
   + cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')
+  + `</bdi>`
   + `</bdi></p>`;
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
