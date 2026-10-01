@@ -212,6 +212,7 @@ export function renderSheet(container, state, sheet, onChange) {
       </div>
     </div>
     <div id="page-overflow-warning" class="error no-print" hidden></div>
+    <p id="page-fit-notice" class="hint no-print" hidden></p>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
@@ -251,25 +252,65 @@ export function renderSheet(container, state, sheet, onChange) {
   // splits it across two, repeating the header and leaving the שחרית panel's own position
   // (calculated for the one tall page, not for wherever the split landed) sitting in the
   // wrong place on whichever physical sheet it ends up on - measured directly, from a real
-  // print preview, as the confusing, overlapping-looking extra page this warns about here.
-  // Checked after the real pages are built and measured, not predicted, since what a page
-  // needs depends on which special weeks land on it together - the one thing nothing short
-  // of building it can know in advance. The threshold is 40px over 817px, well past the
-  // handful of px the molad note's own documented edge case can add (see its own comment
-  // in this file), so that known, accepted case never trips this warning, while a page
-  // that needs a second physical sheet always does.
+  // print preview, as the confusing, overlapping-looking extra page this fits (or, failing
+  // that, warns about) below.
+  //
+  // Asked for directly: shrink the text rather than make the admin rearrange weeks. One
+  // scale for every page in #pages - both this sheet's own and its companion's, since they
+  // print and are read as one job - not a scale per page, so flipping between pages of the
+  // same chart never meets a size change that was not there on the paper itself. Each
+  // page's own *current* font size is the starting point (not the stored sheet.style,
+  // which stays exactly what the admin set - this never writes back to it, so a chart that
+  // needed shrinking once does not quietly ship smaller forever after), stepped down 2% at
+  // a time and re-measured for real after each step (syncHeaderRowHeight has to run again
+  // too, since a smaller font changes what the even share itself comes out to), rather than
+  // computed in one guess - a wall chart's own text does not shrink linearly with page
+  // height the way a block of prose would, between the merged שחרית panel, the different
+  // column counts a קיץ versus a חורף page carries, and rounding in syncHeaderRowHeight
+  // itself.
+  //
+  // Stopped at 85% of the chosen size: a wall chart is read from a few feet away, and a
+  // shul asking for this still needs the result legible, not merely present on the page.
+  // Short of that floor, the warning below still fires, naming which pages still need an
+  // admin to actually move weeks off them - shrinking the text buys room, not an
+  // unconditional guarantee for any combination of weeks on any page count.
+  const pageEls = [...pagesEl.querySelectorAll('.page')];
+  const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
+  const FIT_FLOOR = 0.85;
+  const FIT_STEP = 0.02;
+  const FIT_TOLERANCE = 818; // 1px of rounding past the 817px target is fine, see the layout invariant
+  const applyFitScale = (scale) => {
+    pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
+    syncHeaderRowHeight(pagesEl);
+  };
+  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE);
+  let fitScale = 1;
+  let overflowPages = stillOverflowing();
+  while (overflowPages.length && fitScale > FIT_FLOOR) {
+    fitScale = Math.max(FIT_FLOOR, fitScale - FIT_STEP);
+    applyFitScale(fitScale);
+    overflowPages = stillOverflowing();
+  }
+
   const overflowWarningEl = container.querySelector('#page-overflow-warning');
-  const overflowPages = [...pagesEl.querySelectorAll('.page')]
-    .map((el) => ({ el, height: el.getBoundingClientRect().height }))
-    .filter(({ height }) => height > 857);
   if (overflowPages.length) {
-    const items = overflowPages.map(({ el, height }) =>
-      `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`);
-    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, which prints as a confusing extra page rather than cleanly: ${items.join('; ')}. Go back to Print Layout and move some weeks to another page.`;
+    const items = overflowPages.map((el) => {
+      const height = el.getBoundingClientRect().height;
+      return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`;
+    });
+    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print Layout and move some weeks to another page.`;
     overflowWarningEl.hidden = false;
   } else {
     overflowWarningEl.textContent = '';
     overflowWarningEl.hidden = true;
+  }
+  const fitNoticeEl = container.querySelector('#page-fit-notice');
+  if (!overflowPages.length && fitScale < 1) {
+    fitNoticeEl.textContent = `This chart's text is shrunk to ${Math.round(fitScale * 100)}% of the chosen size so every page fits on one sheet.`;
+    fitNoticeEl.hidden = false;
+  } else {
+    fitNoticeEl.textContent = '';
+    fitNoticeEl.hidden = true;
   }
 
   const restyleOwnPages = () => {
