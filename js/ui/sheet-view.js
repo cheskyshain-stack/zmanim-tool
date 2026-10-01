@@ -550,7 +550,12 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // שבת מברכים is the same kind of note as ערב חנוכה below it: smaller, on a line of its
       // own under the parsha rather than beside it at full size, and only on the שבת chart
       // (week.mevarchim is not asked for the Weekday chart's own week list - see weeks.js).
-      const mevarchimNote = !isWeekday && week.mevarchim ? '<br><span class="parsha-note">שבת מברכים</span>' : '';
+      // The molad itself, where week.molad carries one, prints as a second such line right
+      // under it - already a complete, language-matched sentence (weeks.js's own
+      // moladLabel), not escaped again here any more than specialParsha or parsha are.
+      const mevarchimNote = !isWeekday && week.mevarchim
+        ? `<br><span class="parsha-note">שבת מברכים</span>${week.molad ? `<br><span class="parsha-note">${week.molad}</span>` : ''}`
+        : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
       // size the way "· חנוכה" does for a שבת that is itself inside the eight days.

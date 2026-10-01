@@ -249,38 +249,121 @@ export function hasRoshChodesh(serial, settings) {
 }
 
 /** Not in the workbook - asked for directly, since the workbook carries no column for
- *  it: true on the Shabbos immediately before Rosh Chodesh of the coming month, "שבת
- *  מברכים". A plain forward search over the six days after `serial`: Rosh Chodesh's own
- *  first day (the 30th of a 30-day month, or the 1st where the month just ending has
- *  none) always falls somewhere in the week this Shabbos opens, whichever weekday it
- *  itself lands on - including the one case where that first day is the *next* Shabbos
- *  (hasRoshChodesh falling at offset 7): this Shabbos is correctly that one's own
- *  מברכים, and that Shabbos, being ראש חודש itself rather than the week before it, is
- *  not asked to be מברכים for anything in turn - the search only ever looks forward from
- *  a day, never at the day itself.
+ *  it: the month and year Rosh Chodesh is coming for, where `serial` is the Shabbos
+ *  immediately before it, "שבת מברכים" - or null where it is not such a Shabbos. A plain
+ *  forward search over the six days after `serial`: Rosh Chodesh's own first day (the
+ *  30th of a 30-day month, or the 1st where the month just ending has none) always falls
+ *  somewhere in the week this Shabbos opens, whichever weekday it itself lands on -
+ *  including the one case where that first day is the *next* Shabbos (found at offset
+ *  7): this Shabbos is correctly that one's own מברכים, and that Shabbos, being ראש חודש
+ *  itself rather than the week before it, is not asked to be מברכים for anything in turn
+ *  - the search only ever looks forward from a day, never at the day itself.
  *
  *  ראש השנה (1 תשרי) is skipped explicitly rather than left to hasRoshChodesh's own
  *  exclusion of it, so this reads as its own stated rule rather than one borrowed by
  *  accident: the Shabbos before ראש השנה is never called שבת מברכים (ראש השנה itself is
  *  ברכו by הקב"ה, not by the congregation's own ברכת החודש), and ל' אלול, the only other
  *  day that could have carried the exclusion instead, never exists - Elul is always 29
- *  days. */
-export function isShabbosMevarchim(serial, settings) {
-  if (excelWeekday(serial) !== 7) return false;
+ *  days.
+ *
+ *  The month/year themselves are worked out the same way hasRoshChodesh's own label is -
+ *  a 1st already carries the new month and year outright; a 30th is still the month
+ *  ending, so it is moved forward the same one (two after Shevat, in a leap year) that
+ *  label adds - rather than re-parsed out of that label's own text, which would make the
+ *  two ways of asking the same question able to drift apart. */
+export function shabbosMevarchimMonth(serial, settings) {
+  if (excelWeekday(serial) !== 7) return null;
   // A Shabbos that is itself Rosh Chodesh (its first day, a 30th, or its second, a 1st)
   // is ראש חודש, not שבת מברכים of the month after it - caught directly rather than left
   // to the forward search below, which would otherwise find that same Shabbos's own
   // second day (offset 1, on a 30th) or the next month's day one week later (offset 7,
   // on a 1st that is itself a Shabbos) and call this Shabbos מברכים for a Rosh Chodesh it
   // is already standing in.
-  if (hasRoshChodesh(serial, settings)) return false;
+  if (hasRoshChodesh(serial, settings)) return null;
   for (let offset = 1; offset <= 7; offset++) {
     const day = serial + offset;
     const j = hebrewDateExtended(day, settings.useGregorianBefore1582);
     if (j.month === 7 && j.dayOfMonth === 1) continue;
-    if (hasRoshChodesh(day, settings)) return true;
+    if (j.dayOfMonth === 1) return { month: j.month, year: j.year };
+    if (j.dayOfMonth === 30) return { month: j.month + (j.leap && j.month === 11 ? 2 : 1), year: j.year };
   }
-  return false;
+  return null;
+}
+
+export function isShabbosMevarchim(serial, settings) {
+  return Boolean(shabbosMevarchimMonth(serial, settings));
+}
+
+const CHALAKIM_PER_DAY = 25920;
+const CHALAKIM_PER_HOUR = 1080;
+const CHALAKIM_PER_MINUTE = 18;
+const CHALAKIM_PER_MONTH = 765433; // 29 days, 12 hours, 793 chalakim - the Rambam's own average lunar month
+// Chalakim from the hypothetical first molad, "Tohu" (ב-ה-ר-ד: Monday, 5 hours and 204
+// chalakim past that day's own start), to the molad of Tishrei of year 1 - KosherJava's
+// own CHALAKIM_MOLAD_TOHU is 31524; this project's own epoch sits one day later, so 57444
+// is used here instead. Confirmed against roshHashana's own internal `molad`: the two
+// agree on Tishrei's own chalakim count, year after year, once this constant stands in
+// for KosherJava's.
+const CHALAKIM_MOLAD_TOHU = 57444;
+// floor(chalakim / CHALAKIM_PER_DAY) is a day count from that same zero point
+// roshHashana's own t1 counts from (t1 = floor(molad/25920 + 0.25), the molad's own civil
+// day after the "after noon" dechiya's rounding - the same rounding moladFor below makes
+// its own way, by checking the hour directly rather than adding a quarter day first).
+// This is what turns that count into this project's own excelSerial, confirmed the same
+// way: moladFor(year, 7) lands within a day or two of roshHashana(year) itself, every
+// year checked - the gap being exactly what the other three dechiyos, which moladFor
+// does not apply, can still move Rosh Hashana by.
+const MOLAD_DAY_TO_SERIAL = -2067023;
+
+/** KosherJava's own getChalakimSinceMoladTohu, ported rather than re-derived: the
+ *  classical (Rambam, Hilchos Kiddush HaChodesh 6-8) molad arithmetic, the molad of a
+ *  month as a chalakim count from Tohu. `month` is this file's own numbering (Nissan=1
+ *  through Elul=6, Tishrei=7 through Shevat=11, Adar=12 outside a leap year, Adar I=13 /
+ *  Adar II=14 inside one). */
+function chalakimSinceMoladTohu(year, month) {
+  const leap = mod(7 * year + 1, 19) < 7;
+  const y = year - 1;
+  const monthOfYear = month === 13 ? 6 : month === 14 ? 7 : month >= 7 ? month - 6 : month + (leap ? 7 : 6);
+  const monthsElapsed = 235 * Math.floor(y / 19) + 12 * mod(y, 19) + Math.floor((7 * mod(y, 19) + 1) / 19) + (monthOfYear - 1);
+  return CHALAKIM_MOLAD_TOHU + CHALAKIM_PER_MONTH * monthsElapsed;
+}
+
+/** The molad of a month: the civil day it falls on (an excelSerial, this project's own
+ *  dates throughout) and the civil clock time on it - hours (0-23 from that day's own
+ *  midnight) and minutes and חלקים within the hour, the same three-way split KosherJava's
+ *  own getMolad() makes, and the same adjustment it makes getting there: the chalakim
+ *  count itself keeps a different day boundary (sundown, "ליל שני" rather than "יום שני"),
+ *  so a molad in the back half of its own reckoned day - from "hour 6" on - is already
+ *  into the next civil day by the time a reader's own clock means by "day". Checked
+ *  against the one worked example in KosherJava's own comments: year 1's own Tishrei
+ *  comes out 5 hours, 11 minutes and 6 chalakim past its day's own start - 23:11:20 that
+ *  Sunday night - באה"ד itself, the molad the whole calendar is anchored to. */
+export function moladFor(year, month) {
+  const chalakim = chalakimSinceMoladTohu(year, month);
+  const dayIndex = Math.floor(chalakim / CHALAKIM_PER_DAY);
+  const chalakimInDay = chalakim - dayIndex * CHALAKIM_PER_DAY;
+  const rawHours = Math.floor(chalakimInDay / CHALAKIM_PER_HOUR);
+  const serial = dayIndex + (rawHours >= 6 ? 1 : 0) + MOLAD_DAY_TO_SERIAL;
+  const hours = mod(rawHours + 18, 24);
+  const remaining = chalakimInDay - rawHours * CHALAKIM_PER_HOUR;
+  const minutes = Math.floor(remaining / CHALAKIM_PER_MINUTE);
+  return { serial, hours, minutes, chalakim: remaining - minutes * CHALAKIM_PER_MINUTE };
+}
+
+const MOLAD_DAY_NAMES_HE = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'שבת'];
+
+/** "המולד: יום שלישי, 20:23 ו-6 חלקים" / "The molad: Tuesday, 20:23 and 6 chalakim" - a
+ *  24-hour clock in both languages rather than this project's usual 12-hour one, on
+ *  purpose: every other time on these boards is unambiguously morning or evening from
+ *  its own place on the page, which is exactly what a molad is not - it is the one time
+ *  here that can fall at any hour, and a reader is meant to tell day from night by the
+ *  hour itself. */
+export function moladLabel(molad, settings) {
+  const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial) - 1];
+  const hhmm = `${String(molad.hours).padStart(2, '0')}:${String(molad.minutes).padStart(2, '0')}`;
+  return settings.english
+    ? `The molad: ${day}, ${hhmm} and ${molad.chalakim} chalakim`
+    : `המולד: ${day}, ${hhmm} ו-${molad.chalakim} חלקים`;
 }
 
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
