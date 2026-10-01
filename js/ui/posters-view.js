@@ -1233,7 +1233,22 @@ function balanceRuns(container) {
     // still finds exactly one .poster-t per time on the other two, flat, shapes too.
     const times = [...run.querySelectorAll('.poster-t')];
     if (!wrapped(times)) continue;
-    const cut = Math.floor(times.length / 2);
+    /* A run carrying a נץ note cuts right after it rather than at the halfway mark, asked
+       for directly on the חנוכה sheet's own merged שחרית row: the note is about the one
+       time in front of it (the ותיקין time, or the first מנין a sukkosRow note is paired
+       with), and a plain half-and-half cut can leave an ordinary time or two sitting on the
+       note's own line for no reason other than where the midpoint happened to fall, while
+       the rest of an unrelated run wraps below it. Only applies where something besides the
+       note's own paired time actually precedes the note (a row's label, here, is itself a
+       .poster-t) - a sukkosRow note has nothing of its own in front of it, so the first
+       .poster-t after it is the very time it is paired with, and an index of 0 there is not
+       a cut at all; that case falls back to the even split exactly as before, which is what
+       already keeps that note beside its own time. */
+    const note = run.querySelector('.poster-row-note');
+    const afterNote = note
+      ? times.findIndex((t) => note.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : -1;
+    const cut = afterNote > 0 ? afterNote : Math.floor(times.length / 2);
     if (cut) cuts.push({ run, rest: times.slice(cut) });
   }
   for (const { run, rest } of cuts) {
@@ -1538,14 +1553,14 @@ function vasikinLine(row) {
 }
 
 /** One שחרית row. Every row opens the same way now (vasikinLine above); the only thing
- *  still different between a Rosh Chodesh row and any other is the label - "ראש חודש" on a
- *  line of its own, the day letters left off it, asked for directly when this line was
- *  built, while every other row keeps its own day-range label set in front of its times on
+ *  still different between a Rosh Chodesh row and any other is that its own label - "ראש
+ *  חודש" with its own days' letters (combineShacharisRows's own `row.label`) - sits alone
+ *  on a line of its own, while every other row keeps its label set in front of its times on
  *  one line, the way every other line on this sheet is set. */
 function shacharisRunLines(row) {
   const inner = vasikinLine(row);
   if (!row.isRoshChodesh) return chanukahLineHtml(row.label, inner);
-  return chanukahLineHtml('ראש חודש', '') + chanukahLineHtml(null, inner);
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, inner);
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the

@@ -5584,23 +5584,29 @@ function chanukahShacharisDay(serial, settings) {
      always why. */
   const netzBinding = isRoshChodesh || vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
+  /* The חנוכה sheet's own second and third morning minyanim (and, where the schedule
+     repeats it, the fifth and sixth) swap which of עזרת נשים and למטה carries the one star
+     and which carries the underline from what the everyday board's own time would say -
+     asked for directly, for this sheet alone: the everyday board itself (WEEKDAY_SHACHARIS,
+     WEEKDAY_SHACHARIS_SPECIAL in settings.js) is untouched, and so is the two-star אולם
+     השמחות mark on Rosh Chodesh's own 7:35. */
   const lines = isRoshChodesh
     ? [
       vasikin,
-      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
+      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
+      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
       clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
       clockTime(8, 5, 'the Rosh Chodesh schedule\'s own 8:00, five minutes later during חנוכה'),
-      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
+      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
+      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
     ]
     : [
       vasikin,
-      before10(7, 20, "the everyday board's own second morning minyan").mark('*'),
-      before10(7, 35, "the everyday board's own third morning minyan").underline(),
+      before10(7, 20, "the everyday board's own second morning minyan, moved to למטה for חנוכה").underline(),
+      before10(7, 35, "the everyday board's own third morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
       clockTime(8, 0, "the everyday board's own morning minyan, unmoved"),
-      clockTime(8, 20, "the everyday board's own morning minyan, unmoved").mark('*'),
-      clockTime(8, 40, "the everyday board's own morning minyan, unmoved").underline(),
+      clockTime(8, 20, "the everyday board's own morning minyan, moved to למטה for חנוכה").underline(),
+      clockTime(8, 40, "the everyday board's own morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
     ];
 
   return { serial, isRoshChodesh, netz, netzBinding, lines };
@@ -5701,30 +5707,15 @@ function chanukahVasikinBetween(group) {
  *  on is read off it exactly as before; only the first position, superseded by `vasikin`,
  *  is no longer what a reader of this row is shown.
  *
- *  The non-Rosh-Chodesh row's own label still reads as a day range, or two, rather than
- *  claiming one range that is not there: with Rosh Chodesh carved out of the middle of the
- *  eight days (its ordinary place), the days left are two separate runs, before and after
- *  it, and the eight days are enough that those two runs can open and close on the very same
- *  weekday - the array's own first and last day letter alone then read as "day ב'-ב'", one
- *  day a reader would take as a range of none, where six were actually meant. Each run keeps
- *  its own range (or its own single day), and the runs join the same way Rosh Chodesh's own
- *  label already joins its days, with "ו". */
-function dayRuns(days, wantRoshChodesh) {
-  const runs = [];
-  let i = 0;
-  while (i < days.length) {
-    if (days[i].isRoshChodesh !== wantRoshChodesh) { i++; continue; }
-    let j = i + 1;
-    while (j < days.length && days[j].isRoshChodesh === wantRoshChodesh) j++;
-    runs.push(days.slice(i, j));
-    i = j;
-  }
-  return runs;
-}
-
-const dayRangeLabel = (run) => (run.length === 1
-  ? `${dayLetter(run[0].serial)}'`
-  : `${dayLetter(run[0].serial)}'-${dayLetter(run[run.length - 1].serial)}'`);
+ *  The non-Rosh-Chodesh row's own label names every one of its days rather than a range: with
+ *  Rosh Chodesh carved out of the middle of the eight days (its ordinary place), the days left
+ *  are two separate runs, before and after it, and the eight days are enough that those two
+ *  runs can open and close on the very same weekday - a range's own first and last day letter
+ *  alone then read as "day ב'-ב'", one day a reader would take as a range of none, where six
+ *  were actually meant. Naming every day plainly, the same list Rosh Chodesh's own label
+ *  already names its days with, has no such case to misread: "יום א' ב' ג' ד' א'" repeats a
+ *  letter across the week's own turn rather than hiding it inside a dash. */
+const dayList = (group) => group.map((d) => `${dayLetter(d.serial)}'`).join(' ');
 
 function combineShacharisRows(days) {
   const rc = days.filter((d) => d.isRoshChodesh);
@@ -5734,8 +5725,8 @@ function combineShacharisRows(days) {
     return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group) };
   };
   const rows = [];
-  if (other.length) rows.push(row(other, `יום ${dayRuns(days, false).map(dayRangeLabel).join(' ו')}`));
-  if (rc.length) rows.push(row(rc, `ראש חודש ${rc.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`));
+  if (other.length) rows.push(row(other, `יום ${dayList(other)}`));
+  if (rc.length) rows.push(row(rc, `ראש חודש יום ${dayList(rc)}`));
   if (rows.length === 2 && rc[0].serial < other[0].serial) rows.reverse();
   return rows;
 }
@@ -12405,7 +12396,22 @@ function balanceRuns(container) {
     // still finds exactly one .poster-t per time on the other two, flat, shapes too.
     const times = [...run.querySelectorAll('.poster-t')];
     if (!wrapped(times)) continue;
-    const cut = Math.floor(times.length / 2);
+    /* A run carrying a נץ note cuts right after it rather than at the halfway mark, asked
+       for directly on the חנוכה sheet's own merged שחרית row: the note is about the one
+       time in front of it (the ותיקין time, or the first מנין a sukkosRow note is paired
+       with), and a plain half-and-half cut can leave an ordinary time or two sitting on the
+       note's own line for no reason other than where the midpoint happened to fall, while
+       the rest of an unrelated run wraps below it. Only applies where something besides the
+       note's own paired time actually precedes the note (a row's label, here, is itself a
+       .poster-t) - a sukkosRow note has nothing of its own in front of it, so the first
+       .poster-t after it is the very time it is paired with, and an index of 0 there is not
+       a cut at all; that case falls back to the even split exactly as before, which is what
+       already keeps that note beside its own time. */
+    const note = run.querySelector('.poster-row-note');
+    const afterNote = note
+      ? times.findIndex((t) => note.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : -1;
+    const cut = afterNote > 0 ? afterNote : Math.floor(times.length / 2);
     if (cut) cuts.push({ run, rest: times.slice(cut) });
   }
   for (const { run, rest } of cuts) {
@@ -12710,14 +12716,14 @@ function vasikinLine(row) {
 }
 
 /** One שחרית row. Every row opens the same way now (vasikinLine above); the only thing
- *  still different between a Rosh Chodesh row and any other is the label - "ראש חודש" on a
- *  line of its own, the day letters left off it, asked for directly when this line was
- *  built, while every other row keeps its own day-range label set in front of its times on
+ *  still different between a Rosh Chodesh row and any other is that its own label - "ראש
+ *  חודש" with its own days' letters (combineShacharisRows's own `row.label`) - sits alone
+ *  on a line of its own, while every other row keeps its label set in front of its times on
  *  one line, the way every other line on this sheet is set. */
 function shacharisRunLines(row) {
   const inner = vasikinLine(row);
   if (!row.isRoshChodesh) return chanukahLineHtml(row.label, inner);
-  return chanukahLineHtml('ראש חודש', '') + chanukahLineHtml(null, inner);
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, inner);
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
