@@ -358,6 +358,15 @@ export function combineShacharisRows(days) {
    two minutes.") - a day apart on ותיקין is well inside that. */
 const firstOf = (text) => text.split(SLASH)[0];
 
+/** The wall chart's own שחרית panel never writes a slash between its times - WEEKDAY_SHACHARIS
+ *  and WEEKDAY_SHACHARIS_SPECIAL in settings.js are plain-space-separated, matching the hand-made
+ *  boards this is ported from - unlike every other column on this chart, which does. A plain
+ *  space here, rather than splitLinesInHalf's own default (SLASH, right for a מנחה/מעריב cell
+ *  reporting a live either/or choice), is what keeps חנוכה's own two blocks set the same way as
+ *  the standing one beside them: firstOf above has already resolved any live choice between two
+ *  days to the earlier one, so there is no choice left here for a slash to mark. */
+const SH_PANEL_SPACE = ' ';
+
 export function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, mergeAll = false } = {}) {
   const cellHtml = (c) => `${c.underlined ? `<u>${firstOf(c.text)}</u>` : firstOf(c.text)}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
@@ -365,10 +374,10 @@ export function chanukahScheduleLines(days, settings, { includeRoshChodesh = tru
   if (mergeAll) {
     if (!dayObjs.length) return '';
     const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
-    return splitLinesInHalf(cells.map(cellHtml));
+    return splitLinesInHalf(cells.map(cellHtml), SH_PANEL_SPACE);
   }
   return combineShacharisRows(dayObjs)
-    .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
+    .map((row) => splitLinesInHalf(row.cells.map(cellHtml), SH_PANEL_SPACE))
     .join('\n\n');
 }
 

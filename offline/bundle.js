@@ -5705,6 +5705,15 @@ function combineShacharisRows(days) {
    two minutes.") - a day apart on ותיקין is well inside that. */
 const firstOf = (text) => text.split(SLASH)[0];
 
+/** The wall chart's own שחרית panel never writes a slash between its times - WEEKDAY_SHACHARIS
+ *  and WEEKDAY_SHACHARIS_SPECIAL in settings.js are plain-space-separated, matching the hand-made
+ *  boards this is ported from - unlike every other column on this chart, which does. A plain
+ *  space here, rather than splitLinesInHalf's own default (SLASH, right for a מנחה/מעריב cell
+ *  reporting a live either/or choice), is what keeps חנוכה's own two blocks set the same way as
+ *  the standing one beside them: firstOf above has already resolved any live choice between two
+ *  days to the earlier one, so there is no choice left here for a slash to mark. */
+const SH_PANEL_SPACE = ' ';
+
 function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, mergeAll = false } = {}) {
   const cellHtml = (c) => `${c.underlined ? `<u>${firstOf(c.text)}</u>` : firstOf(c.text)}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
@@ -5712,10 +5721,10 @@ function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, merg
   if (mergeAll) {
     if (!dayObjs.length) return '';
     const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
-    return splitLinesInHalf(cells.map(cellHtml));
+    return splitLinesInHalf(cells.map(cellHtml), SH_PANEL_SPACE);
   }
   return combineShacharisRows(dayObjs)
-    .map((row) => splitLinesInHalf(row.cells.map(cellHtml)))
+    .map((row) => splitLinesInHalf(row.cells.map(cellHtml), SH_PANEL_SPACE))
     .join('\n\n');
 }
 
@@ -10037,7 +10046,10 @@ function reselect(sel, node) {
 // and the ר"ח block underneath it, with a heading between. The separators have been commas, plain
 // spaces and slashes on the shul's own browsers over the years (see the LEGACY_ lists in
 // settings.js), the line breaks are newlines or the <br> and <div> the editor writes, and the only
-// markup that has ever been in it is <u> and <span class="big">.
+// markup that has ever been in it is <u>, <span class="big">, and - written by sheet-view.js
+// itself, never typed - a <div class="chanukah-highlight"> wrapping a heading and its schedule
+// together, which this sets apart with a light background of its own rather than as one more
+// centred line (see .chanukah-highlight in app.css).
 //
 // **Anything else and this does nothing at all.** A line that is not a row of times, or markup
 // this does not recognise, and the whole block is handed back exactly as it came in and prints the
@@ -10077,41 +10089,45 @@ const shEsc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '
 const shKnown = (el) => {
   const tag = el.tagName;
   if (tag === 'U' || tag === 'BR' || tag === 'DIV' || tag === 'P' || tag === 'B' || tag === 'I') return true;
-  return tag === 'SPAN' && (el.className === '' || el.className === 'big' || el.className === 'chanukah-tag');
+  return tag === 'SPAN' && (el.className === '' || el.className === 'big');
 };
 
-/** The block read as lines, each a run of pieces that know whether they are underlined.
+/** The block read as lines, each a run of pieces that know whether they are underlined, plus
+ *  which lines fall inside a `<div class="chanukah-highlight">` wrapper (see
+ *  .chanukah-highlight in app.css) - a group of whole lines, heading and schedule together,
+ *  rather than a mark on one piece of one of them the way underline and `.big` are.
  *
  *  Null where anything unrecognised turns up, which is the signal to leave the block alone.
  *  A newline inside a text node breaks a line as much as a <br> does: the panel is set with
  *  white-space: pre-line, so that is what those newlines have always meant on the screen. */
 function shReadLines(root) {
   const lines = [[]];
+  const groups = [false];
   let ok = true;
-  const walk = (node, underlined, big, badge) => {
+  const walk = (node, underlined, big, group) => {
     if (!ok) return;
     for (const child of node.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
         const parts = String(child.nodeValue).split('\n');
         parts.forEach((text, i) => {
-          if (i) lines.push([]);
-          if (text) lines[lines.length - 1].push({ text, underlined, big, badge });
+          if (i) { lines.push([]); groups.push(group); }
+          if (text) lines[lines.length - 1].push({ text, underlined, big });
         });
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE) continue;
       if (!shKnown(child)) { ok = false; return; }
-      if (child.tagName === 'BR') { lines.push([]); continue; }
+      if (child.tagName === 'BR') { lines.push([]); groups.push(group); continue; }
       const block = child.tagName === 'DIV' || child.tagName === 'P';
       // A block starts a line of its own, unless the line it would start is already empty.
-      if (block && lines[lines.length - 1].length) lines.push([]);
+      if (block && lines[lines.length - 1].length) { lines.push([]); groups.push(group); }
       walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'),
-        badge || child.classList?.contains('chanukah-tag'));
-      if (block) lines.push([]);
+        group || child.classList?.contains('chanukah-highlight'));
+      if (block) { lines.push([]); groups.push(group); }
     }
   };
   walk(root, false, false, false);
-  return ok ? lines : null;
+  return ok ? { lines, groups } : null;
 }
 
 /** One line read as its times and whether they are slash separated, or null when it is not a row
@@ -10156,14 +10172,9 @@ function shReadTimes(line) {
   return ok && times.length ? { times, slashed } : null;
 }
 
-/** A line that is not a row of times, written back out with its underlines and badges
- *  kept (see .chanukah-tag in app.css - the same pill the "חנוכה" tag on a touching
- *  week's own מעריב row is set in, so the two read as one mark wherever they appear). */
+/** A line that is not a row of times, written back out with its underlines kept. */
 const shPlainHtml = (line) => line
-  .map((p) => {
-    const inner = p.underlined ? `<u>${shEsc(p.text)}</u>` : shEsc(p.text);
-    return p.badge ? `<span class="chanukah-tag">${inner}</span>` : inner;
-  })
+  .map((p) => (p.underlined ? `<u>${shEsc(p.text)}</u>` : shEsc(p.text)))
   .join('');
 
 /** The schedule as a grid, or null to leave it exactly as it came in.
@@ -10174,12 +10185,13 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
   if (!doc) return null;
   const box = doc.createElement('div');
   box.innerHTML = String(html ?? '');
-  const lines = shReadLines(box);
-  if (!lines) return null;
+  const read0 = shReadLines(box);
+  if (!read0) return null;
+  const { lines, groups } = read0;
 
-  const read = lines.map((line) => {
+  const read = lines.map((line, i) => {
     const got = line.length ? shReadTimes(line) : null;
-    return { line, times: got?.times || null, slashed: Boolean(got?.slashed) };
+    return { line, times: got?.times || null, slashed: Boolean(got?.slashed), grouped: groups[i] };
   });
   const most = Math.max(0, ...read.map((r) => (r.times ? r.times.length : 0)));
   if (most < 2 || most > SH_MAX) return null; // one time a line has nothing to line up
@@ -10246,25 +10258,46 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
      is-big carries the size the everyday block is set in. It wraps the whole block rather than
      any one line, so it is read off the pieces and put back on the row, and the row's own em is
      what every width in its grid is then measured in. */
+  // A run of consecutive grouped lines (a `<div class="chanukah-highlight">`'s own heading and
+  // schedule together, see shReadLines) is buffered and wrapped in one highlight box of its
+  // own, rather than each line painting its own background - the group is a whole visual unit,
+  // not a mark on each of its lines separately.
   const rows = [];
-  for (const { line, times, slashed } of read) {
-    if (!line.length) { rows.push('<div class="sh-gap"></div>'); continue; }
-    const big = line.every((p) => p.big) ? ' is-big' : '';
-    if (!times || times.length < 2) {
-      rows.push(`<div class="sh-wide${big}">${shPlainHtml(line)}</div>`);
-      continue;
+  let groupBuffer = null;
+  const flushGroup = () => {
+    if (groupBuffer) rows.push(`<div class="chanukah-highlight">${groupBuffer.join('')}</div>`);
+    groupBuffer = null;
+  };
+  for (const { line, times, slashed, grouped } of read) {
+    let html;
+    if (!line.length) {
+      html = '<div class="sh-gap"></div>';
+    } else {
+      const big = line.every((p) => p.big) ? ' is-big' : '';
+      if (!times || times.length < 2) {
+        html = `<div class="sh-wide${big}">${shPlainHtml(line)}</div>`;
+      } else {
+        const { template, pad } = gridFor(times.length, slashed);
+        const cells = [];
+        times.forEach((t, i) => {
+          // The separator the schedule itself uses: a slash, or nothing but the column it would sit in.
+          if (i) cells.push(`<div class="sh-slash">${slashed ? '/' : ''}</div>`);
+          const time = t.underlined ? `<u>${shEsc(t.text)}</u>` : shEsc(t.text);
+          cells.push(`<div class="sh-time">${time}</div>`);
+          cells.push(`<div class="sh-mark">${shEsc(t.mark)}</div>`);
+        });
+        html = `<div class="sh-row is-times${big}" style="grid-template-columns: ${template}; padding-left: ${pad}">${cells.join('')}</div>`;
+      }
     }
-    const { template, pad } = gridFor(times.length, slashed);
-    const cells = [];
-    times.forEach((t, i) => {
-      // The separator the schedule itself uses: a slash, or nothing but the column it would sit in.
-      if (i) cells.push(`<div class="sh-slash">${slashed ? '/' : ''}</div>`);
-      const time = t.underlined ? `<u>${shEsc(t.text)}</u>` : shEsc(t.text);
-      cells.push(`<div class="sh-time">${time}</div>`);
-      cells.push(`<div class="sh-mark">${shEsc(t.mark)}</div>`);
-    });
-    rows.push(`<div class="sh-row is-times${big}" style="grid-template-columns: ${template}; padding-left: ${pad}">${cells.join('')}</div>`);
+    if (grouped) {
+      if (!groupBuffer) groupBuffer = [];
+      groupBuffer.push(html);
+    } else {
+      flushGroup();
+      rows.push(html);
+    }
   }
+  flushGroup();
   return `<div class="sh-sched">${rows.join('')}</div>`;
 }
 
@@ -10761,13 +10794,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const heading = specialShacharisHeading(kinds);
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
     const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
-    // The heading reads "חנוכה" in the same pill the tag on a touching week's own מעריב
-    // row is set in (.chanukah-tag, see shacharis-grid.js), rather than the plain
-    // underlined heading every other block here uses - one mark for חנוכה wherever it
-    // shows on this chart, on a row or on the panel alike.
-    const chanukahBadge = '<span class="chanukah-tag">חנוכה</span>';
-    const chanukahHtml = (chanukahBlocks.regular ? `\n\n${chanukahBadge}\n${chanukahBlocks.regular}` : '')
-      + (chanukahBlocks.roshChodesh ? `\n\nר"ח טבת · ${chanukahBadge}\n${chanukahBlocks.roshChodesh}` : '');
+    // Both of חנוכה's own blocks, heading and schedule together, inside one light-background
+    // box of their own (.chanukah-highlight, see shacharis-grid.js's own handling of this one
+    // div) - set apart from the standing ר"ח ובה"ב block beside it rather than carrying a mark
+    // of their own the way the tag on a touching week's own מעריב row does.
+    const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
+      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
+    const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
