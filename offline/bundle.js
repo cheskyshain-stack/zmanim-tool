@@ -7449,13 +7449,27 @@ function renderTime(mins, place) {
   return text;
 }
 
-/** Which, if any, of this week's own five days fall inside חנוכה's eight - shared by
- *  maarivParts below (whether the row runs חנוכה's own early מעריב at all) and by
- *  sheet-view.js (whether the row's own שחרית is freed from the standing panel, and what
- *  the panel's own חנוכה line says for a week only partly in it). One answer, asked once,
- *  so the row and the panel can never disagree about which week is which. */
+/** Which, if any, of this week's own five days fall inside חנוכה's eight - used by
+ *  maarivParts below, to decide whether the row runs חנוכה's own early מעריב at all. Sunday
+ *  through Thursday only, matching this row's own columns: Friday is never one of this
+ *  row's own days, it is the Shabbos chart's. See chanukahDaysThroughFriday below for the
+ *  wider question the שחרית panel asks instead. */
 function chanukahDaysInWeek(serial, settings) {
   return sundayThroughThursday(serial).filter((d) => chanukahYearFor(d, settings));
+}
+
+/** The same week, through Friday - what sheet-view.js's own שחרית panel asks instead of
+ *  chanukahDaysInWeek, since the panel's standing special-schedule heading already covers
+ *  Sunday through Friday (Friday morning still davens the weekday שחרית too, see
+ *  specialShacharisKinds in hebrew-calendar.js), not just the Sunday-Thursday this row's
+ *  own columns schedule. Asked separately rather than this row's own list plus one more
+ *  day tacked on where it happens to be needed, so a Friday that is itself חנוכה (and,
+ *  some years, also ר"ח טבת - see hasRoshChodesh) is never silently left out of the one
+ *  place a reader would see its morning: a page whose only ר"ח ever falls on such a
+ *  Friday had been showing the plain, non-חנוכה ר"ח ובה"ב box for it, since the panel's
+ *  own list never reached a Friday to begin with. */
+function chanukahDaysThroughFriday(serial, settings) {
+  return sundayThroughFriday(serial).filter((d) => chanukahYearFor(d, settings));
 }
 
 /** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
@@ -7466,6 +7480,12 @@ function chanukahDaysInWeek(serial, settings) {
 function sundayThroughThursday(serial) {
   const sunday = serial - (excelWeekday(serial) - 1);
   return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+/** The same anchor, extended one day further - see chanukahDaysThroughFriday above. */
+function sundayThroughFriday(serial) {
+  const sunday = serial - (excelWeekday(serial) - 1);
+  return [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
 }
 
 /** `days`, minus any that are themselves full יום טוב - never all of them, since a run of
@@ -10761,15 +10781,14 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
      below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
   const panelRow = Math.round((pageWeeks.length - 0.7) / 2);
 
-  /* Every day of חנוכה on this page, full week or partial, across every week the page
-     holds - one list, asked once, so the panel and a row's own tag (sheets/weekday.js)
-     can never disagree about which days are חנוכה's. שחרית is where the whole thing shows
-     for both a full week and a partial one alike: the panel already speaks for the whole
-     page, and a week made entirely of חנוכה gets no row of its own here any more than a
-     partial week does - its מעריב/מנחה difference is tagged on its own row instead (see
-     sheets/weekday.js), the same way a partial week's is. */
+  /* Every day of חנוכה on this page, through Friday, across every week the page holds - one
+     list, asked once, so the panel and the generic ר"ח ובה"ב heading below can never
+     disagree about which days are חנוכה's. Through Friday (chanukahDaysThroughFriday, not
+     the row-scoped chanukahDaysInWeek), since the panel's own heading already speaks for
+     Sunday through Friday - a Friday that is itself חנוכה, some years also ר"ח טבת, still
+     needs its morning said somewhere, and the panel is the only place that ever does. */
   const chanukahPageDays = isWeekday
-    ? pageWeeks.flatMap((w) => chanukahDaysInWeek(w.serial, settings))
+    ? pageWeeks.flatMap((w) => chanukahDaysThroughFriday(w.serial, settings))
     : [];
 
   const panelHtml = (() => {

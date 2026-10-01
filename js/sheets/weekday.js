@@ -66,13 +66,27 @@ function renderTime(mins, place) {
   return text;
 }
 
-/** Which, if any, of this week's own five days fall inside חנוכה's eight - shared by
- *  maarivParts below (whether the row runs חנוכה's own early מעריב at all) and by
- *  sheet-view.js (whether the row's own שחרית is freed from the standing panel, and what
- *  the panel's own חנוכה line says for a week only partly in it). One answer, asked once,
- *  so the row and the panel can never disagree about which week is which. */
+/** Which, if any, of this week's own five days fall inside חנוכה's eight - used by
+ *  maarivParts below, to decide whether the row runs חנוכה's own early מעריב at all. Sunday
+ *  through Thursday only, matching this row's own columns: Friday is never one of this
+ *  row's own days, it is the Shabbos chart's. See chanukahDaysThroughFriday below for the
+ *  wider question the שחרית panel asks instead. */
 export function chanukahDaysInWeek(serial, settings) {
   return sundayThroughThursday(serial).filter((d) => chanukahYearFor(d, settings));
+}
+
+/** The same week, through Friday - what sheet-view.js's own שחרית panel asks instead of
+ *  chanukahDaysInWeek, since the panel's standing special-schedule heading already covers
+ *  Sunday through Friday (Friday morning still davens the weekday שחרית too, see
+ *  specialShacharisKinds in hebrew-calendar.js), not just the Sunday-Thursday this row's
+ *  own columns schedule. Asked separately rather than this row's own list plus one more
+ *  day tacked on where it happens to be needed, so a Friday that is itself חנוכה (and,
+ *  some years, also ר"ח טבת - see hasRoshChodesh) is never silently left out of the one
+ *  place a reader would see its morning: a page whose only ר"ח ever falls on such a
+ *  Friday had been showing the plain, non-חנוכה ר"ח ובה"ב box for it, since the panel's
+ *  own list never reached a Friday to begin with. */
+export function chanukahDaysThroughFriday(serial, settings) {
+  return sundayThroughFriday(serial).filter((d) => chanukahYearFor(d, settings));
 }
 
 /** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
@@ -83,6 +97,12 @@ export function chanukahDaysInWeek(serial, settings) {
 function sundayThroughThursday(serial) {
   const sunday = serial - (excelWeekday(serial) - 1);
   return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+/** The same anchor, extended one day further - see chanukahDaysThroughFriday above. */
+function sundayThroughFriday(serial) {
+  const sunday = serial - (excelWeekday(serial) - 1);
+  return [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
 }
 
 /** `days`, minus any that are themselves full יום טוב - never all of them, since a run of
