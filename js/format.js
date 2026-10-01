@@ -25,6 +25,20 @@ export function formatTime(dayFraction) {
   return `${h12}:${String(m).padStart(2, '0')}`;
 }
 
+/** The same clock, with the seconds kept rather than rounded away - asked for on the
+ *  Special Schedules חנוכה poster's own ראש חודש נץ note, where the point is showing the
+ *  two days' own נץ precisely enough to say why their vasikin times differ by a minute. No
+ *  caller needs this for a printed מנין time, which is why formatTime above still rounds. */
+export function formatTimeWithSeconds(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  const totalSeconds = Math.round(frac * 86400) % 86400;
+  const h24 = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 // Sentinel markers wrapping "this should render underlined" spans (Private Use Area
 // code points, so they can never collide with real content). Kept as plain characters
 // through all the string-building/TEXTJOIN-style formula ports, then converted to real
