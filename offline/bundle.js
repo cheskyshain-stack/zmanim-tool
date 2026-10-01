@@ -1202,11 +1202,13 @@ function yiddishPeriod(hours) {
   return 'ביינאכט';
 }
 
-/** "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4." - hour, minutes and חלקים stay
- *  plain digits here (asked for directly, in place of hebrewNumber()'s own lettering,
- *  which moladLabelCompact uses instead), each its own `<bdi dir="ltr">` for the same
- *  reason moladLabelCompact's own time is: a bare digit is "weak" bidi and two of them
- *  sharing a run can have that run's own order reversed.
+/** "מולד: דינסטאג נאכמיטאג,<br>23 מינוט מיט 7 חלקים נאך 4." - two lines, asked for
+ *  directly, split right after the opening comma: the day and part of day on their own
+ *  line, the actual figures on the one under it. Hour, minutes and חלקים stay plain
+ *  digits here (asked for directly, in place of hebrewNumber()'s own lettering, which
+ *  moladLabelCompact uses instead), each its own `<bdi dir="ltr">` for the same reason
+ *  moladLabelCompact's own time is: a bare digit is "weak" bidi and two of them sharing a
+ *  run can have that run's own order reversed.
  *
  *  A zero part is left out rather than printed as "0 מינוט" or "0 חלקים", and מיט (the
  *  word joining the two) only ever sits between two parts that are both actually there -
@@ -1218,11 +1220,11 @@ function moladLabelYiddish(molad) {
   const period = yiddishPeriod(molad.hours);
   const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
   const hour = `<bdi dir="ltr">${h12}</bdi>`;
-  if (molad.minutes === 0 && molad.chalakim === 0) return `מולד: ${day} ${period}, ${hour} אזייגער.`;
+  if (molad.minutes === 0 && molad.chalakim === 0) return `מולד: ${day} ${period},<br>${hour} אזייגער.`;
   const parts = [];
   if (molad.minutes > 0) parts.push(`<bdi dir="ltr">${molad.minutes}</bdi> מינוט`);
   if (molad.chalakim > 0) parts.push(`<bdi dir="ltr">${molad.chalakim}</bdi> ${molad.chalakim === 1 ? 'חלק' : 'חלקים'}`);
-  return `מולד: ${day} ${period}, ${parts.join(' מיט ')} נאך ${hour}.`;
+  return `מולד: ${day} ${period},<br>${parts.join(' מיט ')} נאך ${hour}.`;
 }
 
 /** Dispatches on settings.moladFormat ('compact', the default, or 'yiddish') - the one
@@ -11346,11 +11348,17 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // parsha name's own line (see parshaCell above) rather than taking a line of its
       // own, which is what let a three-line cell (name, special parsha, molad) overflow
       // in the first place - except the one double-barrelled parsha name long enough on
-      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured), where this
-      // is no better and no worse than before the join: still three lines, the same few
-      // pixels past the page's own height it would have been regardless. Shortening the
-      // molad sentence itself is the only way to close that one case too, and has not
-      // been asked for.
+      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured). Under the
+      // Compact Hebrew molad (one line) that case is no better and no worse than before
+      // the join: still three lines, ~5px past the page's own 817px. Under Yiddish, whose
+      // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), that
+      // same week is four lines total and measured ~27px past instead - line-height on
+      // .parsha-note.is-molad was tried and measured to do nothing (the font's own glyph
+      // metrics floor the line box regardless of what line-height asks for), so font-size
+      // is the only lever left, and shrinking it further changes the molad's own
+      // legibility on every other week too, for the sake of this one. Left as is.
+      // Shortening the molad sentence itself would close both cases and has not been
+      // asked for.
       const mevarchimNote = hasMevarchim
         ? `<br><span class="parsha-note is-molad">${molad}</span>`
         : '';

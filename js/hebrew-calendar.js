@@ -415,11 +415,13 @@ function yiddishPeriod(hours) {
   return 'ביינאכט';
 }
 
-/** "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4." - hour, minutes and חלקים stay
- *  plain digits here (asked for directly, in place of hebrewNumber()'s own lettering,
- *  which moladLabelCompact uses instead), each its own `<bdi dir="ltr">` for the same
- *  reason moladLabelCompact's own time is: a bare digit is "weak" bidi and two of them
- *  sharing a run can have that run's own order reversed.
+/** "מולד: דינסטאג נאכמיטאג,<br>23 מינוט מיט 7 חלקים נאך 4." - two lines, asked for
+ *  directly, split right after the opening comma: the day and part of day on their own
+ *  line, the actual figures on the one under it. Hour, minutes and חלקים stay plain
+ *  digits here (asked for directly, in place of hebrewNumber()'s own lettering, which
+ *  moladLabelCompact uses instead), each its own `<bdi dir="ltr">` for the same reason
+ *  moladLabelCompact's own time is: a bare digit is "weak" bidi and two of them sharing a
+ *  run can have that run's own order reversed.
  *
  *  A zero part is left out rather than printed as "0 מינוט" or "0 חלקים", and מיט (the
  *  word joining the two) only ever sits between two parts that are both actually there -
@@ -431,11 +433,11 @@ function moladLabelYiddish(molad) {
   const period = yiddishPeriod(molad.hours);
   const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
   const hour = `<bdi dir="ltr">${h12}</bdi>`;
-  if (molad.minutes === 0 && molad.chalakim === 0) return `מולד: ${day} ${period}, ${hour} אזייגער.`;
+  if (molad.minutes === 0 && molad.chalakim === 0) return `מולד: ${day} ${period},<br>${hour} אזייגער.`;
   const parts = [];
   if (molad.minutes > 0) parts.push(`<bdi dir="ltr">${molad.minutes}</bdi> מינוט`);
   if (molad.chalakim > 0) parts.push(`<bdi dir="ltr">${molad.chalakim}</bdi> ${molad.chalakim === 1 ? 'חלק' : 'חלקים'}`);
-  return `מולד: ${day} ${period}, ${parts.join(' מיט ')} נאך ${hour}.`;
+  return `מולד: ${day} ${period},<br>${parts.join(' מיט ')} נאך ${hour}.`;
 }
 
 /** Dispatches on settings.moladFormat ('compact', the default, or 'yiddish') - the one

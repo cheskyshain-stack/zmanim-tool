@@ -641,11 +641,17 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // parsha name's own line (see parshaCell above) rather than taking a line of its
       // own, which is what let a three-line cell (name, special parsha, molad) overflow
       // in the first place - except the one double-barrelled parsha name long enough on
-      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured), where this
-      // is no better and no worse than before the join: still three lines, the same few
-      // pixels past the page's own height it would have been regardless. Shortening the
-      // molad sentence itself is the only way to close that one case too, and has not
-      // been asked for.
+      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured). Under the
+      // Compact Hebrew molad (one line) that case is no better and no worse than before
+      // the join: still three lines, ~5px past the page's own 817px. Under Yiddish, whose
+      // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), that
+      // same week is four lines total and measured ~27px past instead - line-height on
+      // .parsha-note.is-molad was tried and measured to do nothing (the font's own glyph
+      // metrics floor the line box regardless of what line-height asks for), so font-size
+      // is the only lever left, and shrinking it further changes the molad's own
+      // legibility on every other week too, for the sake of this one. Left as is.
+      // Shortening the molad sentence itself would close both cases and has not been
+      // asked for.
       const mevarchimNote = hasMevarchim
         ? `<br><span class="parsha-note is-molad">${molad}</span>`
         : '';
