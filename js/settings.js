@@ -173,6 +173,16 @@ export const DEFAULT_SETTINGS = {
      actually in session on. A week BMG is already out of session had 11:30 all along.
      Turning it back off just hides the tag; it does not touch the minyan itself. */
   newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
+  /* Off by default and admin-only, asked for in those exact terms: whether a שבת that is
+     שבת מברכים also prints the molad underneath its parsha name. computeSeasonWeeks works
+     out week.mevarchim/week.molad for every week regardless of this flag - it is cheap and
+     the chart's own week objects are the one place that reads the calendar, not two - but
+     nothing renders either unless this is on. Read only by renderSheet's own call into
+     buildSheetPages (sheet-view.js); the congregation's own reading copy (chart-view.js)
+     never reads this field at all, so there is no path by which turning it on for the
+     admin's own chart could show it to the congregation, even once a season carrying it on
+     is published - see buildSheetPages's own comment. */
+  showMolad: false,
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */

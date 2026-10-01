@@ -276,7 +276,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       season,
       hebrewYear,
       createdAt: new Date().toISOString(),
-      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
+      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha, mevarchim: w.mevarchim, molad: w.molad })),
       pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used

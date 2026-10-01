@@ -2,7 +2,7 @@
 // Kayitz (summer) or Choref (winter) sheet for a given Hebrew year, mirroring the
 // workbook's own P5 formula (SEQUENCE + FILTER on HAS_PARSHA<>"") but without
 // requiring a manually-entered start date or week count.
-import { dateFromHebrew, hasParsha, hasSpecialParsha, hasYomTov, isYomTovOrCholHamoed, hebrewDateExtended, excelWeekday } from '../hebrew-calendar.js';
+import { dateFromHebrew, hasParsha, hasSpecialParsha, hasYomTov, isYomTovOrCholHamoed, shabbosMevarchimMonth, moladFor, moladLabel, hebrewDateExtended, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
 import { inSpringDstWindow } from './common.js';
 
@@ -25,7 +25,7 @@ function seasonEndSerial(season, hebrewYear) {
  *   convention: Kayitz(Y) runs Pesach(Y) -> Sukkos(Y+1); Choref(Y) runs Sukkos(Y) -> Pesach(Y), both within AM year Y)
  * @param {object} settings
  * @param {object} tables {parshaChutz, parshaEY, parshaNames}
- * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string}>}}
+ * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string,mevarchim:boolean,molad:string|null}>}}
  */
 export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   const startSerial = seasonStartSerial(season, hebrewYear);
@@ -39,7 +39,16 @@ export function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   while (d <= endSerial && guard < MAX_WEEKS) {
     const parsha = hasParsha(d, settings, tables);
     if (parsha) {
-      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
+      const mevarchimMonth = shabbosMevarchimMonth(d, settings);
+      // The molad announced *on* this Shabbos is the coming month's own, read off the
+      // same month/year shabbosMevarchimMonth already resolved - never re-derived from
+      // the date a second time, so the two cannot drift apart about which month this
+      // Shabbos is for.
+      const molad = mevarchimMonth ? moladLabel(moladFor(mevarchimMonth.year, mevarchimMonth.month), settings) : null;
+      weeks.push({
+        serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings),
+        mevarchim: Boolean(mevarchimMonth), molad,
+      });
     }
     d += 7;
     guard++;

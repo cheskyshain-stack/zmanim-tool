@@ -105,7 +105,7 @@ function applyOverrideValue(sheet, serial, col, value) {
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
+export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, showMolad = false } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
@@ -118,8 +118,17 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
        js/announced.js. The editable one never does. That is the whole reason the flag is
        carried this far rather than the swap being done for everybody: a cell in the admin is
        a box somebody types into, and a swapped time sitting in it would be saved over the
-       board's own the moment that week was edited for any other reason. */
-    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly });
+       board's own the moment that week was edited for any other reason.
+       showMolad is carried the same explicit way, defaulting closed, for a stricter reason
+       than that one: the congregation's own /chart/ page (chart-view.js) calls this with
+       readOnly alone and nothing in this parameter's own name to fall back on, and must
+       never show it regardless of what state.settings itself holds - settings.showMolad is
+       carried whole into data/published.json (buildPublishedPayload, publish.js) for the
+       admin's own next session to read back, and that published copy is read by nobody but
+       luach.js, not by this file at all, so there is no path by which this chart's own
+       congregation reader could pick the setting up even by mistake. Only renderSheet's own
+       admin call passes it, read fresh off state.settings.showMolad there. */
+    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
@@ -176,7 +185,11 @@ export function renderSheet(container, state, sheet, onChange) {
             { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
             { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
           ])}</div>
-          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view. The picture stays in colour.</p>
+          <div class="poster-bar-switch">${switchHtml('chart-molad', 'Molad', [
+            { value: 'off', label: 'Off', on: !state.settings.showMolad },
+            { value: 'on', label: 'On', on: Boolean(state.settings.showMolad) },
+          ])}</div>
+          <p class="hint">Padding applies to this chart. Ink and Molad apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. Neither ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
         </div>
       </div>
     </div>
@@ -196,7 +209,7 @@ export function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange, { showMolad: Boolean(state.settings.showMolad) });
   const shabbosFirst = sheet.season === 'weekday' && companion;
   const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
   const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
@@ -236,6 +249,14 @@ export function renderSheet(container, state, sheet, onChange) {
   wireSwitch(container, 'chart-ink', value => {
     state.settings.chartInk = value === 'mono' ? 'mono' : 'colour';
     restyleOwnPages();
+    commit();
+  });
+  // No restyleOwnPages here: unlike Ink, this changes which lines a row has, not just
+  // their colour, so the existing DOM cannot simply be restyled - commit()'s own
+  // onChange({save:true}) re-renders the whole view, which rebuilds the rows themselves
+  // with the new setting read fresh.
+  wireSwitch(container, 'chart-molad', value => {
+    state.settings.showMolad = value === 'on';
     commit();
   });
 
@@ -381,7 +402,7 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false } = {}) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false, showMolad = false } = {}) {
   const page = document.createElement('div');
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
@@ -541,16 +562,65 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // the week the eight days belong to on their own.
       const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
       const weekAllChanukah = isWeekday && chanukahDaysInWeek(week.serial, settings).length === 5;
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '')
+      // showMolad is closed by default (renderPage's own parameter) regardless of
+      // week.mevarchim/week.molad themselves, which weeks.js computes unconditionally
+      // for every week, molad-feature on or off - see this function's own caller,
+      // buildSheetPages, for why that default is what keeps the congregation's own
+      // reading copy from ever showing it.
+      const hasMevarchim = !isWeekday && showMolad && week.mevarchim && week.molad;
+      // A special parsha (שקלים, החדש, …) joins the parsha name's own line, the same
+      // inline "· " join "· חנוכה" already uses below, rather than sitting on a line of
+      // its own above the molad note - only on a week that also carries a molad, which
+      // is the one case a third line (name, special parsha, molad, each on its own) was
+      // measured tall enough to overflow a content-squeezed page's own row height (see
+      // the molad note's own comment). Every other week's own special parsha is
+      // untouched, still its own line under the parsha.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish)
+        + (week.specialParsha && !hasMevarchim ? '\n' + week.specialParsha : '')
+        + (week.specialParsha && hasMevarchim ? ` · ${week.specialParsha}` : '')
         + (chanukahLabel === 'chanukah' || weekAllChanukah ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
+      // The molad is the same kind of note as ערב חנוכה below it: smaller, on a line of its
+      // own under the parsha rather than beside it at full size, and only on the שבת chart
+      // (week.mevarchim/week.molad are not asked for the Weekday chart's own week list -
+      // see weeks.js). Already a complete, language-matched sentence (weeks.js's own
+      // moladLabel), not escaped again here any more than specialParsha or parsha are.
+      // The "שבת מברכים" label itself was dropped - asked for directly - so the molad
+      // line, where there is one, is what says this Shabbos is מברכים.
+      //
+      // is-molad sets its own, smaller size and nowrap (see .parsha-note.is-molad in
+      // app.css): the molad sentence is long enough that at the ordinary note size it
+      // wrapped to a second line on a content-squeezed page, measured directly on a real
+      // generated חורף chart - which cannot be let happen, since every row on a page is
+      // pinned to one shared height (syncHeaderRowHeight) and a row whose own content
+      // needs more than that pushes past it, taking the whole 817px page past its own
+      // fixed height with it (and, on a Shabbos chart, misaligns the Weekday chart
+      // printed side by side with it, which lines up pair per row). nowrap on its own,
+      // without the smaller size, makes it worse under table-layout:auto rather than
+      // better: a cell's minimum width becomes the note's own whole width, so the
+      // narrower the note, the narrower table-layout:auto in turn lets the column be -
+      // measured directly, the column kept shrinking in step with the font with nothing
+      // but nowrap, wrap and all. The two together are what breaks that loop.
+      //
+      // A week whose own special parsha (שקלים, החדש, …) also lands here joins the
+      // parsha name's own line (see parshaCell above) rather than taking a line of its
+      // own, which is what let a three-line cell (name, special parsha, molad) overflow
+      // in the first place - except the one double-barrelled parsha name long enough on
+      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured), where this
+      // is no better and no worse than before the join: still three lines, the same few
+      // pixels past the page's own height it would have been regardless. Shortening the
+      // molad sentence itself is the only way to close that one case too, and has not
+      // been asked for.
+      const mevarchimNote = hasMevarchim
+        ? `<br><span class="parsha-note is-molad">${week.molad}</span>`
+        : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
       // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
-      const parshaHtml = nl2br(parshaCell) + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
+      const parshaHtml = nl2br(parshaCell) + mevarchimNote + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
       const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })

@@ -779,6 +779,18 @@ th {
 /* ערב חנוכה, on its own line under the parsha rather than at the parsha's own size: it
    names the week ahead, not this one, so it reads as a note rather than a second title. */
 .parsha-note { font-size: 0.7em; font-weight: normal; }
+/* The molad note is longer than any other note this cell carries, long enough to wrap
+   to a second line at the ordinary note size on a content-squeezed page - see the
+   comment in sheet-view.js on why that can never be let happen. Shrinking the font
+   alone chases its own tail under table-layout:auto: the parsha column's own width is
+   drawn from how much room its cells' content actually needs, so a smaller note just
+   taught the algorithm the column could be narrower still, and it was measured doing
+   exactly that - the column kept shrinking in step with the note, wrap and all, no
+   matter how small the font went. nowrap is what breaks the loop: with it, a cell's own
+   minimum width is the note's own whole width rather than its longest wrappable word,
+   so the column is sized to actually hold it. The smaller size stays alongside it,
+   since the note would otherwise be read at the parsha's own full size. */
+.parsha-note.is-molad { font-size: 0.55em; white-space: nowrap; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
