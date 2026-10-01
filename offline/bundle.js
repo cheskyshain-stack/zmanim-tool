@@ -1092,15 +1092,26 @@ const CHALAKIM_PER_MONTH = 765433; // 29 days, 12 hours, 793 chalakim - the Ramb
 // agree on Tishrei's own chalakim count, year after year, once this constant stands in
 // for KosherJava's.
 const CHALAKIM_MOLAD_TOHU = 57444;
-// floor(chalakim / CHALAKIM_PER_DAY) is a day count from that same zero point
-// roshHashana's own t1 counts from (t1 = floor(molad/25920 + 0.25), the molad's own civil
-// day after the "after noon" dechiya's rounding - the same rounding moladFor below makes
-// its own way, by checking the hour directly rather than adding a quarter day first).
-// This is what turns that count into this project's own excelSerial, confirmed the same
-// way: moladFor(year, 7) lands within a day or two of roshHashana(year) itself, every
-// year checked - the gap being exactly what the other three dechiyos, which moladFor
-// does not apply, can still move Rosh Hashana by.
-const MOLAD_DAY_TO_SERIAL = -2067023;
+// floor(chalakim / CHALAKIM_PER_DAY) is a day count from that same zero point roshHashana's
+// own t1 counts from. This is what turns that count into this project's own excelSerial -
+// one less than roshHashana's own -2067023, not the same number: t1 itself already folds in
+// Rosh Hashana's first dechiya (molad zaken, t1 = floor(molad/25920 + 0.25), rounding any
+// molad from the halachic day's own 19th hour on into the next day), so t1 and -2067023
+// together answer "what day would Rosh Hashana be from the molad-zaken rule alone", not
+// "what civil day did the molad itself fall on" - the question moladFor is actually asking,
+// with its own, different rounding (the hour checked directly, in moladFor itself, against
+// CHALAKIM_PER_HOUR*6, i.e. civil midnight, with nothing of t1's own quarter-day folded in
+// here). Sharing one constant between two different roundings is exactly what put every
+// molad a day later than its own civil day: verified by requiring, across 201 years
+// (5700-5900), that roshHashana(year) minus moladFor(year, 7).serial always lands in {0, 1,
+// 2} - the only gap the three dechiyos moladFor does not apply can ever open, and never
+// negative, since Rosh Hashana cannot predate its own month's molad. The old constant
+// failed that check in 49 of the 201 (an impossible gap outside {0,1,2}); this one holds it
+// in all 201. Caught from two real reference moladim (Cheshvan and Kislev 5787) landing a
+// day later than their own civil weekday - hour, minute and chalakim were already right,
+// only the day was ever wrong, which is what pointed at this constant rather than the hour
+// arithmetic below it.
+const MOLAD_DAY_TO_SERIAL = -2067024;
 
 /** KosherJava's own getChalakimSinceMoladTohu, ported rather than re-derived: the
  *  classical (Rambam, Hilchos Kiddush HaChodesh 6-8) molad arithmetic, the molad of a
@@ -1137,36 +1148,90 @@ function moladFor(year, month) {
   return { serial, hours, minutes, chalakim: remaining - minutes * CHALAKIM_PER_MINUTE };
 }
 
-// "יום ה'", the same single-letter day this project already writes elsewhere (the
+// "יום ה׳", the same single-letter day this project already writes elsewhere (the
 // חנוכה sheet's own row labels, HE_DAY_LETTERS in posters/chanukah.js) - index 0 unused,
 // 1-6 is Sunday through Friday, and 7 is שבת itself, written plainly rather than as a
 // seventh letter: a molad can fall on שבת, unlike the חנוכה rows this mirrors, which
-// never reach that day at all.
-const MOLAD_DAY_NAMES_HE = ['', "יום א'", "יום ב'", "יום ג'", "יום ד'", "יום ה'", "יום ו'", 'שבת'];
+// never reach that day at all. The geresh is the real Unicode character (׳, U+05F3), the
+// same one hebrewNumber() below already writes - not the plain apostrophe this literally
+// used to be, which read fine but was a different character from every other geresh this
+// project prints.
+const MOLAD_DAY_NAMES_HE = ['', 'יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'];
+const MOLAD_DAY_NAMES_YI = ['', 'זונטאג', 'מאנטאג', 'דינסטאג', 'מיטוואך', 'דאנערשטאג', 'פרייטאג', 'שבת'];
 
-/** "מולד: יום ה' 12:54am 8 חלקים" / "Molad: Thursday 12:54am 8 chalakim" - a 12-hour
+/** "מולד: יום ג׳, 4:23pm, ז׳ חלקים" / "Molad: Thursday 4:23pm 8 chalakim" - a 12-hour
  *  clock with am/pm said out loud, asked for directly in place of this project's usual
  *  bare 12-hour clock (every other time on these boards is unambiguously morning or
  *  evening from its own place on the page, which is exactly what a molad is not - so
- *  here, alone, the am/pm has to be the one carrying that.
+ *  here, alone, the am/pm has to be the one carrying that). חלקים is hebrewNumber()'s own
+ *  numeral (א׳ through י״ז, Rosh Chodesh never carries more than 17), not a bare digit,
+ *  dropped - with its own leading comma - when there are none to report: "30 seconds" is
+ *  not a figure anyone announces a molad in, so a round number is common enough to need
+ *  its own, shorter sentence rather than reading "0 חלקים".
  *
- *  The time and the חלקים count are each their own `<bdi dir="ltr">`, not plain text
- *  sitting in the sentence - two "weak" (digit) runs with nothing but a space between
- *  them, inside an RTL sentence, are free to merge into one run and have *that run's*
- *  own order reversed. Measured directly: "3:50am 12" (time, then the count) printed as
- *  "12 3:50am" once the line ran long enough to wrap, which only an isolate on each
- *  number on its own, not just on the time, stops - the same fix a label sharing a run
- *  with a list of times needed elsewhere on this project's own posters, aimed here at
- *  two numbers sharing a run with each other instead of with a label. */
-function moladLabel(molad, settings) {
+ *  Only the time is its own `<bdi dir="ltr">` now, not the חלקים count: a Hebrew numeral
+ *  is already strong-RTL text, ordered correctly wherever it sits, unlike the bare digit
+ *  this used to print - which is exactly why that one needed the isolate and this one does
+ *  not. The time still does: two "weak" (digit) runs with nothing but a space between
+ *  them, inside an RTL sentence, are free to merge into one run and have *that run's* own
+ *  order reversed. Measured directly, on the bare-digit chalakim this replaces: "3:50am
+ *  12" (time, then the count) printed as "12 3:50am" once the line ran long enough to
+ *  wrap, which only an isolate on each number on its own stopped. */
+function moladLabelCompact(molad, settings) {
   const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial)];
   const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
   const ampm = molad.hours < 12 ? 'am' : 'pm';
   const time = `<bdi dir="ltr">${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}</bdi>`;
-  const chalakim = `<bdi dir="ltr">${molad.chalakim}</bdi>`;
-  return settings.english
-    ? `Molad: ${day} ${time} ${chalakim} chalakim`
-    : `מולד: ${day} ${time} ${chalakim} חלקים`;
+  if (settings.english) {
+    const chalakim = `<bdi dir="ltr">${molad.chalakim}</bdi>`;
+    return `Molad: ${day} ${time} ${chalakim} chalakim`;
+  }
+  const chalakimPhrase = molad.chalakim === 0 ? '' : `, ${hebrewNumber(molad.chalakim)} ${molad.chalakim === 1 ? 'חלק' : 'חלקים'}`;
+  return `מולד: ${day}, ${time}${chalakimPhrase}`;
+}
+
+/** Which part of the day a molad hour reads as in Yiddish, asked for as four fixed
+ *  clock-hour windows rather than worked out from sunrise or sunset: the same hour means
+ *  the same word on every date, which a sunrise-based cut would not. 0-4 and 18-23 share
+ *  one word, ביינאכט - there is no fifth word for the far side of midnight, the way
+ *  MOLAD_DAY_NAMES_YI has no eighth day. */
+function yiddishPeriod(hours) {
+  if (hours < 5) return 'ביינאכט';
+  if (hours < 12) return 'אינדערפרי';
+  if (hours < 18) return 'נאכמיטאג';
+  return 'ביינאכט';
+}
+
+/** "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4." - hour, minutes and חלקים stay
+ *  plain digits here (asked for directly, in place of hebrewNumber()'s own lettering,
+ *  which moladLabelCompact uses instead), each its own `<bdi dir="ltr">` for the same
+ *  reason moladLabelCompact's own time is: a bare digit is "weak" bidi and two of them
+ *  sharing a run can have that run's own order reversed.
+ *
+ *  A zero part is left out rather than printed as "0 מינוט" or "0 חלקים", and מיט (the
+ *  word joining the two) only ever sits between two parts that are both actually there -
+ *  so it drops along with whichever part it would otherwise have nothing to join. A molad
+ *  with neither is said as "{hour} אזייגער" instead of the whole "X מינוט מיט Y חלקים
+ *  נאך" shape with nothing in it. */
+function moladLabelYiddish(molad) {
+  const day = MOLAD_DAY_NAMES_YI[excelWeekday(molad.serial)];
+  const period = yiddishPeriod(molad.hours);
+  const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
+  const hour = `<bdi dir="ltr">${h12}</bdi>`;
+  if (molad.minutes === 0 && molad.chalakim === 0) return `מולד: ${day} ${period}, ${hour} אזייגער.`;
+  const parts = [];
+  if (molad.minutes > 0) parts.push(`<bdi dir="ltr">${molad.minutes}</bdi> מינוט`);
+  if (molad.chalakim > 0) parts.push(`<bdi dir="ltr">${molad.chalakim}</bdi> ${molad.chalakim === 1 ? 'חלק' : 'חלקים'}`);
+  return `מולד: ${day} ${period}, ${parts.join(' מיט ')} נאך ${hour}.`;
+}
+
+/** Dispatches on settings.moladFormat ('compact', the default, or 'yiddish') - the one
+ *  place that decides, so a sheet-view.js or calculations-view.js reader never has to ask
+ *  the setting itself. Yiddish is its own script, not a translation mode: selecting it
+ *  prints Yiddish regardless of settings.english, the same way choosing a chart language
+ *  does not touch which siddur nusach a quote is printed in elsewhere on these boards. */
+function moladLabel(molad, settings) {
+  return settings.moladFormat === 'yiddish' ? moladLabelYiddish(molad) : moladLabelCompact(molad, settings);
 }
 
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
@@ -1719,6 +1784,14 @@ const DEFAULT_SETTINGS = {
      the congregation, even once a season carrying it on is published - see
      buildSheetPages's own comment. */
   showMolad: false,
+  /* Which sentence the molad is said in once showMolad is on: 'compact' (default, the
+     short "מולד: יום ג׳, 4:23pm, ז׳ חלקים" line) or 'yiddish' (the shul's own shorthand,
+     "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4."). Read by hebrew-calendar.js's
+     own moladLabel, which is the one place that dispatches on it - sheet-view.js and
+     anything else that wants a molad sentence call that, never format one itself, so
+     there is exactly one place either sentence is built. Same admin-only safety as
+     showMolad itself: this is never read by the congregation's own chart. */
+  moladFormat: 'compact',
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
@@ -10671,6 +10744,19 @@ function chartMarginControl(key, label, value, original) {
     </div></div>`;
 }
 
+/** A fixed, made-up molad - Tuesday afternoon, 23 minutes and 7 chalakim after 4 - shown
+ *  beside the Molad format switch so the two sentences can be compared without opening a
+ *  מברכים week to see one. Not read from any real month (the spec that asked for this is
+ *  explicit: a formatting example, not an actual value), chosen because it exercises both
+ *  a nonzero minutes part and a nonzero חלקים part at once, which is the only shape that
+ *  shows every moving piece of either sentence in one line. The serial is searched for
+ *  rather than hand-picked, so this stays a Tuesday if excelWeekday's own epoch ever moves. */
+function moladFormatExample(format) {
+  let serial = 2;
+  while (excelWeekday(serial) !== 3) serial++;
+  return moladLabel({ serial, hours: 16, minutes: 23, chalakim: 7 }, { moladFormat: format, english: false });
+}
+
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
  *  week). Whichever page ends up containing at least one week past the spring DST
  *  cutover (2nd Sunday of March - not the fall one near Sukkos) prints as a real שבת
@@ -10821,7 +10907,12 @@ function renderSheet(container, state, sheet, onChange) {
             { value: 'off', label: 'Off', on: !state.settings.showMolad },
             { value: 'on', label: 'On', on: Boolean(state.settings.showMolad) },
           ])}</div>
-          <p class="hint">Padding applies to this chart. Ink and Molad apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. Neither ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+          <div class="poster-bar-switch">${switchHtml('chart-molad-format', 'Molad format', [
+            { value: 'compact', label: 'Compact Hebrew', on: state.settings.moladFormat !== 'yiddish' },
+            { value: 'yiddish', label: 'Yiddish', on: state.settings.moladFormat === 'yiddish' },
+          ])}</div>
+          <p class="hint">Padding applies to this chart. Ink, Molad and Molad format apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. None of the three ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+          <p class="hint" id="molad-format-example">${moladFormatExample(state.settings.moladFormat === 'yiddish' ? 'yiddish' : 'compact')} (a formatting example, not an actual month's molad)</p>
         </div>
       </div>
     </div>
@@ -10889,6 +10980,10 @@ function renderSheet(container, state, sheet, onChange) {
   // with the new setting read fresh.
   wireSwitch(container, 'chart-molad', value => {
     state.settings.showMolad = value === 'on';
+    commit();
+  });
+  wireSwitch(container, 'chart-molad-format', value => {
+    state.settings.moladFormat = value === 'yiddish' ? 'yiddish' : 'compact';
     commit();
   });
 

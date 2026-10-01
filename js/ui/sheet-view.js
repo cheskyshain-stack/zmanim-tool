@@ -3,7 +3,7 @@ import {
   resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR,
   WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
 } from '../settings.js';
-import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel } from '../hebrew-calendar.js';
+import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel, excelWeekday } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
@@ -37,6 +37,19 @@ function chartMarginControl(key, label, value, original) {
       <button type="button" id="${key}-more" aria-label="Increase ${label}" ${value >= CHART_PAD_MAX ? 'disabled' : ''}>+</button>
       <button type="button" id="${key}-original" class="poster-year-reset" ${Math.abs(value-original)<0.001?'disabled':''}>Original</button>
     </div></div>`;
+}
+
+/** A fixed, made-up molad - Tuesday afternoon, 23 minutes and 7 chalakim after 4 - shown
+ *  beside the Molad format switch so the two sentences can be compared without opening a
+ *  מברכים week to see one. Not read from any real month (the spec that asked for this is
+ *  explicit: a formatting example, not an actual value), chosen because it exercises both
+ *  a nonzero minutes part and a nonzero חלקים part at once, which is the only shape that
+ *  shows every moving piece of either sentence in one line. The serial is searched for
+ *  rather than hand-picked, so this stays a Tuesday if excelWeekday's own epoch ever moves. */
+function moladFormatExample(format) {
+  let serial = 2;
+  while (excelWeekday(serial) !== 3) serial++;
+  return moladLabel({ serial, hours: 16, minutes: 23, chalakim: 7 }, { moladFormat: format, english: false });
 }
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
@@ -189,7 +202,12 @@ export function renderSheet(container, state, sheet, onChange) {
             { value: 'off', label: 'Off', on: !state.settings.showMolad },
             { value: 'on', label: 'On', on: Boolean(state.settings.showMolad) },
           ])}</div>
-          <p class="hint">Padding applies to this chart. Ink and Molad apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. Neither ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+          <div class="poster-bar-switch">${switchHtml('chart-molad-format', 'Molad format', [
+            { value: 'compact', label: 'Compact Hebrew', on: state.settings.moladFormat !== 'yiddish' },
+            { value: 'yiddish', label: 'Yiddish', on: state.settings.moladFormat === 'yiddish' },
+          ])}</div>
+          <p class="hint">Padding applies to this chart. Ink, Molad and Molad format apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. None of the three ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+          <p class="hint" id="molad-format-example">${moladFormatExample(state.settings.moladFormat === 'yiddish' ? 'yiddish' : 'compact')} (a formatting example, not an actual month's molad)</p>
         </div>
       </div>
     </div>
@@ -257,6 +275,10 @@ export function renderSheet(container, state, sheet, onChange) {
   // with the new setting read fresh.
   wireSwitch(container, 'chart-molad', value => {
     state.settings.showMolad = value === 'on';
+    commit();
+  });
+  wireSwitch(container, 'chart-molad-format', value => {
+    state.settings.moladFormat = value === 'yiddish' ? 'yiddish' : 'compact';
     commit();
   });
 

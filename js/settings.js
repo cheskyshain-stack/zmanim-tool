@@ -184,6 +184,14 @@ export const DEFAULT_SETTINGS = {
      the congregation, even once a season carrying it on is published - see
      buildSheetPages's own comment. */
   showMolad: false,
+  /* Which sentence the molad is said in once showMolad is on: 'compact' (default, the
+     short "מולד: יום ג׳, 4:23pm, ז׳ חלקים" line) or 'yiddish' (the shul's own shorthand,
+     "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4."). Read by hebrew-calendar.js's
+     own moladLabel, which is the one place that dispatches on it - sheet-view.js and
+     anything else that wants a molad sentence call that, never format one itself, so
+     there is exactly one place either sentence is built. Same admin-only safety as
+     showMolad itself: this is never read by the congregation's own chart. */
+  moladFormat: 'compact',
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */
