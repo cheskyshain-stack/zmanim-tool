@@ -5959,6 +5959,16 @@ function buildChorefRow(week, settings) {
   const I = erevTwelveForty5
     ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) => t.text())))
     : erevMincha.text;
+  /* The tag is a *second*, print-only rendering of the same 12:45, never mixed into I
+     above - the same split sheets/weekday.js's own early מעריב makes for the identical
+     reason: I is still what an override is diffed against and what any other reader of
+     this column would see, so it stays the plain time. Only sheet-view.js's own cell
+     rendering reaches for printOverrides, and only when this Friday's own column has not
+     been typed over by hand. */
+  const IPrint = erevTwelveForty5
+    ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) =>
+        t === erevTwelveForty5 ? chanukahTag(t.text()) : t.text())))
+    : null;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
      and carry their traces once that file is converted too; a column with no trace yet is
@@ -5983,7 +5993,7 @@ function buildChorefRow(week, settings) {
     G: plagTimes.filter((t) => t.held === false),
   };
 
-  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
+  return { B, C, D, E, F, G, H, I, traces, notes, dropped, printOverrides: IPrint != null ? { I: IPrint } : undefined };
 }
 
 const CHOREF_COLUMNS = [
@@ -10885,7 +10895,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
         // possibly with manual <u> underlining); computed cells still need nl2br().
-        const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
+        // printOverrides is read here too, same as the Weekday chart's own B/C above: the
+        // Shabbos chart's own Erev Shabbos מנחה column (I) carries the "חנוכה" tag on its
+        // own extra 12:45 this same way (see choref.js), and every other reader of this
+        // column - a hand-typed override, week.specialParsha, anything that reads row.I
+        // directly - still sees the plain untagged time.
+        const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
+        const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
         // data-season records which season this *page* rendered as, so a later edit
         // (see the blur handler below) recomputes its "did this really change?"
         // baseline the same way, without having to re-derive the page split.
