@@ -5474,6 +5474,22 @@ function chanukahShabbosLabel(shabbosSerial, settings) {
   return null;
 }
 
+/** For the שבת chart's own ערב שבת מנחה column: the Hebrew year to treat `fridaySerial`'s
+ *  own evening as חנוכה's, which is not always the answer `chanukahYearFor` gives the
+ *  Friday itself. Every ordinary year that evening is simply one of the eight days, but
+ *  where 25 Kislev falls on שבת the very first candle is lit Friday evening, before שבת's
+ *  own - that Friday's own calendar day is still 24 Kislev, a day `chanukahYearFor` reads
+ *  as not-yet-חנוכה, though the night it opens genuinely is. The same Friday
+ *  `chanukahErevShabbosPairs` already gives a pair of its own for the Special Schedules
+ *  poster; this is the שבת chart's own way of asking the same question, so the two cannot
+ *  disagree about which Friday actually opens חנוכה. */
+function chanukahFridayYear(fridaySerial, settings) {
+  const direct = chanukahYearFor(fridaySerial, settings);
+  if (direct) return direct;
+  const shabbos = hebrewDateExtended(fridaySerial + 1, settings.useGregorianBefore1582);
+  return shabbos.month === 9 && shabbos.dayOfMonth === 25 ? shabbos.year : null;
+}
+
 /** The weekday מעריב: the everyday board's own regular run (6:35 through 11:00 - see
  *  `maarivParts` in `js/sheets/weekday.js`) with one extra, earlier מנין of its own in front.
  *
@@ -5918,9 +5934,13 @@ function buildChorefRow(week, settings) {
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   /* חנוכה's own extra 12:45, the same addition the חנוכה poster's own Erev Shabbos block
      makes from תשפ״ו on: fridayMainMinchaParts is the everyday Friday's own menu and does
-     not carry one at all, so a Friday inside חנוכה gets it spliced in here, between 12:30
-     and 1:00, rather than the poster and this chart disagreeing about the same Friday. */
-  const chanukahYear = chanukahYearFor(friday, settings);
+     not carry one at all, so a Friday whose evening is genuinely חנוכה's gets it spliced
+     in here, between 12:30 and 1:00, rather than the poster and this chart disagreeing
+     about the same Friday. chanukahFridayYear (not the narrower chanukahYearFor) so the
+     one Friday a year that opens חנוכה before its own calendar day reaches 25 Kislev -
+     because 25 Kislev itself is שבת - gets the same addition every other חנוכה Friday
+     does. */
+  const chanukahYear = chanukahFridayYear(friday, settings);
   const erevTwelveForty5 = chanukahYear && chanukahYear >= 5786
     ? clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").underline()
     : null;
