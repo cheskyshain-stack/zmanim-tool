@@ -1503,6 +1503,49 @@ const chanukahRunLine = (cells, label, note) => `<p class="poster-set-line" lang
   + `</bdi>`
   + `</bdi></p>`;
 
+/** One שחרית row. A Rosh Chodesh row (see combineShacharisRows's own `isRoshChodesh` and
+ *  `roshChodeshVasikin`) prints its own way: "ראש חודש" alone on its own line, the day
+ *  letters left off it, and the times on the line under it opening with the in-between
+ *  vasikin time and its own seconds-precise נץ note in place of the row's usual first cell
+ *  and label-adjacent note - asked for directly, in place of the live either-or choice
+ *  every other disagreeing group on this sheet still prints. Every other row is unchanged.
+ *
+ *  The נץ note sits in its own `.poster-row-note` bdi, the same isolation every other note
+ *  on this sheet already gets (see chanukahRunLine) - right after the in-between time rather
+ *  than ahead of the whole line, which is the one thing that cannot be had by just handing
+ *  chanukahRunLine a cell whose own text already reads "6:43 (נץ …)": a cell's text is
+ *  escaped as plain text, so the נץ note's own Hebrew would sit loose inside the times'
+ *  ltr run instead of isolated out of it, and read as a strong character of that run the
+ *  same way the row's own label used to - measured directly, it turned every time after it
+ *  backwards again. The comma after the note is written here rather than left to the sheet's
+ *  own `.poster-t + .poster-t::before` rule, since that rule only ever fires between two
+ *  `.poster-t`s sitting right next to each other and the note breaks exactly that adjacency;
+ *  every other comma on the line, between the times that follow, is still the rule's own.
+ *
+ *  The note's own bdi carries an explicit `dir="ltr"`, which the standing netzNote never
+ *  needed with only one time in it: "(נץ hh:mm:ss / hh:mm:ss)" has a Hebrew word (נץ)
+ *  sharing a run with two times, and forcing ltr on the run as a whole is not enough by
+ *  itself - measured directly, "7:07:58 / 7:08:47" still printed as "7:08:47 / 7:07:58",
+ *  נץ still read as the run's own strong character even under an explicit ltr and the two
+ *  times still swapped around it. נץ is given a nested bdi of its own, with no direction
+ *  forced on it (a single word has no internal order to protect), and the two times sit in
+ *  a second nested bdi, explicitly ltr again - the same fix the row's own label needed one
+ *  level up, repeated one level down for the one word still sharing a run with a pair of
+ *  times. */
+function shacharisRunLines(row) {
+  if (!row.isRoshChodesh) return chanukahRunLine(row.cells, row.label, row.note);
+  const { time, netz } = row.roshChodeshVasikin;
+  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
+  const timesLine = `<p class="poster-set-line" lang="he">`
+    + `<bdi class="poster-chanukah-run">`
+    + `<bdi class="poster-row-times" dir="ltr">`
+    + `<span class="poster-t">${escAttr(time)}</span> <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${escAttr(netz)}</bdi>)</bdi>, `
+    + rest
+    + `</bdi>`
+    + `</bdi></p>`;
+  return chanukahRunLine([], 'ראש חודש') + timesLine;
+}
+
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
  *  standing weekday מנחה and מעריב, then the one ערב שבת block (see `combineErevShabbos`)
  *  the eight days work out to, whether that is one Friday or two. */
@@ -1514,7 +1557,7 @@ function chanukahBody(poster) {
       ${inner}
     </div>`;
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map((row) => chanukahRunLine(row.cells, row.label, row.note)).join('')),
+    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('')),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),

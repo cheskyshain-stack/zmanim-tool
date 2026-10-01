@@ -20,7 +20,7 @@
 import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime } from '../format.js';
+import { formatTime, formatTimeWithSeconds, floorToMinute } from '../format.js';
 import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
@@ -278,6 +278,32 @@ const netzNote = (group) => {
   return `(נץ ${[...new Set(bound.map((d) => formatTime(d.netz)))].join(SLASH)})`;
 };
 
+/** The Special Schedules poster's own way of opening the ראש חודש שחרית line: one time
+ *  between the group's own days, rather than the live either-or choice mergedCell writes
+ *  everywhere a group disagrees, with the exact נץ each day's own vasikin is worked from -
+ *  to the second, not the minute - written beside it, so a reader sees why the two
+ *  mornings differ by a minute instead of being asked to take a single in-between clock
+ *  time on faith. Asked for directly, and only for this one line: every other group on
+ *  this sheet still prints the live choice (see combineShacharisRows, mergedCell).
+ *
+ *  The between time is the average of the group's own netz-minus-25 candidates, each still
+ *  at its own full precision, floored to the start of its minute rather than rounded to the
+ *  nearest one - the beginning of the one minute the two mornings actually straddle, not
+ *  whichever whole minute happens to land closest to the average.
+ *
+ *  Handed back as the two pieces rather than one joined string: posters-view.js sets the נץ
+ *  note in its own bdi, the same isolation `.poster-row-note` already carries elsewhere on
+ *  this sheet, because the Hebrew in "נץ" sitting loose beside the times (unlike the row's
+ *  own label, which is outside the times' own ltr run entirely) reads as a strong character
+ *  of that run and turns the times after it backwards - measured directly, the same bug the
+ *  label itself made before this sheet's own times were given their own direction. */
+export function chanukahRoshChodeshVasikin(group) {
+  const raw = group.map((d) => d.netz - CH_VASIKIN_BEFORE_NETZ / 1440);
+  const between = floorToMinute(raw.reduce((a, b) => a + b, 0) / raw.length);
+  const netz = [...new Set(group.map((d) => formatTimeWithSeconds(d.netz)))].join(SLASH);
+  return { time: formatTime(between), netz };
+}
+
 /** Fewer lines than one per day: consecutive days whose whole morning matches print once,
  *  under a day range rather than a day each ("יום א'-ד'"), the same combining "יום ג'-ד'"
  *  already does on the old sheets.
@@ -286,7 +312,13 @@ const netzNote = (group) => {
  *  ותיקין time agrees, labelled "ראש חודש" with each day's own letter. The ותיקין time itself
  *  still opens the line of times below the label, the same as every other day - both values
  *  are slash-joined when the group's own days do not agree, the same a live choice between
- *  two times is written anywhere else on this sheet. */
+ *  two times is written anywhere else on this sheet.
+ *
+ *  A Rosh Chodesh row also carries `isRoshChodesh` and `roshChodeshVasikin`
+ *  (chanukahRoshChodeshVasikin's own in-between time and seconds-precise נץ note), which is
+ *  what posters-view.js's own chanukahBody reads instead of `cells[0]`/`note` to print that
+ *  one line the Special Schedules poster's own way; every other reader of this row (cells,
+ *  note, label) is unchanged. */
 export function combineShacharisRows(days) {
   const rows = [];
   let i = 0;
@@ -297,7 +329,7 @@ export function combineShacharisRows(days) {
       const group = days.slice(i, j);
       const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`;
       const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-      rows.push({ label, cells, note: netzNote(group) });
+      rows.push({ label, cells, note: netzNote(group), isRoshChodesh: true, roshChodeshVasikin: chanukahRoshChodeshVasikin(group) });
       i = j;
       continue;
     }
