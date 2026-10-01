@@ -361,15 +361,25 @@ const MOLAD_DAY_NAMES_HE = ['', "יום א'", "יום ב'", "יום ג'", "יו�
  *  clock with am/pm said out loud, asked for directly in place of this project's usual
  *  bare 12-hour clock (every other time on these boards is unambiguously morning or
  *  evening from its own place on the page, which is exactly what a molad is not - so
- *  here, alone, the am/pm has to be the one carrying that. */
+ *  here, alone, the am/pm has to be the one carrying that.
+ *
+ *  The time and the חלקים count are each their own `<bdi dir="ltr">`, not plain text
+ *  sitting in the sentence - two "weak" (digit) runs with nothing but a space between
+ *  them, inside an RTL sentence, are free to merge into one run and have *that run's*
+ *  own order reversed. Measured directly: "3:50am 12" (time, then the count) printed as
+ *  "12 3:50am" once the line ran long enough to wrap, which only an isolate on each
+ *  number on its own, not just on the time, stops - the same fix a label sharing a run
+ *  with a list of times needed elsewhere on this project's own posters, aimed here at
+ *  two numbers sharing a run with each other instead of with a label. */
 export function moladLabel(molad, settings) {
   const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial)];
   const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
   const ampm = molad.hours < 12 ? 'am' : 'pm';
-  const time = `${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}`;
+  const time = `<bdi dir="ltr">${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}</bdi>`;
+  const chalakim = `<bdi dir="ltr">${molad.chalakim}</bdi>`;
   return settings.english
-    ? `Molad: ${day} ${time} ${molad.chalakim} chalakim`
-    : `מולד: ${day} ${time} ${molad.chalakim} חלקים`;
+    ? `Molad: ${day} ${time} ${chalakim} chalakim`
+    : `מולד: ${day} ${time} ${chalakim} חלקים`;
 }
 
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and

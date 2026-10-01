@@ -1148,15 +1148,25 @@ const MOLAD_DAY_NAMES_HE = ['', "יום א'", "יום ב'", "יום ג'", "יו�
  *  clock with am/pm said out loud, asked for directly in place of this project's usual
  *  bare 12-hour clock (every other time on these boards is unambiguously morning or
  *  evening from its own place on the page, which is exactly what a molad is not - so
- *  here, alone, the am/pm has to be the one carrying that. */
+ *  here, alone, the am/pm has to be the one carrying that.
+ *
+ *  The time and the חלקים count are each their own `<bdi dir="ltr">`, not plain text
+ *  sitting in the sentence - two "weak" (digit) runs with nothing but a space between
+ *  them, inside an RTL sentence, are free to merge into one run and have *that run's*
+ *  own order reversed. Measured directly: "3:50am 12" (time, then the count) printed as
+ *  "12 3:50am" once the line ran long enough to wrap, which only an isolate on each
+ *  number on its own, not just on the time, stops - the same fix a label sharing a run
+ *  with a list of times needed elsewhere on this project's own posters, aimed here at
+ *  two numbers sharing a run with each other instead of with a label. */
 function moladLabel(molad, settings) {
   const day = settings.english ? DAY_NAMES[excelWeekday(molad.serial) - 1] : MOLAD_DAY_NAMES_HE[excelWeekday(molad.serial)];
   const h12 = molad.hours % 12 === 0 ? 12 : molad.hours % 12;
   const ampm = molad.hours < 12 ? 'am' : 'pm';
-  const time = `${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}`;
+  const time = `<bdi dir="ltr">${h12}:${String(molad.minutes).padStart(2, '0')}${ampm}</bdi>`;
+  const chalakim = `<bdi dir="ltr">${molad.chalakim}</bdi>`;
   return settings.english
-    ? `Molad: ${day} ${time} ${molad.chalakim} chalakim`
-    : `מולד: ${day} ${time} ${molad.chalakim} חלקים`;
+    ? `Molad: ${day} ${time} ${chalakim} chalakim`
+    : `מולד: ${day} ${time} ${chalakim} חלקים`;
 }
 
 /** HAS_BEHAB: "בה״ב" on the Monday/Thursday/Monday after Rosh Chodesh Iyar and
@@ -11126,7 +11136,17 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // the week the eight days belong to on their own.
       const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
       const weekAllChanukah = isWeekday && chanukahDaysInWeek(week.serial, settings).length === 5;
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '')
+      const hasMevarchim = !isWeekday && week.mevarchim && week.molad;
+      // A special parsha (שקלים, החדש, …) joins the parsha name's own line, the same
+      // inline "· " join "· חנוכה" already uses below, rather than sitting on a line of
+      // its own above the molad note - only on a week that also carries a molad, which
+      // is the one case a third line (name, special parsha, molad, each on its own) was
+      // measured tall enough to overflow a content-squeezed page's own row height (see
+      // the molad note's own comment). Every other week's own special parsha is
+      // untouched, still its own line under the parsha.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish)
+        + (week.specialParsha && !hasMevarchim ? '\n' + week.specialParsha : '')
+        + (week.specialParsha && hasMevarchim ? ` · ${week.specialParsha}` : '')
         + (chanukahLabel === 'chanukah' || weekAllChanukah ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
@@ -11139,8 +11159,32 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // moladLabel), not escaped again here any more than specialParsha or parsha are.
       // The "שבת מברכים" label itself was dropped - asked for directly - so the molad
       // line, where there is one, is what says this Shabbos is מברכים.
-      const mevarchimNote = !isWeekday && week.mevarchim && week.molad
-        ? `<br><span class="parsha-note">${week.molad}</span>`
+      //
+      // is-molad sets its own, smaller size and nowrap (see .parsha-note.is-molad in
+      // app.css): the molad sentence is long enough that at the ordinary note size it
+      // wrapped to a second line on a content-squeezed page, measured directly on a real
+      // generated חורף chart - which cannot be let happen, since every row on a page is
+      // pinned to one shared height (syncHeaderRowHeight) and a row whose own content
+      // needs more than that pushes past it, taking the whole 817px page past its own
+      // fixed height with it (and, on a Shabbos chart, misaligns the Weekday chart
+      // printed side by side with it, which lines up pair per row). nowrap on its own,
+      // without the smaller size, makes it worse under table-layout:auto rather than
+      // better: a cell's minimum width becomes the note's own whole width, so the
+      // narrower the note, the narrower table-layout:auto in turn lets the column be -
+      // measured directly, the column kept shrinking in step with the font with nothing
+      // but nowrap, wrap and all. The two together are what breaks that loop.
+      //
+      // A week whose own special parsha (שקלים, החדש, …) also lands here joins the
+      // parsha name's own line (see parshaCell above) rather than taking a line of its
+      // own, which is what let a three-line cell (name, special parsha, molad) overflow
+      // in the first place - except the one double-barrelled parsha name long enough on
+      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured), where this
+      // is no better and no worse than before the join: still three lines, the same few
+      // pixels past the page's own height it would have been regardless. Shortening the
+      // molad sentence itself is the only way to close that one case too, and has not
+      // been asked for.
+      const mevarchimNote = hasMevarchim
+        ? `<br><span class="parsha-note is-molad">${week.molad}</span>`
         : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
