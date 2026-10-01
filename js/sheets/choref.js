@@ -5,7 +5,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
 import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
-import { chanukahYearFor } from '../posters/chanukah.js';
+import { chanukahFridayYear } from '../posters/chanukah.js';
 import { textjoin, SLASH, splitLinesInHalf, flattenNonEmpty } from '../util.js';
 import { zman, clockTime } from '../zmanim/trace.js';
 
@@ -61,9 +61,13 @@ export function buildChorefRow(week, settings) {
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   /* חנוכה's own extra 12:45, the same addition the חנוכה poster's own Erev Shabbos block
      makes from תשפ״ו on: fridayMainMinchaParts is the everyday Friday's own menu and does
-     not carry one at all, so a Friday inside חנוכה gets it spliced in here, between 12:30
-     and 1:00, rather than the poster and this chart disagreeing about the same Friday. */
-  const chanukahYear = chanukahYearFor(friday, settings);
+     not carry one at all, so a Friday whose evening is genuinely חנוכה's gets it spliced
+     in here, between 12:30 and 1:00, rather than the poster and this chart disagreeing
+     about the same Friday. chanukahFridayYear (not the narrower chanukahYearFor) so the
+     one Friday a year that opens חנוכה before its own calendar day reaches 25 Kislev -
+     because 25 Kislev itself is שבת - gets the same addition every other חנוכה Friday
+     does. */
+  const chanukahYear = chanukahFridayYear(friday, settings);
   const erevTwelveForty5 = chanukahYear && chanukahYear >= 5786
     ? clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").underline()
     : null;
