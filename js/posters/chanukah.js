@@ -346,30 +346,15 @@ export function chanukahVasikinBetween(group) {
  *  on is read off it exactly as before; only the first position, superseded by `vasikin`,
  *  is no longer what a reader of this row is shown.
  *
- *  The non-Rosh-Chodesh row's own label still reads as a day range, or two, rather than
- *  claiming one range that is not there: with Rosh Chodesh carved out of the middle of the
- *  eight days (its ordinary place), the days left are two separate runs, before and after
- *  it, and the eight days are enough that those two runs can open and close on the very same
- *  weekday - the array's own first and last day letter alone then read as "day ב'-ב'", one
- *  day a reader would take as a range of none, where six were actually meant. Each run keeps
- *  its own range (or its own single day), and the runs join the same way Rosh Chodesh's own
- *  label already joins its days, with "ו". */
-function dayRuns(days, wantRoshChodesh) {
-  const runs = [];
-  let i = 0;
-  while (i < days.length) {
-    if (days[i].isRoshChodesh !== wantRoshChodesh) { i++; continue; }
-    let j = i + 1;
-    while (j < days.length && days[j].isRoshChodesh === wantRoshChodesh) j++;
-    runs.push(days.slice(i, j));
-    i = j;
-  }
-  return runs;
-}
-
-const dayRangeLabel = (run) => (run.length === 1
-  ? `${dayLetter(run[0].serial)}'`
-  : `${dayLetter(run[0].serial)}'-${dayLetter(run[run.length - 1].serial)}'`);
+ *  The non-Rosh-Chodesh row's own label names every one of its days rather than a range: with
+ *  Rosh Chodesh carved out of the middle of the eight days (its ordinary place), the days left
+ *  are two separate runs, before and after it, and the eight days are enough that those two
+ *  runs can open and close on the very same weekday - a range's own first and last day letter
+ *  alone then read as "day ב'-ב'", one day a reader would take as a range of none, where six
+ *  were actually meant. Naming every day plainly, the same list Rosh Chodesh's own label
+ *  already names its days with, has no such case to misread: "יום א' ב' ג' ד' א'" repeats a
+ *  letter across the week's own turn rather than hiding it inside a dash. */
+const dayList = (group) => group.map((d) => `${dayLetter(d.serial)}'`).join(' ');
 
 export function combineShacharisRows(days) {
   const rc = days.filter((d) => d.isRoshChodesh);
@@ -379,8 +364,8 @@ export function combineShacharisRows(days) {
     return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group) };
   };
   const rows = [];
-  if (other.length) rows.push(row(other, `יום ${dayRuns(days, false).map(dayRangeLabel).join(' ו')}`));
-  if (rc.length) rows.push(row(rc, `ראש חודש ${rc.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`));
+  if (other.length) rows.push(row(other, `יום ${dayList(other)}`));
+  if (rc.length) rows.push(row(rc, `ראש חודש יום ${dayList(rc)}`));
   if (rows.length === 2 && rc[0].serial < other[0].serial) rows.reverse();
   return rows;
 }
