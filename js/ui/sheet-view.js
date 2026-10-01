@@ -644,14 +644,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured). Under the
       // Compact Hebrew molad (one line) that case is no better and no worse than before
       // the join: still three lines, ~5px past the page's own 817px. Under Yiddish, whose
-      // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), that
-      // same week is four lines total and measured ~27px past instead - line-height on
-      // .parsha-note.is-molad was tried and measured to do nothing (the font's own glyph
-      // metrics floor the line box regardless of what line-height asks for), so font-size
-      // is the only lever left, and shrinking it further changes the molad's own
-      // legibility on every other week too, for the sake of this one. Left as is.
-      // Shortening the molad sentence itself would close both cases and has not been
-      // asked for.
+      // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), the
+      // same week is four lines total: tightened with .parsha-note.is-molad's own
+      // line-height (see app.css), down from ~27px past to ~7px, close to Compact
+      // Hebrew's own baseline rather than well past it. Shortening the molad sentence
+      // itself would close the rest of the gap and has not been asked for.
       const mevarchimNote = hasMevarchim
         ? `<br><span class="parsha-note is-molad">${molad}</span>`
         : '';

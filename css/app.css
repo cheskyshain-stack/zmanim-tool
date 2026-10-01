@@ -789,8 +789,22 @@ th {
    matter how small the font went. nowrap is what breaks the loop: with it, a cell's own
    minimum width is the note's own whole width rather than its longest wrappable word,
    so the column is sized to actually hold it. The smaller size stays alongside it,
-   since the note would otherwise be read at the parsha's own full size. */
-.parsha-note.is-molad { font-size: 0.55em; white-space: nowrap; }
+   since the note would otherwise be read at the parsha's own full size.
+
+   display: inline-block is load-bearing, not decorative, for the Yiddish molad's own
+   second line (moladLabelYiddish's <br>, hebrew-calendar.js): asked to compact the gap
+   between the two lines, line-height alone measured zero effect on a plain inline span -
+   Chromium floors an inline element's own line box at the font's glyph metrics regardless
+   of what line-height asks for, confirmed directly by setting it to 1 and measuring the
+   exact same rendered height as the unset default. Once the note is its own inline-block,
+   line-height governs its line box normally, the same as any block-level element's does -
+   measured span height dropping from 28.39px to 17.59px for the same two lines, nothing
+   else about the span's own content changing. getClientRects() stops being useful for
+   counting this element's own lines once it is inline-block (it always returns one rect
+   for the whole box rather than one per wrapped line); a Range around the text before and
+   after the <br> is what actually confirmed the two lines are still two lines, 8.8px
+   apart, not collapsed into one. */
+.parsha-note.is-molad { font-size: 0.55em; white-space: nowrap; display: inline-block; line-height: 1; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
