@@ -1552,15 +1552,13 @@ function vasikinLine(row) {
   return `<span class="poster-t">${escAttr(time)}</span>${note}${rest}`;
 }
 
-/** One שחרית row. Every row opens the same way now (vasikinLine above); the only thing
- *  still different between a Rosh Chodesh row and any other is that its own label - "ראש
- *  חודש" with its own days' letters (combineShacharisRows's own `row.label`) - sits alone
- *  on a line of its own, while every other row keeps its label set in front of its times on
- *  one line, the way every other line on this sheet is set. */
+/** One שחרית row, label and times on two lines rather than one: the label
+ *  (combineShacharisRows's own `row.label`, "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") alone
+ *  on its own line, then the times under it, opened by vasikinLine the same way whichever
+ *  kind of row it is. Asked for directly, after the label had been on its own line for the
+ *  Rosh Chodesh row only; every row reads the same way now. */
 function shacharisRunLines(row) {
-  const inner = vasikinLine(row);
-  if (!row.isRoshChodesh) return chanukahLineHtml(row.label, inner);
-  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, inner);
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the

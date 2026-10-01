@@ -5584,29 +5584,23 @@ function chanukahShacharisDay(serial, settings) {
      always why. */
   const netzBinding = isRoshChodesh || vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
-  /* The חנוכה sheet's own second and third morning minyanim (and, where the schedule
-     repeats it, the fifth and sixth) swap which of עזרת נשים and למטה carries the one star
-     and which carries the underline from what the everyday board's own time would say -
-     asked for directly, for this sheet alone: the everyday board itself (WEEKDAY_SHACHARIS,
-     WEEKDAY_SHACHARIS_SPECIAL in settings.js) is untouched, and so is the two-star אולם
-     השמחות mark on Rosh Chodesh's own 7:35. */
   const lines = isRoshChodesh
     ? [
       vasikin,
-      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
-      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
+      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
       clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
       clockTime(8, 5, 'the Rosh Chodesh schedule\'s own 8:00, five minutes later during חנוכה'),
-      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
-      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
+      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
     ]
     : [
       vasikin,
-      before10(7, 20, "the everyday board's own second morning minyan, moved to למטה for חנוכה").underline(),
-      before10(7, 35, "the everyday board's own third morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
+      before10(7, 20, "the everyday board's own second morning minyan").mark('*'),
+      before10(7, 35, "the everyday board's own third morning minyan").underline(),
       clockTime(8, 0, "the everyday board's own morning minyan, unmoved"),
-      clockTime(8, 20, "the everyday board's own morning minyan, moved to למטה for חנוכה").underline(),
-      clockTime(8, 40, "the everyday board's own morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(8, 20, "the everyday board's own morning minyan, unmoved").mark('*'),
+      clockTime(8, 40, "the everyday board's own morning minyan, unmoved").underline(),
     ];
 
   return { serial, isRoshChodesh, netz, netzBinding, lines };
@@ -12715,15 +12709,13 @@ function vasikinLine(row) {
   return `<span class="poster-t">${escAttr(time)}</span>${note}${rest}`;
 }
 
-/** One שחרית row. Every row opens the same way now (vasikinLine above); the only thing
- *  still different between a Rosh Chodesh row and any other is that its own label - "ראש
- *  חודש" with its own days' letters (combineShacharisRows's own `row.label`) - sits alone
- *  on a line of its own, while every other row keeps its label set in front of its times on
- *  one line, the way every other line on this sheet is set. */
+/** One שחרית row, label and times on two lines rather than one: the label
+ *  (combineShacharisRows's own `row.label`, "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") alone
+ *  on its own line, then the times under it, opened by vasikinLine the same way whichever
+ *  kind of row it is. Asked for directly, after the label had been on its own line for the
+ *  Rosh Chodesh row only; every row reads the same way now. */
 function shacharisRunLines(row) {
-  const inner = vasikinLine(row);
-  if (!row.isRoshChodesh) return chanukahLineHtml(row.label, inner);
-  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, inner);
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
