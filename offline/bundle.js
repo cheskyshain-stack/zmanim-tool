@@ -1709,14 +1709,15 @@ const DEFAULT_SETTINGS = {
      Turning it back off just hides the tag; it does not touch the minyan itself. */
   newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
   /* Off by default and admin-only, asked for in those exact terms: whether a שבת that is
-     שבת מברכים also prints the molad underneath its parsha name. computeSeasonWeeks works
-     out week.mevarchim/week.molad for every week regardless of this flag - it is cheap and
-     the chart's own week objects are the one place that reads the calendar, not two - but
-     nothing renders either unless this is on. Read only by renderSheet's own call into
-     buildSheetPages (sheet-view.js); the congregation's own reading copy (chart-view.js)
-     never reads this field at all, so there is no path by which turning it on for the
-     admin's own chart could show it to the congregation, even once a season carrying it on
-     is published - see buildSheetPages's own comment. */
+     שבת מברכים also prints the molad underneath its parsha name. Worked out fresh from
+     each week's own date (sheet-view.js, off shabbosMevarchimMonth/moladFor in
+     hebrew-calendar.js) rather than stored on the week object, so a sheet saved before
+     this setting existed shows it immediately once turned on, with nothing to
+     regenerate. Read only by renderSheet's own call into buildSheetPages (sheet-view.js);
+     the congregation's own reading copy (chart-view.js) never reads this field at all, so
+     there is no path by which turning it on for the admin's own chart could show it to
+     the congregation, even once a season carrying it on is published - see
+     buildSheetPages's own comment. */
   showMolad: false,
 };
 
@@ -2639,7 +2640,7 @@ function seasonEndSerial(season, hebrewYear) {
  *   convention: Kayitz(Y) runs Pesach(Y) -> Sukkos(Y+1); Choref(Y) runs Sukkos(Y) -> Pesach(Y), both within AM year Y)
  * @param {object} settings
  * @param {object} tables {parshaChutz, parshaEY, parshaNames}
- * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string,mevarchim:boolean,molad:string|null}>}}
+ * @returns {{startSerial:number, endSerial:number, weeks: Array<{serial:number,date:Date,parsha:string,specialParsha:string}>}}
  */
 function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   const startSerial = seasonStartSerial(season, hebrewYear);
@@ -2653,16 +2654,7 @@ function computeSeasonWeeks(season, hebrewYear, settings, tables) {
   while (d <= endSerial && guard < MAX_WEEKS) {
     const parsha = hasParsha(d, settings, tables);
     if (parsha) {
-      const mevarchimMonth = shabbosMevarchimMonth(d, settings);
-      // The molad announced *on* this Shabbos is the coming month's own, read off the
-      // same month/year shabbosMevarchimMonth already resolved - never re-derived from
-      // the date a second time, so the two cannot drift apart about which month this
-      // Shabbos is for.
-      const molad = mevarchimMonth ? moladLabel(moladFor(mevarchimMonth.year, mevarchimMonth.month), settings) : null;
-      weeks.push({
-        serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings),
-        mevarchim: Boolean(mevarchimMonth), molad,
-      });
+      weeks.push({ serial: d, date: dateFromSerial(d), parsha, specialParsha: hasSpecialParsha(d, settings) });
     }
     d += 7;
     guard++;
@@ -11202,12 +11194,22 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // the week the eight days belong to on their own.
       const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
       const weekAllChanukah = isWeekday && chanukahDaysInWeek(week.serial, settings).length === 5;
-      // showMolad is closed by default (renderPage's own parameter) regardless of
-      // week.mevarchim/week.molad themselves, which weeks.js computes unconditionally
-      // for every week, molad-feature on or off - see this function's own caller,
+      // showMolad is closed by default (renderPage's own parameter) regardless of what
+      // this week's own date works out to - see this function's own caller,
       // buildSheetPages, for why that default is what keeps the congregation's own
       // reading copy from ever showing it.
-      const hasMevarchim = !isWeekday && showMolad && week.mevarchim && week.molad;
+      // Worked out fresh from week.serial rather than read off a stored week.mevarchim /
+      // week.molad: a sheet saved before this feature existed, or before some later fix
+      // to the molad calculation itself, carries neither field, and the switch has no
+      // effect on a sheet that was never regenerated since - caught on a real saved
+      // sheet, where turning Molad on changed nothing. Reading the calendar directly off
+      // the date it is already showing is also what the rest of this project does for
+      // anything that must not go stale in a saved sheet (the Weekday chart's own
+      // schedules, WEEKDAY_SHACHARIS and its kin, are the same pattern): the one place
+      // that is ever asked is the one place that can never disagree with itself.
+      const mevarchimMonth = !isWeekday && showMolad ? shabbosMevarchimMonth(week.serial, settings) : null;
+      const molad = mevarchimMonth ? moladLabel(moladFor(mevarchimMonth.year, mevarchimMonth.month), settings) : null;
+      const hasMevarchim = Boolean(molad);
       // A special parsha (שקלים, החדש, …) joins the parsha name's own line, the same
       // inline "· " join "· חנוכה" already uses below, rather than sitting on a line of
       // its own above the molad note - only on a week that also carries a molad, which
@@ -11225,9 +11227,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
       // The molad is the same kind of note as ערב חנוכה below it: smaller, on a line of its
       // own under the parsha rather than beside it at full size, and only on the שבת chart
-      // (week.mevarchim/week.molad are not asked for the Weekday chart's own week list -
-      // see weeks.js). Already a complete, language-matched sentence (weeks.js's own
-      // moladLabel), not escaped again here any more than specialParsha or parsha are.
+      // (isWeekday above keeps it off the Weekday chart's own week list entirely). Already
+      // a complete, language-matched sentence (hebrew-calendar.js's own moladLabel), not
+      // escaped again here any more than specialParsha or parsha are.
       // The "שבת מברכים" label itself was dropped - asked for directly - so the molad
       // line, where there is one, is what says this Shabbos is מברכים.
       //
@@ -11255,7 +11257,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // molad sentence itself is the only way to close that one case too, and has not
       // been asked for.
       const mevarchimNote = hasMevarchim
-        ? `<br><span class="parsha-note is-molad">${week.molad}</span>`
+        ? `<br><span class="parsha-note is-molad">${molad}</span>`
         : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
@@ -16928,7 +16930,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
       season,
       hebrewYear,
       createdAt: new Date().toISOString(),
-      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha, mevarchim: w.mevarchim, molad: w.molad })),
+      weeks: weeks.map((w) => ({ serial: w.serial, date: w.date.toISOString(), parsha: w.parsha, specialParsha: w.specialParsha })),
       pageSizes: sizes,
       overrides: {},
       style: { ...state.settings.sheetStyle }, // remembers whatever style was last used
