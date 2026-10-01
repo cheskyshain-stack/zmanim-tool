@@ -5620,37 +5620,25 @@ function mergedCell(traces) {
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
 const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
 
-/** Every day's own נץ that is actually why its ותיקין prints when it does, joined to the
- *  time it is worked from rather than sitting apart in the row's label - the same
- *  "(נץ 6:54)" the הושענא רבה מנין on the סוכות sheet carries beside its own מנין
- *  (`sukkosRow`'s own `note`, joined by a non-breaking space so the two can never split
- *  across a line).
+/** Every row's own single ותיקין time, the first thing שחרית prints and the one position
+ *  that can vary across a merged group's own days: the average of the group's own
+ *  netz-minus-25 candidates, each still at its own full precision, floored to the start of
+ *  its minute rather than rounded to the nearest one - the beginning of the one minute the
+ *  group's own mornings actually straddle, not whichever whole minute happens to land
+ *  closest to the average. Asked for directly, in place of the live either-or choice
+ *  mergedCell writes everywhere else a group disagrees (see combineShacharisRows).
  *
- *  Asked for directly: a day whose own ותיקין sits at the everyday board's own floor
- *  (`netzBinding` false, see chanukahShacharisDay) is a day נץ decided nothing, and naming
- *  it beside a time that needed no explaining is a fact nobody asked for. Dropped from the
- *  group entirely rather than printed anyway, and the note itself is dropped (null) when
- *  the group has no day left that נץ actually explains - a group of only floor days has
- *  nothing for this line to say. Rosh Chodesh has no floor to have won instead, so every
- *  Rosh Chodesh day always keeps its own נץ here. */
-const netzNote = (group) => {
-  const bound = group.filter((d) => d.netzBinding);
-  if (!bound.length) return null;
-  return `(נץ ${[...new Set(bound.map((d) => formatTime(d.netz)))].join(SLASH)})`;
-};
-
-/** The Special Schedules poster's own way of opening the ראש חודש שחרית line: one time
- *  between the group's own days, rather than the live either-or choice mergedCell writes
- *  everywhere a group disagrees, with the exact נץ each day's own vasikin is worked from -
- *  to the second, not the minute - written beside it, so a reader sees why the two
- *  mornings differ by a minute instead of being asked to take a single in-between clock
- *  time on faith. Asked for directly, and only for this one line: every other group on
- *  this sheet still prints the live choice (see combineShacharisRows, mergedCell).
- *
- *  The between time is the average of the group's own netz-minus-25 candidates, each still
- *  at its own full precision, floored to the start of its minute rather than rounded to the
- *  nearest one - the beginning of the one minute the two mornings actually straddle, not
- *  whichever whole minute happens to land closest to the average.
+ *  Every day of the eight is merged into one row this way now (see combineShacharisRows),
+ *  so the group behind this call is no longer always two days agreeing on everything but
+ *  this one position (Rosh Chodesh) or days that already print identically (the standing
+ *  ones) - it can hold days that land on the morning's own floor beside days נץ actually
+ *  decided. Asked for directly: a day whose own ותיקין sits at the everyday board's own
+ *  floor (`netzBinding` false, see chanukahShacharisDay) is a day נץ decided nothing, and
+ *  naming its נץ beside a time that needed no explaining is a fact nobody asked for, so the
+ *  note names only the days נץ actually explains, exactly as netzNote used to - and the
+ *  note itself comes back null when nothing in the group is one of them, which the merged
+ *  row's own blended time can still be, once the floor days outnumber the netz days enough
+ *  to pull the average back onto the floor's own minute.
  *
  *  Handed back as the two pieces rather than one joined string: posters-view.js sets the נץ
  *  note in its own bdi, the same isolation `.poster-row-note` already carries elsewhere on
@@ -5658,55 +5646,97 @@ const netzNote = (group) => {
  *  own label, which is outside the times' own ltr run entirely) reads as a strong character
  *  of that run and turns the times after it backwards - measured directly, the same bug the
  *  label itself made before this sheet's own times were given their own direction. */
-function chanukahRoshChodeshVasikin(group) {
-  const raw = group.map((d) => d.netz - CH_VASIKIN_BEFORE_NETZ / 1440);
+/** The one candidate a day actually contributes to the average, at full precision rather
+ *  than the minute `vasikin` itself rounds to: נץ minus 25 outright on Rosh Chodesh, which
+ *  has no floor to answer to, and the later of that and the everyday floor (6:50) on every
+ *  other day - the same comparison chanukahShacharisDay's own `vasikin` makes, asked again
+ *  here rather than read off `vasikin.value` because that value is already rounded to its
+ *  own minute and this average wants to round only once, at the end.
+ *
+ *  Needed once a group can hold a floor day beside a נץ day, now that every non-Rosh-Chodesh
+ *  day merges into one row regardless of whether they agree (see combineShacharisRows): a
+ *  floor day's own נץ minus 25 can sit under 6:50, and averaging that number in in rather
+ *  than the 6:50 the floor actually prints would pull the whole row's own time down to
+ *  something no single day on the sheet is printing - the "don't change the zman of
+ *  prayer" the floor exists for in the first place. */
+const rawVasikinCandidate = (d) => {
+  const netzBased = d.netz - CH_VASIKIN_BEFORE_NETZ / 1440;
+  return d.isRoshChodesh ? netzBased : Math.max(netzBased, T(7, 0) - CH_REGULAR_SHIFT_MINUTES / 1440);
+};
+
+function chanukahVasikinBetween(group) {
+  const raw = group.map(rawVasikinCandidate);
   const between = floorToMinute(raw.reduce((a, b) => a + b, 0) / raw.length);
-  const netz = [...new Set(group.map((d) => formatTimeWithSeconds(d.netz)))].join(SLASH);
+  const bound = group.filter((d) => d.netzBinding);
+  const netz = bound.length ? [...new Set(bound.map((d) => formatTimeWithSeconds(d.netz)))].join(SLASH) : null;
   return { time: formatTime(between), netz };
 }
 
-/** Fewer lines than one per day: consecutive days whose whole morning matches print once,
- *  under a day range rather than a day each ("יום א'-ד'"), the same combining "יום ג'-ד'"
- *  already does on the old sheets.
+/** One row for every one of the eight days that is not Rosh Chodesh, together, and one more
+ *  for Rosh Chodesh's own days (grouped together whether or not their own ותיקין time
+ *  agrees, labelled "ראש חודש" with each day's own letter) - asked for directly, in place
+ *  of the narrower combining this used to do, which only ever merged a run of consecutive
+ *  days: a non-Rosh-Chodesh run on both sides of Rosh Chodesh (the ordinary shape of the
+ *  eight days, which only ever carries Rosh Chodesh as one block in the middle of them)
+ *  printed as two rows of its own kind rather than one, same as a day whose own נץ moved the
+ *  ותיקין time even a minute from its neighbour used to open a row of its own before every
+ *  position but that one started being merged regardless of agreement. Grouping by kind
+ *  rather than by run is what reaches both: every day of one kind is one row wherever in the
+ *  eight it falls. Every position after the ותיקין time is a fixed clock time that cannot
+ *  disagree across the eight days however they are grouped, so this changes nothing about
+ *  what the rest of either line says - only how many lines there are and what the one
+ *  varying position, the ותיקין time, prints (see chanukahVasikinBetween).
  *
- *  Rosh Chodesh days combine on their own terms - grouped together whether or not their own
- *  ותיקין time agrees, labelled "ראש חודש" with each day's own letter. The ותיקין time itself
- *  still opens the line of times below the label, the same as every other day - both values
- *  are slash-joined when the group's own days do not agree, the same a live choice between
- *  two times is written anywhere else on this sheet.
+ *  The two rows print in whichever order their own earliest day actually falls, so a year
+ *  whose eight days open with Rosh Chodesh (its own non-Rosh-Chodesh days all coming after)
+ *  still reads top to bottom the way the calendar does, not in a fixed order that would read
+ *  backwards that one year.
  *
- *  A Rosh Chodesh row also carries `isRoshChodesh` and `roshChodeshVasikin`
- *  (chanukahRoshChodeshVasikin's own in-between time and seconds-precise נץ note), which is
- *  what posters-view.js's own chanukahBody reads instead of `cells[0]`/`note` to print that
- *  one line the Special Schedules poster's own way; every other reader of this row (cells,
- *  note, label) is unchanged. */
-function combineShacharisRows(days) {
-  const rows = [];
+ *  Both kinds of row carry `isRoshChodesh` and `vasikin` (chanukahVasikinBetween's own
+ *  in-between time and, where at least one of the group's own days needs it, its
+ *  seconds-precise נץ note) - what posters-view.js's own shacharisRunLines reads in place
+ *  of `cells[0]` to open every row the same way: the ותיקין time first, then its own נץ
+ *  note where one is needed. `cells` still carries the full line, merged position by
+ *  position the same way a Rosh Chodesh row's always has, so every position from the second
+ *  on is read off it exactly as before; only the first position, superseded by `vasikin`,
+ *  is no longer what a reader of this row is shown.
+ *
+ *  The non-Rosh-Chodesh row's own label still reads as a day range, or two, rather than
+ *  claiming one range that is not there: with Rosh Chodesh carved out of the middle of the
+ *  eight days (its ordinary place), the days left are two separate runs, before and after
+ *  it, and the eight days are enough that those two runs can open and close on the very same
+ *  weekday - the array's own first and last day letter alone then read as "day ב'-ב'", one
+ *  day a reader would take as a range of none, where six were actually meant. Each run keeps
+ *  its own range (or its own single day), and the runs join the same way Rosh Chodesh's own
+ *  label already joins its days, with "ו". */
+function dayRuns(days, wantRoshChodesh) {
+  const runs = [];
   let i = 0;
   while (i < days.length) {
-    if (days[i].isRoshChodesh) {
-      let j = i + 1;
-      while (j < days.length && days[j].isRoshChodesh) j++;
-      const group = days.slice(i, j);
-      const label = `ראש חודש ${group.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`;
-      const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-      rows.push({ label, cells, note: netzNote(group), isRoshChodesh: true, roshChodeshVasikin: chanukahRoshChodeshVasikin(group) });
-      i = j;
-      continue;
-    }
+    if (days[i].isRoshChodesh !== wantRoshChodesh) { i++; continue; }
     let j = i + 1;
-    const lineKey = (d) => d.lines.map((t) => t.text()).join('|');
-    while (j < days.length && !days[j].isRoshChodesh && lineKey(days[j]) === lineKey(days[i])) j++;
-    const group = days.slice(i, j);
-    const first = dayLetter(group[0].serial);
-    const last = dayLetter(group[group.length - 1].serial);
-    rows.push({
-      label: group.length === 1 ? `יום ${first}'` : `יום ${first}'-${last}'`,
-      cells: group[0].lines.map(toCell),
-      note: netzNote(group),
-    });
+    while (j < days.length && days[j].isRoshChodesh === wantRoshChodesh) j++;
+    runs.push(days.slice(i, j));
     i = j;
   }
+  return runs;
+}
+
+const dayRangeLabel = (run) => (run.length === 1
+  ? `${dayLetter(run[0].serial)}'`
+  : `${dayLetter(run[0].serial)}'-${dayLetter(run[run.length - 1].serial)}'`);
+
+function combineShacharisRows(days) {
+  const rc = days.filter((d) => d.isRoshChodesh);
+  const other = days.filter((d) => !d.isRoshChodesh);
+  const row = (group, label) => {
+    const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group) };
+  };
+  const rows = [];
+  if (other.length) rows.push(row(other, `יום ${dayRuns(days, false).map(dayRangeLabel).join(' ו')}`));
+  if (rc.length) rows.push(row(rc, `ראש חודש ${rc.map((d, k) => `${k === 0 ? 'יום ' : 'ו'}${dayLetter(d.serial)}'`).join(' ')}`));
+  if (rows.length === 2 && rc[0].serial < other[0].serial) rows.reverse();
   return rows;
 }
 
@@ -12621,71 +12651,73 @@ function renderTzomGedaliaPoster(poster, settings) {
  *  balanceRuns measures and can be cut evenly along with the times after it, not a fixed
  *  width the run's own share of the line has to fit around.
  *
- *  `note`, where a row has one, is the נץ ותיקין is worked from (see `netzNote` in
- *  posters/chanukah.js), joined to the first time - ותיקין itself - by a non-breaking space
- *  rather than sitting ahead of the row in the label: the same pairing `sukkosRow`'s own
- *  note gives הושענא רבה's מנין and its own נץ, so the two can never split across a line.
- *
- *  The note and the times sit in a second, nested `dir="ltr"` bdi of their own, the same
- *  way every other poster's own list of times already does (rhRow, the יום כיפור after-box)
- *  - this one needed it more than they do and did not have it. A label sharing the *same*
- *  bidi run as the times gives that run a strong Hebrew character of its own, so the
- *  browser's own auto-direction read the whole run right to left and printed the times
- *  backwards: last time nearest the label, first time run off the far end. A line with no
- *  label never showed it - digits alone default to ltr with nothing to override - which is
- *  why שחרית's own two labelled rows read backwards while מנחה and מעריב beneath them,
- *  labelless, already read correctly. Measured directly before this: ראש חודש's own line
- *  read 8:40, 8:20*, 8:05 … down to the label, the reverse of the order a reader wants. */
-const chanukahRunLine = (cells, label, note) => `<p class="poster-set-line" lang="he">`
-  + `<bdi class="poster-chanukah-run">`
-  + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
-  + `<bdi class="poster-row-times" dir="ltr">`
-  + (note ? `<bdi class="poster-row-note">${escAttr(note)}</bdi> ` : '')
-  + cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('')
-  + `</bdi>`
-  + `</bdi></p>`;
-
-/** One שחרית row. A Rosh Chodesh row (see combineShacharisRows's own `isRoshChodesh` and
- *  `roshChodeshVasikin`) prints its own way: "ראש חודש" alone on its own line, the day
- *  letters left off it, and the times on the line under it opening with the in-between
- *  vasikin time and its own seconds-precise נץ note in place of the row's usual first cell
- *  and label-adjacent note - asked for directly, in place of the live either-or choice
- *  every other disagreeing group on this sheet still prints. Every other row is unchanged.
- *
- *  The נץ note sits in its own `.poster-row-note` bdi, the same isolation every other note
- *  on this sheet already gets (see chanukahRunLine) - right after the in-between time rather
- *  than ahead of the whole line, which is the one thing that cannot be had by just handing
- *  chanukahRunLine a cell whose own text already reads "6:43 (נץ …)": a cell's text is
- *  escaped as plain text, so the נץ note's own Hebrew would sit loose inside the times'
- *  ltr run instead of isolated out of it, and read as a strong character of that run the
- *  same way the row's own label used to - measured directly, it turned every time after it
- *  backwards again. The comma after the note is written here rather than left to the sheet's
- *  own `.poster-t + .poster-t::before` rule, since that rule only ever fires between two
- *  `.poster-t`s sitting right next to each other and the note breaks exactly that adjacency;
- *  every other comma on the line, between the times that follow, is still the rule's own.
- *
- *  The note's own bdi carries an explicit `dir="ltr"`, which the standing netzNote never
- *  needed with only one time in it: "(נץ hh:mm:ss / hh:mm:ss)" has a Hebrew word (נץ)
- *  sharing a run with two times, and forcing ltr on the run as a whole is not enough by
- *  itself - measured directly, "7:07:58 / 7:08:47" still printed as "7:08:47 / 7:07:58",
- *  נץ still read as the run's own strong character even under an explicit ltr and the two
- *  times still swapped around it. נץ is given a nested bdi of its own, with no direction
- *  forced on it (a single word has no internal order to protect), and the two times sit in
- *  a second nested bdi, explicitly ltr again - the same fix the row's own label needed one
- *  level up, repeated one level down for the one word still sharing a run with a pair of
- *  times. */
-function shacharisRunLines(row) {
-  if (!row.isRoshChodesh) return chanukahRunLine(row.cells, row.label, row.note);
-  const { time, netz } = row.roshChodeshVasikin;
-  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
-  const timesLine = `<p class="poster-set-line" lang="he">`
+ *  `timesInnerHtml` sits in a second, nested `dir="ltr"` bdi of its own, the same way every
+ *  other poster's own list of times already does (rhRow, the יום כיפור after-box) - this one
+ *  needed it more than they do and did not have it. A label sharing the *same* bidi run as
+ *  the times gives that run a strong Hebrew character of its own, so the browser's own
+ *  auto-direction read the whole run right to left and printed the times backwards: last
+ *  time nearest the label, first time run off the far end. A line with no label never
+ *  showed it - digits alone default to ltr with nothing to override - which is why שחרית's
+ *  own two labelled rows read backwards while מנחה and מעריב beneath them, labelless,
+ *  already read correctly. Measured directly before this: ראש חודש's own line read 8:40,
+ *  8:20*, 8:05 … down to the label, the reverse of the order a reader wants. */
+function chanukahLineHtml(label, timesInnerHtml) {
+  return `<p class="poster-set-line" lang="he">`
     + `<bdi class="poster-chanukah-run">`
+    + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
     + `<bdi class="poster-row-times" dir="ltr">`
-    + `<span class="poster-t">${escAttr(time)}</span> <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${escAttr(netz)}</bdi>)</bdi>, `
-    + rest
+    + timesInnerHtml
     + `</bdi>`
     + `</bdi></p>`;
-  return chanukahRunLine([], 'ראש חודש') + timesLine;
+}
+
+/** A plain list of cells, no in-between time and no נץ note - every line on this sheet
+ *  that is not שחרית (מנחה, מעריב, the ערב שבת menu) still just prints its cells. */
+const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
+  cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join(''));
+
+/** Every שחרית row's own times, opening the same way now whichever kind of row it is (see
+ *  combineShacharisRows's own `vasikin`, chanukahVasikinBetween): the group's own in-between
+ *  ותיקין time first, its own נץ note in parentheses right after it where at least one of
+ *  the group's own days needed נץ to explain it, then the row's ordinary, fixed times.
+ *
+ *  Where there is no note, the ותיקין time's own `.poster-t` sits right next to the first
+ *  ordinary time's, so the sheet's own `.poster-t + .poster-t::before` rule draws the comma
+ *  between them the same as it draws every other comma on this sheet - nothing has to be
+ *  written here for that case. Where there is a note, it sits between the two and breaks
+ *  that adjacency, so the comma after it is written out by hand; every comma after that,
+ *  between the ordinary times that follow, is still the rule's own.
+ *
+ *  The נץ note sits in its own `.poster-row-note` bdi, the same isolation every other note
+ *  on this sheet already gets - measured directly, a Hebrew word sitting loose inside the
+ *  times' own ltr run reads as a strong character of that run and turns every time after it
+ *  backwards, the same bug the row's own label made before the label was moved outside this
+ *  run entirely. With two times in the note itself ("hh:mm:ss / hh:mm:ss"), forcing ltr on
+ *  the note as a whole was not enough by itself either - measured directly, "7:07:58 /
+ *  7:08:47" still came out "7:08:47 / 7:07:58", נץ still read as that run's own strong
+ *  character even under an explicit ltr. נץ is given a nested bdi of its own, with no
+ *  direction forced on it (a single word has no internal order to protect), and the two
+ *  times sit in a second nested bdi, explicitly ltr again - the same fix the row's own
+ *  label needed one level up, repeated one level down for the one word still sharing a run
+ *  with a pair of times. */
+function vasikinLine(row) {
+  const { time, netz } = row.vasikin;
+  const note = netz
+    ? ` <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${escAttr(netz)}</bdi>)</bdi>, `
+    : '';
+  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
+  return `<span class="poster-t">${escAttr(time)}</span>${note}${rest}`;
+}
+
+/** One שחרית row. Every row opens the same way now (vasikinLine above); the only thing
+ *  still different between a Rosh Chodesh row and any other is the label - "ראש חודש" on a
+ *  line of its own, the day letters left off it, asked for directly when this line was
+ *  built, while every other row keeps its own day-range label set in front of its times on
+ *  one line, the way every other line on this sheet is set. */
+function shacharisRunLines(row) {
+  const inner = vasikinLine(row);
+  if (!row.isRoshChodesh) return chanukahLineHtml(row.label, inner);
+  return chanukahLineHtml('ראש חודש', '') + chanukahLineHtml(null, inner);
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
