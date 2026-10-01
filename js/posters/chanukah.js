@@ -223,29 +223,23 @@ function chanukahShacharisDay(serial, settings) {
      always why. */
   const netzBinding = isRoshChodesh || vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
-  /* The חנוכה sheet's own second and third morning minyanim (and, where the schedule
-     repeats it, the fifth and sixth) swap which of עזרת נשים and למטה carries the one star
-     and which carries the underline from what the everyday board's own time would say -
-     asked for directly, for this sheet alone: the everyday board itself (WEEKDAY_SHACHARIS,
-     WEEKDAY_SHACHARIS_SPECIAL in settings.js) is untouched, and so is the two-star אולם
-     השמחות mark on Rosh Chodesh's own 7:35. */
   const lines = isRoshChodesh
     ? [
       vasikin,
-      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
-      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
+      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
       clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
       clockTime(8, 5, 'the Rosh Chodesh schedule\'s own 8:00, five minutes later during חנוכה'),
-      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, moved to למטה for חנוכה").underline(),
-      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
+      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
     ]
     : [
       vasikin,
-      before10(7, 20, "the everyday board's own second morning minyan, moved to למטה for חנוכה").underline(),
-      before10(7, 35, "the everyday board's own third morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
+      before10(7, 20, "the everyday board's own second morning minyan").mark('*'),
+      before10(7, 35, "the everyday board's own third morning minyan").underline(),
       clockTime(8, 0, "the everyday board's own morning minyan, unmoved"),
-      clockTime(8, 20, "the everyday board's own morning minyan, moved to למטה for חנוכה").underline(),
-      clockTime(8, 40, "the everyday board's own morning minyan, moved to עזרת נשים for חנוכה").mark('*'),
+      clockTime(8, 20, "the everyday board's own morning minyan, unmoved").mark('*'),
+      clockTime(8, 40, "the everyday board's own morning minyan, unmoved").underline(),
     ];
 
   return { serial, isRoshChodesh, netz, netzBinding, lines };
