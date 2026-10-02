@@ -20,6 +20,7 @@ globalThis.trafficTest = {
   referrer: trafficReferrer, dailyRows: trafficDailyRows, summary: trafficSummary,
   content: trafficContent, breakdown: trafficBreakdown, patterns: trafficPatterns,
   reconciliation: trafficReconciliation, periods: trafficChartPeriods, daily: trafficDaily,
+  adminStats: trafficAdminStats, adminActivity: trafficAdminActivity,
   preset(key, snapshot) { trafficSelection = { preset: key }; trafficSnapshot = snapshot; return trafficWindow(); },
   selectPreset(key, now) { trafficSelectPreset(key, now); return { range: trafficWindow(), snapshot: trafficSnapshot, cached: trafficCache.size }; },
   keepResponse() { trafficCache.set('completed-window', {}); },
@@ -293,4 +294,56 @@ test('compact chart buttons retain exact ranges while the daily table retains ev
   assert.match(html, /data-traffic-start="2027-02-01" data-traffic-end="2027-02-03"/);
   assert.equal((html.match(/data-traffic-start=/g) || []).length, 6);
   assert.equal((html.match(/data-traffic-day=/g) || []).length, daily.length);
+});
+
+function adminReport(group = { status: 'complete', rows: [] }) {
+  return report({ range: { start: '2026-10-02', end: '2026-10-02', since: '2026-10-02T04:00:00Z', until: '2026-10-03T04:00:00Z' }, groups: { page: group } });
+}
+
+test('admin opens use page views across the two admin addresses, excluding display control', () => {
+  const data = adminReport({ status: 'complete', rows: [
+    { key: '/admin/', views: 6, visits: 0 },
+    { key: '/admin/index.html', views: 3, visits: 1 },
+    { key: '/admin/display/', views: 90, visits: 50 },
+    { key: '/admin/elsewhere', views: 20, visits: 20 },
+    { key: '/', views: 50, visits: 20 },
+  ] });
+  assert.equal(ui.adminStats(data).views, 9);
+  assert.equal(ui.adminStats(data).status, 'complete');
+  assert.match(ui.adminActivity(data), /Admin page opens<\/h3><strong>9<\/strong>/);
+});
+
+test('admin history before tracking began is not presented as zero', () => {
+  const data = adminReport();
+  data.range.until = '2026-10-02T03:45:00Z';
+  assert.equal(ui.adminStats(data).views, null);
+  assert.equal(ui.adminStats(data).status, 'not-tracked');
+  const html = ui.adminActivity(data);
+  assert.match(html, /Not tracked yet/);
+  assert.doesNotMatch(html, /<strong>0<\/strong>/);
+});
+
+test('admin zero requires complete page detail, while measured partial opens are retained', () => {
+  const zero = ui.adminStats(adminReport());
+  assert.equal(zero.views, 0);
+  assert.equal(zero.status, 'complete');
+  const missing = ui.adminStats(adminReport({ status: 'unavailable', rows: [] }));
+  assert.equal(missing.views, null);
+  const partialEmpty = ui.adminStats(adminReport({ status: 'partial', rows: [] }));
+  assert.equal(partialEmpty.views, null);
+  const partial = adminReport({ status: 'partial', rows: [{ key: '/admin/', views: 4, visits: 0 }] });
+  assert.equal(ui.adminStats(partial).views, 4);
+  assert.equal(ui.adminStats(partial).status, 'partial');
+  assert.match(ui.adminActivity(partial), /traffic-admin-qualifier">Recorded<\/span><strong>4<\/strong>/);
+});
+
+test('admin exclusion indicator safely mirrors this browser stored exclusion', () => {
+  try {
+    context.localStorage = { getItem(key) { assert.equal(key, 'zmanim-nocount'); return '1'; } };
+    assert.match(ui.adminActivity(adminReport()), /This browser is excluded from the count/);
+    context.localStorage = { getItem() { return null; } };
+    assert.match(ui.adminActivity(adminReport()), /This browser has no counting exclusion set/);
+    context.localStorage = { getItem() { throw new Error('storage unavailable'); } };
+    assert.match(ui.adminActivity(adminReport()), /exclusion setting could not be read/);
+  } finally { delete context.localStorage; }
 });

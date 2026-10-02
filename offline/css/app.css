@@ -4405,6 +4405,13 @@ body.is-locked { overflow: hidden; }
 .traffic-total-primary p { color: #d0dbe6; }
 .traffic-total-coverage { margin: 0.7rem 0; color: var(--traffic-navy); font-size: 1.4rem; font-weight: 650; }
 .traffic-panel { min-width: 0; border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1.2rem; margin: 0 0 1rem; background: var(--surface); }
+.traffic-admin-activity { display: grid; grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 2fr); gap: 1.2rem; align-items: center; border-left: 3px solid var(--traffic-gold); }
+.traffic-admin-count strong { display: block; margin-top: 0.35rem; font-size: 1.5rem; line-height: 1.2; color: var(--traffic-navy); font-variant-numeric: tabular-nums; }
+.traffic-admin-count .traffic-admin-qualifier { display: block; color: #846631; font-size: 0.7rem; margin-top: 0.5rem; }
+.traffic-admin-browser { display: inline-block; padding: 0.3rem 0.5rem; border-radius: 5px; font-size: 0.72rem; font-weight: 600; color: #52677d; background: #eef2f6; }
+.traffic-admin-browser.is-excluded { color: #2e6354; background: #edf5f1; }
+.traffic-admin-explanation p { margin: 0.55rem 0 0; font-size: 0.76rem; line-height: 1.5; color: #586b7f; }
+.traffic-admin-explanation .traffic-small { font-size: 0.68rem; color: #6a7789; }
 .traffic-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; margin-bottom: 1rem; }
 .traffic-panel h3 { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 650; color: var(--traffic-navy); }
 .traffic-panel-heading p { font-size: 0.77rem; line-height: 1.5; color: #697486; margin: 0; }
@@ -4487,6 +4494,8 @@ body.is-locked { overflow: hidden; }
   .traffic-patterns-content { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 40rem) {
+  .traffic-admin-activity { grid-template-columns: minmax(0, 1fr); gap: 0.7rem; }
+  .traffic-admin-count strong { font-size: 1.3rem; }
   .traffic-header { align-items: flex-start; gap: 0.65rem; }
   .traffic-header .traffic-eyebrow { font-size: 0.57rem; }
   .traffic-header h2 { font-size: 1.5rem; }
@@ -4781,19 +4790,65 @@ body.is-luach #main .luach-zmanim-group:has(> summary:active) { transform:none; 
 body.is-luach #main a.luach-fund-row:active { background:var(--luach-navy);color:var(--luach-cream);border-color:var(--luach-gold);box-shadow:inset 0 2px 6px rgba(0,0,0,.3); }
 body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-body,.luach-give-title,.luach-account-title,.luach-account-blurb,.luach-fund-action) { color:var(--luach-cream);opacity:1; }
 
-/* Admin navigation grouped by task, with secondary tools inside their section. */
-#nav .admin-nav-group { display:flex; flex-direction:column; gap:.15rem; margin:0 0 .7rem; }
-#nav .admin-nav-label { margin:.2rem .75rem .3rem; color:rgba(255,255,255,.58); font-size:.65rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
-#nav a.nav-btn { text-decoration:none; }
-#nav .admin-site-link { margin-top:.3rem; border-top:1px solid rgba(255,255,255,.13); border-radius:0; padding-top:.85rem; }
+/* Admin home and navigation. These rules do not change any printed chart. */
+#nav .admin-nav-sections { display:flex; flex-direction:column; gap:.55rem; width:100%; }
+#nav .admin-nav-group { display:flex; flex-direction:column; gap:.15rem; margin:0; }
+#nav .admin-nav-label { margin:.65rem .75rem .3rem; color:#c8b57e; font-size:.67rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; }
+#nav a.nav-btn { text-decoration:none; min-height:44px; box-sizing:border-box; line-height:1.35; }
+#nav .nav-btn small { font-size:.68rem; opacity:.72; white-space:nowrap; }
+#nav .admin-nav-public-links { border-top:1px solid rgba(255,255,255,.16); padding-top:.55rem; margin-top:.25rem; }
+#nav .admin-nav-toggle { display:none; }
+#nav :is(a,button):focus-visible { outline:2px solid #d6ba70; outline-offset:2px; }
 .sidebar { overflow-y:auto; }
 .admin-section-tabs { flex-wrap:wrap; margin-bottom:1.2rem; }
+.admin-home { color:#142b43; }
+.admin-home-heading { padding:1.5rem; margin:0 0 1.4rem; background:#faf7ee; border:1px solid #e1d6b6; border-radius:12px; }
+.admin-home-eyebrow { margin:0 0 .6rem; color:#7c6837; font-size:.77rem; font-weight:650; letter-spacing:.025em; }
+.admin-home-heading h2 { font-size:clamp(1.8rem,3vw,2.25rem); letter-spacing:-.035em; }
+.admin-home-heading > p:not(.admin-home-eyebrow) { margin:.55rem 0 1rem; max-width:48ch; color:#566474; line-height:1.55; }
+.admin-home-quick-links { display:flex; gap:.5rem 1rem; align-items:center; flex-wrap:wrap; }
+.admin-home-quick-links > a { min-height:44px; display:inline-flex; align-items:center; gap:.35rem; color:#183650; font-weight:600; font-size:.86rem; text-underline-offset:3px; }
+.admin-home-quick-links .admin-home-primary { text-decoration:none; border-radius:7px; background:#16334b; color:#fff; padding:.65rem .9rem; box-sizing:border-box; }
+.admin-home-primary > span { margin-left:.6rem; }
+.admin-home-new-tab { font-size:.71rem; font-weight:400; }
+.admin-home-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; align-items:start; }
+.admin-home-section { min-width:0; background:#fff; border:1px solid #dbe0e5; border-radius:10px; overflow:hidden; }
+.admin-home-section > header { padding:1.05rem 1.1rem .95rem; border-bottom:2px solid #d6c28b; background:#fafbfc; }
+.admin-home-section h3 { margin:0 0 .3rem; color:#142b43; font-size:1.04rem; }
+.admin-home-section > header p { margin:0; color:#687380; line-height:1.45; font-size:.8rem; }
+.admin-home-task { display:flex; flex-direction:column; gap:.35rem; padding:1.05rem 1.1rem; border-bottom:1px solid #e8ebee; text-decoration:none; color:#17344d; }
+.admin-home-task:last-child { border-bottom:0; }
+.admin-home-task-title { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:.91rem; font-weight:700; }
+.admin-home-task-title > span { color:#a68a44; }
+.admin-home-task-description { font-size:.81rem; color:#627080; line-height:1.5; }
+.admin-home-task:hover { background:#f9f6ed; }
+.admin-home-secondary { display:flex; flex-wrap:wrap; gap:.1rem 1rem; padding:.45rem 1.1rem; background:#fafbfc; }
+.admin-home-secondary a { display:inline-flex; align-items:center; min-height:44px; font-size:.8rem; color:#1c405e; text-underline-offset:3px; }
+.admin-home-note { max-width:76ch; margin:1.25rem 0 0; font-size:.8rem; line-height:1.55; color:#6b7480; }
+.admin-home a:focus-visible { outline:2px solid #9b7b2e; outline-offset:-3px; }
 @media screen and (max-width:900px) {
  #nav { width:100%; }
- #nav .admin-nav-group { flex:1 1 100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; margin-bottom:.4rem; }
+ #nav .admin-nav-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:54px; box-sizing:border-box; padding:.45rem .85rem; margin:0; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.17); border-radius:7px; color:#fff; text-align:left; font-family:inherit; font-size:.95rem; font-weight:600; line-height:1.35; cursor:pointer; }
+ #nav .admin-nav-toggle small { display:block; color:#c8b57e; font-size:.65rem; font-weight:500; margin-bottom:.1rem; }
+ #nav .admin-nav-chevron { font-size:1.4rem; line-height:1; }
+ #nav.is-expanded .admin-nav-chevron { transform:rotate(180deg); }
+ #nav .admin-nav-sections { display:none; padding-top:.45rem; }
+ #nav.is-expanded .admin-nav-sections { display:flex; }
+ #nav .admin-nav-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; }
  #nav .admin-nav-label { grid-column:1 / -1; }
- #nav .nav-btn { min-width:0; height:auto; white-space:normal; }
- #nav .admin-site-link { width:100%; }
+ #nav .nav-btn { min-width:0; width:100%; height:auto; min-height:46px; white-space:normal; }
+ #nav .admin-nav-public-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; }
+ .admin-home-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .admin-home-heading { padding:1.2rem; }
+}
+@media screen and (max-width:580px) {
+ .admin-home-grid { grid-template-columns:1fr; }
+ .admin-home-heading { padding:1.05rem; }
+ .admin-home-quick-links { gap:.2rem .85rem; }
+ .admin-home-quick-links .admin-home-primary { width:100%; justify-content:space-between; margin-bottom:.25rem; }
+ .admin-home-task { padding:1rem 1.05rem; }
+ .admin-home-task-description { font-size:.85rem; }
+ .admin-home-section > header p { font-size:.85rem; }
 }
 
 

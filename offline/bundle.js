@@ -3323,6 +3323,66 @@ function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ==== ui/admin-home.js ====
+/** Shared task names keep the home page and navigation consistent. */
+const ADMIN_TAB_LABELS = {
+  home: 'Admin home', week: 'Weekly schedules', charts: 'Seasonal charts',
+  generate: 'Print layouts', saved: 'Saved copies', posters: 'Special schedules',
+  status: 'Website schedule status', traffic: 'Site statistics',
+  settings: 'Schedule settings', calc: 'Calculation guide',
+  guide: 'Help & instructions', program: 'Offline program',
+};
+
+const ADMIN_NAV_SECTIONS = [
+  { title: 'Schedules', description: 'View times and prepare charts for printing.', items: [
+    { tab: 'week', icon: 'week', description: 'Browse the weekday and Shabbos schedules, one week at a time.' },
+    { tab: 'charts', icon: 'generate', description: 'View seasonal charts, adjust print layouts, and reopen saved copies.' },
+    { tab: 'posters', icon: 'posters', description: 'View and print Yom Tov, fast day, and other special schedules.' },
+  ] },
+  { title: 'Website & screen', description: 'Manage what people see and read.', items: [
+    { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
+    { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
+    { tab: 'status', icon: 'status', description: 'Check which schedules are showing on the website and when they change.' },
+    { tab: 'traffic', icon: 'traffic', description: 'Review website views, visits, traffic sources, and admin activity for the same date range.' },
+  ] },
+  { title: 'Settings & help', description: 'Adjust schedules and find instructions.', items: [
+    { tab: 'settings', icon: 'settings', description: 'Change local schedule rules and print preferences, or save a backup.' },
+    { tab: 'calc', icon: 'calc', description: 'See how the schedule times are calculated.' },
+    { tab: 'guide', icon: 'guide', description: 'Find printing instructions, saved-copy help, and the offline program.' },
+  ] },
+];
+
+/** No live status is inferred here. Each task opens its own source of information. */
+function renderAdminHome(container, onOpenTab) {
+  const admHomeLink = (item) => `<a class="admin-home-task" href="${item.tab ? `#${item.tab}` : item.href}"${item.tab ? ` data-admin-tab="${item.tab}"` : ''}>
+    <span class="admin-home-task-title">${item.tab ? ADMIN_TAB_LABELS[item.tab] : item.label}<span aria-hidden="true">&rarr;</span></span>
+    <span class="admin-home-task-description">${item.description}</span>
+  </a>`;
+  container.innerHTML = `<div class="admin-home">
+    <header class="admin-home-heading">
+      <p class="admin-home-eyebrow">Bais Medrash of Lakewood Commons</p>
+      <h2>Admin home</h2>
+      <p>Schedules, announcements, and the tools that keep the shul informed.</p>
+      <div class="admin-home-quick-links">
+        <a class="admin-home-primary" href="/admin/display/">Shul View controls <span aria-hidden="true">&rarr;</span></a>
+        <a href="/tv/" target="_blank" rel="noopener">Open Shul View <span class="admin-home-new-tab">(new tab)</span></a>
+        <a href="/" target="_blank" rel="noopener">Open website <span class="admin-home-new-tab">(new tab)</span></a>
+      </div>
+    </header>
+    <div class="admin-home-grid">${ADMIN_NAV_SECTIONS.map((section) => `<section class="admin-home-section">
+      <header><h3>${section.title}</h3><p>${section.description}</p></header>
+      ${section.items.map(admHomeLink).join('')}
+      ${section.title === 'Schedules' ? '<div class="admin-home-secondary"><a href="#generate" data-admin-tab="generate">Print layouts</a><a href="#saved" data-admin-tab="saved">Saved copies</a></div>' : ''}
+    </section>`).join('')}</div>
+    <p class="admin-home-note">Saved copies and schedule settings are kept in this browser. Use Schedule settings to export a backup. Screen announcements are managed separately in Shul View controls.</p>
+  </div>`;
+  container.querySelectorAll('[data-admin-tab]').forEach((link) => link.addEventListener('click', (event) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onOpenTab(link.dataset.adminTab);
+  }));
+}
+
 // ==== posters/chart-cell.js ====
 // A wall chart's cell, read back as a poster's own times.
 //
@@ -11023,7 +11083,7 @@ function renderSheet(container, state, sheet, onChange) {
       const height = el.getBoundingClientRect().height;
       return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`;
     });
-    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print Layout and move some weeks to another page.`;
+    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
     overflowWarningEl.hidden = false;
   } else {
     overflowWarningEl.textContent = '';
@@ -17204,13 +17264,13 @@ function fmtDate(date) {
 /** Help for the current automatic schedule workflow. */
 function renderGuide(container, onOpenTab) {
   container.innerHTML = `
-    <h2>Help &amp; Instructions</h2>
+    <h2>Help &amp; instructions</h2>
     <p class="hint">Find schedules, prepare printed charts, and manage your local copies.</p>
     <details class="panel" open>
       <summary>Automatic schedules</summary>
       <div class="panel-body">
         <p>The congregation website generates its seasonal charts automatically. There is no seasonal sending or publishing step.</p>
-        <p><strong>Weekly Schedule</strong> shows one week at a time. <strong>Season Charts → View Charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
+        <p><strong>Weekly schedules</strong> shows one week at a time. <strong>Seasonal charts → View charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
         <p>Each season uses three Shabbos pages and three matching weekday pages. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
       </div>
     </details>
@@ -17218,7 +17278,7 @@ function renderGuide(container, onOpenTab) {
       <summary>Print a chart with your own page splits</summary>
       <div class="panel-body">
         <ol>
-          <li>Open <strong>Season Charts → Print Layout</strong>.</li>
+          <li>Open <strong>Seasonal charts → Print layouts</strong>.</li>
           <li>Choose the season and Hebrew year, then continue.</li>
           <li>Adjust the number of weeks on each page and open the charts.</li>
           <li>Use <strong>Print / Save as PDF</strong>.</li>
@@ -17236,28 +17296,35 @@ function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>Saved copies</summary>
       <div class="panel-body">
-        <p>Open <strong>Season Charts → Saved Copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
+        <p>Open <strong>Seasonal charts → Saved copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
         <p>You can edit cells, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
       </div>
     </details>
     <details class="panel">
       <summary>Special schedules and messages</summary>
       <div class="panel-body">
-        <p><strong>Special Schedules</strong> contains the Yom Tov and fast day posters, plus the option to write a sheet of your own.</p>
-        <p><strong>Messages</strong> opens the separate page for preparing and copying schedule messages.</p>
+        <p><strong>Special schedules</strong> contains the Yom Tov and fast day posters, plus the option to write a sheet of your own.</p>
+        <p><strong>Schedule messages</strong> opens the separate page for preparing and copying schedule messages.</p>
+      </div>
+    </details>
+    <details class="panel">
+      <summary>Shul View and the website</summary>
+      <div class="panel-body">
+        <p><strong>Shul View controls</strong> manages announcements, Parnes Hayom, and screen settings. Use its calendar to preview a date, or choose <strong>Open Shul View</strong> to see the live screen.</p>
+        <p><strong>Website schedule status</strong> shows which schedules appear on the website and when they change. <strong>Site statistics</strong> shows website traffic and admin activity for your selected dates.</p>
       </div>
     </details>
     <details class="panel">
       <summary>Settings and backups</summary>
       <div class="panel-body">
-        <p><strong>Settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
-        <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Settings → Backup</strong> to export a backup or import one on another device.</p>
-        <p><strong>How Times Are Calculated</strong> explains the formulas used by the charts and special schedules.</p>
+        <p><strong>Schedule settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
+        <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Schedule settings → Backup</strong> to export a backup or import one on another device.</p>
+        <p><strong>Calculation guide</strong> explains the formulas used by the charts and special schedules.</p>
       </div>
     </details>
     <div class="actions">
-      <button type="button" id="guide-start" class="btn-primary">Open Season Charts</button>
-      <button type="button" id="guide-program">Get the Program</button>
+      <button type="button" id="guide-start" class="btn-primary">Open seasonal charts</button>
+      <button type="button" id="guide-program">Offline program</button>
     </div>
   `;
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('charts'));
@@ -21536,6 +21603,7 @@ function renderStatus(main) {
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
+const TRAFFIC_ADMIN_TRACKING_START = '2026-10-02T03:45:00Z';
 const TRAFFIC_RANGES = [
   { key: 'today', label: 'Today', days: 1 },
   { key: 'yesterday', label: 'Yesterday', days: 1 },
@@ -21547,7 +21615,7 @@ const TRAFFIC_RANGES = [
 const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
-  '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin',
+  '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -21679,6 +21747,43 @@ function trafficSummary(data, daily) {
       <p>${trafficEsc(coverage.detail)}.<br>Today includes only the time elapsed.</p>
     </section>
   </div>`;
+}
+function trafficBrowserExcluded() {
+  try {
+    if (!globalThis.localStorage) return null;
+    return Boolean(globalThis.localStorage.getItem('zmanim-nocount'));
+  } catch { return null; }
+}
+function trafficAdminStats(data) {
+  const until = Date.parse(data.range?.until || data.until || data.snapshotAt);
+  if (Number.isFinite(until) && until <= Date.parse(TRAFFIC_ADMIN_TRACKING_START)) {
+    return { views: null, status: 'not-tracked' };
+  }
+  const group = data.groups?.page;
+  if (!Number.isFinite(until) || !group || !['complete', 'partial'].includes(group.status)) {
+    return { views: null, status: 'unavailable' };
+  }
+  const adminRows = (group.rows || []).filter((row) => ['/admin/', '/admin/index.html'].includes(String(row.key ?? row.path ?? '').split('?')[0]));
+  const validRows = adminRows.filter((row) => trafficKnown(row.views));
+  const views = validRows.reduce((total, row) => total + row.views, 0);
+  if (group.status === 'complete' && validRows.length === adminRows.length) return { views, status: 'complete' };
+  return views > 0 ? { views, status: 'partial' } : { views: null, status: 'unavailable' };
+}
+function trafficAdminActivity(data) {
+  const count = trafficAdminStats(data);
+  const excluded = trafficBrowserExcluded();
+  const value = count.status === 'not-tracked' ? 'Not tracked yet' : trafficNum(count.views);
+  const detail = count.status === 'not-tracked' ? 'Admin activity was not recorded in this selected period.'
+    : count.status === 'unavailable' ? 'A reliable count is not available for this range yet. This does not mean nobody opened the admin.'
+      : count.status === 'partial' ? 'Recorded opens from the available page data. This range is incomplete, so the total may be higher.'
+        : 'An open is counted after the admin is unlocked. Reloads count again; changing admin tabs does not.';
+  const browser = excluded === true ? 'This browser is excluded from the count.'
+    : excluded === false ? 'This browser has no counting exclusion set.' : 'This browser’s exclusion setting could not be read.';
+  return `<section class="traffic-panel traffic-admin-activity" aria-label="Admin activity">
+    <div class="traffic-admin-count"><h3>Admin page opens</h3>${count.status === 'partial' ? '<span class="traffic-admin-qualifier">Recorded</span>' : ''}<strong>${trafficEsc(value)}</strong></div>
+    <div class="traffic-admin-explanation"><span class="traffic-admin-browser${excluded === true ? ' is-excluded' : ''}">${trafficEsc(browser)}</span><p>${trafficEsc(detail)}</p>
+      <p class="traffic-small">Added with this update on October 1, 2026. Earlier admin opens were not recorded. Counts can arrive late and do not identify who opened the page.</p></div>
+  </section>`;
 }
 function trafficReconciliation(data, daily) {
   const recorded = daily.filter((row) => trafficKnown(row.views));
@@ -21845,7 +21950,8 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Shul View, Messages, and admin pages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Unlocked admin page opens were added with the October 1, 2026 update. Shul View and Messages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>
       <div><dt>One date range</dt><dd>Every panel uses ${trafficEsc(trafficDateLabel(range.start, true))} through ${trafficEsc(trafficDateLabel(range.end, true))}, in New York. Today's record stops at the snapshot time. Daylight saving changes are included.</dd></div>
@@ -21885,7 +21991,7 @@ function trafficContent(data, range) {
     'Some source requests did not complete. Available records are still shown. Open collection status below for the reported errors.', 'error'));
   if (coverage.status === 'complete' && data.totals?.views === 0) notices.push(trafficNotice('No page views recorded',
     'This selected period was collected successfully and reported zero views. Analytics blockers and device opt-outs can prevent visits from being counted.', 'quiet'));
-  return `${trafficSummary(data, daily)}${notices.join('')}${trafficDaily(data, daily)}
+  return `${trafficSummary(data, daily)}${trafficAdminActivity(data)}${notices.join('')}${trafficDaily(data, daily)}
     <div class="traffic-breakdowns">
       ${trafficBreakdown(data, 'page', 'Pages viewed', 'Which pages were opened. Entry visits show where a visit began.', { wide: true, visits: true, paths: true, name: trafficPageName, label: 'Page' })}
       ${trafficBreakdown(data, 'device', 'Devices', 'Page views by device type.', { name: (key) => TRAFFIC_DEVICES[key.toLowerCase()] || key || 'Not supplied', label: 'Device' })}
@@ -21997,7 +22103,8 @@ const Z = { sunrise, sunset, sunriseElev, sunsetElev, solarNoon, dstLocal, minch
 // ==== app.js ====
 const state = loadState();
 let tables = null;
-let currentTab = 'charts';
+let currentTab = 'home';
+let adminStarted = false;
 let currentSheetId = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
@@ -22030,14 +22137,9 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-// Making a chart first, then the week you are on, then the sheets you already have, then
-// the things you set once. Rules is no longer among them - it is the first panel inside
-// Settings, being something configured rather than a place you go. Generate leading also
-// matches where the app opens.
-const tabs = ['week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
-// "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
-// said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings: 'Settings', saved: 'Saved Copies', traffic: 'Site Statistics', calc: 'How Times Are Calculated', program: 'Get the Program', guide: 'Help & Instructions', week: 'Weekly Schedule', posters: 'Special Schedules', status: 'What the Congregation Sees' };
+// Keep existing hashes so saved links and the chart workflows continue to work.
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
+const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
    Without this the tab was a variable that started at Generate and was never written
@@ -22071,7 +22173,8 @@ function writeRoute() {
 /** Take it from there, on load and on back or forward. Returns whether anything moved, so
  *  the caller can decide whether a redraw is needed. */
 function readRoute() {
-  const [tab, ...rest] = routeParts();
+  const [requestedTab, ...rest] = routeParts();
+  const tab = requestedTab || 'home';
   if (!routeTabs.has(tab)) return false;
   const same = tab === currentTab && !currentSheetId
     && (tab !== 'posters' || rest.join('/') === posterRoute().join('/'));
@@ -22084,12 +22187,14 @@ function readRoute() {
 
 // Back and forward. Our own writes come back through here too and are recognised as
 // already applied, so they do not cause a second render.
-window.addEventListener('hashchange', () => { if (readRoute()) render(); });
+window.addEventListener('hashchange', () => { if (adminStarted && readRoute()) render(); });
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
 // stays a single self-contained folder with no extra assets to load.
 const tabIcons = {
+  home: '<path d="M3 9.5 10 3.5l7 6"/><path d="M4.8 8.2v8.3h10.4V8.2M8.2 16.5v-5h3.6v5"/>',
+  screen: '<rect x="2" y="3.5" width="16" height="11" rx="1.5"/><path d="M10 14.5v3M6.5 17.5h7"/>',
   generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
   settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
@@ -22135,28 +22240,47 @@ function openTab(tab) {
   currentSheetId = null;
   writeRoute();
   render();
+  window.scrollTo(0, 0);
+  const heading = main.querySelector('h2');
+  if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
 }
 
 function renderNav() {
   const active = currentSheetId || ['generate', 'saved'].includes(currentTab) ? 'charts'
     : currentTab === 'program' ? 'guide' : currentTab;
-  const button = t => `<button class="nav-btn ${active === t ? 'active' : ''}" ${active === t ? 'aria-current="page"' : ''} data-tab="${t}">${icon(t === 'charts' ? 'generate' : t)}<span>${tabLabels[t]}</span></button>`;
-  const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
-  nav.innerHTML = group('Schedules', ['week', 'charts', 'posters', 'status'].map(button).join('')
-      + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
-    + group('Management', ['traffic', 'settings'].map(button).join('')
-      + `<a class="nav-btn" href="/admin/display/">${icon('site')}<span>Manage Shul View</span></a>`
-      + `<a class="nav-btn" href="/display/" target="_blank" rel="noopener">${icon('site')}<span>Open Shul View</span></a>`)
-    + group('Help', ['calc', 'guide'].map(button).join(''))
-    + `<a class="nav-btn admin-site-link" href="/">${icon('site')}<span>View Website</span></a>`;
-  nav.querySelectorAll('button[data-tab]').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.tab)));
+  const link = item => `<a class="nav-btn ${active === item.tab ? 'active' : ''}" href="${item.tab ? `#${item.tab}` : item.href}" ${active === item.tab ? 'aria-current="page"' : ''}${item.tab ? ` data-tab="${item.tab}"` : ''}>${icon(item.icon || item.tab)}<span>${item.tab ? tabLabels[item.tab] : item.label}</span></a>`;
+  nav.classList.remove('is-expanded');
+  nav.setAttribute('aria-label', 'Admin navigation');
+  nav.innerHTML = `<button type="button" class="admin-nav-toggle" aria-expanded="false" aria-controls="admin-navigation"><span><small>Menu</small>${tabLabels[currentTab]}</span><span class="admin-nav-chevron" aria-hidden="true">⌄</span></button>
+    <div class="admin-nav-sections" id="admin-navigation">
+      ${link({ tab: 'home' })}
+      ${ADMIN_NAV_SECTIONS.map(section => `<section class="admin-nav-group" aria-label="${section.title}"><h2 class="admin-nav-label">${section.title}</h2>${section.items.map(link).join('')}</section>`).join('')}
+      <div class="admin-nav-public-links">
+        <a class="nav-btn" href="/tv/" target="_blank" rel="noopener">${icon('screen')}<span>Open Shul View <small>(new tab)</small></span></a>
+        <a class="nav-btn" href="/" target="_blank" rel="noopener">${icon('site')}<span>Open website <small>(new tab)</small></span></a>
+      </div>
+    </div>`;
+  const toggle = nav.querySelector('.admin-nav-toggle');
+  toggle.addEventListener('click', () => {
+    const expanded = nav.classList.toggle('is-expanded');
+    toggle.setAttribute('aria-expanded', String(expanded));
+  });
+  nav.onkeydown = event => {
+    if (event.key === 'Escape' && nav.classList.contains('is-expanded')) {
+      nav.classList.remove('is-expanded'); toggle.setAttribute('aria-expanded', 'false'); toggle.focus();
+    }
+  };
+  nav.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); openTab(link.dataset.tab);
+  }));
 }
 
 function addSectionTabs(items) {
   const bar = document.createElement('div');
   bar.className = 'pane-switch no-print admin-section-tabs';
   bar.setAttribute('aria-label', 'Section navigation');
-  bar.innerHTML = items.map(t => `<button type="button" class="pane-btn ${currentTab === t ? 'is-on' : ''}" ${currentTab === t ? 'aria-current="page"' : ''} data-section="${t}">${t === 'charts' ? 'View Charts' : tabLabels[t]}</button>`).join('');
+  bar.innerHTML = items.map(t => `<button type="button" class="pane-btn ${currentTab === t ? 'is-on' : ''}" ${currentTab === t ? 'aria-current="page"' : ''} data-section="${t}">${t === 'charts' ? 'View charts' : tabLabels[t]}</button>`).join('');
   bar.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.section)));
   main.prepend(bar);
 }
@@ -22165,7 +22289,7 @@ function addSectionTabs(items) {
  *  the two is chosen. The same pair the congregation's site puts on its menu, so the two
  *  screens hold the same things in the same order. */
 function renderWeekTab(showPublish) {
-  main.innerHTML = '<h2 class="no-print">Weekly Schedule</h2><div id="week-pane"></div>';
+  main.innerHTML = '<h2 class="no-print">Weekly schedules</h2><div id="week-pane"></div>';
   renderWeek(main.querySelector('#week-pane'), buildAutomaticCharts(state, tables),
     serial => { weekSerial = serial; render(); }, weekSerial, { heading: false });
   main.querySelector('#publish-panel')?.remove();
@@ -22223,7 +22347,9 @@ function paint() {
     });
     return;
   }
-  if (currentTab === 'settings') {
+  if (currentTab === 'home') {
+    renderAdminHome(main, openTab);
+  } else if (currentTab === 'settings') {
     renderSettings(
       main,
       state,
@@ -22246,7 +22372,7 @@ function paint() {
       () => persist()
     );
   } else if (currentTab === 'charts') {
-    main.innerHTML = '<h2 class="no-print">Season Charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print Layout for your own page splits, or Saved Copies to reopen a local chart.</p><div id="season-chart-view"></div>';
+    main.innerHTML = '<h2 class="no-print">Seasonal charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print layouts for your own page splits, or Saved copies to reopen a chart saved on this device.</p><div id="season-chart-view"></div>';
     renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), { confine: false });
   } else if (currentTab === 'generate') {
     renderGenerate(
@@ -22259,7 +22385,7 @@ function paint() {
         currentSheetId = sheet.id;
         render();
         const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id);
-        toast(weekday ? 'Saved in Season Charts → Saved Copies, with its weekday chart.' : 'Saved in Season Charts → Saved Copies.');
+        toast(weekday ? 'Saved in Seasonal charts → Saved copies, with its weekday chart.' : 'Saved in Seasonal charts → Saved copies.');
       },
       (tab) => {
         currentTab = tab;
@@ -22327,14 +22453,14 @@ function paint() {
     addSectionTabs(['charts', 'generate', 'saved']);
     if (currentTab === 'saved') {
       const heading = main.querySelector('h2');
-      if (heading) heading.textContent = 'Saved Copies';
+      if (heading) heading.textContent = tabLabels.saved;
       main.querySelectorAll('button').forEach(btn => {
         if (btn.textContent.trim().startsWith('Publishing')) btn.remove();
       });
     }
   }
   if (['guide', 'program'].includes(currentTab)) addSectionTabs(['guide', 'program']);
-  if (['posters', 'traffic', 'calc'].includes(currentTab)) {
+  if (['posters', 'traffic', 'calc', 'status', 'settings', 'guide', 'program', 'generate'].includes(currentTab)) {
     const heading = main.querySelector('h2');
     if (heading) heading.textContent = tabLabels[currentTab];
   }
@@ -22349,6 +22475,8 @@ wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 
 
 function start() {
+  window.dispatchEvent(new Event('zmanim-admin-open'));
+  adminStarted = true;
   loadTables()
     .then((t) => {
       tables = t;

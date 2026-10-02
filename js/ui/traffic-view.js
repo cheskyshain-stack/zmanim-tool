@@ -2,6 +2,7 @@
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
+const TRAFFIC_ADMIN_TRACKING_START = '2026-10-02T03:45:00Z';
 const TRAFFIC_RANGES = [
   { key: 'today', label: 'Today', days: 1 },
   { key: 'yesterday', label: 'Yesterday', days: 1 },
@@ -13,7 +14,7 @@ const TRAFFIC_RANGES = [
 const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
-  '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin',
+  '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -145,6 +146,43 @@ function trafficSummary(data, daily) {
       <p>${trafficEsc(coverage.detail)}.<br>Today includes only the time elapsed.</p>
     </section>
   </div>`;
+}
+function trafficBrowserExcluded() {
+  try {
+    if (!globalThis.localStorage) return null;
+    return Boolean(globalThis.localStorage.getItem('zmanim-nocount'));
+  } catch { return null; }
+}
+function trafficAdminStats(data) {
+  const until = Date.parse(data.range?.until || data.until || data.snapshotAt);
+  if (Number.isFinite(until) && until <= Date.parse(TRAFFIC_ADMIN_TRACKING_START)) {
+    return { views: null, status: 'not-tracked' };
+  }
+  const group = data.groups?.page;
+  if (!Number.isFinite(until) || !group || !['complete', 'partial'].includes(group.status)) {
+    return { views: null, status: 'unavailable' };
+  }
+  const adminRows = (group.rows || []).filter((row) => ['/admin/', '/admin/index.html'].includes(String(row.key ?? row.path ?? '').split('?')[0]));
+  const validRows = adminRows.filter((row) => trafficKnown(row.views));
+  const views = validRows.reduce((total, row) => total + row.views, 0);
+  if (group.status === 'complete' && validRows.length === adminRows.length) return { views, status: 'complete' };
+  return views > 0 ? { views, status: 'partial' } : { views: null, status: 'unavailable' };
+}
+function trafficAdminActivity(data) {
+  const count = trafficAdminStats(data);
+  const excluded = trafficBrowserExcluded();
+  const value = count.status === 'not-tracked' ? 'Not tracked yet' : trafficNum(count.views);
+  const detail = count.status === 'not-tracked' ? 'Admin activity was not recorded in this selected period.'
+    : count.status === 'unavailable' ? 'A reliable count is not available for this range yet. This does not mean nobody opened the admin.'
+      : count.status === 'partial' ? 'Recorded opens from the available page data. This range is incomplete, so the total may be higher.'
+        : 'An open is counted after the admin is unlocked. Reloads count again; changing admin tabs does not.';
+  const browser = excluded === true ? 'This browser is excluded from the count.'
+    : excluded === false ? 'This browser has no counting exclusion set.' : 'This browser’s exclusion setting could not be read.';
+  return `<section class="traffic-panel traffic-admin-activity" aria-label="Admin activity">
+    <div class="traffic-admin-count"><h3>Admin page opens</h3>${count.status === 'partial' ? '<span class="traffic-admin-qualifier">Recorded</span>' : ''}<strong>${trafficEsc(value)}</strong></div>
+    <div class="traffic-admin-explanation"><span class="traffic-admin-browser${excluded === true ? ' is-excluded' : ''}">${trafficEsc(browser)}</span><p>${trafficEsc(detail)}</p>
+      <p class="traffic-small">Added with this update on October 1, 2026. Earlier admin opens were not recorded. Counts can arrive late and do not identify who opened the page.</p></div>
+  </section>`;
 }
 function trafficReconciliation(data, daily) {
   const recorded = daily.filter((row) => trafficKnown(row.views));
@@ -311,7 +349,8 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Shul View, Messages, and admin pages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Unlocked admin page opens were added with the October 1, 2026 update. Shul View and Messages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>
       <div><dt>One date range</dt><dd>Every panel uses ${trafficEsc(trafficDateLabel(range.start, true))} through ${trafficEsc(trafficDateLabel(range.end, true))}, in New York. Today's record stops at the snapshot time. Daylight saving changes are included.</dd></div>
@@ -351,7 +390,7 @@ function trafficContent(data, range) {
     'Some source requests did not complete. Available records are still shown. Open collection status below for the reported errors.', 'error'));
   if (coverage.status === 'complete' && data.totals?.views === 0) notices.push(trafficNotice('No page views recorded',
     'This selected period was collected successfully and reported zero views. Analytics blockers and device opt-outs can prevent visits from being counted.', 'quiet'));
-  return `${trafficSummary(data, daily)}${notices.join('')}${trafficDaily(data, daily)}
+  return `${trafficSummary(data, daily)}${trafficAdminActivity(data)}${notices.join('')}${trafficDaily(data, daily)}
     <div class="traffic-breakdowns">
       ${trafficBreakdown(data, 'page', 'Pages viewed', 'Which pages were opened. Entry visits show where a visit began.', { wide: true, visits: true, paths: true, name: trafficPageName, label: 'Page' })}
       ${trafficBreakdown(data, 'device', 'Devices', 'Page views by device type.', { name: (key) => TRAFFIC_DEVICES[key.toLowerCase()] || key || 'Not supplied', label: 'Device' })}

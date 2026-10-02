@@ -1,7 +1,7 @@
 {
-  "name": "Zmanim boards, admin",
-  "short_name": "Zmanim admin",
-  "description": "Generate, edit and publish the zmanim boards for קהל לב מנחם.",
+  "name": "Lakewood Commons Shul Admin",
+  "short_name": "Shul admin",
+  "description": "Manage schedules, Shul View, and site statistics for קהל לב מנחם.",
   "id": "/admin/",
   "start_url": "/admin/",
   "scope": "/admin/",

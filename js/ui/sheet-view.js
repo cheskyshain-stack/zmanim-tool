@@ -298,7 +298,7 @@ export function renderSheet(container, state, sheet, onChange) {
       const height = el.getBoundingClientRect().height;
       return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`;
     });
-    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print Layout and move some weeks to another page.`;
+    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
     overflowWarningEl.hidden = false;
   } else {
     overflowWarningEl.textContent = '';

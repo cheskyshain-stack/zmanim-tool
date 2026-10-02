@@ -93,18 +93,17 @@ SITE_URL_MARKER = "<!-- site address: stamped by build-offline.py from SITE_URL,
 # at all: the tag is not written, and a tag written by an earlier run is taken out again, so
 # turning it off is emptying this line.
 #
-# The congregation's page only. It is stamped into index.html before the route pages are
-# written, so /week/, /chart/, /schedules/ and /donate/ carry it too; /admin/ is a different
-# file and never gets it, and the offline copy is built out of /admin, so a USB stick has
-# nothing in it that would try to phone home from a shul's laptop.
+# Stamped into the public pages and the online admin. Admin starts the beacon only after
+# the PIN is accepted or remembered; changing its tabs does not count another page open.
+# The offline copy has the loader removed, and local previews never start the beacon.
 #
-# Three things are kept out of the count, which matter because most of the traffic to a shul's
+# These things are kept out of the count, which matter because most of the traffic to a shul's
 # new site in its first month is the person building it:
 #
 #   - Anywhere that is not the live address. The beacon is only asked for when the page is
 #     being read at SITE_URL's own host, so a local `python -m http.server`, a preview, or
 #     somebody's fork of the repository counts nothing.
-#   - The admin, which never carries the tag at all.
+#   - The admin PIN screen, until the admin actually opens.
 #   - A device that has asked not to be counted. Opening the site once with ?count=off marks
 #     that browser and it is not counted again; ?count=on undoes it. See ANALYTICS_OPT_OUT.
 ANALYTICS_TOKEN = "e96217102b81416db30f31a0c105fece"
@@ -645,7 +644,7 @@ def stamp_site_url(page: Path):
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
-def stamp_analytics(page: Path):
+def stamp_analytics(page: Path, *, admin=False):
     """Write the analytics loader into the page head, or take it out again.
 
     Between markers like everything else stamped here, so a second run replaces rather than
@@ -660,7 +659,8 @@ def stamp_analytics(page: Path):
       - not a browser that has asked not to be counted, which is how the shul keeps its own
         testing out of its own numbers.
 
-    The third, the admin, is handled by not stamping that file at all.
+    The admin waits for the application's unlocked start event and disables SPA tracking.
+    A tab change in the same admin document is not another admin page open.
 
     The script it writes is a module, which is what Cloudflare's own snippet asks for and is
     also deferred by definition, so nothing on the page ever waits for a counter. It is the
@@ -672,11 +672,14 @@ def stamp_analytics(page: Path):
     """
     html = page.read_text(encoding="utf-8")
     host = SITE_URL.split("//", 1)[-1].split("/", 1)[0]
-    # Written on one line on purpose: it is inline in the head of five pages, and the comment
+    # Written on one line on purpose: it is inline in the page head, and the comment
     # stripper that keeps this repository's reasoning out of the browser would have to be
     # taught about it otherwise. The reasoning is above, where it belongs.
+    beacon_config = {"token": ANALYTICS_TOKEN}
+    if admin:
+        beacon_config["spa"] = False
     loader = (
-        "<script>(function(){try{"
+        "function(){try{"
         f'if(location.hostname!=="{host}")return;'
         f'var p=new URLSearchParams(location.search),k="{ANALYTICS_OPT_OUT}";'
         f'if(p.has("{ANALYTICS_OPT_PARAM}")){{'
@@ -688,9 +691,11 @@ def stamp_analytics(page: Path):
         "try{if(localStorage.getItem(k))return;}catch(e){}"
         'var s=document.createElement("script");s.type="module";'
         's.src="https://static.cloudflareinsights.com/beacon.min.js";'
-        f"s.setAttribute(\"data-cf-beacon\",'{{\"token\": \"{ANALYTICS_TOKEN}\"}}');"
-        "document.head.appendChild(s);}catch(e){}})();</script>"
+        f"s.setAttribute(\"data-cf-beacon\",'{json.dumps(beacon_config)}');"
+        "document.head.appendChild(s);}catch(e){}}"
     )
+    loader = (f'<script>window.addEventListener("zmanim-admin-open",{loader},{{once:true}});</script>'
+              if admin else f"<script>({loader})();</script>")
     block = f"{ANALYTICS_MARKER}\n{loader}" if ANALYTICS_TOKEN else ""
     pattern = re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n"
     if ANALYTICS_MARKER in html:
@@ -1075,6 +1080,7 @@ def main():
     write_sitemap()
     stamp_css_versions(ROOT / "admin" / "index.html", "../")
     stamp_js_versions(ROOT / "admin" / "index.html", "../", "app.js")
+    stamp_analytics(ROOT / "admin" / "index.html", admin=True)
     # The messages page, stamped the same way and for the same reason: it imports the same
     # modules, so it needs the same map or it would run new code against ten minute old
     # modules. Its own entry, since it is a much smaller program than the admin.
@@ -1086,6 +1092,9 @@ def main():
     # script off the filesystem, so the import map and the ?v= come straight back out,
     # and the site-absolute asset paths go back to relative ones.
     html = (ROOT / "admin" / "index.html").read_text(encoding="utf-8")
+    html = re.sub(re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n", "", html, flags=re.S)
+    if "static.cloudflareinsights.com" in html:
+        raise RuntimeError("offline build: the analytics loader was left in")
     html = html.replace('href="../css/', 'href="css/').replace('src="/assets/', 'src="assets/')
     # The block admin/index.html marks off with <!-- icons --> ... <!-- /icons -->.
     html = re.sub(r"[ \t]*<!-- icons -->.*?<!-- /icons -->\n", "", html, flags=re.S)

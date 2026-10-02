@@ -9,8 +9,13 @@ secret in the site, a fixture, a response, or this repository.
 - **Page views**: recorded views, including repeat views. Every chart and share uses this metric.
 - **Entry visits**: Cloudflare's direct or external-referrer entries, not unique people.
 - Tracking is installed on Home, Weekly Zmanim, Zmanim Chart, Special Schedules,
-  and Donate. This report does not track Shul View, Messages, or admin.
+  and Donate. Admin tracking begins with the October 2026 admin update and runs only
+  after its PIN is accepted or remembered. Shul View and Messages are not tracked.
 - Offline use, blocked beacons, and the per-browser `?count=off` opt-out are not counted.
+- Admin activity uses page views for `/admin/` and `/admin/index.html`, including
+  internal arrivals. Its beacon disables SPA measurement so changing tabs does not
+  count another open. Existing excluded browsers stay excluded. These are recorded
+  opens, not identified people or a complete sign-in log; older visits cannot be recovered.
 - Cloudflare can sample queries. A category mismatch is disclosed, never scaled to hide it.
 
 ## One window for every figure

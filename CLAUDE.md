@@ -69,10 +69,11 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   comment nodes in the DOM and are just as readable in devtools.
 - Stamps the analytics loader into `index.html` from `ANALYTICS_TOKEN`, before the route pages
   are written so they inherit it. Empty means nothing is written and anything an earlier run
-  wrote is taken out, so turning analytics off is emptying that line. The congregation's page
-  only: `/admin/` is a different file and the offline copy is built out of `/admin`, so a USB
-  stick carries nothing that would try to phone home.
-  It is a loader rather than the beacon's own tag because two of the three answers to "who is
+  wrote is taken out, so turning analytics off is emptying that line. The online `/admin/`
+  also carries a loader, which waits for `zmanim-admin-open` after the PIN is accepted or
+  remembered. Its `spa: false` setting counts document opens, not changes between tabs.
+  The offline build strips the loader, so a USB stick never sends analytics.
+  It is a loader rather than the beacon's own tag because the answers to "who is
   being counted" have to be given before the request goes out. It asks for the beacon only when
   `location.hostname` is `SITE_URL`'s own host, so a local `python -m http.server` and any
   preview count nothing, and only when this browser has not asked to be left out. **Opening the
