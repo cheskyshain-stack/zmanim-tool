@@ -29,7 +29,8 @@ import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-te
 import { shulNow } from '../zmanim/solar.js';
 import { tzomGedaliaText, chartFastText, fastsBetween } from '../taanis-text.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
-import { buildWeekdayRow } from '../sheets/weekday.js';
+import { buildWeekdayRow, chanukahDaysInWeek } from '../sheets/weekday.js';
+import { chanukahScheduleLines } from '../posters/chanukah.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
 import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText, hoshanaRabbaText } from '../erev-yomtov-text.js';
@@ -209,8 +210,11 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  Friday in front of it, which is exactly the week this message is about. Its מנחה and מעריב are
  *  built the way the chart builds them and then have any saved sheet's overrides laid over, so a
  *  cell somebody corrected by hand reaches the message. The morning is not part of that row: it
- *  is the Settings schedule the chart prints as one merged cell, or the סליחות season's own lists
- *  where the week is in one (see wkMornings in week-text.js).
+ *  is the Settings schedule the chart prints as one merged cell, the סליחות season's own lists
+ *  where the week is in one (see wkMornings in week-text.js), or - asked for directly, after the
+ *  wall chart's own Shacharis panel had been carrying it for a while with no message to match -
+ *  חנוכה's own morning on the one week every one of whose five weekdays is חנוכה, which also
+ *  renames the week for the message the same way Sukkos, Pesach and Shavuos already do.
  *
  *  Sent on the Sunday, which is six days before the Shabbos. See TX_WEEK_FROM for how long it
  *  stands.
@@ -218,7 +222,24 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  @param entry - a week and its season, from txWeekdayWeeks. */
 function txWeek(state, settings, tables, entry, now) {
   const shabbos = entry.week.serial;
-  const name = txWeekName(entry.week, settings, tables);
+  /* A week every one of whose five weekdays is חנוכה is named for it rather than for its own
+     parsha - "Week of Chanuka", not "Week of P' Miketz" - the same rule every other yom-tov
+     week on this page already follows (WK_TEXT's own note: a week named for the yom tov in it
+     is not a week named for a parsha), and the same five-day test the Weekday chart itself
+     uses to decide whether to write "· חנוכה" into that week's own parsha cell
+     (sheet-view.js's weekAllChanukah). A week only partly חנוכה keeps its own parsha name and
+     its own ordinary morning, same as the chart keeps that week's plain label.
+     The morning itself is chanukahScheduleLines on those same five days, merged into the one
+     line the wall chart's own full-week row prints (mergeAll: true, see chanukahPanelBlocks)
+     and with Rosh Chodesh left out of the merge (includeRoshChodesh: false) where that week
+     also carries one: ROSH CHODESH already sends its own message, and this page does not say
+     a מנין twice. */
+  const chanukahDays = chanukahDaysInWeek(shabbos, settings);
+  const isChanukahWeek = chanukahDays.length === 5;
+  const name = isChanukahWeek ? weekName('Chanuka', false) : txWeekName(entry.week, settings, tables);
+  const shacharisCell = isChanukahWeek
+    ? chanukahScheduleLines(chanukahDays, settings, { includeRoshChodesh: false, mergeAll: true })
+    : WEEKDAY_SHACHARIS;
   const built = buildWeekdayRow(entry.week, settings);
   /* Overrides only where a saved Weekday chart actually covers this week. mergeRow wants a real
      sheet to read them off and throws on null, and most weeks here have no saved chart at all:
@@ -227,7 +248,7 @@ function txWeek(state, settings, tables, entry, now) {
      weeks no Shabbos sheet has. */
   const chart = weekdayChartFor(null, shabbos, state);
   const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
-  const text = weekText(WEEKDAY_SHACHARIS, row, name, shabbos, settings, afterYomKippurLine(shabbos, settings, now));
+  const text = weekText(shacharisCell, row, name, shabbos, settings, afterYomKippurLine(shabbos, settings, now));
   if (!text) return null;
   return {
     id: `week-${shabbos}`,
