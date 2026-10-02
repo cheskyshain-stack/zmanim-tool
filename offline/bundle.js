@@ -2609,8 +2609,17 @@ function shabbosMinchaParts(shabbosDate, settings, specialParsha = '') {
       .onlyWhen(T(gh, gm) <= sunsetVal - 1 / 24, 'printed once שקיעה is at least an hour after it'));
 
   const times = [early, ...standing.filter((t) => t.held), main, late];
+  const flat = flattenNonEmpty(times.map((t) => t.text()));
+  /* Three times (no standing מנין held, the ordinary shape most of the year) forced onto
+     one top and two bottom rather than left to splitLinesInHalf's own width balancing,
+     asked for directly: the balancer chose two-top-one-bottom on some weeks, which put the
+     later of the two bottom times (late, שקיעה less 30) on a line of its own while early and
+     main, the two further from שקיעה, shared the one above it. The bottom line is always
+     meant to carry more, not whichever split happens to balance the two lines' width that
+     week. Four and up are untouched - splitLinesInHalf already splits those evenly or
+     bottom-heavy on its own. */
   return {
-    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
+    text: splitLinesInHalf(flat, SLASH, flat.length === 3 ? 1 : null),
     times,
     dropped: standing.filter((t) => !t.held),
   };
