@@ -1556,27 +1556,26 @@ function shacharisRunLines(row) {
   return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
 }
 
-/** The sheet's own נץ section: one line per שחרית row that needed נץ to explain its own
- *  ותיקין time, in the same order as the rows themselves, each line the row's own
- *  netzDaysHtml. A section of its own rather than a note under each row, asked for
- *  directly: both rows' נץ times now stand together under one heading the same way מנחה
- *  and מעריב already get their own, instead of a reader finding one under the first row's
- *  times and a second one further down under the second row's.
+/** The שחרית block's own נץ lines, one per row that needed נץ to explain its own ותיקין
+ *  time, in the same order as the rows themselves. Part of שחרית's own box, asked for
+ *  directly - not a section of its own the way מנחה and מעריב are, so it opens with a
+ *  label line the same weight as a row's own ("ראש חודש...") rather than a full underlined
+ *  poster-set-head, and sits inside שחרית's own div rather than closing it and opening
+ *  another.
  *
  *  Each line still carries `poster-netz-line` (see its own rule in app.css): `.poster-set`
  *  centers every line on its own width, so a row naming four netz days reads far wider than
- *  a row naming one, and centered, the two would land nowhere near each other even sharing
- *  the section's own heading - measured directly on the two-row case, 589px against 715px
- *  for the two lines' own left edges. Flush left instead, every line in this section opens
- *  at the same x regardless of how many days it names.
+ *  a row naming one, and centered, the two would land nowhere near each other even under
+ *  the same label - measured directly on the two-row case, 589px against 715px for the two
+ *  lines' own left edges. Flush left instead, every line here opens at the same x
+ *  regardless of how many days it names.
  *
- *  Left out entirely where no row in the group needed one, the same as the section above it
- *  (poster.erevShabbos) is left out where the group has none of its own. */
-function netzSectionLines(poster) {
-  return poster.shacharisRows
-    .filter((row) => row.vasikin.netzDays)
-    .map((row) => chanukahLineHtml(null, netzDaysHtml(row.vasikin.netzDays), 'poster-netz-line'))
-    .join('');
+ *  Left out entirely where no row in the group needed one. */
+function netzBlockLines(poster) {
+  const rows = poster.shacharisRows.filter((row) => row.vasikin.netzDays);
+  if (!rows.length) return '';
+  return chanukahLineHtml(CH_TEXT.netz, '')
+    + rows.map((row) => chanukahLineHtml(null, netzDaysHtml(row.vasikin.netzDays), 'poster-netz-line')).join('');
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
@@ -1584,22 +1583,13 @@ function netzSectionLines(poster) {
  *  the eight days work out to, whether that is one Friday or two. */
 function chanukahBody(poster) {
   const timeLine = (times) => chanukahRunLine(times.map(toCell));
-  const section = (head, inner, setClass) => `
-    <div class="poster-set${setClass ? ` ${setClass}` : ''}">
+  const section = (head, inner) => `
+    <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
-  const netzLines = netzSectionLines(poster);
   const sections = [
-    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('')),
-    // Reference lines, not a fourth standing block the way מנחה/מעריב are: the sheet
-    // already carries nine lines and up before this section exists at all (see the note on
-    // .poster.is-chanukah .poster-set-line), and giving נץ the same full heading-and-section
-    // margins as every other block pushed two real years (אוקטובר 2027, אוקטובר 2030, both
-    // with a double-Friday ערב שבת heading of their own) 22px past the page's own 1056px -
-    // confirmed directly, not fitting on main before this section existed. .poster-netz-set
-    // in app.css halves both margins the section() call above would otherwise give it.
-    netzLines ? section(CH_TEXT.netz, netzLines, 'poster-netz-set') : '',
+    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('') + netzBlockLines(poster)),
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
