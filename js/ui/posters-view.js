@@ -1519,60 +1519,56 @@ function chanukahLineHtml(label, timesInnerHtml) {
 const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
   cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join(''));
 
-/** Every שחרית row's own times, opening the same way now whichever kind of row it is (see
- *  combineShacharisRows's own `vasikin`, chanukahVasikinBetween): the group's own in-between
- *  ותיקין time first, its own נץ note in parentheses right after it where at least one of
- *  the group's own days needed נץ to explain it, then the row's ordinary, fixed times.
+/** Every שחרית row's own times, the group's own in-between ותיקין time first (see
+ *  combineShacharisRows's own `vasikin`, chanukahVasikinBetween), then the row's ordinary,
+ *  fixed times - the ותיקין time's own `.poster-t` sits right next to the first ordinary
+ *  one's, so the sheet's own `.poster-t + .poster-t::before` rule draws the comma between
+ *  them the same as it draws every other comma on this sheet, on every row alike now that
+ *  the נץ note (see netzLineHtml) is its own line below rather than sharing this one. */
+function vasikinLine(row) {
+  const { time } = row.vasikin;
+  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
+  return `<span class="poster-t">${escAttr(time)}</span>${rest}`;
+}
+
+/** The row's own נץ line, asked for directly as a third line of its own rather than a
+ *  parenthetical sharing the times line - a reader's eye was going to the middle of the
+ *  times to find it either way, and a line of its own is where the label ("יום א' ב' ג'
+ *  ד'") already put the row's other aside, one line up.
  *
- *  Where there is no note, the ותיקין time's own `.poster-t` sits right next to the first
- *  ordinary time's, so the sheet's own `.poster-t + .poster-t::before` rule draws the comma
- *  between them the same as it draws every other comma on this sheet - nothing has to be
- *  written here for that case. Where there is a note, it sits between the two and breaks
- *  that adjacency, so the comma after it is written out by hand; every comma after that,
- *  between the ordinary times that follow, is still the rule's own.
+ *  Each נץ time still carries its own day letter above it, asked for directly the first
+ *  time this was built: the row's own label two lines up already says which days share the
+ *  row, and a reader working out which נץ belongs to which day had to count slashes against
+ *  it rather than read the letter off the time itself. The letter is its own `<bdi>`, the
+ *  same isolation נץ itself gets below - a bare Hebrew character sitting loose beside a
+ *  time is exactly the shape that has turned a run backwards elsewhere on this sheet, so it
+ *  is never trusted plain beside a digit here either, small as it is.
  *
- *  The נץ note sits in its own `.poster-row-note` bdi, the same isolation every other note
- *  on this sheet already gets - measured directly, a Hebrew word sitting loose inside the
- *  times' own ltr run reads as a strong character of that run and turns every time after it
- *  backwards, the same bug the row's own label made before the label was moved outside this
- *  run entirely. With two times in the note itself ("hh:mm:ss / hh:mm:ss"), forcing ltr on
- *  the note as a whole was not enough by itself either - measured directly, "7:07:58 /
- *  7:08:47" still came out "7:08:47 / 7:07:58", נץ still read as that run's own strong
- *  character even under an explicit ltr. נץ is given a nested bdi of its own, with no
- *  direction forced on it (a single word has no internal order to protect), and the two
- *  times sit in a second nested bdi, explicitly ltr again - the same fix the row's own
- *  label needed one level up, repeated one level down for the one word still sharing a run
- *  with a pair of times.
- *
- *  Each נץ time carries its own day letter above it now, asked for directly: the row's own
- *  label four words above ("יום א' ב' ג' ד'") already says which days share the row, and a
- *  reader working out which נץ belongs to which day had to count slashes against it. The
- *  letter is its own `<bdi>`, the same isolation נץ itself already gets - a bare Hebrew
- *  character sitting loose beside a time is exactly the shape that has turned a run
- *  backwards elsewhere on this sheet (see the comment above), so it is never trusted
- *  plain beside a digit here either, small as it is. */
+ *  נץ itself is given a nested bdi of its own, with no direction forced on it (a single
+ *  word has no internal order to protect), and the times sit in a second nested bdi,
+ *  explicitly ltr - measured directly, forcing ltr on the note as a whole was not enough by
+ *  itself: with more than one time in it ("7:07:58 / 7:08:47"), that still came out
+ *  "7:08:47 / 7:07:58", נץ still read as that run's own strong character even under an
+ *  explicit ltr on the run around it. */
 function netzDaysHtml(netzDays) {
   return netzDays.map(({ time, letters }) => {
     const label = letters.map((l) => `${l}'`).join('/');
     return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
   }).join(' / ');
 }
-function vasikinLine(row) {
-  const { time, netzDays } = row.vasikin;
-  const note = netzDays
-    ? ` <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${netzDaysHtml(netzDays)}</bdi>)</bdi>, `
-    : '';
-  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
-  return `<span class="poster-t">${escAttr(time)}</span>${note}${rest}`;
+function netzLineHtml(netzDays) {
+  return `<bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${netzDaysHtml(netzDays)}</bdi>)</bdi>`;
 }
 
-/** One שחרית row, label and times on two lines rather than one: the label
- *  (combineShacharisRows's own `row.label`, "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") alone
- *  on its own line, then the times under it, opened by vasikinLine the same way whichever
- *  kind of row it is. Asked for directly, after the label had been on its own line for the
- *  Rosh Chodesh row only; every row reads the same way now. */
+/** One שחרית row, on three lines rather than one: the label (combineShacharisRows's own
+ *  `row.label`, "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") on its own line, the row's own
+ *  times under it (vasikinLine), then - only where at least one of the group's own days
+ *  needed נץ to explain its own ותיקין time - the נץ line (netzLineHtml) under that.
+ *  Asked for directly, after the נץ note had shared the times line as a parenthetical;
+ *  every row with one reads the same way now. */
 function shacharisRunLines(row) {
-  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
+  const netzLine = row.vasikin.netzDays ? chanukahLineHtml(null, netzLineHtml(row.vasikin.netzDays)) : '';
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row)) + netzLine;
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
