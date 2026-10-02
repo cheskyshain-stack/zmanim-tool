@@ -303,12 +303,30 @@ const rawVasikinCandidate = (d) => {
   return d.isRoshChodesh ? netzBased : Math.max(netzBased, T(7, 0) - CH_REGULAR_SHIFT_MINUTES / 1440);
 };
 
+/** Which day(s) of the week each נץ time in the note belongs to, asked for directly: the
+ *  note lists a time for every day נץ actually explains, in the same left-to-right order
+ *  they are typed in, and a reader counting slashes against "יום א' ב' ג' ד'" four words
+ *  above it had to count correctly every time. Grouped by the printed time itself (not by
+ *  day) since two days can in principle share one printed second - rare, but a reader is
+ *  still owed both letters rather than only the first day's, so dayLetter joins every day
+ *  that landed on one slot with the same "/" the row's own times use elsewhere. */
+function netzDayGroups(bound) {
+  const order = [];
+  const byTime = new Map();
+  for (const d of bound) {
+    const time = formatTimeWithSeconds(d.netz);
+    if (!byTime.has(time)) { byTime.set(time, []); order.push(time); }
+    byTime.get(time).push(dayLetter(d.serial));
+  }
+  return order.map((time) => ({ time, letters: byTime.get(time) }));
+}
+
 export function chanukahVasikinBetween(group) {
   const raw = group.map(rawVasikinCandidate);
   const between = floorToMinute(raw.reduce((a, b) => a + b, 0) / raw.length);
   const bound = group.filter((d) => d.netzBinding);
-  const netz = bound.length ? [...new Set(bound.map((d) => formatTimeWithSeconds(d.netz)))].join(SLASH) : null;
-  return { time: formatTime(between), netz };
+  const netzDays = bound.length ? netzDayGroups(bound) : null;
+  return { time: formatTime(between), netzDays };
 }
 
 /** One row for every one of the eight days that is not Rosh Chodesh, together, and one more

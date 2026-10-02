@@ -1542,11 +1542,25 @@ const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
  *  direction forced on it (a single word has no internal order to protect), and the two
  *  times sit in a second nested bdi, explicitly ltr again - the same fix the row's own
  *  label needed one level up, repeated one level down for the one word still sharing a run
- *  with a pair of times. */
+ *  with a pair of times.
+ *
+ *  Each נץ time carries its own day letter above it now, asked for directly: the row's own
+ *  label four words above ("יום א' ב' ג' ד'") already says which days share the row, and a
+ *  reader working out which נץ belongs to which day had to count slashes against it. The
+ *  letter is its own `<bdi>`, the same isolation נץ itself already gets - a bare Hebrew
+ *  character sitting loose beside a time is exactly the shape that has turned a run
+ *  backwards elsewhere on this sheet (see the comment above), so it is never trusted
+ *  plain beside a digit here either, small as it is. */
+function netzDaysHtml(netzDays) {
+  return netzDays.map(({ time, letters }) => {
+    const label = letters.map((l) => `${l}'`).join('/');
+    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
+  }).join(' / ');
+}
 function vasikinLine(row) {
-  const { time, netz } = row.vasikin;
-  const note = netz
-    ? ` <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${escAttr(netz)}</bdi>)</bdi>, `
+  const { time, netzDays } = row.vasikin;
+  const note = netzDays
+    ? ` <bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${netzDaysHtml(netzDays)}</bdi>)</bdi>, `
     : '';
   const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
   return `<span class="poster-t">${escAttr(time)}</span>${note}${rest}`;
