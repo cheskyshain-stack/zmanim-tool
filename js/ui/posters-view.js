@@ -1563,18 +1563,14 @@ function shacharisRunLines(row) {
  *  poster-set-head, and sits inside שחרית's own div rather than closing it and opening
  *  another.
  *
- *  Each line still carries `poster-netz-line` (see its own rule in app.css): `.poster-set`
- *  centers every line on its own width, so a row naming four netz days reads far wider than
- *  a row naming one, and centered, the two would land nowhere near each other even under
- *  the same label - measured directly on the two-row case, 589px against 715px for the two
- *  lines' own left edges. Flush left instead, every line here opens at the same x
- *  regardless of how many days it names.
- *
- *  Left out entirely where no row in the group needed one. */
+ *  Both the label and the lines under it carry `poster-netz-line` (see its own rule in
+ *  app.css), smaller than the rest of the block and centered like every other line here -
+ *  asked for directly, after flush left: these read as a reference under the row's own
+ *  times, not a second times line the same weight as the first. */
 function netzBlockLines(poster) {
   const rows = poster.shacharisRows.filter((row) => row.vasikin.netzDays);
   if (!rows.length) return '';
-  return chanukahLineHtml(CH_TEXT.netz, '')
+  return chanukahLineHtml(CH_TEXT.netz, '', 'poster-netz-line')
     + rows.map((row) => chanukahLineHtml(null, netzDaysHtml(row.vasikin.netzDays), 'poster-netz-line')).join('');
 }
 
