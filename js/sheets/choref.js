@@ -3,11 +3,10 @@
 // Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { ceilToMinute, floorToMinute, formatTime, underlineTime, chanukahTag } from '../format.js';
+import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
 import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
-import { chanukahFridayYear } from '../posters/chanukah.js';
-import { textjoin, SLASH, splitLinesInHalf, flattenNonEmpty } from '../util.js';
-import { zman, clockTime } from '../zmanim/trace.js';
+import { textjoin, SLASH } from '../util.js';
+import { zman } from '../zmanim/trace.js';
 
 export function buildChorefRow(week, settings) {
   const shabbos = week.serial;
@@ -58,35 +57,12 @@ export function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
+  /* 12:45 used to be spliced in here on its own, as though it were חנוכה's own addition,
+     print-tagged to say so. It is not: fridayMainMinchaParts now offers it on every
+     standard-time Friday, exactly where it offers 12:30, so there is nothing left for
+     this column to add or to tag. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
-  /* חנוכה's own extra 12:45, the same addition the חנוכה poster's own Erev Shabbos block
-     makes from תשפ״ו on: fridayMainMinchaParts is the everyday Friday's own menu and does
-     not carry one at all, so a Friday whose evening is genuinely חנוכה's gets it spliced
-     in here, between 12:30 and 1:00, rather than the poster and this chart disagreeing
-     about the same Friday. chanukahFridayYear (not the narrower chanukahYearFor) so the
-     one Friday a year that opens חנוכה before its own calendar day reaches 25 Kislev -
-     because 25 Kislev itself is שבת - gets the same addition every other חנוכה Friday
-     does. */
-  const chanukahYear = chanukahFridayYear(friday, settings);
-  const erevTwelveForty5 = chanukahYear && chanukahYear >= 5786
-    ? clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").underline()
-    : null;
-  const erevMinchaTimes = erevTwelveForty5
-    ? [erevMincha.times[0], erevTwelveForty5, ...erevMincha.times.slice(1)]
-    : erevMincha.times;
-  const I = erevTwelveForty5
-    ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) => t.text())))
-    : erevMincha.text;
-  /* The tag is a *second*, print-only rendering of the same 12:45, never mixed into I
-     above - the same split sheets/weekday.js's own early מעריב makes for the identical
-     reason: I is still what an override is diffed against and what any other reader of
-     this column would see, so it stays the plain time. Only sheet-view.js's own cell
-     rendering reaches for printOverrides, and only when this Friday's own column has not
-     been typed over by hand. */
-  const IPrint = erevTwelveForty5
-    ? splitLinesInHalf(flattenNonEmpty(erevMinchaTimes.map((t) =>
-        t === erevTwelveForty5 ? chanukahTag(t.text()) : t.text())))
-    : null;
+  const I = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
      and carry their traces once that file is converted too; a column with no trace yet is
@@ -97,7 +73,7 @@ export function buildChorefRow(week, settings) {
     C: shabbosMincha.times,
     E: shacharis.times,
     H: candles.times,
-    I: erevMinchaTimes,
+    I: erevMincha.times,
     F: [maarivFri],
     G: [...plagTimes.filter((t) => t.held !== false), minchaFri],
   };
@@ -111,7 +87,7 @@ export function buildChorefRow(week, settings) {
     G: plagTimes.filter((t) => t.held === false),
   };
 
-  return { B, C, D, E, F, G, H, I, traces, notes, dropped, printOverrides: IPrint != null ? { I: IPrint } : undefined };
+  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
 }
 
 export const CHOREF_COLUMNS = [

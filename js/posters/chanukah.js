@@ -68,24 +68,18 @@ const CH_REGULAR_SHIFT_MINUTES = 10;
  *  an ordinary one by design, and the floor asked for is wider, not the same one moved over. */
 const CH_RC_FLOOR_MINUTES = 20;
 
-/** Rosh Chodesh's own morning is `WEEKDAY_SHACHARIS_SPECIAL`, untouched, except the ותיקין
- *  swap every day gets and one more thing: the 8:00 in the middle of that schedule prints as
- *  8:05 during חנוכה. Four of the five sampled Rosh Chodesh mornings (תשפ״ג-תשפ״ז) say 8:05;
- *  only תשפ״ב says 8:00, which reads as the one that slipped rather than the rule. */
-const CH_ROSH_CHODESH_MIDDLE_SHIFT = 5;
-
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
  *  12:45 (only once the clocks are back, which every חנוכה is), 1:15 or 1:20, and 1:35 or 1:40,
  *  each weighed against the latest מנחה גדולה לחומרא reaches across the relevant week, exactly
  *  the way the everyday board decides them, in the same room (`LMATA` there) - then 1:50,
- *  unmarked, the same fixed close every year keeps. 12:45 is only on the sheet from תשפ״ו on;
- *  earlier years do not print it, the same way the everyday board did not carry it yet either.
+ *  unmarked, the same fixed close every year keeps. 12:45 stands here the same way it stands
+ *  on the everyday board: it is not חנוכה's own addition, so there is no condition left to ask.
  *
  *  The old sheets' own ** on these four is that room, not אולם השמחות: unlike the morning,
  *  which needs three star levels to tell four rooms apart, nothing in this afternoon or the
  *  Erev Shabbos menu below it is ever printed with a single star, so ** here is simply this
  *  section's own way of writing למטה. The location does not move for חנוכה. */
-export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveForty5) {
+export function chanukahWeekdayMincha(referenceSerial, settings) {
   const weekMgl = weekLatestMinchaGedola(referenceSerial, settings);
   const mgl = () => zman('מנחה גדולה לחומרא', weekMgl,
     "the latest מנחה גדולה לחומרא reaches across this day's own week");
@@ -105,9 +99,7 @@ export function chanukahWeekdayMincha(referenceSerial, settings, includeTwelveFo
      minutes across them, which is what says it is a flat clock time and not a computed one. */
   const late = fixedTime('4:15', { label: 'the fixed late מנחה before candle lighting, unchanged across every sampled year' }).underline();
 
-  const all = includeTwelveForty5 ? [twelveForty5, earlyMincha, mainMincha, oneFifty, late]
-    : [earlyMincha, mainMincha, oneFifty, late];
-  return all;
+  return [twelveForty5, earlyMincha, mainMincha, oneFifty, late];
 }
 
 /** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
@@ -134,22 +126,6 @@ export function chanukahShabbosLabel(shabbosSerial, settings) {
   const sunday = hebrewDateExtended(shabbosSerial + 1, settings.useGregorianBefore1582);
   if (sunday.month === 9 && sunday.dayOfMonth === 25) return 'erev';
   return null;
-}
-
-/** For the שבת chart's own ערב שבת מנחה column: the Hebrew year to treat `fridaySerial`'s
- *  own evening as חנוכה's, which is not always the answer `chanukahYearFor` gives the
- *  Friday itself. Every ordinary year that evening is simply one of the eight days, but
- *  where 25 Kislev falls on שבת the very first candle is lit Friday evening, before שבת's
- *  own - that Friday's own calendar day is still 24 Kislev, a day `chanukahYearFor` reads
- *  as not-yet-חנוכה, though the night it opens genuinely is. The same Friday
- *  `chanukahErevShabbosPairs` already gives a pair of its own for the Special Schedules
- *  poster; this is the שבת chart's own way of asking the same question, so the two cannot
- *  disagree about which Friday actually opens חנוכה. */
-export function chanukahFridayYear(fridaySerial, settings) {
-  const direct = chanukahYearFor(fridaySerial, settings);
-  if (direct) return direct;
-  const shabbos = hebrewDateExtended(fridaySerial + 1, settings.useGregorianBefore1582);
-  return shabbos.month === 9 && shabbos.dayOfMonth === 25 ? shabbos.year : null;
 }
 
 /** The weekday מעריב: the everyday board's own regular run (6:35 through 11:00 - see
@@ -200,7 +176,7 @@ function chanukahMaariv(hebrewYear, settings) {
 
 /** One day of the morning: the ותיקין time first, then either the everyday board's own two
  *  lines (shifted ten minutes on the first) or, on Rosh Chodesh, the Rosh Chodesh schedule
- *  with the one 8:00 that prints as 8:05.
+ *  unmoved, including its own middle 8:00.
  *
  *  Both kinds of day carry a floor: a non-Rosh-Chodesh morning is never earlier than the
  *  everyday board's own first minyan (7:00) moved ten minutes earlier, and a Rosh Chodesh
@@ -244,7 +220,7 @@ function chanukahShacharisDay(serial, settings) {
       clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
       clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
       clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
-      clockTime(8, 5, 'the Rosh Chodesh schedule\'s own 8:00, five minutes later during חנוכה'),
+      clockTime(8, 0, "the Rosh Chodesh schedule's own 8:00, unmoved"),
       clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
       clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
     ]
@@ -574,19 +550,15 @@ export function combineErevShabbos(erevShabbosList, settings, tables) {
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
  *  lighting (see `candleLightingParts`) appended after it.
  *
- *  12:45, the same addition the weekday מנחה gained from תשפ״ו on, gets its own candidate
- *  here too: the everyday Friday menu does not carry one at all, so this is חנוכה's own,
- *  not a moved copy of an existing one. */
-function chanukahErevShabbos(fridaySerial, shabbosSerial, settings, includeTwelveForty5) {
+ *  12:45 used to be spliced in here on its own, as though it were חנוכה's own addition.
+ *  It is not: fridayMainMinchaParts now offers it on every standard-time Friday, exactly
+ *  where it offers 12:30, so a חנוכה Friday gets it the same way any other winter Friday
+ *  does and there is nothing left for this function to add. */
+function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
   const fridayDate = dateFromSerial(fridaySerial);
   const friday = fridayMainMinchaParts(fridayDate, settings, shabbosSerial);
-  const times = [...friday.times];
-  // Between 12:30 and 1:00, the same place the weekday chart's own 12:45 sits ahead of 1:15.
-  if (includeTwelveForty5) {
-    times.splice(1, 0, clockTime(12, 45, "חנוכה's own early Erev Shabbos מנחה, offered from תשפ״ו on").underline());
-  }
   const candle = candleLightingParts(fridayDate, settings).times[0];
-  return [...times, candle];
+  return [...friday.times, candle];
 }
 
 /** The Friday/Shabbos pairs this year's eight days touch. Usually one: the Friday that falls
@@ -630,7 +602,7 @@ export function buildChanukahPoster(year, settings, tables) {
     M.list(serial, CH_TEXT.shacharis, day.lines.map(toCell), MORNING);
   }
 
-  const weekdayMincha = chanukahWeekdayMincha(days[0]?.serial ?? kislev25, settings, year >= 5786);
+  const weekdayMincha = chanukahWeekdayMincha(days[0]?.serial ?? kislev25, settings);
   for (const day of days) {
     if (fridaySerials.has(day.serial) || day.serial === sundayAfterShabbos) continue;
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
@@ -653,7 +625,7 @@ export function buildChanukahPoster(year, settings, tables) {
   }
 
   const erevShabbosList = erevShabbosPairs.map(({ fridaySerial, shabbosSerial }) => {
-    const times = chanukahErevShabbos(fridaySerial, shabbosSerial, settings, year >= 5786);
+    const times = chanukahErevShabbos(fridaySerial, shabbosSerial, settings);
     M.list(fridaySerial, CH_TEXT.mincha, times.map(toCell), AFTERNOON);
     // The night whose candle is lit after this Friday's own שקיעה: night 1 when 25 Kislev
     // falls on the Shabbos right after it, counting on from there.

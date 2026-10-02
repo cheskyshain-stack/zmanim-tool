@@ -72,9 +72,11 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  formula in both sheets. Printed across two lines, split as evenly as possible
  *  (more options on the second line when the count is odd).
  *
- *  12:30 and 1:00 still read the clock: while the clocks are forward, nothing is offered
- *  before 1:35. That is the shul's rule and it is a deliberate departure from the
- *  workbook, which does not have it.
+ *  12:30, 12:45 and 1:00 still read the clock: while the clocks are forward, nothing is
+ *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
+ *  workbook, which does not have it. 12:45 is the newer of the two added this way, asked
+ *  for directly once a Friday that happened to be חנוכה's own had been getting it and
+ *  every other standard-time Friday had not.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -119,6 +121,13 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
        does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
     clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    /* Offered wherever 12:30 is, on the same condition: the two came on together, 12:45
+       starting תשפ״ו. It used to be spliced in only on a Friday that was also חנוכה's own
+       (chanukahErevShabbos, and separately sheets/choref.js's own I column, print-tagged as
+       חנוכה's), which was never what made it real - the clocks being back is, the same thing
+       that already holds 12:30 and 1:00 back for the rest of the year. Asked for directly:
+       every other standard-time Friday had the same 12:30 with nothing at 12:45 behind it. */
+    clockTime(12, 45, 'the second of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
     /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
        neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
@@ -144,8 +153,8 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
     note: onStandardTime
-      ? 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest.'
-      : 'The clocks are forward this week, so 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.',
+      ? 'The clocks are back this week, so 12:30, 12:45 and 1:00 are offered in front of the rest.'
+      : 'The clocks are forward this week, so 12:30, 12:45 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.',
   };
 }
 export function fridayMainMinchaMenu(fridayDate, settings, shabbosSerial) {
