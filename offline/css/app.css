@@ -4364,136 +4364,156 @@ body.is-locked { overflow: hidden; }
   .lock-key { font-size: 1.3rem; }
 }
 
-/* --- Traffic ------------------------------------------------------------------------
-   How many people are reading the congregation's site. The numbers come from a Worker in
-   the shul's Cloudflare account (see js/ui/traffic-view.js); everything here is about
-   putting them on a screen that is mostly opened on a phone. */
-.traffic-ranges { display: flex; gap: 0.4rem; margin: 0.2rem 0 1rem; }
-.traffic-range {
-  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 0.35rem 0.9rem; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-sm);
+/* --- Site statistics --------------------------------------------------------------
+   Scoped to the admin traffic tab. Counts, unknown records and partial coverage each
+   have a distinct presentation; no printed schedule styling is inherited. */
+.traffic-view { --traffic-navy: #152b43; --traffic-gold: #aa8749; --traffic-line: #dce2e9; }
+.traffic-header { display: flex; justify-content: space-between; align-items: center; gap: 1.2rem; margin-bottom: 1.3rem; }
+.traffic-header h2 { margin: 0.15rem 0 0.4rem; font-size: clamp(1.65rem, 3vw, 2rem); letter-spacing: -0.035em; color: var(--traffic-navy); }
+.traffic-header p { margin: 0; color: var(--muted); font-size: 0.87rem; }
+.traffic-header .traffic-eyebrow { font-size: 0.68rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.1em; color: #647386; }
+.traffic-refresh, .traffic-apply, .traffic-range { min-height: 2.7rem; padding: 0.6rem 0.95rem; border: 1px solid var(--traffic-line); border-radius: 8px; font: inherit; font-size: 0.83rem; font-weight: 600; line-height: 1.2; cursor: pointer; background: #fff; color: var(--traffic-navy); }
+.traffic-refresh { flex: 0 0 auto; border-color: var(--traffic-navy); background: var(--traffic-navy); color: white; }
+.traffic-refresh:hover, .traffic-apply:hover { filter: brightness(1.12); }
+.traffic-refresh:disabled { opacity: 0.65; cursor: wait; }
+.traffic-view button:focus-visible, .traffic-view input:focus-visible, .traffic-view summary:focus-visible, .traffic-chart-scroll:focus-visible { outline: 3px solid #4a80bd; outline-offset: 3px; }
+.traffic-controls { background: var(--surface); border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1rem 1.2rem; }
+.traffic-ranges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+.traffic-range { min-height: 2.35rem; padding: 0.5rem 0.9rem; background: #f6f8fa; border-color: transparent; }
+.traffic-range:hover { background: #e9eef4; }
+.traffic-range.is-on { background: var(--traffic-navy); color: white; border-color: var(--traffic-navy); }
+.traffic-range-form { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: end; }
+.traffic-range-form label { display: flex; flex-direction: column; gap: 0.3rem; color: #596679; font-size: 0.76rem; font-weight: 600; }
+.traffic-range-form input { width: 10.5rem; max-width: 100%; min-height: 2.65rem; padding: 0.55rem 0.6rem; border: 1px solid #bdc8d5; border-radius: 7px; color: var(--traffic-navy); background: white; font: inherit; font-size: 0.9rem; }
+.traffic-apply { background: #f3eee3; border-color: #ddd0b5; }
+.traffic-range-error { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 0.84rem; }
+.traffic-range-error:empty { display: none; }
+.traffic-range-summary { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid var(--traffic-line); }
+.traffic-range-summary strong { display: block; color: var(--traffic-navy); font-size: 0.92rem; }
+.traffic-range-summary span { color: #687487; font-size: 0.75rem; }
+.traffic-range-summary div > span { display: block; margin-top: 0.28rem; }
+.traffic-load-status { min-height: 1.1rem; margin: 0.75rem 0; color: #687487; font-size: 0.73rem; }
+.traffic-loading { padding: 3rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--traffic-line); border-radius: 12px; }
+.traffic-totals { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 0.8rem; margin: 0 0 1rem; }
+.traffic-total { display: flex; flex-direction: column; padding: 1.2rem; border: 1px solid var(--traffic-line); background: var(--surface); border-radius: 11px; min-width: 0; }
+.traffic-total-label { font-size: 0.79rem; font-weight: 650; color: #536176; text-transform: uppercase; letter-spacing: 0.055em; }
+.traffic-total-n { margin: 0.5rem 0; color: var(--traffic-navy); font-size: clamp(1.5rem, 3.3vw, 2.5rem); line-height: 1.15; font-weight: 650; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.traffic-total p { margin: auto 0 0; font-size: 0.77rem; line-height: 1.55; color: #677387; }
+.traffic-total-primary { background: var(--traffic-navy); border-color: var(--traffic-navy); box-shadow: 0 3px 8px #152b4312; }
+.traffic-total-primary .traffic-total-label { color: #e6cc99; }
+.traffic-total-primary .traffic-total-n { color: white; }
+.traffic-total-primary p { color: #d0dbe6; }
+.traffic-total-coverage { margin: 0.7rem 0; color: var(--traffic-navy); font-size: 1.4rem; font-weight: 650; }
+.traffic-panel { min-width: 0; border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1.2rem; margin: 0 0 1rem; background: var(--surface); }
+.traffic-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; margin-bottom: 1rem; }
+.traffic-panel h3 { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 650; color: var(--traffic-navy); }
+.traffic-panel-heading p { font-size: 0.77rem; line-height: 1.5; color: #697486; margin: 0; }
+.traffic-unit { padding: 0.3rem 0; white-space: nowrap; color: #697486; font-size: 0.71rem; }
+.traffic-status { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 5px; white-space: nowrap; color: #617185; background: #edf1f5; font-size: 0.68rem; font-weight: 650; line-height: 1.2; }
+.traffic-status-complete { color: #2e6354; background: #edf5f1; }
+.traffic-status-partial { color: #80571d; background: #fbf1d8; }
+.traffic-notice { margin-bottom: 0.8rem; padding: 0.85rem 1rem; background: #fbf5e7; border: 1px solid #eadbbe; border-left: 3px solid #b99450; border-radius: 8px; color: #765c2e; font-size: 0.8rem; line-height: 1.55; }
+.traffic-notice p { margin: 0.25rem 0 0; }
+.traffic-notice strong { font-size: 0.83rem; }
+.traffic-notice-error { border-color: #edc6bf; border-left-color: #bd5541; background: #fff4f1; color: #8b3726; }
+.traffic-notice-quiet { background: #eff5f8; border-color: #ccdce4; border-left-color: #6b93a8; color: #3b6070; }
+.traffic-chart-scroll { overflow-x: auto; overscroll-behavior-inline: contain; padding: 0.2rem 0 0.6rem; }
+.traffic-chart { display: flex; width: 100%; min-width: min-content; gap: 0.45rem; height: 12.5rem; padding-bottom: 0; margin: 0; }
+.traffic-day-bar { display: grid; grid-template-rows: 1.2rem 1fr 2.2rem; align-items: stretch; justify-items: center; flex: 1 0 2.7rem; min-width: 2.7rem; padding: 0; border: 0; border-radius: 3px; background: transparent; font: inherit; cursor: pointer; color: var(--traffic-navy); }
+.traffic-day-value { white-space: nowrap; font-size: 0.68rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.traffic-day-track { display: flex; align-items: flex-end; width: 100%; border-bottom: 1px solid #c6d2df; background: repeating-linear-gradient(to top, transparent, transparent calc(25% - 1px), #f2f4f7 calc(25% - 1px), #f2f4f7 25%); }
+.traffic-day-fill { display: block; width: 100%; max-width: 2.8rem; margin: 0 auto; border-radius: 4px 4px 0 0; background: #3c6487; transition: filter 0.12s; }
+.traffic-day-bar:hover .traffic-day-fill { filter: brightness(0.85); }
+.traffic-day-label { font-size: 0.62rem; white-space: nowrap; color: #687487; padding-top: 0.4rem; }
+.traffic-day-label small { display: block; font: inherit; font-size: 0.58rem; margin-top: 0.1rem; }
+.traffic-day-partial .traffic-day-fill, .traffic-key-partial { background: repeating-linear-gradient(135deg, #c7a260, #c7a260 4px, #ebd8b2 4px, #ebd8b2 8px); }
+.traffic-day-unavailable .traffic-day-fill { background: #f5f6f8; border: 1px dashed #c1c9d2; border-bottom: 0; }
+.traffic-day-unavailable .traffic-day-value { color: #778290; font-weight: 400; }
+.traffic-chart-key { display: flex; flex-wrap: wrap; gap: 0.8rem; color: #697486; font-size: 0.67rem; margin: 0.65rem 0; }
+.traffic-chart-key span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.traffic-chart-key i { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
+.traffic-key-recorded { background: #3c6487; }
+.traffic-key-missing { border: 1px dashed #a8b5c4; background: #f5f6f8; }
+.traffic-reconcile { margin: 0.85rem 0; font-size: 0.77rem; color: #54677a; }
+.traffic-daily-details { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--traffic-line); }
+.traffic-view summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--traffic-navy); }
+.traffic-view summary::marker { color: var(--traffic-gold); }
+.traffic-table-scroll { width: 100%; overflow: auto; }
+.traffic-daily-table { max-height: 26rem; margin-top: 0.8rem; }
+.traffic-table { width: 100%; border-collapse: collapse; font: inherit; font-size: 0.8rem; table-layout: auto; margin: 0; }
+.traffic-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.traffic-table th, .traffic-table td { border: 0; border-bottom: 1px solid #e6ebf0; padding: 0.7rem 0.45rem; vertical-align: top; text-align: left; background: transparent; color: var(--traffic-navy); font: inherit; font-size: 0.8rem; line-height: 1.45; }
+.traffic-table thead th { font-size: 0.69rem; color: #647185; font-weight: 600; background: #f6f8fa; }
+.traffic-table tbody th { color: var(--traffic-navy); font-weight: 550; }
+.traffic-table tbody tr:nth-child(even) td, .traffic-table tbody tr:nth-child(even) th { background: transparent; }
+.traffic-table .traffic-figure { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.traffic-table .traffic-share { color: #697486; }
+.traffic-table small { display: block; color: #697486; font-size: 0.66rem; font-weight: 400; margin-top: 0.15rem; overflow-wrap: anywhere; }
+.traffic-table .traffic-row-name { overflow-wrap: anywhere; min-width: 5.5rem; }
+.traffic-table .traffic-residual th, .traffic-table .traffic-residual td { color: #805d28; background: #fdf8ed; }
+.traffic-table tfoot th, .traffic-table tfoot td { border-bottom: 0; border-top: 1px solid #cbd6e1; font-weight: 600; padding-top: 0.85rem; }
+.traffic-denominator { padding-top: 0.8rem; margin: 0; font-size: 0.69rem; color: #697486; line-height: 1.5; }
+.traffic-text-button { padding: 0; border: 0; background: transparent; color: #315f8b; text-align: left; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.traffic-breakdowns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.traffic-breakdowns > .traffic-panel { margin-bottom: 0; }
+.traffic-breakdowns { margin-bottom: 1rem; }
+.traffic-panel-wide { grid-column: 1 / -1; }
+.traffic-unavailable { background: #f7f9fb; border-radius: 7px; padding: 1.1rem; color: #677487; font-size: 0.8rem; line-height: 1.55; }
+.traffic-unavailable strong { color: #4f6278; }
+.traffic-unavailable p { margin: 0.4rem 0 0; }
+.traffic-small { font-size: 0.75rem; line-height: 1.55; color: #697486; overflow-wrap: anywhere; }
+.traffic-patterns-content { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding-top: 1.1rem; }
+.traffic-patterns-content > section { min-width: 0; }
+.traffic-time-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.45rem; margin: 0.8rem 0; }
+.traffic-time-grid div { padding: 0.55rem 0.3rem; text-align: center; background: #f5f7fa; border: 1px solid #e8ecf1; border-radius: 6px; }
+.traffic-time-grid span { display: block; color: #6a7688; font-size: 0.61rem; }
+.traffic-time-grid strong { display: block; margin-top: 0.3rem; font-size: 0.95rem; color: var(--traffic-navy); font-variant-numeric: tabular-nums; }
+.traffic-browser-details > .traffic-breakdowns { margin: 1rem 0 0; }
+.traffic-browser-details .traffic-panel { border-radius: 7px; padding: 1rem; }
+.traffic-method-content { padding-top: 1.2rem; }
+.traffic-definition-list, .traffic-technical-list { margin: 0.6rem 0 1.4rem; font-size: 0.77rem; line-height: 1.6; }
+.traffic-definition-list > div, .traffic-technical-list > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid #eef1f5; }
+.traffic-definition-list dt, .traffic-technical-list dt { font-weight: 600; color: var(--traffic-navy); }
+.traffic-definition-list dd, .traffic-technical-list dd { margin: 0; color: #657286; overflow-wrap: anywhere; }
+.traffic-technical-list code { font-size: 0.73rem; }
+@media (min-width: 76rem) {
+  main.traffic-view { padding-inline: 2.2rem; }
 }
-.traffic-range:hover { background: var(--accent-soft); }
-.traffic-range.is-on { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
-/* The two figures, side by side and big enough to read across a desk. They wrap on a phone
-   rather than shrinking, since a number that has to be squinted at is no use. */
-.traffic-totals { display: flex; flex-wrap: wrap; gap: 1.4rem; margin-bottom: 1.2rem; }
-.traffic-total { display: flex; flex-direction: column; }
-.traffic-total-n { font-size: 2.1rem; font-weight: 600; line-height: 1.1; color: var(--ink); }
-.traffic-total-w { font-size: var(--fs-sm); color: var(--muted); }
-/* One bar a day. The row has the height, each bar's fill has a percentage of it, so nothing
-   is measured and it is right at any width. align-items:end is what stands them on the axis
-   rather than hanging them from the top. */
-.traffic-chart {
-  display: flex; align-items: flex-end; gap: 3px; height: 130px;
-  padding-bottom: 1.3rem; margin-bottom: 1.6rem;
-  border-bottom: 1px solid var(--border);
+@media (max-width: 58rem) {
+  .traffic-totals { grid-template-columns: 1fr 1fr; }
+  .traffic-total:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; align-items: center; column-gap: 1rem; }
+  .traffic-total:last-child .traffic-total-coverage { margin: 0.4rem 0 0; grid-column: 1; }
+  .traffic-total:last-child p { grid-column: 2; grid-row: 1 / 3; margin: 0; }
+  .traffic-patterns-content { grid-template-columns: minmax(0, 1fr); }
 }
-/* Each bar is a <button> now, so the browser's own button styling has to be taken back off:
-   padding, border, background and the font are all inherited or cleared, and what is left is the
-   shape the chart already had. */
-.traffic-bar {
-  flex: 1 1 0; position: relative; height: 100%; display: flex; align-items: flex-end;
-  min-width: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit;
-  -webkit-tap-highlight-color: transparent;
+@media (max-width: 40rem) {
+  .traffic-header { align-items: flex-start; gap: 0.65rem; }
+  .traffic-header .traffic-eyebrow { font-size: 0.57rem; }
+  .traffic-header h2 { font-size: 1.5rem; }
+  .traffic-header p { font-size: 0.75rem; }
+  .traffic-refresh { min-height: 2.6rem; padding: 0.6rem; font-size: 0.71rem; max-width: 5.2rem; }
+  .traffic-controls, .traffic-panel { padding: 0.9rem; border-radius: 10px; }
+  .traffic-range { flex: 1 0 26%; padding-inline: 0.4rem; }
+  .traffic-range-form label { flex: 1 1 40%; min-width: 0; }
+  .traffic-range-form input { width: 100%; min-width: 0; }
+  .traffic-apply { width: 100%; }
+  .traffic-total { padding: 0.9rem; }
+  .traffic-total-label { font-size: 0.67rem; letter-spacing: 0.025em; }
+  .traffic-total p { font-size: 0.69rem; }
+  .traffic-total-n { font-size: 1.9rem; }
+  .traffic-total-coverage { font-size: 1.15rem; }
+  .traffic-panel-heading { gap: 0.45rem; }
+  .traffic-panel-heading h3 { font-size: 0.92rem; }
+  .traffic-panel-heading p { font-size: 0.71rem; }
+  .traffic-unit { display: none; }
+  .traffic-breakdowns { grid-template-columns: minmax(0, 1fr); }
+  .traffic-table th, .traffic-table td { font-size: 0.73rem; padding-inline: 0.35rem; }
+  .traffic-table thead th { font-size: 0.65rem; }
+  .traffic-table .traffic-row-name { min-width: 5rem; }
+  .traffic-definition-list > div, .traffic-technical-list > div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+  .traffic-status { padding-inline: 0.35rem; font-size: 0.61rem; }
+  .traffic-browser-details .traffic-panel { padding: 0.8rem; }
 }
-/* Only where a bar actually opens something. The hours chart uses the same class for shapes
-   that are not buttons and must not look like one. */
-.traffic-chart.is-pickable .traffic-bar { cursor: pointer; border-radius: 3px; }
-.traffic-chart.is-pickable .traffic-bar:hover .traffic-bar-fill,
-.traffic-chart.is-pickable .traffic-bar:focus-visible .traffic-bar-fill {
-  filter: brightness(0.86);
-}
-.traffic-chart.is-pickable .traffic-bar:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
-/* Why the chart's days are not the reader's days. Under the chart it is about rather than at the
-   foot of the tab, because that is where the two numbers stop agreeing: the shul read Today as
-   nothing and the bar over the same date as busy, which is a contradiction six panels above where
-   this used to be explained. Set close under the chart and away from the panel below it, so it
-   reads as a note on the chart rather than as the start of the next thing. */
-.traffic-utc-note { margin: 0.35rem 0 1.6rem; }
-
-/* The date field beside the ranges, and the way back out of a day. */
-.traffic-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
-.traffic-pick-label { color: var(--muted); font-size: var(--fs-sm); }
-.traffic-date {
-  font: inherit; font-size: var(--fs-sm); padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--ink);
-}
-/* The day being looked at, where the chart sits over a range. */
-.traffic-oneday {
-  margin: 0 0 1.2rem; font-size: var(--fs-lg); font-weight: 600; color: var(--ink);
-}
-/* --ui-accent, the blue this program's own controls are, and not --accent: that one is the
-   printed chart's grey and its value is load-bearing for what comes out of a printer. A screen
-   of numbers is a screen, not a board. */
-.traffic-bar-fill {
-  width: 100%; background: var(--ui-accent); border-radius: 2px 2px 0 0; min-height: 2px;
-}
-/* The day under its own bar, and only where there is room for it: at 30 bars on a phone the
-   labels would be a grey smear, so they are dropped and the bars keep the space. The title
-   on each bar still says the day and the count on a hover or a long press. */
-.traffic-bar-day {
-  position: absolute; bottom: -1.15rem; left: 50%; transform: translateX(-50%);
-  font-size: 0.62rem; color: var(--muted); white-space: nowrap;
-}
-.traffic-chart:has(.traffic-bar:nth-child(9)) .traffic-bar-day { display: none; }
-/* The hours chart is always 24 bars and is exempt, because the rule above was written for a
-   range of days where the labels are dates and every bar wants one. Here only every third hour
-   is labelled and the rest carry an empty label, so the row is already thinned and dropping it
-   wholesale leaves a chart nobody can read a time off. */
-.traffic-hours .traffic-bar-day { display: block !important; }
-.traffic-heading { font-size: var(--fs-lg); margin: 0 0 0.5rem; }
-/* Its own borders and its own background, said outright. A bare table in this stylesheet
-   inherits the printed chart's rules further up (`th, td` and the striped body rows), and this
-   one came out banded grey with a dark header, which is a wall chart's clothes on a list of
-   numbers. */
-.traffic-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-.traffic-table th, .traffic-table td {
-  border: 0; border-bottom: 1px solid var(--border);
-  padding: 0.5rem 0.5rem; text-align: left; background-color: transparent; vertical-align: top;
-}
-.traffic-table th { color: var(--muted); font-weight: 500; }
-.traffic-table tbody tr:last-child td { border-bottom: 0; }
-/* And the band on every second row, which is the chart's again and needs one more class than
-   `tbody tr:nth-child(even) td` carries before it will let go.
-   background-color rather than the `background` shorthand, in both rules above and here. The
-   shorthand also resets background-image, and the share bars are a background image on the
-   cell: written as `background: none` this silently wiped the bar off every second row, which
-   on screen read as Monday and Wednesday having no visitors at all. */
-.traffic-table tbody tr:nth-child(even) td { background-color: transparent; }
-.traffic-figure { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* The address under the page's name, small: the name is what it is, the path is how to
-   check that it is. */
-.traffic-page { display: flex; flex-direction: column; }
-.traffic-path { font-size: 0.7rem; color: var(--muted); }
-/* A share bar behind the name, rather than a bar element beside it.
-   Painted as a background on the cell, so the table stays a table: the columns line up, the
-   figures stay in their own cells, and a screen reader still reads rows rather than a row of
-   divs pretending to be one. The share is of the largest row, not of the total, because what
-   these answer is which one is the big one. */
-.traffic-shares .traffic-page {
-  /* Thinned with color-mix rather than by picking a second, paler colour, so it follows the
-     accent the admin is set to instead of drifting away from it the first time that changes. */
-  background-image: linear-gradient(to right,
-    color-mix(in srgb, var(--ui-accent) 16%, transparent) 0 var(--share, 0%),
-    transparent var(--share, 0%));
-  background-repeat: no-repeat;
-  border-radius: 2px;
-  padding-inline: 0.4rem;
-}
-.traffic-pct { color: var(--muted); }
-/* A panel Cloudflare would not answer. Its own colour so it does not read as a figure, and it
-   sits where the panel would have been rather than at the top, since the rest of the screen is
-   fine. See trafficPanelError: the message is Cloudflare's own words on purpose. */
-.traffic-panel-error { color: var(--danger); margin-top: 0; }
-.traffic-foot { margin-top: 1.1rem; }
-.traffic-setup ol { margin: 0.6rem 0 0.8rem 1.1rem; padding: 0; }
-.traffic-setup li { margin-bottom: 0.4rem; }
-.traffic-setup code, .traffic-error code { background: var(--accent-soft); border-radius: 3px; padding: 0.05rem 0.3rem; }
-.traffic-error h3 { color: var(--danger); margin-top: 0; }
-
 /* ── What the Congregation Sees, the admin's own status tab ───────────────────────────────
    Read js/ui/status-view.js: three sections, one per congregation-facing page, the last one
    a table of the Special Schedules and their own lead-time window. */
