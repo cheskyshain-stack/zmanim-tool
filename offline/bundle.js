@@ -13091,8 +13091,8 @@ function renderTzomGedaliaPoster(poster, settings) {
  *  own two labelled rows read backwards while מנחה and מעריב beneath them, labelless,
  *  already read correctly. Measured directly before this: ראש חודש's own line read 8:40,
  *  8:20*, 8:05 … down to the label, the reverse of the order a reader wants. */
-function chanukahLineHtml(label, timesInnerHtml) {
-  return `<p class="poster-set-line" lang="he">`
+function chanukahLineHtml(label, timesInnerHtml, lineClass) {
+  return `<p class="poster-set-line${lineClass ? ` ${lineClass}` : ''}" lang="he">`
     + `<bdi class="poster-chanukah-run">`
     + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
     + `<bdi class="poster-row-times" dir="ltr">`
@@ -13152,9 +13152,19 @@ function netzLineHtml(netzDays) {
  *  times under it (vasikinLine), then - only where at least one of the group's own days
  *  needed נץ to explain its own ותיקין time - the נץ line (netzLineHtml) under that.
  *  Asked for directly, after the נץ note had shared the times line as a parenthetical;
- *  every row with one reads the same way now. */
+ *  every row with one reads the same way now.
+ *
+ *  The נץ line carries `poster-netz-line` (see its own rule in app.css), asked for directly
+ *  once two of them landed in different spots on the same page: `.poster-set` centers every
+ *  line on its own width, so a row naming four netz days read far wider than a row naming
+ *  one, and the two notes centered around the same midpoint but opened nowhere near each
+ *  other - measured directly, 589px against 715px, a reader's eye had to hunt sideways for
+ *  the mark every row. Flush left instead, every נץ line opens at the same x regardless of
+ *  how many days it names: the thing being kept in one place is the mark, not the block. */
 function shacharisRunLines(row) {
-  const netzLine = row.vasikin.netzDays ? chanukahLineHtml(null, netzLineHtml(row.vasikin.netzDays)) : '';
+  const netzLine = row.vasikin.netzDays
+    ? chanukahLineHtml(null, netzLineHtml(row.vasikin.netzDays), 'poster-netz-line')
+    : '';
   return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row)) + netzLine;
 }
 
