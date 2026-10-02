@@ -23,6 +23,7 @@ function fixture({ events = [], archive = true, failGroup, failWrite = false, fa
   } };
   globalThis.fetch = async (url, init) => {
     assert.equal(url, 'https://api.cloudflare.com/client/v4/graphql');
+    assert.equal(init.redirect, 'manual', 'workerd supports manual redirects and credentials must never follow a redirect');
     const { query, variables } = JSON.parse(init.body);
     assert.match(query, /datetime_geq: \$since, datetime_lt: \$until/);
     const dimensions = /dimensions \{ ([^}]+) \}/.exec(query)[1].trim().split(/\s+/);
@@ -479,6 +480,38 @@ test('rate limiting is isolated to its source and archive-free readers keep thei
     assert(upstream > sent);
     assert.equal(other.body.collection.status, 'ok');
   } finally { now = originalNow; }
+});
+
+test('redirected upstream requests are rejected without following or caching an empty success', async () => {
+  const f = fixture();
+  f.env.CF_ACCOUNT_ID = 'redirect-runtime-test';
+  let requests = 0;
+  globalThis.fetch = async (url, init) => {
+    requests += 1;
+    assert.equal(url, 'https://api.cloudflare.com/client/v4/graphql');
+    assert.equal(init.redirect, 'manual');
+    return new Response(null, { status: 302, headers: { location: 'https://untrusted.example/never-follow' } });
+  };
+  const { body, response } = await f.get('days=1');
+  assert(requests > 0);
+  assert.equal(body.totals.views, null);
+  assert.equal(body.collection.status, 'degraded');
+  assert.match(body.collection.errors.join(' '), /unexpected redirect \(HTTP 302\)/);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.cache.size, 0);
+});
+
+test('network exception details remain diagnosable while credentials are redacted', async () => {
+  const f = fixture();
+  f.env.CF_ACCOUNT_ID = 'network-runtime-test';
+  globalThis.fetch = async () => { throw new Error('Invalid runtime option, token test-token, Bearer private-value'); };
+  const { body } = await f.get('days=1');
+  const errors = body.collection.errors.join(' ');
+  assert.match(errors, /Invalid runtime option/);
+  assert(!errors.includes('test-token'));
+  assert(!errors.includes('private-value'));
+  assert.match(errors, /\[redacted\]/);
 });
 
 test('validation and existing CORS/method behavior are preserved', async () => {

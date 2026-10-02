@@ -5,7 +5,15 @@ import vm from 'node:vm';
 
 // Exercise the real rendering functions without introducing exports into the offline bundle.
 const source = await readFile(new URL('../js/ui/traffic-view.js', import.meta.url), 'utf8');
-const context = vm.createContext({ Intl, Date, URL, URLSearchParams, Map, Set });
+// The Worker suite replaces global Date. Keep this renderer's clock independent
+// so combined tests and later calendar dates cannot expire a cooldown fixture.
+const UITestNativeDate = vm.runInNewContext('Date');
+const uiNow = UITestNativeDate.parse('2026-10-02T02:00:00Z');
+class UITestDate extends UITestNativeDate {
+  constructor(...args) { super(...(args.length ? args : [uiNow])); }
+  static now() { return uiNow; }
+}
+const context = vm.createContext({ Intl, Date: UITestDate, URL, URLSearchParams, Map, Set });
 vm.runInContext(source.replace('export function renderTraffic', 'function renderTraffic') + `
 globalThis.trafficTest = {
   today: trafficToday, dates: trafficDates, validate: trafficValidateRange,
@@ -108,7 +116,7 @@ test('partial history qualifies recorded totals without discarding the known cou
 
 test('provider cooldown retains figures and shows a New York retry time without repeated-refresh advice', () => {
   const data = report({ collection: { status: 'degraded', errors: ['Provider throttled collection'], remainingDays: 12,
-    cooldownUntil: new Date(Date.now() + 15 * 60000).toISOString(), retryAfterSeconds: 900 } });
+    cooldownUntil: new UITestDate(uiNow + 15 * 60000).toISOString(), retryAfterSeconds: 900 } });
   const html = ui.content(data, range);
   assert.match(html, /Collection paused/);
   assert.match(html, /Available figures are retained/);

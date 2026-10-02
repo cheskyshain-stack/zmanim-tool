@@ -20,7 +20,7 @@ const SITE_TOKEN = 'e96217102b81416db30f31a0c105fece';
 // their own identity. An override must never silently import that other source.
 const LEGACY_ACCOUNT = '04b085d9f19ac1ba6d333e0006fc94c1';
 const LEGACY_SITE_TAG = 'abd00a69157843b2bb7275c8a265d88f';
-const BUILD = '2026-10-01-stats-v2b';
+const BUILD = '2026-10-01-stats-v2c';
 const CACHE_SECONDS = 45;
 const ROW_LIMIT = 10000;
 const READ_REPAIR_DAYS = 5;
@@ -121,7 +121,13 @@ async function upstreamFetch(url, init, budget) {
   if (budget.remaining <= 0) throw new Error('Analytics collection reached its request budget. The remaining dates will be collected on a later run.');
   budget.remaining -= 1;
   budget.upstreamRequests += 1;
-  return fetch(url, { ...init, redirect: 'error' });
+  // Workerd supports only manual/follow. Never follow a redirected API request
+  // carrying the analytics credential; reject the response explicitly instead.
+  const response = await fetch(url, { ...init, redirect: 'manual' });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error(`Cloudflare returned an unexpected redirect (HTTP ${response.status}).`);
+  }
+  return response;
 }
 async function collectionCache(cache, method, key, value, budget) {
   if (!cache || budget.remaining <= 0) return null;
@@ -190,7 +196,7 @@ async function askGroup(env, source, since, until, group, budget) {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }, budget);
       body = await response.json().catch(() => null);
-    } catch (error) { return { error: budget.remaining <= 0 ? 'Analytics collection reached its request budget. Retry or wait for the next collection.' : 'Cloudflare could not be reached.' }; }
+    } catch (error) { return { error: budget.remaining <= 0 ? 'Analytics collection reached its request budget. Retry or wait for the next collection.' : `Cloudflare request failed: ${safeError(error, env)}` }; }
     if (response.status === 429) return beginCooldown(source);
     if (!response.ok) return { error: `Cloudflare answered HTTP ${response.status}.` };
     if (body?.errors?.length) {
