@@ -672,16 +672,18 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const mevarchimMonth = !isWeekday && showMolad ? shabbosMevarchimMonth(week.serial, settings) : null;
       const molad = mevarchimMonth ? moladLabel(moladFor(mevarchimMonth.year, mevarchimMonth.month), settings) : null;
       const hasMevarchim = Boolean(molad);
-      // A special parsha (שקלים, החדש, …) joins the parsha name's own line, the same
-      // inline "· " join "· חנוכה" already uses below, rather than sitting on a line of
-      // its own above the molad note - only on a week that also carries a molad, which
-      // is the one case a third line (name, special parsha, molad, each on its own) was
-      // measured tall enough to overflow a content-squeezed page's own row height (see
-      // the molad note's own comment). Every other week's own special parsha is
-      // untouched, still its own line under the parsha.
+      // A special parsha (שקלים, החדש, …) always joins the parsha name's own line, the
+      // same inline "· " join "· חנוכה" already uses below, rather than sitting on a
+      // line of its own under it - asked for directly, in place of the line it used to
+      // get only on a week with no molad, which read as two different conventions for
+      // the same thing depending on what else that week happened to carry. A week that
+      // also has a molad note can come out three lines this way (name · special, then
+      // the molad's own line, now itself sometimes two more under Yiddish) - the
+      // chart's own auto-shrink absorbs that the same way it absorbs any other page that
+      // needs more room than 817px holds, rather than this reaching for a second
+      // convention to dodge it.
       const parshaCell = weekOfLabel(week.parsha, isEnglish)
-        + (week.specialParsha && !hasMevarchim ? '\n' + week.specialParsha : '')
-        + (week.specialParsha && hasMevarchim ? ` · ${week.specialParsha}` : '')
+        + (week.specialParsha ? ` · ${week.specialParsha}` : '')
         + (chanukahLabel === 'chanukah' || weekAllChanukah ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
