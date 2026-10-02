@@ -6165,31 +6165,25 @@ function chanukahPanelNetzNote(dayObjs) {
  *  as anywhere else on this sheet. The day-by-day picture is the Special Schedules
  *  poster's job, not this panel's.
  *
- *  Asked for directly, a small נץ note (chanukahPanelNetzNote, one per block that needs one)
- *  now follows, under the ר"ח block rather than one under each block's own schedule - the
- *  wall chart used to carry no נץ note at all, where the Special Schedules poster for the
- *  same days always has. `<span class="small">` is shacharis-grid.js's own signal for a line
- *  to print smaller than the schedule above it (see its own `is-small`, the same mechanism
- *  `is-big` already is): the note is never itself a row of times (it carries a range and the
- *  word נץ, not a schedule), so shacharisGridHtml reads it as a line of its own rather than
- *  trying to grid it, which is what lets it print at all without the block's real times
- *  being misread. */
+ *  Asked for directly, each block's own small נץ note (chanukahPanelNetzNote) now follows
+ *  its schedule where at least one of the block's own days needed one - the wall chart used
+ *  to carry no נץ note at all, where the Special Schedules poster for the same days always
+ *  has. `<span class="small">` is shacharis-grid.js's own signal for a line to print smaller
+ *  than the schedule above it (see its own `is-small`, the same mechanism `is-big` already
+ *  is): the note is never itself a row of times (it carries a range and the word נץ, not a
+ *  schedule), so shacharisGridHtml reads it as a line of its own rather than trying to grid
+ *  it, which is what lets it print at all without the block's real times being misread. */
 function chanukahPanelBlocks(days, settings) {
   const regularDays = days.filter((d) => !hasRoshChodesh(d, settings));
   const roshChodeshDays = days.filter((d) => hasRoshChodesh(d, settings));
-  const schedule = (list) => (list.length ? chanukahScheduleLines(list, settings, { mergeAll: true }) : null);
-  const note = (list) => (list.length ? chanukahPanelNetzNote(list.map((d) => chanukahShacharisDay(d, settings))) : null);
-  const notes = [note(regularDays), note(roshChodeshDays)].filter(Boolean);
-  return {
-    regular: schedule(regularDays),
-    roshChodesh: schedule(roshChodeshDays),
-    // Both blocks' own notes, where either has one, printed together rather than one under
-    // each block's own schedule - asked for directly, under the ר"ח block specifically
-    // (sheet-view.js appends this after both schedules, and ר"ח prints second whenever both
-    // blocks exist). Neither note says which block it is its own, the same as the poster's
-    // own consolidated note does not say which row either once that moved the same way.
-    netz: notes.length ? notes.map((n) => `<span class="small">${n}</span>`).join('\n') : null,
+  const block = (list) => {
+    if (!list.length) return null;
+    const lines = chanukahScheduleLines(list, settings, { mergeAll: true });
+    const dayObjs = list.map((d) => chanukahShacharisDay(d, settings));
+    const note = chanukahPanelNetzNote(dayObjs);
+    return note ? `${lines}\n<span class="small">${note}</span>` : lines;
   };
+  return { regular: block(regularDays), roshChodesh: block(roshChodeshDays) };
 }
 
 /** One ערב שבת block rather than one per Friday: the eight days can touch two (see
@@ -11439,11 +11433,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // box of their own (.chanukah-highlight, see shacharis-grid.js's own handling of this one
     // div) - set apart from the standing ר"ח ובה"ב block beside it rather than carrying a mark
     // of their own the way the tag on a touching week's own מעריב row does.
-    // chanukahBlocks.netz, where either block needed one, goes last - under the ר"ח block
-    // specifically, asked for directly, since ר"ח always prints second here when both exist.
     const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
-      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '')
-      + (chanukahBlocks.netz ? `\n${chanukahBlocks.netz}` : '');
+      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
     const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();

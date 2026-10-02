@@ -564,11 +564,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // box of their own (.chanukah-highlight, see shacharis-grid.js's own handling of this one
     // div) - set apart from the standing ר"ח ובה"ב block beside it rather than carrying a mark
     // of their own the way the tag on a touching week's own מעריב row does.
-    // chanukahBlocks.netz, where either block needed one, goes last - under the ר"ח block
-    // specifically, asked for directly, since ר"ח always prints second here when both exist.
     const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
-      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '')
-      + (chanukahBlocks.netz ? `\n${chanukahBlocks.netz}` : '');
+      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
     const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();
