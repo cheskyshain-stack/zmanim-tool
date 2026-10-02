@@ -3581,12 +3581,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    is for rather than being a time itself. */
 .poster-netz-day { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; vertical-align: bottom; }
 .poster-netz-day-label { font-size: 0.55em; color: var(--muted); }
-/* The נץ line's own line (shacharisRunLines), kept out of .poster-set's own
+/* The נץ line's own line (netzSectionLines), kept out of .poster-set's own
    text-align: center. A row naming one נץ day reads far narrower than a row naming four,
    and centered, the two notes landed nowhere near each other even though centered on the
    same midpoint - a reader's eye had to hunt sideways to find the mark every row. Flush
    left instead, every נץ line opens at the same x regardless of how many days it names. */
 .poster-netz-line { text-align: left; }
+/* The נץ section itself (chanukahBody), half the heading's own margin and half the
+   section's: reference lines under the schedule, not a fourth standing block the weight of
+   שחרית, מנחה or מעריב. At the full margins every other section gets, two real years
+   (אוקטובר 2027, אוקטובר 2030, both already carrying a double-Friday ערב שבת heading of
+   their own) ran 22px past the page's own 1056px - confirmed directly, this section did not
+   exist on main before it. Halving both margins instead of shrinking the type: the type is
+   what is actually being read, and the air around a reference section is what there was
+   room to give up. */
+.poster.is-chanukah .poster-set.poster-netz-set { margin-bottom: 0.15in; }
+.poster.is-chanukah .poster-netz-set .poster-set-head { margin-bottom: 0.07in; }
 /* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
    of it so it does not run into the first row's time, and it inherits .poster-row-label for
    the gap between its own word and its own time. */

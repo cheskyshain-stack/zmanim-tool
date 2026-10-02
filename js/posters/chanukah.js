@@ -34,6 +34,7 @@ const CH_FRIDAY = 6;
 export const CH_TEXT = {
   title: 'חנוכה',
   shacharis: 'שחרית',
+  netz: 'נץ',
   mincha: 'מנחה',
   maariv: 'מעריב',
   erevShabbos: 'ערב שבת',

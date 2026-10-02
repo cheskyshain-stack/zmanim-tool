@@ -1531,54 +1531,52 @@ function vasikinLine(row) {
   return `<span class="poster-t">${escAttr(time)}</span>${rest}`;
 }
 
-/** The row's own נץ line, asked for directly as a third line of its own rather than a
- *  parenthetical sharing the times line - a reader's eye was going to the middle of the
- *  times to find it either way, and a line of its own is where the label ("יום א' ב' ג'
- *  ד'") already put the row's other aside, one line up.
- *
- *  Each נץ time still carries its own day letter above it, asked for directly the first
- *  time this was built: the row's own label two lines up already says which days share the
- *  row, and a reader working out which נץ belongs to which day had to count slashes against
- *  it rather than read the letter off the time itself. The letter is its own `<bdi>`, the
- *  same isolation נץ itself gets below - a bare Hebrew character sitting loose beside a
- *  time is exactly the shape that has turned a run backwards elsewhere on this sheet, so it
- *  is never trusted plain beside a digit here either, small as it is.
- *
- *  נץ itself is given a nested bdi of its own, with no direction forced on it (a single
- *  word has no internal order to protect), and the times sit in a second nested bdi,
- *  explicitly ltr - measured directly, forcing ltr on the note as a whole was not enough by
- *  itself: with more than one time in it ("7:07:58 / 7:08:47"), that still came out
- *  "7:08:47 / 7:07:58", נץ still read as that run's own strong character even under an
- *  explicit ltr on the run around it. */
+/** One group's own list of נץ times, each carrying its own day letter above it, asked for
+ *  directly the first time this was built: a group's own label ("יום א' ב' ג' ד'") already
+ *  says which days share the row, and a reader working out which נץ belongs to which day
+ *  had to count slashes against it rather than read the letter off the time itself. The
+ *  letter is its own `<bdi>`, the same isolation every mark on this sheet near a digit
+ *  already gets - a bare Hebrew character sitting loose beside a time is exactly the shape
+ *  that has turned a run backwards elsewhere on this sheet, so it is never trusted plain
+ *  beside a digit here either, small as it is. */
 function netzDaysHtml(netzDays) {
   return netzDays.map(({ time, letters }) => {
     const label = letters.map((l) => `${l}'`).join('/');
     return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
   }).join(' / ');
 }
-function netzLineHtml(netzDays) {
-  return `<bdi class="poster-row-note" dir="ltr">(<bdi>נץ</bdi> <bdi dir="ltr">${netzDaysHtml(netzDays)}</bdi>)</bdi>`;
+
+/** One שחרית row, label over times: the label (combineShacharisRows's own `row.label`,
+ *  "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") on its own line, the row's own times under it
+ *  (vasikinLine). The row's own נץ note, if it has one, is not here - it moved to the
+ *  sheet's own נץ section, see netzSectionLines, asked for directly once the two had to be
+ *  found one under the other; this is back to the label-and-times shape the row had before
+ *  that note existed at all. */
+function shacharisRunLines(row) {
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
 }
 
-/** One שחרית row, on three lines rather than one: the label (combineShacharisRows's own
- *  `row.label`, "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") on its own line, the row's own
- *  times under it (vasikinLine), then - only where at least one of the group's own days
- *  needed נץ to explain its own ותיקין time - the נץ line (netzLineHtml) under that.
- *  Asked for directly, after the נץ note had shared the times line as a parenthetical;
- *  every row with one reads the same way now.
+/** The sheet's own נץ section: one line per שחרית row that needed נץ to explain its own
+ *  ותיקין time, in the same order as the rows themselves, each line the row's own
+ *  netzDaysHtml. A section of its own rather than a note under each row, asked for
+ *  directly: both rows' נץ times now stand together under one heading the same way מנחה
+ *  and מעריב already get their own, instead of a reader finding one under the first row's
+ *  times and a second one further down under the second row's.
  *
- *  The נץ line carries `poster-netz-line` (see its own rule in app.css), asked for directly
- *  once two of them landed in different spots on the same page: `.poster-set` centers every
- *  line on its own width, so a row naming four netz days read far wider than a row naming
- *  one, and the two notes centered around the same midpoint but opened nowhere near each
- *  other - measured directly, 589px against 715px, a reader's eye had to hunt sideways for
- *  the mark every row. Flush left instead, every נץ line opens at the same x regardless of
- *  how many days it names: the thing being kept in one place is the mark, not the block. */
-function shacharisRunLines(row) {
-  const netzLine = row.vasikin.netzDays
-    ? chanukahLineHtml(null, netzLineHtml(row.vasikin.netzDays), 'poster-netz-line')
-    : '';
-  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row)) + netzLine;
+ *  Each line still carries `poster-netz-line` (see its own rule in app.css): `.poster-set`
+ *  centers every line on its own width, so a row naming four netz days reads far wider than
+ *  a row naming one, and centered, the two would land nowhere near each other even sharing
+ *  the section's own heading - measured directly on the two-row case, 589px against 715px
+ *  for the two lines' own left edges. Flush left instead, every line in this section opens
+ *  at the same x regardless of how many days it names.
+ *
+ *  Left out entirely where no row in the group needed one, the same as the section above it
+ *  (poster.erevShabbos) is left out where the group has none of its own. */
+function netzSectionLines(poster) {
+  return poster.shacharisRows
+    .filter((row) => row.vasikin.netzDays)
+    .map((row) => chanukahLineHtml(null, netzDaysHtml(row.vasikin.netzDays), 'poster-netz-line'))
+    .join('');
 }
 
 /** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
@@ -1586,13 +1584,22 @@ function shacharisRunLines(row) {
  *  the eight days work out to, whether that is one Friday or two. */
 function chanukahBody(poster) {
   const timeLine = (times) => chanukahRunLine(times.map(toCell));
-  const section = (head, inner) => `
-    <div class="poster-set">
+  const section = (head, inner, setClass) => `
+    <div class="poster-set${setClass ? ` ${setClass}` : ''}">
       <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
       ${inner}
     </div>`;
+  const netzLines = netzSectionLines(poster);
   const sections = [
     section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('')),
+    // Reference lines, not a fourth standing block the way מנחה/מעריב are: the sheet
+    // already carries nine lines and up before this section exists at all (see the note on
+    // .poster.is-chanukah .poster-set-line), and giving נץ the same full heading-and-section
+    // margins as every other block pushed two real years (אוקטובר 2027, אוקטובר 2030, both
+    // with a double-Friday ערב שבת heading of their own) 22px past the page's own 1056px -
+    // confirmed directly, not fitting on main before this section existed. .poster-netz-set
+    // in app.css halves both margins the section() call above would otherwise give it.
+    netzLines ? section(CH_TEXT.netz, netzLines, 'poster-netz-set') : '',
     section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
