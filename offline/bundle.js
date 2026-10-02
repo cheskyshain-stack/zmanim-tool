@@ -13179,27 +13179,30 @@ function vasikinLine(row) {
   return `<span class="poster-t">${escAttr(time)}</span>${rest}`;
 }
 
-/** One group's own list of נץ times, each carrying its own day letter above it, asked for
+/** One group's own list of נץ times, each carrying its own "יום X" above it, asked for
  *  directly the first time this was built: a group's own label ("יום א' ב' ג' ד'") already
  *  says which days share the row, and a reader working out which נץ belongs to which day
- *  had to count slashes against it rather than read the letter off the time itself. The
- *  letter is its own `<bdi>`, the same isolation every mark on this sheet near a digit
- *  already gets - a bare Hebrew character sitting loose beside a time is exactly the shape
- *  that has turned a run backwards elsewhere on this sheet, so it is never trusted plain
- *  beside a digit here either, small as it is. */
+ *  had to count slashes against it rather than read the day off the time itself. "יום"
+ *  repeats before every time rather than once over the whole list, asked for directly after
+ *  a bare letter - the row's own label already says "יום" once over several letters, and a
+ *  reader short of that context seeing a bare "א'" over a time had no word telling them it
+ *  was a day at all. The letter is its own `<bdi>`, the same isolation every mark on this
+ *  sheet near a digit already gets - a bare Hebrew character sitting loose beside a time is
+ *  exactly the shape that has turned a run backwards elsewhere on this sheet, so it is
+ *  never trusted plain beside a digit here either, small as it is. */
 function netzDaysHtml(netzDays) {
   return netzDays.map(({ time, letters }) => {
-    const label = letters.map((l) => `${l}'`).join('/');
+    const label = `יום ${letters.map((l) => `${l}'`).join('/')}`;
     return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
   }).join(' / ');
 }
 
 /** One שחרית row, label over times: the label (combineShacharisRows's own `row.label`,
  *  "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") on its own line, the row's own times under it
- *  (vasikinLine). The row's own נץ note, if it has one, is not here - it moved to the
- *  sheet's own נץ section, see netzSectionLines, asked for directly once the two had to be
- *  found one under the other; this is back to the label-and-times shape the row had before
- *  that note existed at all. */
+ *  (vasikinLine). The row's own נץ note, if it has one, is not here - it moved into
+ *  שחרית's own box as its own lines, see netzBlockLines, asked for directly once the two
+ *  had to be found one under the other; this is back to the label-and-times shape the row
+ *  had before that note existed at all. */
 function shacharisRunLines(row) {
   return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
 }
