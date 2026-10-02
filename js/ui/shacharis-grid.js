@@ -51,20 +51,21 @@ const shEsc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '
 
 /** The markup this understands, and nothing else.
  *
- *  U and SPAN.big are the two the editor writes, BR and DIV are how it breaks a line, and B and I
- *  are here because the toolbar can write them and they carry no meaning this needs to keep track
- *  of: a line is still a line inside one. Anything else (a table, a font tag, a pasted colour)
- *  means the block is not what this was written for. */
+ *  U, SPAN.big and SPAN.small are the ones the editor writes (SPAN.small for the חנוכה panel's
+ *  own נץ note, see chanukahPanelBlocks - nowhere else writes it), BR and DIV are how it breaks
+ *  a line, and B and I are here because the toolbar can write them and they carry no meaning
+ *  this needs to keep track of: a line is still a line inside one. Anything else (a table, a
+ *  font tag, a pasted colour) means the block is not what this was written for. */
 const shKnown = (el) => {
   const tag = el.tagName;
   if (tag === 'U' || tag === 'BR' || tag === 'DIV' || tag === 'P' || tag === 'B' || tag === 'I') return true;
-  return tag === 'SPAN' && (el.className === '' || el.className === 'big');
+  return tag === 'SPAN' && (el.className === '' || el.className === 'big' || el.className === 'small');
 };
 
 /** The block read as lines, each a run of pieces that know whether they are underlined, plus
  *  which lines fall inside a `<div class="chanukah-highlight">` wrapper (see
  *  .chanukah-highlight in app.css) - a group of whole lines, heading and schedule together,
- *  rather than a mark on one piece of one of them the way underline and `.big` are.
+ *  rather than a mark on one piece of one of them the way underline, `.big` and `.small` are.
  *
  *  Null where anything unrecognised turns up, which is the signal to leave the block alone.
  *  A newline inside a text node breaks a line as much as a <br> does: the panel is set with
@@ -73,7 +74,7 @@ function shReadLines(root) {
   const lines = [[]];
   const groups = [false];
   let ok = true;
-  const walk = (node, underlined, big, group) => {
+  const walk = (node, underlined, big, small, group) => {
     if (!ok) return;
     for (const child of node.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -81,7 +82,7 @@ function shReadLines(root) {
         parts.forEach((text, i) => {
           if (i) { lines.push([]); groups.push(group); }
           if (text) {
-            lines[lines.length - 1].push({ text, underlined, big });
+            lines[lines.length - 1].push({ text, underlined, big, small });
             /* A line's own group can be decided before anything is known to belong to it: the
                blank line "\n\n" leaves in front of <div class="chanukah-highlight"> is pushed
                (group still false, the div not reached yet) and then, since that line is still
@@ -104,11 +105,12 @@ function shReadLines(root) {
       // A block starts a line of its own, unless the line it would start is already empty.
       if (block && lines[lines.length - 1].length) { lines.push([]); groups.push(group); }
       walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'),
+        small || child.classList?.contains('small'),
         group || child.classList?.contains('chanukah-highlight'));
       if (block) { lines.push([]); groups.push(group); }
     }
   };
-  walk(root, false, false, false);
+  walk(root, false, false, false, false);
   return ok ? { lines, groups } : null;
 }
 
@@ -237,9 +239,11 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
   /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
      carrying one time, the blank line between the blocks) is a line of its own, centred under
      them, which is where the boards the shul hangs put it.
-     is-big carries the size the everyday block is set in. It wraps the whole block rather than
-     any one line, so it is read off the pieces and put back on the row, and the row's own em is
-     what every width in its grid is then measured in. */
+     is-big carries the size the everyday block is set in, and is-small the חנוכה panel's own
+     נץ note (see chanukahPanelBlocks), the one line on this chart smaller than the rest of it
+     rather than larger. Both wrap the whole line rather than any one piece, so each is read off
+     every piece on the line and put back on the line as a whole; is-big's own row-grid lines
+     also carry it down onto the row itself, which is where its own em comes from. */
   // A run of consecutive grouped lines (a `<div class="chanukah-highlight">`'s own heading and
   // schedule together, see shReadLines) is buffered and wrapped in one highlight box of its
   // own, rather than each line painting its own background - the group is a whole visual unit,
@@ -256,8 +260,9 @@ export function shacharisGridHtml(html, doc = typeof document === 'undefined' ? 
       html = '<div class="sh-gap"></div>';
     } else {
       const big = line.every((p) => p.big) ? ' is-big' : '';
+      const small = line.every((p) => p.small) ? ' is-small' : '';
       if (!times || times.length < 2) {
-        html = `<div class="sh-wide${big}">${shPlainHtml(line)}</div>`;
+        html = `<div class="sh-wide${big}${small}">${shPlainHtml(line)}</div>`;
       } else {
         const { template, pad } = gridFor(times.length, slashed);
         const cells = [];

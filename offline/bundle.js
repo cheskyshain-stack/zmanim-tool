@@ -5701,6 +5701,14 @@ const CH_VASIKIN_BEFORE_NETZ = 25;
  *  that dropped away starting תשפ״ב and never came back, so they are not part of this rule. */
 const CH_REGULAR_SHIFT_MINUTES = 10;
 
+/** Rosh Chodesh's own floor: the ותיקין minyan is never more than 20 minutes earlier than
+ *  Rosh Chodesh's own 7:00 (the schedule's own second line, unmoved - see chanukahShacharisDay),
+ *  the same shape the everyday board's own floor is, asked for directly after a year (תשצ"ג)
+ *  where נץ minus 25 alone printed 6:37, 23 minutes ahead of the 7:00 beside it. Its own number
+ *  rather than CH_REGULAR_SHIFT_MINUTES's ten: a Rosh Chodesh morning already opens earlier than
+ *  an ordinary one by design, and the floor asked for is wider, not the same one moved over. */
+const CH_RC_FLOOR_MINUTES = 20;
+
 /** Rosh Chodesh's own morning is `WEEKDAY_SHACHARIS_SPECIAL`, untouched, except the ותיקין
  *  swap every day gets and one more thing: the 8:00 in the middle of that schedule prints as
  *  8:05 during חנוכה. Four of the five sampled Rosh Chodesh mornings (תשפ״ג-תשפ״ז) say 8:05;
@@ -5835,12 +5843,14 @@ function chanukahMaariv(hebrewYear, settings) {
  *  lines (shifted ten minutes on the first) or, on Rosh Chodesh, the Rosh Chodesh schedule
  *  with the one 8:00 that prints as 8:05.
  *
- *  On a day that is not Rosh Chodesh, the ותיקין time is never earlier than the everyday
- *  board's own first minyan (7:00) moved ten minutes earlier - נץ minus 25 only when that is
- *  the later of the two. Confirmed against a year (תשפ״ז) where נץ falls early enough in the
- *  season that נץ minus 25 alone would print a morning earlier than 6:50, which the sheet does
- *  not do: 6:50 is the floor. Rosh Chodesh carries no such floor - its own נץ minus 25 is the
- *  ותיקין time outright, the same as every sampled Rosh Chodesh morning already confirmed. */
+ *  Both kinds of day carry a floor: a non-Rosh-Chodesh morning is never earlier than the
+ *  everyday board's own first minyan (7:00) moved ten minutes earlier, and a Rosh Chodesh
+ *  morning is never more than CH_RC_FLOOR_MINUTES (20) earlier than Rosh Chodesh's own 7:00 -
+ *  נץ minus 25 only when that is the later of the two either way. Confirmed against a year
+ *  (תשפ״ז) where נץ falls early enough that נץ minus 25 alone would print a non-Rosh-Chodesh
+ *  morning earlier than 6:50, which the sheet does not do, and a year (תשצ"ג) where the same
+ *  thing happened to Rosh Chodesh's own morning - 6:37, 23 minutes ahead of the 7:00 beside
+ *  it - which asked for its own floor rather than none at all. */
 function chanukahShacharisDay(serial, settings) {
   const netz = Z.sunriseElev(dateFromSerial(serial), settings);
   const rchLabel = hasRoshChodesh(serial, settings);
@@ -5852,18 +5862,22 @@ function chanukahShacharisDay(serial, settings) {
   const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
     .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
     .round('to the closer minute');
-  const vasikin = isRoshChodesh ? vasikinNetz
+  const vasikin = isRoshChodesh
+    ? vasikinNetz.laterOf(
+      clockTime(7, 0, "Rosh Chodesh's own second morning minyan, unmoved").minus(CH_RC_FLOOR_MINUTES,
+        `${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00, the floor its own first minyan does not cross`),
+      `the ותיקין minyan is never more than ${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00`)
     : vasikinNetz.laterOf(
       before10(7, 0, "the everyday board's own first morning minyan"),
       'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
   /* Whether נץ is actually why this day's ותיקין prints when it does, asked for directly:
-     a day the floor wins is a day the shul's own everyday minyan is on the board same as
-     any other, and נץ had nothing to do with the printed time - naming it there is a fact
-     nobody asked for beside a time that needed no explaining. Read off vasikin's own last
-     step rather than compared again here, so this can never disagree with which candidate
-     laterOf actually kept. Rosh Chodesh has no floor to have won instead, so its own נץ is
-     always why. */
-  const netzBinding = isRoshChodesh || vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
+     a day the floor wins is a day the shul's own everyday minyan (or Rosh Chodesh's own) is
+     on the board same as any other, and נץ had nothing to do with the printed time - naming
+     it there is a fact nobody asked for beside a time that needed no explaining. Read off
+     vasikin's own last step rather than compared again here, so this can never disagree with
+     which candidate laterOf actually kept - true for either kind of day now that both carry
+     a floor to have won instead of נץ. */
+  const netzBinding = vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
   const lines = isRoshChodesh
     ? [
@@ -5928,21 +5942,22 @@ const dayLetter = (serial) => HE_DAY_LETTERS[excelWeekday(serial)] || '';
  *  of that run and turns the times after it backwards - measured directly, the same bug the
  *  label itself made before this sheet's own times were given their own direction. */
 /** The one candidate a day actually contributes to the average, at full precision rather
- *  than the minute `vasikin` itself rounds to: נץ minus 25 outright on Rosh Chodesh, which
- *  has no floor to answer to, and the later of that and the everyday floor (6:50) on every
- *  other day - the same comparison chanukahShacharisDay's own `vasikin` makes, asked again
- *  here rather than read off `vasikin.value` because that value is already rounded to its
- *  own minute and this average wants to round only once, at the end.
+ *  than the minute `vasikin` itself rounds to: נץ minus 25, floored at 20 minutes before
+ *  Rosh Chodesh's own 7:00 on a Rosh Chodesh day or ten minutes before the everyday board's
+ *  own 7:00 on any other - the same comparison chanukahShacharisDay's own `vasikin` makes,
+ *  asked again here rather than read off `vasikin.value` because that value is already
+ *  rounded to its own minute and this average wants to round only once, at the end.
  *
  *  Needed once a group can hold a floor day beside a נץ day, now that every non-Rosh-Chodesh
  *  day merges into one row regardless of whether they agree (see combineShacharisRows): a
- *  floor day's own נץ minus 25 can sit under 6:50, and averaging that number in in rather
- *  than the 6:50 the floor actually prints would pull the whole row's own time down to
+ *  floor day's own נץ minus 25 can sit under its own floor, and averaging that number in
+ *  rather than the floor the day actually prints would pull the whole row's own time down to
  *  something no single day on the sheet is printing - the "don't change the zman of
  *  prayer" the floor exists for in the first place. */
 const rawVasikinCandidate = (d) => {
   const netzBased = d.netz - CH_VASIKIN_BEFORE_NETZ / 1440;
-  return d.isRoshChodesh ? netzBased : Math.max(netzBased, T(7, 0) - CH_REGULAR_SHIFT_MINUTES / 1440);
+  const floorMinutes = d.isRoshChodesh ? CH_RC_FLOOR_MINUTES : CH_REGULAR_SHIFT_MINUTES;
+  return Math.max(netzBased, T(7, 0) - floorMinutes / 1440);
 };
 
 /** Which day(s) of the week each נץ time in the note belongs to, asked for directly: the
@@ -5972,11 +5987,12 @@ const averageBetween = (group) => floorToMinute(group.reduce((sum, d) => sum + r
 /** One row's own ותיקין time and נץ note. `sharedBetween`, when given, is the time to print
  *  instead of this row's own average - see combineShacharisRows, which passes one in only
  *  where every one of the eight days needed נץ to move its own morning: on every other year
- *  the two rows keep their own separate averages, a non-Rosh-Chodesh row that sits wholly on
- *  the floor beside a Rosh Chodesh row that never does, which is the ordinary shape of the
- *  eight days and the reason the two rows are two rows rather than one. The נץ note still
- *  comes off this row's own days regardless, since it is naming which of them נץ actually
- *  explains, not what the row's own time happens to equal. */
+ *  the two rows keep their own separate averages, one or both resting wholly on its own
+ *  floor (CH_REGULAR_SHIFT_MINUTES for a non-Rosh-Chodesh day, CH_RC_FLOOR_MINUTES for a
+ *  Rosh Chodesh one), which is the ordinary shape of the eight days and the reason the two
+ *  rows are two rows rather than one. The נץ note still comes off this row's own days
+ *  regardless, since it is naming which of them נץ actually explains, not what the row's own
+ *  time happens to equal. */
 function chanukahVasikinBetween(group, sharedBetween) {
   const between = sharedBetween !== undefined ? sharedBetween : averageBetween(group);
   const bound = group.filter((d) => d.netzBinding);
@@ -6109,6 +6125,32 @@ function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, merg
     .join('\n\n');
 }
 
+/** A small נץ note for the Weekday chart's own tiny panel - far too little room for the
+ *  Special Schedules poster's own day-by-day picture (netzDayGroups, a letter and a
+ *  seconds-precise time per day). Every day in the block that needed נץ to move its own
+ *  morning (`netzBinding`), reduced to the distinct minutes its own נץ falls on, earliest
+ *  to latest: "נץ 7:17-7:18" rather than a time a day, which 150px of panel does not have
+ *  the width for even at a fraction of the poster's own size. Sorted by the underlying נץ
+ *  value before formatting, not by the formatted string ("7:5" would otherwise sort after
+ *  "7:17"). Null where נץ moved nothing in the block, the same as the poster's own note. */
+function chanukahPanelNetzNote(dayObjs) {
+  const bound = dayObjs.filter((d) => d.netzBinding).sort((a, b) => a.netz - b.netz);
+  if (!bound.length) return null;
+  const times = [...new Set(bound.map((d) => formatTime(d.netz)))];
+  const range = times.length > 1 ? `${times[0]}-${times[times.length - 1]}` : times[0];
+  /* U+2066/U+2067/U+2069 (LRI/RLI/PDI) rather than the poster's own <bdi> - shacharis-grid.js
+     flattens a line to plain text plus a few flags (underlined, big, small) and does not carry
+     DOM structure through it, so a <bdi> here would be dropped on the way back out. These are
+     plain Unicode codepoints, invisible but real characters in the text itself, so they survive
+     shPlainHtml's escaping untouched and isolate נץ the same way the poster's own bdi does: the
+     whole note forced ltr (outer LRI/PDI), נץ isolated inside it with no direction forced on it
+     (RLI/PDI, a single word has no internal order to protect), the range isolated and forced ltr
+     in its own pair. Measured directly before this: plain "נץ 7:17-7:18" in a direction: ltr
+     container (.shacharis-panel) rendered with נץ at the line's own right and the range at its
+     left, the reverse of the poster's own established reading for the same phrase. */
+  return `⁦⁧נץ⁩ ⁦${range}⁩⁩`;
+}
+
 /** The Weekday chart's standing שחרית panel, חנוכה's own addition to it: up to two
  *  two-line blocks, one for the eight days' ordinary mornings and one for ר"ח טבת's own
  *  (which always falls entirely inside them), each of which the panel heads with its own
@@ -6121,11 +6163,26 @@ function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, merg
  *  a page-wide panel says one thing about the whole run rather than a line per day, and a
  *  day's own disagreement (נץ drifting a minute) is a live choice, slash-joined, the same
  *  as anywhere else on this sheet. The day-by-day picture is the Special Schedules
- *  poster's job, not this panel's. */
+ *  poster's job, not this panel's.
+ *
+ *  Asked for directly, each block's own small נץ note (chanukahPanelNetzNote) now follows
+ *  its schedule where at least one of the block's own days needed one - the wall chart used
+ *  to carry no נץ note at all, where the Special Schedules poster for the same days always
+ *  has. `<span class="small">` is shacharis-grid.js's own signal for a line to print smaller
+ *  than the schedule above it (see its own `is-small`, the same mechanism `is-big` already
+ *  is): the note is never itself a row of times (it carries a range and the word נץ, not a
+ *  schedule), so shacharisGridHtml reads it as a line of its own rather than trying to grid
+ *  it, which is what lets it print at all without the block's real times being misread. */
 function chanukahPanelBlocks(days, settings) {
   const regularDays = days.filter((d) => !hasRoshChodesh(d, settings));
   const roshChodeshDays = days.filter((d) => hasRoshChodesh(d, settings));
-  const block = (list) => (list.length ? chanukahScheduleLines(list, settings, { mergeAll: true }) : null);
+  const block = (list) => {
+    if (!list.length) return null;
+    const lines = chanukahScheduleLines(list, settings, { mergeAll: true });
+    const dayObjs = list.map((d) => chanukahShacharisDay(d, settings));
+    const note = chanukahPanelNetzNote(dayObjs);
+    return note ? `${lines}\n<span class="small">${note}</span>` : lines;
+  };
   return { regular: block(regularDays), roshChodesh: block(roshChodeshDays) };
 }
 
@@ -10528,20 +10585,21 @@ const shEsc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '
 
 /** The markup this understands, and nothing else.
  *
- *  U and SPAN.big are the two the editor writes, BR and DIV are how it breaks a line, and B and I
- *  are here because the toolbar can write them and they carry no meaning this needs to keep track
- *  of: a line is still a line inside one. Anything else (a table, a font tag, a pasted colour)
- *  means the block is not what this was written for. */
+ *  U, SPAN.big and SPAN.small are the ones the editor writes (SPAN.small for the חנוכה panel's
+ *  own נץ note, see chanukahPanelBlocks - nowhere else writes it), BR and DIV are how it breaks
+ *  a line, and B and I are here because the toolbar can write them and they carry no meaning
+ *  this needs to keep track of: a line is still a line inside one. Anything else (a table, a
+ *  font tag, a pasted colour) means the block is not what this was written for. */
 const shKnown = (el) => {
   const tag = el.tagName;
   if (tag === 'U' || tag === 'BR' || tag === 'DIV' || tag === 'P' || tag === 'B' || tag === 'I') return true;
-  return tag === 'SPAN' && (el.className === '' || el.className === 'big');
+  return tag === 'SPAN' && (el.className === '' || el.className === 'big' || el.className === 'small');
 };
 
 /** The block read as lines, each a run of pieces that know whether they are underlined, plus
  *  which lines fall inside a `<div class="chanukah-highlight">` wrapper (see
  *  .chanukah-highlight in app.css) - a group of whole lines, heading and schedule together,
- *  rather than a mark on one piece of one of them the way underline and `.big` are.
+ *  rather than a mark on one piece of one of them the way underline, `.big` and `.small` are.
  *
  *  Null where anything unrecognised turns up, which is the signal to leave the block alone.
  *  A newline inside a text node breaks a line as much as a <br> does: the panel is set with
@@ -10550,7 +10608,7 @@ function shReadLines(root) {
   const lines = [[]];
   const groups = [false];
   let ok = true;
-  const walk = (node, underlined, big, group) => {
+  const walk = (node, underlined, big, small, group) => {
     if (!ok) return;
     for (const child of node.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -10558,7 +10616,7 @@ function shReadLines(root) {
         parts.forEach((text, i) => {
           if (i) { lines.push([]); groups.push(group); }
           if (text) {
-            lines[lines.length - 1].push({ text, underlined, big });
+            lines[lines.length - 1].push({ text, underlined, big, small });
             /* A line's own group can be decided before anything is known to belong to it: the
                blank line "\n\n" leaves in front of <div class="chanukah-highlight"> is pushed
                (group still false, the div not reached yet) and then, since that line is still
@@ -10581,11 +10639,12 @@ function shReadLines(root) {
       // A block starts a line of its own, unless the line it would start is already empty.
       if (block && lines[lines.length - 1].length) { lines.push([]); groups.push(group); }
       walk(child, underlined || child.tagName === 'U', big || child.classList?.contains('big'),
+        small || child.classList?.contains('small'),
         group || child.classList?.contains('chanukah-highlight'));
       if (block) { lines.push([]); groups.push(group); }
     }
   };
-  walk(root, false, false, false);
+  walk(root, false, false, false, false);
   return ok ? { lines, groups } : null;
 }
 
@@ -10714,9 +10773,11 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
   /* A line that is a row of times is a grid; anything else (the ר"ח ובה"ב heading, a last line
      carrying one time, the blank line between the blocks) is a line of its own, centred under
      them, which is where the boards the shul hangs put it.
-     is-big carries the size the everyday block is set in. It wraps the whole block rather than
-     any one line, so it is read off the pieces and put back on the row, and the row's own em is
-     what every width in its grid is then measured in. */
+     is-big carries the size the everyday block is set in, and is-small the חנוכה panel's own
+     נץ note (see chanukahPanelBlocks), the one line on this chart smaller than the rest of it
+     rather than larger. Both wrap the whole line rather than any one piece, so each is read off
+     every piece on the line and put back on the line as a whole; is-big's own row-grid lines
+     also carry it down onto the row itself, which is where its own em comes from. */
   // A run of consecutive grouped lines (a `<div class="chanukah-highlight">`'s own heading and
   // schedule together, see shReadLines) is buffered and wrapped in one highlight box of its
   // own, rather than each line painting its own background - the group is a whole visual unit,
@@ -10733,8 +10794,9 @@ function shacharisGridHtml(html, doc = typeof document === 'undefined' ? null : 
       html = '<div class="sh-gap"></div>';
     } else {
       const big = line.every((p) => p.big) ? ' is-big' : '';
+      const small = line.every((p) => p.small) ? ' is-small' : '';
       if (!times || times.length < 2) {
-        html = `<div class="sh-wide${big}">${shPlainHtml(line)}</div>`;
+        html = `<div class="sh-wide${big}${small}">${shPlainHtml(line)}</div>`;
       } else {
         const { template, pad } = gridFor(times.length, slashed);
         const cells = [];

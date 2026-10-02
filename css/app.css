@@ -999,6 +999,11 @@ td.ruled .cell { background: var(--ruled); }
 .sh-slash { text-align: center; }
 /* The ר"ח ובה"ב heading, and a last line carrying one time where the rows above carry two. */
 .sh-wide { text-align: center; }
+/* The חנוכה panel's own נץ note (see chanukahPanelBlocks in chanukah.js), the one line on this
+   chart set smaller than the rest of it: a reference under the schedule, not a third standing
+   line the weight of the times above it, and muted for the same reason the poster's own נץ
+   line is - naming which day a time is for rather than being a time itself. */
+.sh-wide.is-small { font-size: 0.7em; color: var(--muted); }
 /* The blank line between the two blocks, which a flex column would otherwise close up. */
 .sh-gap { height: 0.5em; }
 /* חנוכה's own heading(s) and schedule(s), set apart on the panel with a light background of
