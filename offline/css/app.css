@@ -751,6 +751,18 @@ table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size
    dark one. The width is a property of zoom, and only moving the fit to transform would
    change it. */
 th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: middle; text-align: center; }
+/* The chart's own border only, not every table's - "How Times Are Calculated", Visitor
+   Statistics and What the Congregation Sees' own status table all still want the plain
+   grid above, so this is scoped to .page rather than widening the bare rule itself.
+   Asked for directly: no line between one row and the next any more - the zebra shading
+   already carries that, and a board read from a few feet away does not need both. The
+   columns keep a line between them, since nothing else marks where one time column ends
+   and the next begins the way shading marks a row, but subtler than the dark, crisp one
+   the table's own outer frame keeps: #ccd3da is the שחרית panel's own light grey (see
+   .shacharis-panel), reused here as this project's one answer for "a border that reads
+   as a hint rather than a rule". */
+.page table { border: 1px solid #9aa7b3; }
+.page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #ccd3da; border-right: 1px solid #ccd3da; }
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
