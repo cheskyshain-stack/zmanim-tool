@@ -3580,6 +3580,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    not a second row of equally-weighted text - and muted, since it names which day a time
    is for rather than being a time itself. */
 .poster-netz-day { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; vertical-align: bottom; }
+.poster-netz-day + .poster-netz-day { margin-inline-start: 0.35em; }
 .poster-netz-day-label { font-size: 0.55em; color: var(--muted); }
 /* The שחרית block's own נץ lines (netzBlockLines), smaller than the row's own times and
    centered like every other line in .poster-set rather than set apart from them: a

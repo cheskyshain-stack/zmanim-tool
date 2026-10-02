@@ -1541,12 +1541,19 @@ function vasikinLine(row) {
  *  was a day at all. The letter is its own `<bdi>`, the same isolation every mark on this
  *  sheet near a digit already gets - a bare Hebrew character sitting loose beside a time is
  *  exactly the shape that has turned a run backwards elsewhere on this sheet, so it is
- *  never trusted plain beside a digit here either, small as it is. */
+ *  never trusted plain beside a digit here either, small as it is.
+ *
+ *  No slash between one entry and the next, asked for directly once every entry carried its
+ *  own "יום X": the slash was there to tell entries apart, and a label over every time does
+ *  that job better than a mark between them does. The gap it leaves is `.poster-netz-day +
+ *  .poster-netz-day` in app.css rather than a joined string, so the day and its time stay
+ *  one span - a space joined into the string here would sit between the two bdi and could
+ *  be read as part of either one. */
 function netzDaysHtml(netzDays) {
   return netzDays.map(({ time, letters }) => {
     const label = `יום ${letters.map((l) => `${l}'`).join('/')}`;
     return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
-  }).join(' / ');
+  }).join('');
 }
 
 /** One שחרית row, label over times: the label (combineShacharisRows's own `row.label`,
