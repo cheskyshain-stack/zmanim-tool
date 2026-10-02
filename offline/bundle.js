@@ -16718,20 +16718,6 @@ function chartSpreads(state) {
  *  spreadIndexForNow below explains has to agree with this one. */
 const CHART_EARLY_DAYS = 7;
 
-/** TEMPORARY: asked for directly, to hold the newly-posted חורף תשפ"ז chart back from the
- *  congregation's page - every page of it, for as long as real time keeps moving through
- *  it, not just until its own first Shabbos arrives - until told to unhide it. Every page
- *  of that one season is left out of consideration entirely, in both spreadIndexForNow and
- *  chartStretchSerials below, so the site falls back to whatever was showing before it
- *  (קיץ תשפ"ו's own last page) and stays there. Not a setting: take this whole block out,
- *  and its one use in each of those two functions, the moment the shul says to unhide it. */
-const TEMP_HIDDEN_SEASON = { season: 'choref', hebrewYear: 5787 };
-function tempIsHiddenSpread(spread) {
-  return TEMP_HIDDEN_SEASON != null
-    && spread.sheet.season === TEMP_HIDDEN_SEASON.season
-    && spread.sheet.hebrewYear === TEMP_HIDDEN_SEASON.hebrewYear;
-}
-
 /** The spread covering now.
  *
  *  A chart page owns from seven days before its own first week until seven days before the
@@ -16770,9 +16756,6 @@ function spreadIndexForNow(spreads, state, settings) {
   const starts = spreads.map((s) => Math.min(...s.serials));
   let found = -1;
   for (let n = 0; n < starts.length; n++) {
-    // TEMPORARY (see TEMP_HIDDEN_SEASON): a hidden page is skipped outright, never chosen,
-    // so the last page still standing is whatever came before that whole season.
-    if (tempIsHiddenSpread(spreads[n])) continue;
     if (starts[n] - CHART_EARLY_DAYS <= target) found = n;
   }
   return found === -1 ? 0 : found;
@@ -16795,14 +16778,7 @@ function liveChartRange(state, settings) {
   if (!spreads.length) return null;
   const starts = spreads.map((s) => Math.min(...s.serials));
   const at = spreadIndexForNow(spreads, state, settings);
-  // TEMPORARY (see TEMP_HIDDEN_SEASON): the next page's own start is skipped past when it
-  // is a hidden one, the same way spreadIndexForNow itself skips past it.
-  let nextStart = Infinity;
-  for (let n = at + 1; n < starts.length; n++) {
-    if (tempIsHiddenSpread(spreads[n])) continue;
-    nextStart = starts[n];
-    break;
-  }
+  const nextStart = starts[at + 1] ?? Infinity;
   return {
     from: starts[at] - CHART_EARLY_DAYS,
     until: nextStart === Infinity ? Infinity : nextStart - CHART_EARLY_DAYS,
@@ -21024,20 +21000,11 @@ function chartStretchSerials(showing, index, state) {
   const starts = spreads.map((s) => Math.min(...s.serials));
   let i = -1;
   for (let n = 0; n < starts.length; n++) {
-    // TEMPORARY (see TEMP_HIDDEN_SEASON in chart-view.js): mirrors the same skip
-    // spreadIndexForNow now gives /chart/, so the two still can't disagree about which
-    // chart is up.
-    if (tempIsHiddenSpread(spreads[n])) continue;
     if (starts[n] - CHART_EARLY_DAYS <= showing) i = n;
   }
   if (i === -1) return null; // before the first chart there is: nothing to be held to
   const from = starts[i] - CHART_EARLY_DAYS;
-  let nextStart = Infinity;
-  for (let n = i + 1; n < starts.length; n++) {
-    if (tempIsHiddenSpread(spreads[n])) continue;
-    nextStart = starts[n];
-    break;
-  }
+  const nextStart = starts[i + 1] ?? Infinity;
   const until = nextStart === Infinity ? Infinity : nextStart - CHART_EARLY_DAYS;
   const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
   return within.length ? within : null;

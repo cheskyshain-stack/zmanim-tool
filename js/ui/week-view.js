@@ -36,7 +36,7 @@ import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { weekEndsMins } from '../upcoming.js';
 import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
-import { chartSpreads, CHART_EARLY_DAYS, tempIsHiddenSpread } from './chart-view.js';
+import { chartSpreads, CHART_EARLY_DAYS } from './chart-view.js';
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -1492,20 +1492,11 @@ function chartStretchSerials(showing, index, state) {
   const starts = spreads.map((s) => Math.min(...s.serials));
   let i = -1;
   for (let n = 0; n < starts.length; n++) {
-    // TEMPORARY (see TEMP_HIDDEN_SEASON in chart-view.js): mirrors the same skip
-    // spreadIndexForNow now gives /chart/, so the two still can't disagree about which
-    // chart is up.
-    if (tempIsHiddenSpread(spreads[n])) continue;
     if (starts[n] - CHART_EARLY_DAYS <= showing) i = n;
   }
   if (i === -1) return null; // before the first chart there is: nothing to be held to
   const from = starts[i] - CHART_EARLY_DAYS;
-  let nextStart = Infinity;
-  for (let n = i + 1; n < starts.length; n++) {
-    if (tempIsHiddenSpread(spreads[n])) continue;
-    nextStart = starts[n];
-    break;
-  }
+  const nextStart = starts[i + 1] ?? Infinity;
   const until = nextStart === Infinity ? Infinity : nextStart - CHART_EARLY_DAYS;
   const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
   return within.length ? within : null;
