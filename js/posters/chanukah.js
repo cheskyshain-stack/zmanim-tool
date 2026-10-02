@@ -322,9 +322,22 @@ function netzDayGroups(bound) {
   return order.map((time) => ({ time, letters: byTime.get(time) }));
 }
 
-export function chanukahVasikinBetween(group) {
-  const raw = group.map(rawVasikinCandidate);
-  const between = floorToMinute(raw.reduce((a, b) => a + b, 0) / raw.length);
+/** The floored average of a set of days' own raw candidates (`rawVasikinCandidate`), the
+ *  arithmetic `chanukahVasikinBetween` runs on whichever days it is handed - split out so
+ *  `combineShacharisRows` can run it once across all eight days and hand the one result to
+ *  both rows, rather than each row running it again on its own four. */
+const averageBetween = (group) => floorToMinute(group.reduce((sum, d) => sum + rawVasikinCandidate(d), 0) / group.length);
+
+/** One row's own ותיקין time and נץ note. `sharedBetween`, when given, is the time to print
+ *  instead of this row's own average - see combineShacharisRows, which passes one in only
+ *  where every one of the eight days needed נץ to move its own morning: on every other year
+ *  the two rows keep their own separate averages, a non-Rosh-Chodesh row that sits wholly on
+ *  the floor beside a Rosh Chodesh row that never does, which is the ordinary shape of the
+ *  eight days and the reason the two rows are two rows rather than one. The נץ note still
+ *  comes off this row's own days regardless, since it is naming which of them נץ actually
+ *  explains, not what the row's own time happens to equal. */
+export function chanukahVasikinBetween(group, sharedBetween) {
+  const between = sharedBetween !== undefined ? sharedBetween : averageBetween(group);
   const bound = group.filter((d) => d.netzBinding);
   const netzDays = bound.length ? netzDayGroups(bound) : null;
   return { time: formatTime(between), netzDays };
@@ -372,9 +385,17 @@ const dayList = (group) => group.map((d) => `${dayLetter(d.serial)}'`).join(' ')
 export function combineShacharisRows(days) {
   const rc = days.filter((d) => d.isRoshChodesh);
   const other = days.filter((d) => !d.isRoshChodesh);
+  /* Where every one of the eight days needed נץ to move its own morning - not the ordinary
+     shape, where the non-Rosh-Chodesh days sit on the floor while Rosh Chodesh (which has no
+     floor to sit on) does not - both rows print the one average across all eight rather than
+     two rows each averaging their own four: asked for directly, after a year where every day
+     really was moved and the two rows still printed a minute apart from each other (6:52
+     against 6:53), which read as two different answers to the same question. */
+  const allPushed = days.length > 0 && days.every((d) => d.netzBinding);
+  const shared = allPushed ? averageBetween(days) : undefined;
   const row = (group, label) => {
     const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group) };
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared) };
   };
   const rows = [];
   if (other.length) rows.push(row(other, `יום ${dayList(other)}`));
