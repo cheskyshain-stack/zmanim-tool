@@ -3581,12 +3581,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    is for rather than being a time itself. */
 .poster-netz-day { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; vertical-align: bottom; }
 .poster-netz-day-label { font-size: 0.55em; color: var(--muted); }
-/* The נץ line's own line (shacharisRunLines), kept out of .poster-set's own
-   text-align: center. A row naming one נץ day reads far narrower than a row naming four,
-   and centered, the two notes landed nowhere near each other even though centered on the
-   same midpoint - a reader's eye had to hunt sideways to find the mark every row. Flush
-   left instead, every נץ line opens at the same x regardless of how many days it names. */
-.poster-netz-line { text-align: left; }
+/* The שחרית block's own נץ lines (netzBlockLines), smaller than the row's own times and
+   centered like every other line in .poster-set rather than set apart from them: a
+   reference under the row's own times, not a second times line the same weight as the
+   first. Scoped under .poster.is-chanukah .poster-set-line, which this overrides, to win
+   on specificity rather than relying on source order. */
+.poster.is-chanukah .poster-set-line.poster-netz-line { font-size: 12pt; }
 /* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
    of it so it does not run into the first row's time, and it inherits .poster-row-label for
    the gap between its own word and its own time. */
