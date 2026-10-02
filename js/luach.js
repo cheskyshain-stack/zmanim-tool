@@ -15,9 +15,10 @@ import { wireSecretDoor } from './ui/nav-helpers.js';
 import { wireCopyButton, copyToClipboard } from './ui/copy.js';
 import { showBlocked } from './ui/blocked.js';
 import { renderWeek } from './ui/week-view.js';
-import { renderChartBrowser } from './ui/chart-view.js';
+import { renderChartBrowser, chartSpreads, spreadIndexForNow, CHART_EARLY_DAYS } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
+import { excelSerial } from './zmanim/solar.js';
 
 const main = document.getElementById('main');
 
@@ -618,6 +619,75 @@ function startNextUp(published) {
   window.addEventListener('resize', nextUpFit);
 }
 
+/** The one-device flag for the "new chart" pop-up: which chart this browser has already
+ *  been told about. A single value rather than a growing list, since only one chart is
+ *  ever eligible to announce at a time (see chartAnnouncement below) and the one before it
+ *  has nothing left to say once a new one replaces it here. */
+const CHART_ANNOUNCE_KEY = 'zmanim-chart-announced';
+function announcedChartId() {
+  try { return localStorage.getItem(CHART_ANNOUNCE_KEY); } catch { return null; }
+}
+function markChartAnnounced(id) {
+  try { localStorage.setItem(CHART_ANNOUNCE_KEY, id); } catch { /* no localStorage, no pop-up either */ }
+}
+
+/** Whether there is a chart worth telling the congregation about right now, and which one.
+ *
+ *  "Right now" is the chart spreadIndexForNow is already showing - the one /chart/ opens
+ *  to - so this can never announce a chart the page itself is not on, and whether it has
+ *  started showing at all (its own CHART_EARLY_DAYS early window) is spreadIndexForNow's
+ *  call entirely, not re-asked here: it answers off the current week, which on a Friday is
+ *  already tomorrow's Shabbos, not literally today's calendar date, and a second, plainer
+ *  "today" computed here could disagree with it by a day or two right at the boundary.
+ *
+ *  What is asked here is the other half: whether it has been showing too long to still be
+ *  news. CHART_EARLY_DAYS again, now counted forward in plain calendar days from the
+ *  chart's own first date, so the pop-up survives one more week once that date has actually
+ *  arrived and then stops - the window the shul asked for is seven days on each side of
+ *  that date, and the early side is already given by spreadIndexForNow's own pick.
+ *
+ *  The id is the spread itself (season, Hebrew year, and which of that season's pages),
+ *  so a page turning within the same season is its own announcement, same as a new season
+ *  starting - both are "a new chart" on the question the shul was asked. */
+function chartAnnouncement(published) {
+  try {
+    const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+    const settings = resolveSettings(published.settings);
+    const spreads = chartSpreads(state);
+    if (!spreads.length) return null;
+    const at = spreadIndexForNow(spreads, state, settings);
+    const spread = spreads[at];
+    const start = Math.min(...spread.serials);
+    const today = excelSerial(new Date());
+    if (today > start + CHART_EARLY_DAYS) return null;
+    return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}` };
+  } catch {
+    return null; // a chart that cannot be read must not take the home page down with it
+  }
+}
+
+function chartAnnouncementHtml() {
+  return `<dialog class="luach-announce" aria-labelledby="luach-announce-title">
+    <button type="button" class="luach-announce-close" aria-label="Close">&times;</button>
+    <h2 id="luach-announce-title" class="luach-announce-title">New chart available</h2>
+    <p class="luach-announce-body">A new zmanim chart has been posted.</p>
+    <a class="luach-announce-open" href="/chart/">Open the chart</a>
+  </dialog>`;
+}
+
+/** Wired once, right after the dialog is put on the page. Closing it is the only thing
+ *  this needs to do for itself: the "first time only" rule is already settled by the
+ *  moment it was marked announced, before it was ever shown, and the Open link is a plain
+ *  same-origin link that wireNav already takes over like any other. */
+function wireChartAnnouncement(root) {
+  const dialog = root.querySelector('.luach-announce');
+  if (!dialog) return;
+  dialog.querySelector('.luach-announce-close')?.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+}
+
 function renderHome(published) {
   // The menu, and only the menu, is laid out to fill the screen (see is-home in app.css).
   // The pages behind it are as tall as the board on them and must not be stretched.
@@ -629,6 +699,15 @@ function renderHome(published) {
   markNextInline(main);
   openTheDoor();
   startNextUp(published);
+
+  const toAnnounce = chartAnnouncement(published);
+  if (toAnnounce && announcedChartId() !== toAnnounce.id) {
+    // Marked before it is shown, not after it is dismissed: "the first time" means the
+    // first time it is put on the screen, not the first time somebody closes it.
+    markChartAnnounced(toAnnounce.id);
+    main.insertAdjacentHTML('beforeend', chartAnnouncementHtml());
+    wireChartAnnouncement(main);
+  }
 }
 
 /** Three taps in the navy cap go to the generator. Wired after every render, since each

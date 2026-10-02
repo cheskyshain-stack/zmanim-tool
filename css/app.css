@@ -5108,6 +5108,32 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .luach-home-email { text-align:center; margin:.5rem auto 1.5rem; width:100%; max-width:100%; font-size:1.05rem; color:#12274f; }
 .luach-contact-email { color:inherit; white-space:nowrap; display:inline-block; max-width:100%; text-underline-offset:3px; }
 
+/* The "new chart" pop-up: a native dialog, so Escape and the backdrop close it for free
+   and nothing here has to track focus by hand. */
+.luach-announce {
+  position: relative; width: min(23rem, calc(100vw - 2.4rem));
+  border: none; border-radius: 16px; padding: 1.5rem 1.6rem 1.7rem;
+  background: var(--luach-cream); color: var(--luach-ink);
+  box-shadow: 0 18px 40px rgba(16,31,52,0.3);
+}
+.luach-announce::backdrop { background: rgba(16,31,52,0.5); }
+.luach-announce-close {
+  position: absolute; top: 0.5rem; right: 0.6rem;
+  background: none; border: none; font-size: 1.6rem; line-height: 1;
+  color: var(--luach-navy); opacity: 0.75; cursor: pointer; padding: 0.25rem;
+}
+.luach-announce-close:hover { opacity: 1; }
+.luach-announce-title { margin: 0 1.6rem 0.5rem 0; font-size: 1.2rem; font-weight: 800; color: var(--luach-navy); }
+.luach-announce-body { margin: 0 0 1.2rem; line-height: 1.5; }
+.luach-announce-open {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 0.7rem 1rem; border-radius: 10px;
+  background: var(--luach-navy); color: var(--luach-cream); font-weight: 700;
+  text-decoration: none;
+}
+.luach-announce-open:hover { background: var(--luach-navy-deep); }
+.luach-announce-open:active { transform: none; }
+
 /* The next-minyan badge shares the date line without shifting the centered date. */
 .reader-agenda-day > summary,
 .reader-agenda-day > summary:has(.reader-next-badge) { display:block; padding:16px; }
