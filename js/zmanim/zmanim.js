@@ -53,6 +53,9 @@ export const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN
 export const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
 export const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
 export const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
+// Mirrors alos16_1 above: the מ"א day's own end, off plain SUNSET the same way alos16_1 is
+// off plain SUNRISE, rather than tzais50/60/72's SUNSET_elev-plus-minutes.
+export const tzais16_1 = (date, settings) => sunset(date, settings, 16.1);
 
 // ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
 export const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;
@@ -77,6 +80,12 @@ export function minchaGedola30MinAfterChatzos(date, settings) {
 /** MINCHA_GEDOLA_LECHUMRA: __ZMAN_LECHUMRA(latest=TRUE, ...) i.e. the later of the two. */
 export function minchaGedolaLechumra(date, settings) {
   return Math.max(minchaGedola(date, settings), minchaGedola30MinAfterChatzos(date, settings));
+}
+/** מנחה גדולה, the day measured alos ט״ז.1° to שקיעה ט״ז.1° (the מ"א day) rather than
+ *  minchaGedola's own sunrise/sunset - same half-a-proportional-hour-past-חצות formula,
+ *  a wider day under it. */
+export function minchaGedolaMGA16_1(date, settings) {
+  return fromEndOfDay(tzais16_1(date, settings), solarNoon(date, settings), alos16_1(date, settings), 5.5 / 12, 5.5 / 6, settings.useAstronomicalChatzos);
 }
 export function minchaKetana(date, settings) {
   return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 2.5 / 12, 2.5 / 6, settings.useAstronomicalChatzos);

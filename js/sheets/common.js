@@ -77,7 +77,9 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  workbook, which does not have it. 12:15 (12:45 for a stretch, see below) is the newer of
  *  the two added this way, and only runs at all on a Friday whose own Shabbos falls inside
  *  חנוכה, tagged on the board as חנוכה's own - every other standard-time Friday has 12:30
- *  and nothing in front of it.
+ *  and nothing in front of it. Neither may print before מנחה גדולה, read the מ"א way (עלות
+ *  ט״ז.1° to שקיעה ט״ז.1°, not sunrise/sunset) and rounded up to the next five minutes - its
+ *  own floor, not weekLatestMinchaGedola's GRA-based one below.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -91,10 +93,16 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  week to week through a season; the shul asked for two round numbers instead, the same
  *  1:35/1:40 the weekday board already gives. */
 export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
-  const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
+  /* The floor under 12:15 and 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
+     to שקיעה ט״ז.1° rather than sunrise/sunset - rounded up to the next five minutes, the
+     minute itself rather than the second: 12:20:59 is still 12:20, only 12:21:00 reaches
+     12:25. Asked for directly in place of the GRA-based מנחה גדולה לחומרא this used to read. */
+  const mglVal = Z.minchaGedolaMGA16_1(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
-    'the later of מנחה גדולה, which is half a proportional hour after חצות, and חצות plus thirty clock minutes. Both move with חצות, so this walks through the season');
+  const mgl = () => zman('מנחה גדולה (מ"א ט״ז.1°)', mglVal,
+    'half a proportional (מ"א) hour after חצות, the day measured from עלות ט״ז.1° to שקיעה ט״ז.1°')
+    .floorToStep(1, 'seconds are not held against it - the minute this falls in is what counts')
+    .ceilToStep(5, 'rounded up to the next five minutes');
   /* Short, because the מנחה גדולה it is weighed against now explains itself. */
   const notBefore = 'a מנחה is never offered before it';
 

@@ -2363,6 +2363,9 @@ const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN;
 const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
 const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
 const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
+// Mirrors alos16_1 above: the מ"א day's own end, off plain SUNSET the same way alos16_1 is
+// off plain SUNRISE, rather than tzais50/60/72's SUNSET_elev-plus-minutes.
+const tzais16_1 = (date, settings) => sunset(date, settings, 16.1);
 
 // ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
 const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;
@@ -2387,6 +2390,12 @@ function minchaGedola30MinAfterChatzos(date, settings) {
 /** MINCHA_GEDOLA_LECHUMRA: __ZMAN_LECHUMRA(latest=TRUE, ...) i.e. the later of the two. */
 function minchaGedolaLechumra(date, settings) {
   return Math.max(minchaGedola(date, settings), minchaGedola30MinAfterChatzos(date, settings));
+}
+/** מנחה גדולה, the day measured alos ט״ז.1° to שקיעה ט״ז.1° (the מ"א day) rather than
+ *  minchaGedola's own sunrise/sunset - same half-a-proportional-hour-past-חצות formula,
+ *  a wider day under it. */
+function minchaGedolaMGA16_1(date, settings) {
+  return fromEndOfDay(tzais16_1(date, settings), solarNoon(date, settings), alos16_1(date, settings), 5.5 / 12, 5.5 / 6, settings.useAstronomicalChatzos);
 }
 function minchaKetana(date, settings) {
   return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 2.5 / 12, 2.5 / 6, settings.useAstronomicalChatzos);
@@ -2493,7 +2502,9 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  workbook, which does not have it. 12:15 (12:45 for a stretch, see below) is the newer of
  *  the two added this way, and only runs at all on a Friday whose own Shabbos falls inside
  *  חנוכה, tagged on the board as חנוכה's own - every other standard-time Friday has 12:30
- *  and nothing in front of it.
+ *  and nothing in front of it. Neither may print before מנחה גדולה, read the מ"א way (עלות
+ *  ט״ז.1° to שקיעה ט״ז.1°, not sunrise/sunset) and rounded up to the next five minutes - its
+ *  own floor, not weekLatestMinchaGedola's GRA-based one below.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -2507,10 +2518,16 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  week to week through a season; the shul asked for two round numbers instead, the same
  *  1:35/1:40 the weekday board already gives. */
 function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
-  const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
+  /* The floor under 12:15 and 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
+     to שקיעה ט״ז.1° rather than sunrise/sunset - rounded up to the next five minutes, the
+     minute itself rather than the second: 12:20:59 is still 12:20, only 12:21:00 reaches
+     12:25. Asked for directly in place of the GRA-based מנחה גדולה לחומרא this used to read. */
+  const mglVal = Z.minchaGedolaMGA16_1(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
-    'the later of מנחה גדולה, which is half a proportional hour after חצות, and חצות plus thirty clock minutes. Both move with חצות, so this walks through the season');
+  const mgl = () => zman('מנחה גדולה (מ"א ט״ז.1°)', mglVal,
+    'half a proportional (מ"א) hour after חצות, the day measured from עלות ט״ז.1° to שקיעה ט״ז.1°')
+    .floorToStep(1, 'seconds are not held against it - the minute this falls in is what counts')
+    .ceilToStep(5, 'rounded up to the next five minutes');
   /* Short, because the מנחה גדולה it is weighed against now explains itself. */
   const notBefore = 'a מנחה is never offered before it';
 
@@ -22301,7 +22318,7 @@ function renderTraffic(container, options = {}) {
 }
 
 // ==== namespace shims for `import * as X` ====
-const Z = { sunrise, sunset, sunriseElev, sunsetElev, solarNoon, dstLocal, minchaGedola, minchaGedola30MinAfterChatzos, minchaGedolaLechumra, minchaKetana, samuchLeminchaKetana, plagHamincha, plagHaminchaCustom, sofZmanShmaGRA, sofZmanShmaMGA72, sofZmanTfilaGRA, alos16_1, misheyakir10_2, tzais50, tzais60, tzais72, tzaisGeonim8_5, alos72 };
+const Z = { sunrise, sunset, sunriseElev, sunsetElev, solarNoon, dstLocal, minchaGedola, minchaGedola30MinAfterChatzos, minchaGedolaLechumra, minchaGedolaMGA16_1, minchaKetana, samuchLeminchaKetana, plagHamincha, plagHaminchaCustom, sofZmanShmaGRA, sofZmanShmaMGA72, sofZmanTfilaGRA, alos16_1, misheyakir10_2, tzais50, tzais60, tzais72, tzaisGeonim8_5, tzais16_1, alos72 };
 
 // ==== app.js ====
 const state = loadState();
