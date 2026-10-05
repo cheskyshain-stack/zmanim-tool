@@ -761,8 +761,15 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
    grey (see .shacharis-panel), reused here as this project's one answer for "a border
    that reads as a hint rather than a rule" - the outer frame used to keep the bare rule's
    own darker #9aa7b3 instead, which read as a different weight around the same table; asked
-   for directly to match the column lines, so the whole frame is now one grey throughout. */
-.page table { border: 1px solid #ccd3da; }
+   for directly to match the column lines, so the whole frame is one grey throughout.
+   No top edge either, asked for the same day: the header row is a solid block of
+   --sheet-accent reaching the very top of the table, and that fill is already the
+   boundary against the page behind it - a grey line drawn right on top of a solid dark
+   block added nothing a sighted reader could use. The bottom edge keeps its line: the
+   zebra shading under it is at most a 40% tint of the accent colour (see tbody
+   tr:nth-child(even) below), never the header's own full strength, so there is no fill
+   there crisp enough to stand in for a border on its own. */
+.page table { border: 1px solid #ccd3da; border-top: none; }
 .page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #ccd3da; border-right: 1px solid #ccd3da; }
 th {
   background: var(--sheet-accent, var(--accent));
