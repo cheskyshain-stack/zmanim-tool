@@ -11227,14 +11227,17 @@ function renderSheet(container, state, sheet, onChange) {
   // column counts a קיץ versus a חורף page carries, and rounding in syncHeaderRowHeight
   // itself.
   //
-  // Stopped at 85% of the chosen size: a wall chart is read from a few feet away, and a
-  // shul asking for this still needs the result legible, not merely present on the page.
-  // Short of that floor, the warning below still fires, naming which pages still need an
-  // admin to actually move weeks off them - shrinking the text buys room, not an
-  // unconditional guarantee for any combination of weeks on any page count.
+  // Floor is a hard technical one now, not a legibility one: asked for directly, an admin
+  // who picks a page count low enough to need real shrinking (an entire season on its own
+  // one page, among others) wants the result to fit over staying readable from a few feet
+  // away, and picking that page count is itself the deliberate choice, the same as it
+  // always was for 1 through 8. 10% keeps the scale a real, positive, renderable number;
+  // short of even that the warning below still fires, naming which pages still do not fit
+  // - shrinking the text buys room, not an unconditional guarantee for any combination of
+  // weeks on any page count.
   const pageEls = [...pagesEl.querySelectorAll('.page')];
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
-  const FIT_FLOOR = 0.85;
+  const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
   const FIT_TOLERANCE = 818; // 1px of rounding past the 817px target is fine, see the layout invariant
   const applyFitScale = (scale) => {
