@@ -22,6 +22,39 @@ import { shulNow } from './zmanim/solar.js';
 
 const main = document.getElementById('main');
 
+/** Reload this tab after it has sat open a full day, so a page left running on a kiosk or a
+ *  phone that is never actually closed eventually picks up fresh data - a republished
+ *  chart, a new season, code from a deploy - rather than running forever on whatever
+ *  loaded whenever it was first opened. http(s) only: the offline copy has nothing newer
+ *  to fetch, and a file:// reload is a page sitting on a USB stick, not a stale tab.
+ *
+ *  Timed by checking elapsed time rather than a single 24-hour setTimeout, because a
+ *  background tab's timers are throttled or paused by the browser and a long setTimeout is
+ *  not reliable sleep there. visibilitychange, pageshow and focus ask again the moment
+ *  somebody actually looks at the tab, which is the only time a stale one matters, and the
+ *  interval is a fallback for a screen left on and never backgrounded at all, the way a
+ *  kiosk display would be.
+ *
+ *  Held back while a donation panel is open (see wireDonateFrames): pulling the page out
+ *  from under somebody mid-payment is a worse cost than a day-old price sitting on screen
+ *  a little longer. */
+const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+function watchForStaleTab() {
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+  const openedAt = Date.now();
+  const refreshIfStale = () => {
+    if (Date.now() - openedAt < REFRESH_AFTER_MS) return;
+    if (document.querySelector('.luach-give-frame:not([hidden])')) return;
+    location.reload();
+  };
+  setInterval(refreshIfStale, 30 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshIfStale();
+  });
+  window.addEventListener('pageshow', refreshIfStale);
+  window.addEventListener('focus', refreshIfStale);
+}
+
 
 /* The two marks on the menu, and the chevron on the end of each. The clock goes on the
    week, which is a list of times, and the calendar on the chart, which is the whole
@@ -1182,6 +1215,7 @@ function wireNav(published) {
 
 
 (async () => {
+  watchForStaleTab();
   let published;
   try {
     for (let attempt=0; attempt<2; attempt++) {
