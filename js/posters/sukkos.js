@@ -141,12 +141,12 @@ export const SK_TEXT = {
   simchasShacharis: '8:15',
   /* יזכור, which is announced rather than worked out. One per שחרית: the למטה מנין's and the
      main בית מדרש's. Both move later when שמיני עצרת is Shabbos, the davening running longer -
-     the למטה one by forty five minutes, asked for directly for this one; the main one still
-     by half an hour. */
+     the למטה one by half an hour, the main one by forty five minutes, asked for directly for
+     this one. */
   yizkorEarly: '9:10',
   yizkorLate: '10:25',
-  yizkorShabbosEarly: '9:55',
-  yizkorShabbos: '10:55',
+  yizkorShabbosEarly: '9:40',
+  yizkorShabbos: '11:10',
 };
 
 /** The שמחת בית השואבה sheet, which is a sheet of its own rather than a block of the
@@ -837,20 +837,20 @@ export function buildSukkosPoster(year, settings) {
 
        Each יזכור keeps the mark of the מנין it belongs to. The 7:30 is the למטה מנין, so its
        יזכור is underlined too, being said where that מנין is; the 8:15's is in the main בית
-       מדרש and stays plain. On Shabbos both run later, the davening being longer: 9:55 and
-       10:55 against 9:10 and 10:25 - forty five minutes on the למטה one, asked for directly
-       for this one, half an hour on the main one. */
+       מדרש and stays plain. On Shabbos both run later, the davening being longer: 9:40 and
+       11:10 against 9:10 and 10:25 - half an hour on the למטה one, forty five minutes on the
+       main one, asked for directly for this one. */
     const yizkor = [
       line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
       line(SK_TEXT.yizkor, [
         txtT(isShabbos(n) ? SK_TEXT.yizkorShabbosEarly : SK_TEXT.yizkorEarly,
           isShabbos(n)
-            ? 'announced at this time, the שבת davening running forty five minutes longer than a weekday יום טוב\'s'
+            ? 'announced at this time, the שבת davening running half an hour longer than a weekday יום טוב\'s'
             : 'announced at this time, and "בערך" because it is where the davening reaches rather than a זמן',
           { am: true, underlined: true }),
         txtT(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate,
           isShabbos(n)
-            ? 'the same for the later שחרית, likewise half an hour on'
+            ? 'the same for the later שחרית, running forty five minutes on instead'
             : 'the same for the later שחרית', { am: true }),
       ], { calc: 'yizkor' }),
     ];
