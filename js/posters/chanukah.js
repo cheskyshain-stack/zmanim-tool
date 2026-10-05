@@ -17,7 +17,7 @@
 // The afternoon and evening never print a single star at all, so their own old ** already
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
-import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended } from '../hebrew-calendar.js';
+import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended, chanukahYearFor } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, formatTimeWithSeconds, floorToMinute } from '../format.js';
@@ -69,11 +69,12 @@ const CH_REGULAR_SHIFT_MINUTES = 10;
 const CH_RC_FLOOR_MINUTES = 20;
 
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
- *  12:45 (only once the clocks are back, which every חנוכה is), 1:15 or 1:20, and 1:35 or 1:40,
- *  each weighed against the latest מנחה גדולה לחומרא reaches across the relevant week, exactly
- *  the way the everyday board decides them, in the same room (`LMATA` there) - then 1:50,
- *  unmarked, the same fixed close every year keeps. 12:45 stands here the same way it stands
- *  on the everyday board: it is not חנוכה's own addition, so there is no condition left to ask.
+ *  1:00, 1:15 or 1:20, and 1:35 or 1:40, each weighed against the latest מנחה גדולה לחומרא
+ *  reaches across the relevant week, exactly the way the everyday board decides them, in the
+ *  same room (`LMATA` there) - then 1:50, unmarked, the same fixed close every year keeps.
+ *  1:00 moved here from 12:45 the same day it moved on the everyday board, asked for
+ *  directly: this poster reads that board's own standing slots and has to keep matching them
+ *  rather than printing a 12:45 no longer offered anywhere else.
  *
  *  The old sheets' own ** on these four is that room, not אולם השמחות: unlike the morning,
  *  which needs three star levels to tell four rooms apart, nothing in this afternoon or the
@@ -85,7 +86,7 @@ export function chanukahWeekdayMincha(referenceSerial, settings) {
     "the latest מנחה גדולה לחומרא reaches across this day's own week");
   const notBefore = 'a מנחה is never offered before it';
 
-  const twelveForty5 = clockTime(12, 45, 'the first of the early weekday מנחה מנינים')
+  const oneOclock = clockTime(13, 0, 'the first of the early weekday מנחה מנינים')
     .laterOf(mgl(), notBefore).underline();
   const earlyMincha = weekMgl <= T(13, 15)
     ? clockTime(13, 15, 'the earlier of the two early weekday מנחה מנינים').underline()
@@ -99,19 +100,7 @@ export function chanukahWeekdayMincha(referenceSerial, settings) {
      minutes across them, which is what says it is a flat clock time and not a computed one. */
   const late = fixedTime('4:15', { label: 'the fixed late מנחה before candle lighting, unchanged across every sampled year' }).underline();
 
-  return [twelveForty5, earlyMincha, mainMincha, oneFifty, late];
-}
-
-/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
- *  so the Hebrew year to build that חנוכה's own poster or extras from. Both months land in
- *  the same AM year (Kislev and Teves both follow תשרי within one year's own count), so
- *  there is no year-boundary to special-case. Shared by the weekday and שבת charts, so a
- *  week or a Friday only ever asks this one place whether it is inside חנוכה. */
-export function chanukahYearFor(serial, settings) {
-  const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
-  if (j.month === 9 && j.dayOfMonth >= 25) return j.year;
-  if (j.month === 10 && j.dayOfMonth <= 2) return j.year;
-  return null;
+  return [oneOclock, earlyMincha, mainMincha, oneFifty, late];
 }
 
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
@@ -550,10 +539,10 @@ export function combineErevShabbos(erevShabbosList, settings, tables) {
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
  *  lighting (see `candleLightingParts`) appended after it.
  *
- *  12:45 used to be spliced in here on its own, as though it were חנוכה's own addition.
- *  It is not: fridayMainMinchaParts now offers it on every standard-time Friday, exactly
- *  where it offers 12:30, so a חנוכה Friday gets it the same way any other winter Friday
- *  does and there is nothing left for this function to add. */
+ *  12:45 is not spliced in here on its own: fridayMainMinchaParts already knows to offer it,
+ *  tagged, on exactly the Fridays this function is ever called for (one of the eight days'
+ *  own, per chanukahErevShabbosPairs below), so there is nothing left for this function to
+ *  add. */
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
   const fridayDate = dateFromSerial(fridaySerial);
   const friday = fridayMainMinchaParts(fridayDate, settings, shabbosSerial);

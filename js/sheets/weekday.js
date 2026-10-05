@@ -31,12 +31,12 @@
 // per-cell override and rendered instead of anything computed here (see overrides.js).
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana, isAssurMelacha } from '../hebrew-calendar.js';
+import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana, isAssurMelacha, chanukahYearFor } from '../hebrew-calendar.js';
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
 import { isKayitzWeek } from './weeks.js';
-import { chanukahYearFor, chanukahEarlyMaariv } from '../posters/chanukah.js';
+import { chanukahEarlyMaariv } from '../posters/chanukah.js';
 import { formatTime, underlineTime, newMinyanTag, chanukahTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
@@ -179,7 +179,7 @@ function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }
 
 /** מנחה.
  *
- *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
+ *  Regular times: 1:00, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
  *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
  *  keeps the location it started with. None of the evening three (6:35, 7:30, 8:00) run at
  *  all once the week's own שקיעה has walked them back to 5:00 or earlier. */
@@ -187,7 +187,7 @@ function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
 
-  // 12:45 only runs on standard time. DST always flips on a Sunday, so all five days
+  // 1:00 only runs on standard time. DST always flips on a Sunday, so all five days
   // agree; .every() is just being explicit about which way a split week would go.
   const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
   const bmg = isBmgWeek(week.serial, settings);
@@ -207,7 +207,7 @@ function minchaParts(week, settings) {
 
   /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
      neither if it creeps past 1:20 too. Used to read the clock (DST) instead of מנחה
-     גדולה, the same rule 12:45 above still runs on; sheets/common.js's own note on
+     גדולה, the same rule 1:00 above still runs on; sheets/common.js's own note on
      weekLatestMinchaGedola has the week that rule got wrong. */
   const earlyMincha = latestMinchaGedola <= HM(13, 15) ? HM(13, 15)
     : latestMinchaGedola <= HM(13, 20) ? HM(13, 20)
@@ -222,13 +222,13 @@ function minchaParts(week, settings) {
   const clears = "at least 15 minutes before the earliest שקיעה of the week's own regular days";
 
   /* **A time that does not run this week stays in the list, marked, rather than being taken
-     out of it.** Removed, the column simply had no 12:45 and nothing to say about it, which
+     out of it.** Removed, the column simply had no 1:00 and nothing to say about it, which
      is the same fault the shul found on the 1:35 carried one step further: not a rule with a
      side missing but a מנין missing altogether. offSeason slots are held out of the stepping
      and the crowding below, since neither applies to a time that is not on the board. */
   const clocksBack = 'offered only while the clocks are back';
   const slots = [
-    { mins: HM(12, 45), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    { mins: HM(13, 0), place: LMATA, offSeason: standardTime ? null : clocksBack },
     /* 1:15, 1:20, or neither, and which one turns on a number, the same reason the 1:35
        line below does. */
     { mins: earlyMincha ?? HM(13, 15), place: LMATA,

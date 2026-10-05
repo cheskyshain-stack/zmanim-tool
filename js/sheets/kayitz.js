@@ -123,6 +123,9 @@ export function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
+  /* 12:45 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
+     board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
+     L itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const L = erevMincha.text;
 
@@ -163,7 +166,13 @@ export function buildKayitzRow(week, settings) {
     I: cutOf(earlyCols.I), J: cutOf(earlyCols.J), K: cutOf(earlyCols.K),
   };
 
-  return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
+  return {
+    B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped,
+    /* Same split as sheets/weekday.js's own B column: printOverrides is read only by
+       ui/sheet-view.js's cell rendering, and only when this week's own L has not been typed
+       over by hand - every other reader (row.L directly) sees the plain, untagged value. */
+    printOverrides: erevMincha.printText != null ? { L: erevMincha.printText } : undefined,
+  };
 }
 
 export const KAYITZ_COLUMNS = [
