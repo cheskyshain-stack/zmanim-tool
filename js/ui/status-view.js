@@ -22,7 +22,7 @@ import { currentReaderWeek, weekTitle } from './week-view.js';
 import { chartSpreads, spreadIndexForNow, spreadLabel } from './chart-view.js';
 import { onePageOccasionSpans, ONEPAGE_LEAD_DAYS } from './posters-view.js';
 import { weekEndsMins } from '../upcoming.js';
-import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { formatTime } from '../format.js';
 import { escAttr } from '../util.js';
 
@@ -59,7 +59,7 @@ function scheduleRow(entry, today) {
 /** The three congregation-facing screens, read off one published snapshot. */
 function statusBody(published) {
   const settings = resolveSettings(published.settings);
-  const today = excelSerial(new Date());
+  const today = shulNow(new Date(), settings).serial;
 
   // Weekly Schedule, /week/.
   const index = readerWeekIndex(published);

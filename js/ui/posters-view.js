@@ -33,7 +33,7 @@ import { buildOwnPoster } from '../posters/own.js';
 import { renderOwnEditor, newOwnSheet } from './own-view.js';
 import { saveState } from '../storage.js';
 import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
-import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
+import { excelSerial, dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
 import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
@@ -52,9 +52,13 @@ const POSTER_FONT = 'Times New Roman';
  *  The year number turns over at ר"ה, so "this year" stops being the useful answer the
  *  moment יו"כ is past: in אלול 5786 the calendar still says 5786, but the סליחות a week
  *  away are for ר"ה 5787. This asks the question the poster asks, which yomim noraim are
- *  still ahead, and rolls over the day after יו"כ. */
-export function nextYomimNoraim(today = new Date()) {
-  const serial = excelSerial(today);
+ *  still ahead, and rolls over the day after יו"כ.
+ *
+ *  `now` reads through shulNow rather than excelSerial's own UTC day, so a visitor (or this
+ *  admin's own browser) checking between roughly 7pm and midnight Eastern still gets the
+ *  shul's own today, not tomorrow's UTC date. */
+export function nextYomimNoraim(settings, now = new Date()) {
+  const serial = shulNow(now, settings).serial;
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
   return serial > yomKippur(year) ? year + 1 : year;
@@ -77,7 +81,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(new Date(), resolveSettings(state.settings)).serial).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -771,7 +775,7 @@ export const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 export function onePageOccasionSpans(state, settings) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -805,8 +809,8 @@ export function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+export function currentOnePageSheets(state, settings, { on = shulNow(new Date(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
@@ -2638,7 +2642,7 @@ export function renderPosters(container, state, routeChanged, tables) {
      posterYears), which puts everything ahead again.
      Off the days postersByDate already worked out, so nothing is built for it. */
   const withSheets = groups.filter((g) => g.items.length && g.lastStart != null);
-  const nowSerial = excelSerial(new Date());
+  const nowSerial = shulNow(new Date(), settings).serial;
   const current = withSheets.find((g) => g.lastStart >= nowSerial)
     || withSheets[withSheets.length - 1] || null;
 

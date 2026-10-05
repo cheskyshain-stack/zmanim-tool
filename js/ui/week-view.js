@@ -1401,7 +1401,7 @@ function weekCardsHtml(showing, index, state, settings) {
           ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
+          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true)
       );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,

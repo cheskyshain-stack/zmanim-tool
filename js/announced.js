@@ -18,7 +18,7 @@
 //
 // A real change to the schedule belongs in Settings or in a rule, not here. This is for the
 // two days between "they announced something else" and "the board is right again".
-import { excelSerial, dateFromSerial } from './zmanim/solar.js';
+import { excelSerial, dateFromSerial, shulNow } from './zmanim/solar.js';
 
 /** One entry a change.
  *
@@ -40,20 +40,30 @@ export const ANNOUNCED = [
   },
 ];
 
-/** A plain date to the serial the rest of the program counts in. */
+/** A plain date to the serial the rest of the program counts in.
+ *
+ *  Built through Date.UTC rather than the local-time Date(y, m-1, d) constructor this used
+ *  to call: that reads y/m/d as midnight in whatever zone the runtime itself is in, and
+ *  excelSerial then reads the UTC day back off it, which disagreed with itself for a
+ *  visitor whose own device is not on US time - `2026-09-09` came back as the 8th for a
+ *  reader ahead of UTC. These three numbers are a calendar date on their own, with nothing
+ *  to do with anybody's clock, so nothing here should ask what time zone anybody is in. */
 function serialOf(iso) {
   const [y, m, d] = String(iso).split('-').map(Number);
-  return y && m && d ? excelSerial(new Date(y, m - 1, d)) : null;
+  return y && m && d ? excelSerial(new Date(Date.UTC(y, m - 1, d))) : null;
 }
 
-/** Today, as the reader's own device has it. The whole point of these entries is that they
- *  are about the next day or two, so they are read against the clock in the reader's hand. */
-const today = () => excelSerial(new Date());
+/** Today, in the shul's own time zone - not the reader's device and not this UTC
+ *  container's. The entries are about the next day or two of the shul's own schedule, so
+ *  "today" has to be Lakewood's, the same as everywhere else this question is asked
+ *  (shulNow); reading it off the UTC calendar day instead used to call it tomorrow for
+ *  several hours every evening, Eastern time being behind UTC. */
+const today = (settings) => shulNow(new Date(), settings).serial;
 
 /** The entries that are live at all: an entry is only ever live during its own days, so one
  *  left in this file after its day has passed changes nothing. */
-function live() {
-  const now = today();
+function live(settings) {
+  const now = today(settings);
   return ANNOUNCED.filter((a) => {
     const from = serialOf(a.from);
     const to = serialOf(a.to);
@@ -71,9 +81,9 @@ function live() {
  *  The text goes back through this before it is parsed rather than after, so the minutes
  *  behind it move with it: "what is on next" counts down to the time it is showing rather
  *  than to the one on the board. */
-export function announcedCell(text, columnKey, serial) {
+export function announcedCell(text, columnKey, serial, settings) {
   let out = String(text ?? '');
-  for (const a of live()) {
+  for (const a of live(settings)) {
     if (a.column !== columnKey) continue;
     const from = serialOf(a.from);
     const to = serialOf(a.to);
@@ -98,10 +108,10 @@ export function announcedCell(text, columnKey, serial) {
  *  `anchor` is the week's Shabbos, the way every week is keyed here; the days the Weekday
  *  chart speaks for are the Sunday through Thursday before it, which is offset 6 to offset 2
  *  back from the Shabbos. The same walk posters/day.js makes over a week. */
-export function announcedWeekCell(text, columnKey, anchor) {
+export function announcedWeekCell(text, columnKey, anchor, settings) {
   const sunday = anchor - 6;
   for (let day = sunday; day <= sunday + 4; day += 1) {
-    const swapped = announcedCell(text, columnKey, day);
+    const swapped = announcedCell(text, columnKey, day, settings);
     if (swapped !== String(text ?? '')) return swapped;
   }
   return String(text ?? '');
@@ -110,6 +120,6 @@ export function announcedWeekCell(text, columnKey, anchor) {
 /** Whether anything is live, so a screen can say why it is not quoting the board. Nothing
  *  reads it yet; it is here because the first question anyone asks about a swapped time is
  *  "is that right?" and the answer should be somewhere. */
-export function announcedNow() {
-  return live().map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
+export function announcedNow(settings) {
+  return live(settings).map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
 }

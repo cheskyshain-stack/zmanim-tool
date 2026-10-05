@@ -3,7 +3,7 @@
 // workbook's own P5 formula (SEQUENCE + FILTER on HAS_PARSHA<>"") but without
 // requiring a manually-entered start date or week count.
 import { dateFromHebrew, hasParsha, hasSpecialParsha, hasYomTov, isYomTovOrCholHamoed, hebrewDateExtended, excelWeekday } from '../hebrew-calendar.js';
-import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
+import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { inSpringDstWindow } from './common.js';
 
 const MAX_WEEKS = 60; // safety cap, well above any real season's length
@@ -173,7 +173,7 @@ export function splitChorefAtSpringCutover(weeks, settings) {
  *  worth preparing a schedule for. Used to keep the Generate form's year field from
  *  ever defaulting to an already-passed season. */
 export function nextAvailableYearFor(season, settings) {
-  const today = excelSerial(new Date());
+  const today = shulNow(new Date(), settings).serial;
   let y = hebrewDateExtended(today, settings.useGregorianBefore1582).year - 1; // step back one to not overshoot a season that started in a lower-numbered year
   for (let i = 0; i < 6 && seasonEndSerial(season, y) < today; i++) y++;
   return y;
@@ -183,7 +183,7 @@ export function nextAvailableYearFor(season, settings) {
  *  (below), which wants the *next* season instead, and reused by
  *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
  *  the wall right now" asks this rather than working the boundaries out again. */
-export function currentSeasonAndYear(settings, anchor = excelSerial(new Date())) {
+export function currentSeasonAndYear(settings, anchor = shulNow(new Date(), settings).serial) {
   const y0 = hebrewDateExtended(anchor, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);

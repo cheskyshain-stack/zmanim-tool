@@ -910,7 +910,7 @@ function posterHtml(poster, year, settings) {
 
 export function renderCalculations(container, state, onOpenTab) {
   const settings = resolveSettings(state.settings);
-  const posterYear = nextYomimNoraim();
+  const posterYear = nextYomimNoraim(settings);
   container.innerHTML = `
     <h2>Calculations</h2>
     <p class="hint">Every column on every chart and every line on every poster, and how each one is worked out.</p>

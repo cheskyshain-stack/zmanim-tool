@@ -625,7 +625,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           // row[c.key] directly and never sees the tag either. See sheets/weekday.js.
           const overridden = overriddenKeys.has(c.key);
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
-          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial) : computedValue;
+          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
           return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }

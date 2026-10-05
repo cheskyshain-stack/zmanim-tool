@@ -4,7 +4,7 @@
 // the chart view had to import it, and week-view imports the chart view to put the chart
 // under the cards - a cycle, which ES modules tolerate but build-offline.py cannot order
 // into one flat script.
-import { dateFromSerial, shulNow } from '../zmanim/solar.js';
+import { shulNow } from '../zmanim/solar.js';
 
 
 /** The week the congregation should be looking at: the first one not yet finished.
@@ -18,19 +18,19 @@ import { dateFromSerial, shulNow } from '../zmanim/solar.js';
  *  `endsAt(serial)` gives that moment as minutes after midnight on the week's own Shabbos,
  *  and is passed in rather than worked out here: it has to read the week's printed times,
  *  which means the sheets, the rules and the overrides, and nothing else this module does
- *  needs any of that. Without it there is nothing to read, so it falls back to the calendar
- *  day and rolls at midnight, which is what it always did. */
-export function currentSerial(serials, settings = null, endsAt = null) {
-  const now = new Date();
-  if (settings && endsAt) {
-    const { serial: today, mins } = shulNow(now, settings);
-    const over = (s) => s < today || (s === today && mins >= endsAt(s));
-    const ahead = serials.filter((s) => !over(s));
-    return ahead.length ? Math.min(...ahead) : Math.max(...serials);
-  }
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
+ *  needs any of that.
+ *
+ *  Both arguments are required - this used to fall back to the calendar day rolling at
+ *  plain local midnight when either was missing, which was never asked of this file and
+ *  read the visitor's own device time zone rather than the shul's: a visitor checking from
+ *  Israel, or this app built on a UTC container, could roll the day at a different moment
+ *  than Lakewood does. Nothing has called it without both since the fallback was written,
+ *  so there was nothing left for it to protect. */
+export function currentSerial(serials, settings, endsAt) {
+  const { serial: today, mins } = shulNow(new Date(), settings);
+  const over = (s) => s < today || (s === today && mins >= endsAt(s));
+  const ahead = serials.filter((s) => !over(s));
+  return ahead.length ? Math.min(...ahead) : Math.max(...serials);
 }
 
 /** Swipe across the week to page through it, the way a photo album works: drag left to

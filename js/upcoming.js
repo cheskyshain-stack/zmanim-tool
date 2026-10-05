@@ -246,7 +246,7 @@ export function minyanimForDay(serial, state, settings) {
          the minutes come off the time that is being shown: a card counting down to 8:15 while
          printing 8:10 would be worse than either time on its own. Nothing there most days,
          and nothing there ever reaches the board or the formula. */
-      for (const t of parseCell(announcedCell(row[column.key], column.key, serial))) out.push({ ...t, name });
+      for (const t of parseCell(announcedCell(row[column.key], column.key, serial, settings))) out.push({ ...t, name });
     }
     /* The morning, which through the סליחות season is not the everyday one. From the Sunday
        סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the

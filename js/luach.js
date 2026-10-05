@@ -18,7 +18,7 @@ import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser, chartSpreads, spreadIndexForNow, CHART_EARLY_DAYS } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
-import { excelSerial } from './zmanim/solar.js';
+import { shulNow } from './zmanim/solar.js';
 
 const main = document.getElementById('main');
 
@@ -641,10 +641,11 @@ function markChartAnnounced(id) {
  *  "today" computed here could disagree with it by a day or two right at the boundary.
  *
  *  What is asked here is the other half: whether it has been showing too long to still be
- *  news. CHART_EARLY_DAYS again, now counted forward in plain calendar days from the
- *  chart's own first date, so the pop-up survives one more week once that date has actually
- *  arrived and then stops - the window the shul asked for is seven days on each side of
- *  that date, and the early side is already given by spreadIndexForNow's own pick.
+ *  news. CHART_EARLY_DAYS again, now counted forward in calendar days in the shul's own
+ *  time zone (shulNow, not a plain new Date() reading) from the chart's own first date, so
+ *  the pop-up survives one more week once that date has actually arrived and then stops -
+ *  the window the shul asked for is seven days on each side of that date, and the early
+ *  side is already given by spreadIndexForNow's own pick.
  *
  *  The id is the spread itself (season, Hebrew year, and which of that season's pages),
  *  so a page turning within the same season is its own announcement, same as a new season
@@ -658,7 +659,7 @@ function chartAnnouncement(published) {
     const at = spreadIndexForNow(spreads, state, settings);
     const spread = spreads[at];
     const start = Math.min(...spread.serials);
-    const today = excelSerial(new Date());
+    const today = shulNow(new Date(), settings).serial;
     if (today > start + CHART_EARLY_DAYS) return null;
     return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}` };
   } catch {

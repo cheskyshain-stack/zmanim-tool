@@ -714,7 +714,7 @@ const TX_KIND_NAMES = {
 export function renderTexts(container, state, settings, tables) {
   const messages = [];
   const now = new Date();
-  const today = Math.floor((now.getTime() - Date.UTC(1899, 11, 30)) / 86400000);
+  const today = shulNow(now, settings).serial;
 
   const year = txTishreiYear(today);
 

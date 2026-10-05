@@ -305,20 +305,30 @@ const ANNOUNCED = [
   },
 ];
 
-/** A plain date to the serial the rest of the program counts in. */
+/** A plain date to the serial the rest of the program counts in.
+ *
+ *  Built through Date.UTC rather than the local-time Date(y, m-1, d) constructor this used
+ *  to call: that reads y/m/d as midnight in whatever zone the runtime itself is in, and
+ *  excelSerial then reads the UTC day back off it, which disagreed with itself for a
+ *  visitor whose own device is not on US time - `2026-09-09` came back as the 8th for a
+ *  reader ahead of UTC. These three numbers are a calendar date on their own, with nothing
+ *  to do with anybody's clock, so nothing here should ask what time zone anybody is in. */
 function serialOf(iso) {
   const [y, m, d] = String(iso).split('-').map(Number);
-  return y && m && d ? excelSerial(new Date(y, m - 1, d)) : null;
+  return y && m && d ? excelSerial(new Date(Date.UTC(y, m - 1, d))) : null;
 }
 
-/** Today, as the reader's own device has it. The whole point of these entries is that they
- *  are about the next day or two, so they are read against the clock in the reader's hand. */
-const today = () => excelSerial(new Date());
+/** Today, in the shul's own time zone - not the reader's device and not this UTC
+ *  container's. The entries are about the next day or two of the shul's own schedule, so
+ *  "today" has to be Lakewood's, the same as everywhere else this question is asked
+ *  (shulNow); reading it off the UTC calendar day instead used to call it tomorrow for
+ *  several hours every evening, Eastern time being behind UTC. */
+const today = (settings) => shulNow(new Date(), settings).serial;
 
 /** The entries that are live at all: an entry is only ever live during its own days, so one
  *  left in this file after its day has passed changes nothing. */
-function live() {
-  const now = today();
+function live(settings) {
+  const now = today(settings);
   return ANNOUNCED.filter((a) => {
     const from = serialOf(a.from);
     const to = serialOf(a.to);
@@ -336,9 +346,9 @@ function live() {
  *  The text goes back through this before it is parsed rather than after, so the minutes
  *  behind it move with it: "what is on next" counts down to the time it is showing rather
  *  than to the one on the board. */
-function announcedCell(text, columnKey, serial) {
+function announcedCell(text, columnKey, serial, settings) {
   let out = String(text ?? '');
-  for (const a of live()) {
+  for (const a of live(settings)) {
     if (a.column !== columnKey) continue;
     const from = serialOf(a.from);
     const to = serialOf(a.to);
@@ -363,10 +373,10 @@ function announcedCell(text, columnKey, serial) {
  *  `anchor` is the week's Shabbos, the way every week is keyed here; the days the Weekday
  *  chart speaks for are the Sunday through Thursday before it, which is offset 6 to offset 2
  *  back from the Shabbos. The same walk posters/day.js makes over a week. */
-function announcedWeekCell(text, columnKey, anchor) {
+function announcedWeekCell(text, columnKey, anchor, settings) {
   const sunday = anchor - 6;
   for (let day = sunday; day <= sunday + 4; day += 1) {
-    const swapped = announcedCell(text, columnKey, day);
+    const swapped = announcedCell(text, columnKey, day, settings);
     if (swapped !== String(text ?? '')) return swapped;
   }
   return String(text ?? '');
@@ -375,8 +385,8 @@ function announcedWeekCell(text, columnKey, anchor) {
 /** Whether anything is live, so a screen can say why it is not quoting the board. Nothing
  *  reads it yet; it is here because the first question anyone asks about a swapped time is
  *  "is that right?" and the answer should be somewhere. */
-function announcedNow() {
-  return live().map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
+function announcedNow(settings) {
+  return live(settings).map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
 }
 
 // ==== ui/copy.js ====
@@ -2881,7 +2891,7 @@ function splitChorefAtSpringCutover(weeks, settings) {
  *  worth preparing a schedule for. Used to keep the Generate form's year field from
  *  ever defaulting to an already-passed season. */
 function nextAvailableYearFor(season, settings) {
-  const today = excelSerial(new Date());
+  const today = shulNow(new Date(), settings).serial;
   let y = hebrewDateExtended(today, settings.useGregorianBefore1582).year - 1; // step back one to not overshoot a season that started in a lower-numbered year
   for (let i = 0; i < 6 && seasonEndSerial(season, y) < today; i++) y++;
   return y;
@@ -2891,7 +2901,7 @@ function nextAvailableYearFor(season, settings) {
  *  (below), which wants the *next* season instead, and reused by
  *  publish.js's firstPageRangeForCurrentSeason - anywhere that means "the season on
  *  the wall right now" asks this rather than working the boundaries out again. */
-function currentSeasonAndYear(settings, anchor = excelSerial(new Date())) {
+function currentSeasonAndYear(settings, anchor = shulNow(new Date(), settings).serial) {
   const y0 = hebrewDateExtended(anchor, settings.useGregorianBefore1582).year;
   const sukkosY0 = dateFromHebrew(15, 7, y0);
   const pesachY0 = dateFromHebrew(15, 1, y0);
@@ -8539,19 +8549,19 @@ function cellDetailHtml({ header, key, chartName, printed, times, note, dropped,
  *  `endsAt(serial)` gives that moment as minutes after midnight on the week's own Shabbos,
  *  and is passed in rather than worked out here: it has to read the week's printed times,
  *  which means the sheets, the rules and the overrides, and nothing else this module does
- *  needs any of that. Without it there is nothing to read, so it falls back to the calendar
- *  day and rolls at midnight, which is what it always did. */
-function currentSerial(serials, settings = null, endsAt = null) {
-  const now = new Date();
-  if (settings && endsAt) {
-    const { serial: today, mins } = shulNow(now, settings);
-    const over = (s) => s < today || (s === today && mins >= endsAt(s));
-    const ahead = serials.filter((s) => !over(s));
-    return ahead.length ? Math.min(...ahead) : Math.max(...serials);
-  }
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const upcoming = serials.filter((s) => dateFromSerial(s).getTime() >= todayUtc);
-  return upcoming.length ? Math.min(...upcoming) : Math.max(...serials);
+ *  needs any of that.
+ *
+ *  Both arguments are required - this used to fall back to the calendar day rolling at
+ *  plain local midnight when either was missing, which was never asked of this file and
+ *  read the visitor's own device time zone rather than the shul's: a visitor checking from
+ *  Israel, or this app built on a UTC container, could roll the day at a different moment
+ *  than Lakewood does. Nothing has called it without both since the fallback was written,
+ *  so there was nothing left for it to protect. */
+function currentSerial(serials, settings, endsAt) {
+  const { serial: today, mins } = shulNow(new Date(), settings);
+  const over = (s) => s < today || (s === today && mins >= endsAt(s));
+  const ahead = serials.filter((s) => !over(s));
+  return ahead.length ? Math.min(...ahead) : Math.max(...serials);
 }
 
 /** Swipe across the week to page through it, the way a photo album works: drag left to
@@ -11460,7 +11470,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           // row[c.key] directly and never sees the tag either. See sheets/weekday.js.
           const overridden = overriddenKeys.has(c.key);
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
-          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial) : computedValue;
+          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
           return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
         }
@@ -11749,9 +11759,13 @@ const POSTER_FONT = 'Times New Roman';
  *  The year number turns over at ר"ה, so "this year" stops being the useful answer the
  *  moment יו"כ is past: in אלול 5786 the calendar still says 5786, but the סליחות a week
  *  away are for ר"ה 5787. This asks the question the poster asks, which yomim noraim are
- *  still ahead, and rolls over the day after יו"כ. */
-function nextYomimNoraim(today = new Date()) {
-  const serial = excelSerial(today);
+ *  still ahead, and rolls over the day after יו"כ.
+ *
+ *  `now` reads through shulNow rather than excelSerial's own UTC day, so a visitor (or this
+ *  admin's own browser) checking between roughly 7pm and midnight Eastern still gets the
+ *  shul's own today, not tomorrow's UTC date. */
+function nextYomimNoraim(settings, now = new Date()) {
+  const serial = shulNow(now, settings).serial;
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
   return serial > yomKippur(year) ? year + 1 : year;
@@ -11774,7 +11788,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(new Date(), resolveSettings(state.settings)).serial).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -12468,7 +12482,7 @@ const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 function onePageOccasionSpans(state, settings) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -12502,8 +12516,8 @@ function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+function currentOnePageSheets(state, settings, { on = shulNow(new Date(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
@@ -14335,7 +14349,7 @@ function renderPosters(container, state, routeChanged, tables) {
      posterYears), which puts everything ahead again.
      Off the days postersByDate already worked out, so nothing is built for it. */
   const withSheets = groups.filter((g) => g.items.length && g.lastStart != null);
-  const nowSerial = excelSerial(new Date());
+  const nowSerial = shulNow(new Date(), settings).serial;
   const current = withSheets.find((g) => g.lastStart >= nowSerial)
     || withSheets[withSheets.length - 1] || null;
 
@@ -15181,7 +15195,7 @@ function minyanimForDay(serial, state, settings) {
          the minutes come off the time that is being shown: a card counting down to 8:15 while
          printing 8:10 would be worse than either time on its own. Nothing there most days,
          and nothing there ever reaches the board or the formula. */
-      for (const t of parseCell(announcedCell(row[column.key], column.key, serial))) out.push({ ...t, name });
+      for (const t of parseCell(announcedCell(row[column.key], column.key, serial, settings))) out.push({ ...t, name });
     }
     /* The morning, which through the סליחות season is not the everyday one. From the Sunday
        סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the
@@ -16264,7 +16278,7 @@ function posterHtml(poster, year, settings) {
 
 function renderCalculations(container, state, onOpenTab) {
   const settings = resolveSettings(state.settings);
-  const posterYear = nextYomimNoraim();
+  const posterYear = nextYomimNoraim(settings);
   container.innerHTML = `
     <h2>Calculations</h2>
     <p class="hint">Every column on every chart and every line on every poster, and how each one is worked out.</p>
@@ -18735,8 +18749,8 @@ function sheetSections(showing, index, state, settings, withChol) {
       mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
-      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing)),
-      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing)),
+      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings)),
+      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings)),
     ]]);
   }
   return out;
@@ -20909,7 +20923,7 @@ function weekCardsHtml(showing, index, state, settings) {
           ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
+          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true)
       );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,
@@ -21534,7 +21548,7 @@ function scheduleRow(entry, today) {
 /** The three congregation-facing screens, read off one published snapshot. */
 function statusBody(published) {
   const settings = resolveSettings(published.settings);
-  const today = excelSerial(new Date());
+  const today = shulNow(new Date(), settings).serial;
 
   // Weekly Schedule, /week/.
   const index = readerWeekIndex(published);

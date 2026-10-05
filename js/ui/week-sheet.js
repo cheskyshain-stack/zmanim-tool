@@ -283,8 +283,8 @@ function sheetSections(showing, index, state, settings, withChol) {
       mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
-      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing)),
-      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing)),
+      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings)),
+      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings)),
     ]]);
   }
   return out;
