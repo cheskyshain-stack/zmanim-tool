@@ -93,11 +93,14 @@ export function buildChorefRow(week, settings) {
 export const CHOREF_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against. That part
+  // prints smaller - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: 'מעריב' },
   { key: 'G', header: 'מנחה\nמעריב' },
   { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nערב שבת' },
+  { key: 'I', header: 'מנחה\nערב שבת', headerSub: true },
 ];
 

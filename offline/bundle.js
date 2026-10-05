@@ -4726,11 +4726,18 @@ function buildKayitzRow(week, settings) {
 
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
-  // Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
-  // its own זמן under it, smaller the same way the מ"א beside the גר"א is in the ס"ז קר"ש
-  // column. NBSP after the word so the pair can never wrap apart.
-  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\n${smallText(`פלג ${formatTime(e.plag)}`)}`;
-  const I = plagWindow ? cell(early72) : '';
+  /* Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
+     its own זמן under it. NBSP after the word so the pair can never wrap apart.
+     בעזר"נ no longer has its own word in the header - it is a star on the time itself now,
+     matching the one star בעזרת נשים already carries everywhere else on this site (posters,
+     messages, the week card's own auto-built legend, which reads * and ** off a printed time
+     to say what they mean). למטה keeps its underline rather than moving to a star count of
+     its own: two stars already means באולם השמחות throughout those same places, a different
+     room, and giving למטה that mark would make that legend name the wrong room wherever this
+     cell is read. The underline already matches the chart's own footer note ("All underlined
+     מנינים will be למטה"), so dropping למטה's own word costs nothing there. */
+  const cell = (e, star = '') => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}${star}\nפלג ${formatTime(e.plag)}`;
+  const I = plagWindow ? cell(early72, '*') : '';
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
@@ -4780,7 +4787,11 @@ function buildKayitzRow(week, settings) {
 const KAYITZ_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against: the two
+  // opinions, the room's star count, or the day the מנין falls on. That part prints smaller,
+  // all of it, not just a bracketed word - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: ' מעריב ' },
   { key: 'G', header: 'מנחה\nמעריב' },
@@ -4788,10 +4799,12 @@ const KAYITZ_COLUMNS = [
   // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
   // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
   // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר"נ)\nפלג מ"א 72' },
-  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
-  { key: 'K', header: 'מנחה\nפלג גר"א' },
-  { key: 'L', header: 'מנחה\nערב שבת' },
+  // Neither room has its own word in the header any more: בעזר"נ is the star on the מנין's
+  // own time, למטה is still its underline (see the cell() function above, and why).
+  { key: 'I', header: 'מנחה\nפלג מ"א 72', headerSub: true },
+  { key: 'J', header: 'מנחה\nפלג מ"א', headerSub: true },
+  { key: 'K', header: 'מנחה\nפלג גר"א', headerSub: true },
+  { key: 'L', header: 'מנחה\nערב שבת', headerSub: true },
 ];
 
 // ==== posters/pesach.js ====
@@ -5777,12 +5790,15 @@ function buildChorefRow(week, settings) {
 const CHOREF_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against. That part
+  // prints smaller - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: 'מעריב' },
   { key: 'G', header: 'מנחה\nמעריב' },
   { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nערב שבת' },
+  { key: 'I', header: 'מנחה\nערב שבת', headerSub: true },
 ];
 
 // ==== posters/sukkos.js ====
@@ -11368,7 +11384,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${Number(sheet.columnWidths[key]) || 0}px"` : ''}>`).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerBasisSmall(c.header))}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerHtml(c))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
@@ -11681,20 +11697,21 @@ function splitBuild(season) {
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 
-/** A column heading's last line, when it names the reckoning rather than the מנין - every
- *  פלג column and the ס"ז קר"ש one - prints smaller beside the name above it, the same idea
- *  week-sheet.js's own (private) nameAndBasis applies for the One sheet view, matched here by
- *  the same rule rather than shared code, since the two views never render through one
- *  function. Wrapped only for this <th>'s own HTML: c.header itself stays the plain string it
- *  always was, because rules-view's own checkbox labels, week-view's and weekly-reader's week
- *  card, and erev-text.js all read that same string apart from this table and do not know
+/** A column's heading, its first line at the heading's own regular size and, when the
+ *  column is marked headerSub (sheets/kayitz.js, sheets/choref.js), every line after that
+ *  smaller - what the name on the first line is read against, whether that is two opinions,
+ *  a room's star count or the day the מנין falls on. Not every multi-line heading is this
+ *  shape: the Weekday chart's own "מנחה\nמעריב" names two coequal תפילות on two lines, and
+ *  "הדלקת\nנרות" is one phrase broken in two, so headerSub is a flag the column sets rather
+ *  than a pattern guessed from the text, to keep those two from being read the same way.
+ *  Wrapped only for this <th>'s own HTML: c.header itself stays the plain string it always
+ *  was, because rules-view's own checkbox labels, week-view's and weekly-reader's week card,
+ *  and erev-text.js all read that same string apart from this table and do not know
  *  smallText()'s sentinel - only this function's own call to nl2br does. */
-function headerBasisSmall(header) {
-  const lines = String(header).split('\n');
-  const last = lines[lines.length - 1] || '';
-  const isBasis = lines.length > 1 && (last.startsWith('פלג') || last.includes('גר'));
-  if (!isBasis) return nl2br(header);
-  return nl2br(lines.slice(0, -1).join('\n')) + '<br><span class="cell-small">' + nl2br(last) + '</span>';
+function headerHtml(c) {
+  if (!c.headerSub) return nl2br(c.header);
+  const [first, ...rest] = String(c.header).split('\n');
+  return nl2br(first) + rest.map((line) => '<br><span class="cell-small">' + nl2br(line) + '</span>').join('');
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
@@ -18710,10 +18727,10 @@ const sheetSection = (title, rows) => (rows.filter(Boolean).length
 /** A column's heading split into the name of the מנין and the זמן it is set against.
  *
  *  A chart heading is written to wrap inside a narrow column, so its lines are a name broken
- *  up rather than several things: "מנחה / (למטה) / פלג מ״א" is one מנין. The last line is the
- *  exception where it names the reckoning rather than the מנין, which is every פלג column and
- *  the ס״ז קר״ש one, and that becomes the smaller line beside the name. Everything else joins
- *  the name, brackets and all, since the room is part of which מנין this is. */
+ *  up rather than several things: "מנחה / פלג מ״א" is one מנין (its room is a mark on the
+ *  time itself now, not a word of its own on the heading - see sheets/kayitz.js). The last
+ *  line is the exception where it names the reckoning rather than the מנין, which is every
+ *  פלג column and the ס״ז קר״ש one, and that becomes the smaller line beside the name. */
 function nameAndBasis(header) {
   const lines = String(header).split('\n').map((l) => l.trim()).filter(Boolean);
   const last = lines[lines.length - 1] || '';
@@ -20955,9 +20972,14 @@ function weekCardsHtml(showing, index, state, settings) {
       const parts=String(value).split('\n');
       const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
       if(!html && c.header.includes('פלג') && parts.length>1) {
-        const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ').replace(/\s*\((?:למטה|בעזר["״]נ)\)/g,'');
-        const minchaTime = /בעזר["״]נ/.test(c.header) && !parts[0].includes('*') ? parts[0] + '*' : parts[0];
-        add(minchaLabel,minchaTime,c.key);
+        // The room used to be a bracketed word on the header's own line ("(למטה)",
+        // "(בעזר\"נ)"), stripped back out here for the label, with a star added onto the
+        // time if the header said בעזר"נ and the time did not already carry one. The chart
+        // itself carries the room now - a star on the מנין's own time, an underline for
+        // למטה - so parts[0] already reads exactly as the wall chart does and neither needs
+        // doing here any more. See sheets/kayitz.js.
+        const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ');
+        add(minchaLabel,parts[0],c.key);
         add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''),c.key);
       } else if(!html && c.key==='H' && parts.length>1) {
         add('הדלקת נרות',parts[0]);

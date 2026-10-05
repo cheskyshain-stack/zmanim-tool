@@ -1349,9 +1349,14 @@ function weekCardsHtml(showing, index, state, settings) {
       const parts=String(value).split('\n');
       const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
       if(!html && c.header.includes('פלג') && parts.length>1) {
-        const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ').replace(/\s*\((?:למטה|בעזר["״]נ)\)/g,'');
-        const minchaTime = /בעזר["״]נ/.test(c.header) && !parts[0].includes('*') ? parts[0] + '*' : parts[0];
-        add(minchaLabel,minchaTime,c.key);
+        // The room used to be a bracketed word on the header's own line ("(למטה)",
+        // "(בעזר\"נ)"), stripped back out here for the label, with a star added onto the
+        // time if the header said בעזר"נ and the time did not already carry one. The chart
+        // itself carries the room now - a star on the מנין's own time, an underline for
+        // למטה - so parts[0] already reads exactly as the wall chart does and neither needs
+        // doing here any more. See sheets/kayitz.js.
+        const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ');
+        add(minchaLabel,parts[0],c.key);
         add(c.header.split('\n').find(x=>x.startsWith('פלג')),parts.slice(1).join(' ').replace(/פלג\s*/g,''),c.key);
       } else if(!html && c.key==='H' && parts.length>1) {
         add('הדלקת נרות',parts[0]);

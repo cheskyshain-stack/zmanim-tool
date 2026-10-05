@@ -4,7 +4,7 @@
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
-import { ceilToMinute, floorToMinute, formatTime, underlineTime, smallText } from '../format.js';
+import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
 import { T, inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
@@ -108,11 +108,18 @@ export function buildKayitzRow(week, settings) {
 
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
-  // Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
-  // its own זמן under it, smaller the same way the מ"א beside the גר"א is in the ס"ז קר"ש
-  // column. NBSP after the word so the pair can never wrap apart.
-  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\n${smallText(`פלג ${formatTime(e.plag)}`)}`;
-  const I = plagWindow ? cell(early72) : '';
+  /* Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
+     its own זמן under it. NBSP after the word so the pair can never wrap apart.
+     בעזר"נ no longer has its own word in the header - it is a star on the time itself now,
+     matching the one star בעזרת נשים already carries everywhere else on this site (posters,
+     messages, the week card's own auto-built legend, which reads * and ** off a printed time
+     to say what they mean). למטה keeps its underline rather than moving to a star count of
+     its own: two stars already means באולם השמחות throughout those same places, a different
+     room, and giving למטה that mark would make that legend name the wrong room wherever this
+     cell is read. The underline already matches the chart's own footer note ("All underlined
+     מנינים will be למטה"), so dropping למטה's own word costs nothing there. */
+  const cell = (e, star = '') => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}${star}\nפלג ${formatTime(e.plag)}`;
+  const I = plagWindow ? cell(early72, '*') : '';
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
@@ -162,7 +169,11 @@ export function buildKayitzRow(week, settings) {
 export const KAYITZ_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against: the two
+  // opinions, the room's star count, or the day the מנין falls on. That part prints smaller,
+  // all of it, not just a bracketed word - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: ' מעריב ' },
   { key: 'G', header: 'מנחה\nמעריב' },
@@ -170,9 +181,11 @@ export const KAYITZ_COLUMNS = [
   // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
   // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
   // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר"נ)\nפלג מ"א 72' },
-  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
-  { key: 'K', header: 'מנחה\nפלג גר"א' },
-  { key: 'L', header: 'מנחה\nערב שבת' },
+  // Neither room has its own word in the header any more: בעזר"נ is the star on the מנין's
+  // own time, למטה is still its underline (see the cell() function above, and why).
+  { key: 'I', header: 'מנחה\nפלג מ"א 72', headerSub: true },
+  { key: 'J', header: 'מנחה\nפלג מ"א', headerSub: true },
+  { key: 'K', header: 'מנחה\nפלג גר"א', headerSub: true },
+  { key: 'L', header: 'מנחה\nערב שבת', headerSub: true },
 ];
 

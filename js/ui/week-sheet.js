@@ -163,10 +163,10 @@ const sheetSection = (title, rows) => (rows.filter(Boolean).length
 /** A column's heading split into the name of the מנין and the זמן it is set against.
  *
  *  A chart heading is written to wrap inside a narrow column, so its lines are a name broken
- *  up rather than several things: "מנחה / (למטה) / פלג מ״א" is one מנין. The last line is the
- *  exception where it names the reckoning rather than the מנין, which is every פלג column and
- *  the ס״ז קר״ש one, and that becomes the smaller line beside the name. Everything else joins
- *  the name, brackets and all, since the room is part of which מנין this is. */
+ *  up rather than several things: "מנחה / פלג מ״א" is one מנין (its room is a mark on the
+ *  time itself now, not a word of its own on the heading - see sheets/kayitz.js). The last
+ *  line is the exception where it names the reckoning rather than the מנין, which is every
+ *  פלג column and the ס״ז קר״ש one, and that becomes the smaller line beside the name. */
 function nameAndBasis(header) {
   const lines = String(header).split('\n').map((l) => l.trim()).filter(Boolean);
   const last = lines[lines.length - 1] || '';
