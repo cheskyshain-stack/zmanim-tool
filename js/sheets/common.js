@@ -72,11 +72,12 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  formula in both sheets. Printed across two lines, split as evenly as possible
  *  (more options on the second line when the count is odd).
  *
- *  12:30, 12:45 and 1:00 still read the clock: while the clocks are forward, nothing is
+ *  12:15, 12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
- *  workbook, which does not have it. 12:45 is the newer of the two added this way, asked
- *  for directly once a Friday that happened to be חנוכה's own had been getting it and
- *  every other standard-time Friday had not.
+ *  workbook, which does not have it. 12:15 (12:45 for a stretch, see below) is the newer of
+ *  the two added this way, and only runs at all on a Friday whose own Shabbos falls inside
+ *  חנוכה, tagged on the board as חנוכה's own - every other standard-time Friday has 12:30
+ *  and nothing in front of it.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -116,22 +117,23 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
      Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
      flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
   const clocksBack = 'offered only while the clocks are back';
-  /* 12:45 is back to running only on a Friday whose Shabbos falls inside חנוכה (chanukahYearFor),
-     tagged on the board as חנוכה's own (chanukahTag, below) - the way it worked before תשפ״ו,
-     when it was widened to every standard-time Friday and the tag came off with it (see the old
-     note this replaced, kept in git history rather than here now that it is no longer what runs).
-     Asked for directly, back the other way: every other standard-time Friday goes back to 12:30
-     alone, nothing at 12:45 behind it. */
+  /* 12:15 (moved here from 12:45) is back to running only on a Friday whose Shabbos falls
+     inside חנוכה (chanukahYearFor), tagged on the board as חנוכה's own (chanukahTag, below) -
+     the way the earlier of these two מנינים worked before תשפ״ו, when it was moved to 12:45
+     and widened to every standard-time Friday, and the tag came off with it (see the old note
+     this replaced, kept in git history rather than here now that it is no longer what runs).
+     Asked for directly, back the other way: every other standard-time Friday goes back to
+     12:30 alone, nothing in front of it. */
   const chanukahOnly = 'offered only on a Friday whose Shabbos falls during חנוכה';
-  const twelveFortyFive = clockTime(12, 45, 'the second of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
+  const twelveFifteen = clockTime(12, 15, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
     .onlyWhen(onStandardTime && isChanukahShabbos, !onStandardTime ? clocksBack : chanukahOnly);
   const all = [
+    twelveFifteen,
     /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
        Math.max is symmetric so the answer is the same, but the chain starts where the name
        does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
-    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
-    twelveFortyFive,
+    clockTime(12, 30, 'the second of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
     /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
        neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
@@ -163,9 +165,9 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
      own cell rendering reaches for printOverrides, built from this in sheets/choref.js's and
      sheets/kayitz.js's own row, and only when this week's own column has not been typed over
      by hand. */
-  const twelveFortyFiveText = twelveFortyFive.text();
-  const printText = twelveFortyFiveText
-    ? splitLinesInHalf(flattenNonEmpty(all.map((t) => (t === twelveFortyFive ? chanukahTag(twelveFortyFiveText) : t.text()))))
+  const twelveFifteenText = twelveFifteen.text();
+  const printText = twelveFifteenText
+    ? splitLinesInHalf(flattenNonEmpty(all.map((t) => (t === twelveFifteen ? chanukahTag(twelveFifteenText) : t.text()))))
     : null;
 
   return {
@@ -174,10 +176,10 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
     note: !onStandardTime
-      ? 'The clocks are forward this week, so 12:30, 12:45 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
+      ? 'The clocks are forward this week, so 12:15, 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
       : isChanukahShabbos
-        ? 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest, and this Friday\'s own Shabbos is inside חנוכה, so 12:45 runs too.'
-        : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest. 12:45 runs only on a Friday whose Shabbos is inside חנוכה, and this one is not.',
+        ? 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest, and this Friday\'s own Shabbos is inside חנוכה, so 12:15 runs too.'
+        : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest. 12:15 runs only on a Friday whose Shabbos is inside חנוכה, and this one is not.',
   };
 }
 export function fridayMainMinchaMenu(fridayDate, settings, shabbosSerial) {

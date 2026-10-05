@@ -539,7 +539,7 @@ export function combineErevShabbos(erevShabbosList, settings, tables) {
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
  *  lighting (see `candleLightingParts`) appended after it.
  *
- *  12:45 is not spliced in here on its own: fridayMainMinchaParts already knows to offer it,
+ *  12:15 is not spliced in here on its own: fridayMainMinchaParts already knows to offer it,
  *  tagged, on exactly the Fridays this function is ever called for (one of the eight days'
  *  own, per chanukahErevShabbosPairs below), so there is nothing left for this function to
  *  add. */

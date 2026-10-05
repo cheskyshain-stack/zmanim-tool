@@ -123,7 +123,7 @@ export function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  /* 12:45 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
+  /* 12:15 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
      board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
      L itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);

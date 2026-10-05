@@ -635,7 +635,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // possibly with manual <u> underlining); computed cells still need nl2br().
         // printOverrides is read here too, same as the Weekday chart's own B/C above: the
         // Shabbos chart's own Erev Shabbos מנחה column (I) carries the "חנוכה" tag on its
-        // own extra 12:45 this same way (see choref.js), and every other reader of this
+        // own extra 12:15 this same way (see choref.js), and every other reader of this
         // column - a hand-typed override, week.specialParsha, anything that reads row.I
         // directly - still sees the plain untagged time.
         const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';

@@ -248,23 +248,24 @@ function minchaParts(week, settings) {
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },
-    /* Asked for: once the week's own שקיעה has walked the evening מנחה back to 5:00 or
-       earlier, none of these three run at all that week, rather than being printed at 5:00
-       or stepping on past it toward the darkest weeks of the year. They come back on their
-       own once the days have lengthened enough again that stepping does not push them that
-       far - no separate switch, since the same stepping already answers both directions.
+    /* Asked for, corrected from an earlier 5:00: once the week's own שקיעה has walked the
+       evening מנחה back to 4:15 or earlier, none of these three run at all that week, so the
+       BMG מנחה right in front of them is the last one of the day, rather than the board
+       printing an evening מנחה at or before the BMG one. They come back on their own once
+       the days have lengthened enough again that stepping does not push them that far - no
+       separate switch, since the same stepping already answers both directions.
        All three carry the cutoff, not only the 6:35 one: all three sit on the same
        five-minute grid as the latest שקיעה they are walked against, so whenever any
        stepping is needed at all they land on the exact same minute (proven on חיי שרה
        תשפ"ז: 6:35, 7:30 and 8:00 all step to 4:30). Cutting only the first would have left
        the 7:30 one free to take its place, fifteen minutes clear of the 4:15 BMG מנחה in
        front of it and so not close enough to be dropped as crowding it - the board would
-       still have shown a 4:30, just from a different base time. earliestPrinted is read
-       below, after the stepping loop, not here, since it needs each slot's own stepped
+       still have shown a time there, just from a different base time. earliestPrinted is
+       read below, after the stepping loop, not here, since it needs each slot's own stepped
        value to check. */
-    { mins: HM(18, 35), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
-    { mins: HM(19, 30), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
-    { mins: HM(20, 0), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
+    { mins: HM(18, 35), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15) },
+    { mins: HM(19, 30), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15) },
+    { mins: HM(20, 0), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15) },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
 

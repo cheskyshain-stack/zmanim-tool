@@ -57,7 +57,7 @@ export function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
-  /* 12:45 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
+  /* 12:15 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
      board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
      I itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
