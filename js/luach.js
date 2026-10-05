@@ -21,6 +21,12 @@ import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.
 import { shulNow } from './zmanim/solar.js';
 
 const main = document.getElementById('main');
+/** Which week /week/ is currently showing, moved by Previous/This week/Next - see
+ *  renderWeekPage. Module level rather than a closure inside it so a stale-tab reload
+ *  (watchForStaleTab, saveRestorePoint) can read it without renderWeekPage knowing that
+ *  reloading is a thing that happens. null means "whichever is next", the page's own
+ *  default. */
+let weekShowing = null;
 
 /** Reload this tab after it has sat open a full day, so a page left running on a kiosk or a
  *  phone that is never actually closed eventually picks up fresh data - a republished
@@ -28,31 +34,95 @@ const main = document.getElementById('main');
  *  loaded whenever it was first opened. http(s) only: the offline copy has nothing newer
  *  to fetch, and a file:// reload is a page sitting on a USB stick, not a stale tab.
  *
+ *  Never in the middle of anything. A reload only ever happens at one of two kinds of
+ *  moment: the instant a new page is about to open - a menu tap, back, forward - where the
+ *  reader has already left for somewhere else and reloading there is simply opening that
+ *  page fresh instead of from this old script; or, on the page the reader is already on,
+ *  only once they have stopped touching it for a while (IDLE_BEFORE_REFRESH_MS) or have
+ *  just come back to a tab that sat in the background (visibilitychange, pageshow's own
+ *  bfcache restore, focus) - never mid-scroll, mid-tap, or while they are actively reading.
+ *  A plain interval alone would have reloaded under a thumb mid-swipe; checking idle time
+ *  first is what rules that out.
+ *
  *  Timed by checking elapsed time rather than a single 24-hour setTimeout, because a
  *  background tab's timers are throttled or paused by the browser and a long setTimeout is
- *  not reliable sleep there. visibilitychange, pageshow and focus ask again the moment
- *  somebody actually looks at the tab, which is the only time a stale one matters, and the
- *  interval is a fallback for a screen left on and never backgrounded at all, the way a
- *  kiosk display would be.
+ *  not reliable sleep there.
  *
  *  Held back while a donation panel is open (see wireDonateFrames): pulling the page out
  *  from under somebody mid-payment is a worse cost than a day-old price sitting on screen
  *  a little longer. */
 const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+const IDLE_BEFORE_REFRESH_MS = 5 * 60 * 1000;
+const RELOAD_RESTORE_KEY = 'zmanim-reload-restore';
+
+const openedAt = Date.now();
+let lastInteraction = openedAt;
+const tabIsStale = () => Date.now() - openedAt >= REFRESH_AFTER_MS;
+const donationPanelOpen = () => Boolean(document.querySelector('.luach-give-frame:not([hidden])'));
+
+/** What it takes to land back where the reader was. The page itself needs nothing saved -
+ *  reload() repeats the same address - so this is only the scroll position and, on
+ *  /week/, which week was showing: the one piece of this site's own state that Previous,
+ *  This week and Next (see renderWeekPage, weekShowing) keep off the address bar. Read
+ *  once, by takeRestorePoint below, and cleared the moment it is read, so a reader who
+ *  closes this tab and opens a fresh one later is never silently scrolled somewhere old. */
+function saveRestorePoint() {
+  try {
+    sessionStorage.setItem(RELOAD_RESTORE_KEY, JSON.stringify({
+      path: location.pathname, scrollY: window.scrollY, weekShowing,
+    }));
+  } catch { /* no sessionStorage - the reload still happens, just without the memory of it */ }
+}
+
+/** Reload now, on the page the reader is already on: the only one of the two safe moments
+ *  (see watchForStaleTab) that needs saveRestorePoint, since reload() alone would otherwise
+ *  land back at the top of the same page rather than where they actually were. */
+function reloadInPlace() {
+  saveRestorePoint();
+  location.reload();
+}
+
+/** Consumed once, before the very first render on a fresh load: what to put back if this
+ *  load is the other end of reloadInPlace. Null on an ordinary load, or when the saved page
+ *  is not the one this address is actually on - typing a different address, or reloading by
+ *  hand, must never scroll a reader somewhere that page never asked for. */
+function takeRestorePoint() {
+  try {
+    const raw = sessionStorage.getItem(RELOAD_RESTORE_KEY);
+    sessionStorage.removeItem(RELOAD_RESTORE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    return saved && saved.path === location.pathname ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 function watchForStaleTab() {
   if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
-  const openedAt = Date.now();
-  const refreshIfStale = () => {
-    if (Date.now() - openedAt < REFRESH_AFTER_MS) return;
-    if (document.querySelector('.luach-give-frame:not([hidden])')) return;
-    location.reload();
-  };
-  setInterval(refreshIfStale, 30 * 60 * 1000);
+  const markActive = () => { lastInteraction = Date.now(); };
+  for (const type of ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel']) {
+    window.addEventListener(type, markActive, { passive: true, capture: true });
+  }
+  // The only trigger that waits rather than acting the moment it is asked: everything
+  // else below is already a safe moment on its own.
+  setInterval(() => {
+    if (!tabIsStale() || donationPanelOpen()) return;
+    if (Date.now() - lastInteraction < IDLE_BEFORE_REFRESH_MS) return;
+    reloadInPlace();
+  }, 60000);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshIfStale();
+    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen()) reloadInPlace();
   });
-  window.addEventListener('pageshow', refreshIfStale);
-  window.addEventListener('focus', refreshIfStale);
+  window.addEventListener('pageshow', (ev) => {
+    // persisted: restored from the back-forward cache, i.e. a tab that sat aside for a
+    // while - not the ordinary pageshow every fresh load also fires, which openedAt being
+    // brand new already keeps tabIsStale() from acting on.
+    if (ev.persisted && tabIsStale() && !donationPanelOpen()) reloadInPlace();
+  });
+  window.addEventListener('focus', () => {
+    if (tabIsStale() && !donationPanelOpen()) reloadInPlace();
+  });
 }
 
 
@@ -753,7 +823,6 @@ function openTheDoor() {
 function renderWeekPage(published) {
   stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  let serial = null;
   const draw = () => {
     clearTimeout(nextUpTimer);
     const expanded = new Map([...main.querySelectorAll('[data-agenda-key]')].map(el=>[el.dataset.agendaKey,el.open]));
@@ -764,10 +833,10 @@ function renderWeekPage(published) {
       main.querySelector('#week-host'),
       state,
       (next) => {
-        serial = next;
+        weekShowing = next;
         draw();
       },
-      serial,
+      weekShowing,
       { luach: true }
     );
     /* Previous, Today and Next used to live in a More options dropdown, whose open state had
@@ -1158,7 +1227,7 @@ function stampPage(where) {
   if (canon) canon.href = new URL(where ? `/${where}/` : '/', location.href).href;
 }
 
-function route(published) {
+function route(published, { preserveWeekShowing = false } = {}) {
   const where = whereAmI();
   // One address per page. Arriving on /#week leaves the bar reading /#week, which is a
   // second way of writing an address that already has a first one: replaceState rather
@@ -1168,6 +1237,11 @@ function route(published) {
     history.replaceState(null, '', where ? `/${where}/` : '/');
   }
   stampPage(where);
+  // Every ordinary way of arriving here - a menu tap, back, forward, a #week link from
+  // outside - opens /week/ fresh, on whichever week is next, the same as it always has.
+  // Only a stale-tab reload asks to be put back on the week it already had open (see
+  // takeRestorePoint), which is the one caller that passes preserveWeekShowing.
+  if (!preserveWeekShowing) weekShowing = null;
   if (where === 'week') return renderWeekPage(published);
   if (where === 'chart') return renderChartPage(published);
   if (where === 'schedules') return renderSchedulesPage(published);
@@ -1197,6 +1271,10 @@ function wireNav(published) {
     ev.preventDefault();
     if (url.pathname === location.pathname) return;
     history.pushState(null, '', url.pathname);
+    // The reader has already left for a new page - the address now says so - so a stale
+    // tab reloads right here rather than rendering the old script's idea of that page.
+    // See watchForStaleTab: this is one of the moments nothing is ever interrupted.
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
     route(published);
     // A tap that swaps the page but leaves the scroll where it was reads as a page that
     // did not answer: on a long week list the new page opens halfway down itself.
@@ -1210,7 +1288,11 @@ function wireNav(published) {
       ], { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
     }
   });
-  window.addEventListener('popstate', () => route(published));
+  window.addEventListener('popstate', () => {
+    // Back or forward is the same "already left for a new page" moment a menu tap is.
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
+    route(published);
+  });
 }
 
 
@@ -1242,10 +1324,27 @@ function wireNav(published) {
     return;
   }
   wireNav(published);
-  route(published);
+  // Consumed once, before the first render: the other end of a stale-tab reload (see
+  // watchForStaleTab) names the week /week/ had open and the scroll position to put back,
+  // both otherwise lost the moment the old script is gone. Null on every ordinary load.
+  const restore = takeRestorePoint();
+  if (restore && Number.isFinite(restore.weekShowing)) weekShowing = restore.weekShowing;
+  route(published, { preserveWeekShowing: Boolean(restore) });
+  if (restore && Number.isFinite(restore.scrollY)) {
+    // Applied now and again once layout has actually settled: a webfont or an image
+    // landing after the first paint can still grow the page under a scroll position
+    // asked for before that happened.
+    const applyScroll = () => window.scrollTo(0, restore.scrollY);
+    applyScroll();
+    requestAnimationFrame(() => requestAnimationFrame(applyScroll));
+    document.fonts?.ready?.then(applyScroll);
+  }
   // Still listened for: a link with a hash in it can come from outside the page, and the
   // click handler above never sees those.
-  window.addEventListener('hashchange', () => route(published));
+  window.addEventListener('hashchange', () => {
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
+    route(published);
+  });
 })();
 
 
