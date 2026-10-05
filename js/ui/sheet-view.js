@@ -509,7 +509,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${Number(sheet.columnWidths[key]) || 0}px"` : ''}>`).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerBasisSmall(c.header))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
@@ -820,6 +820,22 @@ function withHebrewDate(week, settings) {
 function splitBuild(season) {
   if (season === 'weekday') return buildWeekdayRow;
   return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
+}
+
+/** A column heading's last line, when it names the reckoning rather than the מנין - every
+ *  פלג column and the ס"ז קר"ש one - prints smaller beside the name above it, the same idea
+ *  week-sheet.js's own (private) nameAndBasis applies for the One sheet view, matched here by
+ *  the same rule rather than shared code, since the two views never render through one
+ *  function. Wrapped only for this <th>'s own HTML: c.header itself stays the plain string it
+ *  always was, because rules-view's own checkbox labels, week-view's and weekly-reader's week
+ *  card, and erev-text.js all read that same string apart from this table and do not know
+ *  smallText()'s sentinel - only this function's own call to nl2br does. */
+function headerBasisSmall(header) {
+  const lines = String(header).split('\n');
+  const last = lines[lines.length - 1] || '';
+  const isBasis = lines.length > 1 && (last.startsWith('פלג') || last.includes('גר'));
+  if (!isBasis) return nl2br(header);
+  return nl2br(lines.slice(0, -1).join('\n')) + '<br><span class="cell-small">' + nl2br(last) + '</span>';
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
