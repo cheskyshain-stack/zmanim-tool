@@ -181,7 +181,8 @@ function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }
  *
  *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
  *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
- *  keeps the location it started with. */
+ *  keeps the location it started with. None of the evening three (6:35, 7:30, 8:00) run at
+ *  all once the week's own שקיעה has walked them back to 5:00 or earlier. */
 function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
@@ -247,9 +248,23 @@ function minchaParts(week, settings) {
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },
-    { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
-    { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
-    { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
+    /* Asked for: once the week's own שקיעה has walked the evening מנחה back to 5:00 or
+       earlier, none of these three run at all that week, rather than being printed at 5:00
+       or stepping on past it toward the darkest weeks of the year. They come back on their
+       own once the days have lengthened enough again that stepping does not push them that
+       far - no separate switch, since the same stepping already answers both directions.
+       All three carry the cutoff, not only the 6:35 one: all three sit on the same
+       five-minute grid as the latest שקיעה they are walked against, so whenever any
+       stepping is needed at all they land on the exact same minute (proven on חיי שרה
+       תשפ"ז: 6:35, 7:30 and 8:00 all step to 4:30). Cutting only the first would have left
+       the 7:30 one free to take its place, fifteen minutes clear of the 4:15 BMG מנחה in
+       front of it and so not close enough to be dropped as crowding it - the board would
+       still have shown a 4:30, just from a different base time. earliestPrinted is read
+       below, after the stepping loop, not here, since it needs each slot's own stepped
+       value to check. */
+    { mins: HM(18, 35), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
+    { mins: HM(19, 30), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
+    { mins: HM(20, 0), place: LMATA, shkiaDriven: true, earliestPrinted: HM(17, 0) },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
 
@@ -266,6 +281,10 @@ function minchaParts(week, settings) {
   const kept = [];
   for (const slot of slots) {
     if (slot.offSeason) continue;
+    if (slot.earliestPrinted != null && slot.mins <= slot.earliestPrinted) {
+      slot.droppedBecause = `stepped back to ${fmtMinutes(slot.mins)}, at or before ${fmtMinutes(slot.earliestPrinted)}, which this מנין does not run`;
+      continue;
+    }
     const prev = kept[kept.length - 1];
     if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) {
       slot.droppedBecause = `moved back to within ${TOO_CLOSE} minutes of the ${fmtMinutes(prev.mins)} in front of it`;
