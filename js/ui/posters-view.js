@@ -748,12 +748,20 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  halves of each are already on it under their own names, and a sheet holding them twice is
  *  the same schedule said twice.
  *
- *  Only two years are looked at. Every sheet's dates sit within a month of ר"ה, and
- *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything still
- *  ahead and the year before it covers the sheets that run past יו"כ, which from סוכות onwards
- *  is most of them. A year nowhere near today is not built at all: this is asked on the page
- *  every visitor lands on, and building a season to find out that none of it is up cost 120ms
- *  on a slow phone. The dates come from the calendar, which costs nothing.
+ *  Only two years are looked at: the Hebrew year today is in, and the one before it - between
+ *  the two, every occasion from ר"ה through the following אלול is covered once, since a date
+ *  either side of a Rosh Hashana falls in whichever of the pair that Rosh Hashana belongs to.
+ *  A year nowhere near today is not built at all: this is asked on the page every visitor
+ *  lands on, and building a season to find out that none of it is up cost 120ms on a slow
+ *  phone. The dates come from the calendar, which costs nothing.
+ *
+ *  This used to skip a year unless `on` fell within about a month of its own Rosh Hashana -
+ *  true of ר"ה, יו"כ and סוכות, which is all POSTER_OCCASIONS held when this was written, but
+ *  not of חנוכה, three months later, or anything after it: the live page could never show
+ *  them, whatever the admin's own Posters tab could build on demand. Caught the same way the
+ *  gap in ONEPAGE_SECTIONS was: asked to make the one-page sheet work for חנוכה and it did not,
+ *  anywhere a visitor could actually reach it. The window is the whole Hebrew year now, not a
+ *  month of it.
  *
  *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at all.
  *  That is the right way round here rather than a shortcut: the chart is what the board says,
@@ -814,7 +822,10 @@ export function currentOnePageSheets(state, settings, { on = shulNow(new Date(),
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
-    if (on < rh - 45 || on > rh + 35) continue;
+    const rhAfter = roshHashana(year - 3761 + 1);
+    // lead rather than a fixed number: a sheet can go up this many days before its own first
+    // date, and that is as early as this year has anything worth building for.
+    if (on < rh - lead || on >= rhAfter) continue;
     for (const name of POSTER_OCCASIONS) {
       let built = null;
       try {
@@ -1855,6 +1866,31 @@ const ONEPAGE_SECTIONS = {
     { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
     { label: YK_TEXT.afterBig.maariv, times: p.after.maariv },
   ])],
+  /* The same four sections chanukahBody draws on the sheet of its own (see posters/chanukah.js):
+     one or two combined mornings, the standing weekday מנחה, the one ערב שבת block the eight
+     days work out to (sometimes two Fridays merged into one), and מעריב. Missing before this,
+     not merely unlisted: a poster with no entry here is left off the sheet silently (see the
+     table's own note above), and חנוכה had none, so "All on one" for חנוכה printed a header and
+     a footer with nothing between them. Nothing here works out a time, same as every other
+     entry: these are the poster's own rows, cut to this sheet's shape.
+     Each שחרית row's own ותיקין time (vasikin) stands in for its first, merged cell exactly the
+     way the full sheet's own vasikinLine draws it: that one position is never the group's own
+     agreed time the way every other position is, so it cannot be read off row.cells[0] along
+     with the rest. */
+  chanukah: (p) => {
+    const shacharisRow = (row) => ({
+      label: row.label,
+      times: [{ text: row.vasikin.time, underlined: false, mark: '' }, ...row.cells.slice(1)],
+    });
+    const oneLine = (label, times) => oneSection(label, [{ label, times }]);
+    const sections = [
+      oneSection(CH_TEXT.shacharis, p.shacharisRows.map(shacharisRow)),
+      oneLine(CH_TEXT.mincha, p.weekdayMincha.map(toCell)),
+    ];
+    if (p.erevShabbos) sections.push(oneLine(p.erevShabbos.title, p.erevShabbos.cells));
+    sections.push(oneLine(CH_TEXT.maariv, p.maariv.map(toCell)));
+    return sections;
+  },
 };
 
 /** One row: the name on the right, the times on the left, the way a timetable is read.
