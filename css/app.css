@@ -871,6 +871,11 @@ td.ruled .cell { background: var(--ruled); }
    Serif for Times New Roman, whose ע does not reach the line, so it has to be checked in the
    font that actually ships (see HEBREW_STAND_IN in sheet-view.js). */
 .ul, u { text-decoration: underline; text-underline-offset: 2px; text-decoration-skip-ink: none; }
+/* smallText() (format.js): the stricter/alternate reading set smaller than the one a cell
+   leads with - פלג under its מנחה in the early קיץ columns, מ"א beside גר"א in ס"ז קר"ש.
+   Same idea as .head-room on a heading, a size of its own rather than borrowed from there,
+   since a cell and a heading are not read at the same size to begin with. */
+.cell-small { font-size: 0.8em; }
 /* Weekday chart's שחרית column: one shul-wide schedule for the whole page (see
    sheet-view.js) rather than a per-week editable cell - not contenteditable, so style it
    as plainly distinct from the surrounding editable cells. direction:ltr for the same

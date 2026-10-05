@@ -84,6 +84,20 @@ export function chanukahTag(text) {
   return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + 'חנוכה' + CHANUKAH_TAG_END;
 }
 
+// Same PUA mechanism again, for a span that should print smaller than the rest of its cell:
+// the stricter/alternate reading sitting beside the main one (sheets/kayitz.js's own פלג
+// under its מנחה, and the מ"א beside the גר"א in the ס"ז קר"ש column of both Shabbos charts),
+// the same way .head-room already sets a heading's bracketed room smaller than the מנין name
+// above it. Two markers, not three: there is no inner word to seam off, unlike NEW/חנוכה.
+export const SMALL_START = '';
+export const SMALL_END = '';
+
+/** Wraps an already-formatted value (which may itself carry underline sentinels) so it
+ *  renders smaller than the rest of its cell. */
+export function smallText(text) {
+  return SMALL_START + text + SMALL_END;
+}
+
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
  *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
  *  the caller can leave those digits untouched rather than mangle them. */

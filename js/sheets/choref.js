@@ -3,7 +3,7 @@
 // Excel-style serial date; Friday-anchored columns use `week.serial - 1`.
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
+import { ceilToMinute, floorToMinute, formatTime, underlineTime, smallText } from '../format.js';
 import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { textjoin, SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
@@ -31,7 +31,9 @@ export function buildChorefRow(week, settings) {
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
-  const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
+  // מ"א set smaller, the same way the קיץ chart's early מנינים' own פלג is: the stricter
+  // reading beside the one the chart leads with, not a value of its own weight.
+  const D = `${smallText(shmaMGA.text())}${SLASH}${shmaGRA.text()}`;
   const shacharis = shacharisParts();
   const E = shacharis.text;
 

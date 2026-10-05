@@ -18,6 +18,7 @@ import { shacharisGridHtml } from './shacharis-grid.js';
 import {
   UL_START, UL_END, NEW_TAG_START, NEW_TAG_MID, NEW_TAG_END,
   CHANUKAH_TAG_START, CHANUKAH_TAG_MID, CHANUKAH_TAG_END,
+  SMALL_START, SMALL_END,
   normalizeRichText, markHeaderRoom,
 } from '../format.js';
 import { applyTimeShorthand } from './rich-text.js';
@@ -859,6 +860,11 @@ function nl2br(str) {
     .split(CHANUKAH_TAG_START).join('<span class="chanukah-tag">')
     .split(CHANUKAH_TAG_MID).join('<span class="tag-word">')
     .split(CHANUKAH_TAG_END).join('</span></span>');
-  return chanukahTagged.replace(/\n/g, '<br>');
+  // smallText() (format.js): the stricter/alternate reading beside the main one - פלג under
+  // its מנחה, מ"א beside גר"א - set smaller, same idea as .head-room on a heading.
+  const smalled = chanukahTagged
+    .split(SMALL_START).join('<span class="cell-small">')
+    .split(SMALL_END).join('</span>');
+  return smalled.replace(/\n/g, '<br>');
 }
 

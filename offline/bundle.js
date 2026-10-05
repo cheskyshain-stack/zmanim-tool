@@ -2015,6 +2015,20 @@ function chanukahTag(text) {
   return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + 'חנוכה' + CHANUKAH_TAG_END;
 }
 
+// Same PUA mechanism again, for a span that should print smaller than the rest of its cell:
+// the stricter/alternate reading sitting beside the main one (sheets/kayitz.js's own פלג
+// under its מנחה, and the מ"א beside the גר"א in the ס"ז קר"ש column of both Shabbos charts),
+// the same way .head-room already sets a heading's bracketed room smaller than the מנין name
+// above it. Two markers, not three: there is no inner word to seam off, unlike NEW/חנוכה.
+const SMALL_START = '';
+const SMALL_END = '';
+
+/** Wraps an already-formatted value (which may itself carry underline sentinels) so it
+ *  renders smaller than the rest of its cell. */
+function smallText(text) {
+  return SMALL_START + text + SMALL_END;
+}
+
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that
  *  isn't a plausible time on a 12-hour board (hour outside 1-12, minutes past 59), so
  *  the caller can leave those digits untouched rather than mangle them. */
@@ -4683,7 +4697,9 @@ function buildKayitzRow(week, settings) {
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
-  const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
+  // מ"א set smaller, the same way the early מנינים' own פלג is: the stricter reading beside
+  // the one the chart leads with, not a value of its own weight.
+  const D = `${smallText(shmaMGA.text())}${SLASH}${shmaGRA.text()}`;
   const shacharis = shacharisParts();
   const E = shacharis.text;
 
@@ -4713,8 +4729,9 @@ function buildKayitzRow(week, settings) {
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
   // Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
-  // its own זמן under it. NBSP after the word so the pair can never wrap apart.
-  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\nפלג ${formatTime(e.plag)}`;
+  // its own זמן under it, smaller the same way the מ"א beside the גר"א is in the ס"ז קר"ש
+  // column. NBSP after the word so the pair can never wrap apart.
+  const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\n${smallText(`פלג ${formatTime(e.plag)}`)}`;
   const I = plagWindow ? cell(early72) : '';
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
@@ -5700,7 +5717,9 @@ function buildChorefRow(week, settings) {
 
   const shmaMGA = zman('סוף זמן קריאת שמע מ״א', Z.sofZmanShmaMGA72(shabbosDate, settings), 'the day measured from עלות 72 to צאת 72');
   const shmaGRA = zman('סוף זמן קריאת שמע גר״א', Z.sofZmanShmaGRA(shabbosDate, settings), 'the day measured from sunrise to שקיעה');
-  const D = `${shmaMGA.text()}${SLASH}${shmaGRA.text()}`;
+  // מ"א set smaller, the same way the קיץ chart's early מנינים' own פלג is: the stricter
+  // reading beside the one the chart leads with, not a value of its own weight.
+  const D = `${smallText(shmaMGA.text())}${SLASH}${shmaGRA.text()}`;
   const shacharis = shacharisParts();
   const E = shacharis.text;
 
@@ -11704,7 +11723,12 @@ function nl2br(str) {
     .split(CHANUKAH_TAG_START).join('<span class="chanukah-tag">')
     .split(CHANUKAH_TAG_MID).join('<span class="tag-word">')
     .split(CHANUKAH_TAG_END).join('</span></span>');
-  return chanukahTagged.replace(/\n/g, '<br>');
+  // smallText() (format.js): the stricter/alternate reading beside the main one - פלג under
+  // its מנחה, מ"א beside גר"א - set smaller, same idea as .head-room on a heading.
+  const smalled = chanukahTagged
+    .split(SMALL_START).join('<span class="cell-small">')
+    .split(SMALL_END).join('</span>');
+  return smalled.replace(/\n/g, '<br>');
 }
 
 // ==== ui/posters-view.js ====
