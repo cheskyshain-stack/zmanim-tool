@@ -1866,13 +1866,14 @@ const ONEPAGE_SECTIONS = {
     { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
     { label: YK_TEXT.afterBig.maariv, times: p.after.maariv },
   ])],
-  /* The same four sections chanukahBody draws on the sheet of its own (see posters/chanukah.js):
-     one or two combined mornings, the standing weekday מנחה, the one ערב שבת block the eight
-     days work out to (sometimes two Fridays merged into one), and מעריב. Missing before this,
-     not merely unlisted: a poster with no entry here is left off the sheet silently (see the
-     table's own note above), and חנוכה had none, so "All on one" for חנוכה printed a header and
-     a footer with nothing between them. Nothing here works out a time, same as every other
-     entry: these are the poster's own rows, cut to this sheet's shape.
+  /* The same sections chanukahBody draws on the sheet of its own (see posters/chanukah.js):
+     one or two combined mornings with their own נץ note where a day needed it, the standing
+     weekday מנחה, מעריב, and the one ערב שבת block the eight days work out to (sometimes two
+     Fridays merged into one). Missing before this, not merely unlisted: a poster with no
+     entry here is left off the sheet silently (see the table's own note above), and חנוכה had
+     none, so "All on one" for חנוכה printed a header and a footer with nothing between them.
+     Nothing here works out a time, same as every other entry: these are the poster's own
+     rows, cut to this sheet's shape.
      Each שחרית row's own ותיקין time (vasikin) stands in for its first, merged cell exactly the
      way the full sheet's own vasikinLine draws it: that one position is never the group's own
      agreed time the way every other position is, so it cannot be read off row.cells[0] along
@@ -1882,13 +1883,21 @@ const ONEPAGE_SECTIONS = {
       label: row.label,
       times: [{ text: row.vasikin.time, underlined: false, mark: '' }, ...row.cells.slice(1)],
     });
+    // One row per day the row's own ותיקין time needed נץ to explain it (netzBlockLines'
+    // own rows, on the full sheet), each day labelled rather than run together the way the
+    // full sheet's own netzDaysHtml sets them under one heading - this sheet's own row
+    // shape has no room for a label over every time, only one label a row.
+    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters }) => ({
+      label: `${CH_TEXT.netz} יום ${letters.map((l) => `${l}'`).join('/')}`,
+      times: [{ text: time, underlined: false, mark: '' }],
+    }));
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
-      oneSection(CH_TEXT.shacharis, p.shacharisRows.map(shacharisRow)),
+      oneSection(CH_TEXT.shacharis, p.shacharisRows.flatMap((row) => [shacharisRow(row), ...netzRows(row)])),
       oneLine(CH_TEXT.mincha, p.weekdayMincha.map(toCell)),
+      oneLine(CH_TEXT.maariv, p.maariv.map(toCell)),
     ];
     if (p.erevShabbos) sections.push(oneLine(p.erevShabbos.title, p.erevShabbos.cells));
-    sections.push(oneLine(CH_TEXT.maariv, p.maariv.map(toCell)));
     return sections;
   },
 };
