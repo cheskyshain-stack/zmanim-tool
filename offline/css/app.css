@@ -757,11 +757,12 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
    Asked for directly: no line between one row and the next any more - the zebra shading
    already carries that, and a board read from a few feet away does not need both. The
    columns keep a line between them, since nothing else marks where one time column ends
-   and the next begins the way shading marks a row, but subtler than the dark, crisp one
-   the table's own outer frame keeps: #ccd3da is the שחרית panel's own light grey (see
-   .shacharis-panel), reused here as this project's one answer for "a border that reads
-   as a hint rather than a rule". */
-.page table { border: 1px solid #9aa7b3; }
+   and the next begins the way shading marks a row. #ccd3da is the שחרית panel's own light
+   grey (see .shacharis-panel), reused here as this project's one answer for "a border
+   that reads as a hint rather than a rule" - the outer frame used to keep the bare rule's
+   own darker #9aa7b3 instead, which read as a different weight around the same table; asked
+   for directly to match the column lines, so the whole frame is now one grey throughout. */
+.page table { border: 1px solid #ccd3da; }
 .page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #ccd3da; border-right: 1px solid #ccd3da; }
 th {
   background: var(--sheet-accent, var(--accent));
