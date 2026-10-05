@@ -195,6 +195,8 @@ export const KAYITZ_COLUMNS = [
   { key: 'I', header: 'מנחה\nפלג מ"א 72', headerSub: true },
   { key: 'J', header: 'מנחה\nפלג מ"א', headerSub: true },
   { key: 'K', header: 'מנחה\nפלג גר"א', headerSub: true },
-  { key: 'L', header: 'מנחה\nערב שבת', headerSub: true },
+  // Not headerSub: "ערב שבת" names which מנחה this is, the same weight as "מנחה" above it,
+  // not a reckoning read against the name the way a פלג line or ס"ז קר"ש's two opinions are.
+  { key: 'L', header: 'מנחה\nערב שבת' },
 ];
 

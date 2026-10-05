@@ -106,6 +106,8 @@ export const CHOREF_COLUMNS = [
   { key: 'F', header: 'מעריב' },
   { key: 'G', header: 'מנחה\nמעריב' },
   { key: 'H', header: 'הדלקת\nנרות' },
-  { key: 'I', header: 'מנחה\nערב שבת', headerSub: true },
+  // Not headerSub: "ערב שבת" names which מנחה this is, the same weight as "מנחה" above it,
+  // not a reckoning read against the name the way D's two opinions are.
+  { key: 'I', header: 'מנחה\nערב שבת' },
 ];
 
