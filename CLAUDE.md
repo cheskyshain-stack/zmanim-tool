@@ -133,6 +133,8 @@ before printing. `tests/time-explanations.cjs` checks actual clicks and chart ge
 Rounding steps show the rule, the actual earlier or later movement, and the values before
 and after rounding. Traces also record nearest-minute display rounding separately from
 the arithmetic, while times printed with seconds retain that precision.
+The separate Calculation guide was removed. Old `#calc` bookmarks open Seasonal charts;
+calculation details come from clicking a time with Explain times enabled.
 
 Admin print layouts have a **Spring clock change** switch on winter charts (also when
 opening their Weekday companion). **Separate headers** gives weeks before spring DST

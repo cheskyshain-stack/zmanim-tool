@@ -56,7 +56,7 @@ export function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p><strong>Schedule settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
         <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Schedule settings → Backup</strong> to export a backup or import one on another device.</p>
-        <p><strong>Calculation guide</strong> explains the formulas used by the charts and special schedules.</p>
+        <p>Turn on <strong>Explain times</strong>, then click a schedule time to see its calculation and rounding. Turn it off to edit times.</p>
       </div>
     </details>
     <div class="actions">
@@ -67,4 +67,3 @@ export function renderGuide(container, onOpenTab) {
   container.querySelector('#guide-start').addEventListener('click', () => onOpenTab('charts'));
   container.querySelector('#guide-program').addEventListener('click', () => onOpenTab('program'));
 }
-
