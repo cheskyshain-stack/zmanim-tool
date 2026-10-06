@@ -775,6 +775,28 @@ function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Match the straight double quote in the chart's ס"ז קר"ש heading. Only visible
+ *  text changes; attributes, room keys and calculation data keep their original values. */
+function useStraightHebrewQuotes(root) {
+  if (!root) return;
+  const walker = root.ownerDocument.createTreeWalker(root, 4); // NodeFilter.SHOW_TEXT
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement?.closest('script, style, textarea')) continue;
+    const text = node.data.replace(/״/g, '"').replace(/([\u0590-\u05ff])[“”](?=[\u0590-\u05ff])/g, '$1"');
+    if (text !== node.data) node.data = text;
+  }
+}
+
+/** The same presentation for cell comparisons, so changing a quote's appearance
+ *  cannot create a manual override when somebody only clicks into a cell and leaves. */
+function straightHebrewQuoteHtml(html) {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  useStraightHebrewQuotes(box);
+  return box.innerHTML;
+}
+
 /** Whether two שחרית schedules say different things, whatever separators they were typed with.
  *  Used to drop a season line that only repeats the everyday one: the morning of יום א' of
  *  סליחות is the ordinary list, its סליחות having been said the night before, and printing it
@@ -8680,6 +8702,7 @@ function installTimeExplanations(main, host) {
     const note = [context.note, missing ? 'This displayed time has no recorded calculation. Check the source schedule before treating it as a fixed time.' : ''].filter(Boolean).join(' ');
     const fixed = times.length && times.every(t => t.steps.every(s => ['fixed', 'condition', 'underline', 'mark'].includes(s.kind)));
     dialog.innerHTML = cellDetailHtml({ ...context, note, printed: choices.map(c => c.token.text).join(' / '), times });
+    useStraightHebrewQuotes(dialog);
     const badge = document.createElement('p');
     badge.className = 'time-explain-kind';
     badge.textContent = missing ? 'Calculation not recorded' : fixed ? 'Fixed time' : 'Calculated time';
@@ -9621,6 +9644,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
+  useStraightHebrewQuotes(page);
+
   /** What this cell would hold with no manual override - what an edit is diffed against
    *  to decide whether it's a real change worth storing. */
   const baselineHtmlFor = (cellEl) => {
@@ -9635,7 +9660,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // Every column, Weekday included, is built as plain text with underline sentinels
     // that nl2br has to mark up first - or the comparison would see markup-vs-none and
     // store a bogus override on a cell nobody actually edited.
-    return normalizeRichText(nl2br(raw));
+    return straightHebrewQuoteHtml(normalizeRichText(nl2br(raw)));
   };
 
   const commitCell = (cellEl) => {
@@ -9644,7 +9669,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const newHtml = normalizeRichText(cellEl.innerHTML);
     const before = getOverride(sheet, serial, col); // undefined = "no override"
     const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    if (before === after) return; // no real change (e.g. just clicked in and out)
+    const displayedBefore = before === undefined ? undefined : straightHebrewQuoteHtml(normalizeRichText(before));
+    if (displayedBefore === after) return; // no real change (e.g. just clicked in and out)
     applyOverrideValue(sheet, serial, col, after);
     const hist = getHistory(sheet.id);
     hist.undo.push({ serial, col, before, after });
@@ -16691,6 +16717,7 @@ let fitHandler = null;
  *  so where a run should be cut does not change when the type does, and the heights they
  *  settle are what the fit then measures. */
 function layoutPosters(container) {
+  useStraightHebrewQuotes(container);
   balanceRuns(container);
   balanceOnePageTimes(container);
   fitPoster(container);
@@ -18465,6 +18492,7 @@ const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
  *  and every measurement is divided back by that zoom, so the room left at the foot means the
  *  same tenth of an inch whatever the screen did to the sheet. */
 function fitWeekSheet(container) {
+  useStraightHebrewQuotes(container);
   for (const sheet of container.querySelectorAll('.poster.is-weeksheet')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelector(':scope > .onepage-col');
@@ -19191,6 +19219,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     ${agenda.notices.map(d=>`<p class="reader-note">${readerDayHeading(d.serial, d.label, settings)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
+  useStraightHebrewQuotes(container);
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
   container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
@@ -20065,6 +20094,7 @@ const MAX_GROW_ACROSS = 2.6;
 const growCapFor = (card) => (card.classList.contains('is-weekday-card') ? MAX_GROW_ACROSS : MAX_GROW);
 
 function fitLinesToPage(container) {
+  useStraightHebrewQuotes(container);
   container.querySelectorAll('.week-card').forEach((card) => {
     const box = card.querySelector('.week-lines');
     const inner = box?.firstElementChild;
@@ -20188,6 +20218,7 @@ function fitLinesToPage(container) {
  *  will really be drawn. It re-reads its own breaks back into separators before deciding
  *  again, so calling it repeatedly settles rather than accumulating. */
 function fitPairColumns(sheet) {
+  useStraightHebrewQuotes(sheet);
   /* Each column is sized on its own first, and then **both are set to the smaller of the two
      answers**, so the two lists are in one size across the sheet.
 

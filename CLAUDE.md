@@ -242,6 +242,10 @@ styles, and identical footer positions in the physical desktop and phone PDFs.
 
 This is where the sneaky bugs live.
 
+- Display Hebrew double quotes with the straight mark used in `ס"ז קר"ש`, including
+  headings, notes and Hebrew years. `useStraightHebrewQuotes` changes text nodes before
+  layout measurements, preserving attributes and calculation keys. Editable chart
+  comparisons use the same presentation so an unchanged cell does not gain an override.
 - `.cell` and `.shacharis-merged` set `direction: ltr` deliberately. Changing that
   scrambles the time strings.
 - Wrap Hebrew inside an otherwise-LTR string in `<bdi>`, or you get output like

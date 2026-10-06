@@ -168,6 +168,28 @@ export function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Match the straight double quote in the chart's ס"ז קר"ש heading. Only visible
+ *  text changes; attributes, room keys and calculation data keep their original values. */
+export function useStraightHebrewQuotes(root) {
+  if (!root) return;
+  const walker = root.ownerDocument.createTreeWalker(root, 4); // NodeFilter.SHOW_TEXT
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement?.closest('script, style, textarea')) continue;
+    const text = node.data.replace(/״/g, '"').replace(/([\u0590-\u05ff])[“”](?=[\u0590-\u05ff])/g, '$1"');
+    if (text !== node.data) node.data = text;
+  }
+}
+
+/** The same presentation for cell comparisons, so changing a quote's appearance
+ *  cannot create a manual override when somebody only clicks into a cell and leaves. */
+export function straightHebrewQuoteHtml(html) {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  useStraightHebrewQuotes(box);
+  return box.innerHTML;
+}
+
 /** Whether two שחרית schedules say different things, whatever separators they were typed with.
  *  Used to drop a season line that only repeats the everyday one: the morning of יום א' of
  *  סליחות is the ordinary list, its סליחות having been said the night before, and printing it

@@ -36,7 +36,7 @@ import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWee
 import { excelSerial, dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
+import { hebrewLang, DAY_NAMES, SLASH, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 
@@ -2580,6 +2580,7 @@ let fitHandler = null;
  *  so where a run should be cut does not change when the type does, and the heights they
  *  settle are what the fit then measures. */
 export function layoutPosters(container) {
+  useStraightHebrewQuotes(container);
   balanceRuns(container);
   balanceOnePageTimes(container);
   fitPoster(container);

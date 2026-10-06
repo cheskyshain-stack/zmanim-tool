@@ -34,7 +34,7 @@ import { buildWeekdayRow } from '../sheets/weekday.js';
 import { UL_START, UL_END } from '../format.js';
 import { TZG_TEXT } from '../posters/tzomgedalia.js';
 import { weekdayMornings } from '../posters/day.js';
-import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
+import { hebrewLang, escAttr, SOFT_SLASH, useStraightHebrewQuotes } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
@@ -396,6 +396,7 @@ const leadFor = (scale) => WS_PT * scale * WS_LINE * WS_LEAD;
  *  and every measurement is divided back by that zoom, so the room left at the foot means the
  *  same tenth of an inch whatever the screen did to the sheet. */
 export function fitWeekSheet(container) {
+  useStraightHebrewQuotes(container);
   for (const sheet of container.querySelectorAll('.poster.is-weeksheet')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelector(':scope > .onepage-col');

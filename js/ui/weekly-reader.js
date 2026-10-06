@@ -6,7 +6,7 @@ import { buildPesachPoster } from '../posters/pesach.js';
 import { hebrewDateExtended, hasTaanis, hasRoshChodesh, hasBehab, excelWeekday } from '../hebrew-calendar.js';
 import { rowFor, weekIndex } from '../sheets/rows.js';
 import { dateFromSerial, shulNow } from '../zmanim/solar.js';
-import { escAttr, DAY_NAMES } from '../util.js';
+import { escAttr, DAY_NAMES, useStraightHebrewQuotes } from '../util.js';
 import { UL_START, UL_END } from '../format.js';
 import { sanitizeRichText } from '../security.js';
 import { liveChartRange } from './chart-view.js';
@@ -457,6 +457,7 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
     ${agenda.notices.map(d=>`<p class="reader-note">${readerDayHeading(d.serial, d.label, settings)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
+  useStraightHebrewQuotes(container);
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
   container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
