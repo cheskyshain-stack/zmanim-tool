@@ -171,6 +171,8 @@ Each physical chart page explains the location stars it prints: `*בעזרת נ�
 `**באולם השמחות`. Build this key from the rendered tables after joining DST sections,
 including saved edits, rules and the weekday morning panel. Keep each star count with
 its Hebrew label in a separate bidi isolate and reserve its space before fitting pages.
+Omit unused locations, including the standard downstairs line on a page without an
+underlined minyan time. Rebuild standard star keys from older custom footers per page.
 `syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
 without changing saved styles. Collapsed table borders and the gap between DST sections
 are included in row-height calculations. Measurement temporarily removes screen scaling

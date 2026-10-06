@@ -176,6 +176,18 @@ function fillChartLocationLegend(page) {
   const marks = new Set([...page.querySelectorAll('table')].flatMap(table =>
     [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])));
   const footer = page.querySelector('.footer-text');
+  const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
+  // Rebuild standard location keys from this page, including ones in an older custom
+  // footer. Other custom notes stay intact. Drop the downstairs line when no time uses it.
+  for (const node of [...footer.childNodes]) {
+    if (node.nodeType !== 3) continue;
+    const text = node.textContent.replace(/\s+/g, ' ').trim();
+    const starKey = /בעזרת נשים|באולם השמחות/.test(text)
+      && !text.replace(/בעזרת נשים|באולם השמחות|\*|\s/g, '');
+    if (!starKey && (hasDownstairs || text !== WEEKDAY_FOOTER_NOTE)) continue;
+    if (node.nextSibling?.nodeName === 'BR') node.nextSibling.remove();
+    node.remove();
+  }
   const existingNote = footer.textContent.replace(/\s+/g, ' ');
   const locations = [['*', 'בעזרת נשים'], ['**', 'באולם השמחות']].filter(([mark, label]) => {
     if (!marks.has(mark)) return false;
