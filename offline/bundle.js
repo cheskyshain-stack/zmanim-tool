@@ -1558,13 +1558,9 @@ const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00 8:20* 
  *  the everyday one above it rather than on a short line. */
 const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
-/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
- *
- *  It says what the marks on the times above it mean, so it belongs with the schedules and not
- *  with the shul's own footer: the stars are written by the schedules and read by every screen
- *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
- *  one of them would be the board explaining its own marks wrongly. */
-const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
+/** The Weekday chart's fixed note. Location stars are explained separately by the chart
+ *  renderer from the times on each physical page, including its שחרית panel. */
+const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -8868,12 +8864,41 @@ function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, 
       winterTable.replaceWith(sections);
       sections.append(winterTable, summerPage.querySelector('table'));
     }
+    fillChartLocationLegend(el);
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
     if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
+}
+
+/** Explain the location marks on this physical page, after any DST sections are joined.
+ *  Reading the rendered tables includes rules, saved edits and the weekday morning panel.
+ *  Each Hebrew label is isolated with its own stars so the two meanings stay together. */
+function fillChartLocationLegend(page) {
+  const marks = new Set([...page.querySelectorAll('table')].flatMap(table =>
+    [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])));
+  const footer = page.querySelector('.footer-text');
+  const existingNote = footer.textContent.replace(/\s+/g, ' ');
+  const locations = [['*', 'בעזרת נשים'], ['**', 'באולם השמחות']].filter(([mark, label]) => {
+    if (!marks.has(mark)) return false;
+    const stars = mark.replace(/\*/g, '\\*');
+    return !new RegExp(`(?:^|[^*])${stars}(?!\\*)\\s*${label}|${label}\\s*${stars}(?!\\*)`).test(existingNote);
+  });
+  if (!locations.length) return;
+  const legend = document.createElement('div');
+  legend.className = 'chart-location-legend';
+  legend.dir = 'rtl';
+  locations.forEach(([mark, label], index) => {
+    if (index) legend.append('   ');
+    const entry = document.createElement('bdi');
+    entry.dir = 'rtl';
+    entry.lang = 'he';
+    entry.textContent = `${mark}${label}`;
+    legend.append(entry);
+  });
+  footer.querySelector('.footer-address').before(legend);
 }
 
 /** Makes every row on every page the same height. Must run with the pages in the
