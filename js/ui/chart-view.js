@@ -170,6 +170,7 @@ function fitChartToWindow(pagesEl) {
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
     if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
+    syncPageHeights(pagesEl);
     const available = fit ? fit.clientWidth : pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
@@ -244,7 +245,6 @@ export function renderChartBrowser(container, state, opts = {}) {
     const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
     const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    syncPageHeights(pagesEl);
     fitChartToWindow(pagesEl);
 
     const go = (next) => {
