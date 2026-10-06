@@ -543,12 +543,7 @@ export function combineErevShabbos(erevShabbosList, settings, tables) {
 /** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
  *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
- *  lighting (see `candleLightingParts`) appended after it.
- *
- *  12:15 is not spliced in here on its own: fridayMainMinchaParts already knows to offer it,
- *  tagged, on exactly the Fridays this function is ever called for (one of the eight days'
- *  own, per chanukahErevShabbosPairs below), so there is nothing left for this function to
- *  add. */
+ *  lighting (see `candleLightingParts`) appended after it. */
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
   const fridayDate = dateFromSerial(fridaySerial);
   const friday = fridayMainMinchaParts(fridayDate, settings, shabbosSerial);
