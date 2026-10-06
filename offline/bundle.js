@@ -1594,10 +1594,9 @@ const LEGACY_FOOTER_ADDRESS = [
   'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
 ];
 
-/** The chart's header colour, which the parsha column is painted in too. Light gray with
- *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
- *  every page is a lot of toner, and the user asked for the light one. */
-const DEFAULT_ACCENT_COLOR = '#c9ced5';
+/** Neutral light gray for the printed chart. The previous blue-gray could acquire a
+ *  green cast on paper; equal RGB channels keep the standard shading free of a hue. */
+const DEFAULT_ACCENT_COLOR = '#cecece';
 
 /** How each season is named in the interface. Defined once and imported, rather than
  *  written out in each screen that needs it: build-offline.py flattens every module into
@@ -1609,7 +1608,7 @@ const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף', week
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
  *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
-const LEGACY_ACCENT_COLORS = ['#54595f'];
+const LEGACY_ACCENT_COLORS = ['#54595f', '#c9ced5'];
 
 const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
@@ -9162,21 +9161,33 @@ function headerInkFor(color) {
   const hex = String(color || '').replace('#', '');
   if (hex.length !== 6) return '#fff';
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
+  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#000' : '#fff';
+}
+
+function grayChartAccent(color) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return DEFAULT_ACCENT_COLOR;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16));
+  const gray = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b).toString(16).padStart(2, '0');
+  return '#' + gray.repeat(3);
 }
 
 function applyStyle(target, style, ink = style.ink) {
   target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
-  // Filter the chart sections separately so the building picture keeps its colour.
+  // CSS filters rasterize chart text in PDFs. Set neutral colours directly instead.
   target.style.filter = '';
+  target.classList.toggle('is-mono', ink === 'mono');
   target.querySelectorAll('table, .header-center, .header-rabbi, .page-footer').forEach(el => {
-    el.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+    el.style.filter = '';
   });
+  const savedAccent = String(style.accentColor || DEFAULT_ACCENT_COLOR).toLowerCase();
+  const colour = LEGACY_ACCENT_COLORS.includes(savedAccent) ? DEFAULT_ACCENT_COLOR : savedAccent;
+  const accent = ink === 'mono' ? grayChartAccent(colour) : colour;
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
-  target.style.setProperty('--sheet-accent', style.accentColor);
-  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
+  target.style.setProperty('--sheet-accent', accent);
+  target.style.setProperty('--sheet-head-ink', headerInkFor(accent));
 }
 
 /** Measure at paper size even when Fit to screen or Side by side is active. */

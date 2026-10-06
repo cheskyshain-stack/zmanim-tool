@@ -1,6 +1,6 @@
 import { safeHeaderImage } from '../security.js';
 import {
-  resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR,
+  resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR, LEGACY_ACCENT_COLORS,
   WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
 } from '../settings.js';
 import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel, excelWeekday } from '../hebrew-calendar.js';
@@ -476,21 +476,33 @@ function headerInkFor(color) {
   const hex = String(color || '').replace('#', '');
   if (hex.length !== 6) return '#fff';
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
+  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#000' : '#fff';
+}
+
+function grayChartAccent(color) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return DEFAULT_ACCENT_COLOR;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16));
+  const gray = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b).toString(16).padStart(2, '0');
+  return '#' + gray.repeat(3);
 }
 
 function applyStyle(target, style, ink = style.ink) {
   target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
-  // Filter the chart sections separately so the building picture keeps its colour.
+  // CSS filters rasterize chart text in PDFs. Set neutral colours directly instead.
   target.style.filter = '';
+  target.classList.toggle('is-mono', ink === 'mono');
   target.querySelectorAll('table, .header-center, .header-rabbi, .page-footer').forEach(el => {
-    el.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+    el.style.filter = '';
   });
+  const savedAccent = String(style.accentColor || DEFAULT_ACCENT_COLOR).toLowerCase();
+  const colour = LEGACY_ACCENT_COLORS.includes(savedAccent) ? DEFAULT_ACCENT_COLOR : savedAccent;
+  const accent = ink === 'mono' ? grayChartAccent(colour) : colour;
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
   target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
   target.style.setProperty('--sheet-header-scale', style.headerScale);
-  target.style.setProperty('--sheet-accent', style.accentColor);
-  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
+  target.style.setProperty('--sheet-accent', accent);
+  target.style.setProperty('--sheet-head-ink', headerInkFor(accent));
 }
 
 /** Measure at paper size even when Fit to screen or Side by side is active. */

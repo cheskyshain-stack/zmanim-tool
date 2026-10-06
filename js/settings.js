@@ -110,10 +110,9 @@ export const LEGACY_FOOTER_ADDRESS = [
   'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
 ];
 
-/** The chart's header colour, which the parsha column is painted in too. Light gray with
- *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
- *  every page is a lot of toner, and the user asked for the light one. */
-export const DEFAULT_ACCENT_COLOR = '#c9ced5';
+/** Neutral light gray for the printed chart. The previous blue-gray could acquire a
+ *  green cast on paper; equal RGB channels keep the standard shading free of a hue. */
+export const DEFAULT_ACCENT_COLOR = '#cecece';
 
 /** How each season is named in the interface. Defined once and imported, rather than
  *  written out in each screen that needs it: build-offline.py flattens every module into
@@ -125,7 +124,7 @@ export const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
  *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
-export const LEGACY_ACCENT_COLORS = ['#54595f'];
+export const LEGACY_ACCENT_COLORS = ['#54595f', '#c9ced5'];
 
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
