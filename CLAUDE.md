@@ -122,6 +122,15 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+The admin's **Explain times** switch stays available on every tab. Shared chart, week and
+poster renderers register their own time traces through `ui/time-explanations.js`; the
+congregation's page never installs that registry and emits no inspector markup. Clicks
+use measured text ranges to select one time inside a cell, without wrapping or changing
+editable chart text. Explain mode temporarily disables cell editing and restores it when
+turned off. Manual overrides and rules replace the corresponding traces with explicitly
+entered times, so a changed value cannot claim its old solar formula. The modal closes
+before printing. `tests/time-explanations.cjs` checks actual clicks and chart geometry.
+
 Admin print layouts have a **Spring clock change** switch on winter charts (also when
 opening their Weekday companion). **Separate headers** gives weeks before spring DST
 their own winter columns and puts the summer header below them on the same page. The

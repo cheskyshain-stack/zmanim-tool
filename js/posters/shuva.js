@@ -100,8 +100,14 @@ export function shabbosShuvaSerial(hebrewYearNum) {
  *  Split out from buildShuvaPoster because the cell can now come from two places, a saved
  *  chart or the calendar, and everything after the cell is the same either way.
  */
-function posterFromCell(week, cell) {
+function posterFromCell(week, cell, traces = [], explanation = '') {
   const found = erevTimes(cell);
+  const tracePool = [...traces];
+  const traceFor = (t) => {
+    const i = tracePool.findIndex(tr => tr.plain() === t.text);
+    return i < 0 ? null : tracePool.splice(i, 1)[0];
+  };
+  for (const t of found) t.trace = traceFor(t);
 
   // The דרשה is the time whose own line says דרשה. Asked of the text in front of it rather
   // than of its position, since a hand-edited cell can put it anywhere, and asked of the
@@ -120,7 +126,7 @@ function posterFromCell(week, cell) {
   // the main בית מדרש, '*' is בעזרת נשים, '**' is באולם השמחות, and למטה is the underline.
   const mincha = found
     .filter((t) => !isDrasha(t))
-    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '' }));
+    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '', trace: t.trace, explanation }));
 
   return {
     week,
@@ -129,6 +135,8 @@ function posterFromCell(week, cell) {
     // one was the exception and so it never answered: see currentOnePageSheets in posters-view.
     span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
+    drashaTrace: drasha?.trace,
+    explanation,
     mincha,
     // Only the marks that are actually on this poster get explained. Each line says which
     // direction it has to be set in: the underline line is an English sentence carrying
@@ -153,7 +161,7 @@ export function buildShuvaPoster(sheet, state, settings) {
   const week = shuvaWeekOf(sheet);
   if (!week) return null;
   const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-  return posterFromCell(week, row.C);
+  return posterFromCell(week, row.C, row.traces?.C, row.traceNotes?.C);
 }
 
 /** The same poster with no chart at all, worked out from the calendar.
@@ -181,5 +189,5 @@ export function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
     specialParsha: hasSpecialParsha(serial, settings),
   };
   const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
-  return posterFromCell(week, row.C);
+  return posterFromCell(week, row.C, row.traces?.C, row.traceNotes?.C);
 }

@@ -823,7 +823,7 @@ export function buildSukkosPoster(year, settings) {
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.
       line(SK_TEXT.shacharis, hoshanaTimes,
-        { calc: 'hoshanaShacharis', netz: hoshanaNetz, note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
+        { calc: 'hoshanaShacharis', netz: hoshanaNetz, noteTimes: [{ trace: zman('נץ', hoshanaSunrise) }], note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
     ],
   });
 

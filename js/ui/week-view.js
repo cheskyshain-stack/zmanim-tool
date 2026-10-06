@@ -37,6 +37,7 @@ import { weekEndsMins } from '../upcoming.js';
 import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
 import { chartSpreads, CHART_EARLY_DAYS } from './chart-view.js';
+import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -800,12 +801,12 @@ function formatLabel(label) {
 }
 
 /** A label/time line. */
-function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
+function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '', explanation = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
     <span class="week-label"${hebrewLang(labelHtml || formatLabel(label))}>${labelHtml || formatLabel(label)}</span>
-    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}>${isHtml ? text : weekNl2br(text)}</span>
+    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}${explanation === true ? timeExplanationAttrs({ header: label, printed: text, fixed: true }) : explanation}>${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
 
@@ -1347,7 +1348,7 @@ function weekCardsHtml(showing, index, state, settings) {
       const value=shabbos.row[c.key], html=shabbos.overriddenKeys.has(c.key);
       if(value==null || value==='')continue;
       const parts=String(value).split('\n');
-      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
+      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key), explanation: chartExplanationAttrs(shabbos.row, c.key, label, `Weekly schedule · ${week.parsha || ''}`, { value: text })});
       if(!html && c.header.includes('פלג') && parts.length>1) {
         // The room used to be a bracketed word on the header's own line ("(למטה)",
         // "(בעזר\"נ)"), stripped back out here for the label, with a star added onto the
@@ -1370,11 +1371,11 @@ function weekCardsHtml(showing, index, state, settings) {
   const orderedRows=[...printRows.filter(r=>r.friday).sort((a,b)=>firstTime(a)-firstTime(b)),...printRows.filter(r=>!r.friday)];
   const shownPairs = new Set();
   const shabbosLines=orderedRows.map(r=>{
-    if (!r.pair) return line(r.label,r.text,r.html);
+    if (!r.pair) return line(r.label,r.text,r.html,false,'',r.explanation);
     if (shownPairs.has(r.pair)) return '';
     shownPairs.add(r.pair);
     const pair = printRows.filter(item=>item.pair===r.pair);
-    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html)).join('')}</div>`;
+    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html,false,'',item.explanation)).join('')}</div>`;
   }).join('');
 
   const weekday = weekdayChartFor(sheet, showing, state);
@@ -1406,7 +1407,7 @@ function weekCardsHtml(showing, index, state, settings) {
           ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true)
+          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true, '', chartExplanationAttrs(wdRow, c.key, c.header, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }))
       );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,

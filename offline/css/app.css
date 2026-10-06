@@ -174,6 +174,22 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 .nav-btn:not(.active):hover { background: rgba(255,255,255,0.09); color: #fff; }
 
 .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+.time-explain-bar { display:flex; flex-direction:column; gap:.35rem; direction:ltr; }
+.time-explain-bar button { margin:0; min-height:44px; color:#fff; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.3); font-size:.86rem; }
+.time-explain-bar button[aria-pressed="true"] { background:#f0dfb3; color:#15283f; border-color:#f0dfb3; }
+.time-explain-bar span { color:#d4dce5; font-size:.72rem; line-height:1.45; }
+.time-explain-kind { font-weight:700; color:#17344d; margin:.6rem 0; }
+@media screen {
+  .time-explain-target { cursor:help !important; }
+  .time-explain-target:hover { outline:1px dotted #a68a44; outline-offset:2px; }
+  .time-explain-target:focus-visible { outline:2px solid #a68a44; outline-offset:2px; }
+}
+@media screen and (max-width:900px) {
+  .sidebar-foot:has(.time-explain-bar) { width:100%; margin-left:0; }
+  .time-explain-bar { flex-direction:row; align-items:center; gap:.7rem; width:100%; }
+  .time-explain-bar button { flex:none; }
+  .time-explain-bar span { min-width:0; }
+}
 .sidebar-site { font-size: var(--fs-xs); color: rgba(255,255,255,0.45); text-align: center; }
 
 /* Backup section in Settings (moved out of the sidebar). The Import "button" is really
@@ -5305,4 +5321,3 @@ body.is-luach #main .print-btn {
 body.is-luach #main .print-btn:hover:not(:disabled) { background:#e9ddbd; color:#15283f; border-color:#b8a06a; box-shadow:0 2px 5px rgb(21 40 63 / 8%); transform:none; }
 body.is-luach #main .print-btn:active:not(:disabled) { background:#e2d3ad; color:#15283f; box-shadow:none; transform:none; }
 body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
-

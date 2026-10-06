@@ -200,3 +200,9 @@ export function fixedTime(text, { am = false, label } = {}) {
   if (!am) h += 12;
   return clockTime(h, Number(m[2]), label);
 }
+
+/** Times explicitly entered by an admin, rather than the calculated values they replace. */
+export function enteredTimeTraces(value, label) {
+  const plain = String(value ?? '').replace(/<[^>]*>/g, ' ');
+  return [...plain.matchAll(/\b\d{1,2}:\d{2}\b/g)].map(m => fixedTime(m[0], { label }));
+}
