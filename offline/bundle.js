@@ -2531,12 +2531,11 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  formula in both sheets. Printed across two lines, split as evenly as possible
  *  (more options on the second line when the count is odd).
  *
- *  12:15, 12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
+ *  12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
- *  workbook, which does not have it. 12:15 (12:45 for a stretch, see below) is the newer of
- *  the two added this way, and only runs at all on a Friday whose own Shabbos falls inside
- *  חנוכה, tagged on the board as חנוכה's own - every other standard-time Friday has 12:30
- *  and nothing in front of it. Neither may print before מנחה גדולה, read the מ"א way (עלות
+ *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
+ *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
+ *  before מנחה גדולה, read the מ"א way (עלות
  *  ט״ז.1° to שקיעה ט״ז.1°, not sunrise/sunset) and rounded up to the next five minutes - its
  *  own floor, not weekLatestMinchaGedola's GRA-based one below.
  *
@@ -2552,7 +2551,7 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  week to week through a season; the shul asked for two round numbers instead, the same
  *  1:35/1:40 the weekday board already gives. */
 function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
-  /* The floor under 12:15 and 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
+  /* The floor under 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
      to שקיעה ט״ז.1° rather than sunrise/sunset - rounded up to the next five minutes, the
      minute itself rather than the second: 12:20:59 is still 12:20, only 12:21:00 reaches
      12:25. Asked for directly in place of the GRA-based מנחה גדולה לחומרא this used to read. */
@@ -2568,7 +2567,6 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
   const weekMgl = weekLatestMinchaGedola(shabbosSerial, settings);
   const weekMglText = formatTime(weekMgl);
   const sundayFriday = "somewhere in the week's own regular days";
-  const isChanukahShabbos = Boolean(chanukahYearFor(shabbosSerial, settings));
 
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
@@ -2584,23 +2582,12 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
      Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
      flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
   const clocksBack = 'offered only while the clocks are back';
-  /* 12:15 (moved here from 12:45) is back to running only on a Friday whose Shabbos falls
-     inside חנוכה (chanukahYearFor), tagged on the board as חנוכה's own (chanukahTag, below) -
-     the way the earlier of these two מנינים worked before תשפ״ו, when it was moved to 12:45
-     and widened to every standard-time Friday, and the tag came off with it (see the old note
-     this replaced, kept in git history rather than here now that it is no longer what runs).
-     Asked for directly, back the other way: every other standard-time Friday goes back to
-     12:30 alone, nothing in front of it. */
-  const chanukahOnly = 'offered only on a Friday whose Shabbos falls during חנוכה';
-  const twelveFifteen = clockTime(12, 15, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
-    .onlyWhen(onStandardTime && isChanukahShabbos, !onStandardTime ? clocksBack : chanukahOnly);
   const all = [
-    twelveFifteen,
     /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
        Math.max is symmetric so the answer is the same, but the chain starts where the name
        does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
-    clockTime(12, 30, 'the second of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
     /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
        neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
@@ -2622,31 +2609,13 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
   ];
 
   const text = splitLinesInHalf(flattenNonEmpty(all.map((t) => t.text())));
-  /* The tag is a *second*, print-only rendering, never mixed into `text` above - the same
-     split sheets/weekday.js makes for its own "NEW" and חנוכה tags, and for the same reason:
-     `text` is what every other reader of this column reads too (row.I/row.L directly) - the
-     week card, the One sheet, erev-text.js's own character-by-character walk building the
-     Friday message (js/erev-text.js's erevTimes, which has no idea about this sentinel and
-     would leave the bare word "חנוכה" sitting mid-string between two times) - and none of
-     those are the printed chart, so none of them should ever see a tag. Only sheet-view.js's
-     own cell rendering reaches for printOverrides, built from this in sheets/choref.js's and
-     sheets/kayitz.js's own row, and only when this week's own column has not been typed over
-     by hand. */
-  const twelveFifteenText = twelveFifteen.text();
-  const printText = twelveFifteenText
-    ? splitLinesInHalf(flattenNonEmpty(all.map((t) => (t === twelveFifteen ? chanukahTag(twelveFifteenText) : t.text()))))
-    : null;
-
   return {
     text,
-    printText,
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
     note: !onStandardTime
-      ? 'The clocks are forward this week, so 12:15, 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
-      : isChanukahShabbos
-        ? 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest, and this Friday\'s own Shabbos is inside חנוכה, so 12:15 runs too.'
-        : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest. 12:15 runs only on a Friday whose Shabbos is inside חנוכה, and this one is not.',
+      ? 'The clocks are forward this week, so 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
+      : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest.',
   };
 }
 function fridayMainMinchaMenu(fridayDate, settings, shabbosSerial) {
@@ -4741,12 +4710,7 @@ function combineErevShabbos(erevShabbosList, settings, tables) {
 /** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
  *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
- *  lighting (see `candleLightingParts`) appended after it.
- *
- *  12:15 is not spliced in here on its own: fridayMainMinchaParts already knows to offer it,
- *  tagged, on exactly the Fridays this function is ever called for (one of the eight days'
- *  own, per chanukahErevShabbosPairs below), so there is nothing left for this function to
- *  add. */
+ *  lighting (see `candleLightingParts`) appended after it. */
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
   const fridayDate = dateFromSerial(fridaySerial);
   const friday = fridayMainMinchaParts(fridayDate, settings, shabbosSerial);
@@ -4901,9 +4865,6 @@ function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
-  /* 12:15 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
-     board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
-     I itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const I = erevMincha.text;
 
@@ -4932,10 +4893,6 @@ function buildChorefRow(week, settings) {
 
   return {
     B, C, D, E, F, G, H, I, traces, notes, dropped,
-    /* Same split as sheets/weekday.js's own B column: printOverrides is read only by
-       ui/sheet-view.js's cell rendering, and only when this week's own I has not been typed
-       over by hand - every other reader (row.I directly) sees the plain, untagged value. */
-    printOverrides: erevMincha.printText != null ? { I: erevMincha.printText } : undefined,
   };
 }
 
@@ -5079,9 +5036,6 @@ function buildKayitzRow(week, settings) {
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  /* 12:15 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
-     board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
-     L itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const L = erevMincha.text;
 
@@ -5124,10 +5078,6 @@ function buildKayitzRow(week, settings) {
 
   return {
     B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped,
-    /* Same split as sheets/weekday.js's own B column: printOverrides is read only by
-       ui/sheet-view.js's cell rendering, and only when this week's own L has not been typed
-       over by hand - every other reader (row.L directly) sees the plain, untagged value. */
-    printOverrides: erevMincha.printText != null ? { L: erevMincha.printText } : undefined,
   };
 }
 

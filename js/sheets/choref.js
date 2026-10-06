@@ -57,9 +57,6 @@ export function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
-  /* 12:15 runs only on a Friday whose Shabbos is inside חנוכה, tagged as חנוכה's own on the
-     board (fridayMainMinchaParts, sheets/common.js) - printOverrides below carries that tag,
-     I itself stays the plain value every other reader of this column reads. */
   const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const I = erevMincha.text;
 
@@ -88,10 +85,6 @@ export function buildChorefRow(week, settings) {
 
   return {
     B, C, D, E, F, G, H, I, traces, notes, dropped,
-    /* Same split as sheets/weekday.js's own B column: printOverrides is read only by
-       ui/sheet-view.js's cell rendering, and only when this week's own I has not been typed
-       over by hand - every other reader (row.I directly) sees the plain, untagged value. */
-    printOverrides: erevMincha.printText != null ? { I: erevMincha.printText } : undefined,
   };
 }
 

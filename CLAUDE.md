@@ -122,6 +122,10 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
+candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
+the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
+
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks
