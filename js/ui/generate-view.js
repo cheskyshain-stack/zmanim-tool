@@ -145,7 +145,8 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   // is on the summer schedule from the clock change through Pesach. You choose the page
   // split yourself below (covering all the weeks, as usual); at render time, any page
   // that ends up containing at least one of these weeks prints as a real קיץ chart -
-  // the other, earlier weeks on that same page just show blank Plag columns.
+  // the other, earlier weeks on that same page show blank Plag columns unless the admin
+  // print layout gives them their own winter header.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
   const kayitzWeekCount = weeks.length - springSplitIndex;
 
@@ -157,11 +158,11 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   el.innerHTML = `
     <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
-      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: summer columns start here</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
       kayitzWeekCount > 0
-        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout. Keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout. ${state.settings.sheetStyle.splitSpringDst ? 'Your print layout gives earlier weeks on the same page their own winter header.' : 'A page holding any of them uses summer columns. You can choose separate winter and summer headers after opening the charts.'}</p>`
         : ''
     }
     <form id="page-form" class="form-grid">

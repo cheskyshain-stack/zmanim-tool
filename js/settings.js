@@ -161,7 +161,7 @@ export const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR, splitSpringDst: false },
   /* Not a time default like the ones above, and not a per-cell override either: the Weekday
      chart's 11:30 מעריב runs every week of קיץ now (sheets/weekday.js), regardless of BMG,
      and not at all in חורף - this flag never touches that. It only controls whether 11:30

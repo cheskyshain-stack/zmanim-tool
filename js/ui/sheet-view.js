@@ -119,7 +119,7 @@ function applyOverrideValue(sheet, serial, col, value) {
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, showMolad = false } = {}) {
+export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
@@ -142,7 +142,22 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
        luach.js, not by this file at all, so there is no path by which this chart's own
        congregation reader could pick the setting up even by mistake. Only renderSheet's own
        admin call passes it, read fresh off state.settings.showMolad there. */
-    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+    const springStart = sheet.season === 'choref' && splitSpringDst
+      ? pw.findIndex(week => inSpringDstWindow(week.date, settings)) : -1;
+    // This mixed page already uses summer formulas, rules and override keys. Keep those
+    // keys in both sections: winter's Erev Shabbos I is summer's L, so an existing edit
+    // must stay with the same minyan when its three unused Plag columns are hidden.
+    const winterColumns = springStart > 0
+      ? CHOREF_COLUMNS.map(column => column.key === 'I' ? { ...column, key: 'L' } : column) : columns;
+    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+    if (springStart > 0) {
+      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+      const sections = document.createElement('div');
+      sections.className = 'chart-sections';
+      const winterTable = el.querySelector('table');
+      winterTable.replaceWith(sections);
+      sections.append(winterTable, summerPage.querySelector('table'));
+    }
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
@@ -181,6 +196,8 @@ export function renderSheet(container, state, sheet, onChange) {
         state.sheets
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const winterSheet = sheet.season === 'choref' ? sheet : companion?.season === 'choref' ? companion : null;
+  if (winterSheet && !winterSheet.style) winterSheet.style = { ...state.settings.sheetStyle };
 
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
@@ -195,6 +212,11 @@ export function renderSheet(container, state, sheet, onChange) {
         <div class="poster-bar">
           ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
           ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
+          ${winterSheet ? `<div class="poster-bar-switch">${switchHtml('chart-dst-headers', 'Spring clock change', [
+            { value: 'one', label: 'One header', on: !winterSheet.style.splitSpringDst },
+            { value: 'separate', label: 'Separate headers', on: Boolean(winterSheet.style.splitSpringDst) },
+          ])}</div>
+          <p class="hint">Separate headers keeps winter columns above the clock change and starts summer columns below it, on the same page. Applies to this print layout.</p>` : ''}
           <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
             { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
             { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
@@ -230,7 +252,9 @@ export function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange, { showMolad: Boolean(state.settings.showMolad) });
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange, {
+    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(sh?.style?.splitSpringDst),
+  });
   const shabbosFirst = sheet.season === 'weekday' && companion;
   const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
   const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
@@ -325,7 +349,9 @@ export function renderSheet(container, state, sheet, onChange) {
   // Persists sheet.style as the app's "last used" style too, so the next *newly
   // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
   const commit = () => {
-    state.settings.sheetStyle = { ...sheet.style };
+    state.settings.sheetStyle = { ...sheet.style,
+      splitSpringDst: winterSheet ? Boolean(winterSheet.style.splitSpringDst) : Boolean(state.settings.sheetStyle.splitSpringDst),
+    };
     onChange({ save: true });
   };
   for (const [key, field, original] of [['chart-pad-y', 'paddingY', 0.35], ['chart-pad-x', 'paddingX', 0.5]]) {
@@ -356,6 +382,11 @@ export function renderSheet(container, state, sheet, onChange) {
   wireSwitch(container, 'chart-molad-format', value => {
     state.settings.moladFormat = value === 'yiddish' ? 'yiddish' : 'compact';
     commit();
+  });
+  wireSwitch(container, 'chart-dst-headers', value => {
+    winterSheet.style.splitSpringDst = value === 'separate';
+    state.settings.sheetStyle.splitSpringDst = winterSheet.style.splitSpringDst;
+    onChange({ save: true });
   });
 
 }
@@ -457,7 +488,26 @@ function applyStyle(target, style, ink = style.ink) {
  *  actually needs - better to overflow the even split than to clip real text. Re-run on
  *  every applyStyle(), since the font/size controls invalidate the measurements. */
 function syncHeaderRowHeight(pagesEl) {
+  pagesEl.querySelectorAll('.chart-sections').forEach(sections => {
+    const tables = [...sections.querySelectorAll('table')];
+    const rows = tables.flatMap(table => [...table.rows]);
+    tables.forEach(table => { table.style.height = ''; });
+    rows.forEach(row => { row.style.height = ''; });
+    sections.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => { el.style.marginTop = ''; });
+    if (!sections.getBoundingClientRect().height || !rows.length) return;
+    const borders = tables.map(table => table.getBoundingClientRect().height
+      - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+    const gap = parseFloat(getComputedStyle(sections).rowGap) || 0;
+    const available = sections.getBoundingClientRect().height - gap * (tables.length - 1)
+      - borders.reduce((sum, border) => sum + border, 0);
+    // Both tables share one row height, including their headers. Natural content is the
+    // floor so the page grows when necessary and the existing shrink-to-fit loop sees it.
+    const height = Math.max(available / rows.length, ...rows.map(row => row.getBoundingClientRect().height));
+    rows.forEach(row => { row.style.height = height + 'px'; });
+    tables.forEach((table, index) => { table.style.height = (height * table.rows.length + borders[index]) + 'px'; });
+  });
   pagesEl.querySelectorAll('table').forEach((table) => {
+    if (table.parentElement.classList.contains('chart-sections')) return;
     if (!table.getBoundingClientRect().height) return;
     const headRow = table.querySelector('thead tr');
     const bodyRows = [...table.querySelectorAll('tbody tr')];

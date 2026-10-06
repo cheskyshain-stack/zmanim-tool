@@ -122,6 +122,18 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+Admin print layouts have a **Spring clock change** switch on winter charts (also when
+opening their Weekday companion). **Separate headers** gives weeks before spring DST
+their own winter columns and puts the summer header below them on the same page. The
+choice lives in the winter sheet's `style.splitSpringDst` and is remembered in
+`settings.sheetStyle` for new print layouts. The default is one header. Only the admin's
+`renderSheet` passes it into `buildSheetPages`; congregation charts keep their layout.
+Both tables share one measured row height, including both headers, and the existing
+shrink-to-fit loop makes room for the extra header. Keep the summer cell keys and rules
+on a mixed page, including `L` for the winter section's Erev Shabbos menu, so changing
+the header layout cannot move or lose a saved override. Browser coverage is in
+`tests/dst-print-layout.cjs`.
+
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 817 px on screen at 100%.
   All pages must measure 817px high. If they don't, something overflowed.
 - **Every row in a chart is the same height, including the header row.** The header may
