@@ -235,7 +235,7 @@ export function buildRoshHashanaPoster(year, settings) {
     M.at(dayOn, RH_TEXT.mincha, mainMincha);
 
     // מוצאי יו"ט, the only place the 72 minute צאת is printed. The 72 is the underlined one,
-    // which is the same way round the boards print a two time מעריב (see calculations-view).
+    // which is the same way round the boards print a two time מעריב.
     if (i === 1) {
       const motzei = () => zman('שקיעה', dayShkia, `on ${RH_TEXT.day[i]} itself, at the shul's elevation`);
       lines.push(line(RH_TEXT.maariv, [tmT(motzei().plus(60)), tmT(motzei().plus(72).underline(), true)], { calc: 'motzeiMaariv' }));

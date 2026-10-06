@@ -8,7 +8,6 @@ import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
 import { renderProgram } from './ui/program-view.js';
 import { renderPosters, posterRoute, setPosterRoute } from './ui/posters-view.js';
-import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { renderTraffic } from './ui/traffic-view.js';
@@ -56,7 +55,7 @@ const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
-const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
@@ -92,7 +91,9 @@ function writeRoute() {
  *  the caller can decide whether a redraw is needed. */
 function readRoute() {
   const [requestedTab, ...rest] = routeParts();
-  const tab = requestedTab || 'home';
+  // Old bookmarks open the charts, where Explain times supplies the calculation details.
+  const tab = requestedTab === 'calc' ? 'charts' : requestedTab || 'home';
+  if (requestedTab === 'calc') location.replace('#charts');
   if (!routeTabs.has(tab)) return false;
   const same = tab === currentTab && !currentSheetId
     && (tab !== 'posters' || rest.join('/') === posterRoute().join('/'));
@@ -119,7 +120,6 @@ const tabIcons = {
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
   program: '<path d="M10 3v9"/><path d="M6.5 8.5 10 12l3.5-3.5"/><path d="M3.5 13v2.5A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5V13"/>',
-  calc: '<rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M7 6h6"/><path d="M7 9.5h2M11 9.5h2M7 13h2M11 13h2"/>',
   // A line climbing over two low bars: what the screen itself draws.
   traffic: '<path d="M3 16.5h14"/><rect x="4.5" y="11" width="3" height="5.5" rx="0.6"/><rect x="9" y="8" width="3" height="8.5" rx="0.6"/><rect x="13.5" y="4.5" width="3" height="12" rx="0.6"/>',
   // A speech bubble with two lines in it: the message, rather than the sheet it is read off.
@@ -317,15 +317,6 @@ function paint() {
     // whichever half was last open, that trip wants this one.
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
-  } else if (currentTab === 'calc') {
-    /* The automatic sheets, not the raw state. The saved-sheet list is empty now that the
-       charts are computed rather than generated, and this page reads one real week off it to
-       work every column through: handed state it found nothing and quietly printed "blank
-       that week" in every cell, which is the shape of failure this page is written to avoid.
-       Same call the week card and the chart browser make, so all three show one week. */
-    renderCalculations(main, buildAutomaticCharts(state, tables), (tab) => {
-      openTab(tab);
-    });
   } else if (currentTab === 'traffic') {
     renderTraffic(main);
   } else if (currentTab === 'posters') {
@@ -378,7 +369,7 @@ function paint() {
     }
   }
   if (['guide', 'program'].includes(currentTab)) addSectionTabs(['guide', 'program']);
-  if (['posters', 'traffic', 'calc', 'status', 'settings', 'guide', 'program', 'generate'].includes(currentTab)) {
+  if (['posters', 'traffic', 'status', 'settings', 'guide', 'program', 'generate'].includes(currentTab)) {
     const heading = main.querySelector('h2');
     if (heading) heading.textContent = tabLabels[currentTab];
   }

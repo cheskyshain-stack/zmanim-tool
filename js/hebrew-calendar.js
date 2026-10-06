@@ -441,7 +441,7 @@ function moladLabelYiddish(molad) {
 }
 
 /** Dispatches on settings.moladFormat ('compact', the default, or 'yiddish') - the one
- *  place that decides, so a sheet-view.js or calculations-view.js reader never has to ask
+ *  place that decides, so a sheet renderer never has to ask
  *  the setting itself. Yiddish is its own script, not a translation mode: selecting it
  *  prints Yiddish regardless of settings.english, the same way choosing a chart language
  *  does not touch which siddur nusach a quote is printed in elsewhere on these boards. */

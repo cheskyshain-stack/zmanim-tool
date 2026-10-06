@@ -3,7 +3,7 @@ export const ADMIN_TAB_LABELS = {
   home: 'Admin home', week: 'Weekly schedules', charts: 'Seasonal charts',
   generate: 'Print layouts', saved: 'Saved copies', posters: 'Special schedules',
   status: 'Website schedule status', traffic: 'Site statistics',
-  settings: 'Schedule settings', calc: 'Calculation guide',
+  settings: 'Schedule settings',
   guide: 'Help & instructions', program: 'Offline program',
 };
 
@@ -21,7 +21,6 @@ export const ADMIN_NAV_SECTIONS = [
   ] },
   { title: 'Settings & help', description: 'Adjust schedules and find instructions.', items: [
     { tab: 'settings', icon: 'settings', description: 'Change local schedule rules and print preferences, or save a backup.' },
-    { tab: 'calc', icon: 'calc', description: 'See how the schedule times are calculated.' },
     { tab: 'guide', icon: 'guide', description: 'Find printing instructions, saved-copy help, and the offline program.' },
   ] },
 ];
