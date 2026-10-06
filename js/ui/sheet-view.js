@@ -10,7 +10,7 @@ import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThrou
 import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay } from '../posters/chanukah.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang, escText, escAttr } from '../util.js';
+import { hebrewLang, escText, escAttr, useStraightHebrewQuotes, straightHebrewQuoteHtml } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
@@ -936,6 +936,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
+  useStraightHebrewQuotes(page);
+
   /** What this cell would hold with no manual override - what an edit is diffed against
    *  to decide whether it's a real change worth storing. */
   const baselineHtmlFor = (cellEl) => {
@@ -950,7 +952,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // Every column, Weekday included, is built as plain text with underline sentinels
     // that nl2br has to mark up first - or the comparison would see markup-vs-none and
     // store a bogus override on a cell nobody actually edited.
-    return normalizeRichText(nl2br(raw));
+    return straightHebrewQuoteHtml(normalizeRichText(nl2br(raw)));
   };
 
   const commitCell = (cellEl) => {
@@ -959,7 +961,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const newHtml = normalizeRichText(cellEl.innerHTML);
     const before = getOverride(sheet, serial, col); // undefined = "no override"
     const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    if (before === after) return; // no real change (e.g. just clicked in and out)
+    const displayedBefore = before === undefined ? undefined : straightHebrewQuoteHtml(normalizeRichText(before));
+    if (displayedBefore === after) return; // no real change (e.g. just clicked in and out)
     applyOverrideValue(sheet, serial, col, after);
     const hist = getHistory(sheet.id);
     hist.undo.push({ serial, col, before, after });

@@ -1,6 +1,7 @@
 import { cellDetailHtml } from './calc-cell.js';
 import { fixedTime } from '../zmanim/trace.js';
 import { announcedWeekCell } from '../announced.js';
+import { useStraightHebrewQuotes } from '../util.js';
 
 // Renderers attach their own calculation, never a lookup by clock time across the page.
 // Only the admin installs this registry. Shared congregation renderers emit nothing extra.
@@ -126,6 +127,7 @@ export function installTimeExplanations(main, host) {
     const note = [context.note, missing ? 'This displayed time has no recorded calculation. Check the source schedule before treating it as a fixed time.' : ''].filter(Boolean).join(' ');
     const fixed = times.length && times.every(t => t.steps.every(s => ['fixed', 'condition', 'underline', 'mark'].includes(s.kind)));
     dialog.innerHTML = cellDetailHtml({ ...context, note, printed: choices.map(c => c.token.text).join(' / '), times });
+    useStraightHebrewQuotes(dialog);
     const badge = document.createElement('p');
     badge.className = 'time-explain-kind';
     badge.textContent = missing ? 'Calculation not recorded' : fixed ? 'Fixed time' : 'Calculated time';

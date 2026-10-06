@@ -23,7 +23,7 @@ import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInW
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
@@ -869,6 +869,7 @@ const MAX_GROW_ACROSS = 2.6;
 const growCapFor = (card) => (card.classList.contains('is-weekday-card') ? MAX_GROW_ACROSS : MAX_GROW);
 
 function fitLinesToPage(container) {
+  useStraightHebrewQuotes(container);
   container.querySelectorAll('.week-card').forEach((card) => {
     const box = card.querySelector('.week-lines');
     const inner = box?.firstElementChild;
@@ -992,6 +993,7 @@ function fitLinesToPage(container) {
  *  will really be drawn. It re-reads its own breaks back into separators before deciding
  *  again, so calling it repeatedly settles rather than accumulating. */
 function fitPairColumns(sheet) {
+  useStraightHebrewQuotes(sheet);
   /* Each column is sized on its own first, and then **both are set to the smaller of the two
      answers**, so the two lists are in one size across the sheet.
 
