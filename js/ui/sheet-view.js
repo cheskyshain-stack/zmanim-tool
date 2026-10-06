@@ -242,6 +242,7 @@ export function renderSheet(container, state, sheet, onChange) {
       <div id="pages" class="pages"></div>
     </div>
   `;
+  useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
 

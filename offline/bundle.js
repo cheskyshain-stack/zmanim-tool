@@ -8950,6 +8950,7 @@ function renderSheet(container, state, sheet, onChange) {
       <div id="pages" class="pages"></div>
     </div>
   `;
+  useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
 
@@ -11585,6 +11586,7 @@ function howFar(item) {
 
 
 
+
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
@@ -11807,6 +11809,7 @@ function renderChartBrowser(container, state, opts = {}) {
         <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
+    useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
     const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
     const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
