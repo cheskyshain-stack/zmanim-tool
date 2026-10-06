@@ -825,6 +825,14 @@ th {
    after the <br> is what actually confirmed the two lines are still two lines, 8.8px
    apart, not collapsed into one. */
 .parsha-note.is-molad { font-size: 0.55em; white-space: nowrap; display: inline-block; line-height: 1; }
+/* The digits in a molad note (the time, and in Yiddish format the minute/chalakim counts)
+   ink taller than the Hebrew letters around them at the same font-size: measured with
+   Canvas actualBoundingBoxAscent/Descent in the real font stack, Hebrew body letters are
+   about 59-60px of ink against digits at 66-68px, both at a 100px font-size. Every digit
+   run in a molad note is already its own <bdi dir="ltr"> for bidi ordering (see
+   moladLabelCompact/moladLabelYiddish in hebrew-calendar.js), so that element is what gets
+   scaled down, to 0.88em, which measured level with the letters around it. */
+.parsha-note.is-molad bdi { font-size: 0.88em; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
