@@ -18814,6 +18814,17 @@ function readerDayTitle(serial, settings) {
   return hasRoshChodesh(serial, settings) ? 'ראש חודש' : 'Special schedule';
 }
 
+function readerDayHeading(serial, title, settings) {
+  // Public weekday headings are English, regardless of the printed chart's language.
+  const english = { ...settings, english: true };
+  const occasion = [
+    hasRoshChodesh(serial, english),
+    hasBehab(serial, english) ? 'BHB' : '',
+    hasTaanis(serial, english),
+  ].filter(label => label && !title.includes(label)).join(' · ');
+  return `${escAttr(title)}${occasion ? ` <span class="reader-day-occasion">· ${escAttr(occasion)}</span>` : ''}`;
+}
+
 /** Shared poster event lists take priority over the ordinary chart for that day.
  * This does not change the next-minyan engine or the underlying calculations. */
 function weeklyReaderData(showing, index, state, settings) {
@@ -19123,7 +19134,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
       return `${heading}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span></div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`;
     }).join('');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
-      <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
+      <summary><span><strong>${readerDayHeading(section.serial, section.title, settings)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
       <div class="reader-agenda-rows">${rowsHtml}</div>
     </details>`;
   }).join('');
@@ -19166,7 +19177,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     </nav>
     ${displaySections.some(section => section.events.some(readerRoomFor)) ? '<p class="reader-room-hint no-print">Tap a minyan time to see its room.</p>' : ''}
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
-    ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
+    ${agenda.notices.map(d=>`<p class="reader-note">${readerDayHeading(d.serial, d.label, settings)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));

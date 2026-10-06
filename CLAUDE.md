@@ -319,6 +319,10 @@ Export/Import in Settings moves it between devices.
   indoor room. Keep the hint and dialog off paper, and defer the minute redraw while
   the dialog is open. `tests/weekly-room-details.cjs` checks phone taps, keyboard access,
   all four rooms, week navigation, and native printing.
+- Weekly day headings also name Rosh Chodesh (including its month), BHB, and fast days
+  beside the weekday. Read these labels from the existing calendar helpers in English;
+  keep section keys, grouping, and minyan calculations independent of the labels. Use
+  the same labels in notices for days whose full schedule has not been supplied.
 
 ## Site statistics
 
