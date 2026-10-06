@@ -1,8 +1,10 @@
 // Run after build-offline.py. Set NODE_PATH to Playwright when it is not installed locally.
+// Requires pdftotext (Poppler) on PATH to check footer placement on physical PDF pages.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../dist');
 const server = http.createServer((req, res) => {
@@ -14,6 +16,20 @@ const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
   res.end(fs.readFileSync(file));
 });
+
+function verifyPdfFooters(pdf, count, label) {
+  assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, count, label + ': physical page count');
+  const result = spawnSync('pdftotext', ['-bbox', '-', '-'], { input: pdf, encoding: 'utf8' });
+  assert.equal(result.status, 0, label + ': PDF text extraction: ' + (result.error?.message || result.stderr));
+  const pages = [...result.stdout.matchAll(/<page\b[^>]*height="([\d.]+)"[^>]*>([\s\S]*?)<\/page>/g)];
+  assert.equal(pages.length, count, label + ': extracted physical page count');
+  pages.forEach((page, index) => {
+    const addresses = [...page[2].matchAll(/<word\b[^>]*yMin="([\d.]+)"[^>]*>Bais<\/word>/g)];
+    assert.equal(addresses.length, 1, label + ': page ' + (index + 1) + ' has its own address exactly once');
+    assert(Number(addresses[0][1]) > Number(page[1]) * 0.75,
+      label + ': page ' + (index + 1) + ' address stays at the bottom, below its chart');
+  });
+}
 
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -137,7 +153,7 @@ const server = http.createServer((req, res) => {
     await page.emulateMedia({ media: 'print' });
     await verify(6, 'Printed 5787');
     const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
-    assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 6, 'PDF has six physical sheets');
+    verifyPdfFooters(pdf, 6, 'Desktop split headers');
     await page.emulateMedia({ media: 'screen' });
 
     await generate(5786);
@@ -147,7 +163,7 @@ const server = http.createServer((req, res) => {
     await verify(2, 'Whole season');
     await page.emulateMedia({ media: 'print' });
     const compactPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
-    assert.equal((compactPdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 2, 'Whole season PDF has two sheets');
+    verifyPdfFooters(compactPdf, 2, 'Desktop whole season');
     await page.emulateMedia({ media: 'screen' });
 
     // Open the Weekday companion with a page break exactly at the clock change.
@@ -183,8 +199,46 @@ const server = http.createServer((req, res) => {
     }), 'Companion saves the choice on its winter chart');
     await generate(5787, 3, 'kayitz');
     assert.equal(await page.locator('#chart-dst-headers-label, .chart-sections').count(), 0, 'Summer has no winter option');
+
+    // Start on a phone rather than resizing a chart already fitted on a desktop.
+    // The latter cannot catch overflow hidden by the phone's reduced screen preview.
+    const phoneContext = await browser.newContext({ viewport: { width: 375, height: 812 },
+      isMobile: true, deviceScaleFactor: 2,
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36' });
+    await phoneContext.route('**/*', route => route.request().url().startsWith(origin + '/')
+      || route.request().url().startsWith('data:') ? route.continue() : route.abort());
+    await phoneContext.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
+    const phone = await phoneContext.newPage();
+    phone.on('pageerror', error => errors.push('Phone: ' + error.message));
+    const generatePhone = async count => {
+      await phone.goto(origin + `/admin/?phone-pages=${count}#generate`);
+      await phone.locator('label[for=season-choref]').click();
+      await phone.locator('input[name=hebrewYear]').fill('5787');
+      await phone.locator('#gen-form button[type=submit]').click();
+      if (count !== 3) {
+        await phone.locator('input[name=numPages]').fill(String(count));
+        await phone.locator('input[name=numPages]').dispatchEvent('change');
+      }
+      await phone.locator('#page-form button[type=submit]').click();
+      await phone.locator('label[for=chart-dst-headers-separate]').click();
+      await phone.evaluate(() => document.fonts.ready);
+      await phone.waitForFunction(() => !document.querySelector('.toast'));
+      assert(await phone.locator('#page-overflow-warning').isHidden(), 'Phone chart fits without an overflow warning');
+      assert(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone chart stays within screen width');
+    };
+    await generatePhone(3);
+    const phonePdf = await phone.pdf({ preferCSSPageSize: true, printBackground: true });
+    verifyPdfFooters(phonePdf, 6, 'Phone split headers');
+    if (process.env.DST_MOBILE_PDF) fs.writeFileSync(process.env.DST_MOBILE_PDF, phonePdf);
+    const phoneFontSizes = await phone.locator('#pages .page').evaluateAll(pages => pages.map(el => getComputedStyle(el).getPropertyValue('--sheet-font-size')));
+    assert.equal(new Set(phoneFontSizes).size, 1, 'Phone print job uses one shared font scale');
+    assert.equal(await phone.evaluate(() => JSON.parse(localStorage.getItem('zmanim-app-state-v1')).sheets[0].style.fontSizePt), 10,
+      'Automatic fit preserves the saved font choice');
+    await generatePhone(1);
+    verifyPdfFooters(await phone.pdf({ preferCSSPageSize: true, printBackground: true }), 2, 'Phone whole season');
+    await phoneContext.close();
     assert.deepEqual(errors, [], 'No browser errors');
-    console.log('Verified edits, persistence, public charts, both molad formats, mobile controls and PDF pagination.');
+    console.log('Verified edits, persistence, public charts, both molad formats, mobile controls, and each physical PDF footer on desktop and phone.');
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

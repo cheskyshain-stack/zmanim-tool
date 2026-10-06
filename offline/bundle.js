@@ -8996,7 +8996,6 @@ function renderSheet(container, state, sheet, onChange) {
 
   // Row heights need the pages in the document to be measured.
   syncHeaderRowHeight(pagesEl);
-  autoFit(container);
 
   // A page is supposed to be exactly 817px (11in x 8.5in at 100%, see the layout
   // invariant) - syncHeaderRowHeight shares that out evenly, but it is a CSS minimum, not
@@ -9071,6 +9070,10 @@ function renderSheet(container, state, sheet, onChange) {
     fitNoticeEl.textContent = '';
     fitNoticeEl.hidden = true;
   }
+
+  // Fit the paper at full size first. Measuring the phone's reduced preview hid an
+  // overflowing mixed-header page and let its address print above the next header.
+  autoFit(container);
 
   const restyleOwnPages = () => {
     pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
