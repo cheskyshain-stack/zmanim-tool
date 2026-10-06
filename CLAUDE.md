@@ -150,9 +150,16 @@ the header layout cannot move or lose a saved override. Browser coverage is in
 Measure and shrink the full-size pages before applying Fit to screen. Measuring a
 phone's zoomed preview hid the overflow and put page 5's address on page 6. Browser
 coverage must start on a phone viewport and check footer placement in the actual PDF.
+All charts in a print job share the same top and bottom edges for double-sided printing.
+`syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
+without changing saved styles. Collapsed table borders and the gap between DST sections
+are included in row-height calculations. Measurement temporarily removes screen scaling
+and the print height cap so genuine overflow stays visible to the fit loop. Refit when
+fonts arrive and before printing. Browser coverage checks chart bounds, different saved
+styles, and identical footer positions in the physical desktop and phone PDFs.
 
-- A page is letter landscape: 11in x 8.5in, which is 1056 x 817 px on screen at 100%.
-  All pages must measure 817px high. If they don't, something overflowed.
+- A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
+  All pages must measure 816px high. If they don't, something overflowed.
 - **Every row in a chart is the same height, including the header row.** The header may
   be taller than the body rows when its text needs it, but never shorter. This is
   `syncHeaderRowHeight` in `js/ui/sheet-view.js` and it took several attempts to get
@@ -586,7 +593,7 @@ was that it does not really have to be hidden. So do not raise it again, and do 
 
 ## Verify before you call it done
 
-Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
+Generate a sheet and check: all pages 816px, rows equal within a page, interleaved order,
 the דרשה afternoon built (מצורע/הגדול in a חורף sheet and האזינו/שובה in a קיץ one both
 read as three lines: times, then a דרשה line, then times), no console errors,
 no horizontal overflow at 375px on every screen, and the live hash matches after deploy.

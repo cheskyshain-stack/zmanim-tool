@@ -265,10 +265,7 @@ export function renderSheet(container, state, sheet, onChange) {
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
 
-  // Row heights need the pages in the document to be measured.
-  syncHeaderRowHeight(pagesEl);
-
-  // A page is supposed to be exactly 817px (11in x 8.5in at 100%, see the layout
+  // A page is supposed to be exactly 816px (11in x 8.5in at 100%, see the layout
   // invariant) - syncHeaderRowHeight shares that out evenly, but it is a CSS minimum, not
   // a cap, and a page whose own content genuinely needs more (most often the Weekday
   // chart's שחרית panel, which has to print every schedule in play - the everyday one,
@@ -307,40 +304,57 @@ export function renderSheet(container, state, sheet, onChange) {
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
   const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
-  const FIT_TOLERANCE = 818; // 1px of rounding past the 817px target is fine, see the layout invariant
+  const FIT_TOLERANCE = 8.5 * 96 + 1 / 64; // only CSS sub-pixel rounding past the paper height
   const applyFitScale = (scale) => {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncHeaderRowHeight(pagesEl);
   };
   const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE);
-  let fitScale = 1;
-  let overflowPages = stillOverflowing();
-  while (overflowPages.length && fitScale > FIT_FLOOR) {
-    fitScale = Math.max(FIT_FLOOR, fitScale - FIT_STEP);
-    applyFitScale(fitScale);
-    overflowPages = stillOverflowing();
-  }
+  const fitPaper = () => {
+    if (!document.body.contains(pagesEl)) return;
+    atPaperSize(pagesEl, () => {
+      applyFitScale(1);
+      let fitScale = 1;
+      let overflowPages = stillOverflowing();
+      while (overflowPages.length && fitScale > FIT_FLOOR) {
+        fitScale = Math.max(FIT_FLOOR, fitScale - FIT_STEP);
+        applyFitScale(fitScale);
+        overflowPages = stillOverflowing();
+      }
 
-  const overflowWarningEl = container.querySelector('#page-overflow-warning');
-  if (overflowPages.length) {
-    const items = overflowPages.map((el) => {
-      const height = el.getBoundingClientRect().height;
-      return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 817)}px over one sheet)`;
+      const overflowWarningEl = container.querySelector('#page-overflow-warning');
+      if (overflowPages.length) {
+        const items = overflowPages.map((el) => {
+          const height = el.getBoundingClientRect().height;
+          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 8.5 * 96)}px over one sheet)`;
+        });
+        overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
+        overflowWarningEl.hidden = false;
+      } else {
+        overflowWarningEl.textContent = '';
+        overflowWarningEl.hidden = true;
+      }
+      const fitNoticeEl = container.querySelector('#page-fit-notice');
+      if (!overflowPages.length && fitScale < 1) {
+        fitNoticeEl.textContent = `This chart's text is shrunk to ${Math.round(fitScale * 100)}% of the chosen size so every page fits on one sheet.`;
+        fitNoticeEl.hidden = false;
+      } else {
+        fitNoticeEl.textContent = '';
+        fitNoticeEl.hidden = true;
+      }
     });
-    overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
-    overflowWarningEl.hidden = false;
-  } else {
-    overflowWarningEl.textContent = '';
-    overflowWarningEl.hidden = true;
-  }
-  const fitNoticeEl = container.querySelector('#page-fit-notice');
-  if (!overflowPages.length && fitScale < 1) {
-    fitNoticeEl.textContent = `This chart's text is shrunk to ${Math.round(fitScale * 100)}% of the chosen size so every page fits on one sheet.`;
-    fitNoticeEl.hidden = false;
-  } else {
-    fitNoticeEl.textContent = '';
-    fitNoticeEl.hidden = true;
-  }
+  };
+  fitPaper();
+  document.fonts?.ready?.then(() => {
+    if (!document.body.contains(pagesEl)) return;
+    fitPaper();
+    autoFit(container);
+  });
+  if (chartBeforePrintHandler) window.removeEventListener('beforeprint', chartBeforePrintHandler);
+  chartBeforePrintHandler = () => {
+    if (document.body.contains(pagesEl)) fitPaper();
+  };
+  window.addEventListener('beforeprint', chartBeforePrintHandler);
 
   // Fit the paper at full size first. Measuring the phone's reduced preview hid an
   // overflowing mixed-header page and let its address print above the next header.
@@ -402,6 +416,7 @@ const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season
 // --- Fit to screen -----------------------------------------------------------------
 // Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
 // the view shouldn't snap back to full size underneath you each time.
+let chartBeforePrintHandler;
 let fitOn = false;
 let fitChosenByUser = false;
 let fitResizeHandler = null;
@@ -478,74 +493,97 @@ function applyStyle(target, style, ink = style.ink) {
   target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
 }
 
-/** Makes every row in a table - header included - exactly the same height.
- *
- *  Left alone, the header always comes out shorter: the table stretches to fill the page
- *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
- *  height in proportion to each row's *natural* content height, which for the header is
- *  a single short line. Simply pinning the header to a measured data-row height doesn't
- *  settle it either - the total is fixed, so growing the header shrinks the data rows it
- *  was just matched against.
- *
- *  So instead of measuring one against the other, this splits the table's total height
- *  evenly across all its rows, which is stable in one pass. The floor guards the case
- *  where there are enough rows that an even share would be tighter than the content
- *  actually needs - better to overflow the even split than to clip real text. Re-run on
- *  every applyStyle(), since the font/size controls invalidate the measurements. */
-function syncHeaderRowHeight(pagesEl) {
-  pagesEl.querySelectorAll('.chart-sections').forEach(sections => {
-    const tables = [...sections.querySelectorAll('table')];
-    const rows = tables.flatMap(table => [...table.rows]);
-    tables.forEach(table => { table.style.height = ''; });
-    rows.forEach(row => { row.style.height = ''; });
-    sections.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => { el.style.marginTop = ''; });
-    if (!sections.getBoundingClientRect().height || !rows.length) return;
-    const borders = tables.map(table => table.getBoundingClientRect().height
-      - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
-    const gap = parseFloat(getComputedStyle(sections).rowGap) || 0;
-    const available = sections.getBoundingClientRect().height - gap * (tables.length - 1)
-      - borders.reduce((sum, border) => sum + border, 0);
-    // Both tables share one row height, including their headers. Natural content is the
-    // floor so the page grows when necessary and the existing shrink-to-fit loop sees it.
-    const height = Math.max(available / rows.length, ...rows.map(row => row.getBoundingClientRect().height));
-    rows.forEach(row => { row.style.height = height + 'px'; });
-    tables.forEach((table, index) => { table.style.height = (height * table.rows.length + borders[index]) + 'px'; });
-  });
-  pagesEl.querySelectorAll('table').forEach((table) => {
-    if (table.parentElement.classList.contains('chart-sections')) return;
-    if (!table.getBoundingClientRect().height) return;
-    const headRow = table.querySelector('thead tr');
-    const bodyRows = [...table.querySelectorAll('tbody tr')];
-    if (!headRow || !bodyRows.length) return;
-    const allRows = [headRow, ...bodyRows];
-    allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
-
-    // Every row gets an equal share of the table's height. Measuring the tallest row and
-    // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
-    // cell spans every row, so its height is what the browser divides between them, and
-    // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
-    // the distribution, not the row's own requirement - pinning to it inflated the whole
-    // table past the 8.5in page. The even share is the real target; the row only stays
-    // taller if its own content genuinely needs more, which the tightened parsha
-    // line-height now avoids.
-    // The header is never shorter than a body row, so there are two cases and the table
-    // has to end up exactly its own height either way:
-    //   header fits in an equal share  -> every row (header included) takes that share
-    //   header needs more than a share -> it keeps its height, the rest split what's left
-    // Using one formula for both overflowed the page: the first case pushed a tall header
-    // down to a share it couldn't fit in, the second handed a short header a share bigger
-    // than it needed.
-    const tableHeight = table.getBoundingClientRect().height;
-    const headNatural = headRow.getBoundingClientRect().height;
-    const evenShare = tableHeight / allRows.length;
-    const target = headNatural <= evenShare ? evenShare : (tableHeight - headNatural) / bodyRows.length;
-    bodyRows.forEach((r) => (r.style.height = target + 'px'));
-    // The header never comes out shorter than a body row, and keeps its own greater
-    // height where its text needs it.
-    headRow.style.height = Math.max(target, headNatural) + 'px';
-  });
-  centerMoladNotes(pagesEl);
+/** Measure at paper size even when Fit to screen or Side by side is active. */
+function atPaperSize(pagesEl, measure) {
+  const pages = [...pagesEl.querySelectorAll('.page')].filter(page => page.getClientRects().length);
+  if (!pages.length) return;
+  const styles = [
+    [pagesEl, 'zoom', '1'], [pagesEl, 'transform', 'none'],
+    ...pages.flatMap(page => [
+      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', '8.5in'],
+    ]),
+  ].map(([el, name, temporary]) => ({ el, name, temporary,
+    value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) }));
+  styles.forEach(({ el, name, temporary }) => el.style.setProperty(name, temporary, 'important'));
+  try {
+    return measure(pages);
+  } finally {
+    styles.forEach(({ el, name, value, priority }) => {
+      if (value) el.style.setProperty(name, value, priority);
+      else el.style.removeProperty(name);
+    });
+  }
 }
+
+/** Reserve one chart area for the whole print job. Header/footer text and saved
+ *  margins can differ between the two sheets, so use the space every page can hold.
+ *  Rows share that height, with a taller header only where its content needs it. */
+function syncHeaderRowHeight(pagesEl) {
+  atPaperSize(pagesEl, pages => {
+    const layouts = pages.map(page => {
+      const header = page.querySelector('.page-header');
+      const footer = page.querySelector('.page-footer');
+      const sections = page.querySelector('.chart-sections');
+      const tables = [...page.querySelectorAll('table')];
+      [header, footer, sections, ...tables].filter(Boolean).forEach(el => {
+        el.style.height = '';
+        el.style.flex = 'none';
+      });
+      page.querySelectorAll('tr').forEach(row => { row.style.height = ''; });
+      page.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => { el.style.marginTop = ''; });
+      const style = getComputedStyle(page);
+      const paddingTop = header.getBoundingClientRect().top - page.getBoundingClientRect().top;
+      const paddingBottom = parseFloat(style.paddingBottom) || 0;
+      const headerGap = tables[0].getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+      const footerGap = footer.getBoundingClientRect().top - tables.at(-1).getBoundingClientRect().bottom;
+      return { header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap,
+        top: paddingTop + header.getBoundingClientRect().height + headerGap,
+        bottom: 8.5 * 96 - paddingBottom - footer.getBoundingClientRect().height - footerGap };
+    });
+    // Whole CSS pixels keep the shared frame stable through table border rounding.
+    const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
+    const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
+    const chartHeight = Math.max(0, bottom - top);
+    layouts.forEach(({ header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap }) => {
+      header.style.height = (top - paddingTop - headerGap) + 'px';
+      footer.style.height = (8.5 * 96 - bottom - paddingBottom - footerGap) + 'px';
+      const borders = tables.map(table => table.getBoundingClientRect().height
+        - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+      if (sections) {
+        const rows = tables.flatMap(table => [...table.rows]);
+        const gap = tables[1].getBoundingClientRect().top - tables[0].getBoundingClientRect().bottom;
+        const available = chartHeight - gap * (tables.length - 1)
+          - borders.reduce((sum, border) => sum + border, 0);
+        // Both headers share the body row height. Content remains the floor so an
+        // overflowing page grows and the paper's shrink-to-fit loop can see it.
+        const height = Math.max(available / rows.length, ...rows.map(row => row.getBoundingClientRect().height));
+        rows.forEach(row => { row.style.height = height + 'px'; });
+        tables.forEach((table, index) => {
+          table.style.height = (height * table.rows.length + borders[index]) + 'px';
+        });
+        // Let the last table take the fractional remainder after browser rounding.
+        const used = tables.slice(0, -1).reduce((sum, table) => sum + table.getBoundingClientRect().height, 0);
+        tables.at(-1).style.height = Math.max(0, chartHeight - gap * (tables.length - 1) - used) + 'px';
+      } else {
+        const table = tables[0];
+        const headRow = table.querySelector('thead tr');
+        const bodyRows = [...table.querySelectorAll('tbody tr')];
+        if (!headRow || !bodyRows.length) return;
+        const headNatural = headRow.getBoundingClientRect().height;
+        const available = chartHeight - borders[0];
+        const evenShare = available / (bodyRows.length + 1);
+        const target = headNatural <= evenShare ? evenShare : (available - headNatural) / bodyRows.length;
+        bodyRows.forEach(row => { row.style.height = Math.max(0, target) + 'px'; });
+        headRow.style.height = Math.max(evenShare, headNatural) + 'px';
+        // A table's height is a minimum: real content can still grow it. Account for
+        // its collapsed border so pinned rows do not add half a pixel to every page.
+        table.style.height = chartHeight + 'px';
+      }
+    });
+    centerMoladNotes(pagesEl);
+  });
+}
+
 
 /** Keeps a parsha name at the row's own vertical centre on a week that also carries a
  *  compact Hebrew molad note (the .parsha-cell-centered cells built in buildRow above),
@@ -783,7 +821,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // also has a molad note can come out three lines this way (name · special, then
       // the molad's own line, now itself sometimes two more under Yiddish) - the
       // chart's own auto-shrink absorbs that the same way it absorbs any other page that
-      // needs more room than 817px holds, rather than this reaching for a second
+      // needs more room than 816px holds, rather than this reaching for a second
       // convention to dodge it.
       const parshaCell = weekOfLabel(week.parsha, isEnglish)
         + (week.specialParsha ? ` · ${week.specialParsha}` : '')
@@ -805,7 +843,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // wrapped to a second line on a content-squeezed page, measured directly on a real
       // generated חורף chart - which cannot be let happen, since every row on a page is
       // pinned to one shared height (syncHeaderRowHeight) and a row whose own content
-      // needs more than that pushes past it, taking the whole 817px page past its own
+      // needs more than that pushes past it, taking the whole 816px page past its own
       // fixed height with it (and, on a Shabbos chart, misaligns the Weekday chart
       // printed side by side with it, which lines up pair per row). nowrap on its own,
       // without the smaller size, makes it worse under table-layout:auto rather than
@@ -820,7 +858,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // in the first place - except the one double-barrelled parsha name long enough on
       // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured). Under the
       // Compact Hebrew molad (one line) that case is no better and no worse than before
-      // the join: still three lines, ~5px past the page's own 817px. Under Yiddish, whose
+      // the join: still three lines, ~5px past the page's own 816px. Under Yiddish, whose
       // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), the
       // same week is four lines total: tightened with .parsha-note.is-molad's own
       // line-height (see app.css), down from ~27px past to ~7px, close to Compact

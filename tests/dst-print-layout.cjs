@@ -23,12 +23,46 @@ function verifyPdfFooters(pdf, count, label) {
   assert.equal(result.status, 0, label + ': PDF text extraction: ' + (result.error?.message || result.stderr));
   const pages = [...result.stdout.matchAll(/<page\b[^>]*height="([\d.]+)"[^>]*>([\s\S]*?)<\/page>/g)];
   assert.equal(pages.length, count, label + ': extracted physical page count');
-  pages.forEach((page, index) => {
+  const addressPositions = pages.map((page, index) => {
     const addresses = [...page[2].matchAll(/<word\b[^>]*yMin="([\d.]+)"[^>]*>Bais<\/word>/g)];
     assert.equal(addresses.length, 1, label + ': page ' + (index + 1) + ' has its own address exactly once');
     assert(Number(addresses[0][1]) > Number(page[1]) * 0.75,
       label + ': page ' + (index + 1) + ' address stays at the bottom, below its chart');
+    return Number(addresses[0][1]);
   });
+  assert(Math.max(...addressPositions) - Math.min(...addressPositions) < 0.01,
+    label + ': every physical PDF page has the same footer position');
+}
+
+async function verifyChartFrames(page, count, label, selector = '#pages') {
+  const frames = await page.locator(selector).evaluate(host => {
+    const pages = [...host.querySelectorAll('.page')];
+    const elements = [host, ...pages];
+    const styles = elements.map(el => el.getAttribute('style'));
+    try {
+      elements.forEach(el => el.style.setProperty('zoom', '1', 'important'));
+      host.style.setProperty('transform', 'none', 'important');
+      return pages.map(page => {
+        const box = page.getBoundingClientRect();
+        const tables = [...page.querySelectorAll('table')];
+        return { top: tables[0].getBoundingClientRect().top - box.top,
+          bottom: tables.at(-1).getBoundingClientRect().bottom - box.top,
+          height: box.height };
+      });
+    } finally {
+      elements.forEach((el, index) => styles[index] === null
+        ? el.removeAttribute('style') : el.setAttribute('style', styles[index]));
+    }
+  });
+  assert.equal(frames.length, count, label + ': frame count');
+  for (const edge of ['top', 'bottom']) {
+    const values = frames.map(frame => frame[edge]);
+    assert(Math.max(...values) - Math.min(...values) <= 1 / 64,
+      label + ': matching chart ' + edge + ' edges: ' + values.join(', '));
+  }
+  frames.forEach(frame => assert(Math.abs(frame.height - 816) <= 1 / 64,
+    label + ': exact landscape Letter page height'));
+  return frames;
 }
 
 (async () => {
@@ -45,6 +79,17 @@ function verifyPdfFooters(pdf, count, label) {
     await context.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    const publicPage = await context.newPage();
+    publicPage.on('pageerror', error => errors.push('Public: ' + error.message));
+    await publicPage.goto(origin + '/chart/?count=off');
+    await publicPage.locator('.pages .page').first().waitFor();
+    await publicPage.evaluate(() => document.fonts.ready);
+    await publicPage.waitForTimeout(100);
+    await verifyChartFrames(publicPage, 2, 'Congregation chart', '.pages');
+    await publicPage.setViewportSize({ width: 375, height: 812 });
+    await publicPage.waitForTimeout(100);
+    await verifyChartFrames(publicPage, 2, 'Congregation chart on a phone', '.pages');
+    await publicPage.close();
     const settled = async () => {
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(100);
@@ -86,6 +131,7 @@ function verifyPdfFooters(pdf, count, label) {
         assert.equal(measurement.label, index % 2 ? 'Weekday' : 'שבת חורף', label + ': print order');
       });
       assert(await page.locator('#page-overflow-warning').isHidden(), label + ': overflow warning');
+      await verifyChartFrames(page, count, label);
       return measurements;
     };
 
@@ -200,6 +246,49 @@ function verifyPdfFooters(pdf, count, label) {
     await generate(5787, 3, 'kayitz');
     assert.equal(await page.locator('#chart-dst-headers-label, .chart-sections').count(), 0, 'Summer has no winter option');
 
+    // A saved companion can have different margins, fonts and letterhead sizes.
+    // Reserve common chart bounds without overwriting either sheet's saved choices.
+    await page.evaluate(async () => {
+      const { renderSheet } = await import('/js/ui/sheet-view.js');
+      const state = JSON.parse(localStorage.getItem('zmanim-app-state-v1'));
+      const shabbos = state.sheets.find(sheet => sheet.season === 'kayitz');
+      const weekday = state.sheets.find(sheet => sheet.linkedSheetId === shabbos.id);
+      Object.assign(shabbos.style, { fontSizePt: 13, headerScale: 1.25, paddingY: 0.25 });
+      Object.assign(weekday.style, { fontFamily: 'Arial', fontSizePt: 11, headerScale: 0.9, paddingY: 0.45 });
+      const original = JSON.stringify([shabbos.style, weekday.style]);
+      state.settings.footerNote = 'First note\nSecond note\nThird note\nFourth note';
+      const draw = () => renderSheet(document.querySelector('main'), state, shabbos, event => {
+        if (event.save) draw();
+      });
+      draw();
+      window.duplexStyleFixture = { state, original };
+    });
+    await settled();
+    await verifyChartFrames(page, 6, 'Different saved styles');
+    assert(await page.evaluate(() => {
+      const { state, original } = window.duplexStyleFixture;
+      const shabbos = state.sheets.find(sheet => sheet.season === 'kayitz');
+      const weekday = state.sheets.find(sheet => sheet.linkedSheetId === shabbos.id);
+      return JSON.stringify([shabbos.style, weekday.style]) === original;
+    }), 'Alignment preserves both saved styles');
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.locator('#chart-pad-y-more').click();
+    await settled();
+    await verifyChartFrames(page, 6, 'Padding changed on a phone');
+    await page.setViewportSize({ width: 1500, height: 1000 });
+    await page.locator('#chart-pad-y-original').click();
+    await settled();
+    await page.evaluate(async () => {
+      const { syncPageHeights } = await import('/js/ui/sheet-view.js');
+      document.querySelector('#sheet-stack').classList.add('is-side-by-side');
+      syncPageHeights(document.querySelector('#pages'));
+    });
+    await verifyChartFrames(page, 6, 'Side by side');
+    assert.equal(await page.evaluate(() => {
+      const { state } = window.duplexStyleFixture;
+      return state.sheets.find(sheet => sheet.season === 'kayitz').style.fontSizePt;
+    }), 13, 'Automatic alignment preserves the saved font size');
+
     // Start on a phone rather than resizing a chart already fitted on a desktop.
     // The latter cannot catch overflow hidden by the phone's reduced screen preview.
     const phoneContext = await browser.newContext({ viewport: { width: 375, height: 812 },
@@ -225,6 +314,7 @@ function verifyPdfFooters(pdf, count, label) {
       await phone.waitForFunction(() => !document.querySelector('.toast'));
       assert(await phone.locator('#page-overflow-warning').isHidden(), 'Phone chart fits without an overflow warning');
       assert(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone chart stays within screen width');
+      await verifyChartFrames(phone, count * 2, 'Phone frame');
     };
     await generatePhone(3);
     const phonePdf = await phone.pdf({ preferCSSPageSize: true, printBackground: true });
