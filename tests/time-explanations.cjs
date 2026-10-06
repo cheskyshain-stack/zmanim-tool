@@ -27,13 +27,18 @@ const server = http.createServer((req, res) => {
     await context.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    const settled = async () => { await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(100); };
+    const settled = async () => {
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForFunction(() => !document.querySelector('.toast'));
+      await page.waitForTimeout(100);
+    };
     const switchOn = async () => {
       const toggle = page.locator('#explain-times-toggle');
       if (await toggle.getAttribute('aria-pressed') === 'false') await toggle.click();
     };
     const clickTime = async (locator, index = 0) => {
       await locator.scrollIntoViewIfNeeded();
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const coords = await locator.evaluate((el, index) => {
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), found = [];
         while (walker.nextNode()) {
@@ -51,9 +56,11 @@ const server = http.createServer((req, res) => {
       await page.locator('.time-explain-dialog[open]').waitFor({ timeout: 3000 }).catch(async error => {
         console.error('Click context:', await page.evaluate(coords => ({ hash: location.hash, coords,
           target: document.elementFromPoint(coords.x, coords.y)?.outerHTML,
-          active: document.activeElement?.outerHTML,
+          explanationTarget: document.elementFromPoint(coords.x, coords.y)?.closest('[data-time-explain]')?.outerHTML,
+          active: document.activeElement?.tagName,
           enabled: document.querySelector('#explain-times-toggle')?.getAttribute('aria-pressed'),
         }), coords));
+        console.error('Browser errors:', errors);
         throw error;
       });
       assert.equal(await page.locator('.time-explain-dialog .calc-open-printed').innerText(), coords.text);
@@ -61,7 +68,10 @@ const server = http.createServer((req, res) => {
       assert(!answer.includes('Calculation not recorded'), 'A real source exists for ' + coords.text + '\n' + answer);
       return answer;
     };
-    const close = () => page.keyboard.press('Escape');
+    const close = async () => {
+      await page.keyboard.press('Escape');
+      await page.locator('.time-explain-dialog').waitFor({ state: 'hidden' });
+    };
     const geometry = () => page.locator('#pages .page').evaluateAll(pages => pages.map(p => ({
       height: p.getBoundingClientRect().height,
       rows: [...p.querySelectorAll('tr')].map(r => r.getBoundingClientRect().height),
@@ -139,7 +149,7 @@ const server = http.createServer((req, res) => {
     await page.goto(origin + '/admin/#posters/own:explain-test'); await settled(); await switchOn();
     const ownTimes = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d{1,2}:\d{2}/ });
     assert.match(await clickTime(ownTimes.nth(0)), /Fixed time/); await close();
-    assert.match(await clickTime(ownTimes.nth(1)), /Take off\s+20 minutes[\s\S]*nearest 5/); await close();
+    assert.match(await clickTime(ownTimes.nth(1)), /Take off\s+20 minutes[\s\S]*down to a 5 minute mark \(earlier\)[\s\S]*Before:[\s\S]*After:/); await close();
     assert.match(await clickTime(ownTimes.nth(2)), /18 minutes[\s\S]*Add\s+3 minutes/); await close();
 
     await page.goto(origin + '/admin/#posters/chanukah'); await settled();
@@ -150,7 +160,7 @@ const server = http.createServer((req, res) => {
 
     await page.goto(origin + '/admin/#posters/pesach'); await settled(); await switchOn();
     const drasha = page.locator('.poster-row').filter({ hasText: 'דרשה' }).locator('[data-time-explain]').first();
-    assert.match(await clickTime(drasha), /28 minutes[\s\S]*last|28 minutes[\s\S]*nearest 5/); await close();
+    assert.match(await clickTime(drasha), /28 minutes[\s\S]*down to a 5 minute mark/); await close();
     const target = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d:\d\d/ }).first();
     await target.focus(); await page.keyboard.press('Enter');
     assert(await page.locator('.time-explain-dialog').isVisible(), 'Keyboard opens the explanation'); await close();
@@ -166,6 +176,61 @@ const server = http.createServer((req, res) => {
     assert(!(await page.locator('.time-explain-dialog').getAttribute('open')), 'Printing closes the explanation');
     assert(Buffer.from(pdf.data, 'base64').length > 10000, 'A real print PDF was generated');
     await close();
+
+    await page.evaluate(async () => {
+      const { zman, clockTime } = await import('/js/zmanim/trace.js');
+      const { timeExplanationAttrs } = await import('/js/ui/time-explanations.js');
+      const raw = (h, m, s = 0) => (h * 3600 + m * 60 + s) / 86400;
+      const start = (h, m, s) => zman('שקיעה', raw(h, m, s));
+      const fixtures = [
+        ['up', start(19, 40, 39).ceil()], ['down', start(19, 40, 39).floor()],
+        ['nearest-up', start(19, 40, 39).round()], ['nearest-down', start(19, 40, 20).round()],
+        ['nearest-tie', start(19, 40, 30).round()], ['unchanged', clockTime(19, 40).ceil()],
+        ['five-down', start(20, 3, 15.25).floorToStep(5)], ['five-up', start(20, 3, 15).ceilToStep(5)],
+        ['quarter-nearest', start(20, 8, 15).roundToStep(15)],
+        ['display-only', start(19, 40, 39)], ['display-tie', start(0, 1, 30)], ['boundary', start(19, 59, 59.99).floor()],
+        ['seconds', start(19, 40, 39)],
+      ];
+      for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m++) {
+        const time = start(h, m, 30);
+        if (time.displayRounding.at !== time.plain()) throw Error('Display rounding disagrees at ' + h + ':' + m);
+      }
+      document.getElementById('main').innerHTML = '<h1>Rounding checks</h1>' + fixtures.map(([id, time]) => {
+        const printed = id === 'seconds' ? '7:40:39' : time.plain();
+        return `<p id="round-${id}"${timeExplanationAttrs({ header: 'Rounding', chartName: 'Test schedule', printed, times: [time], single: true })}>${printed}</p>`;
+      }).join('');
+    });
+    const roundingCases = [
+      ['up', /up to a whole minute \(later\)/, /Rounded up \(later\)[\s\S]*Before: 7:40:39\. After: 7:41\./],
+      ['down', /down to a whole minute \(earlier\)/, /Rounded down \(earlier\)[\s\S]*Before: 7:40:39\. After: 7:40\./],
+      ['nearest-up', /nearest whole minute/, /Rounded up \(later\)/],
+      ['nearest-down', /nearest whole minute/, /Rounded down \(earlier\)/],
+      ['nearest-tie', /nearest whole minute/, /Rounded up \(later\)/],
+      ['unchanged', /up to a whole minute/, /Time stays the same/],
+      ['five-down', /down to a 5 minute mark/, /Before: 8:03:15\.25\. After: 8:00\./],
+      ['five-up', /up to a 5 minute mark/, /Before: 8:03:15\. After: 8:05\./],
+      ['quarter-nearest', /nearest 15 minutes/, /Rounded up \(later\)[\s\S]*After: 8:15/],
+      ['display-only', /nearest whole minute/, /Rounded up \(later\)[\s\S]*for display on the schedule/],
+      ['display-tie', /nearest whole minute/, /Rounded down \(earlier\)[\s\S]*After: 12:01/],
+      ['boundary', /down to a whole minute/, /Before: 7:59:59\.99\. After: 7:59\./],
+    ];
+    for (const [id, rule, result] of roundingCases) {
+      const answer = await clickTime(page.locator('#round-' + id));
+      assert.match(answer, rule, id + ' states the rounding rule');
+      assert.match(answer, result, id + ' states the actual direction and values');
+      await close();
+    }
+    const secondAnswer = await clickTime(page.locator('#round-seconds'));
+    assert(!secondAnswer.includes('Round '), 'A seconds-precise printed time has no whole-minute display rounding');
+    await close();
+    await clickTime(page.locator('#round-five-down'));
+    const roundingMobile = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth,
+      dialog: document.querySelector('.time-explain-dialog').getBoundingClientRect().toJSON() }));
+    assert(roundingMobile.width <= roundingMobile.viewport + 1, 'Rounding explanations do not overflow on mobile');
+    assert(roundingMobile.dialog.left >= 0 && roundingMobile.dialog.right <= 375, 'Rounding dialog fits mobile');
+    if (process.env.TIME_EXPLAIN_ROUNDING_SCREENSHOT) await page.screenshot({ path: process.env.TIME_EXPLAIN_ROUNDING_SCREENSHOT });
+    await close();
+    console.log('Verified rounding up, down, nearest in both directions, ties, unchanged times, 5 and 15 minutes, display rounding and seconds.');
     const publicPage = await context.newPage();
     await publicPage.goto(origin + '/chart/'); await publicPage.waitForTimeout(150);
     assert.equal(await publicPage.locator('#explain-times-toggle,[data-time-explain]').count(), 0, 'The option is admin-only');
