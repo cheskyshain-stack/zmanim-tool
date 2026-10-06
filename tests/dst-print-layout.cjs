@@ -45,6 +45,19 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
       return pages.map(page => {
         const box = page.getBoundingClientRect();
         const tables = [...page.querySelectorAll('table')];
+        const legend = page.querySelector('.chart-location-legend');
+        const marks = [...new Set(tables.flatMap(table =>
+          [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])))].sort();
+        const hasUnderlinedTime = tables.some(table => [...table.querySelectorAll('u')]
+          .some(el => /\d{1,2}:\d{2}/.test(el.textContent)));
+        if (Boolean(legend?.querySelector('.chart-location-downstairs')) !== hasUnderlinedTime)
+          throw Error('The footer must explain only the underlined times on its page');
+        const keys = [...(legend?.querySelectorAll(':scope > bdi') || [])]
+          .map(el => el.textContent.match(/^\*{1,2}/)[0]).sort();
+        if (JSON.stringify(keys) !== JSON.stringify(marks)) throw Error('The footer must explain only its page’s stars');
+        if (legend && (legend.scrollWidth > legend.clientWidth + 1
+          || legend.getBoundingClientRect().height > parseFloat(getComputedStyle(legend).lineHeight) + 1))
+          throw Error('Location notes must fit on a single line');
         return { top: tables[0].getBoundingClientRect().top - box.top,
           bottom: tables.at(-1).getBoundingClientRect().bottom - box.top,
           height: box.height };
@@ -139,14 +152,24 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     assert.equal(await page.locator('.chart-sections').count(), 0, 'Existing layouts start with one header');
     const menu = page.locator('#pages .page[data-sheet-label="שבת חורף"]').last().locator('.cell[data-col=L]').first();
     const serial = await menu.getAttribute('data-serial');
-    await menu.fill('12:47');
-    await page.locator('#chart-dst-headers-label').click();
+    // Older saved overrides still display even though chart cells can no longer edit them.
+    await page.evaluate(serial => {
+      const state = JSON.parse(localStorage.getItem('zmanim-app-state-v1'));
+      const sheet = state.sheets.find(sheet => sheet.season === 'choref');
+      sheet.overrides[serial] ||= {};
+      sheet.overrides[serial].L = '12:47';
+      localStorage.setItem('zmanim-app-state-v1', JSON.stringify(state));
+    }, serial);
+    await page.goto(origin + '/admin/#saved');
+    await page.reload();
+    await page.locator('.saved-list .open-btn').first().click();
+    await settled();
     const original = await cells();
     await page.locator('label[for=chart-dst-headers-separate]').click();
     await settled();
     const separate = await cells();
     for (const [key, text] of Object.entries(separate)) assert.equal(text, original[key], 'Unchanged time ' + key);
-    assert.equal(separate[serial + ':L'], '12:47', 'Existing Erev Shabbos edit stays in the winter section');
+    assert.equal(separate[serial + ':L'], '12:47', 'Saved Erev Shabbos override stays in the winter section');
     const sections = await page.locator('.chart-sections table').evaluateAll(tables => tables.map(table => ({
       columns: table.rows[0].cells.length,
       names: [...table.tBodies[0].rows].map(row => row.querySelector('.parsha-cell').innerText),
@@ -156,14 +179,20 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     assert.equal(sections[1].names[0], 'ויקרא · זכור');
     console.log('Separate headers:', JSON.stringify(await verify(6, '5787')));
 
-    const edited = page.locator(`.chart-sections .cell[data-serial="${serial}"][data-col=L]`);
-    await edited.fill('12:48');
+    const savedCell = page.locator(`.chart-sections .cell[data-serial="${serial}"][data-col=L]`);
+    const savedState = await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1'));
+    assert(await page.locator('#pages .cell').evaluateAll(cells => cells.every(cell => !cell.isContentEditable)), 'All chart cells are read-only');
+    await savedCell.click();
+    await page.keyboard.type('12:48');
     await page.locator('#chart-dst-headers-label').click();
+    assert.equal(await savedCell.innerText(), '12:47', 'Typing cannot change a saved chart time');
+    assert.equal(await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1')), savedState, 'Clicking and typing cannot save chart edits');
     await page.locator('label[for=chart-dst-headers-one]').click();
     assert.equal(await page.locator('.chart-sections').count(), 0);
-    assert.equal((await cells())[serial + ':L'], '12:48', 'Edits survive switching back');
+    assert.equal((await cells())[serial + ':L'], '12:47', 'Saved overrides survive switching back');
     await page.locator('label[for=chart-dst-headers-separate]').click();
     await page.goto(origin + '/admin/#saved');
+    await page.reload();
     await page.locator('.saved-list .open-btn').first().click();
     assert(await page.locator('#chart-dst-headers-separate').isChecked(), 'Saved choice survives reload');
     assert.equal(await page.locator('.chart-sections').count(), 1);
@@ -171,7 +200,7 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     const publicTables = await page.evaluate(async () => {
       const { buildSheetPages } = await import('/js/ui/sheet-view.js');
       const state = JSON.parse(localStorage.getItem('zmanim-app-state-v1'));
-      return buildSheetPages(state.sheets.find(sheet => sheet.season === 'choref'), state, () => {}, { readOnly: true })
+      return buildSheetPages(state.sheets.find(sheet => sheet.season === 'choref'), state, { readOnly: true })
         .map(page => page.querySelectorAll('table').length);
     });
     assert.deepEqual(publicTables, [1, 1, 1], 'Public charts keep their existing layout');
@@ -292,7 +321,7 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     // Start on a phone rather than resizing a chart already fitted on a desktop.
     // The latter cannot catch overflow hidden by the phone's reduced screen preview.
     const phoneContext = await browser.newContext({ viewport: { width: 375, height: 812 },
-      isMobile: true, deviceScaleFactor: 2,
+      isMobile: true, hasTouch: true, deviceScaleFactor: 2,
       userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36' });
     await phoneContext.route('**/*', route => route.request().url().startsWith(origin + '/')
       || route.request().url().startsWith('data:') ? route.continue() : route.abort());
@@ -317,6 +346,17 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
       await verifyChartFrames(phone, count * 2, 'Phone frame');
     };
     await generatePhone(3);
+    const phoneCell = phone.locator('#pages .cell').first();
+    const phoneState = await phone.evaluate(() => localStorage.getItem('zmanim-app-state-v1'));
+    const phoneText = await phoneCell.innerText();
+    await phoneCell.tap();
+    assert(await phone.evaluate(() => {
+      const active = document.activeElement;
+      return !active.isContentEditable && !active.matches('input,textarea');
+    }), 'Tapping a chart time does not focus a keyboard input');
+    await phone.keyboard.type('12:48');
+    assert.equal(await phoneCell.innerText(), phoneText, 'A phone tap cannot edit the chart');
+    assert.equal(await phone.evaluate(() => localStorage.getItem('zmanim-app-state-v1')), phoneState, 'Phone taps preserve saved data');
     const phonePdf = await phone.pdf({ preferCSSPageSize: true, printBackground: true });
     verifyPdfFooters(phonePdf, 6, 'Phone split headers');
     if (process.env.DST_MOBILE_PDF) fs.writeFileSync(process.env.DST_MOBILE_PDF, phonePdf);
@@ -328,7 +368,7 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     verifyPdfFooters(await phone.pdf({ preferCSSPageSize: true, printBackground: true }), 2, 'Phone whole season');
     await phoneContext.close();
     assert.deepEqual(errors, [], 'No browser errors');
-    console.log('Verified edits, persistence, public charts, both molad formats, mobile controls, and each physical PDF footer on desktop and phone.');
+    console.log('Verified read-only cells, saved overrides, one-line location notes, persistence, public charts, both molad formats, mobile controls, and each physical PDF footer on desktop and phone.');
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

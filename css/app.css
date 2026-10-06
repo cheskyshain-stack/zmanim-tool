@@ -724,7 +724,6 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 /* Everything on a printed page is bold by default (matches the shul's house style). */
 .page { font-weight: 700; }
 .page.is-mono { --ruled: #f3f3f3; }
-.page.is-mono .cell:focus { background: #fafafa; }
 
 .page-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.1in; }
 /* The name on the middle of the sheet, and not on the middle of what is left over.
@@ -908,10 +907,7 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--sheet-accent,
    pages in all: 1.35 leaves every page exactly at its unchanged height, 1.38 already
    overflows twenty of them. */
 .cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.35; direction: ltr; overflow-wrap: normal; word-break: normal; }
-.cell:focus { background: #fffbe6; }
 td.ruled .cell { background: var(--ruled); }
-/* Manually-edited cells no longer get a persistent background tint - only the brief
-   yellow flash while actively focused (above) shows anything changed. */
 /* .ul is no longer emitted (see nl2br in sheet-view.js) but stays styled here so cells
    whose overrides were saved back when it was still in use keep their underlines. */
 /* text-decoration-skip-ink: none, and it is not a preference. An underline here means the
@@ -1167,6 +1163,7 @@ td.ruled .cell { background: var(--ruled); }
 /* Pages share a footer region but can have different numbers of location notes. Keep the
    address at its bottom so adding a key does not shift the double-sided footer alignment. */
 .footer-text { align-self: flex-end; font-size: calc(var(--sheet-font-size) - 2.5pt); color: #444; text-align: center; white-space: pre-line; line-height: 1.3; }
+.chart-location-legend { white-space: nowrap; }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }

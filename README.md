@@ -75,13 +75,11 @@ computer, or after clearing browser data).
 
 ## Rules vs. overrides
 
-- **Overrides** (click any cell on a generated sheet to edit it) are one-off and tied
-  to that specific generated sheet.
+- Chart cells are read-only. **Overrides** from older saved sheets and imported backups
+  are still displayed and remain tied to their original sheet.
 - **Rules** (the Rules tab) are reusable and apply automatically every time you
   generate a sheet - use these for recurring exceptions like Shabbos Teshuva / Shabbos
-  HaGadol having a different Mincha time because of the drasha. Two starter rules are
-  seeded with a placeholder value ("לפי הדרשה - ערוך") - edit them with your shul's
-  actual times.
+  HaGadol having a different Mincha time because of the drasha.
 
 ## What's ported from the workbook vs. simplified
 

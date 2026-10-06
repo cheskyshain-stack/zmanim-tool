@@ -76,7 +76,7 @@ export function renderSavedSheets(container, state, onOpen, onDelete, onChange, 
 
   container.innerHTML = `
     <h2>Saved sheets</h2>
-    <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
+    <p class="hint">Every sheet you've generated. Open one to adjust its print layout or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
     ${
       // The row's own Publish button puts one season up and nothing else. This goes to the
       // publishing panel, which is the place that shows what the congregation is looking
@@ -202,4 +202,3 @@ function created(iso) {
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   return `${date}, ${time}`;
 }
-

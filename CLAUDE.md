@@ -142,8 +142,12 @@ The admin's **Explain times** switch stays available on every tab. Shared chart,
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks
 use measured text ranges to select one time inside a cell, without wrapping or changing
-editable chart text. Explain mode temporarily disables cell editing and restores it when
-turned off. Manual overrides and rules replace the corresponding traces with explicitly
+chart text. All seasonal and weekday chart cells are read-only, including admin print
+layouts and saved copies. Tapping a chart cell must not open the keyboard. Print controls
+remain available, and the `readOnly` renderer option still selects the congregation's
+announced times rather than controlling editing. Explain mode adds temporary focus and
+click targets and restores their original attributes when turned off. Saved manual overrides
+and rules replace the corresponding traces with explicitly
 entered times, so a changed value cannot claim its old solar formula. The modal closes
 before printing. `tests/time-explanations.cjs` checks actual clicks and chart geometry.
 Rounding steps show the rule, the actual earlier or later movement, and the values before
@@ -172,7 +176,9 @@ Each physical chart page explains the location stars it prints: `*בעזרת נ�
 including saved edits, rules and the weekday morning panel. Keep each star count with
 its Hebrew label in a separate bidi isolate and reserve its space before fitting pages.
 Omit unused locations, including the standard downstairs line on a page without an
-underlined minyan time. Rebuild standard star keys from older custom footers per page.
+underlined minyan time. Put the needed locations on one line, using an underlined
+`Underlined` label followed by `בביהמ"ד למטה`, then the star keys separated by dots. Rebuild standard
+location keys from older custom footers per page and preserve unrelated notes.
 `syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
 without changing saved styles. Collapsed table borders and the gap between DST sections
 are included in row-height calculations. Measurement temporarily removes screen scaling
@@ -250,8 +256,7 @@ This is where the sneaky bugs live.
 
 - Display Hebrew double quotes with the straight mark used in `ס"ז קר"ש`, including
   headings, notes and Hebrew years. `useStraightHebrewQuotes` changes text nodes before
-  layout measurements, preserving attributes and calculation keys. Editable chart
-  comparisons use the same presentation so an unchanged cell does not gain an override.
+  layout measurements, preserving attributes and calculation keys.
 - `.cell` and `.shacharis-merged` set `direction: ltr` deliberately. Changing that
   scrambles the time strings.
 - Wrap Hebrew inside an otherwise-LTR string in `<bdi>`, or you get output like
@@ -274,7 +279,8 @@ Everything lives in one localStorage key, `zmanim-app-state-v1`:
 `{ settings, sheets, rules, seeded }`. There is no backend and there will not be one.
 Export/Import in Settings moves it between devices.
 
-- **Per-cell overrides** are one-off, tied to one generated sheet.
+- **Per-cell overrides** are historical saved values tied to one generated sheet.
+  Saved sheets and imported backups retain them, but chart cells cannot create new ones.
 - **Rules** apply at generation time to every future sheet. Conditions: `always`,
   `specialParsha`, `parsha`, `dateISO`, `hebrewDate` (`"5-9"`, month-day counting Nisan
   as 1, recurs yearly). Column keys are sheet-qualified: `kayitz:C`, `choref:B`.

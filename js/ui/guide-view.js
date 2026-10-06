@@ -20,7 +20,7 @@ export function renderGuide(container, onOpenTab) {
           <li>Adjust the number of weeks on each page and open the charts.</li>
           <li>Use <strong>Print / Save as PDF</strong>.</li>
         </ol>
-        <p>Your page splits and cell edits are saved on this device. They do not change the automatic public charts.</p>
+        <p>Your print layout is saved on this device. Chart cells are read-only.</p>
       </div>
     </details>
     <details class="panel">
@@ -34,7 +34,7 @@ export function renderGuide(container, onOpenTab) {
       <summary>Saved copies</summary>
       <div class="panel-body">
         <p>Open <strong>Seasonal charts → Saved copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
-        <p>You can edit cells, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
+        <p>You can adjust print layouts, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
       </div>
     </details>
     <details class="panel">
@@ -56,7 +56,7 @@ export function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p><strong>Schedule settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
         <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Schedule settings → Backup</strong> to export a backup or import one on another device.</p>
-        <p>Turn on <strong>Explain times</strong>, then click a schedule time to see its calculation and rounding. Turn it off to edit times.</p>
+        <p>Turn on <strong>Explain times</strong>, then click a schedule time to see its calculation and rounding.</p>
       </div>
     </details>
     <div class="actions">

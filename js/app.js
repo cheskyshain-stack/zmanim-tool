@@ -248,7 +248,7 @@ function paint() {
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
-  // the sheet's Back button does, and a pending cell edit still commits on blur first.
+  // the sheet's Back button does.
   if (currentSheetId) {
     const sheet = state.sheets.find((s) => s.id === currentSheetId);
     renderSheet(main, state, sheet, (evt) => {
@@ -257,7 +257,7 @@ function paint() {
         render();
       } else if (evt.save) {
         persist();
-        render(); // re-render so the ✎ overridden-cell flag appears immediately
+        render(); // print settings and layout changes redraw the chart
       } else if (evt.openSheetId) {
         currentSheetId = evt.openSheetId; // e.g. the Weekday chart <-> Shabbos sheet companion link
         render();

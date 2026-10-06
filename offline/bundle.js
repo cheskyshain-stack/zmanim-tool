@@ -788,15 +788,6 @@ function useStraightHebrewQuotes(root) {
   }
 }
 
-/** The same presentation for cell comparisons, so changing a quote's appearance
- *  cannot create a manual override when somebody only clicks into a cell and leaves. */
-function straightHebrewQuoteHtml(html) {
-  const box = document.createElement('div');
-  box.innerHTML = html;
-  useStraightHebrewQuotes(box);
-  return box.innerHTML;
-}
-
 /** Whether two שחרית schedules say different things, whatever separators they were typed with.
  *  Used to drop a season line that only repeats the everyday one: the morning of יום א' of
  *  סליחות is the ordinary list, its סליחות having been said the night before, and printing it
@@ -7811,233 +7802,6 @@ const WEEKDAY_COLUMNS = [
   { key: 'E', header: 'שחרית' },
 ];
 
-// ==== ui/rich-text.js ====
-// Shared formatting toolbar for the app's contenteditable fields, which is the sheet's own
-// cells (ui/sheet-view.js). Settings had two such boxes for the Weekday שחרית schedules and no
-// longer does: those are the program's now, see the note at the top of ui/settings-view.js.
-// Underline goes through execCommand, which already handles the add/remove toggle and
-// partial selections correctly; text size is a plain <span class="big"> wrap, so what's
-// stored stays readable HTML rather than the <font size> tags execCommand would emit.
-
-/** The modifier key as this machine's user would write it, for the shortcut hints. */
-const MOD = /mac|iphone|ipad/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
-
-/** Toolbar markup. `label` prefixes it (e.g. "Selected text:") when it needs to say what
- *  it acts on. Each button's tooltip names its keyboard shortcut - the toolbar is the
- *  only place they're discoverable. */
-function richTextToolbarHtml(label = '') {
-  return `<span class="rt-toolbar no-print">
-    ${label ? `<span class="rt-label">${label}</span>` : ''}
-    ${richTextButtonsHtml()}
-  </span>`;
-}
-
-/** Just the buttons, for a container that supplies its own wrapper (the floating bar). */
-function richTextButtonsHtml() {
-  return `<button type="button" data-rt="underline" title="Underline / remove underline from the selected text  (${MOD}+U)"><u>U</u></button>
-    <button type="button" data-rt="big" title="Make the selected text bigger  (${MOD}+Shift+&gt;)">A&plus;</button>
-    <button type="button" data-rt="unbig" title="Put the selected text back to normal size  (${MOD}+Shift+&lt;)">A&minus;</button>`;
-}
-
-/** Ctrl+Shift+> / Ctrl+Shift+< for the size buttons, matching what Word and Google Docs
- *  use. Underline needs nothing: Ctrl+U is already built into contenteditable, and it
- *  fires an input event, so the edit saves the same way a toolbar click does.
- *
- *  One listener for the whole app, resolving the editor from whatever has focus - the
- *  sheet's cells and the Settings שחרית editor both qualify, and neither can be reached
- *  by a keystroke without being focused first. Registered once, since the views that use
- *  the toolbar re-render freely. */
-let shortcutsWired = false;
-function wireShortcutsOnce() {
-  if (shortcutsWired) return;
-  shortcutsWired = true;
-  document.addEventListener('keydown', (e) => {
-    const editor = document.activeElement;
-    if (!editor?.isContentEditable || !(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
-    // Reading both the shifted character and the unshifted key, since which one arrives
-    // depends on the keyboard layout.
-    const cmd = ['>', '.'].includes(e.key) ? 'big' : ['<', ','].includes(e.key) ? 'unbig' : null;
-    if (!cmd) return;
-    e.preventDefault();
-    applyRichTextCommand(cmd, editor);
-    editor.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
-
-/** The same three buttons, following the selection.
- *
- *  The toolbar at the top of the sheet is a long way from the cell you're editing, and on
- *  a phone it can be off screen entirely. This puts the buttons right above whatever you
- *  just selected, and works for any editable field in the app, since it resolves the
- *  editor from the selection rather than from a particular view.
- *
- *  Built once and reused: it's a single element parked on <body> at position:fixed, so it
- *  sits above everything without caring what the page around it is doing. */
-let floatEl = null;
-function floatingToolbarOnce() {
-  if (floatEl) return;
-  floatEl = document.createElement('div');
-  floatEl.className = 'rt-float rt-toolbar no-print';
-  floatEl.hidden = true;
-  floatEl.innerHTML = richTextButtonsHtml();
-  document.body.appendChild(floatEl);
-  // The editor is whichever editable field holds the selection, resolved at click time.
-  wireRichTextToolbar(floatEl, editorOfSelection);
-
-  const place = () => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount || !editorOfSelection()) {
-      floatEl.hidden = true;
-      return;
-    }
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
-    if (!rect.width && !rect.height) {
-      floatEl.hidden = true;
-      return;
-    }
-    floatEl.hidden = false;
-    // Measured after unhiding, since a hidden element has no size to centre on.
-    const { width, height } = floatEl.getBoundingClientRect();
-    const edge = 8;
-    // Below the selection, not above: a phone puts its own Cut/Copy/Paste bar above the
-    // text you just selected, and the two landed on top of each other. The gap clears the
-    // drag handles that hang under the selection on a touch screen. Above only as a
-    // fallback, when there is no room underneath.
-    const BELOW_GAP = 26;
-    const below = rect.bottom + BELOW_GAP;
-    const fitsBelow = below + height <= window.innerHeight - edge;
-    floatEl.style.top = `${fitsBelow ? below : Math.max(edge, rect.top - height - edge)}px`;
-    floatEl.style.left = `${Math.max(edge, Math.min(window.innerWidth - width - edge, rect.left + rect.width / 2 - width / 2))}px`;
-  };
-
-  // selectionchange fires for every caret move, so the work is deferred and collapsed
-  // into one update. A timeout rather than requestAnimationFrame: rAF doesn't run at all
-  // while the page is considered hidden, which would leave the bar stuck wherever it was
-  // when the window lost visibility.
-  let queued = false;
-  const schedule = () => {
-    if (queued) return;
-    queued = true;
-    setTimeout(() => {
-      queued = false;
-      place();
-    }, 0);
-  };
-  document.addEventListener('selectionchange', schedule);
-  // Keep it against the text while the page moves under it.
-  window.addEventListener('scroll', schedule, true);
-  window.addEventListener('resize', schedule);
-}
-
-/** The editable field containing the current selection, or null if it isn't in one. */
-function editorOfSelection() {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return null;
-  let node = sel.getRangeAt(0).commonAncestorContainer;
-  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-  const editor = node.closest?.('[contenteditable="true"]');
-  return editor || null;
-}
-
-/** `getEditor()` is called per click so callers whose target moves (the sheet's toolbar
- *  acts on whichever cell was last focused) can resolve it late. */
-function wireRichTextToolbar(root, getEditor) {
-  wireShortcutsOnce();
-  floatingToolbarOnce();
-  root.querySelectorAll('[data-rt]').forEach((btn) => {
-    // Without this the button steals focus on press, which collapses the selection in
-    // the editor before the click handler ever runs - leaving nothing to format.
-    btn.addEventListener('mousedown', (e) => e.preventDefault());
-    btn.addEventListener('click', () => {
-      const editor = getEditor();
-      if (!editor) return;
-      applyRichTextCommand(btn.dataset.rt, editor);
-      editor.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  });
-}
-
-function applyRichTextCommand(cmd, editor) {
-  if (cmd === 'underline') {
-    document.execCommand('underline');
-    return;
-  }
-  const sel = window.getSelection();
-  if (!sel.rangeCount || sel.isCollapsed) return;
-  const range = sel.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) return;
-
-  if (cmd === 'big') {
-    const span = document.createElement('span');
-    span.className = 'big';
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
-    reselect(sel, span);
-    return;
-  }
-  if (cmd === 'unbig') {
-    // Selection sitting *inside* one big span (the common case - you enlarged a line,
-    // then selected part of it): unwrap that whole span rather than splitting it.
-    let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-    const enclosing = node.closest?.('span.big');
-    if (enclosing && editor.contains(enclosing)) {
-      enclosing.replaceWith(...enclosing.childNodes);
-      return;
-    }
-    // Otherwise the selection spans several - strip any it fully contains.
-    const frag = range.extractContents();
-    frag.querySelectorAll('span.big').forEach((s) => s.replaceWith(...s.childNodes));
-    range.insertNode(frag);
-  }
-}
-
-/** Whether a run of text is nothing but times and the punctuation that separates them,
- *  so expanding bare digits in it is unambiguous.
- *
- *  Without this the expansion reaches into ordinary text: "10 דק׳" became "10:00 דק׳"
- *  and "TEST123" became "TEST1:23" - and because it runs on blur, merely clicking into
- *  a cell and back out was enough to rewrite it and save an override. Any letter in the
- *  run means it isn't a bare time list, so leave it alone. In a formatted field this is
- *  applied per text node, so times and words can still coexist there - a line of times
- *  is expanded even when a Hebrew line right above it isn't. */
-function isBareTimeList(text) {
-  return /\d/.test(text) && !/\p{L}/u.test(text);
-}
-
-/** Rewrites shorthand times in place inside a contenteditable ("1220 130" ->
- *  "12:20/1:30"). Call it on blur, not while typing, or it fights the caret.
- *
- *  With no markup in the field it can work on the text wholesale, separators included.
- *  Once part of the text is underlined or resized, it only expands digits within each
- *  text node and leaves separators alone: the spaces between times may then live in
- *  different nodes than the times themselves, and rewriting across that boundary would
- *  mean rebuilding the field's HTML - which would throw away exactly the formatting the
- *  user just applied. */
-function applyTimeShorthand(editorEl) {
-  if (!editorEl.children.length) {
-    if (!isBareTimeList(editorEl.textContent)) return;
-    const normalized = normalizeTimeList(editorEl.textContent);
-    if (normalized !== editorEl.textContent) editorEl.textContent = normalized;
-    return;
-  }
-  const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-  textNodes.forEach((node) => {
-    if (!isBareTimeList(node.nodeValue)) return;
-    const normalized = normalizeTimeShorthand(node.nodeValue);
-    if (normalized !== node.nodeValue) node.nodeValue = normalized;
-  });
-}
-
-function reselect(sel, node) {
-  sel.removeAllRanges();
-  const r = document.createRange();
-  r.selectNodeContents(node);
-  sel.addRange(r);
-}
-
 // ==== ui/shacharis-grid.js ====
 // The שחרית panel's schedule, set in columns instead of as centred lines.
 //
@@ -8803,29 +8567,14 @@ function fontStackFor(fontFamily) {
   return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
 }
 
-// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
-// intentionally not persisted to localStorage; it lives for as long as the app tab is
-// open, same as undo history in most editors.
-const histories = new Map();
-function getHistory(sheetId) {
-  if (!histories.has(sheetId)) histories.set(sheetId, { undo: [], redo: [] });
-  return histories.get(sheetId);
-}
-function applyOverrideValue(sheet, serial, col, value) {
-  if (value === undefined) clearOverride(sheet, serial, col);
-  else setOverride(sheet, serial, col, value);
-}
-
 /** The printed pages of one sheet, built and styled but not yet in the document.
  *
- *  Exported because the congregation's page shows the same chart, and a second renderer
- *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
- *  that use: it is the same markup with the cell editing taken off, rather than a
- *  different rendering path that could quietly diverge.
+ *  All chart cells are read-only, including admin print copies. The readOnly flag selects
+ *  the congregation's announced times; admin copies retain their calculated and saved values.
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
+function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
@@ -8834,11 +8583,8 @@ function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, 
   const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
   return split.map(({ weeks: pw, effectiveSeason }, i) => {
     const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    /* A read-only chart is the reading copy, so it quotes what the shul has announced: see
-       js/announced.js. The editable one never does. That is the whole reason the flag is
-       carried this far rather than the swap being done for everybody: a cell in the admin is
-       a box somebody types into, and a swapped time sitting in it would be saved over the
-       board's own the moment that week was edited for any other reason.
+    /* The congregation's copy quotes what the shul has announced: see js/announced.js.
+       Admin print layouts keep the chart's calculated times and existing saved overrides.
        showMolad is carried the same explicit way, defaulting closed, for a stricter reason
        than that one: the congregation's own /chart/ page (chart-view.js) calls this with
        readOnly alone and nothing in this parameter's own name to fall back on, and must
@@ -8855,9 +8601,9 @@ function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, 
     // must stay with the same minyan when its three unused Plag columns are hidden.
     const winterColumns = springStart > 0
       ? CHOREF_COLUMNS.map(column => column.key === 'I' ? { ...column, key: 'L' } : column) : columns;
-    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
     if (springStart > 0) {
-      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
       const sections = document.createElement('div');
       sections.className = 'chart-sections';
       const winterTable = el.querySelector('table');
@@ -8868,7 +8614,6 @@ function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, 
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
-    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
 }
@@ -8882,13 +8627,13 @@ function fillChartLocationLegend(page) {
   const footer = page.querySelector('.footer-text');
   const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
   // Rebuild standard location keys from this page, including ones in an older custom
-  // footer. Other custom notes stay intact. Drop the downstairs line when no time uses it.
+  // footer. Other custom notes stay intact; all required locations share one compact line.
   for (const node of [...footer.childNodes]) {
     if (node.nodeType !== 3) continue;
     const text = node.textContent.replace(/\s+/g, ' ').trim();
     const starKey = /בעזרת נשים|באולם השמחות/.test(text)
       && !text.replace(/בעזרת נשים|באולם השמחות|\*|\s/g, '');
-    if (!starKey && (hasDownstairs || text !== WEEKDAY_FOOTER_NOTE)) continue;
+    if (!starKey && text !== WEEKDAY_FOOTER_NOTE) continue;
     if (node.nextSibling?.nodeName === 'BR') node.nextSibling.remove();
     node.remove();
   }
@@ -8898,19 +8643,31 @@ function fillChartLocationLegend(page) {
     const stars = mark.replace(/\*/g, '\\*');
     return !new RegExp(`(?:^|[^*])${stars}(?!\\*)\\s*${label}|${label}\\s*${stars}(?!\\*)`).test(existingNote);
   });
-  if (!locations.length) return;
+  if (!hasDownstairs && !locations.length) return;
   const legend = document.createElement('div');
   legend.className = 'chart-location-legend';
-  legend.dir = 'rtl';
-  locations.forEach(([mark, label], index) => {
-    if (index) legend.append('   ');
+  legend.dir = 'ltr';
+  if (hasDownstairs) {
+    const entry = document.createElement('span');
+    entry.className = 'chart-location-downstairs';
+    const key = document.createElement('u');
+    key.textContent = 'Underlined';
+    const room = document.createElement('bdi');
+    room.dir = 'rtl';
+    room.lang = 'he';
+    room.textContent = 'בביהמ"ד למטה';
+    entry.append(key, ': ', room);
+    legend.append(entry);
+  }
+  locations.forEach(([mark, label]) => {
+    if (legend.childNodes.length) legend.append(' · ');
     const entry = document.createElement('bdi');
     entry.dir = 'rtl';
     entry.lang = 'he';
     entry.textContent = `${mark}${label}`;
     legend.append(entry);
   });
-  footer.querySelector('.footer-address').before(legend);
+  footer.prepend(legend);
 }
 
 /** Makes every row on every page the same height. Must run with the pages in the
@@ -9000,7 +8757,7 @@ function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange, {
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, {
     showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(sh?.style?.splitSpringDst),
   });
   const shabbosFirst = sheet.season === 'weekday' && companion;
@@ -9050,7 +8807,7 @@ function renderSheet(container, state, sheet, onChange) {
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
   const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
-  const FIT_TOLERANCE = 8.5 * 96 + 1 / 64; // only CSS sub-pixel rounding past the paper height
+  const FIT_TOLERANCE = 8.5 * 96; // even sub-pixel overflow can shift the duplex chart frame
   const applyFitScale = (scale) => {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncHeaderRowHeight(pagesEl);
@@ -9160,8 +8917,8 @@ const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season
 
 
 // --- Fit to screen -----------------------------------------------------------------
-// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
-// the view shouldn't snap back to full size underneath you each time.
+// Module-level, not per-render: print controls redraw the sheet, and the view should
+// keep the user's chosen preview scale each time.
 let chartBeforePrintHandler;
 let fitOn = false;
 let fitChosenByUser = false;
@@ -9388,7 +9145,7 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false, showMolad = false } = {}) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, effectiveSeason, { announced = false, showMolad = false } = {}) {
   const page = document.createElement('div');
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
@@ -9513,9 +9270,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
             <div class="shacharis-panel"><div class="shacharis-panel-in"${timeExplanationAttrs({ header: 'שחרית', chartName: 'Weekday chart', printed: panelHtml, times: panelTraces })}>${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
-        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
-        // week stores an override the same as any other column. An override already
-        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // schedule (see sheets/weekday.js), with any existing saved overrides retained.
+        // An override already holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           // The 11:30 "NEW" tag lives only here: a hand-typed override already wins
@@ -9526,11 +9282,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
+          return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
-        // Overridden cells already hold real HTML (captured from the editable div,
-        // possibly with manual <u> underlining); computed cells still need nl2br().
+        // Saved overrides already hold real HTML, possibly with manual <u> underlining;
+        // computed cells still need nl2br().
         // printOverrides is read here too, same as the Weekday chart's own B/C above: the
         // Shabbos chart's own Erev Shabbos מנחה column (I) carries the "חנוכה" tag on its
         // own extra 12:15 this same way (see choref.js), and every other reader of this
@@ -9538,10 +9294,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // directly - still sees the plain untagged time.
         const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
         const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
-        // data-season records which season this *page* rendered as, so a later edit
-        // (see the blur handler below) recomputes its "did this really change?"
-        // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -9684,53 +9437,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   useStraightHebrewQuotes(page);
 
-  /** What this cell would hold with no manual override - what an edit is diffed against
-   *  to decide whether it's a real change worth storing. */
-  const baselineHtmlFor = (cellEl) => {
-    const col = cellEl.dataset.col;
-    const weekSeason = cellEl.dataset.season;
-    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
-    const settingsResolved = resolveSettings(state.settings);
-    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = builtRow;
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
-    const raw = ruled[col] ?? '';
-    // Every column, Weekday included, is built as plain text with underline sentinels
-    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
-    // store a bogus override on a cell nobody actually edited.
-    return straightHebrewQuoteHtml(normalizeRichText(nl2br(raw)));
-  };
-
-  const commitCell = (cellEl) => {
-    const serial = Number(cellEl.dataset.serial);
-    const col = cellEl.dataset.col;
-    const newHtml = normalizeRichText(cellEl.innerHTML);
-    const before = getOverride(sheet, serial, col); // undefined = "no override"
-    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    const displayedBefore = before === undefined ? undefined : straightHebrewQuoteHtml(normalizeRichText(before));
-    if (displayedBefore === after) return; // no real change (e.g. just clicked in and out)
-    applyOverrideValue(sheet, serial, col, after);
-    const hist = getHistory(sheet.id);
-    hist.undo.push({ serial, col, before, after });
-    hist.redo = []; // a fresh edit invalidates any redo history
-    onChange({ save: true });
-  };
-
-  page.querySelectorAll('.cell').forEach((cellEl) => {
-    cellEl.addEventListener('keydown', (e) => {
-      if (cellEl.contentEditable !== 'true') return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-        e.preventDefault();
-        document.execCommand('underline');
-      }
-    });
-    cellEl.addEventListener('blur', () => {
-      if (cellEl.contentEditable !== 'true') return;
-      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
-      commitCell(cellEl);
-    });
-  });
-
   return page;
 }
 
@@ -9739,11 +9445,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
  *  conditions existed. */
 function withHebrewDate(week, settings) {
   return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
-}
-
-function splitBuild(season) {
-  if (season === 'weekday') return buildWeekdayRow;
-  return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 
 /** A column's heading, its first line at the heading's own regular size and, when the
@@ -11848,8 +11549,8 @@ function renderChartBrowser(container, state, opts = {}) {
       <div class="pages-fit"><div class="pages"></div></div>`;
     useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
-    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
-    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
+    const shabbos = buildSheetPages(spread.sheet, state, { readOnly: true });
+    const chol = buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     fitChartToWindow(pagesEl);
 
@@ -12254,7 +11955,7 @@ function renderGuide(container, onOpenTab) {
           <li>Adjust the number of weeks on each page and open the charts.</li>
           <li>Use <strong>Print / Save as PDF</strong>.</li>
         </ol>
-        <p>Your page splits and cell edits are saved on this device. They do not change the automatic public charts.</p>
+        <p>Your print layout is saved on this device. Chart cells are read-only.</p>
       </div>
     </details>
     <details class="panel">
@@ -12268,7 +11969,7 @@ function renderGuide(container, onOpenTab) {
       <summary>Saved copies</summary>
       <div class="panel-body">
         <p>Open <strong>Seasonal charts → Saved copies</strong> to reopen a chart you prepared. A Shabbos chart and its weekday chart share one entry.</p>
-        <p>You can edit cells, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
+        <p>You can adjust print layouts, print, organise copies into folders, or lock a copy against deletion. These copies are kept in this browser on this device.</p>
       </div>
     </details>
     <details class="panel">
@@ -12290,7 +11991,7 @@ function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p><strong>Schedule settings</strong> contains the shul details, location, calculation preferences, rules, and backups. Local settings affect the admin previews and print copies; changing them does not automatically update the public site's shared settings.</p>
         <p>Phone and computer copies do not sync. Clearing browser data can erase local work. Use <strong>Schedule settings → Backup</strong> to export a backup or import one on another device.</p>
-        <p>Turn on <strong>Explain times</strong>, then click a schedule time to see its calculation and rounding. Turn it off to edit times.</p>
+        <p>Turn on <strong>Explain times</strong>, then click a schedule time to see its calculation and rounding.</p>
       </div>
     </details>
     <div class="actions">
@@ -17468,7 +17169,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
 
   container.innerHTML = `
     <h2>Saved sheets</h2>
-    <p class="hint">Every sheet you've generated. Open one to edit or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
+    <p class="hint">Every sheet you've generated. Open one to adjust its print layout or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
     ${
       // The row's own Publish button puts one season up and nothing else. This goes to the
       // publishing panel, which is the place that shows what the congregation is looking
@@ -22117,7 +21818,7 @@ function paint() {
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
-  // the sheet's Back button does, and a pending cell edit still commits on blur first.
+  // the sheet's Back button does.
   if (currentSheetId) {
     const sheet = state.sheets.find((s) => s.id === currentSheetId);
     renderSheet(main, state, sheet, (evt) => {
@@ -22126,7 +21827,7 @@ function paint() {
         render();
       } else if (evt.save) {
         persist();
-        render(); // re-render so the ✎ overridden-cell flag appears immediately
+        render(); // print settings and layout changes redraw the chart
       } else if (evt.openSheetId) {
         currentSheetId = evt.openSheetId; // e.g. the Weekday chart <-> Shabbos sheet companion link
         render();
