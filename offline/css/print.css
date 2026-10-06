@@ -14,7 +14,7 @@
   .no-print { display: none !important; }
   /* Pages unticked in the page picker are left out of the print/PDF run. */
   .page-excluded { display: none !important; }
-  html, body { background: white; }
+  html, body, body.is-luach { background: white; }
   /* The sidebar is .no-print, so the shell has nothing left to lay out beside main -
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
@@ -36,6 +36,9 @@
   #sheet-stack.is-side-by-side > .pages { display: block; }
   #sheet-stack.is-side-by-side > .pages > .page { zoom: 1; }
   .page {
+    --ink: #000;
+    --muted: #000;
+    color: #000;
     width: 11in;
     height: 8.5in;
     min-height: 0;
@@ -47,6 +50,8 @@
   }
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
+  .page .footer-text { color: #000; }
+  .page .cell:focus { background: transparent; }
 }
 
 /* --- When the browser will not give us the 11in the page is built for ----------------
@@ -98,7 +103,7 @@
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* Retain the original soft panel shadow when printing. */
-  .shacharis-panel { box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13); }
+  .shacharis-panel { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.13); }
 }
 
 /* --- The week cards on paper -------------------------------------------------------

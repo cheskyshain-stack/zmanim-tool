@@ -723,6 +723,8 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 
 /* Everything on a printed page is bold by default (matches the shul's house style). */
 .page { font-weight: 700; }
+.page.is-mono { --ruled: #f3f3f3; }
+.page.is-mono .cell:focus { background: #fafafa; }
 
 .page-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.1in; }
 /* The name on the middle of the sheet, and not on the middle of what is left over.
@@ -776,7 +778,7 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
    Asked for directly: no line between one row and the next any more - the zebra shading
    already carries that, and a board read from a few feet away does not need both. The
    columns keep a line between them, since nothing else marks where one time column ends
-   and the next begins the way shading marks a row. #ccd3da is the שחרית panel's own light
+   and the next begins the way shading marks a row. #d2d2d2 is the שחרית panel's own light
    grey (see .shacharis-panel), reused here as this project's one answer for "a border
    that reads as a hint rather than a rule" - the outer frame used to keep the bare rule's
    own darker #9aa7b3 instead, which read as a different weight around the same table; asked
@@ -788,8 +790,8 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
    zebra shading under it is at most a 40% tint of the accent colour (see tbody
    tr:nth-child(even) below), never the header's own full strength, so there is no fill
    there crisp enough to stand in for a border on its own. */
-.page table { border: 1px solid #ccd3da; border-top: none; }
-.page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #ccd3da; border-right: 1px solid #ccd3da; }
+.page table { border: 1px solid #d2d2d2; border-top: none; }
+.page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #d2d2d2; border-right: 1px solid #d2d2d2; }
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
@@ -977,8 +979,8 @@ td.ruled .cell { background: var(--ruled); }
   top: calc((0.35 - var(--above, 0)) * 100% + (0.35 - var(--above, 0)) * 1px);
   height: calc((var(--rows, 3) - 0.7) * 100% + (var(--rows, 3) - 0.7) * 1px);
   left: 18%; right: 18%;
-  background: #fff; border: 1px solid #ccd3da; border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13);
+  background: #fff; border: 1px solid #d2d2d2; border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.13);
   display: grid; place-content: center;
   padding: 0.14in 0.1in; box-sizing: border-box;
   white-space: pre-line; line-height: 1.3; direction: ltr;
@@ -1161,7 +1163,7 @@ td.ruled .cell { background: var(--ruled); }
   align-items: center;
   gap: 0.12in;
 }
-.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #9aa7b3, transparent); }
+.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #a5a5a5, transparent); }
 .footer-text { font-size: calc(var(--sheet-font-size) - 2.5pt); color: #444; text-align: center; white-space: pre-line; line-height: 1.3; }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 

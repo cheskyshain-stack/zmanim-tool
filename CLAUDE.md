@@ -122,6 +122,13 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
+shadows, plus black print text on white paper. Upgrade the old blue-gray default in
+saved charts and published settings. Black and white mode sets gray colour values
+directly, preserving PDF text; CSS grayscale filters rasterize the tables and text.
+`tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
+ink modes, including saved defaults and a custom colour.
+
 Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
