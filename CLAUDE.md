@@ -126,6 +126,11 @@ Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
 
+The after-Sukkos extra 9:00 Maariv is kept through Thursday, October 8, 2026 in Lakewood
+and omitted from Friday onward, including future years previewed before that date.
+`buildSukkosAfter` applies the cutoff to the shared list read by posters and weekday
+charts. The after-Yom-Kippur and Chol Hamoed lists keep their own 9:00 minyanim.
+
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks

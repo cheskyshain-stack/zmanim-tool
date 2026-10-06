@@ -13,7 +13,7 @@
 // already make, so somebody holding this and the board is reading one set of marks.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, excelSerial, shulNow } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, ceilToMinute, roundToMinute, UL_START } from '../format.js';
 import { SLASH } from '../util.js';
@@ -391,6 +391,9 @@ export function sukkosChmMaariv(days, settings) {
    יו"כ ones do, and all this decides is which days they have to hold for. */
 const SK_AFTER_FIRST = 24;  // the morning after שמחת תורה
 const SK_THURSDAY = 5;      // excelWeekday: 1 = Sunday .. 7 = Shabbos
+// The extra 9:00 מעריב ends after this Thursday in Lakewood. Future after-Sukkos
+// schedules omit it even when previewed before the cutoff.
+const SK_AFTER_NINE_LAST_DAY = excelSerial(new Date('2026-10-08T00:00:00Z'));
 
 /** The days the after סוכות schedule is set by: from the first weekday after שמחת תורה to the
  *  Thursday of that same week.
@@ -427,9 +430,9 @@ export function sukkosAfterDays(rh, settings) {
 }
 
 /** The after סוכות schedule: the same three lists as after יו"כ, bound by that week's own days. */
-export function buildSukkosAfter(rh, settings) {
+export function buildSukkosAfter(rh, settings, { now = new Date() } = {}) {
   const days = sukkosAfterDays(rh, settings);
-  return afterSchedule(
+  const after = afterSchedule(
     Math.min(...days.map((s) => skShkia(s, settings))),
     Math.max(...days.map((s) => skMinchaGedola(s, settings))),
     settings,
@@ -439,6 +442,10 @@ export function buildSukkosAfter(rh, settings) {
     // prints today.
     { lastFifteen: true }
   );
+  if (days[days.length - 1] > SK_AFTER_NINE_LAST_DAY || shulNow(now, settings).serial > SK_AFTER_NINE_LAST_DAY) {
+    after.maariv = after.maariv.filter(time => time.text !== '9:00');
+  }
+  return after;
 }
 
 /** A Shabbos that falls inside this sheet, worked the way an ordinary Shabbos of the year is.
