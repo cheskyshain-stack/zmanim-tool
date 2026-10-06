@@ -727,13 +727,28 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // line-height (see app.css), down from ~27px past to ~7px, close to Compact
       // Hebrew's own baseline rather than well past it. Shortening the molad sentence
       // itself would close the rest of the gap and has not been asked for.
-      const mevarchimNote = hasMevarchim
-        ? `<br><span class="parsha-note is-molad">${molad}</span>`
-        : '';
+      const mevarchimNote = hasMevarchim ? `<span class="parsha-note is-molad">${molad}</span>` : '';
       // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
       // week ahead rather than this one, so it does not belong beside the parsha at full
       // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
-      const parshaHtml = nl2br(parshaCell) + mevarchimNote + (chanukahLabel === 'erev' ? '<br><span class="parsha-note">ערב חנוכה</span>' : '');
+      const erevChanukahNote = chanukahLabel === 'erev' ? '<span class="parsha-note">ערב חנוכה</span>' : '';
+      // A week with a molad note used to have the parsha name pulled up off the row's own
+      // centre, since vertical-align:middle on the <td> centres the name and the note
+      // together as one two-line block - asked to stop: the name should sit exactly where
+      // it sits on a week with no molad, and the molad note should hang under it, centred
+      // in whatever room is left below. .parsha-cell-inner does that with a flex column
+      // (an empty ::before as the matching spacer above the name, in app.css) rather than
+      // by measuring anything in script, which keeps this in the same no-JS-layout style
+      // the rest of the sheet's cells use.
+      // Only the compact Hebrew molad gets it, asked for directly: the Yiddish molad is
+      // two lines of its own (moladLabelYiddish's own <br>) and may not leave enough room
+      // below the name to stay centred in it, so that format keeps the plain stacked
+      // layout it already had.
+      const centerMolad = hasMevarchim && settings.moladFormat !== 'yiddish';
+      const parshaHtml = centerMolad
+        ? `<div class="parsha-cell-inner"><div class="parsha-cell-name">${nl2br(parshaCell)}</div>`
+          + `<div class="parsha-cell-sub">${[mevarchimNote, erevChanukahNote].filter(Boolean).join('<br>')}</div></div>`
+        : nl2br(parshaCell) + [mevarchimNote, erevChanukahNote].filter(Boolean).map((n) => '<br>' + n).join('');
       const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
