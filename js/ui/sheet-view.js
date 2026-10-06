@@ -10,19 +10,18 @@ import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThrou
 import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay } from '../posters/chanukah.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang, escText, escAttr, useStraightHebrewQuotes, straightHebrewQuoteHtml } from '../util.js';
+import { hebrewLang, escText, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
-import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
+import { mergeRow } from '../overrides.js';
 import { announcedWeekCell } from '../announced.js';
 import { shacharisGridHtml } from './shacharis-grid.js';
 import {
   UL_START, UL_END, NEW_TAG_START, NEW_TAG_MID, NEW_TAG_END,
   CHANUKAH_TAG_START, CHANUKAH_TAG_MID, CHANUKAH_TAG_END,
   SMALL_START, SMALL_END,
-  normalizeRichText, markHeaderRoom,
+  markHeaderRoom,
 } from '../format.js';
-import { applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
@@ -99,29 +98,14 @@ export function fontStackFor(fontFamily) {
   return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
 }
 
-// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
-// intentionally not persisted to localStorage; it lives for as long as the app tab is
-// open, same as undo history in most editors.
-const histories = new Map();
-function getHistory(sheetId) {
-  if (!histories.has(sheetId)) histories.set(sheetId, { undo: [], redo: [] });
-  return histories.get(sheetId);
-}
-function applyOverrideValue(sheet, serial, col, value) {
-  if (value === undefined) clearOverride(sheet, serial, col);
-  else setOverride(sheet, serial, col, value);
-}
-
 /** The printed pages of one sheet, built and styled but not yet in the document.
  *
- *  Exported because the congregation's page shows the same chart, and a second renderer
- *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
- *  that use: it is the same markup with the cell editing taken off, rather than a
- *  different rendering path that could quietly diverge.
+ *  All chart cells are read-only, including admin print copies. The readOnly flag selects
+ *  the congregation's announced times; admin copies retain their calculated and saved values.
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
+export function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
@@ -130,11 +114,8 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
   const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
   return split.map(({ weeks: pw, effectiveSeason }, i) => {
     const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    /* A read-only chart is the reading copy, so it quotes what the shul has announced: see
-       js/announced.js. The editable one never does. That is the whole reason the flag is
-       carried this far rather than the swap being done for everybody: a cell in the admin is
-       a box somebody types into, and a swapped time sitting in it would be saved over the
-       board's own the moment that week was edited for any other reason.
+    /* The congregation's copy quotes what the shul has announced: see js/announced.js.
+       Admin print layouts keep the chart's calculated times and existing saved overrides.
        showMolad is carried the same explicit way, defaulting closed, for a stricter reason
        than that one: the congregation's own /chart/ page (chart-view.js) calls this with
        readOnly alone and nothing in this parameter's own name to fall back on, and must
@@ -151,9 +132,9 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
     // must stay with the same minyan when its three unused Plag columns are hidden.
     const winterColumns = springStart > 0
       ? CHOREF_COLUMNS.map(column => column.key === 'I' ? { ...column, key: 'L' } : column) : columns;
-    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
     if (springStart > 0) {
-      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly, showMolad });
+      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
       const sections = document.createElement('div');
       sections.className = 'chart-sections';
       const winterTable = el.querySelector('table');
@@ -164,7 +145,6 @@ export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = 
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
-    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
 }
@@ -178,13 +158,13 @@ function fillChartLocationLegend(page) {
   const footer = page.querySelector('.footer-text');
   const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
   // Rebuild standard location keys from this page, including ones in an older custom
-  // footer. Other custom notes stay intact. Drop the downstairs line when no time uses it.
+  // footer. Other custom notes stay intact; all required locations share one compact line.
   for (const node of [...footer.childNodes]) {
     if (node.nodeType !== 3) continue;
     const text = node.textContent.replace(/\s+/g, ' ').trim();
     const starKey = /בעזרת נשים|באולם השמחות/.test(text)
       && !text.replace(/בעזרת נשים|באולם השמחות|\*|\s/g, '');
-    if (!starKey && (hasDownstairs || text !== WEEKDAY_FOOTER_NOTE)) continue;
+    if (!starKey && text !== WEEKDAY_FOOTER_NOTE) continue;
     if (node.nextSibling?.nodeName === 'BR') node.nextSibling.remove();
     node.remove();
   }
@@ -194,19 +174,31 @@ function fillChartLocationLegend(page) {
     const stars = mark.replace(/\*/g, '\\*');
     return !new RegExp(`(?:^|[^*])${stars}(?!\\*)\\s*${label}|${label}\\s*${stars}(?!\\*)`).test(existingNote);
   });
-  if (!locations.length) return;
+  if (!hasDownstairs && !locations.length) return;
   const legend = document.createElement('div');
   legend.className = 'chart-location-legend';
-  legend.dir = 'rtl';
-  locations.forEach(([mark, label], index) => {
-    if (index) legend.append('   ');
+  legend.dir = 'ltr';
+  if (hasDownstairs) {
+    const entry = document.createElement('span');
+    entry.className = 'chart-location-downstairs';
+    const key = document.createElement('u');
+    key.textContent = 'Underlined';
+    const room = document.createElement('bdi');
+    room.dir = 'rtl';
+    room.lang = 'he';
+    room.textContent = 'בביהמ"ד למטה';
+    entry.append(key, ': ', room);
+    legend.append(entry);
+  }
+  locations.forEach(([mark, label]) => {
+    if (legend.childNodes.length) legend.append(' · ');
     const entry = document.createElement('bdi');
     entry.dir = 'rtl';
     entry.lang = 'he';
     entry.textContent = `${mark}${label}`;
     legend.append(entry);
   });
-  footer.querySelector('.footer-address').before(legend);
+  footer.prepend(legend);
 }
 
 /** Makes every row on every page the same height. Must run with the pages in the
@@ -296,7 +288,7 @@ export function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange, {
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, {
     showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(sh?.style?.splitSpringDst),
   });
   const shabbosFirst = sheet.season === 'weekday' && companion;
@@ -346,7 +338,7 @@ export function renderSheet(container, state, sheet, onChange) {
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
   const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
-  const FIT_TOLERANCE = 8.5 * 96 + 1 / 64; // only CSS sub-pixel rounding past the paper height
+  const FIT_TOLERANCE = 8.5 * 96; // even sub-pixel overflow can shift the duplex chart frame
   const applyFitScale = (scale) => {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncHeaderRowHeight(pagesEl);
@@ -456,8 +448,8 @@ const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season
 
 
 // --- Fit to screen -----------------------------------------------------------------
-// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
-// the view shouldn't snap back to full size underneath you each time.
+// Module-level, not per-render: print controls redraw the sheet, and the view should
+// keep the user's chosen preview scale each time.
 let chartBeforePrintHandler;
 let fitOn = false;
 let fitChosenByUser = false;
@@ -684,7 +676,7 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false, showMolad = false } = {}) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, effectiveSeason, { announced = false, showMolad = false } = {}) {
   const page = document.createElement('div');
   page.className = 'page';
   const isEnglish = state.settings.language === 'en';
@@ -809,9 +801,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
             <div class="shacharis-panel"><div class="shacharis-panel-in"${timeExplanationAttrs({ header: 'שחרית', chartName: 'Weekday chart', printed: panelHtml, times: panelTraces })}>${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
-        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
-        // week stores an override the same as any other column. An override already
-        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // schedule (see sheets/weekday.js), with any existing saved overrides retained.
+        // An override already holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
           // The 11:30 "NEW" tag lives only here: a hand-typed override already wins
@@ -822,11 +813,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
+          return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
-        // Overridden cells already hold real HTML (captured from the editable div,
-        // possibly with manual <u> underlining); computed cells still need nl2br().
+        // Saved overrides already hold real HTML, possibly with manual <u> underlining;
+        // computed cells still need nl2br().
         // printOverrides is read here too, same as the Weekday chart's own B/C above: the
         // Shabbos chart's own Erev Shabbos מנחה column (I) carries the "חנוכה" tag on its
         // own extra 12:15 this same way (see choref.js), and every other reader of this
@@ -834,10 +825,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // directly - still sees the plain untagged time.
         const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
         const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
-        // data-season records which season this *page* rendered as, so a later edit
-        // (see the blur handler below) recomputes its "did this really change?"
-        // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -980,53 +968,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   useStraightHebrewQuotes(page);
 
-  /** What this cell would hold with no manual override - what an edit is diffed against
-   *  to decide whether it's a real change worth storing. */
-  const baselineHtmlFor = (cellEl) => {
-    const col = cellEl.dataset.col;
-    const weekSeason = cellEl.dataset.season;
-    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
-    const settingsResolved = resolveSettings(state.settings);
-    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = builtRow;
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
-    const raw = ruled[col] ?? '';
-    // Every column, Weekday included, is built as plain text with underline sentinels
-    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
-    // store a bogus override on a cell nobody actually edited.
-    return straightHebrewQuoteHtml(normalizeRichText(nl2br(raw)));
-  };
-
-  const commitCell = (cellEl) => {
-    const serial = Number(cellEl.dataset.serial);
-    const col = cellEl.dataset.col;
-    const newHtml = normalizeRichText(cellEl.innerHTML);
-    const before = getOverride(sheet, serial, col); // undefined = "no override"
-    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    const displayedBefore = before === undefined ? undefined : straightHebrewQuoteHtml(normalizeRichText(before));
-    if (displayedBefore === after) return; // no real change (e.g. just clicked in and out)
-    applyOverrideValue(sheet, serial, col, after);
-    const hist = getHistory(sheet.id);
-    hist.undo.push({ serial, col, before, after });
-    hist.redo = []; // a fresh edit invalidates any redo history
-    onChange({ save: true });
-  };
-
-  page.querySelectorAll('.cell').forEach((cellEl) => {
-    cellEl.addEventListener('keydown', (e) => {
-      if (cellEl.contentEditable !== 'true') return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-        e.preventDefault();
-        document.execCommand('underline');
-      }
-    });
-    cellEl.addEventListener('blur', () => {
-      if (cellEl.contentEditable !== 'true') return;
-      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
-      commitCell(cellEl);
-    });
-  });
-
   return page;
 }
 
@@ -1035,11 +976,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
  *  conditions existed. */
 function withHebrewDate(week, settings) {
   return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
-}
-
-function splitBuild(season) {
-  if (season === 'weekday') return buildWeekdayRow;
-  return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
 }
 
 /** A column's heading, its first line at the heading's own regular size and, when the

@@ -244,8 +244,8 @@ export function renderChartBrowser(container, state, opts = {}) {
       <div class="pages-fit"><div class="pages"></div></div>`;
     useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
-    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
-    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
+    const shabbos = buildSheetPages(spread.sheet, state, { readOnly: true });
+    const chol = buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     fitChartToWindow(pagesEl);
 

@@ -86,7 +86,11 @@ const server = http.createServer((req, res) => {
     await page.locator('#pages .page').first().waitFor(); await settled();
     const before = await geometry();
     const saved = await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1'));
+    const assertReadOnly = async label => assert(await page.locator('#pages .cell')
+      .evaluateAll(cells => cells.length > 0 && cells.every(cell => !cell.isContentEditable)), label);
+    await assertReadOnly('Chart cells start read-only');
     await switchOn();
+    await assertReadOnly('Explanation targets remain read-only');
     assert.deepEqual(await geometry(), before, 'Explain mode preserves every chart row and value');
     const candles = page.locator('.cell[data-col=H]').first();
     assert.match(await clickTime(candles, 0), /Take off\s+18 minutes/);
@@ -98,8 +102,28 @@ const server = http.createServer((req, res) => {
     assert.match(await clickTime(sermon, 1), /60 minutes/); await close();
     assert.equal(await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1')), saved, 'Inspecting never saves an edit');
     await page.locator('#explain-times-toggle').click();
-    await candles.fill('12:48');
-    await page.locator('#explain-times-toggle').click();
+    await assertReadOnly('Turning explanations off does not enable editing');
+    const originalCandles = await candles.innerText();
+    await candles.click();
+    await page.keyboard.type('12:48');
+    await page.locator('#chart-dst-headers-label').click();
+    assert.equal(await candles.innerText(), originalCandles, 'Typing after inspection cannot change a time');
+    assert.equal(await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1')), saved, 'Typing after inspection cannot save an override');
+    // Historical overrides and imported backups retain their explicitly entered explanation.
+    const serial = await candles.getAttribute('data-serial');
+    await page.evaluate(serial => {
+      const state = JSON.parse(localStorage.getItem('zmanim-app-state-v1'));
+      const sheet = state.sheets.find(sheet => sheet.season === 'choref');
+      sheet.overrides[serial] ||= {};
+      sheet.overrides[serial].H = '12:48';
+      localStorage.setItem('zmanim-app-state-v1', JSON.stringify(state));
+    }, serial);
+    await page.goto(origin + '/admin/#saved');
+    await page.reload();
+    await page.locator('.saved-list .open-btn').first().click();
+    await settled();
+    await switchOn();
+    await assertReadOnly('Saved override cells stay read-only');
     assert.match(await clickTime(page.locator('.cell[data-col=H]').first()), /Fixed time[\s\S]*Entered by hand/);
     assert.equal(await page.locator('.time-explain-dialog .calc-steps').innerText(), 'Set by the shul: Entered by hand in this saved chart\n12:48');
     await close();
@@ -235,6 +259,6 @@ const server = http.createServer((req, res) => {
     await publicPage.goto(origin + '/chart/'); await publicPage.waitForTimeout(150);
     assert.equal(await publicPage.locator('#explain-times-toggle,[data-time-explain]').count(), 0, 'The option is admin-only');
     assert.deepEqual(errors, []);
-    console.log('Verified exact clicks, fixed times, sunset offsets, sermons, manual edits, keyboard, mobile and unchanged chart geometry.');
+    console.log('Verified read-only charts, exact clicks, fixed times, sunset offsets, sermons, saved overrides, keyboard, mobile and unchanged chart geometry.');
   } finally { await browser.close(); server.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; server.close(); });

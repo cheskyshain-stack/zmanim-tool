@@ -51,7 +51,6 @@
   .page:last-child { page-break-after: auto; }
   .cell { outline: none; }
   .page .footer-text { color: #000; }
-  .page .cell:focus { background: transparent; }
 }
 
 /* --- When the browser will not give us the 11in the page is built for ----------------
