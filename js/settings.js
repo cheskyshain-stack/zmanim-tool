@@ -52,13 +52,9 @@ export const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00
  *  the everyday one above it rather than on a short line. */
 export const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
-/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
- *
- *  It says what the marks on the times above it mean, so it belongs with the schedules and not
- *  with the shul's own footer: the stars are written by the schedules and read by every screen
- *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
- *  one of them would be the board explaining its own marks wrongly. */
-export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
+/** The Weekday chart's fixed note. Location stars are explained separately by the chart
+ *  renderer from the times on each physical page, including its שחרית panel. */
+export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
