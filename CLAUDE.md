@@ -303,6 +303,13 @@ Export/Import in Settings moves it between devices.
 - `main.is-wide` (Saved sheets) gets 78rem, because a six-column table wraps at 62rem.
 - A sheet view is exempt from the cap entirely; a page is a fixed 11in.
 - `.gen-column` holds the Generate flow to 42rem.
+- On the congregation's `/week/`, minyan times are buttons opening room details in
+  English and Hebrew. The room comes from the existing agenda event: underlined means
+  downstairs, one star means Ezras Nashim, two mean Simcha hall, and an unmarked minyan
+  means the main Bais Medrash. Auxiliary zmanim and unmarked Kiddush Levana get no
+  indoor room. Keep the hint and dialog off paper, and defer the minute redraw while
+  the dialog is open. `tests/weekly-room-details.cjs` checks phone taps, keyboard access,
+  all four rooms, week navigation, and native printing.
 
 ## Site statistics
 

@@ -18780,6 +18780,22 @@ function weeklyAgenda(data, showing, state, settings, now = new Date()) {
 const readerEventKey = e => JSON.stringify([e.name, e.mins, e.place || '']);
 const readerCategory = e => e.name.includes('מנחה') ? 'mincha' : e.name.includes('מעריב') ? 'maariv' : e.mins < 720 ? 'morning' : 'other';
 const READER_LABELS = { morning: 'שחרית / סליחות', mincha: 'מנחה', maariv: 'מעריב', other: 'Additional times' };
+const READER_ROOMS = {
+  '': { name: 'Main Bais Medrash', hebrew: 'בית מדרש' },
+  'למטה': { name: 'Downstairs', hebrew: 'בית מדרש למטה' },
+  'בעזר״נ': { name: 'Ezras Nashim', hebrew: 'עזרת נשים' },
+  'באולם השמחות': { name: 'Simcha hall', hebrew: 'אולם השמחות' },
+};
+let readerRoomBeforePrint;
+
+function readerRoomFor(event) {
+  if (event.auxiliary) return null;
+  const place = event.place || '';
+  // An unmarked minyan is in the main Bais Medrash. Other entries such as Kiddush
+  // Levana do not acquire an indoor location just because their room field is empty.
+  if (!place && !/שחרית|סליחות|מנחה|מעריב|כל נדרי|קול נדרי|מוסף|נעילה|ותיקין/.test(event.name)) return null;
+  return READER_ROOMS[place] || { name: place, hebrew: '' };
+}
 
 /** Holiday chart rows can be dated midweek. The reader always means Sunday to
  * Shabbos, including weeks whose only schedule is a special poster. */
@@ -18924,7 +18940,43 @@ function readerTimeHtml(e) {
      to it cannot be read against the wrong one, and the shul asked for it set the way the פלג
      under a מנחה is: the times one to a line, each name on its right. */
   const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}${e.started?'<small>Just started</small>':''}</span>`;
+  const location = readerRoomFor(e);
+  const tag = location ? 'button' : 'span';
+  const attrs = location ? ` type="button" aria-haspopup="dialog" aria-label="${escAttr(`${e.name}, ${label}, ${location.name}. Show room`)}" data-reader-room="${escAttr(location.name)}" data-reader-room-hebrew="${escAttr(location.hebrew)}" data-reader-service="${escAttr(e.name)}" data-reader-clock="${escAttr(label)}"` : '';
+  return `<${tag} class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(location?.name || place)}"${attrs}><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}${e.started?'<small>Just started</small>':''}</${tag}>`;
+}
+
+function wireReaderRooms(root) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'reader-room-dialog no-print';
+  dialog.setAttribute('aria-labelledby', 'reader-room-title');
+  dialog.innerHTML = `<button type="button" class="reader-room-close" aria-label="Close room details">&times;</button>
+    <p class="reader-room-service"><bdi lang="he"></bdi></p>
+    <p class="reader-room-clock" dir="ltr"></p>
+    <h2 id="reader-room-title"></h2>
+    <p class="reader-room-hebrew" lang="he" dir="rtl"></p>`;
+  root.appendChild(dialog);
+  root.addEventListener('click', event => {
+    const time = event.target.closest('[data-reader-room]');
+    if (!time || !root.contains(time)) return;
+    dialog.querySelector('.reader-room-service bdi').textContent = time.dataset.readerService;
+    dialog.querySelector('.reader-room-clock').textContent = time.dataset.readerClock;
+    dialog.querySelector('h2').textContent = time.dataset.readerRoom;
+    const hebrew = dialog.querySelector('.reader-room-hebrew');
+    hebrew.textContent = time.dataset.readerRoomHebrew;
+    hebrew.hidden = !hebrew.textContent;
+    time.focus({ preventScroll: true });
+    dialog.showModal();
+  });
+  dialog.querySelector('.reader-room-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => {
+    if (event.target !== dialog) return;
+    const box = dialog.getBoundingClientRect();
+    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+  });
+  if (readerRoomBeforePrint) window.removeEventListener('beforeprint', readerRoomBeforePrint);
+  readerRoomBeforePrint = () => { if (dialog.isConnected && dialog.open) dialog.close(); };
+  window.addEventListener('beforeprint', readerRoomBeforePrint);
 }
 
 /** The פלג under its own מנחה: the second line of one cell of the board, set small under the
@@ -19155,6 +19207,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
     <nav class="reader-nav no-print" aria-label="Other weeks">
       <button id="reader-prev" ${canPrev?'':'disabled'}>← Previous</button><button id="reader-today">This week</button><button id="reader-next" ${canNext?'':'disabled'}>Next →</button>
     </nav>
+    ${displaySections.some(section => section.events.some(readerRoomFor)) ? '<p class="reader-room-hint no-print">Tap a minyan time to see its room.</p>' : ''}
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
     ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
@@ -19162,6 +19215,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
   container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
+  wireReaderRooms(container.querySelector('.weekly-reader'));
 }
 
 // ==== ui/week-view.js ====

@@ -4956,6 +4956,17 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-shabbos-row > div { text-align: left; font: 700 1.15rem/1.5 Georgia,'Times New Roman',serif; overflow-wrap: anywhere; }
 .reader-shabbos { margin-top: 24px; }
 .reader-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 15px; margin: 23px 0 0; font: 400 .78rem/1.5 Arial,sans-serif; color: #586474; }
+.reader-room-hint { margin: -8px 0 18px; color: #586474; font: 400 .8rem/1.5 Arial,sans-serif; text-align: center; }
+:where(button).reader-time { appearance: none; border: 0; padding: 0; margin: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: 4px; }
+button.reader-time:focus-visible { outline: 2px solid #b88f3a; outline-offset: 4px; }
+.reader-room-dialog { width: min(22rem,calc(100% - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 40px 24px 28px; overflow: auto; border: 1px solid #ddd6bc; border-radius: 18px; background: #faf8f2; color: #142640; text-align: center; box-shadow: 0 16px 48px rgba(18,39,79,.22); }
+.reader-room-dialog::backdrop { background: rgba(18,39,79,.3); }
+.reader-room-dialog .reader-room-close { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #586474; font: 400 28px/1 Arial,sans-serif; cursor: pointer; }
+.reader-room-close:focus-visible { outline: 2px solid #b88f3a; }
+.reader-room-service { margin: 0 0 8px; font-size: 1rem; }
+.reader-room-clock { margin: 0 0 18px; font: 700 1.8rem/1.25 Georgia,'Times New Roman',serif; }
+.reader-room-dialog h2 { margin: 0 0 6px; font: 700 1.35rem/1.35 Arial,sans-serif; }
+.reader-room-hebrew { margin: 0; font-size: 1.1rem; }
 @media (min-width: 760px) { .reader-columns { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; } }
 @media print {
   .weekly-reader { max-width: none; padding: 0; color: #000; }
