@@ -1807,10 +1807,15 @@ function roundToMinute(dayFraction) {
   return Math.round(dayFraction * 1440) / 1440;
 }
 
+/** The minute chosen for display, shared with the explanation of display rounding. */
+function timeDisplayMinutes(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  return Math.round(frac * 1440);
+}
+
 /** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
 function formatTime(dayFraction) {
-  const frac = ((dayFraction % 1) + 1) % 1;
-  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const totalMinutes = timeDisplayMinutes(dayFraction) % 1440;
   const h24 = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
@@ -1985,6 +1990,22 @@ function markHeaderRoom(escaped) {
    flattens every module into one scope where two of a name is a hard error. It caught this. */
 const TRACE_MIN = 1 / 1440;
 
+// Keep seconds before rounding, including fractions, so a value just before the next
+// minute cannot appear to have already reached it. The printed schedule is unchanged.
+function tracePreciseTime(value) {
+  const frac = ((value % 1) + 1) % 1;
+  const hundredths = Math.floor(frac * 8640000 + 1e-4) % 8640000;
+  const seconds = Math.floor(hundredths / 100);
+  const tail = String(hundredths % 100).padStart(2, '0').replace(/0+$/, '');
+  return formatTimeWithSeconds(seconds / 86400) + (tail ? `.${tail}` : '');
+}
+
+function traceRoundingStep(value, next, entry) {
+  const delta = next - value;
+  return { kind: 'round', ...entry, from: tracePreciseTime(value), at: formatTime(next),
+    movement: Math.abs(delta) < TRACE_MIN * 1e-7 ? 'same' : delta > 0 ? 'up' : 'down' };
+}
+
 /** Appends a step that records the value it left behind, so the calculations page can show
  *  the arithmetic running rather than only its answer: "שקיעה 4:31, take off 15, 4:16". */
 function step(steps, value, entry) {
@@ -1993,10 +2014,13 @@ function step(steps, value, entry) {
 
 /** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
 function make(value, steps, flags) {
+  const displayed = Math.floor(value) + timeDisplayMinutes(value) / 1440;
   return Object.freeze({
     value,
     steps: Object.freeze(steps),
     flags: Object.freeze(flags),
+    displayRounding: Math.abs(displayed - value) < TRACE_MIN * 1e-7 ? null :
+      Object.freeze(traceRoundingStep(value, displayed, { way: 'nearest', because: 'for display on the schedule' })),
 
     /** The printed string, underline sentinels and marks included, which is exactly what
      *  the builders used to produce by hand. */
@@ -2024,15 +2048,15 @@ function make(value, steps, flags) {
        rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
     ceil(because) {
       const next = ceilToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'up', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'up', because })], flags);
     },
     floor(because) {
       const next = floorToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'down', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'down', because })], flags);
     },
     round(because) {
       const next = roundToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'nearest', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'nearest', because })], flags);
     },
 
     /* To a whole number of minutes is not the only rounding on these boards. A time the shul
@@ -2042,17 +2066,17 @@ function make(value, steps, flags) {
     roundToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.round(value * per) / per;
-      return make(next, step(steps, next, { kind: 'round', way: 'nearest', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'nearest', every: minutes, because })], flags);
     },
     ceilToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.ceil(value * per - 1e-9) / per;
-      return make(next, step(steps, next, { kind: 'round', way: 'up', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'up', every: minutes, because })], flags);
     },
     floorToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440;
-      return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'down', every: minutes, because })], flags);
     },
 
     /* The Weekday chart's times move themselves, which no offset describes: a standing 6:35
@@ -8568,9 +8592,12 @@ function stepHtml(s) {
     case 'offset':
       return line(`${s.minutes < 0 ? 'Take off' : 'Add'} <strong>${minutes(s.minutes)}</strong>`);
     case 'round': {
-      const every = s.every ? `the nearest ${s.every} minutes` : 'the whole minute';
-      const way = s.way === 'up' ? 'up to' : s.way === 'down' ? 'down to' : 'to';
-      return line(`Round <strong>${way} ${every}</strong>`);
+      const target = s.every && s.every !== 1 ? `a ${s.every} minute mark` : 'a whole minute';
+      const nearest = s.every && s.every !== 1 ? `the nearest ${s.every} minutes` : 'the nearest whole minute';
+      const rule = s.way === 'up' ? `up to ${target} (later)` : s.way === 'down' ? `down to ${target} (earlier)` : `to ${nearest}`;
+      const movement = s.movement === 'same' ? 'Time stays the same.' : s.movement === 'up' ? 'Rounded up (later).' : s.movement === 'down' ? 'Rounded down (earlier).' : '';
+      const change = s.from ? ` Before: <bdi>${cellEsc(s.from)}</bdi>. After: <bdi>${cellEsc(s.at)}</bdi>.` : '';
+      return line(`Round <strong>${rule}</strong><span class="calc-round-change">${movement}${change}</span>`);
     }
     case 'pick': {
       const took = s.took === 'other' ? 'that one wins' : 'this one wins';
@@ -8608,6 +8635,8 @@ function stepHtml(s) {
 /** One time and its working. */
 function cellTimeHtml(time) {
   const printed = time.plain();
+  const steps = [...time.steps];
+  if (time.displayRounding && !/\d{1,2}:\d{2}:\d{2}/.test(printed)) steps.push(time.displayRounding);
   const dropped = time.held === false;
   /* A dropped time is headed by where it started, not where it ended. On the Weekday chart
      three מנינים can all be pushed onto the same minute and then dropped for crowding, and
@@ -8620,7 +8649,7 @@ function cellTimeHtml(time) {
         <span class="calc-time-value">${cellEsc(head)}</span>
         ${dropped ? '<span class="calc-time-note">not printed this week</span>' : ''}
       </div>
-      <ol class="calc-steps">${time.steps.map(stepHtml).join('')}</ol>
+      <ol class="calc-steps">${steps.map(stepHtml).join('')}</ol>
     </li>`;
 }
 

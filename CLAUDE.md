@@ -130,6 +130,9 @@ editable chart text. Explain mode temporarily disables cell editing and restores
 turned off. Manual overrides and rules replace the corresponding traces with explicitly
 entered times, so a changed value cannot claim its old solar formula. The modal closes
 before printing. `tests/time-explanations.cjs` checks actual clicks and chart geometry.
+Rounding steps show the rule, the actual earlier or later movement, and the values before
+and after rounding. Traces also record nearest-minute display rounding separately from
+the arithmetic, while times printed with seconds retain that precision.
 
 Admin print layouts have a **Spring clock change** switch on winter charts (also when
 opening their Weekday companion). **Separate headers** gives weeks before spring DST

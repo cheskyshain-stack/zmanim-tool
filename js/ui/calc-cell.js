@@ -44,9 +44,12 @@ function stepHtml(s) {
     case 'offset':
       return line(`${s.minutes < 0 ? 'Take off' : 'Add'} <strong>${minutes(s.minutes)}</strong>`);
     case 'round': {
-      const every = s.every ? `the nearest ${s.every} minutes` : 'the whole minute';
-      const way = s.way === 'up' ? 'up to' : s.way === 'down' ? 'down to' : 'to';
-      return line(`Round <strong>${way} ${every}</strong>`);
+      const target = s.every && s.every !== 1 ? `a ${s.every} minute mark` : 'a whole minute';
+      const nearest = s.every && s.every !== 1 ? `the nearest ${s.every} minutes` : 'the nearest whole minute';
+      const rule = s.way === 'up' ? `up to ${target} (later)` : s.way === 'down' ? `down to ${target} (earlier)` : `to ${nearest}`;
+      const movement = s.movement === 'same' ? 'Time stays the same.' : s.movement === 'up' ? 'Rounded up (later).' : s.movement === 'down' ? 'Rounded down (earlier).' : '';
+      const change = s.from ? ` Before: <bdi>${cellEsc(s.from)}</bdi>. After: <bdi>${cellEsc(s.at)}</bdi>.` : '';
+      return line(`Round <strong>${rule}</strong><span class="calc-round-change">${movement}${change}</span>`);
     }
     case 'pick': {
       const took = s.took === 'other' ? 'that one wins' : 'this one wins';
@@ -84,6 +87,8 @@ function stepHtml(s) {
 /** One time and its working. */
 function cellTimeHtml(time) {
   const printed = time.plain();
+  const steps = [...time.steps];
+  if (time.displayRounding && !/\d{1,2}:\d{2}:\d{2}/.test(printed)) steps.push(time.displayRounding);
   const dropped = time.held === false;
   /* A dropped time is headed by where it started, not where it ended. On the Weekday chart
      three מנינים can all be pushed onto the same minute and then dropped for crowding, and
@@ -96,7 +101,7 @@ function cellTimeHtml(time) {
         <span class="calc-time-value">${cellEsc(head)}</span>
         ${dropped ? '<span class="calc-time-note">not printed this week</span>' : ''}
       </div>
-      <ol class="calc-steps">${time.steps.map(stepHtml).join('')}</ol>
+      <ol class="calc-steps">${steps.map(stepHtml).join('')}</ol>
     </li>`;
 }
 

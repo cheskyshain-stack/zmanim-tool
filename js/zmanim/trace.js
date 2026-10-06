@@ -26,11 +26,27 @@
 // Every object is frozen and each link returns a new one, so a candidate can be measured
 // against another (earlierOf, laterOf) without either being changed by the asking.
 
-import { ceilToMinute, floorToMinute, roundToMinute, formatTime, underlineTime } from '../format.js';
+import { ceilToMinute, floorToMinute, roundToMinute, formatTime, formatTimeWithSeconds, timeDisplayMinutes, underlineTime } from '../format.js';
 
 /* Named for this file alone: zmanim.js already has a top-level MIN, and build-offline.py
    flattens every module into one scope where two of a name is a hard error. It caught this. */
 const TRACE_MIN = 1 / 1440;
+
+// Keep seconds before rounding, including fractions, so a value just before the next
+// minute cannot appear to have already reached it. The printed schedule is unchanged.
+function tracePreciseTime(value) {
+  const frac = ((value % 1) + 1) % 1;
+  const hundredths = Math.floor(frac * 8640000 + 1e-4) % 8640000;
+  const seconds = Math.floor(hundredths / 100);
+  const tail = String(hundredths % 100).padStart(2, '0').replace(/0+$/, '');
+  return formatTimeWithSeconds(seconds / 86400) + (tail ? `.${tail}` : '');
+}
+
+function traceRoundingStep(value, next, entry) {
+  const delta = next - value;
+  return { kind: 'round', ...entry, from: tracePreciseTime(value), at: formatTime(next),
+    movement: Math.abs(delta) < TRACE_MIN * 1e-7 ? 'same' : delta > 0 ? 'up' : 'down' };
+}
 
 /** Appends a step that records the value it left behind, so the calculations page can show
  *  the arithmetic running rather than only its answer: "שקיעה 4:31, take off 15, 4:16". */
@@ -40,10 +56,13 @@ function step(steps, value, entry) {
 
 /** One traced time. Not constructed directly: see zman, fixedTime and clockTime. */
 function make(value, steps, flags) {
+  const displayed = Math.floor(value) + timeDisplayMinutes(value) / 1440;
   return Object.freeze({
     value,
     steps: Object.freeze(steps),
     flags: Object.freeze(flags),
+    displayRounding: Math.abs(displayed - value) < TRACE_MIN * 1e-7 ? null :
+      Object.freeze(traceRoundingStep(value, displayed, { way: 'nearest', because: 'for display on the schedule' })),
 
     /** The printed string, underline sentinels and marks included, which is exactly what
      *  the builders used to produce by hand. */
@@ -71,15 +90,15 @@ function make(value, steps, flags) {
        rounds down, and that is exactly the sort of thing a reader comes to this page to find. */
     ceil(because) {
       const next = ceilToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'up', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'up', because })], flags);
     },
     floor(because) {
       const next = floorToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'down', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'down', because })], flags);
     },
     round(because) {
       const next = roundToMinute(value);
-      return make(next, step(steps, next, { kind: 'round', way: 'nearest', because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'nearest', because })], flags);
     },
 
     /* To a whole number of minutes is not the only rounding on these boards. A time the shul
@@ -89,17 +108,17 @@ function make(value, steps, flags) {
     roundToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.round(value * per) / per;
-      return make(next, step(steps, next, { kind: 'round', way: 'nearest', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'nearest', every: minutes, because })], flags);
     },
     ceilToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.ceil(value * per - 1e-9) / per;
-      return make(next, step(steps, next, { kind: 'round', way: 'up', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'up', every: minutes, because })], flags);
     },
     floorToStep(minutes, because) {
       const per = 1440 / minutes;
       const next = Math.floor((value * 1440 + 1e-7) / minutes) * minutes / 1440;
-      return make(next, step(steps, next, { kind: 'round', way: 'down', every: minutes, because }), flags);
+      return make(next, [...steps, traceRoundingStep(value, next, { way: 'down', every: minutes, because })], flags);
     },
 
     /* The Weekday chart's times move themselves, which no offset describes: a standing 6:35

@@ -15,10 +15,15 @@ export function roundToMinute(dayFraction) {
   return Math.round(dayFraction * 1440) / 1440;
 }
 
+/** The minute chosen for display, shared with the explanation of display rounding. */
+export function timeDisplayMinutes(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  return Math.round(frac * 1440);
+}
+
 /** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
 export function formatTime(dayFraction) {
-  const frac = ((dayFraction % 1) + 1) % 1;
-  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const totalMinutes = timeDisplayMinutes(dayFraction) % 1440;
   const h24 = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
