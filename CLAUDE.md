@@ -147,6 +147,9 @@ shrink-to-fit loop makes room for the extra header. Keep the summer cell keys an
 on a mixed page, including `L` for the winter section's Erev Shabbos menu, so changing
 the header layout cannot move or lose a saved override. Browser coverage is in
 `tests/dst-print-layout.cjs`.
+Measure and shrink the full-size pages before applying Fit to screen. Measuring a
+phone's zoomed preview hid the overflow and put page 5's address on page 6. Browser
+coverage must start on a phone viewport and check footer placement in the actual PDF.
 
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 817 px on screen at 100%.
   All pages must measure 817px high. If they don't, something overflowed.
