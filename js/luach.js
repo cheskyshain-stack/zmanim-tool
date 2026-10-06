@@ -825,6 +825,11 @@ function renderWeekPage(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   const draw = () => {
     clearTimeout(nextUpTimer);
+    // Keep the minute refresh from dismissing room details while someone reads them.
+    if (main.querySelector('.reader-room-dialog[open]')) {
+      nextUpTimer = setTimeout(draw, 60000 - Date.now() % 60000 + 50);
+      return;
+    }
     const expanded = new Map([...main.querySelectorAll('[data-agenda-key]')].map(el=>[el.dataset.agendaKey,el.open]));
     main.className = '';
     main.innerHTML = backBar('week') + '<div id="week-host"></div>';
