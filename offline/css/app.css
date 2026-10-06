@@ -4983,6 +4983,7 @@ button.reader-time:focus-visible { outline: 2px solid #b88f3a; outline-offset: 4
 .reader-agenda-day > summary { display:flex; align-items:center; gap:10px; padding:16px; cursor:pointer; list-style:none; }
 .reader-agenda-day > summary::-webkit-details-marker { display:none; }
 .reader-agenda-day > summary strong { display:block; font-size:1.15rem; }
+.reader-day-occasion { font-size:.82em; font-weight:500; color:#586474; }
 .reader-agenda-day > summary small { display:block; margin-top:4px; color:#586474; font:400 .8rem/1.4 Arial,sans-serif; }
 .reader-agenda-chevron { margin-left:auto; transition:transform .2s; }
 .reader-agenda-day[open] .reader-agenda-chevron { transform:rotate(180deg); }
