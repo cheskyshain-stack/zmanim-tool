@@ -836,16 +836,26 @@ th {
 /* Keeps the parsha name at the row's own vertical centre on a week carrying a compact
    Hebrew molad note, rather than letting vertical-align: middle on the <td> centre the
    name and the note as one two-line block, which pulled the name up off the line every
-   other week's name sits on. The empty ::before is a spacer matching .parsha-cell-name's
-   own flex factor, so the row's height splits evenly above the name and below it;
-   .parsha-cell-sub then centres the molad note (and, on the rare week that also carries
-   one, the ערב חנוכה note) in that lower half on its own. See sheet-view.js for why the
-   Yiddish molad does not get this: it is two lines of its own and the room below the name
-   is not asked to stretch to fit it. */
-.parsha-cell-inner { display: flex; flex-direction: column; height: 100%; }
-.parsha-cell-inner::before { content: ""; flex: 1 1 0; min-height: 0; }
-.parsha-cell-name { flex: 0 0 auto; }
-.parsha-cell-sub { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
+   other week's name sits on. vertical-align: top hands this cell's own vertical layout
+   over entirely to centerMoladNotes in sheet-view.js, which measures the row's real
+   height and writes an explicit margin-top on .parsha-cell-name (centring it in the full
+   cell) and on .parsha-cell-sub (centring the molad note, and on the rare week that also
+   carries one, the ערב חנוכה note, in whatever room is left below the name) - a
+   flex-column attempt at the same thing, with height: 100% on a wrapper and an empty
+   ::before as a spacer, measured as not reaching the cell's real height at all in a real
+   browser, the sub region coming out 0px. See sheet-view.js for why the Yiddish molad
+   does not get this: it is two lines of its own and the room below the name is not asked
+   to stretch to fit it. */
+.parsha-cell.parsha-cell-centered { vertical-align: top; }
+.parsha-cell-name, .parsha-cell-sub { margin-top: 0; }
+/* Without this, .parsha-cell-sub's own line box inherits .parsha-cell's line-height: 1.15
+   at the parsha name's own (larger) font-size, and that invisible "strut" measured as
+   taller than the molad note itself (18.4px against the note's own 8.8px) even though the
+   note is the only thing in the box - which fed a wrong height into centerMoladNotes'
+   own measurement. line-height: 0 here collapses the strut; the molad note keeps its own
+   line-height (.parsha-note.is-molad sets it directly, not inherited past that point), so
+   this only changes what the empty space around it measures as. */
+.parsha-cell-sub { line-height: 0; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than

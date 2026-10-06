@@ -489,6 +489,43 @@ function syncHeaderRowHeight(pagesEl) {
     // height where its text needs it.
     headRow.style.height = Math.max(target, headNatural) + 'px';
   });
+  centerMoladNotes(pagesEl);
+}
+
+/** Keeps a parsha name at the row's own vertical centre on a week that also carries a
+ *  compact Hebrew molad note (the .parsha-cell-centered cells built in buildRow above),
+ *  with the molad note (and, on the rare week that also carries one, the ערב חנוכה note
+ *  beside it) centred in whatever room is left below the name, rather than letting
+ *  vertical-align: middle on the <td> centre the name and the note as one two-line block.
+ *
+ *  Written by measuring and setting an explicit margin-top rather than attempted in CSS
+ *  alone, same as the row heights just above: a percentage height inside a table cell is
+ *  exactly the kind of thing that does not reliably resolve, and a flex-column version of
+ *  this measured a 0px sub-region in a real browser - the opposite of centred. Needs the
+ *  row's own height to already be final, so it runs last, after every row in this table
+ *  has its real height pinned above. */
+function centerMoladNotes(pagesEl) {
+  pagesEl.querySelectorAll('.parsha-cell-centered').forEach((td) => {
+    const nameEl = td.querySelector('.parsha-cell-name');
+    const subEl = td.querySelector('.parsha-cell-sub');
+    if (!nameEl || !subEl) return;
+    nameEl.style.marginTop = '';
+    subEl.style.marginTop = ''; // drop previous pins so measurements are fresh
+    // margin-top positions against the <td>'s content box, not its border box - the
+    // padding has to come off cellHeight first, or the name lands pushed one padding's
+    // worth below true centre (measured directly: ~1.9px off on a ~17px padding, enough
+    // to see).
+    const cellStyle = getComputedStyle(td);
+    const paddingTop = parseFloat(cellStyle.paddingTop) || 0;
+    const paddingBottom = parseFloat(cellStyle.paddingBottom) || 0;
+    const contentHeight = td.getBoundingClientRect().height - paddingTop - paddingBottom;
+    const nameHeight = nameEl.getBoundingClientRect().height;
+    const subHeight = subEl.getBoundingClientRect().height;
+    const spaceAbove = Math.max(0, (contentHeight - nameHeight) / 2);
+    nameEl.style.marginTop = spaceAbove + 'px';
+    const spaceBelow = Math.max(0, contentHeight - spaceAbove - nameHeight);
+    subEl.style.marginTop = Math.max(0, (spaceBelow - subHeight) / 2) + 'px';
+  });
 }
 
 
@@ -736,20 +773,26 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // centre, since vertical-align:middle on the <td> centres the name and the note
       // together as one two-line block - asked to stop: the name should sit exactly where
       // it sits on a week with no molad, and the molad note should hang under it, centred
-      // in whatever room is left below. .parsha-cell-inner does that with a flex column
-      // (an empty ::before as the matching spacer above the name, in app.css) rather than
-      // by measuring anything in script, which keeps this in the same no-JS-layout style
-      // the rest of the sheet's cells use.
+      // in whatever room is left below. parsha-cell-centered (app.css) and
+      // centerMoladNotes below do that by measuring and writing an explicit margin-top on
+      // each of .parsha-cell-name/.parsha-cell-sub, the same technique
+      // syncHeaderRowHeight already uses for the row itself - a flex-column attempt at
+      // this (height: 100% on a wrapper inside the <td>, an empty ::before as the
+      // matching spacer) measured as not reaching the cell's real height at all in a real
+      // browser: percentage heights inside a table cell are exactly the kind of thing
+      // that does not reliably resolve, and the sub region came out 0px, the note centred
+      // on a single point rather than in the space below the name.
       // Only the compact Hebrew molad gets it, asked for directly: the Yiddish molad is
       // two lines of its own (moladLabelYiddish's own <br>) and may not leave enough room
       // below the name to stay centred in it, so that format keeps the plain stacked
       // layout it already had.
       const centerMolad = hasMevarchim && settings.moladFormat !== 'yiddish';
+      const parshaClass = centerMolad ? 'parsha-cell parsha-cell-centered' : 'parsha-cell';
       const parshaHtml = centerMolad
-        ? `<div class="parsha-cell-inner"><div class="parsha-cell-name">${nl2br(parshaCell)}</div>`
-          + `<div class="parsha-cell-sub">${[mevarchimNote, erevChanukahNote].filter(Boolean).join('<br>')}</div></div>`
+        ? `<div class="parsha-cell-name">${nl2br(parshaCell)}</div>`
+          + `<div class="parsha-cell-sub">${[mevarchimNote, erevChanukahNote].filter(Boolean).join('<br>')}</div>`
         : nl2br(parshaCell) + [mevarchimNote, erevChanukahNote].filter(Boolean).map((n) => '<br>' + n).join('');
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
+      const parshaTd = `<td class="${parshaClass}"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
       return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');
