@@ -742,6 +742,9 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .header-rabbi { font-size: var(--sheet-font-size); text-align: right; white-space: pre-line; flex-shrink: 0; line-height: 1.3; }
 
 table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size); flex: 1; table-layout: auto; }
+/* Two headers on one winter print page, with row heights shared across both tables. */
+.chart-sections { display: flex; flex-direction: column; flex: 1; gap: 0.12in; }
+.chart-sections > table { flex: none; }
 /* The grid is heavier on a phone than on a desktop and this is not the place it can be
    fixed. Shrinking the page to fit does not thin these rules: a border is never painted
    thinner than one pixel however small the zoom, so at 0.34 the 1px rule still lands on
