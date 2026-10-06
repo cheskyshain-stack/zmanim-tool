@@ -38,6 +38,7 @@ import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js'
 import { fontStackFor } from './sheet-view.js';
 import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
 import { switchHtml, wireSwitch } from './switch.js';
+import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -911,7 +912,7 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
   const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
-  return `${body}${escAttr(t.mark || '')}`;
+  return posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
 }
 
 /** A זמן given both ways, set as two little columns: the name of each reckoning over its own
@@ -999,7 +1000,7 @@ function renderShuvaPoster(poster, settings) {
   const body = `
     <h2 class="poster-title" lang="he">${escAttr(SHUVA_TEXT.title)}</h2>
     ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${escAttr(l)}</p>`).join('')}
-    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${escAttr(poster.drasha)}</bdi></p>` : ''}
+    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${timeHtml({ text: poster.drasha, trace: poster.drashaTrace, explanation: poster.explanation })}</bdi></p>` : ''}
     <p class="poster-mincha" lang="he"><span class="poster-row-label">${escAttr(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
@@ -1026,7 +1027,7 @@ function slichosBody(poster) {
     // with Hebrew now inside the run, the first strong character is the note's and auto would
     // turn the whole list around. Measured after the change, not assumed.
     const parts = r.times.map(timeHtml);
-    const note = r.note ? `<bdi class="poster-row-note">${escAttr(r.note)}</bdi>` : '';
+    const note = r.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace) || [], note: r.note })}>${escAttr(r.note)}</bdi>` : '';
     // On the left of the first time, which is the side it has always been on: it says that
     // מנין runs five minutes earlier on the days it names, so it belongs against that time
     // and not against the row's last one.
@@ -1128,7 +1129,7 @@ function renderVasikinPoster(poster, settings) {
   const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
     <div class="poster-rows is-dense">
       <div class="poster-times">
-        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '', trace: ln.trace }])).join('')}
       </div>
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
@@ -1363,7 +1364,7 @@ function sukkosRow(ln) {
 
      Joined to the first time by a non-breaking space, so the נץ and the מנין it is the נץ for
      can never be split across two lines. See onePageRows for where that showed. */
-  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
+  const note = ln.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: ln.label, printed: ln.note, times: ln.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: ln.note })}>${escAttr(ln.note)}</bdi>\u00A0` : '';
   const times = !ln.times.length
     ? note
     : isReckoned(ln.times)
@@ -1430,14 +1431,14 @@ function renderSukkosShuavaPoster(poster, settings) {
   const body = `
     <div class="poster-shuava">
       <h2 class="poster-shuava-head" lang="he">${escAttr(t.title)}</h2>
-      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
+      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi${timeExplanationAttrs({ header: t.title, printed: t.at, fixed: true })}>${escAttr(t.at)}</bdi></p>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
       <hr class="poster-shuava-rule">
       <!-- Where it is, spelled out. This sheet has no key on it and nothing on it is marked,
            so the words are the only thing that can say it; the schedule says it with a star
            instead and prints the name alone. -->
       <h2 class="poster-shuava-head" lang="he">${escAttr(`${t.mishna} ${t.mishnaWhere}`)}</h2>
-      <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
+      <p class="poster-shuava-line" dir="ltr"${timeExplanationAttrs({ header: t.mishna, printed: t.mishnaAt, fixed: true })}>${escAttr(t.mishnaAt)}</p>
       <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
     </div>`;
   return posterShell(settings, body, poster.legend || []);
@@ -1484,7 +1485,7 @@ function tzomGedaliaBody(poster) {
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
     ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
-        <bdi>${escAttr(s.note.text)}</bdi></p></div>`
+        <bdi>${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></p></div>`
     : `
     <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(s.head)}</h3>
@@ -1543,7 +1544,7 @@ const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
 function vasikinLine(row) {
   const { time } = row.vasikin;
   const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
-  return `<span class="poster-t">${escAttr(time)}</span>${rest}`;
+  return `<span class="poster-t">${timeHtml({ text: time, trace: row.vasikin.trace })}</span>${rest}`;
 }
 
 /** One group's own list of נץ times, each carrying its own "יום X" above it, asked for
@@ -1565,9 +1566,9 @@ function vasikinLine(row) {
  *  one span - a space joined into the string here would sit between the two bdi and could
  *  be read as part of either one. */
 function netzDaysHtml(netzDays) {
-  return netzDays.map(({ time, letters }) => {
+  return netzDays.map(({ time, letters, trace }) => {
     const label = `יום ${letters.map((l) => `${l}'`).join('/')}`;
-    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
+    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${timeHtml({ text: time, trace })}</bdi></span>`;
   }).join('');
 }
 
@@ -1803,7 +1804,7 @@ const namedDay = (heading, yomtov, days, sep) => {
   const parts = String(heading).split(sep);
   return days.includes(parts[0]) ? [`${parts[0]} ${yomtov}`, ...parts.slice(1)].join(sep) : heading;
 };
-const onePlain = (text) => [{ text, underlined: false, mark: '' }];
+const onePlain = (text, trace = null, explanation = '') => [{ text, underlined: false, mark: '', trace, explanation }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
  *  key, so adding a poster to the run and adding it here are the same word twice and a
@@ -1830,13 +1831,13 @@ const ONEPAGE_SECTIONS = {
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
     // of its own it is a line without a heading; here every line has a label already, so it
     // is a row like the rest.
-    ? { label: s.note.label, times: onePlain(s.note.text) }
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() })))],
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a
     // timetable, and it says nothing the heading over it and the word דרשה do not.
-    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha) : [] },
+    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha, p.drashaTrace, p.explanation) : [] },
     { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
   ])],
   yomkippur: (p) => [
@@ -1881,15 +1882,15 @@ const ONEPAGE_SECTIONS = {
   chanukah: (p) => {
     const shacharisRow = (row) => ({
       label: row.label,
-      times: [{ text: row.vasikin.time, underlined: false, mark: '' }, ...row.cells.slice(1)],
+      times: [{ text: row.vasikin.time, underlined: false, mark: '', trace: row.vasikin.trace }, ...row.cells.slice(1)],
     });
     // One row per day the row's own ותיקין time needed נץ to explain it (netzBlockLines'
     // own rows, on the full sheet), each day labelled rather than run together the way the
     // full sheet's own netzDaysHtml sets them under one heading - this sheet's own row
     // shape has no room for a label over every time, only one label a row.
-    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters }) => ({
+    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters, trace }) => ({
       label: `${CH_TEXT.netz} יום ${letters.map((l) => `${l}'`).join('/')}`,
-      times: [{ text: time, underlined: false, mark: '' }],
+      times: [{ text: time, underlined: false, mark: '', trace }],
     }));
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
@@ -1931,7 +1932,7 @@ function onePageRows(r) {
      space. They are two boxes with a space between them, and a column an inch and a half wide
      broke at that space: the הושענא רבה row came out with "(נץ 6:54)" alone on one line and the
      6:18 it is the נץ for on the next, which reads as a line about nothing. */
-  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi>\u00A0` : '';
+  const note = r.note ? `<bdi class="onepage-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: r.note })}>${escAttr(r.note)}</bdi>\u00A0` : '';
   // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
   // strong characters, so a note's Hebrew would otherwise turn the whole run around.
   //

@@ -1470,159 +1470,16 @@ function splitWeeksIntoPages(weeks, sizes) {
   return pages;
 }
 
-// ==== rules.js ====
-// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
-// HaGadol have a different Mincha time because of the drasha"). Applied to every
-// generated sheet automatically, before any one-off manual per-cell overrides - that's
-// the intended distinction between rules (recurring, reapplies every year) and
-// overrides (tied to one generated sheet instance).
-//
-// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
-// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
-// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
-// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
-// touching the wrong column on the other sheet.
-//
-// A condition can combine any of:
-//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
-//   parsha:        [names]      - matches week.parsha
-//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
-//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
-//                                 (month 5 = Av). Recurs every year, unlike dateISO.
-//   always:        true         - matches every week (for a blanket override)
-//
-// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
-// isn't stored on saved sheets, so it's computed at render time and works for sheets
-// generated before hebrewDate conditions existed.
-function conditionMatches(condition, week) {
-  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
-  // import need not: an older export, or a file edited by hand, and reading .always off
-  // undefined threw and took down every screen that draws a sheet.
-  if (!condition) return false;
-  if (condition.always) return true;
-  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
-  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
-  // The date is guarded for the same reason: a week whose date will not parse would throw
-  // here rather than simply not matching. storage.js repairs those on the way in, so this
-  // is the second line rather than the first.
-  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
-    ? week.date.toISOString().slice(0, 10) : null;
-  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
-  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
-  return false;
-}
+// ==== security-purify.js ====
+// Pinned upstream DOMPurify 3.4.15, wrapped for the offline module flattener.
+const richTextPurifier = (() => {
+const module = { exports: {} };
+const exports = module.exports;
+/*! @license DOMPurify 3.4.15 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.15/LICENSE */
+!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).DOMPurify=e()}(this,function(){"use strict";function t(t,e){(null==e||e>t.length)&&(e=t.length);for(var n=0,o=Array(e);n<e;n++)o[n]=t[n];return o}function e(e,n){return function(t){if(Array.isArray(t))return t}(e)||function(t,e){var n=null==t?null:"undefined"!=typeof Symbol&&t[Symbol.iterator]||t["@@iterator"];if(null!=n){var o,r,i,a,l=[],c=!0,s=!1;try{if(i=(n=n.call(t)).next,0===e);else for(;!(c=(o=i.call(n)).done)&&(l.push(o.value),l.length!==e);c=!0);}catch(t){s=!0,r=t}finally{try{if(!c&&null!=n.return&&(a=n.return(),Object(a)!==a))return}finally{if(s)throw r}}return l}}(e,n)||function(e,n){if(e){if("string"==typeof e)return t(e,n);var o={}.toString.call(e).slice(8,-1);return"Object"===o&&e.constructor&&(o=e.constructor.name),"Map"===o||"Set"===o?Array.from(e):"Arguments"===o||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(o)?t(e,n):void 0}}(e,n)||function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}const n=Object.entries,o=Object.setPrototypeOf,r=Object.isFrozen,i=Object.getPrototypeOf,a=Object.getOwnPropertyDescriptor;let l=Object.freeze,c=Object.seal,s=Object.create,u="undefined"!=typeof Reflect&&Reflect,f=u.apply,p=u.construct;l||(l=function(t){return t}),c||(c=function(t){return t}),f||(f=function(t,e){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return t.apply(e,o)}),p||(p=function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),o=1;o<e;o++)n[o-1]=arguments[o];return new t(...n)});const m=L(Array.prototype.forEach),d=L(Array.prototype.lastIndexOf),h=L(Array.prototype.pop),y=L(Array.prototype.push),g=L(Array.prototype.splice),b=Array.isArray,S=L(String.prototype.toLowerCase),T=L(String.prototype.toString),A=L(String.prototype.match),E=L(String.prototype.replace),w=L(String.prototype.indexOf),v=L(String.prototype.trim),O=L(Number.prototype.toString),N=L(Boolean.prototype.toString),x="undefined"==typeof BigInt?null:L(BigInt.prototype.toString),_="undefined"==typeof Symbol?null:L(Symbol.prototype.toString),D=L(Object.prototype.hasOwnProperty),R=L(Object.prototype.toString),k=L(RegExp.prototype.test),C=(I=TypeError,function(){for(var t=arguments.length,e=new Array(t),n=0;n<t;n++)e[n]=arguments[n];return p(I,e)});var I;function L(t){return function(e){e instanceof RegExp&&(e.lastIndex=0);for(var n=arguments.length,o=new Array(n>1?n-1:0),r=1;r<n;r++)o[r-1]=arguments[r];return f(t,e,o)}}function z(t,e){let n=arguments.length>2&&void 0!==arguments[2]?arguments[2]:S;if(o&&o(t,null),!b(e))return t;let i=e.length;for(;i--;){let o=e[i];if("string"==typeof o){const t=n(o);t!==o&&(r(e)||(e[i]=t),o=t)}t[o]=!0}return t}function M(t){for(let e=0;e<t.length;e++){D(t,e)||(t[e]=null)}return t}function P(t){const o=s(null);for(const i of n(t)){var r=e(i,2);const n=r[0],a=r[1];D(t,n)&&(b(a)?o[n]=M(a):a&&"object"==typeof a&&a.constructor===Object?o[n]=P(a):o[n]=a)}return o}function U(t,e){for(;null!==t;){const n=a(t,e);if(n){if(n.get)return L(n.get);if("function"==typeof n.value)return L(n.value)}t=i(t)}return function(){return null}}const F=l(["a","abbr","acronym","address","area","article","aside","audio","b","bdi","bdo","big","blink","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","content","data","datalist","dd","decorator","del","details","dfn","dialog","dir","div","dl","dt","element","em","fieldset","figcaption","figure","font","footer","form","h1","h2","h3","h4","h5","h6","head","header","hgroup","hr","html","i","img","input","ins","kbd","label","legend","li","main","map","mark","marquee","menu","menuitem","meter","nav","nobr","ol","optgroup","option","output","p","picture","pre","progress","q","rp","rt","ruby","s","samp","search","section","select","shadow","slot","small","source","spacer","span","strike","strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time","tr","track","tt","u","ul","var","video","wbr"]),H=l(["svg","a","altglyph","altglyphdef","altglyphitem","animatecolor","animatemotion","animatetransform","circle","clippath","defs","desc","ellipse","enterkeyhint","exportparts","filter","font","g","glyph","glyphref","hkern","image","inputmode","line","lineargradient","marker","mask","metadata","mpath","part","path","pattern","polygon","polyline","radialgradient","rect","stop","style","switch","symbol","text","textpath","title","tref","tspan","view","vkern"]),j=l(["feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feDistantLight","feDropShadow","feFlood","feFuncA","feFuncB","feFuncG","feFuncR","feGaussianBlur","feImage","feMerge","feMergeNode","feMorphology","feOffset","fePointLight","feSpecularLighting","feSpotLight","feTile","feTurbulence"]),B=l(["animate","color-profile","cursor","discard","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","foreignobject","hatch","hatchpath","mesh","meshgradient","meshpatch","meshrow","missing-glyph","script","set","solidcolor","unknown","use"]),W=l(["math","menclose","merror","mfenced","mfrac","mglyph","mi","mlabeledtr","mmultiscripts","mn","mo","mover","mpadded","mphantom","mroot","mrow","ms","mspace","msqrt","mstyle","msub","msup","msubsup","mtable","mtd","mtext","mtr","munder","munderover","mprescripts"]),Y=l(["maction","maligngroup","malignmark","mlongdiv","mscarries","mscarry","msgroup","mstack","msline","msrow","semantics","annotation","annotation-xml","mprescripts","none"]),G=l(["#text"]),q=l(["accept","action","align","alt","autocapitalize","autocomplete","autopictureinpicture","autoplay","background","bgcolor","border","capture","cellpadding","cellspacing","checked","cite","class","clear","color","cols","colspan","command","commandfor","controls","controlslist","coords","crossorigin","datetime","decoding","default","dir","disabled","disablepictureinpicture","disableremoteplayback","download","draggable","enctype","enterkeyhint","exportparts","face","for","headers","height","hidden","high","href","hreflang","id","inert","inputmode","integrity","ismap","kind","label","lang","list","loading","loop","low","max","maxlength","media","method","min","minlength","multiple","muted","name","nonce","noshade","novalidate","nowrap","open","optimum","part","pattern","placeholder","playsinline","popover","popovertarget","popovertargetaction","poster","preload","pubdate","radiogroup","readonly","rel","required","rev","reversed","role","rows","rowspan","spellcheck","scope","selected","shape","size","sizes","slot","span","srclang","start","src","srcset","step","style","summary","tabindex","title","translate","type","usemap","valign","value","width","wrap","xmlns"]),$=l(["accent-height","accumulate","additive","alignment-baseline","amplitude","ascent","attributename","attributetype","azimuth","basefrequency","baseline-shift","begin","bias","by","class","clip","clippathunits","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","cx","cy","d","dx","dy","diffuseconstant","direction","display","divisor","dominant-baseline","dur","edgemode","elevation","end","exponent","fill","fill-opacity","fill-rule","filter","filterunits","flood-color","flood-opacity","font-family","font-size","font-size-adjust","font-stretch","font-style","font-variant","font-weight","fx","fy","g1","g2","glyph-name","glyphref","gradientunits","gradienttransform","height","href","id","image-rendering","in","in2","intercept","k","k1","k2","k3","k4","kerning","keypoints","keysplines","keytimes","lang","lengthadjust","letter-spacing","kernelmatrix","kernelunitlength","lighting-color","local","marker-end","marker-mid","marker-start","markerheight","markerunits","markerwidth","maskcontentunits","maskunits","max","mask","mask-type","media","method","mode","min","name","numoctaves","offset","operator","opacity","order","orient","orientation","origin","overflow","paint-order","path","pathlength","patterncontentunits","patterntransform","patternunits","pointer-events","points","preservealpha","preserveaspectratio","primitiveunits","r","rx","ry","radius","refx","refy","repeatcount","repeatdur","restart","result","rotate","scale","seed","shape-rendering","slope","specularconstant","specularexponent","spreadmethod","startoffset","stddeviation","stitchtiles","stop-color","stop-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke","stroke-width","style","surfacescale","systemlanguage","tabindex","tablevalues","targetx","targety","transform","transform-origin","text-anchor","text-decoration","text-orientation","text-rendering","textlength","type","u1","u2","unicode","values","vector-effect","viewbox","visibility","version","vert-adv-y","vert-origin-x","vert-origin-y","width","word-spacing","wrap","writing-mode","xchannelselector","ychannelselector","x","x1","x2","xmlns","y","y1","y2","z","zoomandpan"]),X=l(["accent","accentunder","align","bevelled","close","columnalign","columnlines","columnspacing","columnspan","denomalign","depth","dir","display","displaystyle","encoding","fence","frame","height","href","id","largeop","length","linethickness","lquote","lspace","mathbackground","mathcolor","mathsize","mathvariant","maxsize","minsize","movablelimits","notation","numalign","open","rowalign","rowlines","rowspacing","rowspan","rspace","rquote","scriptlevel","scriptminsize","scriptsizemultiplier","selection","separator","separators","stretchy","subscriptshift","supscriptshift","symmetric","voffset","width","xmlns"]),K=l(["xlink:href","xml:id","xlink:title","xml:space","xmlns:xlink"]),V=c(/{{[\w\W]*|^[\w\W]*}}/g),Z=c(/<%[\w\W]*|^[\w\W]*%>/g),J=c(/\${[\w\W]*/g),Q=c(/^data-[\-\w.\u00B7-\uFFFF]+$/),tt=c(/^aria-[\-\w]+$/),et=c(/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i),nt=c(/^(?:\w+script|data):/i),ot=c(/[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g),rt=c(/^html$/i),it=c(/^[a-z][.\w]*(-[.\w]+)+$/i),at=c(/<[/\w!]/g),lt=c(/<[/\w]/g),ct=c(/<\/no(script|embed|frames)/i),st=c(/\/>/i),ut=1,ft=3,pt=7,mt=8,dt=9,ht=11,yt=["style","script","xmp","iframe","noembed","noframes","plaintext","noscript"],gt=l(z({},yt)),bt=function(){const t={};return m(yt,e=>{t[e]=c(new RegExp("</"+e+"(?=[\\t\\n\\f\\r />])","i"))}),l(t)}(),St=function(){return"undefined"==typeof window?null:window},Tt=function(t,e,n,o){return D(t,e)&&b(t[e])?z(o.base?P(o.base):{},t[e],o.transform):n},At=function(t,e,n){const o=D(t,e)?t[e]:void 0;return o&&"object"==typeof o?P(o):n()};var Et=function t(){let e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:St();const o=e=>t(e);if(o.version="3.4.15",o.removed=[],!e||!e.document||e.document.nodeType!==dt||!e.Element)return o.isSupported=!1,o;let r=e.document;const i=r,a=i.currentScript;e.DocumentFragment;const u=e.HTMLTemplateElement,f=e.Node,p=e.Element,I=e.NodeFilter,L=e.NamedNodeMap;void 0===L&&(e.NamedNodeMap||e.MozNamedAttrMap),e.HTMLFormElement;const M=e.DOMParser,yt=e.trustedTypes,Et=p.prototype,wt=U(Et,"cloneNode"),vt=U(Et,"remove"),Ot=U(Et,"removeAttributeNode"),Nt=U(Et,"nextSibling"),xt=U(Et,"childNodes"),_t=U(Et,"parentNode"),Dt=U(Et,"shadowRoot"),Rt=U(Et,"attributes"),kt=f&&f.prototype?U(f.prototype,"nodeType"):null,Ct=f&&f.prototype?U(f.prototype,"nodeName"):null,It=f&&f.prototype?U(f.prototype,"ownerDocument"):null,Lt=function(t){return kt?kt(t):t.nodeType},zt=function(t){return Ct?Ct(t):t.nodeName};if("function"==typeof u){const t=r.createElement("template");t.content&&t.content.ownerDocument&&(r=t.content.ownerDocument)}let Mt,Pt,Ut="",Ft=!1,Ht=0;const jt=function(){if(Ht>0)throw C('A configured TRUSTED_TYPES_POLICY callback (createHTML or createScriptURL) must not call DOMPurify.sanitize, as that causes infinite recursion. Do not pass a policy whose callbacks wrap DOMPurify as TRUSTED_TYPES_POLICY; see the "DOMPurify and Trusted Types" section of the README.')},Bt=function(t){jt(),Ht++;try{return Mt.createHTML(t)}finally{Ht--}},Wt=function(){return Ft||(Pt=function(t,e){if("object"!=typeof t||"function"!=typeof t.createPolicy)return null;let n=null;const o="data-tt-policy-suffix";e&&e.hasAttribute(o)&&(n=e.getAttribute(o));const r="dompurify"+(n?"#"+n:"");try{return t.createPolicy(r,{createHTML:t=>t,createScriptURL:t=>t})}catch(t){return console.warn("TrustedTypes policy "+r+" could not be created."),null}}(yt,a),Ft=!0),Pt},Yt=r,Gt=Yt.implementation,qt=Yt.createNodeIterator,$t=Yt.createDocumentFragment,Xt=Yt.getElementsByTagName,Kt=i.importNode;let Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]};o.isSupported="function"==typeof n&&"function"==typeof _t&&Gt&&void 0!==Gt.createHTMLDocument;const Zt=V,Jt=Z,Qt=J,te=Q,ee=tt,ne=nt,oe=ot,re=it;let ie=et,ae=null;const le=z({},[...F,...H,...j,...W,...G]);let ce=null;const se=z({},[...q,...$,...X,...K]);let ue=Object.seal(s(null,{tagNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},allowCustomizedBuiltInElements:{writable:!0,configurable:!1,enumerable:!0,value:!1}})),fe=null,pe=null;const me=Object.seal(s(null,{tagCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeCheck:{writable:!0,configurable:!1,enumerable:!0,value:null}}));let de=!0,he=!0,ye=!1,ge=!0,be=!1,Se=!0,Te=!1,Ae=!1,Ee=null,we=null,ve=!1,Oe=!1,Ne=!1,xe=!1,_e=!0,De=!1;const Re="user-content-";let ke=!0,Ce=!1,Ie={},Le=null;const ze=z({},["annotation-xml","audio","colgroup","desc","foreignobject","head","iframe","math","mi","mn","mo","ms","mtext","noembed","noframes","noscript","plaintext","script","selectedcontent","style","svg","template","thead","title","video","xmp"]);let Me=null;const Pe=z({},["audio","video","img","source","image","track"]);let Ue=null;const Fe=z({},["alt","class","for","id","label","name","pattern","placeholder","role","summary","title","value","style","xmlns"]),He="http://www.w3.org/1998/Math/MathML",je="http://www.w3.org/2000/svg",Be="http://www.w3.org/1999/xhtml";let We=Be,Ye=!1,Ge=null;const qe=z({},[He,je,Be],T),$e=l(["mi","mo","mn","ms","mtext"]);let Xe=z({},$e);const Ke=l(["annotation-xml"]);let Ve=z({},Ke);const Ze=z({},["title","style","font","a","script"]);let Je=null;const Qe=["application/xhtml+xml","text/html"];let tn=null,en=null;const nn=r.createElement("form"),on=function(t){return t instanceof RegExp||t instanceof Function},rn=function(){let t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{};if(en&&en===t)return;t&&"object"==typeof t||(t={}),t=P(t),Je=-1===Qe.indexOf(t.PARSER_MEDIA_TYPE)?"text/html":t.PARSER_MEDIA_TYPE,tn="application/xhtml+xml"===Je?T:S,ae=Tt(t,"ALLOWED_TAGS",le,{transform:tn}),ce=Tt(t,"ALLOWED_ATTR",se,{transform:tn}),Ge=Tt(t,"ALLOWED_NAMESPACES",qe,{transform:T}),Ue=Tt(t,"ADD_URI_SAFE_ATTR",Fe,{transform:tn,base:Fe}),Me=Tt(t,"ADD_DATA_URI_TAGS",Pe,{transform:tn,base:Pe}),Le=Tt(t,"FORBID_CONTENTS",ze,{transform:tn}),fe=Tt(t,"FORBID_TAGS",P({}),{transform:tn}),pe=Tt(t,"FORBID_ATTR",P({}),{transform:tn}),Ie=!!D(t,"USE_PROFILES")&&(t.USE_PROFILES&&"object"==typeof t.USE_PROFILES?P(t.USE_PROFILES):t.USE_PROFILES),de=!1!==t.ALLOW_ARIA_ATTR,he=!1!==t.ALLOW_DATA_ATTR,ye=t.ALLOW_UNKNOWN_PROTOCOLS||!1,ge=!1!==t.ALLOW_SELF_CLOSE_IN_ATTR,be=t.SAFE_FOR_TEMPLATES||!1,Se=!1!==t.SAFE_FOR_XML,Te=t.WHOLE_DOCUMENT||!1,Oe=t.RETURN_DOM||!1,Ne=t.RETURN_DOM_FRAGMENT||!1,xe=t.RETURN_TRUSTED_TYPE||!1,ve=t.FORCE_BODY||!1,_e=!1!==t.SANITIZE_DOM,De=t.SANITIZE_NAMED_PROPS||!1,ke=!1!==t.KEEP_CONTENT,Ce=t.IN_PLACE||!1,ie=function(t){try{return k(t,""),!0}catch(t){return!1}}(t.ALLOWED_URI_REGEXP)?t.ALLOWED_URI_REGEXP:et,We="string"==typeof t.NAMESPACE?t.NAMESPACE:Be,Xe=At(t,"MATHML_TEXT_INTEGRATION_POINTS",()=>z({},$e)),Ve=At(t,"HTML_INTEGRATION_POINTS",()=>z({},Ke));const e=At(t,"CUSTOM_ELEMENT_HANDLING",()=>s(null));if(ue=s(null),D(e,"tagNameCheck")&&on(e.tagNameCheck)&&(ue.tagNameCheck=e.tagNameCheck),D(e,"attributeNameCheck")&&on(e.attributeNameCheck)&&(ue.attributeNameCheck=e.attributeNameCheck),D(e,"allowCustomizedBuiltInElements")&&"boolean"==typeof e.allowCustomizedBuiltInElements&&(ue.allowCustomizedBuiltInElements=e.allowCustomizedBuiltInElements),c(ue),be&&(he=!1),Ne&&(Oe=!0),Ie&&(ae=z({},G),ce=s(null),!0===Ie.html&&(z(ae,F),z(ce,q)),!0===Ie.svg&&(z(ae,H),z(ce,$),z(ce,K)),!0===Ie.svgFilters&&(z(ae,j),z(ce,$),z(ce,K)),!0===Ie.mathMl&&(z(ae,W),z(ce,X),z(ce,K))),me.tagCheck=null,me.attributeCheck=null,D(t,"ADD_TAGS")&&("function"==typeof t.ADD_TAGS?me.tagCheck=t.ADD_TAGS:b(t.ADD_TAGS)&&(ae===le&&(ae=P(ae)),z(ae,t.ADD_TAGS,tn))),D(t,"ADD_ATTR")&&("function"==typeof t.ADD_ATTR?me.attributeCheck=t.ADD_ATTR:b(t.ADD_ATTR)&&(ce===se&&(ce=P(ce)),z(ce,t.ADD_ATTR,tn))),D(t,"ADD_FORBID_CONTENTS")&&b(t.ADD_FORBID_CONTENTS)&&(Le===ze&&(Le=P(Le)),z(Le,t.ADD_FORBID_CONTENTS,tn)),ke&&(ae["#text"]=!0),Te&&z(ae,["html","head","body"]),ae.table&&(z(ae,["tbody"]),delete fe.tbody),t.TRUSTED_TYPES_POLICY){if("function"!=typeof t.TRUSTED_TYPES_POLICY.createHTML)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createHTML" hook.');if("function"!=typeof t.TRUSTED_TYPES_POLICY.createScriptURL)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createScriptURL" hook.');const e=Mt;Mt=t.TRUSTED_TYPES_POLICY;try{Ut=Bt("")}catch(t){throw Mt=e,t}}else null===t.TRUSTED_TYPES_POLICY?(Mt=void 0,Ut=""):(void 0===Mt&&(Mt=Wt()),Mt&&"string"==typeof Ut&&(Ut=Bt("")));l&&l(t),en=t},an=z({},[...H,...j,...B]),ln=z({},[...W,...Y]),cn=function(t){let e=_t(t);e&&e.tagName||(e={namespaceURI:We,tagName:"template"});const n=S(t.tagName),o=S(e.tagName);return!!Ge[t.namespaceURI]&&(t.namespaceURI===je?function(t,e,n){return e.namespaceURI===Be?"svg"===t:e.namespaceURI===He?"svg"===t&&("annotation-xml"===n||Xe[n]):Boolean(an[t])}(n,e,o):t.namespaceURI===He?function(t,e,n){return e.namespaceURI===Be?"math"===t:e.namespaceURI===je?"math"===t&&Ve[n]:Boolean(ln[t])}(n,e,o):t.namespaceURI===Be?function(t,e,n){return!(e.namespaceURI===je&&!Ve[n])&&!(e.namespaceURI===He&&!Xe[n])&&!ln[t]&&(Ze[t]||!an[t])}(n,e,o):!("application/xhtml+xml"!==Je||!Ge[t.namespaceURI]))},sn=function(t){y(o.removed,{element:t});try{_t(t).removeChild(t)}catch(e){if(vt(t),!_t(t))throw C("a node selected for removal could not be detached from its tree and cannot be safely returned; refusing to sanitize in place")}},un=function(t,e,n){try{Ot(t,e)}catch(e){try{t.removeAttribute(n)}catch(t){}}},fn=function(t){dn(t);const e=xt(t);if(e){const t=[];m(e,e=>{y(t,e)}),m(t,t=>{try{vt(t)}catch(t){}})}const n=Rt(t);if(n)for(let e=n.length-1;e>=0;--e){const o=n[e],r=o&&o.name;"string"==typeof r&&un(t,o,r)}},pn=function(t,e,n){if(!n)try{n=e.getAttributeNode(t)}catch(t){n=null}y(o.removed,{attribute:n||null,from:e});try{n?Ot(e,n):e.removeAttribute(t)}catch(n){try{e.removeAttribute(t)}catch(t){}}if("is"===t)if(Oe||Ne)try{sn(e)}catch(t){}else try{e.setAttribute(t,"")}catch(t){}},mn=function(t){const e=Rt(t);if(e)for(let n=e.length-1;n>=0;--n){const o=e[n],r=o&&o.name;"string"!=typeof r||ce[tn(r)]||un(t,o,r)}},dn=function(t){const e=[t];for(;e.length>0;){const t=e.pop();Lt(t)===ut&&mn(t);const n=xt(t);if(n)for(let t=n.length-1;t>=0;--t)e.push(n[t])}},hn=function(t,e){return!!Se&&("patchsrc"===t||"for"===t&&"label"!==e&&"output"!==e)},yn=function(t){let e=null,n=null;if(ve)t="<remove></remove>"+t;else{const e=A(t,/^[\r\n\t ]+/);n=e&&e[0]}"application/xhtml+xml"===Je&&We===Be&&(t='<html xmlns="http://www.w3.org/1999/xhtml"><head></head><body>'+t+"</body></html>");const o=Mt?Bt(t):t;if(We===Be)try{e=(new M).parseFromString(o,Je)}catch(t){}if(!e||!e.documentElement){e=Gt.createDocument(We,"template",null);try{e.documentElement.innerHTML=Ye?Ut:o}catch(t){}}const i=e.body||e.documentElement;return t&&n&&i.insertBefore(r.createTextNode(n),i.childNodes[0]||null),We===Be?Xt.call(e,Te?"html":"body")[0]:Te?e.documentElement:i},gn=function(t){const e=It?It(t):t.ownerDocument;return qt.call(e||t,t,I.SHOW_ELEMENT|I.SHOW_COMMENT|I.SHOW_TEXT|I.SHOW_PROCESSING_INSTRUCTION|I.SHOW_CDATA_SECTION,null)},bn=function(t){return t=E(t,Zt," "),t=E(t,Jt," "),t=E(t,Qt," ")},Sn=function(t){var e;t.normalize();const n=It?It(t):t.ownerDocument,o=qt.call(n||t,t,I.SHOW_TEXT|I.SHOW_COMMENT|I.SHOW_CDATA_SECTION|I.SHOW_PROCESSING_INSTRUCTION,null);let r=o.nextNode();for(;r;)r.data=bn(r.data),r=o.nextNode();const i=null===(e=t.querySelectorAll)||void 0===e?void 0:e.call(t,"template");i&&m(i,t=>{An(t.content)&&Sn(t.content)})},Tn=function(t){const e=Ct?Ct(t):null;return"string"==typeof e&&("form"===tn(e)&&("string"!=typeof t.nodeName||"string"!=typeof t.textContent||"function"!=typeof t.removeChild||t.attributes!==Rt(t)||"function"!=typeof t.removeAttribute||"function"!=typeof t.removeAttributeNode||"function"!=typeof t.getAttributeNode||"function"!=typeof t.setAttribute||"string"!=typeof t.namespaceURI||"function"!=typeof t.insertBefore||"function"!=typeof t.hasChildNodes||t.nodeType!==kt(t)||t.childNodes!==xt(t)))},An=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return kt(t)===ht}catch(t){return!1}},En=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return"number"==typeof kt(t)}catch(t){return!1}};function wn(t,e,n){0!==t.length&&m(t,t=>{t.call(o,e,n,en)})}const vn=function(t,e){if(t instanceof RegExp)return k(t,e);if(t instanceof Function){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return Boolean(t(e,...o))}return!1},On=function(t,e,n,o){return 0===t.length?e:e===n||e===o?P(e):e},Nn=function(t,e){return t!==e&&null===_t(t)&&(Ce&&dn(t),!0)},xn=function(t,e){if(wn(Vt.beforeSanitizeElements,t,null),Nn(t,e))return!0;if(Tn(t))return sn(t),!0;const n=tn(zt(t));if(ae=On(Vt.uponSanitizeElement,ae,le,Ee),wn(Vt.uponSanitizeElement,t,{tagName:n,allowedTags:ae}),Nn(t,e))return!0;if(function(t,e){return!!(Se&&t.hasChildNodes()&&!En(t.firstElementChild)&&k(at,t.textContent)&&k(at,t.innerHTML))||!!(Se&&t.namespaceURI===Be&&gt[e]&&(En(t.firstElementChild)||"string"==typeof t.textContent&&k(bt[e],t.textContent)))||t.nodeType===pt||!(!Se||t.nodeType!==mt||!k(lt,t.data))}(t,n))return sn(t),!0;if(fe[n]||!(me.tagCheck instanceof Function&&me.tagCheck(n))&&!ae[n]){const o=function(t,e,n){if(!fe[e]&&Rn(e)&&vn(ue.tagNameCheck,e))return!1;if(ke&&!Le[e]){const e=_t(t),o=xt(t);if(o&&e)for(let r=o.length-1;r>=0;--r){const i=t===n?wt(o[r],!0):o[r];e.insertBefore(i,Nt(t))}}return sn(t),!0}(t,n,e);return!1===o&&wn(Vt.afterSanitizeElements,t,null),o}if(Lt(t)===ut&&!cn(t))return sn(t),!0;if(("noscript"===n||"noembed"===n||"noframes"===n)&&k(ct,t.innerHTML))return sn(t),!0;if(be&&t.nodeType===ft){const e=bn(t.textContent);t.textContent!==e&&(y(o.removed,{element:t.cloneNode()}),t.textContent=e)}return wn(Vt.afterSanitizeElements,t,null),!1},_n=function(t,e,n){if(pe[e])return!1;if(hn(e,t))return!1;if(_e&&("id"===e||"name"===e)&&(n in r||n in nn))return!1;const o=ce[e]||me.attributeCheck instanceof Function&&me.attributeCheck(e,t);return!(!he||!k(te,e))||(!(!de||!k(ee,e))||(o?!!Ue[e]||(!!k(ie,E(n,oe,""))||(!("src"!==e&&"xlink:href"!==e&&"href"!==e||"script"===t||0!==w(n,"data:")||!Me[t])||(!(!ye||k(ne,E(n,oe,"")))||!n))):Rn(t)&&vn(ue.tagNameCheck,t)&&vn(ue.attributeNameCheck,e,t)||"is"===e&&ue.allowCustomizedBuiltInElements&&vn(ue.tagNameCheck,n)))},Dn=z({},["annotation-xml","color-profile","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","missing-glyph"]),Rn=function(t){return!Dn[S(t)]&&k(re,t)},kn=function(t,e,n,o){if(Mt&&"object"==typeof yt&&"function"==typeof yt.getAttributeType&&!n)switch(yt.getAttributeType(t,e)){case"TrustedHTML":return Bt(o);case"TrustedScriptURL":return function(t){jt(),Ht++;try{return Mt.createScriptURL(t)}finally{Ht--}}(o)}return o},Cn=function(t,e,n,o){try{return n?t.setAttributeNS(n,e,o):t.setAttribute(e,o),!Tn(t)||(sn(t),!1)}catch(n){return pn(e,t),!1}},In=function(t){wn(Vt.beforeSanitizeAttributes,t,null);const e=t.attributes;if(!e||Tn(t))return;ce=On(Vt.uponSanitizeAttribute,ce,se,we);const n={attrName:"",attrValue:"",keepAttr:!0,allowedAttributes:ce,forceKeepAttr:void 0};let r=e.length;const i=tn(t.nodeName);for(;r--;){const a=e[r],l=a.name,c=a.namespaceURI,s=a.value,u=tn(l),f=s;let p="value"===l?f:v(f),m=!1;if(n.attrName=u,n.attrValue=p,n.keepAttr=!0,n.forceKeepAttr=void 0,wn(Vt.uponSanitizeAttribute,t,n),p=n.attrValue,!De||"id"!==u&&"name"!==u||0===w(p,Re)||(pn(l,t,a),p=Re+p,m=!0),Se&&k(/((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i,p))pn(l,t,a);else if("attributename"===u&&A(p,"href"))pn(l,t,a);else if(!n.forceKeepAttr)if(n.keepAttr)if(ge||!k(st,p))if(be&&(p=bn(p)),_n(i,u,p)){if(p=kn(i,u,c,p),p!==f){Cn(t,l,c,p)&&m&&h(o.removed)}}else pn(l,t,a);else pn(l,t,a);else pn(l,t,a)}wn(Vt.afterSanitizeAttributes,t,null)},Ln=function(t){let e=null;const n=gn(t);for(wn(Vt.beforeSanitizeShadowDOM,t,null);e=n.nextNode();)if(wn(Vt.uponSanitizeShadowNode,e,null),xn(e,t),In(e),An(e.content)&&Ln(e.content),Lt(e)===ut){const t=Dt(e);An(t)&&(zn(t),Ln(t))}wn(Vt.afterSanitizeShadowDOM,t,null)},zn=function(t){const e=[{node:t,shadow:null}];for(;e.length>0;){const t=e.pop();if(t.shadow){Ln(t.shadow);continue}const n=t.node,o=Lt(n)===ut,r=xt(n);if(r)for(let t=r.length-1;t>=0;--t)e.push({node:r[t],shadow:null});if(o){const t=Ct?Ct(n):null;if("string"==typeof t&&"template"===tn(t)){const t=n.content;An(t)&&e.push({node:t,shadow:null})}}if(o){const t=Dt(n);An(t)&&e.push({node:null,shadow:t},{node:t,shadow:null})}}};return o.sanitize=function(t){let e=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{},n=null,r=null,a=null,l=null;if(Ye=!t,Ye&&(t="\x3c!--\x3e"),"string"!=typeof t&&!En(t)&&"string"!=typeof(t=function(t){switch(typeof t){case"string":return t;case"number":return O(t);case"boolean":return N(t);case"bigint":return x?x(t):"0";case"symbol":return _?_(t):"Symbol()";case"undefined":default:return R(t);case"function":case"object":{if(null===t)return R(t);const e=t,n=U(e,"toString");if("function"==typeof n){const t=n(e);return"string"==typeof t?t:R(t)}return R(t)}}}(t)))throw C("dirty is not a string, aborting");if(!o.isSupported)return t;Ae?(ae=Ee,ce=we):rn(e),(Vt.uponSanitizeElement.length>0||Vt.uponSanitizeAttribute.length>0)&&(ae=P(ae)),Vt.uponSanitizeAttribute.length>0&&(ce=P(ce)),o.removed=[];const c=Ce&&"string"!=typeof t&&En(t);if(c){!function(t){if(!Se)return;const e=[t];for(;e.length>0;){const t=e.pop(),n=Lt(t);if(n===pt||n===mt&&k(lt,t.data)){try{vt(t)}catch(t){}continue}if(n===ut){const e=t,n=tn(zt(t));try{e.hasAttribute&&e.hasAttribute("patchsrc")&&e.removeAttribute("patchsrc"),e.hasAttribute&&e.hasAttribute("for")&&hn("for",n)&&e.removeAttribute("for")}catch(t){}}const o=xt(t);if(o)for(let t=o.length-1;t>=0;--t)e.push(o[t])}}(t);const e=zt(t);if("string"==typeof e){const n=tn(e);if(!ae[n]||fe[n])throw fn(t),C("root node is forbidden and cannot be sanitized in-place")}if(Tn(t))throw fn(t),C("root node is clobbered and cannot be sanitized in-place");try{zn(t)}catch(e){throw fn(t),e}}else if(En(t))n=yn("\x3c!----\x3e"),r=n.ownerDocument.importNode(t,!0),r.nodeType===ut&&"BODY"===r.nodeName||"HTML"===r.nodeName?n=r:n.appendChild(r),zn(n);else{if(!Oe&&!be&&!Te&&-1===t.indexOf("<"))return Mt&&xe?Bt(t):t;if(n=yn(t),!n)return Oe?null:xe?Ut:""}n&&ve&&sn(n.firstChild);const s=c?t:n;try{const t=gn(s);for(;a=t.nextNode();)xn(a,s),In(a),An(a.content)&&Ln(a.content)}catch(e){throw c&&(fn(t),m(o.removed,t=>{t.element&&dn(t.element)})),e}if(c)return m(o.removed,t=>{t.element&&dn(t.element)}),be&&Sn(t),t;if(Oe){if(be&&Sn(n),Ne)for(l=$t.call(n.ownerDocument);n.firstChild;)l.appendChild(n.firstChild);else l=n;return(ce.shadowroot||ce.shadowrootmode)&&(l=Kt.call(i,l,!0)),l}let u=Te?n.outerHTML:n.innerHTML;return Te&&ae["!doctype"]&&n.ownerDocument&&n.ownerDocument.doctype&&n.ownerDocument.doctype.name&&k(rt,n.ownerDocument.doctype.name)&&(u="<!DOCTYPE "+n.ownerDocument.doctype.name+">\n"+u),be&&(u=bn(u)),Mt&&xe?Bt(u):u},o.setConfig=function(){rn(arguments.length>0&&void 0!==arguments[0]?arguments[0]:{}),Ae=!0,Ee=ae,we=ce},o.clearConfig=function(){en=null,Ae=!1,Ee=null,we=null,Mt=Pt,Ut=""},o.isValidAttribute=function(t,e,n){en||rn({});const o=tn(t),r=tn(e);return _n(o,r,n)},o.addHook=function(t,e){"function"==typeof e&&D(Vt,t)&&y(Vt[t],e)},o.removeHook=function(t,e){if(D(Vt,t)){if(void 0!==e){const n=d(Vt[t],e);return-1===n?void 0:g(Vt[t],n,1)[0]}return h(Vt[t])}},o.removeHooks=function(t){D(Vt,t)&&(Vt[t]=[])},o.removeAllHooks=function(){Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]}},o}();return Et});
 
-/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
- *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
- *  compatibility with data saved before that format existed, bare keys ("L") and the
- *  older singular columnKey field (applied to any sheet). */
-function targetColumnsForSeason(rule, season) {
-  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
-  return raw
-    .map((entry) => {
-      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
-      const [entrySeason, key] = entry.split(':');
-      return entrySeason === season ? key : null;
-    })
-    .filter(Boolean);
-}
-
-/** The דרשה rules, both of which have now been retired.
- *
- *  There were two, שבת שובה and שבת הגדול, and each appended the bare word "דרשה" and nothing
- *  else. That said a דרשה was happening and left its time to be typed into the cell by hand
- *  every year. Both afternoons are now worked out in the sheet itself: the דרשה an hour before
- *  the מנחה that is 45 minutes before שקיעה, its מנחה למטה half an hour before that, and the
- *  standing 5:30, 6:00 and 6:30 left off, since the מנחה למטה is what happens instead of them.
- *  See DRASHA_NAMES and shabbosMinchaMenu in sheets/common.js.
- *
- *  שובה went first and הגדול followed once the שובה cell had been printing for a season. So
- *  nothing is seeded here any more, and what is left is taking the old ones back off the
- *  browsers that were given them: left in place, either would sit a second, wordless "דרשה"
- *  underneath the computed one.
- *
- *  Matched on what the rule does rather than on the id it was seeded with. Both of these were
- *  hand-made before they were ever seeded, so on the browser they were made in they carry their
- *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
- *  is matched is an append of nothing but the word itself, which is the rule that is now
- *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
- *  alone: quietly deleting that is worse than a duplicate they can see and remove.
- *
- *  **The condition is not looked at.** It was: the rule had to name שובה or הגדול as a
- *  special-Shabbos. The shul's own board still printed the second, wordless דרשה under the
- *  computed one on שבת הגדול, so a rule was firing that this did not recognise, and a condition
- *  can say the same Shabbos in more ways than a list can hold (the parsha name instead of the
- *  special one, "שבת הגדול" rather than "הגדול", a stray space). What makes the rule redundant
- *  is what it writes, not which week it writes it on: the word on its own says a דרשה is
- *  happening and leaves its time to be typed in, and every one of those times is now computed.
- *
- *  The word is compared with the markup and the invisible characters taken off. A rule's text
- *  is typed into a box and can arrive carrying an <u> from the editor, the isolate characters
- *  a cell wraps Hebrew in (see util.js), a bidi mark from a keyboard, or an nbsp. None of them
- *  change what the line says. */
-const DRASHA_WORD = 'דרשה';
-/** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
-const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
-const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
-function isRetiredTishaBavRule(rule) {
-  return rule?.id === 'rule-tisha-bav' ||
-    (rule?.mode === 'append' && plainText(rule.value).replace(/['"׳״\\s]/g, '') === 'טבאב' &&
-      rule.condition?.hebrewDate?.some(date => date === '5-8' || date === '5-9'));
-}
-
-function isRetiredDrashaRule(rule) {
-  return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
-}
-
-/** The same bare word, left behind in a cell somebody typed over rather than in a rule.
- *
- *  A per-cell override keeps the whole cell, so one made while the rule was still firing kept
- *  a copy of what the rule had added, and deleting the rule does not reach it. Dropped only
- *  where the same cell already prints a דרשה with a time on it, which is the computed line:
- *  the word twice in one cell, once saying when and once saying nothing, is the thing the shul
- *  asked to have off. A cell that carries the bare word and no computed line is left alone,
- *  since there the word is all the cell says about the דרשה.
- *
- *  Only a trailing one, which is where an append puts it. The line break may be a newline or
- *  markup: a typed cell is rich text and the browser's own editor writes a <div> or a <br>
- *  rather than a newline (see lineBoxOf in ui/week-view.js). */
-/** What a line can carry either side of the word without saying anything else: whitespace, the
- *  invisible marks, an opening or closing tag, and the <br> a browser's own editor writes at the
- *  end of a box it made. A line of nothing but those and the word is a line that says the word. */
-const OPENERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<[a-z][^>]*>)';
-const CLOSERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<br\\s*/?>|</[a-z][^>]*>)';
-const TRAILING_BARE_DRASHA = new RegExp(
-  `(?:\\n|<br\\s*/?>|<div[^>]*>|<p[^>]*>)${OPENERS}*${DRASHA_WORD}${CLOSERS}*$`,
-  'i'
-);
-const DRASHA_WITH_TIME = new RegExp(`${DRASHA_WORD}\\s*\\d{1,2}:\\d{2}`);
-function dropDuplicateDrasha(value) {
-  const text = String(value ?? '');
-  if (!DRASHA_WITH_TIME.test(plainText(text))) return text;
-  return text.replace(TRAILING_BARE_DRASHA, '');
-}
-
-/** Applies every enabled rule to a row of computed cell text, returning a new object
- *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
- *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
- *
- *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
- *  'append' adds rule.value as an extra line onto whatever the cell already computed
- *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
-function applyRules(row, week, rules, season, appliedColumns) {
-  let out = row;
-  for (const rule of rules) {
-    if (!rule.enabled || isRetiredTishaBavRule(rule)) continue;
-    if (!conditionMatches(rule.condition, week)) continue;
-    for (const col of targetColumnsForSeason(rule, season)) {
-      if (!(col in out)) continue;
-      if (out === row) out = { ...row };
-      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
-      if (appliedColumns) appliedColumns.add(col);
-    }
-  }
-  return out;
-}
+return module.exports;
+})();
 
 // ==== settings.js ====
 // Settings model, mirroring the workbook's SETTINGS sheet. Stored in a clean,
@@ -1830,17 +1687,6 @@ function resolveSettings(raw) {
     english: raw.language === 'en',
   };
 }
-
-// ==== security-purify.js ====
-// Pinned upstream DOMPurify 3.4.15, wrapped for the offline module flattener.
-const richTextPurifier = (() => {
-const module = { exports: {} };
-const exports = module.exports;
-/*! @license DOMPurify 3.4.15 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.15/LICENSE */
-!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).DOMPurify=e()}(this,function(){"use strict";function t(t,e){(null==e||e>t.length)&&(e=t.length);for(var n=0,o=Array(e);n<e;n++)o[n]=t[n];return o}function e(e,n){return function(t){if(Array.isArray(t))return t}(e)||function(t,e){var n=null==t?null:"undefined"!=typeof Symbol&&t[Symbol.iterator]||t["@@iterator"];if(null!=n){var o,r,i,a,l=[],c=!0,s=!1;try{if(i=(n=n.call(t)).next,0===e);else for(;!(c=(o=i.call(n)).done)&&(l.push(o.value),l.length!==e);c=!0);}catch(t){s=!0,r=t}finally{try{if(!c&&null!=n.return&&(a=n.return(),Object(a)!==a))return}finally{if(s)throw r}}return l}}(e,n)||function(e,n){if(e){if("string"==typeof e)return t(e,n);var o={}.toString.call(e).slice(8,-1);return"Object"===o&&e.constructor&&(o=e.constructor.name),"Map"===o||"Set"===o?Array.from(e):"Arguments"===o||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(o)?t(e,n):void 0}}(e,n)||function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}const n=Object.entries,o=Object.setPrototypeOf,r=Object.isFrozen,i=Object.getPrototypeOf,a=Object.getOwnPropertyDescriptor;let l=Object.freeze,c=Object.seal,s=Object.create,u="undefined"!=typeof Reflect&&Reflect,f=u.apply,p=u.construct;l||(l=function(t){return t}),c||(c=function(t){return t}),f||(f=function(t,e){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return t.apply(e,o)}),p||(p=function(t){for(var e=arguments.length,n=new Array(e>1?e-1:0),o=1;o<e;o++)n[o-1]=arguments[o];return new t(...n)});const m=L(Array.prototype.forEach),d=L(Array.prototype.lastIndexOf),h=L(Array.prototype.pop),y=L(Array.prototype.push),g=L(Array.prototype.splice),b=Array.isArray,S=L(String.prototype.toLowerCase),T=L(String.prototype.toString),A=L(String.prototype.match),E=L(String.prototype.replace),w=L(String.prototype.indexOf),v=L(String.prototype.trim),O=L(Number.prototype.toString),N=L(Boolean.prototype.toString),x="undefined"==typeof BigInt?null:L(BigInt.prototype.toString),_="undefined"==typeof Symbol?null:L(Symbol.prototype.toString),D=L(Object.prototype.hasOwnProperty),R=L(Object.prototype.toString),k=L(RegExp.prototype.test),C=(I=TypeError,function(){for(var t=arguments.length,e=new Array(t),n=0;n<t;n++)e[n]=arguments[n];return p(I,e)});var I;function L(t){return function(e){e instanceof RegExp&&(e.lastIndex=0);for(var n=arguments.length,o=new Array(n>1?n-1:0),r=1;r<n;r++)o[r-1]=arguments[r];return f(t,e,o)}}function z(t,e){let n=arguments.length>2&&void 0!==arguments[2]?arguments[2]:S;if(o&&o(t,null),!b(e))return t;let i=e.length;for(;i--;){let o=e[i];if("string"==typeof o){const t=n(o);t!==o&&(r(e)||(e[i]=t),o=t)}t[o]=!0}return t}function M(t){for(let e=0;e<t.length;e++){D(t,e)||(t[e]=null)}return t}function P(t){const o=s(null);for(const i of n(t)){var r=e(i,2);const n=r[0],a=r[1];D(t,n)&&(b(a)?o[n]=M(a):a&&"object"==typeof a&&a.constructor===Object?o[n]=P(a):o[n]=a)}return o}function U(t,e){for(;null!==t;){const n=a(t,e);if(n){if(n.get)return L(n.get);if("function"==typeof n.value)return L(n.value)}t=i(t)}return function(){return null}}const F=l(["a","abbr","acronym","address","area","article","aside","audio","b","bdi","bdo","big","blink","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","content","data","datalist","dd","decorator","del","details","dfn","dialog","dir","div","dl","dt","element","em","fieldset","figcaption","figure","font","footer","form","h1","h2","h3","h4","h5","h6","head","header","hgroup","hr","html","i","img","input","ins","kbd","label","legend","li","main","map","mark","marquee","menu","menuitem","meter","nav","nobr","ol","optgroup","option","output","p","picture","pre","progress","q","rp","rt","ruby","s","samp","search","section","select","shadow","slot","small","source","spacer","span","strike","strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time","tr","track","tt","u","ul","var","video","wbr"]),H=l(["svg","a","altglyph","altglyphdef","altglyphitem","animatecolor","animatemotion","animatetransform","circle","clippath","defs","desc","ellipse","enterkeyhint","exportparts","filter","font","g","glyph","glyphref","hkern","image","inputmode","line","lineargradient","marker","mask","metadata","mpath","part","path","pattern","polygon","polyline","radialgradient","rect","stop","style","switch","symbol","text","textpath","title","tref","tspan","view","vkern"]),j=l(["feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feDistantLight","feDropShadow","feFlood","feFuncA","feFuncB","feFuncG","feFuncR","feGaussianBlur","feImage","feMerge","feMergeNode","feMorphology","feOffset","fePointLight","feSpecularLighting","feSpotLight","feTile","feTurbulence"]),B=l(["animate","color-profile","cursor","discard","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","foreignobject","hatch","hatchpath","mesh","meshgradient","meshpatch","meshrow","missing-glyph","script","set","solidcolor","unknown","use"]),W=l(["math","menclose","merror","mfenced","mfrac","mglyph","mi","mlabeledtr","mmultiscripts","mn","mo","mover","mpadded","mphantom","mroot","mrow","ms","mspace","msqrt","mstyle","msub","msup","msubsup","mtable","mtd","mtext","mtr","munder","munderover","mprescripts"]),Y=l(["maction","maligngroup","malignmark","mlongdiv","mscarries","mscarry","msgroup","mstack","msline","msrow","semantics","annotation","annotation-xml","mprescripts","none"]),G=l(["#text"]),q=l(["accept","action","align","alt","autocapitalize","autocomplete","autopictureinpicture","autoplay","background","bgcolor","border","capture","cellpadding","cellspacing","checked","cite","class","clear","color","cols","colspan","command","commandfor","controls","controlslist","coords","crossorigin","datetime","decoding","default","dir","disabled","disablepictureinpicture","disableremoteplayback","download","draggable","enctype","enterkeyhint","exportparts","face","for","headers","height","hidden","high","href","hreflang","id","inert","inputmode","integrity","ismap","kind","label","lang","list","loading","loop","low","max","maxlength","media","method","min","minlength","multiple","muted","name","nonce","noshade","novalidate","nowrap","open","optimum","part","pattern","placeholder","playsinline","popover","popovertarget","popovertargetaction","poster","preload","pubdate","radiogroup","readonly","rel","required","rev","reversed","role","rows","rowspan","spellcheck","scope","selected","shape","size","sizes","slot","span","srclang","start","src","srcset","step","style","summary","tabindex","title","translate","type","usemap","valign","value","width","wrap","xmlns"]),$=l(["accent-height","accumulate","additive","alignment-baseline","amplitude","ascent","attributename","attributetype","azimuth","basefrequency","baseline-shift","begin","bias","by","class","clip","clippathunits","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","cx","cy","d","dx","dy","diffuseconstant","direction","display","divisor","dominant-baseline","dur","edgemode","elevation","end","exponent","fill","fill-opacity","fill-rule","filter","filterunits","flood-color","flood-opacity","font-family","font-size","font-size-adjust","font-stretch","font-style","font-variant","font-weight","fx","fy","g1","g2","glyph-name","glyphref","gradientunits","gradienttransform","height","href","id","image-rendering","in","in2","intercept","k","k1","k2","k3","k4","kerning","keypoints","keysplines","keytimes","lang","lengthadjust","letter-spacing","kernelmatrix","kernelunitlength","lighting-color","local","marker-end","marker-mid","marker-start","markerheight","markerunits","markerwidth","maskcontentunits","maskunits","max","mask","mask-type","media","method","mode","min","name","numoctaves","offset","operator","opacity","order","orient","orientation","origin","overflow","paint-order","path","pathlength","patterncontentunits","patterntransform","patternunits","pointer-events","points","preservealpha","preserveaspectratio","primitiveunits","r","rx","ry","radius","refx","refy","repeatcount","repeatdur","restart","result","rotate","scale","seed","shape-rendering","slope","specularconstant","specularexponent","spreadmethod","startoffset","stddeviation","stitchtiles","stop-color","stop-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke","stroke-width","style","surfacescale","systemlanguage","tabindex","tablevalues","targetx","targety","transform","transform-origin","text-anchor","text-decoration","text-orientation","text-rendering","textlength","type","u1","u2","unicode","values","vector-effect","viewbox","visibility","version","vert-adv-y","vert-origin-x","vert-origin-y","width","word-spacing","wrap","writing-mode","xchannelselector","ychannelselector","x","x1","x2","xmlns","y","y1","y2","z","zoomandpan"]),X=l(["accent","accentunder","align","bevelled","close","columnalign","columnlines","columnspacing","columnspan","denomalign","depth","dir","display","displaystyle","encoding","fence","frame","height","href","id","largeop","length","linethickness","lquote","lspace","mathbackground","mathcolor","mathsize","mathvariant","maxsize","minsize","movablelimits","notation","numalign","open","rowalign","rowlines","rowspacing","rowspan","rspace","rquote","scriptlevel","scriptminsize","scriptsizemultiplier","selection","separator","separators","stretchy","subscriptshift","supscriptshift","symmetric","voffset","width","xmlns"]),K=l(["xlink:href","xml:id","xlink:title","xml:space","xmlns:xlink"]),V=c(/{{[\w\W]*|^[\w\W]*}}/g),Z=c(/<%[\w\W]*|^[\w\W]*%>/g),J=c(/\${[\w\W]*/g),Q=c(/^data-[\-\w.\u00B7-\uFFFF]+$/),tt=c(/^aria-[\-\w]+$/),et=c(/^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i),nt=c(/^(?:\w+script|data):/i),ot=c(/[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g),rt=c(/^html$/i),it=c(/^[a-z][.\w]*(-[.\w]+)+$/i),at=c(/<[/\w!]/g),lt=c(/<[/\w]/g),ct=c(/<\/no(script|embed|frames)/i),st=c(/\/>/i),ut=1,ft=3,pt=7,mt=8,dt=9,ht=11,yt=["style","script","xmp","iframe","noembed","noframes","plaintext","noscript"],gt=l(z({},yt)),bt=function(){const t={};return m(yt,e=>{t[e]=c(new RegExp("</"+e+"(?=[\\t\\n\\f\\r />])","i"))}),l(t)}(),St=function(){return"undefined"==typeof window?null:window},Tt=function(t,e,n,o){return D(t,e)&&b(t[e])?z(o.base?P(o.base):{},t[e],o.transform):n},At=function(t,e,n){const o=D(t,e)?t[e]:void 0;return o&&"object"==typeof o?P(o):n()};var Et=function t(){let e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:St();const o=e=>t(e);if(o.version="3.4.15",o.removed=[],!e||!e.document||e.document.nodeType!==dt||!e.Element)return o.isSupported=!1,o;let r=e.document;const i=r,a=i.currentScript;e.DocumentFragment;const u=e.HTMLTemplateElement,f=e.Node,p=e.Element,I=e.NodeFilter,L=e.NamedNodeMap;void 0===L&&(e.NamedNodeMap||e.MozNamedAttrMap),e.HTMLFormElement;const M=e.DOMParser,yt=e.trustedTypes,Et=p.prototype,wt=U(Et,"cloneNode"),vt=U(Et,"remove"),Ot=U(Et,"removeAttributeNode"),Nt=U(Et,"nextSibling"),xt=U(Et,"childNodes"),_t=U(Et,"parentNode"),Dt=U(Et,"shadowRoot"),Rt=U(Et,"attributes"),kt=f&&f.prototype?U(f.prototype,"nodeType"):null,Ct=f&&f.prototype?U(f.prototype,"nodeName"):null,It=f&&f.prototype?U(f.prototype,"ownerDocument"):null,Lt=function(t){return kt?kt(t):t.nodeType},zt=function(t){return Ct?Ct(t):t.nodeName};if("function"==typeof u){const t=r.createElement("template");t.content&&t.content.ownerDocument&&(r=t.content.ownerDocument)}let Mt,Pt,Ut="",Ft=!1,Ht=0;const jt=function(){if(Ht>0)throw C('A configured TRUSTED_TYPES_POLICY callback (createHTML or createScriptURL) must not call DOMPurify.sanitize, as that causes infinite recursion. Do not pass a policy whose callbacks wrap DOMPurify as TRUSTED_TYPES_POLICY; see the "DOMPurify and Trusted Types" section of the README.')},Bt=function(t){jt(),Ht++;try{return Mt.createHTML(t)}finally{Ht--}},Wt=function(){return Ft||(Pt=function(t,e){if("object"!=typeof t||"function"!=typeof t.createPolicy)return null;let n=null;const o="data-tt-policy-suffix";e&&e.hasAttribute(o)&&(n=e.getAttribute(o));const r="dompurify"+(n?"#"+n:"");try{return t.createPolicy(r,{createHTML:t=>t,createScriptURL:t=>t})}catch(t){return console.warn("TrustedTypes policy "+r+" could not be created."),null}}(yt,a),Ft=!0),Pt},Yt=r,Gt=Yt.implementation,qt=Yt.createNodeIterator,$t=Yt.createDocumentFragment,Xt=Yt.getElementsByTagName,Kt=i.importNode;let Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]};o.isSupported="function"==typeof n&&"function"==typeof _t&&Gt&&void 0!==Gt.createHTMLDocument;const Zt=V,Jt=Z,Qt=J,te=Q,ee=tt,ne=nt,oe=ot,re=it;let ie=et,ae=null;const le=z({},[...F,...H,...j,...W,...G]);let ce=null;const se=z({},[...q,...$,...X,...K]);let ue=Object.seal(s(null,{tagNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeNameCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},allowCustomizedBuiltInElements:{writable:!0,configurable:!1,enumerable:!0,value:!1}})),fe=null,pe=null;const me=Object.seal(s(null,{tagCheck:{writable:!0,configurable:!1,enumerable:!0,value:null},attributeCheck:{writable:!0,configurable:!1,enumerable:!0,value:null}}));let de=!0,he=!0,ye=!1,ge=!0,be=!1,Se=!0,Te=!1,Ae=!1,Ee=null,we=null,ve=!1,Oe=!1,Ne=!1,xe=!1,_e=!0,De=!1;const Re="user-content-";let ke=!0,Ce=!1,Ie={},Le=null;const ze=z({},["annotation-xml","audio","colgroup","desc","foreignobject","head","iframe","math","mi","mn","mo","ms","mtext","noembed","noframes","noscript","plaintext","script","selectedcontent","style","svg","template","thead","title","video","xmp"]);let Me=null;const Pe=z({},["audio","video","img","source","image","track"]);let Ue=null;const Fe=z({},["alt","class","for","id","label","name","pattern","placeholder","role","summary","title","value","style","xmlns"]),He="http://www.w3.org/1998/Math/MathML",je="http://www.w3.org/2000/svg",Be="http://www.w3.org/1999/xhtml";let We=Be,Ye=!1,Ge=null;const qe=z({},[He,je,Be],T),$e=l(["mi","mo","mn","ms","mtext"]);let Xe=z({},$e);const Ke=l(["annotation-xml"]);let Ve=z({},Ke);const Ze=z({},["title","style","font","a","script"]);let Je=null;const Qe=["application/xhtml+xml","text/html"];let tn=null,en=null;const nn=r.createElement("form"),on=function(t){return t instanceof RegExp||t instanceof Function},rn=function(){let t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{};if(en&&en===t)return;t&&"object"==typeof t||(t={}),t=P(t),Je=-1===Qe.indexOf(t.PARSER_MEDIA_TYPE)?"text/html":t.PARSER_MEDIA_TYPE,tn="application/xhtml+xml"===Je?T:S,ae=Tt(t,"ALLOWED_TAGS",le,{transform:tn}),ce=Tt(t,"ALLOWED_ATTR",se,{transform:tn}),Ge=Tt(t,"ALLOWED_NAMESPACES",qe,{transform:T}),Ue=Tt(t,"ADD_URI_SAFE_ATTR",Fe,{transform:tn,base:Fe}),Me=Tt(t,"ADD_DATA_URI_TAGS",Pe,{transform:tn,base:Pe}),Le=Tt(t,"FORBID_CONTENTS",ze,{transform:tn}),fe=Tt(t,"FORBID_TAGS",P({}),{transform:tn}),pe=Tt(t,"FORBID_ATTR",P({}),{transform:tn}),Ie=!!D(t,"USE_PROFILES")&&(t.USE_PROFILES&&"object"==typeof t.USE_PROFILES?P(t.USE_PROFILES):t.USE_PROFILES),de=!1!==t.ALLOW_ARIA_ATTR,he=!1!==t.ALLOW_DATA_ATTR,ye=t.ALLOW_UNKNOWN_PROTOCOLS||!1,ge=!1!==t.ALLOW_SELF_CLOSE_IN_ATTR,be=t.SAFE_FOR_TEMPLATES||!1,Se=!1!==t.SAFE_FOR_XML,Te=t.WHOLE_DOCUMENT||!1,Oe=t.RETURN_DOM||!1,Ne=t.RETURN_DOM_FRAGMENT||!1,xe=t.RETURN_TRUSTED_TYPE||!1,ve=t.FORCE_BODY||!1,_e=!1!==t.SANITIZE_DOM,De=t.SANITIZE_NAMED_PROPS||!1,ke=!1!==t.KEEP_CONTENT,Ce=t.IN_PLACE||!1,ie=function(t){try{return k(t,""),!0}catch(t){return!1}}(t.ALLOWED_URI_REGEXP)?t.ALLOWED_URI_REGEXP:et,We="string"==typeof t.NAMESPACE?t.NAMESPACE:Be,Xe=At(t,"MATHML_TEXT_INTEGRATION_POINTS",()=>z({},$e)),Ve=At(t,"HTML_INTEGRATION_POINTS",()=>z({},Ke));const e=At(t,"CUSTOM_ELEMENT_HANDLING",()=>s(null));if(ue=s(null),D(e,"tagNameCheck")&&on(e.tagNameCheck)&&(ue.tagNameCheck=e.tagNameCheck),D(e,"attributeNameCheck")&&on(e.attributeNameCheck)&&(ue.attributeNameCheck=e.attributeNameCheck),D(e,"allowCustomizedBuiltInElements")&&"boolean"==typeof e.allowCustomizedBuiltInElements&&(ue.allowCustomizedBuiltInElements=e.allowCustomizedBuiltInElements),c(ue),be&&(he=!1),Ne&&(Oe=!0),Ie&&(ae=z({},G),ce=s(null),!0===Ie.html&&(z(ae,F),z(ce,q)),!0===Ie.svg&&(z(ae,H),z(ce,$),z(ce,K)),!0===Ie.svgFilters&&(z(ae,j),z(ce,$),z(ce,K)),!0===Ie.mathMl&&(z(ae,W),z(ce,X),z(ce,K))),me.tagCheck=null,me.attributeCheck=null,D(t,"ADD_TAGS")&&("function"==typeof t.ADD_TAGS?me.tagCheck=t.ADD_TAGS:b(t.ADD_TAGS)&&(ae===le&&(ae=P(ae)),z(ae,t.ADD_TAGS,tn))),D(t,"ADD_ATTR")&&("function"==typeof t.ADD_ATTR?me.attributeCheck=t.ADD_ATTR:b(t.ADD_ATTR)&&(ce===se&&(ce=P(ce)),z(ce,t.ADD_ATTR,tn))),D(t,"ADD_FORBID_CONTENTS")&&b(t.ADD_FORBID_CONTENTS)&&(Le===ze&&(Le=P(Le)),z(Le,t.ADD_FORBID_CONTENTS,tn)),ke&&(ae["#text"]=!0),Te&&z(ae,["html","head","body"]),ae.table&&(z(ae,["tbody"]),delete fe.tbody),t.TRUSTED_TYPES_POLICY){if("function"!=typeof t.TRUSTED_TYPES_POLICY.createHTML)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createHTML" hook.');if("function"!=typeof t.TRUSTED_TYPES_POLICY.createScriptURL)throw C('TRUSTED_TYPES_POLICY configuration option must provide a "createScriptURL" hook.');const e=Mt;Mt=t.TRUSTED_TYPES_POLICY;try{Ut=Bt("")}catch(t){throw Mt=e,t}}else null===t.TRUSTED_TYPES_POLICY?(Mt=void 0,Ut=""):(void 0===Mt&&(Mt=Wt()),Mt&&"string"==typeof Ut&&(Ut=Bt("")));l&&l(t),en=t},an=z({},[...H,...j,...B]),ln=z({},[...W,...Y]),cn=function(t){let e=_t(t);e&&e.tagName||(e={namespaceURI:We,tagName:"template"});const n=S(t.tagName),o=S(e.tagName);return!!Ge[t.namespaceURI]&&(t.namespaceURI===je?function(t,e,n){return e.namespaceURI===Be?"svg"===t:e.namespaceURI===He?"svg"===t&&("annotation-xml"===n||Xe[n]):Boolean(an[t])}(n,e,o):t.namespaceURI===He?function(t,e,n){return e.namespaceURI===Be?"math"===t:e.namespaceURI===je?"math"===t&&Ve[n]:Boolean(ln[t])}(n,e,o):t.namespaceURI===Be?function(t,e,n){return!(e.namespaceURI===je&&!Ve[n])&&!(e.namespaceURI===He&&!Xe[n])&&!ln[t]&&(Ze[t]||!an[t])}(n,e,o):!("application/xhtml+xml"!==Je||!Ge[t.namespaceURI]))},sn=function(t){y(o.removed,{element:t});try{_t(t).removeChild(t)}catch(e){if(vt(t),!_t(t))throw C("a node selected for removal could not be detached from its tree and cannot be safely returned; refusing to sanitize in place")}},un=function(t,e,n){try{Ot(t,e)}catch(e){try{t.removeAttribute(n)}catch(t){}}},fn=function(t){dn(t);const e=xt(t);if(e){const t=[];m(e,e=>{y(t,e)}),m(t,t=>{try{vt(t)}catch(t){}})}const n=Rt(t);if(n)for(let e=n.length-1;e>=0;--e){const o=n[e],r=o&&o.name;"string"==typeof r&&un(t,o,r)}},pn=function(t,e,n){if(!n)try{n=e.getAttributeNode(t)}catch(t){n=null}y(o.removed,{attribute:n||null,from:e});try{n?Ot(e,n):e.removeAttribute(t)}catch(n){try{e.removeAttribute(t)}catch(t){}}if("is"===t)if(Oe||Ne)try{sn(e)}catch(t){}else try{e.setAttribute(t,"")}catch(t){}},mn=function(t){const e=Rt(t);if(e)for(let n=e.length-1;n>=0;--n){const o=e[n],r=o&&o.name;"string"!=typeof r||ce[tn(r)]||un(t,o,r)}},dn=function(t){const e=[t];for(;e.length>0;){const t=e.pop();Lt(t)===ut&&mn(t);const n=xt(t);if(n)for(let t=n.length-1;t>=0;--t)e.push(n[t])}},hn=function(t,e){return!!Se&&("patchsrc"===t||"for"===t&&"label"!==e&&"output"!==e)},yn=function(t){let e=null,n=null;if(ve)t="<remove></remove>"+t;else{const e=A(t,/^[\r\n\t ]+/);n=e&&e[0]}"application/xhtml+xml"===Je&&We===Be&&(t='<html xmlns="http://www.w3.org/1999/xhtml"><head></head><body>'+t+"</body></html>");const o=Mt?Bt(t):t;if(We===Be)try{e=(new M).parseFromString(o,Je)}catch(t){}if(!e||!e.documentElement){e=Gt.createDocument(We,"template",null);try{e.documentElement.innerHTML=Ye?Ut:o}catch(t){}}const i=e.body||e.documentElement;return t&&n&&i.insertBefore(r.createTextNode(n),i.childNodes[0]||null),We===Be?Xt.call(e,Te?"html":"body")[0]:Te?e.documentElement:i},gn=function(t){const e=It?It(t):t.ownerDocument;return qt.call(e||t,t,I.SHOW_ELEMENT|I.SHOW_COMMENT|I.SHOW_TEXT|I.SHOW_PROCESSING_INSTRUCTION|I.SHOW_CDATA_SECTION,null)},bn=function(t){return t=E(t,Zt," "),t=E(t,Jt," "),t=E(t,Qt," ")},Sn=function(t){var e;t.normalize();const n=It?It(t):t.ownerDocument,o=qt.call(n||t,t,I.SHOW_TEXT|I.SHOW_COMMENT|I.SHOW_CDATA_SECTION|I.SHOW_PROCESSING_INSTRUCTION,null);let r=o.nextNode();for(;r;)r.data=bn(r.data),r=o.nextNode();const i=null===(e=t.querySelectorAll)||void 0===e?void 0:e.call(t,"template");i&&m(i,t=>{An(t.content)&&Sn(t.content)})},Tn=function(t){const e=Ct?Ct(t):null;return"string"==typeof e&&("form"===tn(e)&&("string"!=typeof t.nodeName||"string"!=typeof t.textContent||"function"!=typeof t.removeChild||t.attributes!==Rt(t)||"function"!=typeof t.removeAttribute||"function"!=typeof t.removeAttributeNode||"function"!=typeof t.getAttributeNode||"function"!=typeof t.setAttribute||"string"!=typeof t.namespaceURI||"function"!=typeof t.insertBefore||"function"!=typeof t.hasChildNodes||t.nodeType!==kt(t)||t.childNodes!==xt(t)))},An=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return kt(t)===ht}catch(t){return!1}},En=function(t){if(!kt||"object"!=typeof t||null===t)return!1;try{return"number"==typeof kt(t)}catch(t){return!1}};function wn(t,e,n){0!==t.length&&m(t,t=>{t.call(o,e,n,en)})}const vn=function(t,e){if(t instanceof RegExp)return k(t,e);if(t instanceof Function){for(var n=arguments.length,o=new Array(n>2?n-2:0),r=2;r<n;r++)o[r-2]=arguments[r];return Boolean(t(e,...o))}return!1},On=function(t,e,n,o){return 0===t.length?e:e===n||e===o?P(e):e},Nn=function(t,e){return t!==e&&null===_t(t)&&(Ce&&dn(t),!0)},xn=function(t,e){if(wn(Vt.beforeSanitizeElements,t,null),Nn(t,e))return!0;if(Tn(t))return sn(t),!0;const n=tn(zt(t));if(ae=On(Vt.uponSanitizeElement,ae,le,Ee),wn(Vt.uponSanitizeElement,t,{tagName:n,allowedTags:ae}),Nn(t,e))return!0;if(function(t,e){return!!(Se&&t.hasChildNodes()&&!En(t.firstElementChild)&&k(at,t.textContent)&&k(at,t.innerHTML))||!!(Se&&t.namespaceURI===Be&&gt[e]&&(En(t.firstElementChild)||"string"==typeof t.textContent&&k(bt[e],t.textContent)))||t.nodeType===pt||!(!Se||t.nodeType!==mt||!k(lt,t.data))}(t,n))return sn(t),!0;if(fe[n]||!(me.tagCheck instanceof Function&&me.tagCheck(n))&&!ae[n]){const o=function(t,e,n){if(!fe[e]&&Rn(e)&&vn(ue.tagNameCheck,e))return!1;if(ke&&!Le[e]){const e=_t(t),o=xt(t);if(o&&e)for(let r=o.length-1;r>=0;--r){const i=t===n?wt(o[r],!0):o[r];e.insertBefore(i,Nt(t))}}return sn(t),!0}(t,n,e);return!1===o&&wn(Vt.afterSanitizeElements,t,null),o}if(Lt(t)===ut&&!cn(t))return sn(t),!0;if(("noscript"===n||"noembed"===n||"noframes"===n)&&k(ct,t.innerHTML))return sn(t),!0;if(be&&t.nodeType===ft){const e=bn(t.textContent);t.textContent!==e&&(y(o.removed,{element:t.cloneNode()}),t.textContent=e)}return wn(Vt.afterSanitizeElements,t,null),!1},_n=function(t,e,n){if(pe[e])return!1;if(hn(e,t))return!1;if(_e&&("id"===e||"name"===e)&&(n in r||n in nn))return!1;const o=ce[e]||me.attributeCheck instanceof Function&&me.attributeCheck(e,t);return!(!he||!k(te,e))||(!(!de||!k(ee,e))||(o?!!Ue[e]||(!!k(ie,E(n,oe,""))||(!("src"!==e&&"xlink:href"!==e&&"href"!==e||"script"===t||0!==w(n,"data:")||!Me[t])||(!(!ye||k(ne,E(n,oe,"")))||!n))):Rn(t)&&vn(ue.tagNameCheck,t)&&vn(ue.attributeNameCheck,e,t)||"is"===e&&ue.allowCustomizedBuiltInElements&&vn(ue.tagNameCheck,n)))},Dn=z({},["annotation-xml","color-profile","font-face","font-face-format","font-face-name","font-face-src","font-face-uri","missing-glyph"]),Rn=function(t){return!Dn[S(t)]&&k(re,t)},kn=function(t,e,n,o){if(Mt&&"object"==typeof yt&&"function"==typeof yt.getAttributeType&&!n)switch(yt.getAttributeType(t,e)){case"TrustedHTML":return Bt(o);case"TrustedScriptURL":return function(t){jt(),Ht++;try{return Mt.createScriptURL(t)}finally{Ht--}}(o)}return o},Cn=function(t,e,n,o){try{return n?t.setAttributeNS(n,e,o):t.setAttribute(e,o),!Tn(t)||(sn(t),!1)}catch(n){return pn(e,t),!1}},In=function(t){wn(Vt.beforeSanitizeAttributes,t,null);const e=t.attributes;if(!e||Tn(t))return;ce=On(Vt.uponSanitizeAttribute,ce,se,we);const n={attrName:"",attrValue:"",keepAttr:!0,allowedAttributes:ce,forceKeepAttr:void 0};let r=e.length;const i=tn(t.nodeName);for(;r--;){const a=e[r],l=a.name,c=a.namespaceURI,s=a.value,u=tn(l),f=s;let p="value"===l?f:v(f),m=!1;if(n.attrName=u,n.attrValue=p,n.keepAttr=!0,n.forceKeepAttr=void 0,wn(Vt.uponSanitizeAttribute,t,n),p=n.attrValue,!De||"id"!==u&&"name"!==u||0===w(p,Re)||(pn(l,t,a),p=Re+p,m=!0),Se&&k(/((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i,p))pn(l,t,a);else if("attributename"===u&&A(p,"href"))pn(l,t,a);else if(!n.forceKeepAttr)if(n.keepAttr)if(ge||!k(st,p))if(be&&(p=bn(p)),_n(i,u,p)){if(p=kn(i,u,c,p),p!==f){Cn(t,l,c,p)&&m&&h(o.removed)}}else pn(l,t,a);else pn(l,t,a);else pn(l,t,a)}wn(Vt.afterSanitizeAttributes,t,null)},Ln=function(t){let e=null;const n=gn(t);for(wn(Vt.beforeSanitizeShadowDOM,t,null);e=n.nextNode();)if(wn(Vt.uponSanitizeShadowNode,e,null),xn(e,t),In(e),An(e.content)&&Ln(e.content),Lt(e)===ut){const t=Dt(e);An(t)&&(zn(t),Ln(t))}wn(Vt.afterSanitizeShadowDOM,t,null)},zn=function(t){const e=[{node:t,shadow:null}];for(;e.length>0;){const t=e.pop();if(t.shadow){Ln(t.shadow);continue}const n=t.node,o=Lt(n)===ut,r=xt(n);if(r)for(let t=r.length-1;t>=0;--t)e.push({node:r[t],shadow:null});if(o){const t=Ct?Ct(n):null;if("string"==typeof t&&"template"===tn(t)){const t=n.content;An(t)&&e.push({node:t,shadow:null})}}if(o){const t=Dt(n);An(t)&&e.push({node:null,shadow:t},{node:t,shadow:null})}}};return o.sanitize=function(t){let e=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{},n=null,r=null,a=null,l=null;if(Ye=!t,Ye&&(t="\x3c!--\x3e"),"string"!=typeof t&&!En(t)&&"string"!=typeof(t=function(t){switch(typeof t){case"string":return t;case"number":return O(t);case"boolean":return N(t);case"bigint":return x?x(t):"0";case"symbol":return _?_(t):"Symbol()";case"undefined":default:return R(t);case"function":case"object":{if(null===t)return R(t);const e=t,n=U(e,"toString");if("function"==typeof n){const t=n(e);return"string"==typeof t?t:R(t)}return R(t)}}}(t)))throw C("dirty is not a string, aborting");if(!o.isSupported)return t;Ae?(ae=Ee,ce=we):rn(e),(Vt.uponSanitizeElement.length>0||Vt.uponSanitizeAttribute.length>0)&&(ae=P(ae)),Vt.uponSanitizeAttribute.length>0&&(ce=P(ce)),o.removed=[];const c=Ce&&"string"!=typeof t&&En(t);if(c){!function(t){if(!Se)return;const e=[t];for(;e.length>0;){const t=e.pop(),n=Lt(t);if(n===pt||n===mt&&k(lt,t.data)){try{vt(t)}catch(t){}continue}if(n===ut){const e=t,n=tn(zt(t));try{e.hasAttribute&&e.hasAttribute("patchsrc")&&e.removeAttribute("patchsrc"),e.hasAttribute&&e.hasAttribute("for")&&hn("for",n)&&e.removeAttribute("for")}catch(t){}}const o=xt(t);if(o)for(let t=o.length-1;t>=0;--t)e.push(o[t])}}(t);const e=zt(t);if("string"==typeof e){const n=tn(e);if(!ae[n]||fe[n])throw fn(t),C("root node is forbidden and cannot be sanitized in-place")}if(Tn(t))throw fn(t),C("root node is clobbered and cannot be sanitized in-place");try{zn(t)}catch(e){throw fn(t),e}}else if(En(t))n=yn("\x3c!----\x3e"),r=n.ownerDocument.importNode(t,!0),r.nodeType===ut&&"BODY"===r.nodeName||"HTML"===r.nodeName?n=r:n.appendChild(r),zn(n);else{if(!Oe&&!be&&!Te&&-1===t.indexOf("<"))return Mt&&xe?Bt(t):t;if(n=yn(t),!n)return Oe?null:xe?Ut:""}n&&ve&&sn(n.firstChild);const s=c?t:n;try{const t=gn(s);for(;a=t.nextNode();)xn(a,s),In(a),An(a.content)&&Ln(a.content)}catch(e){throw c&&(fn(t),m(o.removed,t=>{t.element&&dn(t.element)})),e}if(c)return m(o.removed,t=>{t.element&&dn(t.element)}),be&&Sn(t),t;if(Oe){if(be&&Sn(n),Ne)for(l=$t.call(n.ownerDocument);n.firstChild;)l.appendChild(n.firstChild);else l=n;return(ce.shadowroot||ce.shadowrootmode)&&(l=Kt.call(i,l,!0)),l}let u=Te?n.outerHTML:n.innerHTML;return Te&&ae["!doctype"]&&n.ownerDocument&&n.ownerDocument.doctype&&n.ownerDocument.doctype.name&&k(rt,n.ownerDocument.doctype.name)&&(u="<!DOCTYPE "+n.ownerDocument.doctype.name+">\n"+u),be&&(u=bn(u)),Mt&&xe?Bt(u):u},o.setConfig=function(){rn(arguments.length>0&&void 0!==arguments[0]?arguments[0]:{}),Ae=!0,Ee=ae,we=ce},o.clearConfig=function(){en=null,Ae=!1,Ee=null,we=null,Mt=Pt,Ut=""},o.isValidAttribute=function(t,e,n){en||rn({});const o=tn(t),r=tn(e);return _n(o,r,n)},o.addHook=function(t,e){"function"==typeof e&&D(Vt,t)&&y(Vt[t],e)},o.removeHook=function(t,e){if(D(Vt,t)){if(void 0!==e){const n=d(Vt[t],e);return-1===n?void 0:g(Vt[t],n,1)[0]}return h(Vt[t])}},o.removeHooks=function(t){D(Vt,t)&&(Vt[t]=[])},o.removeAllHooks=function(){Vt={afterSanitizeAttributes:[],afterSanitizeElements:[],afterSanitizeShadowDOM:[],beforeSanitizeAttributes:[],beforeSanitizeElements:[],beforeSanitizeShadowDOM:[],uponSanitizeAttribute:[],uponSanitizeElement:[],uponSanitizeShadowNode:[]}},o}();return Et});
-
-return module.exports;
-})();
 
 // ==== security.js ====
 /** Saved cells allow text formatting, never executable markup, links or media. */
@@ -2306,6 +2152,170 @@ function fixedTime(text, { am = false, label } = {}) {
   let h = Number(m[1]) % 12;
   if (!am) h += 12;
   return clockTime(h, Number(m[2]), label);
+}
+
+/** Times explicitly entered by an admin, rather than the calculated values they replace. */
+function enteredTimeTraces(value, label) {
+  const plain = String(value ?? '').replace(/<[^>]*>/g, ' ');
+  return [...plain.matchAll(/\b\d{1,2}:\d{2}\b/g)].map(m => fixedTime(m[0], { label }));
+}
+
+// ==== rules.js ====
+// Rule engine: reusable, condition-based overrides (e.g. "Shabbos Teshuva and Shabbos
+// HaGadol have a different Mincha time because of the drasha"). Applied to every
+// generated sheet automatically, before any one-off manual per-cell overrides - that's
+// the intended distinction between rules (recurring, reapplies every year) and
+// overrides (tied to one generated sheet instance).
+//
+// A rule's columnKeys are sheet-qualified ("kayitz:L", "choref:I") because the same
+// bare letter means a *different* cell on each sheet (e.g. קיץ column I is a Plag
+// Mincha variant, but חורף column I is the main Erev Shabbos Mincha) - qualifying by
+// sheet lets one rule safely cover both charts' "equivalent" cell at once without ever
+// touching the wrong column on the other sheet.
+//
+// A condition can combine any of:
+//   specialParsha: [names]      - matches week.specialParsha (Hebrew or English)
+//   parsha:        [names]      - matches week.parsha
+//   dateISO:       [YYYY-MM-DD] - matches an explicit Gregorian date
+//   hebrewDate:    ["month-day"]- matches a Hebrew calendar date, e.g. "5-9" for ט' באב
+//                                 (month 5 = Av). Recurs every year, unlike dateISO.
+//   always:        true         - matches every week (for a blanket override)
+//
+// week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
+// isn't stored on saved sheets, so it's computed at render time and works for sheets
+// generated before hebrewDate conditions existed.
+
+function conditionMatches(condition, week) {
+  // A rule with no condition at all matches nothing. Saved rules always carry one, but an
+  // import need not: an older export, or a file edited by hand, and reading .always off
+  // undefined threw and took down every screen that draws a sheet.
+  if (!condition) return false;
+  if (condition.always) return true;
+  if (condition.specialParsha && condition.specialParsha.includes(week.specialParsha)) return true;
+  if (condition.parsha && condition.parsha.includes(week.parsha)) return true;
+  // The date is guarded for the same reason: a week whose date will not parse would throw
+  // here rather than simply not matching. storage.js repairs those on the way in, so this
+  // is the second line rather than the first.
+  const iso = week.date instanceof Date && !Number.isNaN(week.date.getTime())
+    ? week.date.toISOString().slice(0, 10) : null;
+  if (condition.dateISO && iso && condition.dateISO.includes(iso)) return true;
+  if (condition.hebrewDate && week.hebrew && condition.hebrewDate.includes(`${week.hebrew.month}-${week.hebrew.dayOfMonth}`)) return true;
+  return false;
+}
+
+/** A rule's target columns for the given sheet season, as bare column keys (e.g. "L").
+ *  Accepts the current sheet-qualified format ("kayitz:L") and, for backward
+ *  compatibility with data saved before that format existed, bare keys ("L") and the
+ *  older singular columnKey field (applied to any sheet). */
+function targetColumnsForSeason(rule, season) {
+  const raw = Array.isArray(rule.columnKeys) ? rule.columnKeys : rule.columnKey ? [rule.columnKey] : [];
+  return raw
+    .map((entry) => {
+      if (!entry.includes(':')) return entry; // legacy bare key - applies on any sheet
+      const [entrySeason, key] = entry.split(':');
+      return entrySeason === season ? key : null;
+    })
+    .filter(Boolean);
+}
+
+/** The דרשה rules, both of which have now been retired.
+ *
+ *  There were two, שבת שובה and שבת הגדול, and each appended the bare word "דרשה" and nothing
+ *  else. That said a דרשה was happening and left its time to be typed into the cell by hand
+ *  every year. Both afternoons are now worked out in the sheet itself: the דרשה an hour before
+ *  the מנחה that is 45 minutes before שקיעה, its מנחה למטה half an hour before that, and the
+ *  standing 5:30, 6:00 and 6:30 left off, since the מנחה למטה is what happens instead of them.
+ *  See DRASHA_NAMES and shabbosMinchaMenu in sheets/common.js.
+ *
+ *  שובה went first and הגדול followed once the שובה cell had been printing for a season. So
+ *  nothing is seeded here any more, and what is left is taking the old ones back off the
+ *  browsers that were given them: left in place, either would sit a second, wordless "דרשה"
+ *  underneath the computed one.
+ *
+ *  Matched on what the rule does rather than on the id it was seeded with. Both of these were
+ *  hand-made before they were ever seeded, so on the browser they were made in they carry their
+ *  own ids, and matching by id would have left exactly those browsers with the duplicate. What
+ *  is matched is an append of nothing but the word itself, which is the rule that is now
+ *  redundant. Anything with other words in it, or a replace, is somebody's own and is left
+ *  alone: quietly deleting that is worse than a duplicate they can see and remove.
+ *
+ *  **The condition is not looked at.** It was: the rule had to name שובה or הגדול as a
+ *  special-Shabbos. The shul's own board still printed the second, wordless דרשה under the
+ *  computed one on שבת הגדול, so a rule was firing that this did not recognise, and a condition
+ *  can say the same Shabbos in more ways than a list can hold (the parsha name instead of the
+ *  special one, "שבת הגדול" rather than "הגדול", a stray space). What makes the rule redundant
+ *  is what it writes, not which week it writes it on: the word on its own says a דרשה is
+ *  happening and leaves its time to be typed in, and every one of those times is now computed.
+ *
+ *  The word is compared with the markup and the invisible characters taken off. A rule's text
+ *  is typed into a box and can arrive carrying an <u> from the editor, the isolate characters
+ *  a cell wraps Hebrew in (see util.js), a bidi mark from a keyboard, or an nbsp. None of them
+ *  change what the line says. */
+const DRASHA_WORD = 'דרשה';
+/** The isolates, the bidi marks and the nbsp: invisible, and never what a line says. */
+const INVISIBLE = /[\u200e\u200f\u2066-\u2069\u00a0]/g;
+const plainText = (value) => String(value ?? '').replace(/<[^>]*>/g, '').replace(INVISIBLE, ' ');
+function isRetiredTishaBavRule(rule) {
+  return rule?.id === 'rule-tisha-bav' ||
+    (rule?.mode === 'append' && plainText(rule.value).replace(/['"׳״\\s]/g, '') === 'טבאב' &&
+      rule.condition?.hebrewDate?.some(date => date === '5-8' || date === '5-9'));
+}
+
+function isRetiredDrashaRule(rule) {
+  return rule?.mode === 'append' && plainText(rule.value).trim() === DRASHA_WORD;
+}
+
+/** The same bare word, left behind in a cell somebody typed over rather than in a rule.
+ *
+ *  A per-cell override keeps the whole cell, so one made while the rule was still firing kept
+ *  a copy of what the rule had added, and deleting the rule does not reach it. Dropped only
+ *  where the same cell already prints a דרשה with a time on it, which is the computed line:
+ *  the word twice in one cell, once saying when and once saying nothing, is the thing the shul
+ *  asked to have off. A cell that carries the bare word and no computed line is left alone,
+ *  since there the word is all the cell says about the דרשה.
+ *
+ *  Only a trailing one, which is where an append puts it. The line break may be a newline or
+ *  markup: a typed cell is rich text and the browser's own editor writes a <div> or a <br>
+ *  rather than a newline (see lineBoxOf in ui/week-view.js). */
+/** What a line can carry either side of the word without saying anything else: whitespace, the
+ *  invisible marks, an opening or closing tag, and the <br> a browser's own editor writes at the
+ *  end of a box it made. A line of nothing but those and the word is a line that says the word. */
+const OPENERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<[a-z][^>]*>)';
+const CLOSERS = '(?:[\\s\\u00a0\\u200e\\u200f\\u2066-\\u2069]|<br\\s*/?>|</[a-z][^>]*>)';
+const TRAILING_BARE_DRASHA = new RegExp(
+  `(?:\\n|<br\\s*/?>|<div[^>]*>|<p[^>]*>)${OPENERS}*${DRASHA_WORD}${CLOSERS}*$`,
+  'i'
+);
+const DRASHA_WITH_TIME = new RegExp(`${DRASHA_WORD}\\s*\\d{1,2}:\\d{2}`);
+function dropDuplicateDrasha(value) {
+  const text = String(value ?? '');
+  if (!DRASHA_WITH_TIME.test(plainText(text))) return text;
+  return text.replace(TRAILING_BARE_DRASHA, '');
+}
+
+/** Applies every enabled rule to a row of computed cell text, returning a new object
+ *  with matching columns replaced or appended to. `appliedColumns` (a Set) collects
+ *  which *column keys* were touched by a rule, so the UI can flag those specific cells.
+ *
+ *  rule.mode: 'replace' (default) swaps the cell's whole computed value for rule.value;
+ *  'append' adds rule.value as an extra line onto whatever the cell already computed
+ *  to (e.g. adding the word "דרשה" without losing the actual Mincha times). */
+function applyRules(row, week, rules, season, appliedColumns) {
+  let out = row;
+  for (const rule of rules) {
+    if (!rule.enabled || isRetiredTishaBavRule(rule)) continue;
+    if (!conditionMatches(rule.condition, week)) continue;
+    for (const col of targetColumnsForSeason(rule, season)) {
+      if (!(col in out)) continue;
+      if (out === row) out = { ...row };
+      out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      const entered = enteredTimeTraces(rule.value, `Entered by admin rule${rule.name ? `: ${rule.name}` : ''}`);
+      out.traces = { ...out.traces, [col]: [...(rule.mode === 'append' ? out.traces?.[col] || [] : []), ...entered] };
+      out.traceNotes = { ...out.traceNotes, [col]: `An admin rule ${rule.mode === 'append' ? 'adds to' : 'replaces'} this cell${rule.name ? `: ${rule.name}` : '.'}` };
+      if (appliedColumns) appliedColumns.add(col);
+    }
+  }
+  return out;
 }
 
 // ==== zmanim/zmanim.js ====
@@ -4021,11 +4031,15 @@ function parseTimes(str) {
 function buildSlichosPoster(hebrewYearNum) {
   if (!hebrewYearNum) return null;
   const days = posterDays(hebrewYearNum);
-  const rows = SLICHOS_ROWS.map((row) => ({
-    label: row.label,
-    times: parseTimes(row.times),
-    note: row.days ? kriasHatorahNote(days[row.days], row.earlier) : '',
-  }));
+  const rows = SLICHOS_ROWS.map((row) => {
+    const note = row.days ? kriasHatorahNote(days[row.days], row.earlier) : '';
+    const times = parseTimes(row.times);
+    const noteTimes = note ? [{ text: row.earlier, trace: fixedTime(row.earlier, {
+      label: 'the earlier morning time set for the Torah-reading days named on this line',
+    }).onlyWhen(true, note) }] : [];
+    if (note) times[0].explanation = `The first minyan runs at ${row.earlier} on the Torah-reading days named on this line: ${note}`;
+    return { label: row.label, times, note, noteTimes };
+  });
   const all = rows.flatMap((r) => r.times);
 
   // Only the marks that are actually on this poster get explained, same as שבת שובה. The
@@ -4901,6 +4915,7 @@ const KAYITZ_COLUMNS = [
 
 
 
+
 const PS_MIN = 1 / 1440;
 const PS_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
 const PS_FRIDAY = 6;
@@ -4909,12 +4924,7 @@ const PS_FRIDAY = 6;
 const psAt = (h, m) => (h * 60 + m) * PS_MIN;
 /** Down to the last 5 minutes, up to the next, and to the nearest. Announced times are round
  *  fives; which way each one goes is said where it is used. */
-const psDown5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
-const psUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
 const psNear5 = (t) => Math.round(t * 288) / 288;
-/** A day fraction snapped to the minute it prints as, so a comparison here and the sheet
- *  cannot disagree by a rounding. */
-const psPrinted = (t) => Math.round(t * 1440) / 1440;
 
 /** Which day of ניסן each part of the sheet is. */
 const PS_BEDIKA = 13;    // the night bedikas chometz is on, in a year where 14 is not Shabbos
@@ -4945,6 +4955,9 @@ const PS_NEILA_BEFORE = 45;
 
 const psSerial = (rh, day) => rh + day - 1;
 const psShkia = (serial, settings) => Z.sunsetElev(dateFromSerial(serial), settings);
+const psShkiaTrace = (serial, settings) => zman('שקיעה', psShkia(serial, settings),
+  `at the shul's elevation on ${dateFromSerial(serial).toISOString().slice(0, 10)}`);
+const psStandingTrace = (h, m) => clockTime(h, m, 'the standing time on the Pesach schedule');
 
 /** 15 ניסן of a Hebrew year, as a serial.
  *
@@ -5039,9 +5052,9 @@ const PS_TEXT = {
 /** The מנחה run of a יום טוב afternoon: the three fixed ones, then the last worked from that
  *  day's own שקיעה. */
 function pesachDayMincha(serial, settings) {
+  const trace = psShkiaTrace(serial, settings).minus(PS_LAST_MINCHA).round();
   return [...parseTimes(PS_TEXT.dayMincha),
-    { text: formatTime(psPrinted(psShkia(serial, settings) - PS_LAST_MINCHA * PS_MIN)),
-      underlined: false, mark: '' }];
+    { text: trace.plain(), underlined: false, mark: '', trace }];
 }
 
 /** The חול המועד days that keep the everyday schedule: not Shabbos, and not a Friday, which
@@ -5062,20 +5075,25 @@ function pesachChmDays(rh) {
  *  Everything is למטה except the 1:50, as on all five sheets. */
 function pesachChmMincha(days, settings) {
   const earliest = Math.min(...days.map((s) => psShkia(s, settings)));
-  const last = psDown5(earliest - 15 * PS_MIN);
-  const out = [{ t: psAt(13, 35), u: true }, { t: psAt(13, 50) }, { t: psAt(16, 15), u: true }];
+  const lastTrace = zman('שקיעה', earliest, 'the earliest sunset of the Chol Hamoed weekdays this schedule covers').minus(15).floorToStep(5);
+  const last = lastTrace.value;
+  const out = [{ t: psAt(13, 35), u: true, trace: psStandingTrace(13, 35) },
+    { t: psAt(13, 50), trace: psStandingTrace(13, 50) }, { t: psAt(16, 15), u: true, trace: psStandingTrace(16, 15) }];
   const run = [];
   for (let t = psAt(18, 0); t <= last + 1e-9; t += 20 * PS_MIN) {
-    if (last - t >= 15 * PS_MIN - 1e-9) run.push(t);
+    if (last - t >= 15 * PS_MIN - 1e-9) run.push({ t, trace: psStandingTrace(18, 0)
+      .plus(Math.round((t - psAt(18, 0)) / PS_MIN), 'the standing run advances in 20-minute slots')
+      .onlyWhen(true, 'this slot leaves at least 15 minutes before the last minyan') });
   }
-  const before = run.length ? run[run.length - 1] : psAt(16, 15);
+  const before = run.length ? run[run.length - 1].t : psAt(16, 15);
   if (last - before > 20 * PS_MIN + 1e-9) {
     const fill = [20, 15].map((m) => last - m * PS_MIN)
       .find((t) => t - before >= 15 * PS_MIN - 1e-9);
-    if (fill !== undefined) run.push(fill);
+    if (fill !== undefined) run.push({ t: fill, trace: lastTrace.minus(Math.round((last - fill) / PS_MIN),
+      'an extra minyan fills the gap left after the standing run') });
   }
-  for (const t of run) out.push({ t, u: true });
-  out.push({ t: last, u: true });
+  for (const item of run) out.push({ ...item, u: true });
+  out.push({ t: last, u: true, trace: lastTrace });
   return out;
 }
 
@@ -5097,9 +5115,11 @@ const PS_CHM_MAARIV = [[20, 45, false], [21, 30, true], [22, 0, true], [22, 30, 
   [23, 0, true], [23, 30, true], [24, 0, true]];
 function pesachChmMaariv(days, settings) {
   const latest = Math.max(...days.map((s) => psShkia(s, settings)));
-  const first = psUp5(latest + 50 * PS_MIN);
-  return [{ t: first, u: true },
-    ...PS_CHM_MAARIV.map(([h, m, u]) => ({ t: psAt(h, m), u }))
+  const firstTrace = zman('שקיעה', latest, 'the latest sunset of the Chol Hamoed weekdays this schedule covers').plus(50).ceilToStep(5);
+  const first = firstTrace.value;
+  return [{ t: first, u: true, trace: firstTrace },
+    ...PS_CHM_MAARIV.map(([h, m, u]) => ({ t: psAt(h, m), u, trace: psStandingTrace(h, m)
+      .onlyWhen(true, 'this standing time leaves at least 15 minutes after the first minyan') }))
       .filter((g) => g.t - first >= 15 * PS_MIN - 1e-9)];
 }
 
@@ -5113,19 +5133,26 @@ function buildPesachPoster(year, settings) {
   const shkiaOf = (n) => psShkia(day(n), settings);
   const isShabbos = (n) => excelWeekday(day(n)) === PS_SHABBOS;
 
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark });
+  const tm = (t, underlined = false, mark = '') => {
+    let trace = t?.steps ? t : null;
+    if (trace && underlined) trace = trace.underline();
+    if (trace && mark) trace = trace.mark(mark);
+    return { text: trace ? trace.plain() : formatTime(t), underlined, mark, trace };
+  };
+  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark,
+    trace: fixedTime(s, { label: 'the approximate time announced on the Pesach schedule' }) });
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
-  const list = (items) => items.map((x) => tm(x.t, Boolean(x.u), x.mark || ''));
+  const list = (items) => items.map((x) => tm(x.trace || x.t, Boolean(x.u), x.mark || ''));
 
   const bothWays = (serial) => twoReckonings(
     Z.sofZmanShmaMGA72(dateFromSerial(serial), settings),
     Z.sofZmanShmaGRA(dateFromSerial(serial), settings)
-  ).map((r) => ({ ...tm(r.at), name: r.name }));
+  ).map((r) => ({ ...tm(zman(`סוף זמן קריאת שמע ${r.name}`, r.at,
+    r.name.includes('מ') ? 'three proportional hours from alos 72 to tzais 72' : 'three proportional hours from sunrise to sunset')), name: r.name }));
   /** חצות הלילה of the night that opens a day, which is what the seder is timed against.
    *  Solar noon of that night's own day plus twelve hours. */
   const chatzosLine = (nightDay) => line(PS_TEXT.chatzos,
-    [tm(Z.solarNoon(dateFromSerial(day(nightDay)), settings) + 0.5)], { calc: 'chatzos' });
+    [tm(zman('חצות היום', Z.solarNoon(dateFromSerial(day(nightDay)), settings)).plus(720, 'twelve hours later is midnight'))], { calc: 'chatzos' });
 
   const M = minyanList();
   const blocks = [];
@@ -5170,7 +5197,7 @@ function buildPesachPoster(year, settings) {
     at: bedikaOn,
     heading: PS_TEXT.bedika,
     lines: [line(PS_TEXT.maariv,
-      [tm(psShkia(bedikaOn, settings) + 50 * PS_MIN), ...parseTimes(PS_TEXT.bedikaLate)],
+      [tm(psShkiaTrace(bedikaOn, settings).plus(50)), ...parseTimes(PS_TEXT.bedikaLate)],
       { calc: 'bedikaMaariv' })],
   });
   M.at(bedikaOn, PS_TEXT.maariv, psShkia(bedikaOn, settings) + 50 * PS_MIN);
@@ -5192,8 +5219,8 @@ function buildPesachPoster(year, settings) {
       heading: heading(PS_TEXT.erev, PS_EREV) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
-        line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
-        line(PS_TEXT.biur, [tm(alos + 5 * hour)], { calc: 'biur' }),
+        line(PS_TEXT.achila, [tm(zman('סוף זמן אכילת חמץ מ״א', alos + 4 * hour, 'four proportional hours into the day measured from alos 72 to tzais 72'))], { calc: 'achila' }),
+        line(PS_TEXT.biur, [tm(zman('סוף זמן ביעור חמץ מ״א', alos + 5 * hour, 'five proportional hours into the day measured from alos 72 to tzais 72'))], { calc: 'biur' }),
         // The afternoon is the ערב יום טוב run, and on a year where ערב פסח is Shabbos there is
         // no such run: that afternoon is Shabbos's own and the board carries it.
         erevShabbos ? null
@@ -5215,16 +5242,20 @@ function buildPesachPoster(year, settings) {
     const candles = shkia - settings.candleLightingMinutes * PS_MIN;
     const maariv = shkia + 50 * PS_MIN;
     const on = day(nightDay);
+    const nightTrace = psShkiaTrace(on, settings);
+    const candleTrace = nightTrace.minus(settings.candleLightingMinutes, 'the candle-lighting setting');
+    const maarivTrace = nightTrace.plus(50);
     const out = [
-      line(PS_TEXT.candles, [tm(candles)], { calc: 'candles' }),
-      line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }),
-      line(PS_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
+      line(PS_TEXT.candles, [tm(candleTrace)], { calc: 'candles' }),
+      line(PS_TEXT.mincha, [tm(candleTrace.plus(3, 'three minutes after candle lighting'))], { calc: 'candlesMincha' }),
+      line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
     ];
     if (drasha) {
       out.push(line(PS_TEXT.drasha,
-        [tm(psDown5(roundToMinute(maariv) - PS_DRASHA_BEFORE * PS_MIN))], { calc: 'drasha', wrap: true }));
+        [tm(maarivTrace.round().minus(PS_DRASHA_BEFORE, 'before the printed Maariv time').floorToStep(5))], { calc: 'drasha', wrap: true }));
     }
-    out.push(line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
+    out.push(line(PS_TEXT.maariv, [tm(maarivTrace)], { calc: 'nightMaariv',
+      noteTimes: [tm(nightTrace.plus(72))],
       note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }));
     // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
     M.zman(on, PS_TEXT.candles, candles);
@@ -5245,7 +5276,7 @@ function buildPesachPoster(year, settings) {
       // The מנחה is a מנין; the פלג beside it is the זמן it is set against and is not one.
       M.at(friday, PS_TEXT.mincha, e.mincha, { underlined: e.underlined, mark: e.mark });
       return line(`${PS_TEXT.earlyMincha} ${e.name}`,
-        [tm(e.mincha, e.underlined, e.mark), tm(e.plag)], { calc: 'earlyMincha' });
+        [tm(e.trace.mincha, e.underlined, e.mark), tm(e.trace.plag)], { calc: 'earlyMincha' });
     })
     : []);
 
@@ -5277,15 +5308,18 @@ function buildPesachPoster(year, settings) {
     const shkia = shkiaOf(PS_DAY1);
     const maariv = shkia + 50 * PS_MIN;
     const on = day(PS_DAY1);
+    const nightTrace = psShkiaTrace(on, settings);
+    const maarivTrace = nightTrace.plus(50);
     blocks.push({
       at: day(PS_DAY2),
       heading: heading(PS_TEXT.day2, PS_DAY2),
       lines: [
-        line(PS_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
-        line(PS_TEXT.shiur, [tm(psDown5(roundToMinute(maariv) - 20 * PS_MIN))], { calc: 'shiur', wrap: true }),
-        line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
+        line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
+        line(PS_TEXT.shiur, [tm(maarivTrace.round().minus(20, 'before the printed Maariv time').floorToStep(5))], { calc: 'shiur', wrap: true }),
+        line(PS_TEXT.maariv, [tm(maarivTrace)], { calc: 'nightMaariv',
+          noteTimes: [tm(nightTrace.plus(72))],
           note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }),
-        line(PS_TEXT.maarivLmata, [tm(shkia + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.maarivLmata, [tm(nightTrace.plus(72), true)], { calc: 'maarivLmata' }),
         chatzosLine(PS_DAY1),
         ...morningLines(PS_DAY2, PS_TEXT.yomTovShacharis),
         line(PS_TEXT.mincha, pesachDayMincha(day(PS_DAY2), settings), { calc: 'dayMincha' }),
@@ -5294,7 +5328,7 @@ function buildPesachPoster(year, settings) {
         // the שבת חול המועד block gives the night instead.
         day2Friday ? null
           : line(PS_TEXT.maariv,
-            [tm(shkiaOf(PS_DAY2) + 60 * PS_MIN), tm(shkiaOf(PS_DAY2) + 72 * PS_MIN, true)],
+            [tm(psShkiaTrace(day(PS_DAY2), settings).plus(60)), tm(psShkiaTrace(day(PS_DAY2), settings).plus(72), true)],
             { calc: 'motzeiMaariv', sub: PS_TEXT.vsenBracha }),
       ].filter(Boolean),
     });
@@ -5342,6 +5376,8 @@ function buildPesachPoster(year, settings) {
     const row = buildKayitzRow({ serial: shabbosChm, specialParsha: '' }, settings);
     const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
     const candles = shkia - settings.candleLightingMinutes * PS_MIN;
+    const shkiaTrace = psShkiaTrace(friday, settings).floor();
+    const candleTrace = shkiaTrace.minus(settings.candleLightingMinutes, 'the candle-lighting setting');
     const erev = friday > day(PS_DAY2);
     const lines = [];
     if (erev) {
@@ -5350,15 +5386,15 @@ function buildPesachPoster(year, settings) {
     // Only where that Friday is an ordinary weekday. In a year where יום ב' is the Friday
     // there is nothing to bring in early from: the day is already יום טוב.
     if (erev) lines.push(...earlyLines(friday));
-    lines.push(line(PS_TEXT.candles, [tm(candles)], { calc: 'shabbosCandles' }));
-    if (erev) lines.push(line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }));
-    lines.push(line(PS_TEXT.shkia, [tm(shkia)], { calc: 'shabbosShkia' }));
-    lines.push(line(PS_TEXT.maariv, [tm(shkia + 20 * PS_MIN)], { calc: 'shabbosMaariv',
-      extra: { label: PS_TEXT.maarivLmata, times: chartTimes(row.F) } }));
-    lines.push(line(PS_TEXT.shacharis, chartTimes(row.E), { calc: 'shabbosShacharis' }));
+    lines.push(line(PS_TEXT.candles, [tm(candleTrace)], { calc: 'shabbosCandles' }));
+    if (erev) lines.push(line(PS_TEXT.mincha, [tm(candleTrace.plus(3, 'after candle lighting'))], { calc: 'candlesMincha' }));
+    lines.push(line(PS_TEXT.shkia, [tm(shkiaTrace)], { calc: 'shabbosShkia' }));
+    lines.push(line(PS_TEXT.maariv, [tm(shkiaTrace.plus(20))], { calc: 'shabbosMaariv',
+      extra: { label: PS_TEXT.maarivLmata, times: chartLine(row.F, row.traces.F) } }));
+    lines.push(line(PS_TEXT.shacharis, chartLine(row.E, row.traces.E), { calc: 'shabbosShacharis' }));
     lines.push(line(PS_TEXT.krias, bothWays(shabbosChm), { calc: 'krias' }));
-    lines.push(line(PS_TEXT.mincha, chartTimes(row.C), { calc: 'shabbosMincha' }));
-    lines.push(line(PS_TEXT.maariv, chartTimes(row.B), { calc: 'shabbosMotzei',
+    lines.push(line(PS_TEXT.mincha, chartLine(row.C, row.traces.C), { calc: 'shabbosMincha' }));
+    lines.push(line(PS_TEXT.maariv, chartLine(row.B, row.traces.B), { calc: 'shabbosMotzei',
       ...(day2Friday ? { sub: PS_TEXT.vsenBracha } : {}) }));
     blocks.push({
       at: shabbosChm,
@@ -5395,7 +5431,7 @@ function buildPesachPoster(year, settings) {
         // bring in early from.
         ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),
         ...eveningLines(PS_SHVII - 1),
-        line(PS_TEXT.maarivLmata, [tm(shkiaOf(PS_SHVII - 1) + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.maarivLmata, [tm(psShkiaTrace(day(PS_SHVII) - 1, settings).plus(72), true)], { calc: 'maarivLmata' }),
         ...morningLines(n, PS_TEXT.lastDaysShacharis),
         line(PS_TEXT.mincha, pesachDayMincha(day(n), settings), { calc: 'dayMincha' }),
       ].filter(Boolean),
@@ -5412,19 +5448,21 @@ function buildPesachPoster(year, settings) {
     const nightShkia = shkiaOf(PS_SHVII);
     const dayShkia = shkiaOf(PS_ACHRON);
     const neila = psNear5(dayShkia - PS_NEILA_BEFORE * PS_MIN);
+    const nightTrace = psShkiaTrace(day(PS_SHVII), settings);
+    const dayTrace = psShkiaTrace(day(PS_ACHRON), settings);
     blocks.push({
       at: day(n),
       heading: heading(PS_TEXT.achron, n),
       lines: [
-        line(PS_TEXT.shkia, [tm(nightShkia)], { calc: 'nightShkia' }),
-        line(PS_TEXT.maariv, [tm(nightShkia + 50 * PS_MIN)], { calc: 'nightMaariv' }),
-        line(PS_TEXT.maarivLmata, [tm(nightShkia + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
+        line(PS_TEXT.maariv, [tm(nightTrace.plus(50))], { calc: 'nightMaariv' }),
+        line(PS_TEXT.maarivLmata, [tm(nightTrace.plus(72), true)], { calc: 'maarivLmata' }),
         ...morningLines(n, PS_TEXT.lastDaysShacharis),
         line(PS_TEXT.yizkor, [txt(PS_TEXT.yizkorAt)], { calc: 'yizkor' }),
         line(PS_TEXT.mincha, pesachDayMincha(day(n), settings), { calc: 'dayMincha' }),
-        line(PS_TEXT.neila, [tm(neila)], { calc: 'neila' }),
+        line(PS_TEXT.neila, [tm(dayTrace.minus(PS_NEILA_BEFORE).roundToStep(5))], { calc: 'neila' }),
         line(PS_TEXT.maariv,
-          [tm(dayShkia + 60 * PS_MIN), tm(dayShkia + 72 * PS_MIN, true)],
+          [tm(dayTrace.plus(60)), tm(dayTrace.plus(72), true)],
           { calc: 'motzeiMaariv' }),
       ],
     });
@@ -5748,7 +5786,7 @@ function buildRoshHashanaPoster(year, settings) {
     erevHeading: RH_TEXT.erevHeading + (eiruv ? ' · ' + EIRUV_LABEL : ''),
     erevLines: [
       { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
-      { label: RH_TEXT.chatzos, times: [{ text: formatTime(floorToMinute(Z.solarNoon(erev, settings))), underlined: false, mark: '' }] },
+      { label: RH_TEXT.chatzos, times: [tmT(zman('חצות', Z.solarNoon(erev, settings), 'solar noon on Erev Rosh Hashana').floor())] },
       { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
 
     ],
@@ -6700,7 +6738,7 @@ function buildSukkosPoster(year, settings) {
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.
       line(SK_TEXT.shacharis, hoshanaTimes,
-        { calc: 'hoshanaShacharis', netz: hoshanaNetz, note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
+        { calc: 'hoshanaShacharis', netz: hoshanaNetz, noteTimes: [{ trace: zman('נץ', hoshanaSunrise) }], note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
     ],
   });
 
@@ -7499,7 +7537,8 @@ const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.underlined
  *  the first instance, since every instance at one position is always the same room. */
 function mergedCell(traces) {
   const texts = [...new Set(traces.map((t) => t.plain()))];
-  return { text: texts.join(SLASH), underlined: Boolean(traces[0].flags.underlined), mark: traces[0].flags.mark || '' };
+  return { text: texts.join(SLASH), underlined: Boolean(traces[0].flags.underlined), mark: traces[0].flags.mark || '',
+    traces: texts.map(text => traces.find(t => t.plain() === text)) };
 }
 
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
@@ -7565,7 +7604,7 @@ function netzDayGroups(bound) {
     if (!byTime.has(time)) { byTime.set(time, []); order.push(time); }
     byTime.get(time).push(dayLetter(d.serial));
   }
-  return order.map((time) => ({ time, letters: byTime.get(time) }));
+  return order.map((time) => ({ time, letters: byTime.get(time), trace: zman('נץ', bound.find(d => formatTimeWithSeconds(d.netz) === time).netz) }));
 }
 
 /** The floored average of a set of days' own raw candidates (`rawVasikinCandidate`), the
@@ -7583,11 +7622,16 @@ const averageBetween = (group) => floorToMinute(group.reduce((sum, d) => sum + r
  *  rows are two rows rather than one. The נץ note still comes off this row's own days
  *  regardless, since it is naming which of them נץ actually explains, not what the row's own
  *  time happens to equal. */
-function chanukahVasikinBetween(group, sharedBetween) {
+function chanukahVasikinBetween(group, sharedBetween, sharedGroup) {
   const between = sharedBetween !== undefined ? sharedBetween : averageBetween(group);
   const bound = group.filter((d) => d.netzBinding);
   const netzDays = bound.length ? netzDayGroups(bound) : null;
-  return { time: formatTime(between), netzDays };
+  const source = sharedGroup || group;
+  const average = source.reduce((sum, d) => sum + rawVasikinCandidate(d), 0) / source.length;
+  const trace = zman('average morning time', average,
+    'Average the daily candidates at full precision: each day uses the later of sunrise minus 25 minutes and 7:00 minus 10 minutes (ordinary days) or 20 minutes (Rosh Chodesh). Candidates: '
+    + source.map(d => `${dateFromSerial(d.serial).toISOString().slice(0, 10)} ${formatTime(rawVasikinCandidate(d))}`).join(', ')).floor();
+  return { time: formatTime(between), netzDays, trace };
 }
 
 /** One row for every one of the eight days that is not Rosh Chodesh, together, and one more
@@ -7642,7 +7686,7 @@ function combineShacharisRows(days) {
   const shared = allPushed ? averageBetween(days) : undefined;
   const row = (group, label) => {
     const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared) };
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared, allPushed ? days : undefined) };
   };
   const rows = [];
   if (other.length) rows.push(row(other, `יום ${dayList(other)}`));
@@ -9633,6 +9677,7 @@ function erevShviiShelPesachText(poster) {
 
 
 
+
 /** The months, as the Hebrew date counts them: Nisan is 1, the way rules count them too.
  *  Both Adars are offered; a plain year has neither and takes אדר. */
 const OWN_MONTHS = JEWISH_MONTHS_HE.map((name, i) => ({ value: i + 1, name }));
@@ -9719,11 +9764,24 @@ function ownBlockSerial(block, year) {
 function ownRowTimes(row, serial, settings) {
   if (!row) return [];
   if (row.mode !== 'zman') return parseTimes(row.text);
-  const zman = OWN_ZMANIM.find((z) => z.key === row.zman);
-  if (!zman) return [];
+  const selectedZman = OWN_ZMANIM.find((z) => z.key === row.zman);
+  if (!selectedZman) return [];
   const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
-  const at = zman.at(dateFromSerial(serial), settings) + (Number(row.offset) || 0) / 1440;
-  return [{ text: formatTime(round.apply(at)), underlined: Boolean(row.underlined), mark: row.mark || '' }];
+  const day = dateFromSerial(serial);
+  let traced = row.zman === 'candles'
+    ? zman('שקיעה', Z.sunsetElev(day, settings)).minus(settings.candleLightingMinutes ?? 18, 'the candle-lighting setting')
+    : zman(selectedZman.label, selectedZman.at(day, settings));
+  if (row.zman === 'tzais50' || row.zman === 'tzais72') {
+    traced = zman('שקיעה', Z.sunsetElev(day, settings)).plus(row.zman === 'tzais50' ? 50 : 72);
+  } else if (row.zman === 'alos72') {
+    traced = zman('נץ', Z.sunriseElev(day, settings)).minus(72);
+  }
+  if (Number(row.offset)) traced = traced.plus(Number(row.offset), 'the offset selected for this custom row');
+  const rounding = { near: 'round', down: 'floor', up: 'ceil', down5: 'floorToStep', up5: 'ceilToStep' };
+  traced = ['down5', 'up5'].includes(round.key) ? traced[rounding[round.key]](5) : traced[rounding[round.key]]();
+  if (row.underlined) traced = traced.underline();
+  if (row.mark) traced = traced.mark(row.mark);
+  return [{ text: traced.plain(), underlined: Boolean(row.underlined), mark: row.mark || '', trace: traced }];
 }
 
 /** What a row off a זמן says it is, in words, for the editor and for the Calculations page:
@@ -9853,6 +9911,7 @@ function buildSlichosTzomPoster(year, settings) {
 // Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
 // which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
 
+
 function getOverride(sheet, weekSerial, columnKey) {
   return sheet.overrides?.[weekSerial]?.[columnKey];
 }
@@ -9876,6 +9935,8 @@ function mergeRow(computedRow, sheet, weekSerial) {
   if (weekOverrides) {
     for (const [key, value] of Object.entries(weekOverrides)) {
       row[key] = sanitizeRichText(value);
+      row.traces = { ...row.traces, [key]: enteredTimeTraces(row[key], 'Entered by hand in this saved chart') };
+      row.traceNotes = { ...row.traceNotes, [key]: 'This cell is a manual edit. Its displayed times replace the calculated schedule.' };
       overriddenKeys.add(key);
     }
   }
@@ -10058,8 +10119,14 @@ function shabbosShuvaSerial(hebrewYearNum) {
  *  Split out from buildShuvaPoster because the cell can now come from two places, a saved
  *  chart or the calendar, and everything after the cell is the same either way.
  */
-function posterFromCell(week, cell) {
+function posterFromCell(week, cell, traces = [], explanation = '') {
   const found = erevTimes(cell);
+  const tracePool = [...traces];
+  const traceFor = (t) => {
+    const i = tracePool.findIndex(tr => tr.plain() === t.text);
+    return i < 0 ? null : tracePool.splice(i, 1)[0];
+  };
+  for (const t of found) t.trace = traceFor(t);
 
   // The דרשה is the time whose own line says דרשה. Asked of the text in front of it rather
   // than of its position, since a hand-edited cell can put it anywhere, and asked of the
@@ -10078,7 +10145,7 @@ function posterFromCell(week, cell) {
   // the main בית מדרש, '*' is בעזרת נשים, '**' is באולם השמחות, and למטה is the underline.
   const mincha = found
     .filter((t) => !isDrasha(t))
-    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '' }));
+    .map((t) => ({ text: t.text, underlined: t.underlined, mark: starred(t) ? '*' : '', trace: t.trace, explanation }));
 
   return {
     week,
@@ -10087,6 +10154,8 @@ function posterFromCell(week, cell) {
     // one was the exception and so it never answered: see currentOnePageSheets in posters-view.
     span: { from: week.serial, to: week.serial },
     drasha: drasha ? drasha.text : null,
+    drashaTrace: drasha?.trace,
+    explanation,
     mincha,
     // Only the marks that are actually on this poster get explained. Each line says which
     // direction it has to be set in: the underline line is an English sentence carrying
@@ -10111,7 +10180,7 @@ function buildShuvaPoster(sheet, state, settings) {
   const week = shuvaWeekOf(sheet);
   if (!week) return null;
   const { row } = rowFor({ ...week, date: new Date(week.date) }, sheet, state, settings);
-  return posterFromCell(week, row.C);
+  return posterFromCell(week, row.C, row.traces?.C, row.traceNotes?.C);
 }
 
 /** The same poster with no chart at all, worked out from the calendar.
@@ -10139,7 +10208,7 @@ function buildShuvaFromCalendar(hebrewYearNum, state, settings, tables) {
     specialParsha: hasSpecialParsha(serial, settings),
   };
   const { row } = rowFor(week, { season: 'kayitz' }, state, settings);
-  return posterFromCell(week, row.C);
+  return posterFromCell(week, row.C, row.traces?.C, row.traceNotes?.C);
 }
 
 // ==== ui/own-view.js ====
@@ -10985,6 +11054,162 @@ function wireSwitch(root, name, apply) {
     });
 }
 
+// ==== ui/time-explanations.js ====
+// Renderers attach their own calculation, never a lookup by clock time across the page.
+// Only the admin installs this registry. Shared congregation renderers emit nothing extra.
+let timeExplainInstalled = false;
+let timeExplainNext = 0;
+const timeExplainDetails = new Map();
+const timeExplainPattern = /\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]m)?\b/gi;
+
+function timeExplanationAttrs(detail) {
+  if (!timeExplainInstalled) return '';
+  const id = String(++timeExplainNext);
+  timeExplainDetails.set(id, { ...detail, registeredAt: Date.now() });
+  return ` data-time-explain="${id}"`;
+}
+
+function chartExplanationAttrs(row, key, header, chartName, { value = row[key], fixed = false, announcedWeek = null } = {}) {
+  const times = (row.traces?.[key] || []).map(trace => {
+    if (!announcedWeek) return trace;
+    const displayed = announcedWeekCell(trace.plain(), key, announcedWeek.anchor, announcedWeek.settings);
+    return displayed === trace.plain() ? trace : fixedTime(displayed, { label: 'The time temporarily announced by the shul for this week' });
+  });
+  return timeExplanationAttrs({ header, chartName, printed: value,
+    times, note: row.traceNotes?.[key] || row.notes?.[key], fixed });
+}
+
+function posterTimeExplanationHtml(body, time) {
+  if (!timeExplainInstalled) return body;
+  return `<span${timeExplanationAttrs({ printed: time.text, times: time.traces || (time.trace ? [time.trace] : []),
+    header: '', note: time.explanation, single: true })}>${body}</span>`;
+}
+
+function timeExplainTokens(root) {
+  const tokens = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    for (const match of node.textContent.matchAll(timeExplainPattern)) {
+      const range = document.createRange();
+      range.setStart(node, match.index);
+      range.setEnd(node, match.index + match[0].length);
+      tokens.push({ text: match[0], range });
+    }
+  }
+  return tokens;
+}
+
+function timeExplainContext(root, detail) {
+  const row = root.closest('.onepage-row,.week-line,.poster-row,.poster-set,.sukkos-row,.rh-row,.chanukah-line');
+  const label = row?.querySelector('.onepage-label,.week-label,.poster-row-label,.poster-set-head,.poster-label,.sukkos-label,.rh-label,.chanukah-label');
+  const title = root.closest('.poster,.week-card,.page')?.querySelector('.poster-title,.week-card-title,.page-title');
+  return { ...detail, header: detail.header || label?.textContent.trim() || 'Time calculation',
+    chartName: detail.chartName || title?.textContent.trim() || 'Schedule' };
+}
+
+function installTimeExplanations(main, host) {
+  timeExplainInstalled = true;
+  let enabled = false;
+  const originalAttrs = new WeakMap();
+  const bar = document.createElement('div');
+  bar.className = 'time-explain-bar no-print';
+  bar.innerHTML = '<button type="button" id="explain-times-toggle" aria-pressed="false">Explain times</button><span id="explain-times-hint" role="status">Turn on, then click any schedule time.</span>';
+  host.appendChild(bar);
+  const toggle = bar.querySelector('button');
+  const hint = bar.querySelector('[role="status"]');
+  const dialog = document.createElement('dialog');
+  dialog.className = 'calc-open time-explain-dialog no-print';
+  dialog.setAttribute('aria-label', 'Time calculation');
+  document.body.appendChild(dialog);
+
+  const refresh = () => {
+    const live = new Set();
+    for (const el of main.querySelectorAll('[data-time-explain]')) {
+      live.add(el.dataset.timeExplain);
+      if (enabled && timeExplainTokens(el).length) {
+        if (!originalAttrs.has(el)) {
+          originalAttrs.set(el, ['tabindex', 'role', 'aria-label', 'contenteditable'].map(a => el.getAttribute(a)));
+        }
+        el.classList.add('time-explain-target');
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', 'Explain this time');
+        if (el.hasAttribute('contenteditable')) el.setAttribute('contenteditable', 'false');
+      } else if (originalAttrs.has(el)) {
+        el.classList.remove('time-explain-target');
+        ['tabindex', 'role', 'aria-label', 'contenteditable'].forEach((a, i) => {
+          const value = originalAttrs.get(el)[i];
+          if (value === null) el.removeAttribute(a); else el.setAttribute(a, value);
+        });
+        originalAttrs.delete(el);
+      }
+    }
+    // Keep detached markup briefly: the weekly print run restores its original HTML.
+    if (timeExplainDetails.size > 2000) for (const [id, detail] of timeExplainDetails) {
+      if (!live.has(id) && Date.now() - detail.registeredAt > 60000) timeExplainDetails.delete(id);
+    }
+  };
+  new MutationObserver(refresh).observe(main, { childList: true, subtree: true });
+  toggle.addEventListener('click', () => {
+    enabled = !enabled;
+    toggle.setAttribute('aria-pressed', String(enabled));
+    hint.textContent = enabled ? 'Click a time to see its rule. Turn off to edit times.' : 'Turn on, then click any schedule time.';
+    refresh();
+  });
+
+  const open = (root, index) => {
+    const detail = timeExplainDetails.get(root.dataset.timeExplain);
+    if (!detail) return;
+    const tokens = timeExplainTokens(root);
+    const pool = [...(detail.times || [])];
+    const selected = tokens.map(token => {
+      const at = detail.single && tokens.length === 1 && pool.length === 1 ? 0 : pool.findIndex(t => t.plain() === token.text);
+      let trace = at < 0 ? (detail.fixed ? fixedTime(token.text, { label: 'The standing schedule set by the shul' }) : null) : pool.splice(at, 1)[0];
+      if (trace && /^\d{1,2}:\d{2}:\d{2}$/.test(token.text) && trace.steps.length === 1) {
+        trace = { ...trace, plain: () => token.text, steps: [{ ...trace.steps[0], at: token.text }] };
+      }
+      return { token, trace };
+    });
+    const choices = index == null ? selected : selected.slice(index, index + 1);
+    if (!choices.length) return;
+    const times = choices.map(c => c.trace).filter(Boolean);
+    const missing = choices.some(c => !c.trace);
+    const context = timeExplainContext(root, detail);
+    const note = [context.note, missing ? 'This displayed time has no recorded calculation. Check the source schedule before treating it as a fixed time.' : ''].filter(Boolean).join(' ');
+    const fixed = times.length && times.every(t => t.steps.every(s => ['fixed', 'condition', 'underline', 'mark'].includes(s.kind)));
+    dialog.innerHTML = cellDetailHtml({ ...context, note, printed: choices.map(c => c.token.text).join(' / '), times });
+    const badge = document.createElement('p');
+    badge.className = 'time-explain-kind';
+    badge.textContent = missing ? 'Calculation not recorded' : fixed ? 'Fixed time' : 'Calculated time';
+    dialog.querySelector('.calc-open-printed').after(badge);
+    root.focus({ preventScroll: true });
+    dialog.showModal();
+    dialog.querySelector('.calc-close').onclick = () => dialog.close();
+  };
+  main.addEventListener('click', event => {
+    if (!enabled) return;
+    const root = event.target.closest('[data-time-explain]');
+    if (!root) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const tokens = timeExplainTokens(root);
+    const index = tokens.findIndex(t => [...t.range.getClientRects()].some(r =>
+      event.clientX >= r.left - 3 && event.clientX <= r.right + 3 && event.clientY >= r.top - 3 && event.clientY <= r.bottom + 3));
+    open(root, index < 0 ? null : index);
+  }, true);
+  main.addEventListener('keydown', event => {
+    if (!enabled || !['Enter', ' '].includes(event.key)) return;
+    const root = event.target.closest('[data-time-explain]');
+    if (!root) return;
+    event.preventDefault(); event.stopImmediatePropagation(); open(root, null);
+  }, true);
+  dialog.addEventListener('click', event => { if (event.target === dialog) {
+    const r = dialog.getBoundingClientRect();
+    if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) dialog.close();
+  } });
+  window.addEventListener('beforeprint', () => { if (dialog.open) dialog.close(); });
+}
+
 // ==== ui/sheet-view.js ====
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -11622,6 +11847,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
+  const panelTraces = isWeekday ? [
+    ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...chanukahPageDays.flatMap(serial => {
+      const day = chanukahShacharisDay(serial, settings);
+      return [...day.lines, zman('נץ', day.netz)];
+    }),
+  ] : [];
 
   const rows = pageWeeks
     .map((week, weekIdx) => {
@@ -11663,7 +11895,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              the arithmetic. */
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
-            <div class="shacharis-panel"><div class="shacharis-panel-in">${panelLaid}</div></div></td>`;
+            <div class="shacharis-panel"><div class="shacharis-panel-in"${timeExplanationAttrs({ header: 'שחרית', chartName: 'Weekday chart', printed: panelHtml, times: panelTraces })}>${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a
@@ -11679,7 +11911,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -11694,7 +11926,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // data-season records which season this *page* rendered as, so a later edit
         // (see the blur handler below) recomputes its "did this really change?"
         // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -11868,12 +12100,14 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   page.querySelectorAll('.cell').forEach((cellEl) => {
     cellEl.addEventListener('keydown', (e) => {
+      if (cellEl.contentEditable !== 'true') return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
         e.preventDefault();
         document.execCommand('underline');
       }
     });
     cellEl.addEventListener('blur', () => {
+      if (cellEl.contentEditable !== 'true') return;
       applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
       commitCell(cellEl);
     });
@@ -11974,6 +12208,7 @@ function nl2br(str) {
 // A poster is a real 8.5in by 11in page in the document, the same way a chart page is, so
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
+
 
 
 
@@ -12868,7 +13103,7 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
   const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
-  return `${body}${escAttr(t.mark || '')}`;
+  return posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
 }
 
 /** A זמן given both ways, set as two little columns: the name of each reckoning over its own
@@ -12956,7 +13191,7 @@ function renderShuvaPoster(poster, settings) {
   const body = `
     <h2 class="poster-title" lang="he">${escAttr(SHUVA_TEXT.title)}</h2>
     ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${escAttr(l)}</p>`).join('')}
-    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${escAttr(poster.drasha)}</bdi></p>` : ''}
+    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${timeHtml({ text: poster.drasha, trace: poster.drashaTrace, explanation: poster.explanation })}</bdi></p>` : ''}
     <p class="poster-mincha" lang="he"><span class="poster-row-label">${escAttr(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
@@ -12983,7 +13218,7 @@ function slichosBody(poster) {
     // with Hebrew now inside the run, the first strong character is the note's and auto would
     // turn the whole list around. Measured after the change, not assumed.
     const parts = r.times.map(timeHtml);
-    const note = r.note ? `<bdi class="poster-row-note">${escAttr(r.note)}</bdi>` : '';
+    const note = r.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace) || [], note: r.note })}>${escAttr(r.note)}</bdi>` : '';
     // On the left of the first time, which is the side it has always been on: it says that
     // מנין runs five minutes earlier on the days it names, so it belongs against that time
     // and not against the row's last one.
@@ -13085,7 +13320,7 @@ function renderVasikinPoster(poster, settings) {
   const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
     <div class="poster-rows is-dense">
       <div class="poster-times">
-        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '', trace: ln.trace }])).join('')}
       </div>
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
@@ -13320,7 +13555,7 @@ function sukkosRow(ln) {
 
      Joined to the first time by a non-breaking space, so the נץ and the מנין it is the נץ for
      can never be split across two lines. See onePageRows for where that showed. */
-  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
+  const note = ln.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: ln.label, printed: ln.note, times: ln.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: ln.note })}>${escAttr(ln.note)}</bdi>\u00A0` : '';
   const times = !ln.times.length
     ? note
     : isReckoned(ln.times)
@@ -13387,14 +13622,14 @@ function renderSukkosShuavaPoster(poster, settings) {
   const body = `
     <div class="poster-shuava">
       <h2 class="poster-shuava-head" lang="he">${escAttr(t.title)}</h2>
-      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
+      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi${timeExplanationAttrs({ header: t.title, printed: t.at, fixed: true })}>${escAttr(t.at)}</bdi></p>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
       <hr class="poster-shuava-rule">
       <!-- Where it is, spelled out. This sheet has no key on it and nothing on it is marked,
            so the words are the only thing that can say it; the schedule says it with a star
            instead and prints the name alone. -->
       <h2 class="poster-shuava-head" lang="he">${escAttr(`${t.mishna} ${t.mishnaWhere}`)}</h2>
-      <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
+      <p class="poster-shuava-line" dir="ltr"${timeExplanationAttrs({ header: t.mishna, printed: t.mishnaAt, fixed: true })}>${escAttr(t.mishnaAt)}</p>
       <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
     </div>`;
   return posterShell(settings, body, poster.legend || []);
@@ -13441,7 +13676,7 @@ function tzomGedaliaBody(poster) {
     `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
     ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
-        <bdi>${escAttr(s.note.text)}</bdi></p></div>`
+        <bdi>${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></p></div>`
     : `
     <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(s.head)}</h3>
@@ -13500,7 +13735,7 @@ const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
 function vasikinLine(row) {
   const { time } = row.vasikin;
   const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
-  return `<span class="poster-t">${escAttr(time)}</span>${rest}`;
+  return `<span class="poster-t">${timeHtml({ text: time, trace: row.vasikin.trace })}</span>${rest}`;
 }
 
 /** One group's own list of נץ times, each carrying its own "יום X" above it, asked for
@@ -13522,9 +13757,9 @@ function vasikinLine(row) {
  *  one span - a space joined into the string here would sit between the two bdi and could
  *  be read as part of either one. */
 function netzDaysHtml(netzDays) {
-  return netzDays.map(({ time, letters }) => {
+  return netzDays.map(({ time, letters, trace }) => {
     const label = `יום ${letters.map((l) => `${l}'`).join('/')}`;
-    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${escAttr(time)}</bdi></span>`;
+    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${timeHtml({ text: time, trace })}</bdi></span>`;
   }).join('');
 }
 
@@ -13760,7 +13995,7 @@ const namedDay = (heading, yomtov, days, sep) => {
   const parts = String(heading).split(sep);
   return days.includes(parts[0]) ? [`${parts[0]} ${yomtov}`, ...parts.slice(1)].join(sep) : heading;
 };
-const onePlain = (text) => [{ text, underlined: false, mark: '' }];
+const onePlain = (text, trace = null, explanation = '') => [{ text, underlined: false, mark: '', trace, explanation }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
  *  key, so adding a poster to the run and adding it here are the same word twice and a
@@ -13787,13 +14022,13 @@ const ONEPAGE_SECTIONS = {
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
     // of its own it is a line without a heading; here every line has a label already, so it
     // is a row like the rest.
-    ? { label: s.note.label, times: onePlain(s.note.text) }
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() })))],
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a
     // timetable, and it says nothing the heading over it and the word דרשה do not.
-    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha) : [] },
+    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha, p.drashaTrace, p.explanation) : [] },
     { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
   ])],
   yomkippur: (p) => [
@@ -13838,15 +14073,15 @@ const ONEPAGE_SECTIONS = {
   chanukah: (p) => {
     const shacharisRow = (row) => ({
       label: row.label,
-      times: [{ text: row.vasikin.time, underlined: false, mark: '' }, ...row.cells.slice(1)],
+      times: [{ text: row.vasikin.time, underlined: false, mark: '', trace: row.vasikin.trace }, ...row.cells.slice(1)],
     });
     // One row per day the row's own ותיקין time needed נץ to explain it (netzBlockLines'
     // own rows, on the full sheet), each day labelled rather than run together the way the
     // full sheet's own netzDaysHtml sets them under one heading - this sheet's own row
     // shape has no room for a label over every time, only one label a row.
-    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters }) => ({
+    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters, trace }) => ({
       label: `${CH_TEXT.netz} יום ${letters.map((l) => `${l}'`).join('/')}`,
-      times: [{ text: time, underlined: false, mark: '' }],
+      times: [{ text: time, underlined: false, mark: '', trace }],
     }));
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
@@ -13888,7 +14123,7 @@ function onePageRows(r) {
      space. They are two boxes with a space between them, and a column an inch and a half wide
      broke at that space: the הושענא רבה row came out with "(נץ 6:54)" alone on one line and the
      6:18 it is the נץ for on the next, which reads as a line about nothing. */
-  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi>\u00A0` : '';
+  const note = r.note ? `<bdi class="onepage-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: r.note })}>${escAttr(r.note)}</bdi>\u00A0` : '';
   // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
   // strong characters, so a note's Hebrew would otherwise turn the whole run around.
   //
@@ -18800,6 +19035,7 @@ function showToast(message) {
 
 
 
+
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
 const SHEET_FONT = 'Times New Roman';
@@ -18901,7 +19137,7 @@ function cellSource(value) {
  *  תפילה, was built and taken out again: it costs the שבת block above it several steps of type,
  *  measured at --op-scale 1.43 as rows against 1.22 as blocks, and the two halves of one sheet
  *  stopped looking like one sheet. */
-function sheetRow(label, value, sub = '', { split = false } = {}) {
+function sheetRow(label, value, sub = '', { split = false, explanation = '' } = {}) {
   const times = sheetCellHtml(value, { split });
   if (!times) return '';
   return `<div class="onepage-row">
@@ -18911,7 +19147,7 @@ function sheetRow(label, value, sub = '', { split = false } = {}) {
         // is reordered without it.
         sub ? ` <span class="onepage-sub"${hebrewLang(sub)}><bdi>${esc(sub)}</bdi></span>` : ''
       }</span>
-      <div class="onepage-times"><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
+      <div class="onepage-times"${explanation || timeExplanationAttrs({ header: label, printed: value, fixed: true })}><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
     </div>`;
 }
 
@@ -19016,15 +19252,16 @@ function sheetSections(showing, index, state, settings, withChol) {
     // candleLightingCell writes it. Split rather than parsed: the second line is the word and
     // the time together, so the word comes off and the time is what is left.
     const [candles, shkiaLine] = String(row.H ?? '').split('\n');
+    const explained = (key, label) => ({ explanation: chartExplanationAttrs(row, key, label, `Weekly schedule · ${week.parsha || ''}`) });
     const one = (key) => {
-      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles);
+      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles, '', explained('H', SHEET_TEXT.candles));
       if (key === 'shkia') {
-        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim());
+        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim(), '', explained('H', SHEET_TEXT.shkia));
       }
       const col = byKey.get(key);
       if (!col) return '';
       const { label, sub } = nameAndBasis(col.header);
-      return sheetRow(label, row[key], sub);
+      return sheetRow(label, row[key], sub, explained(key, label));
     };
     out.push([SHEET_TEXT.shabbos, plan.order.map(one)]);
   }
@@ -19037,7 +19274,8 @@ function sheetSections(showing, index, state, settings, withChol) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     // Split: the block's lines are two schedules rather than one run cut to fit a column, so
     // every break the chart gave a cell is kept. See sheetCellHtml.
-    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
+    const chol = (label, value, sub = '', key = null) => sheetRow(label, value, sub, { split: true,
+      explanation: key ? chartExplanationAttrs(wdRow, key, label, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }) : '' });
     // The everyday שחרית comes off a week where every morning already has a line of its own:
     // see weekdayMornings in posters/day.js.
     const mornings = weekSpecialShacharis(showing, state, settings);
@@ -19045,8 +19283,8 @@ function sheetSections(showing, index, state, settings, withChol) {
       mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
-      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings)),
-      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings)),
+      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings), '', 'C'),
+      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings), '', 'B'),
     ]]);
   }
   return out;
@@ -19859,6 +20097,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
 
 
 
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -20621,12 +20860,12 @@ function formatLabel(label) {
 }
 
 /** A label/time line. */
-function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
+function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '', explanation = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
     <span class="week-label"${hebrewLang(labelHtml || formatLabel(label))}>${labelHtml || formatLabel(label)}</span>
-    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}>${isHtml ? text : weekNl2br(text)}</span>
+    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}${explanation === true ? timeExplanationAttrs({ header: label, printed: text, fixed: true }) : explanation}>${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
 
@@ -21168,7 +21407,7 @@ function weekCardsHtml(showing, index, state, settings) {
       const value=shabbos.row[c.key], html=shabbos.overriddenKeys.has(c.key);
       if(value==null || value==='')continue;
       const parts=String(value).split('\n');
-      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
+      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key), explanation: chartExplanationAttrs(shabbos.row, c.key, label, `Weekly schedule · ${week.parsha || ''}`, { value: text })});
       if(!html && c.header.includes('פלג') && parts.length>1) {
         // The room used to be a bracketed word on the header's own line ("(למטה)",
         // "(בעזר\"נ)"), stripped back out here for the label, with a star added onto the
@@ -21191,11 +21430,11 @@ function weekCardsHtml(showing, index, state, settings) {
   const orderedRows=[...printRows.filter(r=>r.friday).sort((a,b)=>firstTime(a)-firstTime(b)),...printRows.filter(r=>!r.friday)];
   const shownPairs = new Set();
   const shabbosLines=orderedRows.map(r=>{
-    if (!r.pair) return line(r.label,r.text,r.html);
+    if (!r.pair) return line(r.label,r.text,r.html,false,'',r.explanation);
     if (shownPairs.has(r.pair)) return '';
     shownPairs.add(r.pair);
     const pair = printRows.filter(item=>item.pair===r.pair);
-    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html)).join('')}</div>`;
+    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html,false,'',item.explanation)).join('')}</div>`;
   }).join('');
 
   const weekday = weekdayChartFor(sheet, showing, state);
@@ -21227,7 +21466,7 @@ function weekCardsHtml(showing, index, state, settings) {
           ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
           // Through announced.js as well: see the same call in upcoming.js. A block is one
           // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true)
+          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true, '', chartExplanationAttrs(wdRow, c.key, c.header, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }))
       );
 
     // The second שחרית schedule, only on weeks that actually have one of those days,
@@ -22475,6 +22714,7 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
+installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
 const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
@@ -22525,7 +22765,7 @@ function readRoute() {
 
 // Back and forward. Our own writes come back through here too and are recognised as
 // already applied, so they do not cause a second render.
-window.addEventListener('hashchange', () => { if (adminStarted && readRoute()) render(); });
+window.addEventListener('hashchange', () => { if (adminStarted && tables && readRoute()) render(); });
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build

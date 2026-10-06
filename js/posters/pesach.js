@@ -16,14 +16,15 @@ import { roshHashana, excelWeekday, hebrewDateExtended } from '../hebrew-calenda
 import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, floorToMinute, roundToMinute, UL_START } from '../format.js';
+import { formatTime, floorToMinute } from '../format.js';
 import { SLASH } from '../util.js';
 import { buildKayitzRow, earlyMinchaPlag, hasEarlyPlag } from '../sheets/kayitz.js';
 import { parseTimes } from './slichos.js';
 import { twoReckonings } from './reckonings.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { everydayShacharis } from './yomkippur.js';
-import { chartTimes } from './chart-cell.js';
+import { chartTimes, chartLine } from './chart-cell.js';
+import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 
 const PS_MIN = 1 / 1440;
 const PS_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -33,12 +34,7 @@ const PS_FRIDAY = 6;
 const psAt = (h, m) => (h * 60 + m) * PS_MIN;
 /** Down to the last 5 minutes, up to the next, and to the nearest. Announced times are round
  *  fives; which way each one goes is said where it is used. */
-const psDown5 = (t) => Math.floor(t * 288 + 1e-9) / 288;
-const psUp5 = (t) => Math.ceil(t * 288 - 1e-9) / 288;
 const psNear5 = (t) => Math.round(t * 288) / 288;
-/** A day fraction snapped to the minute it prints as, so a comparison here and the sheet
- *  cannot disagree by a rounding. */
-const psPrinted = (t) => Math.round(t * 1440) / 1440;
 
 /** Which day of ניסן each part of the sheet is. */
 const PS_BEDIKA = 13;    // the night bedikas chometz is on, in a year where 14 is not Shabbos
@@ -69,6 +65,9 @@ const PS_NEILA_BEFORE = 45;
 
 const psSerial = (rh, day) => rh + day - 1;
 const psShkia = (serial, settings) => Z.sunsetElev(dateFromSerial(serial), settings);
+const psShkiaTrace = (serial, settings) => zman('שקיעה', psShkia(serial, settings),
+  `at the shul's elevation on ${dateFromSerial(serial).toISOString().slice(0, 10)}`);
+const psStandingTrace = (h, m) => clockTime(h, m, 'the standing time on the Pesach schedule');
 
 /** 15 ניסן of a Hebrew year, as a serial.
  *
@@ -163,9 +162,9 @@ export const PS_TEXT = {
 /** The מנחה run of a יום טוב afternoon: the three fixed ones, then the last worked from that
  *  day's own שקיעה. */
 function pesachDayMincha(serial, settings) {
+  const trace = psShkiaTrace(serial, settings).minus(PS_LAST_MINCHA).round();
   return [...parseTimes(PS_TEXT.dayMincha),
-    { text: formatTime(psPrinted(psShkia(serial, settings) - PS_LAST_MINCHA * PS_MIN)),
-      underlined: false, mark: '' }];
+    { text: trace.plain(), underlined: false, mark: '', trace }];
 }
 
 /** The חול המועד days that keep the everyday schedule: not Shabbos, and not a Friday, which
@@ -186,20 +185,25 @@ export function pesachChmDays(rh) {
  *  Everything is למטה except the 1:50, as on all five sheets. */
 export function pesachChmMincha(days, settings) {
   const earliest = Math.min(...days.map((s) => psShkia(s, settings)));
-  const last = psDown5(earliest - 15 * PS_MIN);
-  const out = [{ t: psAt(13, 35), u: true }, { t: psAt(13, 50) }, { t: psAt(16, 15), u: true }];
+  const lastTrace = zman('שקיעה', earliest, 'the earliest sunset of the Chol Hamoed weekdays this schedule covers').minus(15).floorToStep(5);
+  const last = lastTrace.value;
+  const out = [{ t: psAt(13, 35), u: true, trace: psStandingTrace(13, 35) },
+    { t: psAt(13, 50), trace: psStandingTrace(13, 50) }, { t: psAt(16, 15), u: true, trace: psStandingTrace(16, 15) }];
   const run = [];
   for (let t = psAt(18, 0); t <= last + 1e-9; t += 20 * PS_MIN) {
-    if (last - t >= 15 * PS_MIN - 1e-9) run.push(t);
+    if (last - t >= 15 * PS_MIN - 1e-9) run.push({ t, trace: psStandingTrace(18, 0)
+      .plus(Math.round((t - psAt(18, 0)) / PS_MIN), 'the standing run advances in 20-minute slots')
+      .onlyWhen(true, 'this slot leaves at least 15 minutes before the last minyan') });
   }
-  const before = run.length ? run[run.length - 1] : psAt(16, 15);
+  const before = run.length ? run[run.length - 1].t : psAt(16, 15);
   if (last - before > 20 * PS_MIN + 1e-9) {
     const fill = [20, 15].map((m) => last - m * PS_MIN)
       .find((t) => t - before >= 15 * PS_MIN - 1e-9);
-    if (fill !== undefined) run.push(fill);
+    if (fill !== undefined) run.push({ t: fill, trace: lastTrace.minus(Math.round((last - fill) / PS_MIN),
+      'an extra minyan fills the gap left after the standing run') });
   }
-  for (const t of run) out.push({ t, u: true });
-  out.push({ t: last, u: true });
+  for (const item of run) out.push({ ...item, u: true });
+  out.push({ t: last, u: true, trace: lastTrace });
   return out;
 }
 
@@ -221,9 +225,11 @@ const PS_CHM_MAARIV = [[20, 45, false], [21, 30, true], [22, 0, true], [22, 30, 
   [23, 0, true], [23, 30, true], [24, 0, true]];
 export function pesachChmMaariv(days, settings) {
   const latest = Math.max(...days.map((s) => psShkia(s, settings)));
-  const first = psUp5(latest + 50 * PS_MIN);
-  return [{ t: first, u: true },
-    ...PS_CHM_MAARIV.map(([h, m, u]) => ({ t: psAt(h, m), u }))
+  const firstTrace = zman('שקיעה', latest, 'the latest sunset of the Chol Hamoed weekdays this schedule covers').plus(50).ceilToStep(5);
+  const first = firstTrace.value;
+  return [{ t: first, u: true, trace: firstTrace },
+    ...PS_CHM_MAARIV.map(([h, m, u]) => ({ t: psAt(h, m), u, trace: psStandingTrace(h, m)
+      .onlyWhen(true, 'this standing time leaves at least 15 minutes after the first minyan') }))
       .filter((g) => g.t - first >= 15 * PS_MIN - 1e-9)];
 }
 
@@ -237,19 +243,26 @@ export function buildPesachPoster(year, settings) {
   const shkiaOf = (n) => psShkia(day(n), settings);
   const isShabbos = (n) => excelWeekday(day(n)) === PS_SHABBOS;
 
-  const tm = (t, underlined = false, mark = '') => ({ text: formatTime(t), underlined, mark });
-  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark });
+  const tm = (t, underlined = false, mark = '') => {
+    let trace = t?.steps ? t : null;
+    if (trace && underlined) trace = trace.underline();
+    if (trace && mark) trace = trace.mark(mark);
+    return { text: trace ? trace.plain() : formatTime(t), underlined, mark, trace };
+  };
+  const txt = (s, underlined = false, mark = '') => ({ text: s, underlined, mark,
+    trace: fixedTime(s, { label: 'the approximate time announced on the Pesach schedule' }) });
   const line = (label, times, opts = {}) => ({ label, times, ...opts });
-  const list = (items) => items.map((x) => tm(x.t, Boolean(x.u), x.mark || ''));
+  const list = (items) => items.map((x) => tm(x.trace || x.t, Boolean(x.u), x.mark || ''));
 
   const bothWays = (serial) => twoReckonings(
     Z.sofZmanShmaMGA72(dateFromSerial(serial), settings),
     Z.sofZmanShmaGRA(dateFromSerial(serial), settings)
-  ).map((r) => ({ ...tm(r.at), name: r.name }));
+  ).map((r) => ({ ...tm(zman(`סוף זמן קריאת שמע ${r.name}`, r.at,
+    r.name.includes('מ') ? 'three proportional hours from alos 72 to tzais 72' : 'three proportional hours from sunrise to sunset')), name: r.name }));
   /** חצות הלילה of the night that opens a day, which is what the seder is timed against.
    *  Solar noon of that night's own day plus twelve hours. */
   const chatzosLine = (nightDay) => line(PS_TEXT.chatzos,
-    [tm(Z.solarNoon(dateFromSerial(day(nightDay)), settings) + 0.5)], { calc: 'chatzos' });
+    [tm(zman('חצות היום', Z.solarNoon(dateFromSerial(day(nightDay)), settings)).plus(720, 'twelve hours later is midnight'))], { calc: 'chatzos' });
 
   const M = minyanList();
   const blocks = [];
@@ -294,7 +307,7 @@ export function buildPesachPoster(year, settings) {
     at: bedikaOn,
     heading: PS_TEXT.bedika,
     lines: [line(PS_TEXT.maariv,
-      [tm(psShkia(bedikaOn, settings) + 50 * PS_MIN), ...parseTimes(PS_TEXT.bedikaLate)],
+      [tm(psShkiaTrace(bedikaOn, settings).plus(50)), ...parseTimes(PS_TEXT.bedikaLate)],
       { calc: 'bedikaMaariv' })],
   });
   M.at(bedikaOn, PS_TEXT.maariv, psShkia(bedikaOn, settings) + 50 * PS_MIN);
@@ -316,8 +329,8 @@ export function buildPesachPoster(year, settings) {
       heading: heading(PS_TEXT.erev, PS_EREV) + (eiruvDay1 ? ' · ' + EIRUV_LABEL : ''),
       lines: [
         line(PS_TEXT.shacharis, everydayShacharis(), { calc: 'erevShacharis' }),
-        line(PS_TEXT.achila, [tm(alos + 4 * hour)], { calc: 'achila' }),
-        line(PS_TEXT.biur, [tm(alos + 5 * hour)], { calc: 'biur' }),
+        line(PS_TEXT.achila, [tm(zman('סוף זמן אכילת חמץ מ״א', alos + 4 * hour, 'four proportional hours into the day measured from alos 72 to tzais 72'))], { calc: 'achila' }),
+        line(PS_TEXT.biur, [tm(zman('סוף זמן ביעור חמץ מ״א', alos + 5 * hour, 'five proportional hours into the day measured from alos 72 to tzais 72'))], { calc: 'biur' }),
         // The afternoon is the ערב יום טוב run, and on a year where ערב פסח is Shabbos there is
         // no such run: that afternoon is Shabbos's own and the board carries it.
         erevShabbos ? null
@@ -339,16 +352,20 @@ export function buildPesachPoster(year, settings) {
     const candles = shkia - settings.candleLightingMinutes * PS_MIN;
     const maariv = shkia + 50 * PS_MIN;
     const on = day(nightDay);
+    const nightTrace = psShkiaTrace(on, settings);
+    const candleTrace = nightTrace.minus(settings.candleLightingMinutes, 'the candle-lighting setting');
+    const maarivTrace = nightTrace.plus(50);
     const out = [
-      line(PS_TEXT.candles, [tm(candles)], { calc: 'candles' }),
-      line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }),
-      line(PS_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
+      line(PS_TEXT.candles, [tm(candleTrace)], { calc: 'candles' }),
+      line(PS_TEXT.mincha, [tm(candleTrace.plus(3, 'three minutes after candle lighting'))], { calc: 'candlesMincha' }),
+      line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
     ];
     if (drasha) {
       out.push(line(PS_TEXT.drasha,
-        [tm(psDown5(roundToMinute(maariv) - PS_DRASHA_BEFORE * PS_MIN))], { calc: 'drasha', wrap: true }));
+        [tm(maarivTrace.round().minus(PS_DRASHA_BEFORE, 'before the printed Maariv time').floorToStep(5))], { calc: 'drasha', wrap: true }));
     }
-    out.push(line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
+    out.push(line(PS_TEXT.maariv, [tm(maarivTrace)], { calc: 'nightMaariv',
+      noteTimes: [tm(nightTrace.plus(72))],
       note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }));
     // A זמן rather than a מנין, so its own list: see `zman` in posters/minyanim.js.
     M.zman(on, PS_TEXT.candles, candles);
@@ -369,7 +386,7 @@ export function buildPesachPoster(year, settings) {
       // The מנחה is a מנין; the פלג beside it is the זמן it is set against and is not one.
       M.at(friday, PS_TEXT.mincha, e.mincha, { underlined: e.underlined, mark: e.mark });
       return line(`${PS_TEXT.earlyMincha} ${e.name}`,
-        [tm(e.mincha, e.underlined, e.mark), tm(e.plag)], { calc: 'earlyMincha' });
+        [tm(e.trace.mincha, e.underlined, e.mark), tm(e.trace.plag)], { calc: 'earlyMincha' });
     })
     : []);
 
@@ -401,15 +418,18 @@ export function buildPesachPoster(year, settings) {
     const shkia = shkiaOf(PS_DAY1);
     const maariv = shkia + 50 * PS_MIN;
     const on = day(PS_DAY1);
+    const nightTrace = psShkiaTrace(on, settings);
+    const maarivTrace = nightTrace.plus(50);
     blocks.push({
       at: day(PS_DAY2),
       heading: heading(PS_TEXT.day2, PS_DAY2),
       lines: [
-        line(PS_TEXT.shkia, [tm(shkia)], { calc: 'nightShkia' }),
-        line(PS_TEXT.shiur, [tm(psDown5(roundToMinute(maariv) - 20 * PS_MIN))], { calc: 'shiur', wrap: true }),
-        line(PS_TEXT.maariv, [tm(maariv)], { calc: 'nightMaariv',
+        line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
+        line(PS_TEXT.shiur, [tm(maarivTrace.round().minus(20, 'before the printed Maariv time').floorToStep(5))], { calc: 'shiur', wrap: true }),
+        line(PS_TEXT.maariv, [tm(maarivTrace)], { calc: 'nightMaariv',
+          noteTimes: [tm(nightTrace.plus(72))],
           note: `(${PS_TEXT.tzais} ${formatTime(shkia + 72 * PS_MIN)})` }),
-        line(PS_TEXT.maarivLmata, [tm(shkia + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.maarivLmata, [tm(nightTrace.plus(72), true)], { calc: 'maarivLmata' }),
         chatzosLine(PS_DAY1),
         ...morningLines(PS_DAY2, PS_TEXT.yomTovShacharis),
         line(PS_TEXT.mincha, pesachDayMincha(day(PS_DAY2), settings), { calc: 'dayMincha' }),
@@ -418,7 +438,7 @@ export function buildPesachPoster(year, settings) {
         // the שבת חול המועד block gives the night instead.
         day2Friday ? null
           : line(PS_TEXT.maariv,
-            [tm(shkiaOf(PS_DAY2) + 60 * PS_MIN), tm(shkiaOf(PS_DAY2) + 72 * PS_MIN, true)],
+            [tm(psShkiaTrace(day(PS_DAY2), settings).plus(60)), tm(psShkiaTrace(day(PS_DAY2), settings).plus(72), true)],
             { calc: 'motzeiMaariv', sub: PS_TEXT.vsenBracha }),
       ].filter(Boolean),
     });
@@ -466,6 +486,8 @@ export function buildPesachPoster(year, settings) {
     const row = buildKayitzRow({ serial: shabbosChm, specialParsha: '' }, settings);
     const shkia = floorToMinute(Z.sunsetElev(dateFromSerial(friday), settings));
     const candles = shkia - settings.candleLightingMinutes * PS_MIN;
+    const shkiaTrace = psShkiaTrace(friday, settings).floor();
+    const candleTrace = shkiaTrace.minus(settings.candleLightingMinutes, 'the candle-lighting setting');
     const erev = friday > day(PS_DAY2);
     const lines = [];
     if (erev) {
@@ -474,15 +496,15 @@ export function buildPesachPoster(year, settings) {
     // Only where that Friday is an ordinary weekday. In a year where יום ב' is the Friday
     // there is nothing to bring in early from: the day is already יום טוב.
     if (erev) lines.push(...earlyLines(friday));
-    lines.push(line(PS_TEXT.candles, [tm(candles)], { calc: 'shabbosCandles' }));
-    if (erev) lines.push(line(PS_TEXT.mincha, [tm(candles + 3 * PS_MIN)], { calc: 'candlesMincha' }));
-    lines.push(line(PS_TEXT.shkia, [tm(shkia)], { calc: 'shabbosShkia' }));
-    lines.push(line(PS_TEXT.maariv, [tm(shkia + 20 * PS_MIN)], { calc: 'shabbosMaariv',
-      extra: { label: PS_TEXT.maarivLmata, times: chartTimes(row.F) } }));
-    lines.push(line(PS_TEXT.shacharis, chartTimes(row.E), { calc: 'shabbosShacharis' }));
+    lines.push(line(PS_TEXT.candles, [tm(candleTrace)], { calc: 'shabbosCandles' }));
+    if (erev) lines.push(line(PS_TEXT.mincha, [tm(candleTrace.plus(3, 'after candle lighting'))], { calc: 'candlesMincha' }));
+    lines.push(line(PS_TEXT.shkia, [tm(shkiaTrace)], { calc: 'shabbosShkia' }));
+    lines.push(line(PS_TEXT.maariv, [tm(shkiaTrace.plus(20))], { calc: 'shabbosMaariv',
+      extra: { label: PS_TEXT.maarivLmata, times: chartLine(row.F, row.traces.F) } }));
+    lines.push(line(PS_TEXT.shacharis, chartLine(row.E, row.traces.E), { calc: 'shabbosShacharis' }));
     lines.push(line(PS_TEXT.krias, bothWays(shabbosChm), { calc: 'krias' }));
-    lines.push(line(PS_TEXT.mincha, chartTimes(row.C), { calc: 'shabbosMincha' }));
-    lines.push(line(PS_TEXT.maariv, chartTimes(row.B), { calc: 'shabbosMotzei',
+    lines.push(line(PS_TEXT.mincha, chartLine(row.C, row.traces.C), { calc: 'shabbosMincha' }));
+    lines.push(line(PS_TEXT.maariv, chartLine(row.B, row.traces.B), { calc: 'shabbosMotzei',
       ...(day2Friday ? { sub: PS_TEXT.vsenBracha } : {}) }));
     blocks.push({
       at: shabbosChm,
@@ -519,7 +541,7 @@ export function buildPesachPoster(year, settings) {
         // bring in early from.
         ...(erevShabbos ? [] : earlyLines(day(PS_SHVII) - 1)),
         ...eveningLines(PS_SHVII - 1),
-        line(PS_TEXT.maarivLmata, [tm(shkiaOf(PS_SHVII - 1) + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.maarivLmata, [tm(psShkiaTrace(day(PS_SHVII) - 1, settings).plus(72), true)], { calc: 'maarivLmata' }),
         ...morningLines(n, PS_TEXT.lastDaysShacharis),
         line(PS_TEXT.mincha, pesachDayMincha(day(n), settings), { calc: 'dayMincha' }),
       ].filter(Boolean),
@@ -536,19 +558,21 @@ export function buildPesachPoster(year, settings) {
     const nightShkia = shkiaOf(PS_SHVII);
     const dayShkia = shkiaOf(PS_ACHRON);
     const neila = psNear5(dayShkia - PS_NEILA_BEFORE * PS_MIN);
+    const nightTrace = psShkiaTrace(day(PS_SHVII), settings);
+    const dayTrace = psShkiaTrace(day(PS_ACHRON), settings);
     blocks.push({
       at: day(n),
       heading: heading(PS_TEXT.achron, n),
       lines: [
-        line(PS_TEXT.shkia, [tm(nightShkia)], { calc: 'nightShkia' }),
-        line(PS_TEXT.maariv, [tm(nightShkia + 50 * PS_MIN)], { calc: 'nightMaariv' }),
-        line(PS_TEXT.maarivLmata, [tm(nightShkia + 72 * PS_MIN, true)], { calc: 'maarivLmata' }),
+        line(PS_TEXT.shkia, [tm(nightTrace)], { calc: 'nightShkia' }),
+        line(PS_TEXT.maariv, [tm(nightTrace.plus(50))], { calc: 'nightMaariv' }),
+        line(PS_TEXT.maarivLmata, [tm(nightTrace.plus(72), true)], { calc: 'maarivLmata' }),
         ...morningLines(n, PS_TEXT.lastDaysShacharis),
         line(PS_TEXT.yizkor, [txt(PS_TEXT.yizkorAt)], { calc: 'yizkor' }),
         line(PS_TEXT.mincha, pesachDayMincha(day(n), settings), { calc: 'dayMincha' }),
-        line(PS_TEXT.neila, [tm(neila)], { calc: 'neila' }),
+        line(PS_TEXT.neila, [tm(dayTrace.minus(PS_NEILA_BEFORE).roundToStep(5))], { calc: 'neila' }),
         line(PS_TEXT.maariv,
-          [tm(dayShkia + 60 * PS_MIN), tm(dayShkia + 72 * PS_MIN, true)],
+          [tm(dayTrace.plus(60)), tm(dayTrace.plus(72), true)],
           { calc: 'motzeiMaariv' }),
       ],
     });

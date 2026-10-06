@@ -37,6 +37,7 @@ import { weekdayMornings } from '../posters/day.js';
 import { hebrewLang, escAttr, SOFT_SLASH } from '../util.js';
 import { fontStackFor } from './sheet-view.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
+import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 
 /** The same face the posters are set in, for the same reason: a sheet is its own document
  *  and does not change when somebody picks a different font for the board. */
@@ -139,7 +140,7 @@ function cellSource(value) {
  *  תפילה, was built and taken out again: it costs the שבת block above it several steps of type,
  *  measured at --op-scale 1.43 as rows against 1.22 as blocks, and the two halves of one sheet
  *  stopped looking like one sheet. */
-function sheetRow(label, value, sub = '', { split = false } = {}) {
+function sheetRow(label, value, sub = '', { split = false, explanation = '' } = {}) {
   const times = sheetCellHtml(value, { split });
   if (!times) return '';
   return `<div class="onepage-row">
@@ -149,7 +150,7 @@ function sheetRow(label, value, sub = '', { split = false } = {}) {
         // is reordered without it.
         sub ? ` <span class="onepage-sub"${hebrewLang(sub)}><bdi>${esc(sub)}</bdi></span>` : ''
       }</span>
-      <div class="onepage-times"><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
+      <div class="onepage-times"${explanation || timeExplanationAttrs({ header: label, printed: value, fixed: true })}><bdi class="onepage-line" dir="ltr">${times}</bdi></div>
     </div>`;
 }
 
@@ -254,15 +255,16 @@ function sheetSections(showing, index, state, settings, withChol) {
     // candleLightingCell writes it. Split rather than parsed: the second line is the word and
     // the time together, so the word comes off and the time is what is left.
     const [candles, shkiaLine] = String(row.H ?? '').split('\n');
+    const explained = (key, label) => ({ explanation: chartExplanationAttrs(row, key, label, `Weekly schedule · ${week.parsha || ''}`) });
     const one = (key) => {
-      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles);
+      if (key === 'candles') return sheetRow(SHEET_TEXT.candles, candles, '', explained('H', SHEET_TEXT.candles));
       if (key === 'shkia') {
-        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim());
+        return sheetRow(SHEET_TEXT.shkia, String(shkiaLine ?? '').replace(SHEET_TEXT.shkia, '').trim(), '', explained('H', SHEET_TEXT.shkia));
       }
       const col = byKey.get(key);
       if (!col) return '';
       const { label, sub } = nameAndBasis(col.header);
-      return sheetRow(label, row[key], sub);
+      return sheetRow(label, row[key], sub, explained(key, label));
     };
     out.push([SHEET_TEXT.shabbos, plan.order.map(one)]);
   }
@@ -275,7 +277,8 @@ function sheetSections(showing, index, state, settings, withChol) {
     const { row: wdRow } = mergeRow(buildWeekdayRow(weekdayWeek, settings), weekday, showing);
     // Split: the block's lines are two schedules rather than one run cut to fit a column, so
     // every break the chart gave a cell is kept. See sheetCellHtml.
-    const chol = (label, value, sub = '') => sheetRow(label, value, sub, { split: true });
+    const chol = (label, value, sub = '', key = null) => sheetRow(label, value, sub, { split: true,
+      explanation: key ? chartExplanationAttrs(wdRow, key, label, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }) : '' });
     // The everyday שחרית comes off a week where every morning already has a line of its own:
     // see weekdayMornings in posters/day.js.
     const mornings = weekSpecialShacharis(showing, state, settings);
@@ -283,8 +286,8 @@ function sheetSections(showing, index, state, settings, withChol) {
       mornings.everydayStands ? chol('שחרית', WEEKDAY_SHACHARIS) : '',
       ...mornings.lines.map((s) => chol(s.label, s.html, s.days)),
       // Both through announced.js, the same as the card and "what is on next": see there.
-      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings)),
-      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings)),
+      chol('מנחה', announcedWeekCell(wdRow.C, 'C', showing, settings), '', 'C'),
+      chol('מעריב', announcedWeekCell(wdRow.B, 'B', showing, settings), '', 'B'),
     ]]);
   }
   return out;

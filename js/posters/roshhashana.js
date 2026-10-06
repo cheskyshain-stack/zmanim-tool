@@ -275,7 +275,7 @@ export function buildRoshHashanaPoster(year, settings) {
     erevHeading: RH_TEXT.erevHeading + (eiruv ? ' · ' + EIRUV_LABEL : ''),
     erevLines: [
       { label: RH_TEXT.slichos.label, times: parseTimes(RH_TEXT.slichos.times) },
-      { label: RH_TEXT.chatzos, times: [{ text: formatTime(floorToMinute(Z.solarNoon(erev, settings))), underlined: false, mark: '' }] },
+      { label: RH_TEXT.chatzos, times: [tmT(zman('חצות', Z.solarNoon(erev, settings), 'solar noon on Erev Rosh Hashana').floor())] },
       { label: RH_TEXT.erevMincha.label, times: parseTimes(RH_TEXT.erevMincha.times) },
 
     ],

@@ -7,7 +7,8 @@ import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh,
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
-import { chanukahShabbosLabel, chanukahPanelBlocks } from '../posters/chanukah.js';
+import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay } from '../posters/chanukah.js';
+import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { hebrewLang, escText, escAttr } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
@@ -24,6 +25,7 @@ import {
 import { applyTimeShorthand } from './rich-text.js';
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
+import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -661,6 +663,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
+  const panelTraces = isWeekday ? [
+    ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...chanukahPageDays.flatMap(serial => {
+      const day = chanukahShacharisDay(serial, settings);
+      return [...day.lines, zman('נץ', day.netz)];
+    }),
+  ] : [];
 
   const rows = pageWeeks
     .map((week, weekIdx) => {
@@ -702,7 +711,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
              the arithmetic. */
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
-            <div class="shacharis-panel"><div class="shacharis-panel-in">${panelLaid}</div></div></td>`;
+            <div class="shacharis-panel"><div class="shacharis-panel-in"${timeExplanationAttrs({ header: 'שחרית', chartName: 'Weekday chart', printed: panelHtml, times: panelTraces })}>${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
         // schedule (see sheets/weekday.js) and still editable on top, so typing over a
@@ -718,7 +727,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Overridden cells already hold real HTML (captured from the editable div,
@@ -733,7 +742,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // data-season records which season this *page* rendered as, so a later edit
         // (see the blur handler below) recomputes its "did this really change?"
         // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
@@ -907,12 +916,14 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
 
   page.querySelectorAll('.cell').forEach((cellEl) => {
     cellEl.addEventListener('keydown', (e) => {
+      if (cellEl.contentEditable !== 'true') return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
         e.preventDefault();
         document.execCommand('underline');
       }
     });
     cellEl.addEventListener('blur', () => {
+      if (cellEl.contentEditable !== 'true') return;
       applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
       commitCell(cellEl);
     });
@@ -995,4 +1006,3 @@ function nl2br(str) {
     .split(SMALL_END).join('</span>');
   return smalled.replace(/\n/g, '<br>');
 }
-

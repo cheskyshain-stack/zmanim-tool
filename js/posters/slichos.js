@@ -294,11 +294,15 @@ export function parseTimes(str) {
 export function buildSlichosPoster(hebrewYearNum) {
   if (!hebrewYearNum) return null;
   const days = posterDays(hebrewYearNum);
-  const rows = SLICHOS_ROWS.map((row) => ({
-    label: row.label,
-    times: parseTimes(row.times),
-    note: row.days ? kriasHatorahNote(days[row.days], row.earlier) : '',
-  }));
+  const rows = SLICHOS_ROWS.map((row) => {
+    const note = row.days ? kriasHatorahNote(days[row.days], row.earlier) : '';
+    const times = parseTimes(row.times);
+    const noteTimes = note ? [{ text: row.earlier, trace: fixedTime(row.earlier, {
+      label: 'the earlier morning time set for the Torah-reading days named on this line',
+    }).onlyWhen(true, note) }] : [];
+    if (note) times[0].explanation = `The first minyan runs at ${row.earlier} on the Torah-reading days named on this line: ${note}`;
+    return { label: row.label, times, note, noteTimes };
+  });
   const all = rows.flatMap((r) => r.times);
 
   // Only the marks that are actually on this poster get explained, same as שבת שובה. The

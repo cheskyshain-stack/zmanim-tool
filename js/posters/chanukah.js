@@ -175,7 +175,7 @@ function chanukahMaariv(hebrewYear, settings) {
  *  morning earlier than 6:50, which the sheet does not do, and a year (תשצ"ג) where the same
  *  thing happened to Rosh Chodesh's own morning - 6:37, 23 minutes ahead of the 7:00 beside
  *  it - which asked for its own floor rather than none at all. */
-function chanukahShacharisDay(serial, settings) {
+export function chanukahShacharisDay(serial, settings) {
   const netz = Z.sunriseElev(dateFromSerial(serial), settings);
   const rchLabel = hasRoshChodesh(serial, settings);
   const isRoshChodesh = Boolean(rchLabel);
@@ -233,7 +233,8 @@ export const toCell = (t) => ({ text: t.plain(), underlined: Boolean(t.flags.und
  *  the first instance, since every instance at one position is always the same room. */
 function mergedCell(traces) {
   const texts = [...new Set(traces.map((t) => t.plain()))];
-  return { text: texts.join(SLASH), underlined: Boolean(traces[0].flags.underlined), mark: traces[0].flags.mark || '' };
+  return { text: texts.join(SLASH), underlined: Boolean(traces[0].flags.underlined), mark: traces[0].flags.mark || '',
+    traces: texts.map(text => traces.find(t => t.plain() === text)) };
 }
 
 const HE_DAY_LETTERS = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'];
@@ -299,7 +300,7 @@ function netzDayGroups(bound) {
     if (!byTime.has(time)) { byTime.set(time, []); order.push(time); }
     byTime.get(time).push(dayLetter(d.serial));
   }
-  return order.map((time) => ({ time, letters: byTime.get(time) }));
+  return order.map((time) => ({ time, letters: byTime.get(time), trace: zman('נץ', bound.find(d => formatTimeWithSeconds(d.netz) === time).netz) }));
 }
 
 /** The floored average of a set of days' own raw candidates (`rawVasikinCandidate`), the
@@ -317,11 +318,16 @@ const averageBetween = (group) => floorToMinute(group.reduce((sum, d) => sum + r
  *  rows are two rows rather than one. The נץ note still comes off this row's own days
  *  regardless, since it is naming which of them נץ actually explains, not what the row's own
  *  time happens to equal. */
-export function chanukahVasikinBetween(group, sharedBetween) {
+export function chanukahVasikinBetween(group, sharedBetween, sharedGroup) {
   const between = sharedBetween !== undefined ? sharedBetween : averageBetween(group);
   const bound = group.filter((d) => d.netzBinding);
   const netzDays = bound.length ? netzDayGroups(bound) : null;
-  return { time: formatTime(between), netzDays };
+  const source = sharedGroup || group;
+  const average = source.reduce((sum, d) => sum + rawVasikinCandidate(d), 0) / source.length;
+  const trace = zman('average morning time', average,
+    'Average the daily candidates at full precision: each day uses the later of sunrise minus 25 minutes and 7:00 minus 10 minutes (ordinary days) or 20 minutes (Rosh Chodesh). Candidates: '
+    + source.map(d => `${dateFromSerial(d.serial).toISOString().slice(0, 10)} ${formatTime(rawVasikinCandidate(d))}`).join(', ')).floor();
+  return { time: formatTime(between), netzDays, trace };
 }
 
 /** One row for every one of the eight days that is not Rosh Chodesh, together, and one more
@@ -376,7 +382,7 @@ export function combineShacharisRows(days) {
   const shared = allPushed ? averageBetween(days) : undefined;
   const row = (group, label) => {
     const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared) };
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared, allPushed ? days : undefined) };
   };
   const rows = [];
   if (other.length) rows.push(row(other, `יום ${dayList(other)}`));

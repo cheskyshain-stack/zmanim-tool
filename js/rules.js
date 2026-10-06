@@ -21,6 +21,8 @@
 // week.hebrew ({month, dayOfMonth}) is attached by the caller - see sheet-view.js. It
 // isn't stored on saved sheets, so it's computed at render time and works for sheets
 // generated before hebrewDate conditions existed.
+import { enteredTimeTraces } from './zmanim/trace.js';
+
 function conditionMatches(condition, week) {
   // A rule with no condition at all matches nothing. Saved rules always carry one, but an
   // import need not: an older export, or a file edited by hand, and reading .always off
@@ -145,9 +147,11 @@ export function applyRules(row, week, rules, season, appliedColumns) {
       if (!(col in out)) continue;
       if (out === row) out = { ...row };
       out[col] = rule.mode === 'append' ? [out[col], rule.value].filter(Boolean).join('\n') : rule.value;
+      const entered = enteredTimeTraces(rule.value, `Entered by admin rule${rule.name ? `: ${rule.name}` : ''}`);
+      out.traces = { ...out.traces, [col]: [...(rule.mode === 'append' ? out.traces?.[col] || [] : []), ...entered] };
+      out.traceNotes = { ...out.traceNotes, [col]: `An admin rule ${rule.mode === 'append' ? 'adds to' : 'replaces'} this cell${rule.name ? `: ${rule.name}` : '.'}` };
       if (appliedColumns) appliedColumns.add(col);
     }
   }
   return out;
 }
-

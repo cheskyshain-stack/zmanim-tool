@@ -16,6 +16,7 @@ import { renderStatus } from './ui/status-view.js';
 import { renderAdminHome, ADMIN_NAV_SECTIONS, ADMIN_TAB_LABELS } from './ui/admin-home.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
+import { installTimeExplanations } from './ui/time-explanations.js';
 
 const state = loadState();
 let tables = null;
@@ -53,6 +54,7 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
+installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
 const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
@@ -103,7 +105,7 @@ function readRoute() {
 
 // Back and forward. Our own writes come back through here too and are recognised as
 // already applied, so they do not cause a second render.
-window.addEventListener('hashchange', () => { if (adminStarted && readRoute()) render(); });
+window.addEventListener('hashchange', () => { if (adminStarted && tables && readRoute()) render(); });
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
@@ -416,5 +418,3 @@ function start() {
    What this is and is not worth is written at the top of ui/lock.js. */
 if (isOpen()) start();
 else renderLock(main, start);
-
-

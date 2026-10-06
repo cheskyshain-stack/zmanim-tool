@@ -25,8 +25,9 @@
 import { dateFromHebrew, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, roundToMinute, floorToMinute, ceilToMinute } from '../format.js';
+import { roundToMinute, floorToMinute, ceilToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { zman } from '../zmanim/trace.js';
 
 /** The months, as the Hebrew date counts them: Nisan is 1, the way rules count them too.
  *  Both Adars are offered; a plain year has neither and takes אדר. */
@@ -114,11 +115,24 @@ export function ownBlockSerial(block, year) {
 export function ownRowTimes(row, serial, settings) {
   if (!row) return [];
   if (row.mode !== 'zman') return parseTimes(row.text);
-  const zman = OWN_ZMANIM.find((z) => z.key === row.zman);
-  if (!zman) return [];
+  const selectedZman = OWN_ZMANIM.find((z) => z.key === row.zman);
+  if (!selectedZman) return [];
   const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
-  const at = zman.at(dateFromSerial(serial), settings) + (Number(row.offset) || 0) / 1440;
-  return [{ text: formatTime(round.apply(at)), underlined: Boolean(row.underlined), mark: row.mark || '' }];
+  const day = dateFromSerial(serial);
+  let traced = row.zman === 'candles'
+    ? zman('שקיעה', Z.sunsetElev(day, settings)).minus(settings.candleLightingMinutes ?? 18, 'the candle-lighting setting')
+    : zman(selectedZman.label, selectedZman.at(day, settings));
+  if (row.zman === 'tzais50' || row.zman === 'tzais72') {
+    traced = zman('שקיעה', Z.sunsetElev(day, settings)).plus(row.zman === 'tzais50' ? 50 : 72);
+  } else if (row.zman === 'alos72') {
+    traced = zman('נץ', Z.sunriseElev(day, settings)).minus(72);
+  }
+  if (Number(row.offset)) traced = traced.plus(Number(row.offset), 'the offset selected for this custom row');
+  const rounding = { near: 'round', down: 'floor', up: 'ceil', down5: 'floorToStep', up5: 'ceilToStep' };
+  traced = ['down5', 'up5'].includes(round.key) ? traced[rounding[round.key]](5) : traced[rounding[round.key]]();
+  if (row.underlined) traced = traced.underline();
+  if (row.mark) traced = traced.mark(row.mark);
+  return [{ text: traced.plain(), underlined: Boolean(row.underlined), mark: row.mark || '', trace: traced }];
 }
 
 /** What a row off a זמן says it is, in words, for the editor and for the Calculations page:
