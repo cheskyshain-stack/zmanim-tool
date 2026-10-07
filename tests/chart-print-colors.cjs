@@ -111,7 +111,7 @@ async function verifyChanukahFill(page, label, printBackground = true) {
       for (let x = Math.ceil(region.x + 4); x < Math.floor(region.x + region.width - 4); x++) {
         const at = (y * width + x) * 3, r = pixels[at], g = pixels[at + 1], b = pixels[at + 2];
         sampled++;
-        if (r === g && g === b && Math.abs(r - 242) <= 1) shaded++;
+        if (r === g && g === b && Math.abs(r - 245) <= 1) shaded++;
       }
     }
     assert(shaded > sampled / 2, label + ': the light gray fill survives printing: ' + shaded + '/' + sampled);

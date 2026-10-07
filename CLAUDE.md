@@ -129,7 +129,7 @@ directly, preserving PDF text; CSS grayscale filters rasterize the tables and te
 `tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
 ink modes, including saved defaults and a custom colour.
 
-The Chanukah morning block uses a light neutral 5% gray (`#f2f2f2`). Draw it as
+The Chanukah morning block uses a light neutral 4% gray (`#f5f5f5`). Draw it as
 decorative SVG artwork behind selectable text as well as a CSS background, so browsers
 can retain it when background graphics are disabled. Add the artwork after building the
 schedule grid; it must not change time parsing, explanations or chart geometry.
