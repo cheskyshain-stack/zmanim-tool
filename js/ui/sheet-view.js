@@ -345,19 +345,7 @@ export function renderSheet(container, state, sheet, onChange) {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncHeaderRowHeight(pagesEl);
   };
-  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE
-    || [...el.querySelectorAll('.shacharis-panel.is-positioned')].some(panel => {
-      const box = panel.getBoundingClientRect();
-      const standing = panel.querySelector('.shacharis-standing').getBoundingClientRect();
-      const style = getComputedStyle(panel);
-      const top = box.top + parseFloat(style.paddingTop) + 1;
-      const bottom = box.bottom - parseFloat(style.paddingBottom) - 1;
-      if (standing.top < top - 0.5 || standing.bottom > bottom + 0.5) return true;
-      const holiday = panel.querySelector('.chanukah-highlight');
-      // Centering the standing schedule leaves half the remaining space below it.
-      // Keep the bottom addition clear even on short pages or with a larger font.
-      return holiday && holiday.getBoundingClientRect().top < standing.bottom + parseFloat(style.fontSize) * 0.5 - 0.5;
-    }));
+  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE);
   const fitPaper = () => {
     if (!document.body.contains(pagesEl)) return;
     atPaperSize(pagesEl, () => {
@@ -979,19 +967,6 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       <span class="footer-line"></span>
     </div>
   `;
-
-  // Keep the standing information at the panel's center independently of the holiday
-  // addition. Wrap only after parsing the grid, preserving its time columns and traces.
-  page.querySelectorAll('.shacharis-panel .sh-sched').forEach(schedule => {
-    const standing = document.createElement('div');
-    standing.className = 'shacharis-standing';
-    for (const child of [...schedule.children]) {
-      if (!child.classList.contains('chanukah-highlight')) standing.append(child);
-    }
-    while (standing.lastElementChild?.classList.contains('sh-gap')) standing.lastElementChild.remove();
-    schedule.prepend(standing);
-    schedule.closest('.shacharis-panel').classList.add('is-positioned');
-  });
 
   // SVG artwork prints even when a browser omits CSS backgrounds. Add it after the
   // schedule grid is built so it cannot affect time parsing, text or row measurements.
