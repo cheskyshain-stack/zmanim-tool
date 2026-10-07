@@ -58,6 +58,33 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
         if (legend && (legend.scrollWidth > legend.clientWidth + 1
           || legend.getBoundingClientRect().height > parseFloat(getComputedStyle(legend).lineHeight) + 1))
           throw Error('Location notes must fit on a single line');
+        if (legend) {
+          const entries = [...legend.children].map(entry => entry.getBoundingClientRect());
+          for (let i = 1; i < entries.length; i++) {
+            if (entries[i - 1].left < entries[i].right - 1)
+              throw Error('Location entries must read from right to left');
+          }
+          const downstairs = legend.querySelector('.chart-location-downstairs');
+          if (downstairs) {
+            const key = downstairs.querySelector('u').getBoundingClientRect();
+            const room = downstairs.querySelector('bdi').getBoundingClientRect();
+            const range = document.createRange();
+            range.setStart(downstairs.childNodes[1], 0); range.setEnd(downstairs.childNodes[1], 1);
+            const colon = range.getBoundingClientRect();
+            if (key.left < room.right - 1 || colon.left < room.right - 1 || colon.right > key.left + 1)
+              throw Error('Underlined must be on the right, with the colon between it and the Hebrew room');
+          }
+          for (const entry of legend.querySelectorAll(':scope > bdi')) {
+            const text = entry.firstChild, count = text.data.startsWith('**') ? 2 : 1;
+            const range = document.createRange();
+            range.setStart(text, 0); range.setEnd(text, count);
+            const mark = range.getBoundingClientRect();
+            range.setStart(text, count); range.setEnd(text, text.length);
+            const room = range.getBoundingClientRect();
+            if (mark.left < room.right - 1 || Math.abs(mark.top - room.top) > 1)
+              throw Error('Each star count must stay on the right of its own Hebrew room');
+          }
+        }
         return { top: tables[0].getBoundingClientRect().top - box.top,
           bottom: tables.at(-1).getBoundingClientRect().bottom - box.top,
           height: box.height };
