@@ -133,11 +133,8 @@ The Chanukah morning block uses a light neutral 4% gray (`#f5f5f5`). Draw it as
 decorative SVG artwork behind selectable text as well as a CSS background, so browsers
 can retain it when background graphics are disabled. Add the artwork after building the
 schedule grid; it must not change time parsing, explanations or chart geometry.
-Keep the standing weekday Shacharis information, including the applicable Rosh Chodesh,
-BHB and fast-day schedule, centered vertically in the whole white panel. Anchor the
-Chanukah addition at the panel's bottom padding, without moving that standing block.
-The paper fit loop must also detect collisions between these separately positioned
-blocks and shrink the job's text as needed, preserving saved font settings.
+Center the standing weekday Shacharis information and the Chanukah addition together
+as one block in the white panel, with the usual small gap between their schedules.
 `tests/chart-print-colors.cjs` checks its pixels with background printing disabled and
 economy colour adjustment on desktop and phone PDFs. Printer toner-saving controls can
 still change how light shading appears on paper.

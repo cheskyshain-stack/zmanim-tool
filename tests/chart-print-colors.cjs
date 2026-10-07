@@ -77,14 +77,13 @@ async function verifyChanukahFill(page, label, printBackground = true) {
         return [...chart.querySelectorAll('.chanukah-highlight')].map(el => {
           const box = el.getBoundingClientRect();
           const panel = el.closest('.shacharis-panel').getBoundingClientRect();
-          const standing = el.closest('.shacharis-panel').querySelector('.shacharis-standing');
-          const regular = standing.getBoundingClientRect();
-          if (Math.abs((regular.top + regular.bottom - panel.top - panel.bottom) / 2) > 0.5
-            || box.top < regular.bottom)
-            throw Error('Standing Shacharis stays centered above the bottom Chanukah block');
+          const schedule = el.closest('.shacharis-panel').querySelector('.sh-sched');
+          const combined = schedule.getBoundingClientRect();
+          if (Math.abs((combined.top + combined.bottom - panel.top - panel.bottom) / 2) > 0.5)
+            throw Error('The combined Shacharis information stays centered in the panel');
           return { index, x: box.x - paper.x, y: box.y - paper.y, width: box.width, height: box.height,
-            text: el.innerText, standing: { x: regular.x - paper.x, y: regular.y - paper.y,
-              width: regular.width, height: regular.height, text: standing.innerText } };
+            text: el.innerText, schedule: { x: combined.x - paper.x, y: combined.y - paper.y,
+              width: combined.width, height: combined.height, text: schedule.innerText } };
         });
       });
     } finally {
@@ -98,7 +97,7 @@ async function verifyChanukahFill(page, label, printBackground = true) {
   const physical = [...text.stdout.matchAll(/<page\b[^>]*>([\s\S]*?)<\/page>/g)];
   assert.equal(physical.length, 6, label + ': six physical pages without overflow');
   for (const region of regions) {
-    for (const [kind, block] of [['Chanukah', region], ['Standing Shacharis', region.standing]]) {
+    for (const [kind, block] of [['Chanukah', region], ['Combined Shacharis', region.schedule]]) {
       const printedTimes = [...physical[region.index][1].matchAll(/<word\b[^>]*xMin="([\d.]+)"[^>]*yMin="([\d.]+)"[^>]*>([^<]*)<\/word>/g)]
         .filter(word => Number(word[1]) >= block.x * 0.75 - 2 && Number(word[1]) <= (block.x + block.width) * 0.75 + 2
           && Number(word[2]) >= block.y * 0.75 - 2 && Number(word[2]) <= (block.y + block.height) * 0.75 + 2)

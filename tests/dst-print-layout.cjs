@@ -52,18 +52,19 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
           .some(el => /\d{1,2}:\d{2}/.test(el.textContent)));
         for (const panel of page.querySelectorAll('.shacharis-panel')) {
           const box = panel.getBoundingClientRect();
-          const standing = panel.querySelector('.shacharis-standing').getBoundingClientRect();
+          const schedule = panel.querySelector('.sh-sched').getBoundingClientRect();
           const style = getComputedStyle(panel);
-          if (Math.abs((standing.top + standing.bottom - box.top - box.bottom) / 2) > 0.5)
-            throw Error('Standing Shacharis information must stay centered in the whole panel');
-          if (standing.top < box.top - 0.5 || standing.bottom > box.bottom + 0.5)
-            throw Error('Standing Shacharis information must fit inside the panel');
-          const holiday = panel.querySelector('.chanukah-highlight')?.getBoundingClientRect();
+          if (Math.abs((schedule.top + schedule.bottom - box.top - box.bottom) / 2) > 0.5)
+            throw Error('The combined Shacharis information must stay centered in the whole panel');
+          if (schedule.top < box.top - 0.5 || schedule.bottom > box.bottom + 0.5)
+            throw Error('The combined Shacharis information must fit inside the panel');
+          const holiday = panel.querySelector('.chanukah-highlight');
           if (holiday) {
-            if (Math.abs(box.bottom - holiday.bottom - parseFloat(style.paddingBottom) - 1) > 0.5)
-              throw Error('The Chanukah addition must stay at the bottom padding');
-            if (holiday.top < standing.bottom + parseFloat(style.fontSize) * 0.5 - 0.5)
-              throw Error('Chanukah must not overlap the centered standing information');
+            let previous = holiday.previousElementSibling;
+            while (previous?.classList.contains('sh-gap')) previous = previous.previousElementSibling;
+            const gap = holiday.getBoundingClientRect().top - previous.getBoundingClientRect().bottom;
+            if (gap < 0 || gap > parseFloat(style.fontSize) * 2)
+              throw Error('Chanukah must stay together with the regular information without overlap');
           }
         }
         if (Boolean(legend?.querySelector('.chart-location-downstairs')) !== hasUnderlinedTime)

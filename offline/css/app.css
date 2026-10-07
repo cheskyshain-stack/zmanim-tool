@@ -966,9 +966,10 @@ td.ruled .cell { background: var(--ruled); }
    A hairline in a light grey and a very faint shadow, which is what makes it read as laid on
    top rather than as a hole in the chart, and z-index so it is over the rules whatever order
    the rows happen to paint in.
-   The standing schedule is centered vertically in this whole panel, independently of
-   the Chanukah addition at its bottom. Keep the fallback for unparsed rich text centered
-   as one block. The parsed schedule retains its own gaps and time-column grids. */
+   place-content centres the schedule in the panel, and it is safe here because the panel holds
+   exactly one child. Put on the text itself it would make every piece of the schedule its own
+   item and swallow the blank line between the two blocks, which is what happened the first
+   time this was tried. */
 .shacharis-panel {
   position: absolute; z-index: 2;
   top: calc((0.35 - var(--above, 0)) * 100% + (0.35 - var(--above, 0)) * 1px);
@@ -979,18 +980,6 @@ td.ruled .cell { background: var(--ruled); }
   display: grid; place-content: center;
   padding: 0.14in 0.1in; box-sizing: border-box;
   white-space: pre-line; line-height: 1.3; direction: ltr;
-}
-.shacharis-panel.is-positioned { display: block; }
-.shacharis-panel.is-positioned .shacharis-panel-in,
-.shacharis-panel.is-positioned .sh-sched { width: 100%; height: 100%; }
-.shacharis-panel.is-positioned .sh-sched { position: relative; display: block; }
-.shacharis-standing {
-  position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; align-items: center;
-}
-.shacharis-panel.is-positioned .chanukah-highlight {
-  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: max-content; margin: 0;
 }
 
 /* The schedule inside that panel, set in columns rather than as centred lines.
