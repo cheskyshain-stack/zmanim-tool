@@ -177,11 +177,13 @@ function fillChartLocationLegend(page) {
   if (!hasDownstairs && !locations.length) return;
   const legend = document.createElement('div');
   legend.className = 'chart-location-legend';
-  legend.dir = 'ltr';
+  legend.dir = 'rtl';
   if (hasDownstairs) {
     const entry = document.createElement('span');
     entry.className = 'chart-location-downstairs';
+    entry.dir = 'rtl';
     const key = document.createElement('u');
+    key.dir = 'ltr';
     key.textContent = 'Underlined';
     const room = document.createElement('bdi');
     room.dir = 'rtl';
