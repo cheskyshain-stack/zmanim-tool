@@ -1067,17 +1067,20 @@ td.ruled .cell { background: var(--ruled); }
 .sh-wide.is-small { font-size: 0.7em; color: var(--muted); }
 /* The blank line between the two blocks, which a flex column would otherwise close up. */
 .sh-gap { height: 0.5em; }
-/* חנוכה's own heading(s) and schedule(s), set apart on the panel with a light background of
-   their own rather than a mark on the heading alone (see shacharisGridHtml's own handling of
-   this one div, which it buffers whole rather than painting line by line). The same light tint
-   of --sheet-accent the "NEW"/"חנוכה" tags are painted in full strength, at a fraction of it: a
-   solid fill read as another header band, where this is meant to read as a quiet box on the
-   panel's own white. flex column, same as .sh-sched itself, so its own heading, gap and rows
-   still stack and centre the way they would loose on the panel. */
+/* חנוכה's headings and schedules share a light neutral fill. The old 2% gray was nearly
+   white on some printers; 10% keeps the box light while giving the printer more to draw.
+   A decorative SVG behind the text also paints this fill as foreground artwork, so
+   disabling CSS background printing does not remove it. Isolation keeps that layer
+   above the surrounding white panel and below the selectable schedule text. */
 .chanukah-highlight {
+  position: relative; isolation: isolate;
   display: flex; flex-direction: column; align-items: center;
-  background: color-mix(in srgb, var(--sheet-accent, var(--accent)) 12%, white);
+  background: #e6e6e6;
   border-radius: 4px; padding: 0.2em 0.5em; margin: 0.15em 0;
+}
+.chanukah-highlight-fill {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1;
+  fill: #e6e6e6; border-radius: inherit; pointer-events: none;
 }
 
 /* Settings' מנחה/מעריב option lists - one editable row per option (rich text, so an

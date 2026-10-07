@@ -966,6 +966,11 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     </div>
   `;
 
+  // SVG artwork prints even when a browser omits CSS backgrounds. Add it after the
+  // schedule grid is built so it cannot affect time parsing, text or row measurements.
+  page.querySelectorAll('.chanukah-highlight').forEach(highlight => {
+    highlight.insertAdjacentHTML('afterbegin', '<svg class="chanukah-highlight-fill" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect width="1" height="1"/></svg>');
+  });
   useStraightHebrewQuotes(page);
 
   return page;

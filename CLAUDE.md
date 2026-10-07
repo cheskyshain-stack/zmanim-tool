@@ -129,6 +129,14 @@ directly, preserving PDF text; CSS grayscale filters rasterize the tables and te
 `tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
 ink modes, including saved defaults and a custom colour.
 
+The Chanukah morning block uses a light neutral 10% gray (`#e6e6e6`). Draw it as
+decorative SVG artwork behind selectable text as well as a CSS background, so browsers
+can retain it when background graphics are disabled. Add the artwork after building the
+schedule grid; it must not change time parsing, explanations or chart geometry.
+`tests/chart-print-colors.cjs` checks its pixels with background printing disabled and
+economy colour adjustment on desktop and phone PDFs. Printer toner-saving controls can
+still change how light shading appears on paper.
+
 Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
