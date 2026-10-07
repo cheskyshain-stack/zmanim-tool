@@ -73,17 +73,16 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
           .map(el => el.textContent.match(/^\*{1,2}/)[0]).sort();
         if (JSON.stringify(keys) !== JSON.stringify(marks)) throw Error('The footer must explain only its page’s stars');
         if (legend) {
-          const expectedHeight = (Number(hasUnderlinedTime) + Number(keys.length > 0))
-            * parseFloat(getComputedStyle(legend).lineHeight);
+          const expectedHeight = parseFloat(getComputedStyle(legend).lineHeight);
           if (legend.scrollWidth > legend.clientWidth + 1
             || Math.abs(legend.getBoundingClientRect().height - expectedHeight) > 1)
-            throw Error('The full downstairs sentence and room stars must each fit on their own line');
+            throw Error('The full downstairs sentence and room stars must fit together on one line');
         }
         if (legend) {
-          const entries = [...legend.querySelectorAll(':scope > bdi')].map(entry => entry.getBoundingClientRect());
+          const entries = [...legend.children].map(entry => entry.getBoundingClientRect());
           for (let i = 1; i < entries.length; i++) {
             if (entries[i - 1].left < entries[i].right - 1)
-              throw Error('Room stars must read from right to left');
+              throw Error('Location entries must read from right to left');
           }
           const downstairs = legend.querySelector('.chart-location-downstairs');
           if (downstairs) {
@@ -97,8 +96,8 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
               if (runs[i - 1].right > runs[i].left + 1)
                 throw Error('The full sentence must read left to right with isolated Hebrew runs');
             }
-            if (entries.some(entry => entry.top < downstairs.getBoundingClientRect().bottom - 1))
-              throw Error('The room stars must be below the full downstairs sentence');
+            if (entries.some(entry => Math.abs(entry.top - downstairs.getBoundingClientRect().top) > 3))
+              throw Error('The room stars must share the line with the full downstairs sentence');
           }
           for (const entry of legend.querySelectorAll(':scope > bdi')) {
             const text = entry.firstChild, count = text.data.startsWith('**') ? 2 : 1;

@@ -8627,8 +8627,8 @@ function fillChartLocationLegend(page) {
   const footer = page.querySelector('.footer-text');
   const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
   // Rebuild standard location keys from this page, including ones in an older custom
-  // footer. Other custom notes stay intact; the full downstairs sentence is followed
-  // by a separate line containing only the room stars this page uses.
+  // footer. Other custom notes stay intact; the full downstairs sentence and only
+  // the room stars this page uses share one line.
   for (const node of [...footer.childNodes]) {
     if (node.nodeType !== 3) continue;
     const text = node.textContent.replace(/\s+/g, ' ').trim();
@@ -8663,8 +8663,8 @@ function fillChartLocationLegend(page) {
     entry.append('All underlined ', minyanim, ' will be ', room);
     legend.append(entry);
   }
-  locations.forEach(([mark, label], index) => {
-    if (index) legend.append(' ');
+  locations.forEach(([mark, label]) => {
+    if (legend.childNodes.length) legend.append(' · ');
     const entry = document.createElement('bdi');
     entry.dir = 'rtl';
     entry.lang = 'he';
