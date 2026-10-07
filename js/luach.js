@@ -1104,6 +1104,7 @@ function donateFrameHtml(href, label, websiteHref = '') {
  *  a card's form is not sitting live behind another card's. */
 function wireDonateFrames(root) {
   const panels = [...root.querySelectorAll('.luach-give-frame')];
+  const frameFits = new Map();
   // Scoped to the account and not to the card, which is the whole of a bug this had: the
   // card and ACH way holds two payment pages, so asking the card for "the" frame handed
   // both Donate buttons the first one. Pressing Building Fund opened its form in the panel
@@ -1111,6 +1112,8 @@ function wireDonateFrames(root) {
   // cosmetic mix-up.
   const accountOf = (el) => el.closest('.luach-give-account') || el.closest('.luach-give-card');
   const shut = (panel) => {
+    frameFits.get(panel)?.disconnect();
+    frameFits.delete(panel);
     panel.hidden = true;
     panel.innerHTML = '';
     const go = accountOf(panel).querySelector('.luach-give-go');
@@ -1134,6 +1137,20 @@ function wireDonateFrames(root) {
       panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref);
       panel.hidden = false;
       go.setAttribute('aria-expanded', 'true');
+      // Cardknox's narrow layouts still need 360px for their fixed-width sections.
+      // Resize the viewport rather than touching cross-origin payment content, and
+      // keep the same live frame when the phone rotates so entered fields survive.
+      const wrap = panel.querySelector('.luach-frame-wrap');
+      const fit = (width) => {
+        if (width > 0) wrap.style.setProperty('--luach-frame-scale', Math.min(1, width / 360));
+      };
+      fit(wrap.clientWidth);
+      const observer = new ResizeObserver(([entry]) => {
+        if (!panel.isConnected) { observer.disconnect(); return; }
+        fit(entry.contentRect.width);
+      });
+      observer.observe(wrap);
+      frameFits.set(panel, observer);
       panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
       // Uncover the form once it is there. A cross-origin frame tells us nothing about what
       // it holds, but load still fires on the element, which is all this needs to know.

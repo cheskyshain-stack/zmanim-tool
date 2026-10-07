@@ -2543,6 +2543,12 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   margin-top: 0.6rem; border-radius: 12px; overflow: hidden;
   border: 1px solid rgba(18,39,79,0.14); background: #ffffff;
 }
+/* Give the open form enough room for the provider's desktop tabs. On phones the
+   form reaches the card edges, instead of losing another two padding widths. */
+.luach-give-page:has(.luach-give-frame:not([hidden])) { max-width: 48rem; }
+@media (max-width: 34rem) {
+  .luach-give-frame { margin-inline: -0.95rem; border-inline: 0; border-radius: 0; }
+}
 .luach-frame-bar {
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.4rem 0.5rem 0.4rem 0.65rem; background: rgba(18,39,79,0.05);
@@ -2569,17 +2575,22 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    is the height left once a phone's own toolbars are counted, and the rem before it is what
    a browser that does not know dvh keeps. */
 .luach-frame {
-  display: block; width: 100%; border: 0; background: #ffffff;
+  position: absolute; inset: 0; display: block; border: 0; background: #ffffff;
+  width: calc(100% / var(--luach-frame-scale, 1));
+  height: calc(100% / var(--luach-frame-scale, 1));
+  transform: scale(var(--luach-frame-scale, 1)); transform-origin: top left;
+}
+/* The waiting state. The wrapper exists only to be the thing the cover is positioned
+   against. It holds the visible height while the form can be slightly scaled to fit
+   a narrow phone. The wider internal viewport keeps fixed-width fields and the
+   security checkbox in view, without stretching the page or losing vertical scrolling. */
+.luach-frame-wrap {
+  position: relative; overflow: hidden;
   height: 34rem; height: min(82dvh, 44rem);
 }
 @media (min-width: 34rem) {
-  .luach-frame { height: 42rem; height: min(80dvh, 48rem); }
+  .luach-frame-wrap { height: 42rem; height: min(80dvh, 48rem); }
 }
-/* The waiting state. The wrapper exists only to be the thing the cover is positioned
-   against, so it must not add a box of its own: the frame is the only thing in it and the
-   frame carries the height. display: flex rather than block, so the iframe's inline
-   baseline gap cannot creep in and make the wrapper a few pixels taller than the frame. */
-.luach-frame-wrap { position: relative; display: flex; }
 .luach-frame-load {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 0.75rem;
