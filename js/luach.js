@@ -406,7 +406,11 @@ const DONATE = {
           title: 'Eiruv / Building Fund',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
         },
-        { title: 'Neileich', href: 'https://www.neileich.org/', cta: 'Open Neileich' },
+        {
+          title: 'Neileich',
+          href: 'https://secure.cardknox.com/neileich',
+          websiteHref: 'https://www.neileich.org/',
+        },
         { title: 'Keren Zichron Zechariah', href: 'https://secure.cardknox.com/kerenzichronzechariah', cta: 'Donate' },
       ],
     },
@@ -959,13 +963,13 @@ function renderChartPage(published) {
  *  the button that opens it. Two of them, because the shul and the building fund bill
  *  through separate merchant pages and a donor has to land on the right one. */
 function donateAccountHtml(acc) {
-  const external = acc.href === 'https://www.neileich.org/';
+  const website = acc.websiteHref ? ` data-website-href="${escAttr(acc.websiteHref)}"` : '';
   return `<div class="luach-give-account">
-    <a class="luach-fund-row${external ? '' : ' luach-give-go'}" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
+    <a class="luach-fund-row luach-give-go" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
-      <span class="luach-fund-action">${external ? 'Visit Neileich' : 'Donate'} <span aria-hidden="true">&rarr;</span></span>
+      <span class="luach-fund-action">Donate <span aria-hidden="true">&rarr;</span></span>
     </a>
-    ${external ? '' : '<div class="luach-give-frame" hidden></div>'}
+    <div class="luach-give-frame" hidden></div>
   </div>`;
 }
 
@@ -1066,17 +1070,20 @@ function wireDonateCopy(root) {
  *  card into. It names the host, and it keeps a way out to a real tab, which is also the
  *  answer if the form will not frame at all: a payment page is entitled to refuse to be
  *  embedded, and when one does the frame comes up blank with nothing to catch from here. */
-function donateFrameHtml(href, label) {
+function donateFrameHtml(href, label, websiteHref = '') {
   let host = '';
   try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
   const out = `href="${escAttr(href)}" target="_blank" rel="noopener noreferrer"`;
+  const barOut = websiteHref
+    ? `<a class="luach-frame-out" href="${escAttr(websiteHref)}" target="_blank" rel="noopener noreferrer">Visit website <span aria-hidden="true">&#8599;</span></a>`
+    : `<a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>`;
   // The waiting state sits over the frame rather than in place of it, so the frame is
   // loading underneath the whole time and there is nothing to swap in when it arrives: the
   // cover is simply taken away. It is opaque because a form paints itself in pieces, and
   // half a form showing through would look broken rather than unfinished.
   return `<div class="luach-frame-bar">
       <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${escAttr(host)}</span>
-      <a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>
+      ${barOut}
       <button type="button" class="luach-frame-shut" aria-label="Close the donation form">&times;</button>
     </div>
     <div class="luach-frame-wrap">
@@ -1124,7 +1131,7 @@ function wireDonateFrames(root) {
       // by anything reading the frame's title out.
       const title = accountOf(go).querySelector('.luach-account-title')
         || card.querySelector('.luach-give-title');
-      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`);
+      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref);
       panel.hidden = false;
       go.setAttribute('aria-expanded', 'true');
       panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
@@ -1381,7 +1388,6 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
-
 
 
 
