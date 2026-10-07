@@ -50,6 +50,13 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
           for (const [key, label] of [['I', 'מנחה\n(בעזר"נ)\nפלג מ"א 72'], ['J', 'מנחה\n(למטה)\nפלג מ"א']]) {
             const header = headers[columns.findIndex(column => column.dataset.colkey === key)];
             if (header.innerText !== label) throw Error('Early Mincha headings must name their rooms');
+            const group = header.querySelector('.chart-room-heading');
+            const lines = [...group.children].map(line => line.getBoundingClientRect());
+            if (lines.length !== 3 || lines.some((line, i) => i && line.top < lines[i - 1].bottom - 0.1))
+              throw Error('The three heading lines must stay distinct in their compact group');
+            const center = box => (box.top + box.bottom) / 2;
+            if (Math.abs(center(group.getBoundingClientRect()) - center(header.getBoundingClientRect())) > 1)
+              throw Error('The compact heading must stay vertically centered');
             const range = document.createRange(); range.selectNodeContents(header.querySelector('.head-room'));
             const room = range.getBoundingClientRect(), box = header.getBoundingClientRect();
             if (room.left < box.left - 1 || room.right > box.right + 1)

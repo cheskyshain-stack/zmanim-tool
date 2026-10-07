@@ -1440,6 +1440,11 @@ body.is-luach .week-cards { align-items: center; }
 .head-room { font-size: 0.86em; }
 /* The chart's parenthesized location line reads smaller than the Plag basis below it. */
 .page th .head-room { font-size: 0.7em; }
+/* Use each heading line's own font size for its height, with a small consistent gap. */
+.chart-room-heading {
+  display: inline-flex; flex-direction: column; align-items: center;
+  line-height: 1.05; gap: 0.06em; vertical-align: middle;
+}
 /* Set to the left edge of its column, mirroring the name set to the right edge of its
    own. Centred, the times floated inward and left a gap on the left about twice the one
    on the right, so the row looked lopsided; flush, the two sides are inset by the same
