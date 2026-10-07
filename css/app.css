@@ -2562,6 +2562,10 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-frame-lock { width: 0.85rem; height: 0.85rem; flex: none; opacity: 0.75; }
 .luach-frame-out { margin-left: auto; color: var(--luach-ink); opacity: 0.72; text-decoration: none; white-space: nowrap; }
 .luach-frame-out:hover { opacity: 1; text-decoration: underline; }
+@media (max-width: 34rem) {
+  .luach-frame-bar:has(.luach-frame-website) { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .luach-frame-website { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+}
 .luach-frame-shut {
   flex: none; width: 1.6rem; height: 1.6rem; padding: 0; border: 0; border-radius: 6px;
   background: transparent; color: var(--luach-ink); font-size: 1.1rem; line-height: 1;
