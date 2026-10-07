@@ -186,12 +186,11 @@ Each physical chart page explains the location stars it prints: `*בעזרת נ�
 including saved edits, rules and the weekday morning panel. Keep each star count with
 its Hebrew label in a separate bidi isolate and reserve its space before fitting pages.
 Omit unused locations, including the standard downstairs line on a page without an
-underlined minyan time. Put the needed locations on one line, using an underlined
-`Underlined` label followed by `בביהמ"ד למטה`, then the star keys separated by dots.
-Read the location line from right to left: the downstairs entry starts on the right,
-followed by the single-star and double-star entries toward the left. Isolate the English
-word inside its RTL entry so its spelling and adjacent colon remain clear. Verify actual
-text coordinates, including the colon and stars, rather than the DOM text order. Rebuild standard
+underlined minyan time. Use the full sentence `All underlined מנינים will be בבית מדרש למטה`
+on its own line, followed by the needed star keys on a separate line. The mixed English
+sentence reads left to right with its Hebrew runs isolated. The star line reads right
+to left, with each star count beside its Hebrew room name. Keep each line unwrapped and
+verify actual text coordinates rather than the DOM text order. Rebuild standard
 location keys from older custom footers per page and preserve unrelated notes.
 `syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
 without changing saved styles. Collapsed table borders and the gap between DST sections
