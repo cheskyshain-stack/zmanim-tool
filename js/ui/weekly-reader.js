@@ -188,7 +188,7 @@ function readerTimeHtml(e) {
   const location = readerRoomFor(e);
   const tag = location ? 'button' : 'span';
   const attrs = location ? ` type="button" aria-haspopup="dialog" aria-label="${escAttr(`${e.name}, ${label}, ${location.name}. Show room`)}" data-reader-room="${escAttr(location.name)}" data-reader-room-hebrew="${escAttr(location.hebrew)}" data-reader-service="${escAttr(e.name)}" data-reader-clock="${escAttr(label)}"` : '';
-  return `<${tag} class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(location?.name || place)}"${attrs}><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}${e.started?'<small>Just started</small>':''}</${tag}>`;
+  return `<${tag} class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(location?.name || place)}"${attrs}><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}</${tag}>`;
 }
 
 function wireReaderRooms(root) {
