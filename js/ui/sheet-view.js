@@ -1001,7 +1001,9 @@ function withHebrewDate(week, settings) {
 function headerHtml(c) {
   if (!c.headerSub) return nl2br(c.header);
   const [first, ...rest] = String(c.header).split('\n');
-  return nl2br(first) + rest.map((line) => '<br><span class="cell-small">' + nl2br(line) + '</span>').join('');
+  // markHeaderRoom gives a bracketed room its own smaller size. Do not shrink it twice.
+  return nl2br(first) + rest.map((line) => '<br>' + (/^\([^()]+\)$/.test(line)
+    ? nl2br(line) : '<span class="cell-small">' + nl2br(line) + '</span>')).join('');
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
