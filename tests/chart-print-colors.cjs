@@ -76,8 +76,15 @@ async function verifyChanukahFill(page, label, printBackground = true) {
         const paper = chart.getBoundingClientRect();
         return [...chart.querySelectorAll('.chanukah-highlight')].map(el => {
           const box = el.getBoundingClientRect();
+          const panel = el.closest('.shacharis-panel').getBoundingClientRect();
+          const standing = el.closest('.shacharis-panel').querySelector('.shacharis-standing');
+          const regular = standing.getBoundingClientRect();
+          if (Math.abs((regular.top + regular.bottom - panel.top - panel.bottom) / 2) > 0.5
+            || box.top < regular.bottom)
+            throw Error('Standing Shacharis stays centered above the bottom Chanukah block');
           return { index, x: box.x - paper.x, y: box.y - paper.y, width: box.width, height: box.height,
-            text: el.innerText };
+            text: el.innerText, standing: { x: regular.x - paper.x, y: regular.y - paper.y,
+              width: regular.width, height: regular.height, text: standing.innerText } };
         });
       });
     } finally {
@@ -91,12 +98,14 @@ async function verifyChanukahFill(page, label, printBackground = true) {
   const physical = [...text.stdout.matchAll(/<page\b[^>]*>([\s\S]*?)<\/page>/g)];
   assert.equal(physical.length, 6, label + ': six physical pages without overflow');
   for (const region of regions) {
-    const printedTimes = [...physical[region.index][1].matchAll(/<word\b[^>]*xMin="([\d.]+)"[^>]*yMin="([\d.]+)"[^>]*>([^<]*)<\/word>/g)]
-      .filter(word => Number(word[1]) >= region.x * 0.75 - 2 && Number(word[1]) <= (region.x + region.width) * 0.75 + 2
-        && Number(word[2]) >= region.y * 0.75 - 2 && Number(word[2]) <= (region.y + region.height) * 0.75 + 2)
-      .flatMap(word => word[3].match(/\d{1,2}:\d{2}/g) || []);
-    for (const time of region.text.match(/\d{1,2}:\d{2}/g) || [])
-      assert(printedTimes.includes(time), label + ': selectable Chanukah time ' + time);
+    for (const [kind, block] of [['Chanukah', region], ['Standing Shacharis', region.standing]]) {
+      const printedTimes = [...physical[region.index][1].matchAll(/<word\b[^>]*xMin="([\d.]+)"[^>]*yMin="([\d.]+)"[^>]*>([^<]*)<\/word>/g)]
+        .filter(word => Number(word[1]) >= block.x * 0.75 - 2 && Number(word[1]) <= (block.x + block.width) * 0.75 + 2
+          && Number(word[2]) >= block.y * 0.75 - 2 && Number(word[2]) <= (block.y + block.height) * 0.75 + 2)
+        .flatMap(word => word[3].match(/\d{1,2}:\d{2}/g) || []);
+      for (const time of block.text.match(/\d{1,2}:\d{2}/g) || [])
+        assert(printedTimes.includes(time), label + ': selectable ' + kind + ' time in its printed block: ' + time);
+    }
     const rendered = spawnSync('pdftoppm', ['-f', String(region.index + 1), '-singlefile', '-r', '96', '-'],
       { input: pdf, maxBuffer: 8 * 1024 * 1024 });
     assert.equal(rendered.status, 0, label + ': render the actual printed page');

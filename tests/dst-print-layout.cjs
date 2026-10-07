@@ -50,6 +50,22 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
           [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])))].sort();
         const hasUnderlinedTime = tables.some(table => [...table.querySelectorAll('u')]
           .some(el => /\d{1,2}:\d{2}/.test(el.textContent)));
+        for (const panel of page.querySelectorAll('.shacharis-panel')) {
+          const box = panel.getBoundingClientRect();
+          const standing = panel.querySelector('.shacharis-standing').getBoundingClientRect();
+          const style = getComputedStyle(panel);
+          if (Math.abs((standing.top + standing.bottom - box.top - box.bottom) / 2) > 0.5)
+            throw Error('Standing Shacharis information must stay centered in the whole panel');
+          if (standing.top < box.top - 0.5 || standing.bottom > box.bottom + 0.5)
+            throw Error('Standing Shacharis information must fit inside the panel');
+          const holiday = panel.querySelector('.chanukah-highlight')?.getBoundingClientRect();
+          if (holiday) {
+            if (Math.abs(box.bottom - holiday.bottom - parseFloat(style.paddingBottom) - 1) > 0.5)
+              throw Error('The Chanukah addition must stay at the bottom padding');
+            if (holiday.top < standing.bottom + parseFloat(style.fontSize) * 0.5 - 0.5)
+              throw Error('Chanukah must not overlap the centered standing information');
+          }
+        }
         if (Boolean(legend?.querySelector('.chart-location-downstairs')) !== hasUnderlinedTime)
           throw Error('The footer must explain only the underlined times on its page');
         const keys = [...(legend?.querySelectorAll(':scope > bdi') || [])]
@@ -267,6 +283,9 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     const compactPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
     verifyPdfFooters(compactPdf, 2, 'Desktop whole season');
     await page.emulateMedia({ media: 'screen' });
+
+    await generate(5787, 8);
+    await verify(16, 'Short winter pages');
 
     // Open the Weekday companion with a page break exactly at the clock change.
     await page.evaluate(async () => {

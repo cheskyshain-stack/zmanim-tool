@@ -100,6 +100,9 @@ const server = http.createServer((req, res) => {
     assert.match(await clickTime(page.locator('.cell[data-col=E]').first()), /Fixed time/); await close();
     const sermon = page.locator('.cell[data-col=C]').filter({ hasText: 'דרשה' }).first();
     assert.match(await clickTime(sermon, 1), /60 minutes/); await close();
+    assert.match(await clickTime(page.locator('.shacharis-standing .sh-time').first()), /Fixed time/); await close();
+    await clickTime(page.locator('.chanukah-highlight .sh-time').first()); await close();
+    assert.deepEqual(await geometry(), before, 'Inspecting both morning blocks preserves the chart layout');
     assert.equal(await page.evaluate(() => localStorage.getItem('zmanim-app-state-v1')), saved, 'Inspecting never saves an edit');
     await page.locator('#explain-times-toggle').click();
     await assertReadOnly('Turning explanations off does not enable editing');
