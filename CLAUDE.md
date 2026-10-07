@@ -31,7 +31,8 @@ cosmetic one. Layout invariants below are not preferences.
 Every change follows this, in order:
 
 1. Edit `js/`, `css/`, `index.html`, `data/`, or `assets/`.
-2. `python build-offline.py` (always, even for CSS only, see below).
+2. `python build-offline.py` (always, even for CSS only, see below), followed by
+   `node scripts/build-schedule-api.mjs` with Node.js 24 to generate the public API.
 3. Serve and test locally on a **fresh, unused port**: `python -m http.server 8907`.
    Reusing a port you served from earlier in the session gets you a cached page and a
    false pass.
@@ -373,6 +374,30 @@ Export/Import in Settings moves it between devices.
   Check actual pointer clicks inside scaled frames, every payment field and security
   checkbox, and all five card/ACH forms. Cardknox's Rav's Fund tab strip itself remains
   700px wide, but its tab labels and payment controls fit the narrower phone viewport.
+
+## Public schedule API
+
+`/api/schedule.json` returns only ten calendar dates: today and the following nine
+days in the shared settings' timezone (`America/New_York` for this shul). It is a
+read-only public JSON feed with no date/range query parameters. Serialize an explicit
+allowlist of date, service, time, parsha, and occasion fields. Never include rooms,
+addresses, coordinates, stars, underlines, or raw settings. Merge identical services
+at the same time after discarding rooms, while retaining different zman reckonings.
+
+`scripts/schedule-feed.mjs` adapts the same weekly reader and agenda engine as `/week/`.
+Use a clock before the ten-day window when collecting events so today's already-passed
+times remain. Normalize overnight events to their actual calendar date, and include
+the preceding week when collecting the window's first day's overnight services.
+Keep `unconfirmed` and `unavailable` dates explicit, without inventing normal schedules.
+
+`node scripts/build-schedule-api.mjs` writes `dist/api/schedule.json` after the ordinary
+Python build; the Python build clears dist first. Do not commit generated JSON or put
+the API adapter/build scripts into dist. The Pages workflow runs this generator on
+every deployment and daily at 04:07 and 05:07 UTC, covering both New York DST offsets.
+Consumers must check the published range and timestamp because scheduled deployment
+can be delayed. `node --test tests/schedule-feed.mjs` checks the ten-day limit, omitted
+location fields, full-day retention, midnight/DST transitions, and special schedules.
+Verify the live JSON, response CORS, and a real fetch from another origin after deploy.
 
 ## Site statistics
 

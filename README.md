@@ -73,6 +73,60 @@ saved in this browser's local storage - nothing is sent anywhere. Use **Export b
 in the header to save a JSON file, and **Import backup** to restore it (e.g. on another
 computer, or after clearing browser data).
 
+## Public schedule API
+
+`GET https://baismedrashoflakewoodcommons.org/api/schedule.json` is a public,
+read-only JSON feed. It needs no API key and supports cross-origin browser fetches.
+It contains exactly ten calendar dates: the build's current day and the following
+nine days, in `America/New_York`. It accepts no date or range parameters. Room names,
+addresses, coordinates, stars, and underline location markings are omitted.
+
+The feed refreshes on every main deployment and daily after New York midnight.
+GitHub's scheduled deployments can be delayed. Consumers must check `generatedAt`
+and require `range.startDate` to match today's date in `timeZone` before displaying
+it as the current ten-day feed. Fetch again when the response is stale; do not
+extend or infer schedules beyond `range.endDate`.
+
+The response has `schemaVersion`, `generatedAt`, `timeZone`, `range`, and `days`.
+Each day includes its ISO `date`, `weekday` (Saturday is named `Shabbos`), `parsha`,
+`hebrewDate`, `occasions`, `status`, and `events`. Hebrew month numbers follow the
+calendar engine: Nissan is 1, Tishrei is 7. Leap-year Adar follows the engine's
+13/14 numbering. Event `time` is local 24-hour `HH:mm`; `displayTime` adds AM/PM.
+`name` is the Hebrew schedule label, `category` is `shacharis`, `mincha`, `maariv`,
+or `other`, and an optional `reckoning` identifies a zman's opinion. Calendar days
+include their full schedule, even after a service has passed. Midnight events are
+filed under their actual calendar date. Identical events in different rooms appear
+once. `unconfirmed` or `unavailable` days must not be treated as ordinary schedules.
+
+```js
+const response = await fetch('https://baismedrashoflakewoodcommons.org/api/schedule.json', {
+  cache: 'no-cache',
+});
+if (!response.ok) throw new Error('Schedule unavailable');
+const schedule = await response.json();
+const parts = new Intl.DateTimeFormat('en-US', {
+  timeZone: schedule.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+}).formatToParts(new Date());
+const part = type => parts.find(p => p.type === type).value;
+const today = `${part('year')}-${part('month')}-${part('day')}`;
+if (schedule.schemaVersion !== 1 || schedule.range.startDate !== today) {
+  throw new Error('Schedule needs refreshing');
+}
+const days = schedule.days;
+```
+
+Build the API after the ordinary site build with Node.js 24:
+
+```bash
+python build-offline.py
+node scripts/build-schedule-api.mjs
+node --test tests/schedule-feed.mjs
+```
+
+The generated `dist/api/schedule.json` is build output and is not committed. Its
+adapter uses the same weekly reader, holiday posters, and chart calculations as
+the public site.
+
 ## Rules vs. overrides
 
 - Chart cells are read-only. **Overrides** from older saved sheets and imported backups

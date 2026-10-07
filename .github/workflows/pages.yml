@@ -26,6 +26,9 @@ on:
   # So the site can be republished without a commit, which is the thing to reach for if a
   # deployment is ever lost or half done.
   workflow_dispatch:
+  # Refresh the ten-day API after New York midnight during either DST offset.
+  schedule:
+    - cron: '7 4,5 * * *'
 
 permissions:
   contents: read
@@ -51,8 +54,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Build the site
         run: python build-offline.py
+
+      - name: Build the ten-day schedule API
+        run: node scripts/build-schedule-api.mjs
+
+      - name: Verify the schedule API contract
+        run: node --test tests/schedule-feed.mjs
 
       - uses: actions/configure-pages@v5
 
