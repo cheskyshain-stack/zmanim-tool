@@ -9450,7 +9450,7 @@ function withHebrewDate(week, settings) {
 /** A column's heading, its first line at the heading's own regular size and, when the
  *  column is marked headerSub (sheets/kayitz.js, sheets/choref.js), every line after that
  *  smaller - what the name on the first line is read against, whether that is two opinions,
- *  a room's star count or the day the מנין falls on. Not every multi-line heading is this
+ *  a room or the day the מנין falls on. Not every multi-line heading is this
  *  shape: the Weekday chart's own "מנחה\nמעריב" names two coequal תפילות on two lines, and
  *  "הדלקת\nנרות" is one phrase broken in two, so headerSub is a flag the column sets rather
  *  than a pattern guessed from the text, to keep those two from being read the same way.
@@ -9461,9 +9461,16 @@ function withHebrewDate(week, settings) {
 function headerHtml(c) {
   if (!c.headerSub) return nl2br(c.header);
   const [first, ...rest] = String(c.header).split('\n');
-  // markHeaderRoom gives a bracketed room its own smaller size. Do not shrink it twice.
-  return nl2br(first) + rest.map((line) => '<br>' + (/^\([^()]+\)$/.test(line)
-    ? nl2br(line) : '<span class="cell-small">' + nl2br(line) + '</span>')).join('');
+  const isRoom = line => /^\([^()]+\)$/.test(line);
+  if (rest.some(isRoom)) {
+    // Each line uses its own font's line height instead of the heading's full-size strut.
+    // markHeaderRoom wraps the room text as a direct child of this compact group.
+    return '<span class="chart-room-heading"><span>' + nl2br(first) + '</span>'
+      + rest.map(line => isRoom(line) ? nl2br(line)
+        : '<span class="cell-small">' + nl2br(line) + '</span>').join('') + '</span>';
+  }
+  // Other headings keep their standard line breaks and smaller basis text.
+  return nl2br(first) + rest.map(line => '<br><span class="cell-small">' + nl2br(line) + '</span>').join('');
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*

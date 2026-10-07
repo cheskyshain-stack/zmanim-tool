@@ -195,8 +195,10 @@ location keys from older custom footers per page and preserve unrelated notes.
 The early Friday Mincha columns name their rooms in the headings: `מנחה / (בעזר"נ) /
 פלג מ"א 72` and `מנחה / (למטה) / פלג מ"א`. The בעזר"נ chart times have no stars;
 למטה retains its underline. Set the parenthesized room labels in chart headings to 70%
-of the heading size, smaller than the Plag line. Keep the room metadata used by posters,
-messages and the weekly reader, whose compact schedules still use their own location marks.
+of the heading size, smaller than the Plag line. Group the three lines closely using each
+line's own font size for its line height, with a small gap between lines. Keep the room
+metadata used by posters, messages and the weekly reader, whose compact schedules still
+use their own location marks.
 `syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
 without changing saved styles. Collapsed table borders and the gap between DST sections
 are included in row-height calculations. Measurement temporarily removes screen scaling
