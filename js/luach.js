@@ -410,6 +410,7 @@ const DONATE = {
           title: 'Neileich',
           href: 'https://secure.cardknox.com/neileich',
           websiteHref: 'https://www.neileich.org/',
+          websiteLabel: 'Visit Neileich\u2019s full website',
         },
         { title: 'Keren Zichron Zechariah', href: 'https://secure.cardknox.com/kerenzichronzechariah', cta: 'Donate' },
       ],
@@ -963,7 +964,9 @@ function renderChartPage(published) {
  *  the button that opens it. Two of them, because the shul and the building fund bill
  *  through separate merchant pages and a donor has to land on the right one. */
 function donateAccountHtml(acc) {
-  const website = acc.websiteHref ? ` data-website-href="${escAttr(acc.websiteHref)}"` : '';
+  const website = acc.websiteHref
+    ? ` data-website-href="${escAttr(acc.websiteHref)}" data-website-label="${escAttr(acc.websiteLabel || 'Visit website')}"`
+    : '';
   return `<div class="luach-give-account">
     <a class="luach-fund-row luach-give-go" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
@@ -1070,12 +1073,12 @@ function wireDonateCopy(root) {
  *  card into. It names the host, and it keeps a way out to a real tab, which is also the
  *  answer if the form will not frame at all: a payment page is entitled to refuse to be
  *  embedded, and when one does the frame comes up blank with nothing to catch from here. */
-function donateFrameHtml(href, label, websiteHref = '') {
+function donateFrameHtml(href, label, websiteHref = '', websiteLabel = 'Visit website') {
   let host = '';
   try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
   const out = `href="${escAttr(href)}" target="_blank" rel="noopener noreferrer"`;
   const barOut = websiteHref
-    ? `<a class="luach-frame-out" href="${escAttr(websiteHref)}" target="_blank" rel="noopener noreferrer">Visit website <span aria-hidden="true">&#8599;</span></a>`
+    ? `<a class="luach-frame-out luach-frame-website" href="${escAttr(websiteHref)}" target="_blank" rel="noopener noreferrer">${escAttr(websiteLabel)} <span aria-hidden="true">&#8599;</span></a>`
     : `<a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>`;
   // The waiting state sits over the frame rather than in place of it, so the frame is
   // loading underneath the whole time and there is nothing to swap in when it arrives: the
@@ -1134,7 +1137,7 @@ function wireDonateFrames(root) {
       // by anything reading the frame's title out.
       const title = accountOf(go).querySelector('.luach-account-title')
         || card.querySelector('.luach-give-title');
-      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref);
+      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref, go.dataset.websiteLabel);
       panel.hidden = false;
       go.setAttribute('aria-expanded', 'true');
       // Cardknox's narrow layouts still need 360px for their fixed-width sections.
