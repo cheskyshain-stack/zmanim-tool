@@ -45,6 +45,20 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
       return pages.map(page => {
         const box = page.getBoundingClientRect();
         const tables = [...page.querySelectorAll('table')];
+        for (const table of tables.filter(table => table.querySelector('col[data-colkey="J"]'))) {
+          const columns = [...table.querySelectorAll('col')], headers = [...table.querySelectorAll('thead th')];
+          for (const [key, label] of [['I', 'מנחה\n(בעזר"נ)\nפלג מ"א 72'], ['J', 'מנחה\n(למטה)\nפלג מ"א']]) {
+            const header = headers[columns.findIndex(column => column.dataset.colkey === key)];
+            if (header.innerText !== label) throw Error('Early Mincha headings must name their rooms');
+            const range = document.createRange(); range.selectNodeContents(header.querySelector('.head-room'));
+            const room = range.getBoundingClientRect(), box = header.getBoundingClientRect();
+            if (room.left < box.left - 1 || room.right > box.right + 1)
+              throw Error('The room label must fit its printed column');
+          }
+          for (const cell of table.querySelectorAll('td:not(.ruled):not(.overridden) .cell[data-col="I"]')) {
+            if (cell.textContent.includes('*')) throw Error('Ezras Nashim chart times use the heading instead of stars');
+          }
+        }
         const legend = page.querySelector('.chart-location-legend');
         const marks = [...new Set(tables.flatMap(table =>
           [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])))].sort();

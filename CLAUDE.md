@@ -192,6 +192,10 @@ entries from right to left, with the full English sentence isolated in left-to-r
 order and each Hebrew phrase isolated inside it. Keep each star beside its Hebrew room name and
 verify actual text coordinates rather than the DOM text order. Rebuild standard
 location keys from older custom footers per page and preserve unrelated notes.
+The early Friday Mincha columns name their rooms in the headings: `מנחה / (בעזר"נ) /
+פלג מ"א 72` and `מנחה / (למטה) / פלג מ"א`. The בעזר"נ chart times have no stars;
+למטה retains its underline. Keep the room metadata used by posters, messages and the
+weekly reader, whose compact schedules still use their own location marks.
 `syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
 without changing saved styles. Collapsed table borders and the gap between DST sections
 are included in row-height calculations. Measurement temporarily removes screen scaling
