@@ -55,9 +55,9 @@ async function handle(req, env) {
     if (!["GET", "HEAD"].includes(req.method)) throw new ApiError(405, "Method not allowed.");
     return new Response(req.method === 'HEAD' ? null : 'This page has been removed.', {status:410, headers:{'Content-Type':'text/plain; charset=utf-8'}});
   }
-  if (['/tv', '/tv/index.html'].includes(path)) {
+  if (['/tv', '/tv/index.html', '/tv3', '/tv3/index.html'].includes(path)) {
     if (!["GET", "HEAD"].includes(req.method)) throw new ApiError(405, "Method not allowed.");
-    url.pathname = '/tv/';
+    url.pathname = path.startsWith('/tv3') ? '/tv3/' : '/tv/';
     return Response.redirect(url.href, 308);
   }
   if (path === '/api/display/offline' && req.method === 'GET') {

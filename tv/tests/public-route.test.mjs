@@ -18,11 +18,11 @@ test('retired public screen URLs return Gone without redirecting', async () => {
 });
 
 test('slashless and index TV URLs still redirect to the canonical screen with query intact', async () => {
-  for (const path of ['/tv', '/tv/index.html']) {
+  for (const path of ['/tv', '/tv/index.html', '/tv3', '/tv3/index.html']) {
     for (const method of ['GET', 'HEAD']) {
       const response = await worker.fetch(new Request(`https://shul.example${path}?theme=light&screen=2`, {method}), {});
       assert.equal(response.status, 308);
-      assert.equal(response.headers.get('location'), 'https://shul.example/tv/?theme=light&screen=2');
+      assert.equal(response.headers.get('location'), `https://shul.example/${path.startsWith('/tv3') ? 'tv3' : 'tv'}/?theme=light&screen=2`);
       assert.equal(response.headers.get('cache-control'), 'no-store');
     }
     const response = await worker.fetch(new Request(`https://shul.example${path}`, {method:'POST'}), {});
@@ -35,6 +35,7 @@ test('TV shell, canonical worker and legacy retirement worker remain public with
   for (const [path, scope] of [
     ['/tv/', null], ['/tv/sw.js', '/tv/'], ['/display/sw.js', '/display/'],
     ['/display-assets/display.js', null], ['/display-assets/display.css', null],
+    ['/tv3/', null], ['/display-assets/tv3.js', null], ['/display-assets/tv3.css', null],
   ]) {
     let assetPath;
     const env = {ASSETS:{fetch:async request => {

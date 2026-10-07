@@ -7,12 +7,39 @@ Implemented on `feature/tv-display` and deployed. The public screen is `/tv/`; t
 | Route | Purpose |
 | --- | --- |
 | `/tv/` | Public 16:9 TV screen |
+| `/tv3/` | Daily schedule design with explicit rooms and rotating notices |
 | `/admin/display/` | Server-protected dashboard, editors, future and unsaved previews, permissions |
 | `/api/display/public` | Public projection of currently published content and applicable schedules |
 | `/api/display/admin/*` | Authenticated administration APIs |
 | `/display-assets/*` | Display/admin scripts, styles and the existing Hebrew font |
 
 The existing main admin has a **Manage TV Display** navigation link. Its existing browser PIN is not sufficient authorization for the new APIs. The new server uses the Cloudflare Access JWT verification pattern already used by the private community calendar. The existing static website has no server-side capability table to reuse, so display capabilities are stored in its own D1 table.
+
+### TV3 daily layout
+
+`/tv3/` is a separate 1920 x 1080 design. The large next-minyan banner follows the
+existing dated events and five-minute retention. Three prayer columns show today's
+complete minyan lists, with explicit Hebrew room names, softened past times and a
+highlight for the current or next minyan. Daily zmanim retain seconds in smaller type.
+Dense services use numbered 25-second pages so the font size stays readable.
+
+The bottom band rotates one active announcement or dedication at a time. Long text
+continues on numbered parts, preserving the full message and contact information.
+Refreshes retain the current card, and expiry is evaluated on each clock tick. The
+same saved light/dark appearance applies. The client reads the existing public seed,
+shared calendar and offline cache; it adds no calculations or private API calls.
+The original `/tv/` screen and its editor stay on their existing renderer.
+
+Build with `npm run build`. Run `node tests/tv3-browser.mjs` with Playwright available
+and Chrome installed, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to another installed
+Chromium. The test covers real daily schedules, special days, both themes, text bounds,
+complete pagination, current-minyan retention, expiration, escaped input, scaling and
+calendar advancement while the network is unavailable. It writes no production data.
+
+The existing production `/tv*` route covers `/tv3/`; no new route, database migration,
+permission or environment variable is required. Publish using the existing production
+Worker configuration and bindings, never the placeholder `wrangler.jsonc`. This layout
+has been verified locally; production deployment requires that account's connection.
 
 1. Add an announcement or פרנס היום, or choose **Manage display schedules**.
 2. Enter content and exact New York start/end times. Templates and timing shortcuts reduce typing.
