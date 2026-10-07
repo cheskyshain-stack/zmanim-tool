@@ -366,6 +366,13 @@ Export/Import in Settings moves it between devices.
   beside the weekday. Read these labels from the existing calendar helpers in English;
   keep section keys, grouping, and minyan calculations independent of the labels. Use
   the same labels in notices for days whose full schedule has not been supplied.
+- Open donation forms get a 48rem page cap and reach the card edges on phones. Give the
+  cross-origin form at least a 360px internal viewport and scale it to the available
+  width, keeping the visible height and vertical scrolling. Resize the existing frame
+  on rotation so entered fields survive, and disconnect its observer when it closes.
+  Check actual pointer clicks inside scaled frames, every payment field and security
+  checkbox, and all five card/ACH forms. Cardknox's Rav's Fund tab strip itself remains
+  700px wide, but its tab labels and payment controls fit the narrower phone viewport.
 
 ## Site statistics
 
