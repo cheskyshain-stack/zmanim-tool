@@ -72,9 +72,12 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
         const keys = [...(legend?.querySelectorAll(':scope > bdi') || [])]
           .map(el => el.textContent.match(/^\*{1,2}/)[0]).sort();
         if (JSON.stringify(keys) !== JSON.stringify(marks)) throw Error('The footer must explain only its page’s stars');
-        if (legend && (legend.scrollWidth > legend.clientWidth + 1
-          || legend.getBoundingClientRect().height > parseFloat(getComputedStyle(legend).lineHeight) + 1))
-          throw Error('Location notes must fit on a single line');
+        if (legend) {
+          const expectedHeight = parseFloat(getComputedStyle(legend).lineHeight);
+          if (legend.scrollWidth > legend.clientWidth + 1
+            || Math.abs(legend.getBoundingClientRect().height - expectedHeight) > 1)
+            throw Error('The full downstairs sentence and room stars must fit together on one line');
+        }
         if (legend) {
           const entries = [...legend.children].map(entry => entry.getBoundingClientRect());
           for (let i = 1; i < entries.length; i++) {
@@ -83,13 +86,18 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
           }
           const downstairs = legend.querySelector('.chart-location-downstairs');
           if (downstairs) {
-            const key = downstairs.querySelector('u').getBoundingClientRect();
-            const room = downstairs.querySelector('bdi').getBoundingClientRect();
-            const range = document.createRange();
-            range.setStart(downstairs.childNodes[1], 0); range.setEnd(downstairs.childNodes[1], 1);
-            const colon = range.getBoundingClientRect();
-            if (key.left < room.right - 1 || colon.left < room.right - 1 || colon.right > key.left + 1)
-              throw Error('Underlined must be on the right, with the colon between it and the Hebrew room');
+            if (downstairs.textContent !== 'All underlined מנינים will be בבית מדרש למטה')
+              throw Error('The downstairs note must use the full original wording');
+            const runs = [...downstairs.childNodes].map(node => {
+              const range = document.createRange(); range.selectNodeContents(node);
+              return range.getBoundingClientRect();
+            });
+            for (let i = 1; i < runs.length; i++) {
+              if (runs[i - 1].right > runs[i].left + 1)
+                throw Error('The full sentence must read left to right with isolated Hebrew runs');
+            }
+            if (entries.some(entry => Math.abs(entry.top - downstairs.getBoundingClientRect().top) > 3))
+              throw Error('The room stars must share the line with the full downstairs sentence');
           }
           for (const entry of legend.querySelectorAll(':scope > bdi')) {
             const text = entry.firstChild, count = text.data.startsWith('**') ? 2 : 1;
@@ -415,7 +423,7 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     verifyPdfFooters(await phone.pdf({ preferCSSPageSize: true, printBackground: true }), 2, 'Phone whole season');
     await phoneContext.close();
     assert.deepEqual(errors, [], 'No browser errors');
-    console.log('Verified read-only cells, saved overrides, one-line location notes, persistence, public charts, both molad formats, mobile controls, and each physical PDF footer on desktop and phone.');
+    console.log('Verified read-only cells, saved overrides, full location notes, persistence, public charts, both molad formats, mobile controls, and each physical PDF footer on desktop and phone.');
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

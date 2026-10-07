@@ -8627,7 +8627,8 @@ function fillChartLocationLegend(page) {
   const footer = page.querySelector('.footer-text');
   const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
   // Rebuild standard location keys from this page, including ones in an older custom
-  // footer. Other custom notes stay intact; all required locations share one compact line.
+  // footer. Other custom notes stay intact; the full downstairs sentence and only
+  // the room stars this page uses share one line.
   for (const node of [...footer.childNodes]) {
     if (node.nodeType !== 3) continue;
     const text = node.textContent.replace(/\s+/g, ' ').trim();
@@ -8650,15 +8651,16 @@ function fillChartLocationLegend(page) {
   if (hasDownstairs) {
     const entry = document.createElement('span');
     entry.className = 'chart-location-downstairs';
-    entry.dir = 'rtl';
-    const key = document.createElement('u');
-    key.dir = 'ltr';
-    key.textContent = 'Underlined';
+    entry.dir = 'ltr';
+    const minyanim = document.createElement('bdi');
+    minyanim.dir = 'rtl';
+    minyanim.lang = 'he';
+    minyanim.textContent = 'מנינים';
     const room = document.createElement('bdi');
     room.dir = 'rtl';
     room.lang = 'he';
-    room.textContent = 'בביהמ"ד למטה';
-    entry.append(key, ': ', room);
+    room.textContent = 'בבית מדרש למטה';
+    entry.append('All underlined ', minyanim, ' will be ', room);
     legend.append(entry);
   }
   locations.forEach(([mark, label]) => {
