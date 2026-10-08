@@ -154,7 +154,8 @@ The remembered **Copies per page** switch selects one copy on the left with the 
 half blank, or two identical copies side by side for a manual cut. The default is one;
 both choices keep the same design and physical size. Keep Shacharis together,
 including all sunrise day labels in a compact strip, followed by Mincha, Maariv and
-Erev Shabbos. Retain every time, merged Friday value and location note. Fit the type
+Erev Shabbos. Its heading says **מנחה ערב שבת**, including on the original full-page
+poster, so the Friday times identify their tefillah. Retain every time, merged Friday value and location note. Fit the type
 at full size and refit when fonts arrive; a phone's preview zoom must not reach paper.
 Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
 onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
