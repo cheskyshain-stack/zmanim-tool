@@ -144,7 +144,12 @@ Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
 
-Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper.
+Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
+under **All on one**. **Just one** and **A sheet each** keep the original full-page
+portrait poster, including its original headings, spacing and location notes; they
+never show or apply the Copies per page switch, even when two copies was remembered.
+The original poster's last schedule block has no trailing margin; the legend provides
+the gap so its location notes stay clear of the frame even with six sunrise references.
 The remembered **Copies per page** switch selects one copy on the left with the other
 half blank, or two identical copies side by side for a manual cut. The default is one;
 both choices keep the same design and physical size. Keep Shacharis together,

@@ -699,7 +699,7 @@ function buildEveryOnePage(state, settings, year) {
  *  Nothing is redrawn for this view: an item is the poster's own markup, so what is in the
  *  run is what comes out when that poster is picked on its own. The name above each is
  *  no-print, so paper gets the sheets and nothing else. */
-function renderAllPosters(built, settings, { landscape = false, halfLetter = false } = {}) {
+function renderAllPosters(built, settings, { landscape = false } = {}) {
   // A sheet set landscape is turned a quarter turn and sat on a portrait page, since a run
   // can only be one page size. The turning is .is-sideways in app.css: the wrapper is the
   // portrait page and the sheet inside it is taken out of the flow and rotated, so its 11in
@@ -717,7 +717,7 @@ function renderAllPosters(built, settings, { landscape = false, halfLetter = fal
       const turned = sideways && it.orientations;
       return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
         <p class="poster-all-name no-print">${escAttr(it.label)}${turned ? ' (turned on its side)' : ''}</p>
-        ${it.render(it.poster, settings, { landscape: turned, halfLetter })}
+        ${it.render(it.poster, settings, { landscape: turned })}
       </div>`;
     }).join('')}
     ${built.notBuilt.length
@@ -1621,8 +1621,7 @@ function chanukahBody(poster) {
     <div class="poster-sets">${sections.join('')}</div>`;
 }
 
-function renderChanukahPoster(poster, settings, { halfLetter = false } = {}) {
-  if (halfLetter) return renderHalfChanukahPoster(poster, settings);
+function renderChanukahPoster(poster, settings) {
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
@@ -2772,9 +2771,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   const showAll = chosenSheets !== 'one';
   const onePage = chosenSheets === 'all';
   const poster = empty ? null : showAll ? runPoster : one;
-  const halfLetter = !scopeAll && (showAll
-    ? items.length === 1 && items[0].key === 'chanukah'
-    : one?.key === 'chanukah');
+  const halfLetter = onePage && !scopeAll && items.length === 1 && items[0].key === 'chanukah';
 
   /* Which of the further switches this sheet actually reads, and whether the occasion showing
      has anything for them to decide. Both belong to the run rather than to a single sheet.
@@ -2873,7 +2870,7 @@ export function renderPosters(container, state, routeChanged, tables) {
            A stepper because the number nobody can work out from here is how much of the paper
            the printer refuses to mark. Whoever is standing at the machine can see that in one
            print, so they get to walk it in a step at a time rather than ask for a number. -->
-      ${!empty && (onePage || halfLetter) ? `<div class="poster-year">
+      ${!empty && onePage ? `<div class="poster-year">
         <span class="poster-year-label" id="poster-margin-label">Margin</span>
         <div class="poster-year-step">
           <button type="button" id="poster-margin-back" aria-label="A narrower margin"
@@ -2888,7 +2885,7 @@ export function renderPosters(container, state, routeChanged, tables) {
             ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
         </div>
       </div>` : ''}
-      ${!empty && (onePage || halfLetter) ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
+      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
         { value: 'colour', label: 'Colour', on: chosenInk !== 'mono' },
         // Two words, which is what a side of a switch holds on a phone. The photo keeps its
         // colour either way and the switch does not try to say so: the sheet in front of you
@@ -2937,7 +2934,7 @@ export function renderPosters(container, state, routeChanged, tables) {
       ? 'Two copies print side by side on landscape Letter paper.'
       : 'Prints on the left half of landscape Letter paper.'} Cut at the middle of the sheet.</p>` : ''}
     <div id="poster-sheet">${!empty && built
-      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: true })
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: onePage })
       : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
     ${!showAll ? `<div class="poster-own-bar no-print">
       ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}

@@ -95,6 +95,46 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert.match(pdf.toString('latin1'), /\/MediaBox \[0 0 792 612\]/, 'Landscape Letter paper');
       await page.emulateMedia({ media: 'screen' });
     };
+    const checkOriginal = async (width, value) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await chooseYear(value);
+      assert.equal(await page.locator('.poster.is-halfpage,.is-half-letter-print,#poster-copies-one,#poster-margin,#poster-ink-colour').count(), 0,
+        'Original poster modes have no half-page layout or controls');
+      assert.equal(await page.locator('.poster.is-chanukah').count(), 1);
+      const expected = await page.evaluate(async value => {
+        const { buildChanukahPoster, toCell } = await import('/js/posters/chanukah.js');
+        const { loadState } = await import('/js/storage.js');
+        const { resolveSettings } = await import('/js/settings.js');
+        const { loadTables } = await import('/js/data-loader.js');
+        const p = buildChanukahPoster(value, resolveSettings(loadState().settings), await loadTables());
+        return { title: p.erevShabbos.title, times: [
+          [...p.shacharisRows.flatMap(row => [row.vasikin.time, ...row.cells.slice(1).map(c => c.text)]),
+            ...p.shacharisRows.flatMap(row => (row.vasikin.netzDays || []).map(day => day.time))],
+          p.weekdayMincha.map(t => toCell(t).text), p.erevShabbos.cells.map(c => c.text), p.maariv.map(t => toCell(t).text)]
+          .map(list => list.flatMap(text => text.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || [])) };
+      }, value);
+      assert.deepEqual(await page.locator('.poster-set-head').allTextContents(), ['שחרית', 'מנחה', expected.title, 'מעריב']);
+      const actual = await page.locator('.poster-set').evaluateAll(sections => sections.map(s =>
+        s.textContent.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || []));
+      assert.deepEqual(actual, expected.times, 'Original poster retains every time and sunrise reference');
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Original poster preview fits');
+      await page.emulateMedia({ media: 'print' });
+      const box = await page.locator('.poster.is-chanukah').evaluate(s => {
+        const r = s.getBoundingClientRect(), cs = getComputedStyle(s);
+        return { x: r.x, y: r.y, width: parseFloat(cs.width), height: parseFloat(cs.height),
+          legendBottom: s.querySelector('.poster-legend').getBoundingClientRect().bottom,
+          bottom: r.bottom - parseFloat(cs.paddingBottom) * r.height / parseFloat(cs.height),
+          paper: document.getElementById('print-page-size').textContent };
+      });
+      assert.deepEqual([box.x, box.y], [0, 0]);
+      assert(Math.abs(box.width - 816) < 0.05 && Math.abs(box.height - 1056) < 0.05, 'Original full-page dimensions');
+      assert(box.legendBottom <= box.bottom + 0.5, 'Original notes stay inside the frame');
+      assert(box.paper.includes('letter portrait'));
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+      assert.equal(pdfPages(pdf), 1, 'Original poster prints on one full page');
+      assert.match(pdf.toString('latin1'), /\/MediaBox \[0 0 612 792\]/);
+      await page.emulateMedia({ media: 'screen' });
+    };
     assert(await page.locator('#poster-copies-one').isChecked(), 'Existing users keep one copy by default');
     for (const copies of ['one', 'two']) {
       await page.locator(`label[for=poster-copies-${copies}]`).click();
@@ -104,7 +144,15 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     for (const mode of ['one', 'each', 'all']) {
       await page.locator(`label[for=poster-sheets-${mode}]`).click();
       await settle();
-      await check(375, 5788);
+      if (mode === 'all') {
+        assert(await page.locator('#poster-copies-two').isChecked(), 'Returning to All on one retains the copy choice');
+        await check(375, 5788);
+      } else {
+        for (const width of [1440, 375]) for (const value of [5785, 5786, 5787, 5788, 5789, 5790, 5791]) {
+          await checkOriginal(width, value);
+        }
+        await chooseYear(5788);
+      }
     }
     for (const margin of ['0.15', '0.75', '0.35']) {
       await page.locator('#poster-margin').selectOption(margin);
@@ -142,7 +190,11 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     const run = await page.pdf({ preferCSSPageSize: true, printBackground: true });
     assert.equal(pdfPages(run), count, 'Mixed run has one page per occasion');
     assert.match(run.toString('latin1'), /\/MediaBox \[0 0 612 792\]/);
+    await page.emulateMedia({ media: 'screen' });
+    await page.locator('label[for=poster-sheets-each]').click(); await settle();
+    assert.equal(await page.locator('.poster.is-halfpage,#poster-copies-one').count(), 0, 'A sheet each keeps every original poster in a whole-year run');
+    assert.equal(await page.locator('.poster.is-chanukah').count(), 1);
     assert.deepEqual(errors, []);
-    console.log('Verified one and two half-Letter Chanukah copies across seven years, desktop and phone, all sheet modes, margins, saved choices and mixed print run.');
+    console.log('Verified half-Letter copies only under All on one; original full-page Just one and A sheet each; seven years, desktop and phone, saved choices and whole-year runs.');
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
