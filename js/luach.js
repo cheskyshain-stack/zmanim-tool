@@ -430,6 +430,7 @@ const DONATE = {
       title: 'DAF',
       blurb: 'Donor Advised Fund',
       icon: 'shul',
+      iconImage: '/assets/daf-providers.png',
       /* Three of the four logos are the provider's own file on the provider's own server.
          OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
          on the tile visibly soft, which the user saw on a phone. So that one is ours:
@@ -1013,8 +1014,10 @@ function donateWayHtml(way) {
      icons beside them: a logo drawn to fill its roundel looks shrunken at the size that
      suits a line drawing. */
   const brand = way.icon === 'zelle' || way.icon === 'swirl';
-  const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}`;
-  const mark = giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
+  const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}${way.iconImage ? ' is-image' : ''}`;
+  const mark = way.iconImage
+    ? `<img class="luach-give-mark-image" src="${escAttr(way.iconImage)}" alt="" width="48" height="48" decoding="async">`
+    : giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
   return `<details class="luach-give-card" name="luach-give">
     <summary class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
