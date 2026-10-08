@@ -4175,7 +4175,8 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   padding: 0.04in 0.08in 0.065in;
   font-size: calc(8.5pt * var(--op-scale));
 }
-.halfpage-netz > bdi { display: flex; justify-content: center; flex-wrap: wrap; row-gap: 0.04in; }
+.halfpage-netz > bdi { display: flex; justify-content: center; flex-wrap: wrap; column-gap: 0.7em; row-gap: 0.04in; }
+.halfpage-netz .poster-netz-day + .poster-netz-day { margin-inline-start: 0; }
 .halfpage-netz .poster-netz-day-label { font-size: 0.65em; }
 .poster.is-halfpage .poster-legend {
   margin-top: auto; font-size: 8pt; line-height: 1.45;
