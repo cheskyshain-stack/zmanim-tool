@@ -48,8 +48,9 @@ import { hebrewDateExtended, dateFromHebrew, excelWeekday } from './hebrew-calen
 export const WK_TEXT = {
   title: 'Week of',
   /** In front of a parsha name and not in front of anything else. The sent messages read
-   *  "Week of P' Ki Seitzei" but "Week of Rosh Hashana", "Week of Shavuos", "Week of Chanuka":
-   *  a week named for the yom tov in it is not a week named for a parsha. */
+   *  "Week of P' Ki Seitzei" but "Week of Rosh Hashana" and "Week of Shavuos":
+   *  a week named for the yom tov in it is not a week named for a parsha.
+   *  Chanuka keeps its parsha, as in "Week of P' Miketz - Chanuka". */
   parsha: "P'",
   shacharis: 'Shacharis',
   selichos: 'Selichos',
