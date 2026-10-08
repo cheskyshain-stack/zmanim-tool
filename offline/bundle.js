@@ -4707,10 +4707,10 @@ function combineErevShabbos(erevShabbosList, settings, tables) {
     ? erevShabbosList.map((es) => hasParsha(es.shabbosSerial, settings, tables))
     : [];
   const title = parshaNames.length && parshaNames.every(Boolean)
-    ? `${CH_TEXT.mincha} ${CH_TEXT.erevShabbos} · ${CH_TEXT.title} פרשת ${parshaNames.join(' ו')}`
+    ? `${CH_TEXT.mincha} ${CH_TEXT.erevShabbos} ${CH_TEXT.title} · פרשת ${parshaNames.join(' ו')}`
     // The calendar tables have not loaded (only reachable when this poster is asked for
     // without them): the sheet still has to say something rather than print nothing.
-    : erevShabbosList.map((es) => `${CH_TEXT.mincha} ${CH_TEXT.erevShabbos} · ${CH_TEXT.title} ${es.night}`).join(' / ');
+    : erevShabbosList.map((es) => `${CH_TEXT.mincha} ${CH_TEXT.erevShabbos} ${CH_TEXT.title} · ${es.night}`).join(' / ');
   const cells = erevShabbosList[0].times.map((_, k) => mergedCell(erevShabbosList.map((es) => es.times[k])));
   return { title, cells };
 }
