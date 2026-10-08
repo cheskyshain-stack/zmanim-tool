@@ -371,8 +371,8 @@ const DONATE = {
    * here: what a particular donor may actually deduct depends on their own return, not on
    * the shul, and a flat promise that every donation is deductible is a claim the shul is
    * not in a position to make for somebody else. */
-  legal: `${SHUL_ENGLISH} is a New Jersey registered not for profit, exempt under section
-    501(c)(3). Tax ID <bdi>${SHUL_TAX_ID}</bdi>. Donations are tax deductible to the extent
+  legal: `${SHUL_ENGLISH} is a New Jersey 501(c)(3) nonprofit.
+    EIN: <bdi>${SHUL_TAX_ID}</bdi>. Donations are tax deductible to the extent
     permitted by law.`,
   ways: [
     {
