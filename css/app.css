@@ -4143,9 +4143,11 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 
 /* Chanukah handout: a real half-sheet, with each tefillah kept together. The full
    landscape paper is added only for print, leaving the other half blank for cutting. */
-.poster-half-sheet { width: 5.5in; height: 8.5in; margin: 0 auto; }
+.poster-half-sheet { width: 5.5in; height: 8.5in; margin: 0 auto; display: flex; direction: ltr; }
+.poster-half-sheet.is-two-copies { width: 11in; }
 .poster.is-halfpage {
   width: 5.5in; height: 8.5in;
+  flex: 0 0 5.5in;
   --op-scale: 1.5;
 }
 .poster.is-halfpage > * { flex-shrink: 0; }

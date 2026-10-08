@@ -291,7 +291,7 @@
      A desktop never showed it, having no zoom to reset. */
   .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
 
-  /* One half-size handout, one landscape Letter sheet, with the right half blank.
+  /* One or two half-size handouts on one landscape Letter sheet.
      Explicit dimensions keep a phone's preview zoom and the portrait poster pin out
      of this print job. The 5.5in cut edge is never part of the printer's outer margin. */
   body:has(.is-half-letter-print),
@@ -312,6 +312,9 @@
     position: absolute; top: 0; left: 0;
     transform-origin: 0 0;
     transform: translateY(5.5in) rotate(-90deg);
+  }
+  body:not(:has(.is-half-letter-print)) .poster-all .poster.is-halfpage + .poster.is-halfpage {
+    transform: translateY(11in) rotate(-90deg);
   }
 }
 
