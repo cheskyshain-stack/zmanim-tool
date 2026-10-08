@@ -4674,9 +4674,9 @@ body.is-locked { overflow: hidden; }
    asked for so that two cards a year apart cannot be mistaken for each other, which needs it
    to be read rather than skipped over. */
 .tx-date { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); white-space: nowrap; }
-/* Pushed against the button rather than against the name, so the button stays at the right
-   edge at every width and the words in front of it wrap without moving it. */
+/* The date and occasion wrap naturally; Copy stays on the right of its own flex line. */
 .tx-when { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
+.tx-copy { margin-left: auto; }
 /* The message as it will be pasted, spacing and all. pre rather than a div, because the line
    breaks are the message: a chat message that lost them is not the same message. Wrapping is
    on so a long line is readable on a phone without the card scrolling sideways. */
