@@ -430,7 +430,7 @@ const DONATE = {
       title: 'DAF',
       blurb: 'Donor Advised Fund',
       icon: 'shul',
-      iconImage: '/assets/daf-providers.png',
+      iconImage: '/assets/daf-providers-transparent.png',
       /* Three of the four logos are the provider's own file on the provider's own server.
          OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
          on the tile visibly soft, which the user saw on a phone. So that one is ours:
