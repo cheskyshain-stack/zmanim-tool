@@ -1643,7 +1643,7 @@ function renderHalfChanukahPoster(poster, settings) {
     </div>`;
   const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
-  return `<div class="poster-half-sheet">${html}</div>`;
+  return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -2483,6 +2483,7 @@ function recallBar() {
     // Snapped to a step and held inside the ends, so a hand-edited value cannot put the
     // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
+    if (saved.copiesPerPage === 1 || saved.copiesPerPage === 2) chosenCopiesPerPage = saved.copiesPerPage;
     if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
     if (Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
@@ -2501,7 +2502,7 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
-      margin: chosenMargin, ink: chosenInk, scope: chosenScope,
+      margin: chosenMargin, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -2562,6 +2563,9 @@ let chosenMargin = OP_PAD;
  *
  * Remembered with the rest of the bar, so a shul that prints in black and white stays there. */
 let chosenInk = 'colour';
+// A Chanukah handout can leave the other half blank or use it for an identical copy.
+// Remember the choice with the bar; full-size posters do not read it.
+let chosenCopiesPerPage = 1;
 /* Whether the run is one yom tov or the whole year of them.
  *
  * Asked for: ראש השנה, יום כיפור and סוכות printed in one go rather than three trips to the
@@ -2618,7 +2622,8 @@ export function fitPoster(container) {
   // A sheet turned on its side is scaled by its wrapper rather than by itself: rotation
   // leaves the sheet's own box 11in wide whatever it looks like, and it is the wrapper, the
   // portrait page it is sitting on, that has to fit the screen.
-  const all = [...container.querySelectorAll('.poster')].map((el) => el.closest('.is-sideways, .poster-half-sheet') || el);
+  const all = [...new Set([...container.querySelectorAll('.poster')]
+    .map((el) => el.closest('.is-sideways, .poster-half-sheet') || el))];
   if (!all.length) return;
   const decide = () => {
     for (const el of all) {
@@ -2890,6 +2895,10 @@ export function renderPosters(container, state, routeChanged, tables) {
         // shows it.
         { value: 'mono', label: 'Black and white', on: chosenInk === 'mono' },
       ])}</div>` : ''}
+      ${!empty && halfLetter ? `<div class="poster-bar-switch">${switchHtml('poster-copies', 'Copies per page', [
+        { value: 'one', label: 'One', on: chosenCopiesPerPage === 1 },
+        { value: 'two', label: 'Two', on: chosenCopiesPerPage === 2 },
+      ])}</div>` : ''}
       ${!empty && onePage && !halfLetter ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
         // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
         // and "Start at a day" both sit inside that where a sentence would not.
@@ -2924,7 +2933,9 @@ export function renderPosters(container, state, routeChanged, tables) {
       : ''}
     <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
          without redrawing the panel the caret is in. -->
-    ${built && halfLetter ? '<p class="hint no-print">5½ × 8½ inches. Prints on the left half of landscape Letter paper. Cut at the middle of the sheet.</p>' : ''}
+    ${built && halfLetter ? `<p class="hint no-print">5½ × 8½ inches per copy. ${chosenCopiesPerPage === 2
+      ? 'Two copies print side by side on landscape Letter paper.'
+      : 'Prints on the left half of landscape Letter paper.'} Cut at the middle of the sheet.</p>` : ''}
     <div id="poster-sheet">${!empty && built
       ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: true })
       : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
@@ -3011,6 +3022,11 @@ export function renderPosters(container, state, routeChanged, tables) {
   });
   wireSwitch(container, 'poster-ink', (value) => {
     chosenInk = value === 'mono' ? 'mono' : 'colour';
+    rememberBar();
+    again();
+  });
+  wireSwitch(container, 'poster-copies', (value) => {
+    chosenCopiesPerPage = value === 'two' ? 2 : 1;
     rememberBar();
     again();
   });
