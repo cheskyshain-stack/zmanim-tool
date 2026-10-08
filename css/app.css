@@ -4168,7 +4168,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   line-height: 1.35;
 }
 .poster.is-halfpage .onepage-label:empty { display: none; }
-.poster.is-halfpage .onepage-label { display: block; font-size: 0.8em; margin-bottom: 0.025in; }
+.poster.is-halfpage .onepage-label { display: block; font-size: 0.8em; font-weight: 700; margin-bottom: 0.025in; }
 .poster.is-halfpage .onepage-times { text-align: center; }
 .halfpage-netz {
   display: flex; justify-content: center; align-items: center; gap: 0.12in;
