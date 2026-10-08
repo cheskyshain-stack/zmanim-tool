@@ -457,9 +457,9 @@ const POSTERS = [
       ? (built.sheets
         ? `<div class="poster-all">${built.sheets.map((b) => `<div class="poster-all-item">
             <p class="poster-all-name no-print"${hebrewLang(b.title)}>${escAttr(b.title)}</p>
-            ${renderOnePagePoster(b, settings)}
+            ${renderOnePagePoster(b, settings, opts)}
           </div>`).join('')}</div>`
-        : renderOnePagePoster(built, settings))
+        : renderOnePagePoster(built, settings, opts))
       : renderAllPosters(built, settings, opts)),
   },
 ];
@@ -699,7 +699,7 @@ function buildEveryOnePage(state, settings, year) {
  *  Nothing is redrawn for this view: an item is the poster's own markup, so what is in the
  *  run is what comes out when that poster is picked on its own. The name above each is
  *  no-print, so paper gets the sheets and nothing else. */
-function renderAllPosters(built, settings, { landscape = false } = {}) {
+function renderAllPosters(built, settings, { landscape = false, halfLetter = false } = {}) {
   // A sheet set landscape is turned a quarter turn and sat on a portrait page, since a run
   // can only be one page size. The turning is .is-sideways in app.css: the wrapper is the
   // portrait page and the sheet inside it is taken out of the flow and rotated, so its 11in
@@ -717,7 +717,7 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
       const turned = sideways && it.orientations;
       return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
         <p class="poster-all-name no-print">${escAttr(it.label)}${turned ? ' (turned on its side)' : ''}</p>
-        ${it.render(it.poster, settings, { landscape: turned })}
+        ${it.render(it.poster, settings, { landscape: turned, halfLetter })}
       </div>`;
     }).join('')}
     ${built.notBuilt.length
@@ -938,12 +938,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false, halfpage = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
     + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
-    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}`;
+    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -1621,8 +1621,29 @@ function chanukahBody(poster) {
     <div class="poster-sets">${sections.join('')}</div>`;
 }
 
-function renderChanukahPoster(poster, settings) {
+function renderChanukahPoster(poster, settings, { halfLetter = false } = {}) {
+  if (halfLetter) return renderHalfChanukahPoster(poster, settings);
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
+}
+
+/** A handout on half a Letter sheet. Keep the morning groups together and put their
+ *  sunrise references in one strip, rather than spending a table row on each day. */
+function renderHalfChanukahPoster(poster, settings) {
+  const sections = ONEPAGE_SECTIONS.chanukah(poster);
+  const morning = sections[0];
+  const netz = poster.shacharisRows.flatMap((row) => row.vasikin.netzDays || []);
+  const section = (s, rows) => `<section class="onepage-sec">
+    <h3 class="onepage-sec-head" lang="he">${escAttr(s.title)}</h3>${rows}</section>`;
+  const body = `<h2 class="onepage-title" lang="he">${escAttr(CH_TEXT.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="halfpage-body">
+      ${section(morning, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
+        + (netz.length ? `<div class="halfpage-netz"><strong lang="he">${escAttr(CH_TEXT.netz)}</strong>
+          <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))}
+      ${sections.slice(1).map((s) => section(s, s.rows.map((row) => onePageRows({ ...row, label: '' })).join(''))).join('')}
+    </div>`;
+  const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
+  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
+  return `<div class="poster-half-sheet">${html}</div>`;
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -1964,7 +1985,10 @@ function onePageRows(r) {
  *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
  *
  *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
-function renderOnePagePoster(built, settings) {
+function renderOnePagePoster(built, settings, { halfLetter = false } = {}) {
+  if (halfLetter && built.items?.length === 1 && built.items[0].key === 'chanukah') {
+    return renderHalfChanukahPoster(built.items[0].poster, settings);
+  }
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
    * On the סליחות sheet it is a line among the rest, being a stretch of ordinary mornings
@@ -2594,7 +2618,7 @@ export function fitPoster(container) {
   // A sheet turned on its side is scaled by its wrapper rather than by itself: rotation
   // leaves the sheet's own box 11in wide whatever it looks like, and it is the wrapper, the
   // portrait page it is sitting on, that has to fit the screen.
-  const all = [...container.querySelectorAll('.poster')].map((el) => el.closest('.is-sideways') || el);
+  const all = [...container.querySelectorAll('.poster')].map((el) => el.closest('.is-sideways, .poster-half-sheet') || el);
   if (!all.length) return;
   const decide = () => {
     for (const el of all) {
@@ -2610,13 +2634,39 @@ export function fitPoster(container) {
     // to be this way round. The סוכות sheet's type is set here for the same reason.
     fitOnePage(container);
     fitSukkos(container);
+    fitHalfChanukah(container);
   };
   decide();
+  if (container.querySelector('.poster.is-halfpage')) {
+    document.fonts.ready.then(() => { if (document.body.contains(all[0])) decide(); });
+  }
   // Rotating a phone changes what fits. One listener, replaced each render so it always
   // points at the posters currently on screen.
   if (fitHandler) window.removeEventListener('resize', fitHandler);
   fitHandler = () => { if (document.body.contains(all[0])) decide(); };
   window.addEventListener('resize', fitHandler);
+}
+
+function fitHalfChanukah(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-halfpage')) {
+    const wrapper = sheet.parentElement;
+    const zoom = wrapper.style.zoom;
+    wrapper.style.zoom = '1';
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    sheet.classList.toggle('is-mono', chosenInk === 'mono');
+    const legend = sheet.querySelector('.poster-legend');
+    const fits = () => {
+      const cs = getComputedStyle(sheet);
+      return legend.getBoundingClientRect().bottom <= sheet.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) + 0.5
+        && sheet.querySelector('.halfpage-body').getBoundingClientRect().bottom <= legend.getBoundingClientRect().top - 6
+        && sheet.scrollWidth <= sheet.clientWidth;
+    };
+    for (let size = 1.5; size >= 1; size = Math.round((size - 0.025) * 1000) / 1000) {
+      sheet.style.setProperty('--op-scale', size);
+      if (fits()) break;
+    }
+    wrapper.style.zoom = zoom;
+  }
 }
 
 /** Redraw after a picker changed, without throwing the reader back to the top.
@@ -2717,6 +2767,9 @@ export function renderPosters(container, state, routeChanged, tables) {
   const showAll = chosenSheets !== 'one';
   const onePage = chosenSheets === 'all';
   const poster = empty ? null : showAll ? runPoster : one;
+  const halfLetter = !scopeAll && (showAll
+    ? items.length === 1 && items[0].key === 'chanukah'
+    : one?.key === 'chanukah');
 
   /* Which of the further switches this sheet actually reads, and whether the occasion showing
      has anything for them to decide. Both belong to the run rather than to a single sheet.
@@ -2738,7 +2791,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   const result = poster && source ? source.build() : { missing: 'No year to build from.' };
   const built = result.poster || null;
 
-  container.className = 'is-sheet-view';
+  container.className = `is-sheet-view${halfLetter ? ' is-half-letter-print' : ''}`;
   container.innerHTML = `
     <h2 class="no-print">Posters</h2>
     <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. What changes with the year is worked out rather than typed, so a poster is right the year it is printed and every year after.</p>
@@ -2815,7 +2868,7 @@ export function renderPosters(container, state, routeChanged, tables) {
            A stepper because the number nobody can work out from here is how much of the paper
            the printer refuses to mark. Whoever is standing at the machine can see that in one
            print, so they get to walk it in a step at a time rather than ask for a number. -->
-      ${!empty && onePage ? `<div class="poster-year">
+      ${!empty && (onePage || halfLetter) ? `<div class="poster-year">
         <span class="poster-year-label" id="poster-margin-label">Margin</span>
         <div class="poster-year-step">
           <button type="button" id="poster-margin-back" aria-label="A narrower margin"
@@ -2830,14 +2883,14 @@ export function renderPosters(container, state, routeChanged, tables) {
             ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
         </div>
       </div>` : ''}
-      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
+      ${!empty && (onePage || halfLetter) ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
         { value: 'colour', label: 'Colour', on: chosenInk !== 'mono' },
         // Two words, which is what a side of a switch holds on a phone. The photo keeps its
         // colour either way and the switch does not try to say so: the sheet in front of you
         // shows it.
         { value: 'mono', label: 'Black and white', on: chosenInk === 'mono' },
       ])}</div>` : ''}
-      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
+      ${!empty && onePage && !halfLetter ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
         // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
         // and "Start at a day" both sit inside that where a sentence would not.
         { value: 'even', label: 'Split evenly', on: chosenBreak === 'even' },
@@ -2871,8 +2924,9 @@ export function renderPosters(container, state, routeChanged, tables) {
       : ''}
     <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
          without redrawing the panel the caret is in. -->
+    ${built && halfLetter ? '<p class="hint no-print">5½ × 8½ inches. Prints on the left half of landscape Letter paper. Cut at the middle of the sheet.</p>' : ''}
     <div id="poster-sheet">${!empty && built
-      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: true })
       : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
     ${!showAll ? `<div class="poster-own-bar no-print">
       ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}
@@ -3040,11 +3094,12 @@ export function renderPosters(container, state, routeChanged, tables) {
     });
   }
   if (built) {
-    /* Every sheet on this tab prints on portrait paper, the landscape ones included: they
+    /* The Chanukah handout occupies half a landscape Letter sheet. Other posters print
+       on portrait paper, the landscape ones included: they
        go on it turned a quarter turn, which is what the run has always done with them and
        what a single one does now as well. See the .poster.is-landscape rule in print.css
        for why it is not left to the paper to be landscape. */
-    setPrintPage('letter portrait');
+    setPrintPage(halfLetter ? 'letter landscape' : 'letter portrait');
     wirePrintButton(container);
 
     /* The erev message onto the clipboard, for the sheets that have one. See ui/copy.js:

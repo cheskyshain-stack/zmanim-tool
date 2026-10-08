@@ -212,9 +212,9 @@
      Both runs are excluded by name rather than by cascade order. A pin to one sheet clips
      everything after the first, and a rule that stopped applying because another one below
      happened to be more specific is not something to be relying on for that. */
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)),
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) .app-shell,
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) main {
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)),
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)) .app-shell,
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)) main {
     width: 8.5in; height: 11in;
     margin: 0; padding: 0;
     overflow: hidden;
@@ -290,6 +290,29 @@
      printed at the 0.42 the screen had them at, a small sheet adrift on a letter page.
      A desktop never showed it, having no zoom to reset. */
   .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
+
+  /* One half-size handout, one landscape Letter sheet, with the right half blank.
+     Explicit dimensions keep a phone's preview zoom and the portrait poster pin out
+     of this print job. The 5.5in cut edge is never part of the printer's outer margin. */
+  body:has(.is-half-letter-print),
+  body:has(.is-half-letter-print) .app-shell,
+  body:has(.is-half-letter-print) main {
+    width: 11in; height: 8.5in;
+    margin: 0; padding: 0; overflow: hidden;
+  }
+  .poster-half-sheet { margin: 0; box-shadow: none; zoom: 1 !important; }
+  body:has(.is-half-letter-print) .poster-half-sheet { width: 11in; height: 8.5in; }
+  .poster.is-halfpage { margin: 0; zoom: 1 !important; }
+  /* Mixed runs retain portrait paper. Turn this small handout onto the top half of
+     that sheet, still at its actual size, rather than changing every other poster. */
+  body:not(:has(.is-half-letter-print)) .poster-all .poster-half-sheet {
+    position: relative; width: 8.5in; height: 11in;
+  }
+  body:not(:has(.is-half-letter-print)) .poster-all .poster.is-halfpage {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0;
+    transform: translateY(5.5in) rotate(-90deg);
+  }
 }
 
 /* --- The same thing again, for the boxes that are portrait ---------------------------
@@ -334,4 +357,5 @@
      drops it by is a fixed distance that a zoom does not scale with it, so scaling the
      sheet would slide it off its own paper rather than fit it. */
   .poster.is-landscape { zoom: 1 !important; }
+  .poster.is-halfpage { zoom: 1 !important; }
 }
