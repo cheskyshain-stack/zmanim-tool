@@ -523,7 +523,7 @@ function nextUpHtml([minyan, candles]) {
           <span class="luach-next-time">${escAttr(clock(item.mins))}<small>${escAttr(meridiem(item.mins))}</small></span>
         </div>
       </div>
-      ${when ? `<p class="luach-next-when">${ICON_WAIT}${escAttr(when)}</p>` : ''}
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}${escAttr(when).replace(/(\d+) (hours?|minutes?)/g, '$1&nbsp;$2')}</p>` : ''}
     </div>`;
   };
   return `<div class="luach-next" aria-live="polite">

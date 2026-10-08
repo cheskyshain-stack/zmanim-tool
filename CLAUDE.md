@@ -429,6 +429,11 @@ be presented as measured zero. Deploy the compatible Worker before its frontend.
 
 ## הדלקת נרות on the congregation's home page
 
+Same-day countdowns show hours and remaining minutes, such as **in 2 hours 5 minutes**.
+Round the total minutes up before splitting into units, omit zero minutes at an exact
+hour, and keep the existing minute refresh and return-to-tab refresh behavior.
+Keep each number together with its unit when the narrow Friday cards wrap.
+
 The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
 read that off the chart's H column alone, which only ever has one on a **Friday with a שבת row
 behind it**, so **every ערב יום טוב had no candle lighting at all**: ערב ר"ה, ערב יו"כ, ערב סוכות,

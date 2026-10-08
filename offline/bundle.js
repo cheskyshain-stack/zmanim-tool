@@ -11279,9 +11279,7 @@ function meridiem(mins) {
   return (((mins % 1440) + 1440) % 1440) < 720 ? 'AM' : 'PM';
 }
 
-/** How far off, in the coarsest words that are still true: "in 25 minutes", "in 2 hours",
- *  "tomorrow", "Monday". A countdown to the second would be stale the moment it was drawn,
- *  and is not what anyone is asking the page.
+/** How far off: "in 25 minutes", "in 2 hours 5 minutes", "tomorrow", "Monday".
  *
  *  `item.in` is not a whole number of minutes. shulNow reads the clock to the millisecond,
  *  which is what the search wants so that a מנין starting this very minute is not skipped,
@@ -11290,8 +11288,8 @@ function meridiem(mins) {
  *
  *  Minutes round up. Anything still to come is at least a minute away until it has
  *  actually arrived, and rounding down would count the last thirty seconds as "in 0
- *  minutes". Hours round to the nearest, where being half an hour out either way is the
- *  whole point of saying "in 3 hours" rather than a number of minutes. */
+ *  minutes". Split that rounded total into hours and remaining minutes so the two
+ *  units agree at an hour boundary, and omit zero minutes at an exact hour. */
 function howFar(item) {
   if (!item) return '';
   // Started, but only just: a מנין held on the card for its grace, or הדלקת נרות in the
@@ -11305,8 +11303,10 @@ function howFar(item) {
   if (minutes === 0) return 'now';
   if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
   if (item.daysOff === 0) {
-    const hours = Math.round(item.in / 60);
-    return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return `in ${hours} hour${hours === 1 ? '' : 's'}`
+      + (remaining ? ` ${remaining} minute${remaining === 1 ? '' : 's'}` : '');
   }
   if (item.daysOff === 1) return 'tomorrow';
   return DAY_NAMES[excelWeekday(item.serial) - 1];
