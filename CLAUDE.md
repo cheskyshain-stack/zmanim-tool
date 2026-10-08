@@ -615,6 +615,9 @@ and listed in `DIST_TREES`.
   סוכות, of פסח, of שבועות and of ראש השנה had no message at all**, which the shul reported. Those
   weeks are named for the yom tov in them, the way the chart's own row is: "Week of Sukkos", and
   the "P'" goes in front of a parsha only.
+  A full Chanuka week keeps the parsha: "Week of P' Miketz - Chanuka". Erev Shabbos messages
+  add " - Chanuka" when Shabbos itself is during Chanuka, including before its first night.
+  Both the upcoming and full-year views use that calendar rule.
   **The morning is not always the everyday שחרית**, and the shul asked why the message still said
   it was. Through the סליחות season the shul opens earlier and on the סליחות sheet's own lists, so
   `wkMornings` asks `weekdayMornings` in `posters/day.js`, which is the same question the week card

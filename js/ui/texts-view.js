@@ -19,7 +19,7 @@
 
 import { weekIndex, rowFor } from '../sheets/rows.js';
 import { computeSeasonWeeks, computeWeekdayWeeks } from '../sheets/weeks.js';
-import { hebrewDateExtended, hasParsha, hasYomTov } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasParsha, hasYomTov, chanukahYearFor } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { wireCopyButton } from './copy.js';
@@ -62,7 +62,7 @@ function txErevShabbos(state, settings, tables, today) {
      simply does not appear until it is four days off. */
   if (found.week.serial - today > TX_AHEAD_DAYS) return null;
   const { columns, row } = rowFor(found.week, found.sheet, state, settings);
-  const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+  const english = txErevParshaName(found.week, settings, tables);
   return {
     id: 'erev-shabbos',
     kind: 'parsha',
@@ -174,6 +174,12 @@ function txWeekName(week, settings, tables) {
   return weekName(yomTov || week.parsha, false);
 }
 
+/** Both message views name Chanuka from Shabbos itself, even before its first night. */
+function txErevParshaName(week, settings, tables) {
+  const name = erevParshaEnglish(week.parsha, tables?.parshaNames);
+  return name && chanukahYearFor(week.serial, settings) ? `${name} - Chanuka` : name;
+}
+
 /** Which of the two morning-after-יום כיפור lines the Week message carries right now, or ''
  *  the rest of the time: nothing before שקיעה the night יום כיפור ends, "TOMORROW..." from
  *  there through 3am, "TODAY..." from 3am through the last שחרית of that morning, then nothing
@@ -213,8 +219,8 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  is the Settings schedule the chart prints as one merged cell, the סליחות season's own lists
  *  where the week is in one (see wkMornings in week-text.js), or - asked for directly, after the
  *  wall chart's own Shacharis panel had been carrying it for a while with no message to match -
- *  חנוכה's own morning on the one week every one of whose five weekdays is חנוכה, which also
- *  renames the week for the message the same way Sukkos, Pesach and Shavuos already do.
+ *  חנוכה's own morning on the one week every one of whose five weekdays is חנוכה. That week
+ *  keeps its parsha name and adds Chanuka to the message heading.
  *
  *  Sent on the Sunday, which is six days before the Shabbos. See TX_WEEK_FROM for how long it
  *  stands.
@@ -222,13 +228,9 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  @param entry - a week and its season, from txWeekdayWeeks. */
 function txWeek(state, settings, tables, entry, now) {
   const shabbos = entry.week.serial;
-  /* A week every one of whose five weekdays is חנוכה is named for it rather than for its own
-     parsha - "Week of Chanuka", not "Week of P' Miketz" - the same rule every other yom-tov
-     week on this page already follows (WK_TEXT's own note: a week named for the yom tov in it
-     is not a week named for a parsha), and the same five-day test the Weekday chart itself
-     uses to decide whether to write "· חנוכה" into that week's own parsha cell
-     (sheet-view.js's weekAllChanukah). A week only partly חנוכה keeps its own parsha name and
-     its own ordinary morning, same as the chart keeps that week's plain label.
+  /* A full Chanuka week keeps its parsha name: "Week of P' Miketz - Chanuka".
+     The same five-day test decides whether the Weekday chart adds "· חנוכה" to its row.
+     A week only partly חנוכה keeps its own ordinary morning and plain parsha label.
      The morning itself is chanukahScheduleLines on those same five days, merged into the one
      line the wall chart's own full-week row prints (mergeAll: true, see chanukahPanelBlocks)
      and with Rosh Chodesh left out of the merge (includeRoshChodesh: false) where that week
@@ -236,7 +238,7 @@ function txWeek(state, settings, tables, entry, now) {
      a מנין twice. */
   const chanukahDays = chanukahDaysInWeek(shabbos, settings);
   const isChanukahWeek = chanukahDays.length === 5;
-  const name = isChanukahWeek ? weekName('Chanuka', false) : txWeekName(entry.week, settings, tables);
+  const name = txWeekName(entry.week, settings, tables) + (isChanukahWeek ? ' - Chanuka' : '');
   const shacharisCell = isChanukahWeek
     ? chanukahScheduleLines(chanukahDays, settings, { includeRoshChodesh: false, mergeAll: true })
     : WEEKDAY_SHACHARIS;
@@ -770,7 +772,7 @@ export function renderTexts(container, state, settings, tables) {
       const found = txAgainst(state, weeks, serial);
       if (!found) continue;
       const { columns, row } = rowFor(found.week, found.sheet, state, settings);
-      const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+      const english = txErevParshaName(found.week, settings, tables);
       messages.push({
         id: `erev-shabbos-${serial}`,
         kind: 'parsha',
