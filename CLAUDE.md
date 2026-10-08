@@ -144,6 +144,16 @@ Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
 
+Admin Chanukah posters use a 5.5in by 8.5in handout on the left half of a landscape
+Letter sheet, with the other half blank for a manual cut. Keep Shacharis together,
+including all sunrise day labels in a compact strip, followed by Mincha, Maariv and
+Erev Shabbos. Retain every time, merged Friday value and location note. Fit the type
+at full size and refit when fonts arrive; a phone's preview zoom must not reach paper.
+Mixed whole-year runs keep portrait Letter paper and rotate the half-size handout
+onto the top half of its own page. Public Special Schedules keep their full-page layout.
+`tests/chanukah-half-letter.cjs` checks seven years, phone and desktop PDFs, margin
+controls, all three sheet modes, content retention and mixed-run pagination.
+
 The after-Sukkos extra 9:00 Maariv is kept through Thursday, October 8, 2026 in Lakewood
 and omitted from Friday onward, including future years previewed before that date.
 `buildSukkosAfter` applies the cutoff to the shared list read by posters and weekday

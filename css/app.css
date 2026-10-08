@@ -4141,6 +4141,41 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .onepage-times u { text-underline-offset: 0.12em; }
 .onepage-note { white-space: nowrap; }
 
+/* Chanukah handout: a real half-sheet, with each tefillah kept together. The full
+   landscape paper is added only for print, leaving the other half blank for cutting. */
+.poster-half-sheet { width: 5.5in; height: 8.5in; margin: 0 auto; }
+.poster.is-halfpage {
+  width: 5.5in; height: 8.5in;
+  --op-scale: 1.5;
+}
+.poster.is-halfpage > * { flex-shrink: 0; }
+.poster.is-halfpage .page-header {
+  --sheet-font-size: 5pt;
+  --sheet-header-scale: 0.44;
+  margin-bottom: 0.12in;
+}
+.poster.is-halfpage .header-row { gap: 0.08in; }
+.poster.is-halfpage .onepage-title { font-size: 18pt; margin-bottom: 0.12in; }
+.halfpage-body { width: 100%; display: flex; flex-direction: column; gap: 0.14in; }
+.poster.is-halfpage .onepage-sec-head { text-align: center; }
+.poster.is-halfpage .onepage-row {
+  display: block; padding: 0.065in 0.08in;
+  line-height: 1.35;
+}
+.poster.is-halfpage .onepage-label:empty { display: none; }
+.poster.is-halfpage .onepage-label { display: block; font-size: 0.8em; margin-bottom: 0.025in; }
+.poster.is-halfpage .onepage-times { text-align: center; }
+.halfpage-netz {
+  display: flex; justify-content: center; align-items: center; gap: 0.12in;
+  padding: 0.04in 0.08in 0.065in;
+  font-size: calc(8.5pt * var(--op-scale));
+}
+.halfpage-netz > bdi { display: flex; justify-content: center; flex-wrap: wrap; row-gap: 0.04in; }
+.halfpage-netz .poster-netz-day-label { font-size: 0.65em; }
+.poster.is-halfpage .poster-legend {
+  margin-top: auto; font-size: 8pt; line-height: 1.45;
+}
+
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
    no year (the shul wants it clean), so this is the one place that answers "is this the
    right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
