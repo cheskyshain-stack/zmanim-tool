@@ -152,8 +152,12 @@ The original poster's last schedule block has no trailing margin; the legend pro
 the gap so its location notes stay clear of the frame even with six sunrise references.
 The remembered **Copies per page** switch selects one copy on the left with the other
 half blank, or two identical copies side by side for a manual cut. The default is one;
-both choices keep the same design and physical size. The Shacharis day-group labels
-are bold. Keep Shacharis together,
+both choices keep the same design and physical size.
+The half-page letterhead uses a larger 2.7in wordmark, with balanced 0.9in corner
+columns for the photo and rabbi's line. Let the wordmark shrink within its column
+when a wider print margin reduces the space, keeping all three parts clear.
+Reserve the logo's aspect ratio before loading so the fit includes its full height.
+The Shacharis day-group labels are bold. Keep Shacharis together,
 including all sunrise day labels in a compact strip with clear gaps between each
 day/time pair, followed by Mincha, Maariv and
 Erev Shabbos. Its heading says **מנחה ערב שבת**, including on the original full-page
