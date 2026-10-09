@@ -5524,8 +5524,6 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-item-copy { flex:1; min-width:0; text-align:left; }
  .is-home .luach-item-title { display:block; font:700 25px/1.2 Georgia,serif; }
  .luach-item-description { display:block; margin-top:4px; font:400 12px/1.4 Arial,sans-serif; color:#64707c; }
- .is-home .luach-home-primary { background:#142b46; border-color:#142b46; color:#fff; }
- .is-home .luach-home-primary .luach-item-description,.is-home .luach-home-primary .luach-item-go { color:#d5dce5; opacity:1; }
  .is-home .luach-item:hover { box-shadow:0 4px 14px #142b4610; }
  .luach-site-footer { width:100%; max-width:1080px; margin:36px auto 0; padding:22px 0 0; border-top:1px solid #e5e2da; text-align:center; color:#576674; }
  .luach-site-footer .luach-foot-part:first-child { display:block; font:400 15px/1.5 Georgia,serif; }
