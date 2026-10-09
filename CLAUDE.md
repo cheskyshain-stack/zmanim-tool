@@ -204,6 +204,19 @@ checks both reference layouts, phone and desktop printing, all sheet modes, the
 conditional note, half-page copies and saved choices, margins, the public Special
 Schedule, and the copyable fast-day message.
 
+Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
+rounds, Cheshvan and Iyar. These always use a framed 5.5in by 8.5in poster on landscape
+Letter paper, with the remembered one-or-two Copies per page switch. Spell out each
+room beside its time instead of printing location marks or a location key. Read the
+times from the seasonal special Shacharis list, and retain Asara's conditional 6:40
+Selichos note. BHB dates come from the same `hasBehab` rule as the charts. Neutral
+shading for Ezras Nashim and the hall is SVG artwork behind selectable text so it
+prints even with background graphics disabled. These supplementary handouts are
+selected separately and do not duplicate the complete schedules in public or
+whole-year print runs. `tests/shacharis-handouts.mjs` checks 51 years of calendar and
+room data; `tests/shacharis-handouts-print.cjs` checks actual half-page PDFs, Hebrew
+coordinates, content, copies, margins, saved choices, and original schedule retention.
+
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks

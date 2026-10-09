@@ -3,10 +3,9 @@
 import { dateFromHebrew, excelWeekday } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 import { fridayMainMinchaParts, candleLightingParts, asaraLastMinchaTrace, fridayLateMinchaTrace } from '../sheets/common.js';
 import { buildChorefRow } from '../sheets/choref.js';
-import { parseTimes } from './slichos.js';
+import { specialShacharisLines } from './special-shacharis.js';
 import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
 import { fixedTime, zman } from '../zmanim/trace.js';
 
@@ -37,13 +36,7 @@ export function buildAsaraBTevesPoster(year, settings) {
   const netz = Z.sunriseElev(date, settings), shkia = Z.sunsetElev(date, settings);
   const rawShkia = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
   const shkiaTrace = friday ? rawShkia.floor('drop the seconds, as on the Friday chart') : rawShkia;
-  const shacharisLines = WEEKDAY_SHACHARIS_SPECIAL.split('\n').map(line =>
-    parseTimes(line.replace(/\s+/g, ',')).map(time => {
-      let trace = fixedTime(time.text, { am: true, label: 'the seasonal chart\'s fast-day Shacharis schedule' });
-      if (time.underlined) trace = trace.underline();
-      if (time.mark) trace = trace.mark(time.mark);
-      return asaraCell(trace);
-    }));
+  const shacharisLines = specialShacharisLines();
   if (asaraSelichosFirst(netz)) {
     const first = shacharisLines.flat().find(time => time.text === '6:40');
     if (first) {

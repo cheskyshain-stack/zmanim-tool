@@ -65,7 +65,7 @@ jobs:
         run: node scripts/build-schedule-api.mjs
 
       - name: Verify the schedule API and special-day rules
-        run: node --test tests/schedule-feed.mjs tests/asara-bteves.mjs
+        run: node --test tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
 
       - uses: actions/configure-pages@v5
 
