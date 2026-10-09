@@ -66,6 +66,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         [row.querySelector('.shacharis-handout-room').textContent, row.querySelector('.shacharis-handout-time').textContent]));
       assert.deepEqual(actual, expected, 'Every time is paired with its written room');
       assert.equal(await page.locator('.poster.is-shacharis').count(), copies);
+      assert.equal(await page.locator('.poster.is-shacharis.is-onepage .page-header').count(), copies, 'Morning handouts use the compact letterhead');
+      assert.equal(await page.locator('.poster.is-shacharis .onepage-title,.poster.is-shacharis .onepage-sec-head').count(), copies * 2,
+        'Compact title and Shacharis section bar are present');
+      assert.equal(await page.locator('.poster.is-shacharis .poster-wordmark,.poster.is-shacharis .poster-rule').count(), 0, 'No framed Word-style letterhead');
       assert.equal(await page.locator('.shacharis-handout-shade').count(), copies * 3);
       assert.equal(await page.locator('.poster.is-shacharis u').count(), 0, 'Rooms replace location underlines');
       const texts = await page.locator('.poster.is-shacharis').allTextContents();
@@ -74,7 +78,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.emulateMedia({ media: 'print' });
       const boxes = await page.locator('.poster.is-shacharis').evaluateAll(sheets => sheets.map(sheet => {
         const r = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
-        const content = [...sheet.querySelectorAll('.poster-wordmark,.poster-rule,.poster-rabbi,.shacharis-handout-heading,.shacharis-handout-run,.shacharis-handout-note')]
+        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-run,.shacharis-handout-note')]
           .map(el => el.getBoundingClientRect());
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
@@ -87,7 +91,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       }));
       for (const [i, box] of boxes.entries()) {
         assert.deepEqual([box.x, box.y, box.width, box.height], [i * 528, 0, 528, 816], 'Each copy is a real half Letter sheet');
-        assert(box.inside && !box.overflow, 'Letterhead, rooms, times and note fit inside the frame: ' + JSON.stringify(box));
+        assert(box.inside && !box.overflow, 'Letterhead, rooms, times and note fit inside the print margins: ' + JSON.stringify(box));
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
         assert(box.paper.includes('letter landscape'));

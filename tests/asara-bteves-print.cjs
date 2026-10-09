@@ -89,6 +89,8 @@ const server = http.createServer((req, res) => {
         return { x: r.x, y: r.y, width: parseFloat(css.width), height: parseFloat(css.height),
           legendBottom: legend.bottom, limit: r.bottom - parseFloat(css.paddingBottom) * zoom,
           contentGap: content ? legend.top - content.bottom : null,
+          sectionGaps: body ? [...body.children].slice(1).map((el, i) =>
+            el.getBoundingClientRect().top - body.children[i].getBoundingClientRect().bottom) : [],
           timesInside: times.every(t => t.x >= r.x - 1 && t.right <= r.right + 1),
           noteInside: note.x >= r.x && note.right <= r.right && note.bottom <= legend.top,
           noteFont: parseFloat(getComputedStyle(sheet.querySelector('.poster-time-note')).fontSize) };
@@ -97,7 +99,10 @@ const server = http.createServer((req, res) => {
         const size = mode === 'all' ? [528, 816] : [816, 1056];
         assert(Math.abs(box.width - size[0]) < 0.1 && Math.abs(box.height - size[1]) < 0.1);
         if (mode === 'all') assert.deepEqual([box.x, box.y], [index * 528, 0], 'Copies sit on the two halves of Letter paper');
-        if (mode === 'all') assert(box.contentGap >= 12 && box.contentGap <= 48, 'The schedule fills the half page while leaving room before the location notes');
+        if (mode === 'all') {
+          assert(box.contentGap >= 12, 'The schedule leaves room before the location notes');
+          assert(box.sectionGaps.every(gap => gap >= 12 && gap <= 24), 'Tefillah blocks stay together with modest gaps');
+        }
         assert(box.legendBottom <= box.limit + 0.5, 'Location key stays inside the frame');
         assert(box.timesInside && box.noteInside, 'Times and the 6:40 note stay inside the page');
       }

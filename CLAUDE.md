@@ -194,8 +194,9 @@ remembered one-or-two Copies per page switch as Chanukah. Keep the Selichos note
 beside 6:40 and retain every time and location mark. **Just one**, **A sheet each**
 and public Special Schedules retain the original full-page poster. Mixed whole-year
 Compact runs rotate both handouts onto their own portrait page, as for Chanukah.
-The Asara half-page body fills the space down to the location notes with more
-leading and evenly distributed tefillah blocks. Keep weekday sunset beside Maariv,
+The Asara half-page body keeps the tefillah blocks together as a centered group,
+with modest fixed gaps instead of distributing three blocks across the page.
+Retain comfortable leading within each list. Keep weekday sunset beside Maariv,
 and Friday candle lighting and sunset together below Mincha. Leave a clear gap
 above the location notes, and fit the schedule at the actual printed size.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
@@ -205,8 +206,9 @@ conditional note, half-page copies and saved choices, margins, the public Specia
 Schedule, and the copyable fast-day message.
 
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
-rounds, Cheshvan and Iyar. These always use a framed 5.5in by 8.5in poster on landscape
-Letter paper, with the remembered one-or-two Copies per page switch. Spell out each
+rounds, Cheshvan and Iyar. These always use the compact 5.5in by 8.5in design on landscape
+Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
+with the remembered one-or-two Copies per page switch. Spell out each
 room beside its time instead of printing location marks or a location key. Read the
 times from the seasonal special Shacharis list, and retain Asara's conditional 6:40
 Selichos note. BHB dates come from the same `hasBehab` rule as the charts. Neutral

@@ -15749,11 +15749,11 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, shacharis = false } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    <div class="halfpage-body${asara ? ' is-asara' : ''}">${sections}</div>`;
-  const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
-  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
+    <div class="halfpage-body${asara ? ' is-asara' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
+  const legend = shacharis ? [] : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
+  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
 }
 
@@ -15789,9 +15789,9 @@ function renderHalfAsaraBTevesPoster(poster, settings) {
   return halfPageShell(poster, settings, poster.title, sections.join(''), { asara: true });
 }
 
-/** A framed half-sheet with the rooms spelled out, like the shul's original morning poster. */
+/** The same compact half-sheet as the complete schedules, with rooms beside each time. */
 function renderShacharisHandout(poster, settings) {
-  const rows = poster.rows.map(row => `<div class="shacharis-handout-row">
+  const rows = poster.rows.map(row => `<div class="onepage-row shacharis-handout-row">
     <div class="shacharis-handout-run${row.highlighted ? ' is-highlighted' : ''}">
       ${row.highlighted ? '<svg class="shacharis-handout-shade" aria-hidden="true" width="100%" height="100%"><rect width="100%" height="100%" fill="#ececec"/></svg>' : ''}
       <bdi class="shacharis-handout-room" dir="rtl" lang="he">${escAttr(row.room)}</bdi>
@@ -15799,15 +15799,7 @@ function renderShacharisHandout(poster, settings) {
     </div>
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
-  const body = `<div class="halfpage-body is-shacharis">
-    <div class="shacharis-handout-heading">
-      <h2 class="poster-title" lang="he">${escAttr(poster.title)}</h2>
-      <p class="shacharis-handout-subtitle" lang="he">${escAttr(poster.subtitle)} ${escAttr(hebrewYear(poster.hebrewYear))}</p>
-    </div>
-    <div class="shacharis-handout-rows">${rows}</div>
-  </div>`;
-  const html = posterShell(settings, body, [], { halfpage: true, shacharis: true });
-  return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, rows), { shacharis: true });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
