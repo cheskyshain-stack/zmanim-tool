@@ -5497,7 +5497,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
  .is-home .luach-approved-name text { font-size:32px; }
  .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David Libre",serif !important; }
- .luach-home-date { margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
+ .luach-home-date { min-height:1.5em; margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
  .luach-home-layout { max-width:560px; margin:0 auto; }
  .is-home .luach-home { display:block; flex:none; max-width:none; margin:0; }
  .luach-home-picture { display:none; }
