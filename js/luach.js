@@ -409,8 +409,8 @@ const DONATE = {
          alt text below is what a tile shows when any of them does not arrive. Each url is
          the provider's own sign-in, since a donor here already has an account to spend. */
       providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: 'Choose your DAF provider and find Bais Medrash of Lakewood Commons using Tax ID 26-4527675.',
-      copy: { label: 'Tax ID', value: SHUL_TAX_ID },
+      how: 'Choose your DAF provider and search for Bais Medrash of Lakewood Commons.',
+      taxId: SHUL_TAX_ID,
     },
   ],
 };
@@ -983,10 +983,10 @@ function donateWayHtml(way) {
      loses its picture is an empty box with nothing in it to click with confidence. This is
      the shul's donation page, so the name is the alt text: the logo when it comes, the
      provider's name when it does not, and never a blank tile. */
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.copy?.value || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
   const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
-  const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
+  const soon = !accounts && !way.copy && !providers ? '<p class="luach-give-soon">Details to follow</p>' : '';
   /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
      a donor recognises the service before reading the title. Zelle keeps its purple, the
      one colour on this page that is not the site's own. Both are set larger than the line

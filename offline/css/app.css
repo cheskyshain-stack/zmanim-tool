@@ -4919,11 +4919,9 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
    to read as a label rather than as a stranded line: centred in the box the logo would have
    filled, and small enough that the longest of the four names sits on two lines inside 40px.
 
-   The box is 110x40 and object-fit keeps each logo whole inside it, so a logo squatter than
-   11:4 is drawn at the full 40px high and a wider one is drawn at the full 110px across.
-   OJC's is the squat one and is therefore the tallest of the four on the card. That is the
-   artwork, not a bug, and it is left alone: the other three are the providers' own files on
-   the providers' own servers and cannot be measured against from here.
+   The default box is 110x40 and object-fit keeps each logo whole. The donation page
+   adjusts The Donors' Fund and OJC sizes for a more even visual weight while preserving
+   their proportions.
 
    assets/daf-ojc.png is the one logo this site serves itself, because the file OJC's own
    site links is a small bitmap and the tile drew it visibly soft on a phone. It is the mark
@@ -5550,6 +5548,12 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-give-blurb { margin:4px 0 0; font:400 12px/1.45 Arial,sans-serif; color:#64707c; opacity:1; }
  .is-give .luach-give-chev { width:18px; height:18px; }
  .is-give .luach-give-open { padding:0 17px 17px; background:#fff; border-top:0; }
+ .is-give .luach-give-open:has(> .luach-daf-providers) { padding:18px 17px 22px; border-top:1px solid rgba(184,143,58,.42); }
+ .is-give .luach-give-how { font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
+ .is-give .luach-daf-providers { gap:10px; margin:18px 0 0; }
+ .is-give .luach-daf-provider img { max-width:100%; }
+ .is-give .luach-daf-provider img[alt="The Donors Fund"] { width:128px; }
+ .is-give .luach-daf-provider img[alt="OJC Fund"] { width:100px; height:36px; }
  .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #ede9e0; }
  .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { min-height:54px; padding:13px 0; gap:15px; border:0; border-radius:0; background:transparent; box-shadow:none; }
  .is-give .luach-give-account:last-child .luach-fund-row { padding-bottom:3px; }
