@@ -2060,11 +2060,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    should have the whole width. The 8rem basis is what decides where two stop fitting side
    by side, and it is set low on purpose: stacking them doubles what the card costs in
    height, and on a 360px phone that was 118px of the reason the page had started to scroll.
-   Measured at 8rem, two boxes sit together from 320px wide and every one of them comes out
-   118px tall with the heading on one line and the name on one line, nothing wrapped.
-
-   The menu is laid out to fill the screen with the address at its foot and it only just
-   does, so the box is kept to three short lines: heading, the thing itself, how far off. */
+   Keep paired times in matching rows so a longer countdown cannot move one time above
+   the other. The menu still follows directly below the cards. */
 .luach-next {
   display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem;
 }
@@ -2136,6 +2133,10 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next-what {
   font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.5rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
+}
+.luach-next-description {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center;
+  column-gap: 0.5rem; direction: rtl; min-width: 0; max-width: 100%;
 }
 /* The same face as the name it sits beside, and for a second reason as well as matching:
    it is Hebrew, and the system stack this used to fall through has no Hebrew serif on
@@ -2248,6 +2249,31 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 @container (max-width: 19rem) {
   .luach-next-what { font-size: 1.2rem; }
 }
+
+/* Paired cards share four rows: heading, time, description and countdown. The flexible
+   description row absorbs any extra room, leaving both times and countdowns aligned.
+   Hide the decorative marks here so complete hour-and-minute wording has the full width. */
+.luach-next.is-paired .luach-next-box {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr auto; row-gap: 0.35rem;
+  padding-inline: 0.65rem;
+}
+.luach-next.is-paired .luach-next-head {
+  grid-row: 1; margin: 0; gap: 0.3rem;
+  font-size: clamp(0.6rem, 7.5cqi, 0.68rem); letter-spacing: 0.07em;
+}
+.luach-next.is-paired .luach-next-body,
+.luach-next.is-paired .luach-next-main { display: contents; }
+.luach-next.is-paired .luach-next-mark,
+.luach-next.is-paired .luach-next-wait { display: none; }
+.luach-next.is-paired .luach-next-time { grid-row: 2; border: 0; padding: 0; }
+.luach-next.is-paired .luach-next-description {
+  grid-row: 3; min-height: 2rem; align-content: center; align-items: baseline;
+}
+.luach-next.is-paired .luach-next-when {
+  grid-row: 4; margin: 0; min-height: 2.7em; font-size: 0.82rem; line-height: 1.35;
+}
+.luach-next-countdown { text-wrap: balance; }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
 .luach-item {

@@ -500,6 +500,10 @@ Same-day countdowns show hours and remaining minutes, such as **in 2 hours 5 min
 Round the total minutes up before splitting into units, omit zero minutes at an exact
 hour, and keep the existing minute refresh and return-to-tab refresh behavior.
 Keep each number together with its unit when the narrow Friday cards wrap.
+When both home time cards are present, align their headings, clock times and countdown
+areas in matching rows, with the event and room between the clock and countdown.
+Keep the complete countdown wording and omit decorative card/hourglass icons in the
+pair so phone text has room. A single card retains its icon and wider inline layout.
 
 The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
 read that off the chart's H column alone, which only ever has one on a **Friday with a שבת row
