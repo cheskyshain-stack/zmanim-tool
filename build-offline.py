@@ -738,6 +738,24 @@ def stamp_google_verification(page: Path):
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
+def stamp_home_header(page: Path):
+    """Keep the initial homepage header identical to the template the app renders."""
+    html = page.read_text(encoding="utf-8")
+    template = re.search(r'<template id="luach-home-header">(.*?)</template>', html, re.S)
+    if not template:
+        raise RuntimeError("Homepage header template is missing")
+    start = "<!-- home header: generated from luach-home-header by build-offline.py -->"
+    end = "<!-- /home header -->"
+    html, count = re.subn(
+        re.escape(start) + r".*?" + re.escape(end),
+        lambda _: start + "\n" + template.group(1).strip() + "\n  " + end,
+        html, flags=re.S,
+    )
+    if count != 1:
+        raise RuntimeError("Homepage header markers are missing or repeated")
+    page.write_text(html, encoding="utf-8", newline="\n")
+
+
 def write_route_pages():
     """Write /week/index.html, /chart/index.html and /donate/index.html.
 
@@ -788,7 +806,7 @@ def write_route_pages():
             r'<script type="application/ld\+json">.*?</script>\n', "", html, flags=re.S
         )
         html = re.sub(
-            r"<main id=\"main\">.*?</main>", route_shell(name, meta), html, flags=re.S
+            r'<main id="main"(?: class="[^"]*")?>.*?</main>', route_shell(name, meta), html, flags=re.S
         )
         # Every one of the substitutions above is a regex against a file this script does
         # not own, and a regex that matches nothing fails quietly: the page would still be
@@ -854,9 +872,14 @@ def route_shell(name: str, meta: dict) -> str:
         '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>'
         '</svg>Donate</a>'
     )
-    return f"""<main id="main">
+    schedule_page = name in ("chart", "schedules")
+    back_href = "/week/" if schedule_page else "/"
+    back_label = "Zmanim" if schedule_page else "Home" if name == "donate" else "Menu"
+    back_name = "Back to Weekly Zmanim" if schedule_page else "Back to Home" if name == "donate" else "Back to Menu"
+    main_class = ' class="is-give"' if name == "donate" else ""
+    return f"""<main id="main"{main_class}>
   <div class="luach-bar no-print">
-    <a class="luach-back" href="/">&larr; Menu</a>
+    <a class="luach-back" href="{back_href}" aria-label="{back_name}">&larr; {back_label}</a>
     <h1 class="luach-bar-title">{meta['heading']}</h1>{give}
   </div>
   <noscript class="preapp">
@@ -1064,6 +1087,7 @@ def main():
     (OUT_DIR / "bundle.js").write_text(bundle, encoding="utf-8")
 
     # The congregation's page at the root, and the app under /admin.
+    stamp_home_header(ROOT / "index.html")
     stamp_css_versions(ROOT / "index.html", "")
     stamp_js_versions(ROOT / "index.html", "", "luach.js")
     # Only the congregation's page: /admin is asked out of search, so an address for it in

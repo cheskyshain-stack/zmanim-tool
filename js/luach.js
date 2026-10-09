@@ -250,34 +250,13 @@ const giveIcon = (key, cls) =>
  *  its details are to follow, so the page says what exists rather than pretending it does
  *  not.
  */
-/** The shul's name in English, which the wordmark cannot supply because it is a picture and
- *  the Hebrew one cannot because it is Hebrew. Written once here and read from both the
- *  masthead and the donation page's thanks line, so the two can never come to disagree. */
+/** The shul's English name for donation text and accessible descriptions. */
 const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
 
 /** The shul's federal tax ID, in the footer of every page and on the Donors' Fund card.
  *  One constant for both: it is the number somebody types into another app to give money,
  *  and two places to write it is one place for a digit to go wrong. */
 const SHUL_TAX_ID = '26-4527675';
-
-/** The shul, small, in the top left of the cap.
- *
- *  The cap is empty on the menu and carries the back link and the page name on every other
- *  screen, so the left of it is the one place on this page already understood as the corner
- *  where a thing sits. It goes there rather than in the flow, which keeps the wordmark
- *  centred and leaves the next minyan card exactly where it was: on a phone that card is
- *  why the site was opened, and nothing should push it down.
- *
- *  One file at 240px and 11KB. The original is 2454px and 2.4MB, and at this size even a
- *  three times screen only asks for about 174px across, so a single small copy covers every
- *  phone there is with room to spare. width and height are on the tag so the corner is the
- *  right shape before the file lands.
- *
- *  Not a link and not a button: it says whose site this is, the way the wordmark under it
- *  does, and there is nowhere for it to go that the menu does not already offer. */
-const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
-      width="240" height="141" decoding="async"
-      alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">`;
 
 /** The footer that ends every page: the address.
  *
@@ -554,18 +533,8 @@ function backBar(where) {
  *  1280. On a phone the two are the same thing, which is how it went unnoticed. */
 function homeHtml(published) {
   const s = published.settings;
-  return `<div class="luach-bar luach-bar-plain no-print"><div class="luach-home-bar-inner">${SHUL_PHOTO}<span class="luach-home-bar-name">${SHUL_ENGLISH}</span><nav class="luach-home-bar-nav" aria-label="Main navigation"><a href="/week/">Zmanim</a><a href="/chart/">Charts</a><a href="/donate/">Donate</a></nav></div></div>
-    <header class="luach-masthead">
-      <!-- The wordmark is a picture, so on its own it leaves this heading with no words in
-           it. The English name goes in beside it, clipped out of the layout but not out of
-           the page, which is what a crawler and a screen reader read. Hardcoded rather than
-           a setting, the same as the thanks line on the donation page: this repository is
-           this shul's, and a second place to type the name is a second place for it to end
-           up written differently. -->
-      <h1 class="luach-masthead-name"><svg class="luach-approved-name" viewBox="0 0 600 65" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      <p class="luach-place" lang="he" dir="rtl">קהל לב מנחם</p>
-      <p class="luach-home-date"></p>
-    </header>
+  // The build copies this same template into the initial HTML, before scripts arrive.
+  return `${document.getElementById('luach-home-header').innerHTML}
     <div class="luach-home-layout">
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
