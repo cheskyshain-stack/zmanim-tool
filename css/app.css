@@ -4160,11 +4160,21 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .poster.is-halfpage > * { flex-shrink: 0; }
 .poster.is-halfpage .page-header {
-  --sheet-font-size: 5pt;
-  --sheet-header-scale: 0.44;
-  margin-bottom: 0.12in;
+  --sheet-font-size: 5.5pt;
+  --sheet-header-scale: 0.58;
+  margin-bottom: 0.15in;
 }
-.poster.is-halfpage .header-row { gap: 0.08in; }
+.poster.is-halfpage .header-row {
+  grid-template-columns: 0.9in minmax(0, 1fr) 0.9in;
+  gap: 0.08in;
+}
+.poster.is-halfpage .header-center { min-width: 0; }
+/* Reserve the logo's height before it loads so the schedule is fitted against
+   the complete header, including after a reload. */
+.poster.is-halfpage .header-logo {
+  width: min(2.7in, 100%); height: auto;
+  aspect-ratio: 1776 / 237;
+}
 .poster.is-halfpage .onepage-title { font-size: 18pt; margin-bottom: 0.12in; }
 .halfpage-body { width: 100%; display: flex; flex-direction: column; gap: 0.14in; }
 .poster.is-halfpage .onepage-sec-head { text-align: center; }
