@@ -64,8 +64,8 @@ jobs:
       - name: Build the ten-day schedule API
         run: node scripts/build-schedule-api.mjs
 
-      - name: Verify the schedule API contract
-        run: node --test tests/schedule-feed.mjs
+      - name: Verify the schedule API and special-day rules
+        run: node --test tests/schedule-feed.mjs tests/asara-bteves.mjs
 
       - uses: actions/configure-pages@v5
 

@@ -173,6 +173,23 @@ and omitted from Friday onward, including future years previewed before that dat
 `buildSukkosAfter` applies the cutoff to the shared list read by posters and weekday
 charts. The after-Yom-Kippur and Chol Hamoed lists keep their own 9:00 minyanim.
 
+Asara B'Teves has its own Special Schedule, built from the seasonal chart's fast-day
+Shacharis list. Add `סליחות קודם שחרית` at 6:40 only when sunrise is later than 7:05.
+Weekday Mincha is 12:45 downstairs, 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
+3:30 downstairs, and a final main minyan at least 40 minutes before true sunset,
+rounded down to the earlier five-minute mark. Maariv is 35 minutes after sunset in
+the main Bais Medrash, 50 minutes after downstairs, and 10:30 in the main Bais Medrash.
+On Friday, use the current regular early-Friday Mincha list and a final main Mincha
+25 minutes before true sunset with seconds dropped. This exception also appears on
+the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle
+lighting and sunset, without a weekday Maariv block; the weekly page and next-minyan
+engine retain the chart's regular Friday-night Maariv. The same builder feeds the
+posters, public Special Schedules, weekly agenda, schedule API and fast-day message.
+`tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
+51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
+checks both reference layouts, phone and desktop printing, all sheet modes, the
+conditional note, the public Special Schedule, and the copyable fast-day message.
+
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks
@@ -664,9 +681,8 @@ and listed in `DIST_TREES`.
   time for time, 6:35 on the two קריאת התורה mornings and 6:40 on the rest, which is what their
   "6:40(m&t6:35)" says; the week of שבועות is their שחרית time for time. Where a מנחה or מעריב
   differs from what they sent (6:55 against their 7:00 that week), the chart is what is kept.
-- **The fast day messages** (`js/taanis-text.js`). **צום גדליה is the only fast with a sheet and
-  the only one with all three lines**: `posters/tzomgedalia.js` carries שחרית, מנחה and מעריב, so
-  the message is the sheet's own. The other three public fasts carry **the morning and nothing
+- **The fast day messages** (`js/taanis-text.js`). צום גדליה and עשרה בטבת read their full
+  schedules from their own posters. The remaining public fasts carry **the morning and nothing
   else**, which is the ר"ח / בה"ב / תענית list out of Settings, the second schedule the wall chart
   prints, and their sent messages carry it time for time. Their מנחה and מעריב are on no board: a
   fast afternoon is not the everyday one (the sent תענית אסתר runs 4:45, 5:10 and 5:15 after the

@@ -5,7 +5,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { T, inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
+import { T, inPlagWindow, fridayMainMinchaParts, fridayLateMinchaTrace, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
 
@@ -97,8 +97,8 @@ export function buildKayitzRow(week, settings) {
     .floor().underline();
   const F = maarivFri.text();
 
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
-  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
+  const gBase = minchaFri.value;
   const secondMaariv = zman('שקיעה', sunsetFriday, 'on the Friday').plus(30).floor()
     .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
   const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
