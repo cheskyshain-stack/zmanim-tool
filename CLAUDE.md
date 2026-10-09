@@ -145,7 +145,7 @@ candidate, usually held back to 12:20, was removed at the shul's request. Keep i
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
 
 Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
-under **All on one**. **Just one** and **A sheet each** keep the original full-page
+under **Compact** (previously **All on one**). **Just one** and **A sheet each** keep the original full-page
 portrait poster, including its original headings, spacing and location notes; they
 never show or apply the Copies per page switch, even when two copies was remembered.
 The original poster's last schedule block has no trailing margin; the legend provides
@@ -185,11 +185,11 @@ the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle
 lighting and sunset, without a weekday Maariv block; the weekly page and next-minyan
 engine retain the chart's regular Friday-night Maariv. The same builder feeds the
 posters, public Special Schedules, weekly agenda, schedule API and fast-day message.
-Its admin **All on one** mode uses the same 5.5in by 8.5in half-page handout and
+Its admin **Compact** mode uses the same 5.5in by 8.5in half-page handout and
 remembered one-or-two Copies per page switch as Chanukah. Keep the Selichos note
 beside 6:40 and retain every time and location mark. **Just one**, **A sheet each**
 and public Special Schedules retain the original full-page poster. Mixed whole-year
-All on one runs rotate both handouts onto their own portrait page, as for Chanukah.
+Compact runs rotate both handouts onto their own portrait page, as for Chanukah.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
 51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
 checks both reference layouts, phone and desktop printing, all sheet modes, the

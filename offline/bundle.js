@@ -16926,10 +16926,8 @@ function renderPosters(container, state, routeChanged, tables) {
       ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
         { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
         { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
-        // The one beside it says sheet, so this reads as all on one sheet without having to
-        // say it, which it has no room to: three sides of a switch get 86px of text each on
-        // a phone and "All on one sheet" is 105px of it.
-        { value: 'all', label: 'All on one', on: chosenSheets === 'all' },
+        // The compact layout uses either a full sheet or a half-page handout, by occasion.
+        { value: 'all', label: 'Compact', on: chosenSheets === 'all' },
       ])}</div>`}
       ${!empty && !showAll ? `<label>Which sheet
         <select id="poster-pick">
