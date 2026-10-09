@@ -35,7 +35,7 @@ export function buildAsaraBTevesPoster(year, settings) {
   const friday = excelWeekday(serial) === 6;
   const netz = Z.sunriseElev(date, settings), shkia = Z.sunsetElev(date, settings);
   const rawShkia = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
-  const shkiaTrace = friday ? rawShkia.floor('drop the seconds, as on the Friday chart') : rawShkia;
+  const shkiaTrace = rawShkia.ceil('show sunset at the later whole minute, never before the actual sunset');
   const shacharisLines = specialShacharisLines();
   if (asaraSelichosFirst(netz)) {
     const first = shacharisLines.flat().find(time => time.text === '6:40');
@@ -57,8 +57,10 @@ export function buildAsaraBTevesPoster(year, settings) {
       last,
     ];
   const maariv = friday ? [] : [
-    asaraCell(shkiaTrace.plus(35, 'the first fast-day Maariv is thirty-five minutes after sunset')),
-    asaraCell(shkiaTrace.plus(50, 'the downstairs Maariv is fifty minutes after sunset').underline()),
+    asaraCell(rawShkia.plus(35, 'the first fast-day Maariv is thirty-five minutes after sunset')
+      .ceil('never start before the full thirty-five minutes have elapsed')),
+    asaraCell(rawShkia.plus(50, 'the downstairs Maariv is fifty minutes after sunset')
+      .ceil('never start before the full fifty minutes have elapsed').underline()),
     asaraCell(fixedTime('10:30')),
   ];
   const candles = friday ? candleLightingParts(date, settings).times[0] : null;

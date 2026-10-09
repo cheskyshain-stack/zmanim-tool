@@ -73,6 +73,10 @@ const server = http.createServer((req, res) => {
       const actual = await page.locator('#poster-sheet .poster').first().locator(rows).evaluateAll(rows =>
         rows.map(row => row.textContent.match(/\d{1,2}:\d{2}/g) || []));
       assert.deepEqual(actual, expected.sets, 'Every time retained in ' + JSON.stringify({ width, mode, year }));
+      if (year === 5787) {
+        assert.deepEqual(actual[2], ['4:35'], 'Sunset with eight seconds rounds later in every layout');
+        assert.deepEqual(actual[3], ['5:10', '5:25', '10:30'], 'Printed fast-day Maariv waits for the complete offsets');
+      }
       const texts = await page.locator('#poster-sheet .poster').allTextContents();
       assert(texts.every(text => text === texts[0]), 'Both copies retain identical times and notes');
       assert.equal(await page.locator('#poster-sheet .poster-time-note').count(), copies);
@@ -116,6 +120,24 @@ const server = http.createServer((req, res) => {
       }
       measured.push({ year, width, mode, copies, boxes });
     }
+    // The phone inspector explains the new later rounding for sunset and both Maariv times.
+    await page.locator('#explain-times-toggle').click();
+    for (const [printed, before, offset] of [['4:35', '4:34:08', null], ['5:10', '5:09:08', 35], ['5:25', '5:24:08', 50]]) {
+      const target = page.locator('#poster-sheet .poster').first().locator('[data-time-explain]')
+        .filter({ hasText: new RegExp('^' + printed + '$') }).first();
+      await target.click();
+      const dialog = page.locator('.time-explain-dialog[open]');
+      await dialog.waitFor();
+      const answer = await dialog.innerText();
+      assert.match(answer, /up to a whole minute \(later\)/);
+      assert(answer.includes('Before: ' + before), 'The inspector retains the actual seconds');
+      assert.doesNotMatch(answer, /nearest whole minute|Rounded down/);
+      if (offset) assert.match(answer, new RegExp('Add\\s+' + offset + ' minutes'));
+      if (output) await page.screenshot({ path: `${output}/5787-${printed.replace(':', '-')}-phone-inspector.png` });
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'hidden' });
+    }
+    await page.locator('#explain-times-toggle').click();
     // Copies and physical size survive reloads, large margins, and phone rotation.
     await page.reload(); await page.locator('.poster.is-halfpage').first().waitFor(); await settle();
     assert(await page.locator('#poster-copies-two').isChecked(), 'Two copies are remembered');
@@ -158,7 +180,7 @@ const server = http.createServer((req, res) => {
     }
     assert.deepEqual(errors, []);
     if (output) fs.writeFileSync(output + '/measurements.json', JSON.stringify(measured, null, 2));
-    console.log(JSON.stringify({ checks: measured.length, years: [5785, 5786, 5787], widths: [1440, 375],
+    console.log(JSON.stringify({ checks: measured.length, roundingInspectors: 3, years: [5785, 5786, 5787], widths: [1440, 375],
       modes: ['one', 'each', 'all'], publicSchedules: true, fastMessages: true, errors }));
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });

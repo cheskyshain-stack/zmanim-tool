@@ -183,6 +183,10 @@ Weekday Mincha is 12:45 downstairs, 1:15 Ezras Nashim, 1:35 downstairs, 1:50 mai
 3:30 downstairs, and a final main minyan at least 40 minutes before true sunset,
 rounded down to the earlier five-minute mark. Maariv is 35 minutes after sunset in
 the main Bais Medrash, 50 minutes after downstairs, and 10:30 in the main Bais Medrash.
+Round the displayed Asara sunset up to the later whole minute on weekdays and Friday.
+For weekday Maariv, add 35 or 50 minutes to true sunset first, then round up, so the
+full interval has elapsed. Keep before-sunset Mincha and candle lighting on their
+earlier rules; do not calculate those deadlines from the rounded sunset display.
 On Friday, use the current regular early-Friday Mincha list and a final main Mincha
 25 minutes before true sunset with seconds dropped. This exception also appears on
 the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle

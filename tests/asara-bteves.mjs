@@ -51,7 +51,7 @@ test('5785 Friday uses the current chart list, with the reference final Mincha a
     fridayMainMinchaParts(date, settings, p.span.from + 1).times.map(t => t.plain()));
   assert.equal(times(p, 'mincha').at(-1).text, '4:25');
   assert.equal(block(p, 'candles').note.text, '4:32');
-  assert.equal(block(p, 'shkia').note.text, '4:50');
+  assert.equal(block(p, 'shkia').note.text, '4:51');
   assert.equal(block(p, 'maariv'), undefined, 'Friday has no weekday fast Maariv block');
   for (const build of [buildChorefRow, buildKayitzRow]) {
     const row = build({ serial: p.span.from + 1, specialParsha: '' }, settings);
@@ -63,7 +63,7 @@ test('5785 Friday uses the current chart list, with the reference final Mincha a
     'Regular Friday-night Maariv remains available to the weekly page');
   assert.equal(p.zmanim[0].name, 'הדלקת נרות');
   assert.equal(p.minyanim.some(e => /הדלקת|שקיעה/.test(e.name)), false, 'Auxiliary zmanim are never minyanim');
-  assert.match(asaraBTevesText(p), /Hadlakas Neiros 4:32\nShkia 4:50/);
+  assert.match(asaraBTevesText(p), /Hadlakas Neiros 4:32\nShkia 4:51/);
   assert.doesNotMatch(asaraBTevesText(p), /Mariv/);
 });
 
@@ -79,12 +79,35 @@ test('sunrise and five-minute boundaries use seconds without rounding to the wro
   assert.equal(asaraLastMinchaTrace(clock(16, 51), true).plain(), '4:26');
 });
 
+test('5787 sunset and fast-day Maariv never announce an earlier minute', () => {
+  const p = buildAsaraBTevesPoster(5787, settings);
+  assert.equal(dateFromSerial(p.span.from).toISOString().slice(0, 10), '2026-12-20');
+  assert(p.shkia > clock(16, 34) && p.shkia < clock(16, 34, 30), 'The actual sunset has seconds that nearest-minute display would discard');
+  assert.equal(block(p, 'shkia').note.text, '4:35');
+  assert.equal(times(p, 'mincha').at(-1).text, '3:50', 'Mincha keeps its earlier deadline from the true sunset');
+  assert.deepEqual(times(p, 'maariv').map(t => [t.text, t.underlined]), [['5:10', false], ['5:25', true], ['10:30', false]]);
+  assert.match(asaraBTevesText(p), /Shkia 4:35\nMariv 5:10m, 5:25d, 10:30m/);
+  assert.deepEqual(p.minyanim.filter(e => e.name === 'מעריב').map(e => e.mins), [17 * 60 + 10, 17 * 60 + 25, 22 * 60 + 30]);
+  const shkia = block(p, 'shkia').note.trace;
+  assert.equal(shkia.steps.at(-1).way, 'up');
+  assert.match(shkia.steps.at(-1).from, /4:34:08/);
+  for (const time of times(p, 'maariv').slice(0, 2)) {
+    const roundingIndex = time.trace.steps.findLastIndex(step => step.kind === 'round');
+    assert.equal(time.trace.steps[roundingIndex].way, 'up');
+    assert.equal(time.trace.steps[roundingIndex - 1].kind, 'offset', 'Apply the offset before rounding, preserving the calculation explanation');
+  }
+});
+
 test('every year obeys its own sunset rules and the seasonal morning schedule', () => {
   let weekdays = 0, fridays = 0;
   for (let year = 5784; year <= 5834; year++) {
     const p = buildAsaraBTevesPoster(year, settings), last = times(p, 'mincha').at(-1);
     assert.equal(hasTaanis(p.span.from, { ...settings, english: true }), 'Tenth of Teves');
     assert.equal(p.span.from, asaraBTevesSerial(year));
+    const printedShkia = block(p, 'shkia').note.trace;
+    const shkiaDelay = (printedShkia.value - p.shkia) * 1440;
+    assert(shkiaDelay >= -1e-7 && shkiaDelay < 1, 'Displayed sunset is never early');
+    assert(Math.abs(printedShkia.value * 1440 - Math.round(printedShkia.value * 1440)) < 1e-7);
     const gap = (p.shkia - last.trace.value) * 1440;
     if (p.friday) {
       fridays++;
@@ -94,8 +117,11 @@ test('every year obeys its own sunset rules and the seasonal morning schedule', 
       assert(gap >= 40 - 1e-7 && gap < 45);
       assert.equal(Math.round(last.trace.value * 1440) % 5, 0);
       const evening = times(p, 'maariv');
-      assert(Math.abs((evening[0].trace.value - p.shkia) * 1440 - 35) < 1e-7);
-      assert(Math.abs((evening[1].trace.value - p.shkia) * 1440 - 50) < 1e-7);
+      for (const [i, offset] of [35, 50].entries()) {
+        const gap = (evening[i].trace.value - p.shkia) * 1440;
+        assert(gap >= offset - 1e-7 && gap < offset + 1, 'Fast-day Maariv waits for the entire offset');
+        assert(Math.abs(evening[i].trace.value * 1440 - Math.round(evening[i].trace.value * 1440)) < 1e-7);
+      }
     }
     assert.equal(last.underlined, false);
     assert.equal(last.mark, '');
