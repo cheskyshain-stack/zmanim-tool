@@ -4178,10 +4178,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-halfpage .onepage-title { font-size: 18pt; margin-bottom: 0.12in; }
 .halfpage-body { width: 100%; display: flex; flex-direction: column; gap: 0.14in; }
 .poster.is-halfpage .halfpage-body.is-asara {
-  flex: 1 0 auto; justify-content: space-between;
-  gap: 0.3in; margin-bottom: 0.24in;
+  flex: 1 0 auto; justify-content: center;
+  gap: 0.16in; margin-bottom: 0.16in;
 }
-.halfpage-body.is-asara .asara-block { display: flex; flex-direction: column; gap: 0.18in; }
+.halfpage-body.is-asara .asara-block { display: flex; flex-direction: column; gap: 0.1in; }
 .poster.is-halfpage .halfpage-body.is-asara .onepage-row {
   padding-block: 0.11in; line-height: 1.5;
 }
@@ -4210,36 +4210,20 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: auto; font-size: 8pt; line-height: 1.45;
 }
 
-/* Morning-only handouts retain the framed Word-style letterhead. Room names replace
-   the chart's marks, and neutral shaded strips remain artwork when backgrounds are off. */
-.poster.is-halfpage.is-shacharis {
-  --inner-top: calc(var(--op-pad, 0.35in) + 0.12in);
-  --inner-side: calc(var(--op-pad, 0.35in) + 0.12in);
-  --inner-bottom: calc(var(--op-pad, 0.35in) + 0.12in);
-  padding: calc(var(--op-pad, 0.35in) + 0.22in);
-}
-.poster.is-shacharis .poster-wordmark { width: min(3.8in, 100%); }
-.poster.is-shacharis .poster-subtitle { font-size: 10pt; margin: 0.05in 0 0.02in; }
-.poster.is-shacharis .poster-rule { width: min(4in, 100%); margin-bottom: 0.08in; }
-.poster.is-shacharis .poster-rabbi { font-size: 8pt; margin-bottom: 0.08in; }
-.poster.is-halfpage .halfpage-body.is-shacharis {
-  flex: 1 0 auto; justify-content: center; align-items: center;
-  gap: 0.24in; padding-bottom: 0.18in;
-}
-.poster.is-shacharis .poster-title { font-size: calc(19pt * var(--op-scale)); margin: 0 0 0.07in; }
-.shacharis-handout-subtitle { font-size: calc(10pt * var(--op-scale)); font-weight: 700; margin: 0; }
-.shacharis-handout-rows { display: flex; flex-direction: column; align-items: center; gap: 0.12in; }
-.shacharis-handout-row { display: flex; flex-direction: column; align-items: center; }
+/* Morning-only handouts share the compact letterhead, title and section band.
+   Neutral room shading remains artwork when background graphics are disabled. */
+.poster.is-halfpage .shacharis-handout-row { padding: 0.045in 0.08in; }
 .shacharis-handout-run {
-  position: relative; display: flex; align-items: baseline; justify-content: center;
-  gap: 0.1in; padding: 0.025in 0.055in;
-  font-size: calc(15pt * var(--op-scale)); font-weight: 700; line-height: 1.2;
+  position: relative; display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.1in; padding: 0.06in 0.09in;
+  font-size: calc(12pt * var(--op-scale)); font-weight: 700; line-height: 1.35;
   white-space: nowrap;
 }
 .shacharis-handout-run.is-highlighted { background: #ececec; }
 .shacharis-handout-shade { position: absolute; inset: 0; pointer-events: none; }
 .shacharis-handout-room, .shacharis-handout-time { position: relative; }
-.shacharis-handout-note { font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; }
+.shacharis-handout-room { font-size: 0.85em; }
+.shacharis-handout-note { font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; margin-top: 0.035in; }
 
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
    no year (the shul wants it clean), so this is the one place that answers "is this the
