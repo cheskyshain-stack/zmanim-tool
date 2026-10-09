@@ -4210,6 +4210,37 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: auto; font-size: 8pt; line-height: 1.45;
 }
 
+/* Morning-only handouts retain the framed Word-style letterhead. Room names replace
+   the chart's marks, and neutral shaded strips remain artwork when backgrounds are off. */
+.poster.is-halfpage.is-shacharis {
+  --inner-top: calc(var(--op-pad, 0.35in) + 0.12in);
+  --inner-side: calc(var(--op-pad, 0.35in) + 0.12in);
+  --inner-bottom: calc(var(--op-pad, 0.35in) + 0.12in);
+  padding: calc(var(--op-pad, 0.35in) + 0.22in);
+}
+.poster.is-shacharis .poster-wordmark { width: min(3.8in, 100%); }
+.poster.is-shacharis .poster-subtitle { font-size: 10pt; margin: 0.05in 0 0.02in; }
+.poster.is-shacharis .poster-rule { width: min(4in, 100%); margin-bottom: 0.08in; }
+.poster.is-shacharis .poster-rabbi { font-size: 8pt; margin-bottom: 0.08in; }
+.poster.is-halfpage .halfpage-body.is-shacharis {
+  flex: 1 0 auto; justify-content: center; align-items: center;
+  gap: 0.24in; padding-bottom: 0.18in;
+}
+.poster.is-shacharis .poster-title { font-size: calc(19pt * var(--op-scale)); margin: 0 0 0.07in; }
+.shacharis-handout-subtitle { font-size: calc(10pt * var(--op-scale)); font-weight: 700; margin: 0; }
+.shacharis-handout-rows { display: flex; flex-direction: column; align-items: center; gap: 0.12in; }
+.shacharis-handout-row { display: flex; flex-direction: column; align-items: center; }
+.shacharis-handout-run {
+  position: relative; display: flex; align-items: baseline; justify-content: center;
+  gap: 0.1in; padding: 0.025in 0.055in;
+  font-size: calc(15pt * var(--op-scale)); font-weight: 700; line-height: 1.2;
+  white-space: nowrap;
+}
+.shacharis-handout-run.is-highlighted { background: #ececec; }
+.shacharis-handout-shade { position: absolute; inset: 0; pointer-events: none; }
+.shacharis-handout-room, .shacharis-handout-time { position: relative; }
+.shacharis-handout-note { font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; }
+
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
    no year (the shul wants it clean), so this is the one place that answers "is this the
    right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
