@@ -206,14 +206,16 @@ conditional note, half-page copies and saved choices, margins, the public Specia
 Schedule, and the copyable fast-day message.
 
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
-rounds, Cheshvan and Iyar. These always use the compact 5.5in by 8.5in design on landscape
+rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
+Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each
 room beside its time instead of printing location marks or a location key. Read the
 times from the seasonal special Shacharis list, and retain Asara's conditional 6:40
-Selichos note. BHB dates come from the same `hasBehab` rule as the charts. Neutral
-shading for Ezras Nashim and the hall is SVG artwork behind selectable text so it
-prints even with background graphics disabled. These supplementary handouts are
+Selichos note. BHB dates come from the same `hasBehab` rule as the charts. All morning
+rows have a plain background, without alternating location shading. The Yom Tov
+picker orders all groups by the first date they cover, including BHB and undrawn
+occasions, and older saved BHB month labels map to their renamed choices. These supplementary handouts are
 selected separately and do not duplicate the complete schedules in public or
 whole-year print runs. `tests/shacharis-handouts.mjs` checks 51 years of calendar and
 room data; `tests/shacharis-handouts-print.cjs` checks actual half-page PDFs, Hebrew

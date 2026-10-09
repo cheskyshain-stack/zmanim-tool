@@ -13645,13 +13645,17 @@ function buildSlichosTzomPoster(year, settings) {
 }
 
 // ==== posters/shacharis.js ====
+const BEHAB_SHACHARIS_TEXT = {
+  afterSukkos: 'בה"ב אחר סוכות',
+  afterPesach: 'בה"ב אחר פסח',
+};
+
 /** Resolve the chart's marks into words for a poster that needs no location key. */
 function shacharisRoomRows(cells) {
   return cells.map(cell => ({
     ...cell,
     room: cell.mark === '**' ? 'באולם השמחות' : cell.mark === '*' ? 'בעזרת נשים'
       : cell.underlined ? 'בית מדרש למטה' : 'בית מדרש',
-    highlighted: Boolean(cell.mark),
   }));
 }
 
@@ -13676,7 +13680,8 @@ function buildBehabShacharisPoster(year, month, settings) {
   const days = behabShacharisDates(year, month, settings);
   if (!days.length) return null;
   return {
-    hebrewYear: year, title: 'בה"ב', subtitle: `שחרית · ${month === 8 ? 'חשון' : 'אייר'}`,
+    hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
+    subtitle: 'שחרית',
     span: { from: days[0], to: days.at(-1) }, days,
     rows: shacharisRoomRows(specialShacharisLines().flat()),
   };
@@ -14205,8 +14210,8 @@ function yearLabel(y) {
 const POSTERS = [
   ...[
     { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
-    { key: 'behabcheshvan', label: 'בה"ב חשון · שחרית', build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
-    { key: 'behabiyar', label: 'בה"ב אייר · שחרית', build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
+    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
+    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
   ].map(({ key, label, build }) => ({
     key, label, group: label,
     // Supplementary morning handouts are picked separately from the complete schedules.
@@ -14651,8 +14656,8 @@ function postersByDate(year, settings, state) {
  *
  *  Adding sheets to one of them is the whole of filling it in: a poster carries
  *  `group: 'סוכות'`, its name here already has the place, and the posters under it sort by
- *  date like everything else. A poster whose group is not in this table still shows, after
- *  these, so a name typed one way in a poster and another way here cannot lose the sheet. */
+ *  date like everything else. Additional groups join the picker by their own dates,
+ *  so adding a sheet cannot put it after holidays that happen later in the year. */
 const POSTER_OCCASIONS = [
   'ראש השנה יום כיפור',
   'סוכות',
@@ -14668,6 +14673,18 @@ const POSTER_OCCASIONS = [
 /** Which heading a poster sits under when it does not name one. Every sheet so far belongs
  *  to the first occasion, so that is the default and no entry above has to say it. */
 const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
+
+/** Undrawn occasions still have a calendar date, so they stay in order in the picker. */
+function posterOccasionStart(name, year) {
+  // Purim is sixteen days before Rosh Chodesh Nisan in both common and leap years.
+  if (name === 'פורים') return dateFromHebrew(1, 1, year) - 16;
+  const dates = {
+    'ראש השנה יום כיפור': [1, 7], 'סוכות': [15, 7], 'חנוכה': [25, 9],
+    'עשרה בטבת': [10, 10], 'פסח': [15, 1],
+    'שבועות': [6, 3], 'שבעה עשר בתמוז': [17, 4], 'תשעה באב': [9, 5],
+  };
+  return dates[name] ? dateFromHebrew(...dates[name], year) : null;
+}
 
 /** The posters cut into those headings, both in date order.
  *
@@ -14691,8 +14708,12 @@ function posterGroups(year, settings, state) {
     const days = items.map((p) => sorted.starts.get(p)?.from).filter((d) => d != null);
     return days.length ? Math.max(...days) : null;
   };
+  const firstStart = (items) => {
+    const days = items.map((p) => sorted.starts.get(p)?.from).filter((d) => d != null);
+    return days.length ? Math.min(...days) : null;
+  };
   return [
-    ...[...byName].map(([name, items]) => ({ name, items, lastStart: lastStart(items) })),
+    ...[...byName].map(([name, items]) => ({ name, items, firstStart: firstStart(items), lastStart: lastStart(items) })),
     ...loose.map((p) => ({ name: null, items: [p], lastStart: null })),
   ];
 }
@@ -15792,8 +15813,7 @@ function renderHalfAsaraBTevesPoster(poster, settings) {
 /** The same compact half-sheet as the complete schedules, with rooms beside each time. */
 function renderShacharisHandout(poster, settings) {
   const rows = poster.rows.map(row => `<div class="onepage-row shacharis-handout-row">
-    <div class="shacharis-handout-run${row.highlighted ? ' is-highlighted' : ''}">
-      ${row.highlighted ? '<svg class="shacharis-handout-shade" aria-hidden="true" width="100%" height="100%"><rect width="100%" height="100%" fill="#ececec"/></svg>' : ''}
+    <div class="shacharis-handout-run">
       <bdi class="shacharis-handout-room" dir="rtl" lang="he">${escAttr(row.room)}</bdi>
       <bdi class="shacharis-handout-time" dir="ltr">${timeHtml({ ...row, mark: '', underlined: false, timeNote: null })}</bdi>
     </div>
@@ -16635,7 +16655,10 @@ function recallBar() {
     // is checked again by the render, which falls back to the first sheet of the occasion
     // and to the year coming up, so a stale or hand edited value costs nothing.
     if (Number.isFinite(saved.year)) chosenYear = saved.year;
-    if (typeof saved.group === 'string') chosenGroup = saved.group;
+    if (typeof saved.group === 'string') chosenGroup = ({
+      'בה"ב חשון · שחרית': BEHAB_SHACHARIS_TEXT.afterSukkos,
+      'בה"ב אייר · שחרית': BEHAB_SHACHARIS_TEXT.afterPesach,
+    })[saved.group] || saved.group;
     if (typeof saved.sheet === 'string') chosen = saved.sheet;
     if (['one', 'each', 'all'].includes(saved.sheets)) chosenSheets = saved.sheets;
     // What the two switches this replaced were remembered as, carried forward so somebody
@@ -16902,10 +16925,11 @@ function renderPosters(container, state, routeChanged, tables) {
   const groups = [
     ...POSTER_OCCASIONS.map((name) => ({
       name, items: drawn.get(name)?.items || [], lastStart: drawn.get(name)?.lastStart ?? null,
+      firstStart: drawn.get(name)?.firstStart ?? posterOccasionStart(name, year),
     })),
     ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name))
-      .map(([name, g]) => ({ name, items: g.items, lastStart: g.lastStart })),
-  ];
+      .map(([name, g]) => ({ name, items: g.items, firstStart: g.firstStart, lastStart: g.lastStart })),
+  ].sort((a, b) => (a.firstStart ?? Infinity) - (b.firstStart ?? Infinity));
   /* The occasion that is on, which the Current button goes back to.
      The first one of the year still ahead of today, by the last day any of its sheets opens
      on: in אלול that is the ימים נוראים, whose יום כיפור sheet is still to come, and once

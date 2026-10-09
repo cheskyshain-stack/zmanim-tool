@@ -9,12 +9,11 @@ import { buildAsaraShacharisPoster, buildBehabShacharisPoster } from '../js/post
 
 const settings = resolveSettings(JSON.parse(await readFile(new URL('../data/published.json', import.meta.url))).settings);
 const expected = [
-  ['6:40', 'בית מדרש', false], ['7:00', 'בעזרת נשים', true],
-  ['7:15', 'בית מדרש למטה', false], ['7:35', 'באולם השמחות', true],
-  ['8:00', 'בית מדרש', false], ['8:20', 'בעזרת נשים', true],
-  ['8:40', 'בית מדרש למטה', false],
+  ['6:40', 'בית מדרש'], ['7:00', 'בעזרת נשים'],
+  ['7:15', 'בית מדרש למטה'], ['7:35', 'באולם השמחות'],
+  ['8:00', 'בית מדרש'], ['8:20', 'בעזרת נשים'], ['8:40', 'בית מדרש למטה'],
 ];
-const rows = poster => poster.rows.map(row => [row.text, row.room, row.highlighted]);
+const rows = poster => poster.rows.map(row => [row.text, row.room]);
 
 test('Asara handouts retain the full poster morning times, rooms and conditional note', () => {
   for (let year = 5784; year <= 5834; year++) {
@@ -35,6 +34,8 @@ test('both BHB rounds use the chart calendar and special Shacharis schedule ever
   for (let year = 5784; year <= 5834; year++) for (const month of [8, 2]) {
     const poster = buildBehabShacharisPoster(year, month, settings);
     assert.deepEqual(rows(poster), expected);
+    assert.equal(poster.title, month === 8 ? 'בה"ב אחר סוכות' : 'בה"ב אחר פסח');
+    assert.equal(poster.subtitle, 'שחרית');
     assert.equal(poster.days.length, 3);
     assert.deepEqual(poster.days.map(excelWeekday), [2, 5, 2]);
     assert.deepEqual(poster.days.slice(1).map((serial, i) => serial - poster.days[i]), [3, 4]);
