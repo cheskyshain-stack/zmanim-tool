@@ -69,7 +69,7 @@ const server = http.createServer((req, res) => {
         return { title: p.title, sets: p.sets.map(s => s.note ? [s.note.text] : s.lines.flat().map(t => t.text)) };
       }, year);
       assert.equal(await page.locator('#poster-sheet .poster').count(), copies);
-      const rows = mode === 'all' ? '.halfpage-body > *' : '.poster-set';
+      const rows = mode === 'all' ? '.halfpage-body .onepage-sec,.halfpage-zman' : '.poster-set';
       const actual = await page.locator('#poster-sheet .poster').first().locator(rows).evaluateAll(rows =>
         rows.map(row => row.textContent.match(/\d{1,2}:\d{2}/g) || []));
       assert.deepEqual(actual, expected.sets, 'Every time retained in ' + JSON.stringify({ width, mode, year }));
@@ -83,9 +83,12 @@ const server = http.createServer((req, res) => {
         const r = sheet.getBoundingClientRect(), css = getComputedStyle(sheet), zoom = r.height / parseFloat(css.height);
         const legend = sheet.querySelector('.poster-legend').getBoundingClientRect();
         const note = sheet.querySelector('.poster-time-note').getBoundingClientRect();
+        const body = sheet.querySelector('.halfpage-body.is-asara');
+        const content = body?.lastElementChild.getBoundingClientRect();
         const times = [...sheet.querySelectorAll('.poster-set-line,.onepage-line,.halfpage-zman')].map(el => el.getBoundingClientRect());
         return { x: r.x, y: r.y, width: parseFloat(css.width), height: parseFloat(css.height),
           legendBottom: legend.bottom, limit: r.bottom - parseFloat(css.paddingBottom) * zoom,
+          contentGap: content ? legend.top - content.bottom : null,
           timesInside: times.every(t => t.x >= r.x - 1 && t.right <= r.right + 1),
           noteInside: note.x >= r.x && note.right <= r.right && note.bottom <= legend.top,
           noteFont: parseFloat(getComputedStyle(sheet.querySelector('.poster-time-note')).fontSize) };
@@ -94,6 +97,7 @@ const server = http.createServer((req, res) => {
         const size = mode === 'all' ? [528, 816] : [816, 1056];
         assert(Math.abs(box.width - size[0]) < 0.1 && Math.abs(box.height - size[1]) < 0.1);
         if (mode === 'all') assert.deepEqual([box.x, box.y], [index * 528, 0], 'Copies sit on the two halves of Letter paper');
+        if (mode === 'all') assert(box.contentGap >= 12 && box.contentGap <= 48, 'The schedule fills the half page while leaving room before the location notes');
         assert(box.legendBottom <= box.limit + 0.5, 'Location key stays inside the frame');
         assert(box.timesInside && box.noteInside, 'Times and the 6:40 note stay inside the page');
       }
