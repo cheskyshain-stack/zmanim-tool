@@ -48,6 +48,8 @@ const server = http.createServer((req, res) => {
       const checked = [];
       for (const year of years) {
         const poster = buildChanukahPoster(year, settings, tables);
+        check(JSON.stringify(poster.erevShabbos.cells.flatMap(cell => clocks(cell.text))) === JSON.stringify(expected),
+          'Combined poster must contain only the regular early Friday Mincha times in ' + year);
         for (const friday of poster.erevShabbosList) {
           const week = index.get(friday.shabbosSerial).week;
           const winter = buildChorefRow(week, settings), summer = buildKayitzRow(week, settings);
