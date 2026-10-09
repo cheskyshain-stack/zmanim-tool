@@ -505,28 +505,28 @@ function nextUpState(published, settings) {
 
 function nextUpHtml([minyan, candles]) {
   if (!minyan && !candles) return '';
+  const paired = Boolean(minyan && candles);
 
-  // The name, the room and the time are three siblings rather than the name and the room
-  // being one lump, because the row they sit in runs right to left and each of them has to
-  // take its own place in that order: שחרית, then למטה, then the time. The mark is outside
-  // that row, so it keeps the left-hand end whichever way the words run.
+  // Keep the name and its room together when a narrow card puts the time on its own row.
+  // Both Hebrew pieces retain their own direction inside the shared description.
   const box = (kind, icon, item, tone) => {
     if (!item) return '';
     const when = howFar(item);
+    const description = `<bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
+      ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}`;
     return `<div class="luach-next-box ${tone}">
       <p class="luach-next-head">${escAttr(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
         <div class="luach-next-main">
-          <bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
-          ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}
+          ${paired ? `<div class="luach-next-description">${description}</div>` : description}
           <span class="luach-next-time">${escAttr(clock(item.mins))}<small>${escAttr(meridiem(item.mins))}</small></span>
         </div>
       </div>
-      ${when ? `<p class="luach-next-when">${ICON_WAIT}${escAttr(when).replace(/(\d+) (hours?|minutes?)/g, '$1&nbsp;$2')}</p>` : ''}
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}<span class="luach-next-countdown">${escAttr(when).replace(/(\d+) (hours?|minutes?)/g, '$1&nbsp;$2')}</span></p>` : ''}
     </div>`;
   };
-  return `<div class="luach-next" aria-live="polite">
+  return `<div class="luach-next${paired ? ' is-paired' : ''}" aria-live="polite">
     ${box('Next minyan', ICON_MINYAN, minyan, 'is-minyan')}${box('Candle lighting', ICON_CANDLES, candles, 'is-candles')}
   </div>`;
 }
