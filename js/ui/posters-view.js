@@ -1657,9 +1657,9 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections) {
+function halfPageShell(poster, settings, title, sections, { asara = false } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    <div class="halfpage-body">${sections}</div>`;
+    <div class="halfpage-body${asara ? ' is-asara' : ''}">${sections}</div>`;
   const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
@@ -1679,11 +1679,22 @@ function renderHalfChanukahPoster(poster, settings) {
 }
 
 function renderHalfAsaraBTevesPoster(poster, settings) {
-  const sections = poster.sets.map(s => s.note
-    ? `<div class="halfpage-zman" lang="he"><span>${escAttr(s.note.label)}</span>
-        <bdi dir="ltr">${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></div>`
-    : halfPageSection(s.head, s.lines.map(times => onePageRows({ label: '', times })).join(''))).join('');
-  return halfPageShell(poster, settings, poster.title, sections);
+  const sections = [];
+  let notes = [];
+  for (const s of poster.sets) {
+    if (s.note) {
+      notes.push(`<div class="halfpage-zman" lang="he"><span>${escAttr(s.note.label)}</span>
+        <bdi dir="ltr">${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></div>`);
+    } else {
+      const section = halfPageSection(s.head, s.lines.map(times => onePageRows({ label: '', times })).join(''));
+      // Keep sunset beside Maariv rather than distributing it as an isolated block.
+      sections.push(notes.length ? `<div class="asara-block">${notes.join('')}${section}</div>` : section);
+      notes = [];
+    }
+  }
+  // On Friday, candle lighting and sunset stay together below Mincha.
+  if (notes.length) sections.push(`<div class="asara-block">${notes.join('')}</div>`);
+  return halfPageShell(poster, settings, poster.title, sections.join(''), { asara: true });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the

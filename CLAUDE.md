@@ -194,6 +194,10 @@ remembered one-or-two Copies per page switch as Chanukah. Keep the Selichos note
 beside 6:40 and retain every time and location mark. **Just one**, **A sheet each**
 and public Special Schedules retain the original full-page poster. Mixed whole-year
 Compact runs rotate both handouts onto their own portrait page, as for Chanukah.
+The Asara half-page body fills the space down to the location notes with more
+leading and evenly distributed tefillah blocks. Keep weekday sunset beside Maariv,
+and Friday candle lighting and sunset together below Mincha. Leave a clear gap
+above the location notes, and fit the schedule at the actual printed size.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
 51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
 checks both reference layouts, phone and desktop printing, all sheet modes, the
