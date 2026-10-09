@@ -1,6 +1,6 @@
 // Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
 // "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended, excelWeekday, isAssurMelacha } from '../hebrew-calendar.js';
 import { formatTime, underlineTime, ceilToMinute } from '../format.js';
@@ -8,6 +8,25 @@ import { flattenNonEmpty, splitLinesInHalf, isolate, NBSP, SLASH } from '../util
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
+
+/** Asara B'Teves: retain sunset's seconds until the requested final rounding. */
+export function asaraLastMinchaTrace(shkia, friday = false) {
+  const base = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+  return friday
+    ? base.minus(25, 'the Friday fast\'s last Mincha is twenty-five minutes before sunset')
+      .floor('remove the seconds, without rounding up')
+    : base.minus(40, 'the last weekday Mincha must be at least forty minutes before sunset')
+      .floorToStep(5, 'round down to the earlier five-minute mark');
+}
+
+/** The Friday chart and fast-day sheet must agree about the final Mincha. */
+export function fridayLateMinchaTrace(date, settings) {
+  const hebrew = hebrewDateExtended(excelSerial(date), settings.useGregorianBefore1582);
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return asaraLastMinchaTrace(Z.sunsetElev(date, settings), true);
+  }
+  return zman('שקיעה', Z.sunset(date, settings), 'on the Friday').minus(15).floor();
+}
 
 /** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
  *  Sunday of March through Pesach), deliberately excluding the *fall* DST window

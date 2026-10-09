@@ -27,8 +27,9 @@ import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-text.js';
 import { shulNow } from '../zmanim/solar.js';
-import { tzomGedaliaText, chartFastText, fastsBetween } from '../taanis-text.js';
+import { tzomGedaliaText, asaraBTevesText, chartFastText, fastsBetween } from '../taanis-text.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
+import { buildAsaraBTevesPoster } from '../posters/asarabteves.js';
 import { buildWeekdayRow, chanukahDaysInWeek } from '../sheets/weekday.js';
 import { chanukahScheduleLines } from '../posters/chanukah.js';
 import { weekdayChartFor } from '../sheets/rows.js';
@@ -563,7 +564,7 @@ function txRoshChodesh(settings, today, howMany = 1) {
  *  Their own kind, `taanis`, rather than folded in with the yom tov ones. A fast is not a yom tov,
  *  and the switch that turns the ערב messages off should not take it with them.
  *
- *  צום גדליה comes off the sheet the shul hangs for that day, whole. The other three come off the
+ *  צום גדליה and עשרה בטבת come off their own sheets. The other fasts come off the
  *  chart: the ר"ח / בה"ב / תענית schedule is the morning those days daven, and their מנחה and
  *  מעריב are on no board, so those two lines are left out (see taanis-text.js). The page carried
  *  צום גדליה alone at first and the shul asked for the rest: a switch called Taanis over one
@@ -594,7 +595,9 @@ function txTaanis(year, settings, today, days) {
   const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
   for (const fast of fastsBetween(today, today + days, settings)) {
     if (!txDaysInWindow(fast.serial, fast.serial, today)) continue;
-    const text = chartFastText(fast.title, shacharisCell);
+    const asara = fast.title === "Asara B'Teves"
+      ? buildAsaraBTevesPoster(hebrewDateExtended(fast.serial, settings.useGregorianBefore1582).year, settings) : null;
+    const text = asara ? asaraBTevesText(asara) : chartFastText(fast.title, shacharisCell);
     if (!text) continue;
     out.push({
       id: `taanis-${fast.serial}`,

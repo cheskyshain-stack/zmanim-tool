@@ -1,7 +1,7 @@
 // The days the sheets on the wall speak for, and what is davening on them.
 //
-// Sixteen days a year the schedule is not on either chart: ערב ר"ה, the two days of ר"ה, צום
-// גדליה, ערב יו"כ and יו"כ, and then ערב סוכות through שמחת תורה. On those days the shul hangs
+// Some days have a complete schedule of their own: ערב ר"ה, the two days of ר"ה, צום
+// גדליה, ערב יו"כ and יו"כ, ערב סוכות through שמחת תורה, and עשרה בטבת. The shul hangs
 // a sheet, and the charts carry the ordinary weekday row for the week they fall in. "What is
 // on next" on the congregation's home page was reading that row and offering it: on יום כיפור
 // it said מנחה 1:15 where the sheet on the wall says 4:15, and on the second day of ר"ה it
@@ -27,6 +27,7 @@ import { roshHashana, hebrewDateExtended, specialDaysInWeek } from '../hebrew-ca
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
+import { buildAsaraBTevesPoster } from './asarabteves.js';
 import { buildSukkosPoster } from './sukkos.js';
 import { buildPesachPoster } from './pesach.js';
 import { slichosMornings, slichosWeekLines } from './slichos.js';
@@ -52,6 +53,15 @@ const SEASON_BEFORE = 16;
  *  times over on a phone. Keyed on the settings object as well as the year: Settings moves
  *  candle lighting and the horizon, and a stale sheet would be worse than a slow one. */
 let built = null;
+let asaraBuilt = null;
+function asaraFor(year, settings) {
+  if (asaraBuilt && asaraBuilt.year === year && asaraBuilt.settings === settings) return asaraBuilt.poster;
+  let poster = null;
+  try { poster = buildAsaraBTevesPoster(year, settings); } catch { poster = null; }
+  asaraBuilt = { year, settings, poster };
+  return poster;
+}
+
 function sheetsFor(year, settings) {
   if (built && built.year === year && built.settings === settings) return built.list;
   const list = [];
@@ -76,8 +86,8 @@ function sheetsFor(year, settings) {
  *  hands back is offered as "what is on next", and candle lighting must never be offered that
  *  way. Each builder registers it through `zman` instead (see posters/minyanim.js).
  *
- *  And it reaches further, because the פסח sheet is in it. specialMinyanim is deliberately only
- *  the תשרי stretch, since that is where a sheet takes a whole day over from the charts, and
+ *  And it reaches further, because the פסח sheet is in it. specialMinyanim takes over only
+ *  the complete schedules in תשרי and the confirmed עשרה בטבת schedule, and
  *  widening it would change what the home page calls the next מנין across all of פסח. Reading
  *  one number off the פסח sheet changes nothing else, and without it ערב פסח and ערב שביעי של
  *  פסח are two erev yom tovs with no candle lighting anywhere: they are not Fridays, so the
@@ -96,7 +106,11 @@ function pesachZmanim(year, settings) {
 }
 
 export function specialCandleLighting(serial, settings) {
-  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  const hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const here = hebrew.year;
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return asaraFor(here, settings)?.zmanim.find(z => z.serial === serial) || null;
+  }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;
@@ -114,10 +128,15 @@ export function specialCandleLighting(serial, settings) {
  *  Empty on every other day of the year, which is the signal to the caller that the charts
  *  are the answer.
  *
- *  Two years are tried because ערב ר"ה is the day before the year turns over: its own Hebrew
+ *  עשרה בטבת uses this Hebrew year's own sheet. Two years are tried in תשרי because ערב
+ *  ר"ה is the day before the year turns over: its own Hebrew
  *  year is the old one, and the sheet it is on belongs to the new. */
 export function specialMinyanim(serial, settings) {
-  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  const hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const here = hebrew.year;
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return (asaraFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
+  }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;

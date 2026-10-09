@@ -4,7 +4,7 @@
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
+import { inPlagWindow, fridayMainMinchaParts, fridayLateMinchaTrace, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { textjoin, SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
 
@@ -44,7 +44,7 @@ export function buildChorefRow(week, settings) {
   const plagGRA = zman('פלג המנחה גר״א', Z.plagHamincha(fridayDate, settings), 'the day measured from sunrise to שקיעה').minus(15);
   const plag50 = zman('פלג המנחה מ״א', Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 50').minus(15);
   const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
   const plagWindow = inPlagWindow(friday, settings);
   /* The three פלג מנינים are silenced outside their season rather than branched away, so the
      column can still say they exist and when. Branched, a winter week simply had one time in

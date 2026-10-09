@@ -13,11 +13,10 @@
 // the fast, three schedules, and a sign-off. No colons after the three labels, where the weekly
 // message has them after two of its three: both are written the way the shul writes them.
 //
-// **צום גדליה is the only fast with a sheet, and it is the only one with all three lines.**
-// `posters/tzomgedalia.js` is the sheet the shul hangs for that day and it carries שחרית, מנחה and
-// מעריב, so every time in that message is read straight off it.
+// צום גדליה and עשרה בטבת read their schedules from their own posters. The Friday
+// עשרה בטבת sheet also supplies candle lighting, and has no weekday Maariv block.
 //
-// The other three public fasts have **the morning and nothing else**: it is the ר"ח / בה"ב / תענית
+// The other public fasts have **the morning and nothing else**: it is the ר"ח / בה"ב / תענית
 // schedule out of Settings, which is the second list the wall chart prints and is what those days
 // daven, and their sent messages carry it time for time. Their מנחה and מעריב are on no board at
 // all. A fast afternoon is not the everyday one, as those sent messages show: תענית אסתר runs
@@ -118,7 +117,7 @@ const tnList = (times) => (times || []).map((t) => t.text + erevWhereMark(t)).jo
 /** One block of the sheet, found by the rule behind it rather than by its heading, so rewording a
  *  heading cannot quietly empty a line of the message. */
 const tnBlock = (poster, calc) => (poster?.sets || []).find((s) => s.calc === calc) || null;
-const tnLine = (poster, calc) => tnList((tnBlock(poster, calc)?.lines || [])[0]);
+const tnLine = (poster, calc) => tnList((tnBlock(poster, calc)?.lines || []).flat());
 const tnMorningLabel = (poster) => {
   const head = String(tnBlock(poster, 'shacharis')?.head || '').trim();
   return TN_MORNING_NAMES[head] || TN_MORNING_FALLBACK;
@@ -151,4 +150,22 @@ export function tzomGedaliaText(poster) {
   ].filter(([, times]) => times);
   if (!rows.length) return '';
   return [TN_TEXT.title, ...rows.map(([label, times]) => `${label} ${times}`), TN_TEXT.signoff].join('\n');
+}
+
+/** Every line comes from the new fast-day sheet, including its conditional 6:40 note. */
+export function asaraBTevesText(poster) {
+  if (!poster) return '';
+  const morning = (tnBlock(poster, 'shacharis')?.lines || []).flat()
+    .map(time => time.text + erevWhereMark(time)
+      + (time.timeNote ? ' (Selichos before Shacharis)' : '')).join(', ');
+  const candles = String(tnBlock(poster, 'candles')?.note?.text || '').trim();
+  const rows = [
+    [TN_TEXT.shacharis, morning],
+    [TN_TEXT.mincha, tnLine(poster, 'mincha')],
+    ['Hadlakas Neiros', candles],
+    [TN_TEXT.shkia, tnShkia(poster)],
+    [TN_TEXT.maariv, tnLine(poster, 'maariv')],
+  ].filter(([, times]) => times);
+  return ["Asara B'Teves" + (poster.friday ? ' - Erev Shabbos' : ''),
+    ...rows.map(([label, times]) => `${label} ${times}`), TN_TEXT.signoff].join('\n');
 }

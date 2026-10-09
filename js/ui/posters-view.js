@@ -24,6 +24,7 @@ import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
+import { buildAsaraBTevesPoster, ASARA_TEXT } from '../posters/asarabteves.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
@@ -256,6 +257,22 @@ const POSTERS = [
       }));
     },
     render: renderChanukahPoster,
+  },
+  {
+    key: 'asarabteves',
+    label: ASARA_TEXT.title,
+    group: ASARA_TEXT.title,
+    covers: (y) => `${ASARA_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildAsaraBTevesPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
+        build: () => ({ poster: buildAsaraBTevesPoster(y, settings) }),
+      }));
+    },
+    render: renderAsaraBTevesPoster,
   },
   {
     key: 'shuva',
@@ -912,7 +929,10 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
   const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
-  return posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
+  const time = posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
+  return t.timeNote
+    ? `<span class="poster-annotated-time">${time}<bdi class="poster-time-note" dir="rtl" lang="he">(${escAttr(t.timeNote)})</bdi></span>`
+    : time;
 }
 
 /** A זמן given both ways, set as two little columns: the name of each reckoning over its own
@@ -1480,9 +1500,9 @@ function renderAfterYomKippurPoster(poster, settings) {
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
-function tzomGedaliaBody(poster) {
+function fastDayBody(poster, title) {
   const timeLine = (times) =>
-    `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
+    `<p class="poster-set-line" lang="he"><bdi dir="ltr">${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
     ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
         <bdi>${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></p></div>`
@@ -1492,12 +1512,20 @@ function tzomGedaliaBody(poster) {
       ${s.lines.map(timeLine).join('')}
     </div>`);
   return `
-    <h2 class="poster-title" lang="he">${escAttr(TZG_TEXT.title)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
+}
+
+function tzomGedaliaBody(poster) {
+  return fastDayBody(poster, TZG_TEXT.title);
 }
 
 function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+function renderAsaraBTevesPoster(poster, settings) {
+  return posterShell(settings, fastDayBody(poster, poster.title), poster.legend || []);
 }
 
 /** One line of times, as a run `balanceRuns` can measure and cut evenly in two if it does
@@ -1853,6 +1881,9 @@ const ONEPAGE_SECTIONS = {
     // is a row like the rest.
     ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() })))],
+  asarabteves: (p) => [oneSection(p.title, p.sets.map(s => s.note
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
+    : { label: s.head, times: s.lines.flat() }))],
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a

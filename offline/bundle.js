@@ -2476,6 +2476,25 @@ function sofZmanTfilaGRA(date, settings) {
 
 const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
+/** Asara B'Teves: retain sunset's seconds until the requested final rounding. */
+function asaraLastMinchaTrace(shkia, friday = false) {
+  const base = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+  return friday
+    ? base.minus(25, 'the Friday fast\'s last Mincha is twenty-five minutes before sunset')
+      .floor('remove the seconds, without rounding up')
+    : base.minus(40, 'the last weekday Mincha must be at least forty minutes before sunset')
+      .floorToStep(5, 'round down to the earlier five-minute mark');
+}
+
+/** The Friday chart and fast-day sheet must agree about the final Mincha. */
+function fridayLateMinchaTrace(date, settings) {
+  const hebrew = hebrewDateExtended(excelSerial(date), settings.useGregorianBefore1582);
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return asaraLastMinchaTrace(Z.sunsetElev(date, settings), true);
+  }
+  return zman('שקיעה', Z.sunset(date, settings), 'on the Friday').minus(15).floor();
+}
+
 /** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
  *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
  *  (Sukkos through the 1st Sunday of November), which is also nominally "DST active"
@@ -4862,7 +4881,7 @@ function buildChorefRow(week, settings) {
   const plagGRA = zman('פלג המנחה גר״א', Z.plagHamincha(fridayDate, settings), 'the day measured from sunrise to שקיעה').minus(15);
   const plag50 = zman('פלג המנחה מ״א', Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 50').minus(15);
   const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
   const plagWindow = inPlagWindow(friday, settings);
   /* The three פלג מנינים are silenced outside their season rather than branched away, so the
      column can still say they exist and when. Branched, a winter week simply had one time in
@@ -5020,8 +5039,8 @@ function buildKayitzRow(week, settings) {
     .floor().underline();
   const F = maarivFri.text();
 
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
-  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
+  const gBase = minchaFri.value;
   const secondMaariv = zman('שקיעה', sunsetFriday, 'on the Friday').plus(30).floor()
     .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
   const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
@@ -9521,6 +9540,105 @@ function nl2br(str) {
   return smalled.replace(/\n/g, '<br>');
 }
 
+// ==== posters/asarabteves.js ====
+// Asara B'Teves, using the shul's weekday and Friday rules. The older Word sheets
+// are reference examples; the current chart owns the standing morning and Friday lists.
+
+
+
+
+
+
+
+
+const ASARA_TEXT = {
+  title: 'עשרה בטבת',
+  fridayTitle: 'עשרה בטבת · ערב שבת',
+  shacharis: 'שחרית',
+  selichosFirst: 'סליחות קודם שחרית',
+  mincha: 'מנחה',
+  candles: 'הדלקת נרות',
+  shkia: 'שקיעה',
+  maariv: 'מעריב',
+};
+
+const asaraBTevesSerial = (year) => dateFromHebrew(10, 10, year);
+
+/** The 6:40 minyan reaches its usual twenty-five-minute point at 7:05. */
+const asaraSelichosFirst = (netz) => netz > (7 * 60 + 5) / 1440 + 1e-9;
+
+function asaraCell(trace) {
+  return { text: trace.plain(), underlined: Boolean(trace.flags.underlined), mark: trace.flags.mark || '', trace };
+}
+
+function buildAsaraBTevesPoster(year, settings) {
+  if (!year) return null;
+  const serial = asaraBTevesSerial(year), date = dateFromSerial(serial);
+  const friday = excelWeekday(serial) === 6;
+  const netz = Z.sunriseElev(date, settings), shkia = Z.sunsetElev(date, settings);
+  const rawShkia = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+  const shkiaTrace = friday ? rawShkia.floor('drop the seconds, as on the Friday chart') : rawShkia;
+  const shacharisLines = WEEKDAY_SHACHARIS_SPECIAL.split('\n').map(line =>
+    parseTimes(line.replace(/\s+/g, ',')).map(time => {
+      let trace = fixedTime(time.text, { am: true, label: 'the seasonal chart\'s fast-day Shacharis schedule' });
+      if (time.underlined) trace = trace.underline();
+      if (time.mark) trace = trace.mark(time.mark);
+      return asaraCell(trace);
+    }));
+  if (asaraSelichosFirst(netz)) {
+    const first = shacharisLines.flat().find(time => time.text === '6:40');
+    if (first) {
+      first.timeNote = ASARA_TEXT.selichosFirst;
+      first.explanation = 'Sunrise is later than 7:05, twenty-five minutes after the 6:40 start. Say Selichos before Shacharis.';
+    }
+  }
+
+  const last = asaraCell(friday ? fridayLateMinchaTrace(date, settings) : asaraLastMinchaTrace(shkia));
+  const mincha = friday
+    ? [...fridayMainMinchaParts(date, settings, serial + 1).times.map(asaraCell), last]
+    : [
+      asaraCell(fixedTime('12:45').underline()),
+      asaraCell(fixedTime('1:15').mark('*')),
+      asaraCell(fixedTime('1:35').underline()),
+      asaraCell(fixedTime('1:50')),
+      asaraCell(fixedTime('3:30').underline()),
+      last,
+    ];
+  const maariv = friday ? [] : [
+    asaraCell(shkiaTrace.plus(35, 'the first fast-day Maariv is thirty-five minutes after sunset')),
+    asaraCell(shkiaTrace.plus(50, 'the downstairs Maariv is fifty minutes after sunset').underline()),
+    asaraCell(fixedTime('10:30')),
+  ];
+  const candles = friday ? candleLightingParts(date, settings).times[0] : null;
+  const sets = [
+    { calc: 'shacharis', head: ASARA_TEXT.shacharis, lines: shacharisLines },
+    { calc: 'mincha', head: ASARA_TEXT.mincha, lines: [mincha.slice(0, 4), mincha.slice(4)] },
+    ...(candles ? [{ calc: 'candles', note: { label: ASARA_TEXT.candles, text: candles.plain(), trace: candles } }] : []),
+    { calc: 'shkia', note: { label: ASARA_TEXT.shkia, text: shkiaTrace.plain(), trace: shkiaTrace } },
+    ...(maariv.length ? [{ calc: 'maariv', head: ASARA_TEXT.maariv, lines: [maariv] }] : []),
+  ];
+  const M = minyanList();
+  M.list(serial, ASARA_TEXT.shacharis, shacharisLines.flat(), MORNING);
+  M.list(serial, ASARA_TEXT.mincha, mincha, AFTERNOON);
+  // The Friday poster matches the reference sheet and has no weekday Maariv block.
+  // The phone still needs the ordinary Friday-night Maariv, read from the winter chart.
+  const fridayMaariv = friday
+    ? buildChorefRow({ serial: serial + 1, specialParsha: '' }, settings).traces.F.map(asaraCell) : [];
+  M.list(serial, ASARA_TEXT.maariv, friday ? fridayMaariv : maariv, AFTERNOON);
+  if (candles) M.zman(serial, ASARA_TEXT.candles, candles.value);
+  const all = [...shacharisLines.flat(), ...mincha, ...maariv];
+  const stars = ['*', '**'].filter(mark => all.some(time => time.mark === mark));
+  return {
+    hebrewYear: year, title: friday ? ASARA_TEXT.fridayTitle : ASARA_TEXT.title,
+    span: { from: serial, to: serial }, friday, netz, shkia, sets,
+    minyanim: M.out, zmanim: M.zmanim,
+    legend: [
+      { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' },
+      { dir: 'rtl', text: stars.map(mark => mark === '*' ? '*בעזרת נשים' : '**באולם השמחות').join(' ') },
+    ].filter(line => line.text),
+  };
+}
+
 // ==== posters/pesach.js ====
 // The פסח sheet: ליל בדיקת חמץ, ערב פסח, the two days, חול המועד, a שבת חול המועד where there
 // is one, שביעי של פסח and אחרון של פסח.
@@ -10600,8 +10718,8 @@ function buildTzomGedaliaPoster(year, settings) {
 // ==== posters/day.js ====
 // The days the sheets on the wall speak for, and what is davening on them.
 //
-// Sixteen days a year the schedule is not on either chart: ערב ר"ה, the two days of ר"ה, צום
-// גדליה, ערב יו"כ and יו"כ, and then ערב סוכות through שמחת תורה. On those days the shul hangs
+// Some days have a complete schedule of their own: ערב ר"ה, the two days of ר"ה, צום
+// גדליה, ערב יו"כ and יו"כ, ערב סוכות through שמחת תורה, and עשרה בטבת. The shul hangs
 // a sheet, and the charts carry the ordinary weekday row for the week they fall in. "What is
 // on next" on the congregation's home page was reading that row and offering it: on יום כיפור
 // it said מנחה 1:15 where the sheet on the wall says 4:15, and on the second day of ר"ה it
@@ -10632,6 +10750,7 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -10651,6 +10770,15 @@ const SEASON_BEFORE = 16;
  *  times over on a phone. Keyed on the settings object as well as the year: Settings moves
  *  candle lighting and the horizon, and a stale sheet would be worse than a slow one. */
 let built = null;
+let asaraBuilt = null;
+function asaraFor(year, settings) {
+  if (asaraBuilt && asaraBuilt.year === year && asaraBuilt.settings === settings) return asaraBuilt.poster;
+  let poster = null;
+  try { poster = buildAsaraBTevesPoster(year, settings); } catch { poster = null; }
+  asaraBuilt = { year, settings, poster };
+  return poster;
+}
+
 function sheetsFor(year, settings) {
   if (built && built.year === year && built.settings === settings) return built.list;
   const list = [];
@@ -10675,8 +10803,8 @@ function sheetsFor(year, settings) {
  *  hands back is offered as "what is on next", and candle lighting must never be offered that
  *  way. Each builder registers it through `zman` instead (see posters/minyanim.js).
  *
- *  And it reaches further, because the פסח sheet is in it. specialMinyanim is deliberately only
- *  the תשרי stretch, since that is where a sheet takes a whole day over from the charts, and
+ *  And it reaches further, because the פסח sheet is in it. specialMinyanim takes over only
+ *  the complete schedules in תשרי and the confirmed עשרה בטבת schedule, and
  *  widening it would change what the home page calls the next מנין across all of פסח. Reading
  *  one number off the פסח sheet changes nothing else, and without it ערב פסח and ערב שביעי של
  *  פסח are two erev yom tovs with no candle lighting anywhere: they are not Fridays, so the
@@ -10695,7 +10823,11 @@ function pesachZmanim(year, settings) {
 }
 
 function specialCandleLighting(serial, settings) {
-  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  const hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const here = hebrew.year;
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return asaraFor(here, settings)?.zmanim.find(z => z.serial === serial) || null;
+  }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;
@@ -10713,10 +10845,15 @@ function specialCandleLighting(serial, settings) {
  *  Empty on every other day of the year, which is the signal to the caller that the charts
  *  are the answer.
  *
- *  Two years are tried because ערב ר"ה is the day before the year turns over: its own Hebrew
+ *  עשרה בטבת uses this Hebrew year's own sheet. Two years are tried in תשרי because ערב
+ *  ר"ה is the day before the year turns over: its own Hebrew
  *  year is the old one, and the sheet it is on belongs to the new. */
 function specialMinyanim(serial, settings) {
-  const here = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  const hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  const here = hebrew.year;
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return (asaraFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
+  }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);
     if (serial < rh - BEFORE || serial > rh + AFTER) continue;
@@ -11074,11 +11211,11 @@ function entryForDay(serial, state) {
  *  A day is served by whichever chart covers it: Sunday through Thursday by the Weekday
  *  chart, Friday and Shabbos by the שבת chart for that week. */
 function minyanimForDay(serial, state, settings) {
-  /* The sheets on the wall first, on the six days a year they are the whole schedule: ערב
-     ר"ה, both days of ר"ה, צום גדליה, ערב יו"כ and יו"כ. Neither chart carries those days,
+  /* The complete special-day sheets on the wall first, including עשרה בטבת and the
+     תשרי schedules. The ordinary charts do not carry their complete day schedules,
      and both carry the ordinary weekday row for the week they fall in, so this used to offer
      it: on יום כיפור the card said מנחה 1:15 where the sheet says 4:15. See posters/day.js
-     for which days are taken over and why the list stops at six. */
+     for which days are taken over. */
   const special = specialMinyanim(serial, settings);
   if (special.length) return special;
 
@@ -13929,6 +14066,7 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
 
 
 
+
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
  *  change when somebody picks a different font for the board. fontStackFor() adds the
@@ -14145,6 +14283,22 @@ const POSTERS = [
       }));
     },
     render: renderChanukahPoster,
+  },
+  {
+    key: 'asarabteves',
+    label: ASARA_TEXT.title,
+    group: ASARA_TEXT.title,
+    covers: (y) => `${ASARA_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildAsaraBTevesPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
+        build: () => ({ poster: buildAsaraBTevesPoster(y, settings) }),
+      }));
+    },
+    render: renderAsaraBTevesPoster,
   },
   {
     key: 'shuva',
@@ -14801,7 +14955,10 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
   const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
-  return posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
+  const time = posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
+  return t.timeNote
+    ? `<span class="poster-annotated-time">${time}<bdi class="poster-time-note" dir="rtl" lang="he">(${escAttr(t.timeNote)})</bdi></span>`
+    : time;
 }
 
 /** A זמן given both ways, set as two little columns: the name of each reckoning over its own
@@ -15369,9 +15526,9 @@ function renderAfterYomKippurPoster(poster, settings) {
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
-function tzomGedaliaBody(poster) {
+function fastDayBody(poster, title) {
   const timeLine = (times) =>
-    `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
+    `<p class="poster-set-line" lang="he"><bdi dir="ltr">${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
     ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
         <bdi>${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></p></div>`
@@ -15381,12 +15538,20 @@ function tzomGedaliaBody(poster) {
       ${s.lines.map(timeLine).join('')}
     </div>`);
   return `
-    <h2 class="poster-title" lang="he">${escAttr(TZG_TEXT.title)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
+}
+
+function tzomGedaliaBody(poster) {
+  return fastDayBody(poster, TZG_TEXT.title);
 }
 
 function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+function renderAsaraBTevesPoster(poster, settings) {
+  return posterShell(settings, fastDayBody(poster, poster.title), poster.legend || []);
 }
 
 /** One line of times, as a run `balanceRuns` can measure and cut evenly in two if it does
@@ -15742,6 +15907,9 @@ const ONEPAGE_SECTIONS = {
     // is a row like the rest.
     ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() })))],
+  asarabteves: (p) => [oneSection(p.title, p.sets.map(s => s.note
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
+    : { label: s.head, times: s.lines.flat() }))],
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a
