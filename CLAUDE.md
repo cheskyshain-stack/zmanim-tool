@@ -185,10 +185,16 @@ the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle
 lighting and sunset, without a weekday Maariv block; the weekly page and next-minyan
 engine retain the chart's regular Friday-night Maariv. The same builder feeds the
 posters, public Special Schedules, weekly agenda, schedule API and fast-day message.
+Its admin **All on one** mode uses the same 5.5in by 8.5in half-page handout and
+remembered one-or-two Copies per page switch as Chanukah. Keep the Selichos note
+beside 6:40 and retain every time and location mark. **Just one**, **A sheet each**
+and public Special Schedules retain the original full-page poster. Mixed whole-year
+All on one runs rotate both handouts onto their own portrait page, as for Chanukah.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
 51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
 checks both reference layouts, phone and desktop printing, all sheet modes, the
-conditional note, the public Special Schedule, and the copyable fast-day message.
+conditional note, half-page copies and saved choices, margins, the public Special
+Schedule, and the copyable fast-day message.
 
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the

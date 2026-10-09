@@ -15679,24 +15679,37 @@ function renderChanukahPoster(poster, settings) {
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
+const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
+const halfPageSection = (title, rows) => `<section class="onepage-sec">
+  <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
+
+function halfPageShell(poster, settings, title, sections) {
+  const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <div class="halfpage-body">${sections}</div>`;
+  const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
+  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
+  return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
+}
+
 /** A handout on half a Letter sheet. Keep the morning groups together and put their
  *  sunrise references in one strip, rather than spending a table row on each day. */
 function renderHalfChanukahPoster(poster, settings) {
   const sections = ONEPAGE_SECTIONS.chanukah(poster);
   const morning = sections[0];
   const netz = poster.shacharisRows.flatMap((row) => row.vasikin.netzDays || []);
-  const section = (s, rows) => `<section class="onepage-sec">
-    <h3 class="onepage-sec-head" lang="he">${escAttr(s.title)}</h3>${rows}</section>`;
-  const body = `<h2 class="onepage-title" lang="he">${escAttr(CH_TEXT.title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    <div class="halfpage-body">
-      ${section(morning, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
+  const sectionsHtml = halfPageSection(morning.title, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
         + (netz.length ? `<div class="halfpage-netz"><strong lang="he">${escAttr(CH_TEXT.netz)}</strong>
-          <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))}
-      ${sections.slice(1).map((s) => section(s, s.rows.map((row) => onePageRows({ ...row, label: '' })).join(''))).join('')}
-    </div>`;
-  const legend = [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
-  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true });
-  return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
+          <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
+    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row, label: '' })).join(''))).join('');
+  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml);
+}
+
+function renderHalfAsaraBTevesPoster(poster, settings) {
+  const sections = poster.sets.map(s => s.note
+    ? `<div class="halfpage-zman" lang="he"><span>${escAttr(s.note.label)}</span>
+        <bdi dir="ltr">${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></div>`
+    : halfPageSection(s.head, s.lines.map(times => onePageRows({ label: '', times })).join(''))).join('');
+  return halfPageShell(poster, settings, poster.title, sections);
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -16042,8 +16055,11 @@ function onePageRows(r) {
  *
  *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
 function renderOnePagePoster(built, settings, { halfLetter = false } = {}) {
-  if (halfLetter && built.items?.length === 1 && built.items[0].key === 'chanukah') {
-    return renderHalfChanukahPoster(built.items[0].poster, settings);
+  if (halfLetter && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key)) {
+    const item = built.items[0];
+    return item.key === 'chanukah'
+      ? renderHalfChanukahPoster(item.poster, settings)
+      : renderHalfAsaraBTevesPoster(item.poster, settings);
   }
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
@@ -16695,7 +16711,7 @@ function fitPoster(container) {
     // to be this way round. The סוכות sheet's type is set here for the same reason.
     fitOnePage(container);
     fitSukkos(container);
-    fitHalfChanukah(container);
+    fitHalfPage(container);
   };
   decide();
   if (container.querySelector('.poster.is-halfpage')) {
@@ -16708,7 +16724,7 @@ function fitPoster(container) {
   window.addEventListener('resize', fitHandler);
 }
 
-function fitHalfChanukah(container) {
+function fitHalfPage(container) {
   for (const sheet of container.querySelectorAll('.poster.is-halfpage')) {
     const wrapper = sheet.parentElement;
     const zoom = wrapper.style.zoom;
@@ -16828,7 +16844,7 @@ function renderPosters(container, state, routeChanged, tables) {
   const showAll = chosenSheets !== 'one';
   const onePage = chosenSheets === 'all';
   const poster = empty ? null : showAll ? runPoster : one;
-  const halfLetter = onePage && !scopeAll && items.length === 1 && items[0].key === 'chanukah';
+  const halfLetter = onePage && !scopeAll && items.length === 1 && HALF_PAGE_POSTERS.has(items[0].key);
 
   /* Which of the further switches this sheet actually reads, and whether the occasion showing
      has anything for them to decide. Both belong to the run rather than to a single sheet.
@@ -17164,7 +17180,7 @@ function renderPosters(container, state, routeChanged, tables) {
     });
   }
   if (built) {
-    /* The Chanukah handout occupies half a landscape Letter sheet. Other posters print
+    /* A half-page handout occupies half a landscape Letter sheet. Other posters print
        on portrait paper, the landscape ones included: they
        go on it turned a quarter turn, which is what the run has always done with them and
        what a single one does now as well. See the .poster.is-landscape rule in print.css

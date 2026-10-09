@@ -184,9 +184,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     const turned = await page.locator('.poster.is-halfpage').evaluateAll(sheets => sheets.map(s => {
       const r = s.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height };
     }));
-    assert.equal(turned.length, 2);
+    assert.equal(turned.length, 4, 'Chanukah and Asara B\'Teves each retain both half-page copies');
     assert(turned.every(s => s.x === 0 && s.width === 816 && s.height === 528));
-    assert.equal(turned[1].y - turned[0].y, 528, 'Mixed run uses both halves without overlap');
+    for (const index of [0, 2]) assert.equal(turned[index + 1].y - turned[index].y, 528, 'Mixed run uses both halves without overlap');
     const run = await page.pdf({ preferCSSPageSize: true, printBackground: true });
     assert.equal(pdfPages(run), count, 'Mixed run has one page per occasion');
     assert.match(run.toString('latin1'), /\/MediaBox \[0 0 612 792\]/);
