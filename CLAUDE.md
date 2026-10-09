@@ -199,6 +199,7 @@ with modest fixed gaps instead of distributing three blocks across the page.
 Retain comfortable leading within each list. Keep weekday sunset beside Maariv,
 and Friday candle lighting and sunset together below Mincha. Leave a clear gap
 above the location notes, and fit the schedule at the actual printed size.
+Do not draw divider lines between time rows within a half-page Asara tefillah.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
 51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
 checks both reference layouts, phone and desktop printing, all sheet modes, the
