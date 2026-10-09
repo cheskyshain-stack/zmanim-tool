@@ -5474,19 +5474,23 @@ body.is-luach #main .print-btn:hover:not(:disabled) { background:#e9ddbd; color:
 body.is-luach #main .print-btn:active:not(:disabled) { background:#e2d3ad; color:#15283f; box-shadow:none; transform:none; }
 body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
 
-/* Approved Home and Donate design. Screen-only scope preserves other public pages and paper. */
+/* All public pages share the homepage's straight navy cap and thin gold edge. */
+@media screen {
+ body.is-luach { --luach-cap-height:64px; --luach-arc:0px; }
+ body.is-luach .luach-bar {
+  height:var(--luach-cap-height); min-height:0; padding:0 20px; margin:0; background:#142b46;
+  border-bottom:2px solid #cbb681; align-items:center;
+ }
+ body.is-luach .luach-bar::after { display:none; }
+ body.is-luach .luach-bar::before { inset:0; }
+}
+
+/* Approved Home and Donate design. Screen-only scope preserves other page content and paper. */
 @media screen {
  body.is-luach:has(main:is(.is-home,.is-give)) {
   --luach-navy:#142b46; --luach-ink:#142b46; --luach-cream:#faf7f0;
-  --luach-cap-height:64px; --luach-arc:0px;
  }
  body.is-luach main:is(.is-home,.is-give) { display:block; min-height:100dvh; padding:93px 18px 27px; }
- body.is-luach main:is(.is-home,.is-give) .luach-bar {
-  height:64px; min-height:0; padding:0 20px; margin:0; background:#142b46;
-  border-bottom:2px solid #cbb681; align-items:center;
- }
- body.is-luach main:is(.is-home,.is-give) .luach-bar::after { display:none; }
- body.is-luach main:is(.is-home,.is-give) .luach-bar::before { inset:0; }
  .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
  body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
  .luach-home-bar-name,.luach-home-bar-nav { display:none; }
@@ -5576,8 +5580,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-account-title { font-size:15px; }
 }
 @media screen and (min-width:760px) {
- body.is-luach:has(main:is(.is-home,.is-give)) { --luach-cap-height:78px; }
- body.is-luach main:is(.is-home,.is-give) .luach-bar { height:78px; }
+ body.is-luach { --luach-cap-height:78px; }
  .is-home .luach-home-bar-name { display:block; font:600 14px Georgia,serif; color:#fff; }
  .is-home .luach-home-bar-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
  .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
