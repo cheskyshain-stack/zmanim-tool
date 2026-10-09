@@ -13644,11 +13644,130 @@ function buildSlichosTzomPoster(year, settings) {
   };
 }
 
+// ==== rosh-chodesh-text.js ====
+// The ROSH CHODESH message, as a block of text somebody can paste into a chat.
+//
+// The shul sends one before every ראש חודש, seventeen of them in the history this was built
+// from, and it is one line:
+//
+//   ROSH CHODESH Nissan Shacharis 6:40m, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
+//
+// **Every time in it comes off the wall chart**, WEEKDAY_SHACHARIS_SPECIAL, which is the
+// second schedule the chart prints on a ר"ח, a בה"ב and a תענית. Nothing here computes a time and
+// nothing here keeps its own copy of one. That is the rule the whole messages page runs on, and
+// this file broke it twice before the shul caught both:
+//
+//   It carried its own copy of the schedule, and the copy had a 6:50 בעזרת נשים the chart has not
+//   got, so the message announced a מנין the board does not show. A second copy of a schedule
+//   disagrees with the board the moment anybody edits either one, and the board is what people
+//   daven from.
+//
+//   It carried the "(T"T 7:25)" that every one of the seventeen sent messages has. That one is on
+//   no chart at all, so nothing here knows how it is arrived at or what would move it, and a line
+//   that is right until the year it quietly is not is worse than a line that was never there.
+//
+// What this does work out is the calendar, not the clock: which month it is, and the day ראש חודש
+// starts on, which is the thirtieth of the month before wherever that month has one. Those are
+// the parts a person gets wrong, and they are not times.
+//
+// One thing the seventeen show that is deliberately not built. Three of them, in חשון, טבת and
+// שבט, open "6:50m&ns, [Netz 7:15]" instead. Both of those numbers are real: the bracket is
+// sunrise and the מנין is sunrise less twenty five minutes, which is why it reads 6:50 one year
+// and 6:51 the next. It looks like a winter rule and it is not one, because כסלו, in the middle
+// of that stretch, uses the ordinary form. Three examples cannot say which months take it, and in
+// any case neither number is on a chart, so neither is built.
+
+
+
+/** The wording, as the shul writes it. The times are not here: see roshChodeshShacharis. */
+const RC_TEXT = {
+  title: 'ROSH CHODESH',
+  label: 'Shacharis',
+  /** Where the shul spells a month differently from the program's own table.
+   *  אב is "Menachem Av" in every one of the sent messages, and חשון is "Mar Cheshvon". Held here
+   *  rather than changed in JEWISH_MONTHS_EN, which the charts and the date lines read: those say
+   *  Av and Cheshvan and should keep saying it. */
+  spelling: { Av: 'Menachem Av', Cheshvan: 'Mar Cheshvon' },
+};
+
+/** The מנינים, read off the wall chart's own ר"ח schedule.
+ *
+ *  **`WEEKDAY_SHACHARIS_SPECIAL` in settings.js, which is the cell the chart prints on a ר"ח, a
+ *  בה"ב and a תענית.** This carried its own copy of that list for a while and it should not have. The shul
+ *  caught it on one time: the copy had a 6:50 בעזרת נשים that the chart has not got, so the message
+ *  was announcing a מנין the board does not show. A second copy of a schedule is a schedule that
+ *  will disagree with the board the first time somebody edits one of them, and the board is the one
+ *  people daven from.
+ *
+ *  So the letters come off the chart's own marks rather than being typed beside the times:
+ *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Change that one
+ *  schedule and this message follows it, which is the whole point.
+ *
+ *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
+ *  not one to send, so the caller drops the card rather than sending the heading on its own. */
+function roshChodeshShacharis(shacharisCell) {
+  const times = erevTimes(shacharisCell);
+  if (!times.length) return '';
+  return times.map((t) => t.text + erevWhereMark(t)).join(', ');
+}
+
+/** The English name of a Hebrew month, spelled the way the messages spell it. */
+function roshChodeshMonthName(month) {
+  const plain = JEWISH_MONTHS_EN[month - 1] || '';
+  return RC_TEXT.spelling[plain] || plain;
+}
+
+/** The next ראש חודש on or after a day, as the days it runs and the month it opens.
+ *
+ *  **תשרי is not one of them.** Its ראש חודש is ראש השנה, which has a message of its own and a
+ *  sheet behind it, and a "ROSH CHODESH Tishrei" beside that would be the same day said twice.
+ *
+ *  Two days wherever the month before has thirty, which is what makes the thirtieth of it the
+ *  first day of ראש חודש. Asked of the calendar rather than of a table of month lengths, since
+ *  the calendar already knows and a table would be a second answer to the same question.
+ *
+ *  Walked forward a day at a time rather than reckoned. A ראש חודש is never more than a month
+ *  off, the walk is at most a few dozen steps, and it cannot be subtly wrong the way arithmetic
+ *  on which month it is can be.
+ *
+ *  @param from - the serial to look forward from.
+ *  @param useGregorianBefore1582 - the setting hebrewDateExtended takes. */
+function nextRoshChodesh(from, useGregorianBefore1582 = false) {
+  for (let s = from; s < from + 70; s += 1) {
+    const at = hebrewDateExtended(s, useGregorianBefore1582);
+    if (at.dayOfMonth !== 1) continue;
+    if (at.month === 7) continue;
+    const before = hebrewDateExtended(s - 1, useGregorianBefore1582);
+    /* The walk starts at `from`, so where today is the first of the month and the month before
+       had thirty days, the ראש חודש found is the one that began yesterday and is still running.
+       That is the right answer: it is today's message, not next month's. */
+    const first = before.dayOfMonth === 30 ? s - 1 : s;
+    return { first, last: s, month: at.month, year: at.year };
+  }
+  return null;
+}
+
+/** The message.
+ *
+ *  @param rc - straight from nextRoshChodesh.
+ *  @param shacharisCell - the chart's own ר"ח schedule, WEEKDAY_SHACHARIS_SPECIAL. */
+function roshChodeshText(rc, shacharisCell) {
+  if (!rc) return '';
+  const name = roshChodeshMonthName(rc.month);
+  if (!name) return '';
+  const times = roshChodeshShacharis(shacharisCell);
+  if (!times) return '';
+  return `${RC_TEXT.title} ${name} ${RC_TEXT.label} ${times}`;
+}
+
 // ==== posters/shacharis.js ====
 const BEHAB_SHACHARIS_TEXT = {
   afterSukkos: 'בה"ב אחר סוכות',
   afterPesach: 'בה"ב אחר פסח',
 };
+
+const ROSH_CHODESH_SHACHARIS_MONTHS = [8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4, 5, 6];
+const roshChodeshShacharisTitle = month => `ראש חודש ${JEWISH_MONTHS_HE[month - 1]}`;
 
 /** Resolve the chart's marks into words for a poster that needs no location key. */
 function shacharisRoomRows(cells) {
@@ -13685,6 +13804,39 @@ function buildBehabShacharisPoster(year, month, settings) {
     span: { from: days[0], to: days.at(-1) }, days,
     rows: shacharisRoomRows(specialShacharisLines().flat()),
   };
+}
+
+/** Read the same one- or two-day occasions as the Rosh Chodesh messages. Walking
+ *  the calendar also handles both Adars without inverse month arithmetic. */
+function buildRoshChodeshShacharisPoster(year, month, settings) {
+  if (!year || !ROSH_CHODESH_SHACHARIS_MONTHS.includes(month)) return null;
+  const end = roshHashana(year - 3760);
+  let from = roshHashana(year - 3761);
+  while (from < end) {
+    const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
+    if (!rc || rc.year !== year) return null;
+    from = rc.last + 1;
+    if (rc.month !== month) continue;
+    // The seven-room morning schedule is for Sunday through Friday.
+    const days = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i)
+      .filter(serial => excelWeekday(serial) !== 7);
+    if (!days.length) return null;
+    const chanukah = month === 10
+      ? buildChanukahPoster(year, settings)?.shacharisRows.find(row => row.isRoshChodesh) : null;
+    const cells = chanukah
+      ? chanukah.cells.map((cell, i) => i === 0
+        ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
+      : specialShacharisLines().flat();
+    return {
+      hebrewYear: year, month,
+      title: roshChodeshShacharisTitle(month) + (chanukah ? ' · חנוכה' : ''),
+      subtitle: 'שחרית',
+      dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
+      span: { from: days[0], to: days.at(-1) }, days,
+      rows: shacharisRoomRows(cells),
+    };
+  }
+  return null;
 }
 
 // ==== posters/shuva.js ====
@@ -14212,8 +14364,13 @@ const POSTERS = [
     { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
     { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
     { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
-  ].map(({ key, label, build }) => ({
-    key, label, group: label,
+    ...ROSH_CHODESH_SHACHARIS_MONTHS.map(month => ({
+      key: `roshchodesh${month}`, label: roshChodeshShacharisTitle(month), group: 'ראש חודש',
+      dated: true,
+      build: (y, s) => buildRoshChodeshShacharisPoster(y, month, s),
+    })),
+  ].map(({ key, label, group = label, dated, build }) => ({
+    key, label, group, dated,
     // Supplementary morning handouts are picked separately from the complete schedules.
     handout: true,
     covers: y => `${label} ${hebrewYear(y)}`,
@@ -14632,7 +14789,8 @@ function postersByDate(year, settings, state) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  const sorted = [...all].sort((a, b) => {
+  // A month absent in this year, or entirely on Shabbos, has no weekday handout.
+  const sorted = all.filter(p => !p.dated || at.get(p).from != null).sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
@@ -15819,7 +15977,8 @@ function renderShacharisHandout(poster, settings) {
     </div>
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, rows), { shacharis: true });
+  const days = poster.dayLabel ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -16578,7 +16737,8 @@ let posterTables = null;
 function posterRoute() {
   // The whole set keeps the key the run entry has always had, so a link written before it
   // became a switch still lands on it.
-  const handout = POSTERS.find(p => p.handout && p.group === chosenGroup);
+  const handout = POSTERS.find(p => p.handout && p.group === chosenGroup && p.key === chosen)
+    || POSTERS.find(p => p.handout && p.group === chosenGroup);
   const key = handout?.key || (chosenSheets === 'one' ? chosen : POSTERS.find((p) => p.last)?.key);
   if (!key) return [];
   const poster = POSTERS.find((p) => p.key === key);
@@ -16955,7 +17115,7 @@ function renderPosters(container, state, routeChanged, tables) {
   /* The whole year of them, or the one showing. Everything below reads `items`, so the
      switches, the Print button and the "nothing here yet" message all answer for what is
      actually in the run rather than for the occasion the picker happens to be on. */
-  const handout = group?.items.length === 1 && Boolean(group.items[0].handout);
+  const handout = Boolean(group?.items.length && group.items.every(p => p.handout));
   const scopeAll = !handout && chosenSheets !== 'one' && chosenScope === 'all';
   const items = scopeAll ? groups.flatMap((g) => g.items).filter(p => !p.handout) : (group ? group.items : []);
   // An occasion nobody has given times for yet. Everything past the picker is left off: a
@@ -16964,6 +17124,11 @@ function renderPosters(container, state, routeChanged, tables) {
   const empty = items.length === 0;
   const runPoster = POSTERS.find((p) => p.last);
   const one = items.find((p) => p.key === chosen) || items[0] || null;
+  if (handout && one && chosen !== one.key) {
+    chosen = one.key;
+    rememberBar();
+    onRoute?.();
+  }
   // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
   const showAll = !handout && chosenSheets !== 'one';
   const onePage = !handout && chosenSheets === 'all';
@@ -17053,7 +17218,7 @@ function renderPosters(container, state, routeChanged, tables) {
         // The compact layout uses either a full sheet or a half-page handout, by occasion.
         { value: 'all', label: 'Compact', on: chosenSheets === 'all' },
       ])}</div>`}
-      ${!empty && !showAll ? `<label>Which sheet
+      ${!empty && !showAll ? `<label>${handout && items.length > 1 ? 'Month' : 'Which sheet'}
         <select id="poster-pick">
           ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>

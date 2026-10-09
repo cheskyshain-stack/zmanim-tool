@@ -4220,6 +4220,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .shacharis-handout-room, .shacharis-handout-time { position: relative; }
 .shacharis-handout-room { font-size: 0.85em; }
+.shacharis-handout-days {
+  text-align: center; font-size: calc(9pt * var(--op-scale)); font-weight: 700;
+  line-height: 1.3; padding-top: 0.035in;
+}
 .shacharis-handout-note { font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; margin-top: 0.035in; }
 
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
