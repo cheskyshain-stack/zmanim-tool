@@ -4700,7 +4700,8 @@ function chanukahPanelBlocks(days, settings) {
  *  Where the two Fridays' own menus agree position for position, printed once; anywhere they
  *  do not (a later week's own מנחה גדולה can move the same slot a Friday differently from an
  *  earlier one) that one position is both values, slash-joined - never two whole menus for
- *  the sake of one differing minute. */
+ *  the sake of one differing minute. The trailing candle-lighting reference stays off this
+ *  combined poster menu, as requested: it belongs to its own Friday, not the shared list. */
 function combineErevShabbos(erevShabbosList, settings, tables) {
   if (!erevShabbosList.length) return null;
   const parshaNames = tables
@@ -4711,7 +4712,8 @@ function combineErevShabbos(erevShabbosList, settings, tables) {
     // The calendar tables have not loaded (only reachable when this poster is asked for
     // without them): the sheet still has to say something rather than print nothing.
     : erevShabbosList.map((es) => `${CH_TEXT.mincha} ${CH_TEXT.erevShabbos} ${CH_TEXT.title} · ${es.night}`).join(' / ');
-  const cells = erevShabbosList[0].times.map((_, k) => mergedCell(erevShabbosList.map((es) => es.times[k])));
+  const minchaLists = erevShabbosList.map((es) => es.times.slice(0, -1));
+  const cells = minchaLists[0].map((_, k) => mergedCell(minchaLists.map((times) => times[k])));
   return { title, cells };
 }
 

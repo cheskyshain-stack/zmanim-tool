@@ -157,7 +157,10 @@ are bold. Keep Shacharis together,
 including all sunrise day labels in a compact strip with clear gaps between each
 day/time pair, followed by Mincha, Maariv and
 Erev Shabbos. Its heading says **מנחה ערב שבת**, including on the original full-page
-poster, so the Friday times identify their tefillah. Retain every time, merged Friday value and location note. Fit the type
+poster, so the Friday times identify their tefillah. Its printed Erev Shabbos list ends at
+3:00: omit the trailing candle-lighting reference from the shared poster menu, without
+adding a separate candle-lighting section. Retain the earlier Mincha times and location
+notes. Fit the type
 at full size and refit when fonts arrive; a phone's preview zoom must not reach paper.
 Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
 onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
