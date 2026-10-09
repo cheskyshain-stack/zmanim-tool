@@ -4183,7 +4183,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .halfpage-body.is-asara .asara-block { display: flex; flex-direction: column; gap: 0.1in; }
 .poster.is-halfpage .halfpage-body.is-asara .onepage-row {
-  padding-block: 0.11in; line-height: 1.5;
+  padding-block: 0.11in; line-height: 1.5; border-bottom: 0;
 }
 .poster.is-halfpage .onepage-sec-head { text-align: center; }
 .poster.is-halfpage .onepage-row {
