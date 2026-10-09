@@ -15,7 +15,9 @@ const server = http.createServer((req, res) => {
     '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2' })[path.extname(file)] || 'application/octet-stream');
   res.end(fs.readFileSync(file));
 });
-const choices = ['עשרה בטבת · שחרית', 'בה"ב חשון · שחרית', 'בה"ב אייר · שחרית'];
+const choices = ['עשרה בטבת · שחרית', 'בה"ב אחר סוכות', 'בה"ב אחר פסח'];
+const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'בה"ב אחר סוכות', 'חנוכה',
+  'עשרה בטבת', 'עשרה בטבת · שחרית', 'פורים', 'פסח', 'בה"ב אחר פסח', 'שבועות', 'שבעה עשר בתמוז', 'תשעה באב'];
 const expected = [
   ['בית מדרש', '6:40'], ['בעזרת נשים', '7:00'], ['בית מדרש למטה', '7:15'],
   ['באולם השמחות', '7:35'], ['בית מדרש', '8:00'], ['בעזרת נשים', '8:20'], ['בית מדרש למטה', '8:40'],
@@ -70,7 +72,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert.equal(await page.locator('.poster.is-shacharis .onepage-title,.poster.is-shacharis .onepage-sec-head').count(), copies * 2,
         'Compact title and Shacharis section bar are present');
       assert.equal(await page.locator('.poster.is-shacharis .poster-wordmark,.poster.is-shacharis .poster-rule').count(), 0, 'No framed Word-style letterhead');
-      assert.equal(await page.locator('.shacharis-handout-shade').count(), copies * 3);
+      assert.equal(await page.locator('.shacharis-handout-shade').count(), 0, 'Morning rows have no highlight artwork');
+      assert(await page.locator('.shacharis-handout-run').evaluateAll(rows => rows.every(row =>
+        getComputedStyle(row).backgroundColor === 'rgba(0, 0, 0, 0)')), 'Every morning row has the same plain background');
       assert.equal(await page.locator('.poster.is-shacharis u').count(), 0, 'Rooms replace location underlines');
       const texts = await page.locator('.poster.is-shacharis').allTextContents();
       assert(texts.every(text => text === texts[0] && !text.includes('*') && !/מנחה|מעריב/.test(text)), 'Only morning times, without location stars');
@@ -106,6 +110,13 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.setViewportSize({ width, height: 1100 });
       await page.locator('#poster-group').selectOption(choice);
       await chooseYear(year);
+      assert.deepEqual(await page.locator('#poster-group option').allTextContents(), chronologicalChoices, 'Yom Tov picker is chronological in ' + year);
+      if (choiceIndex > 0) {
+        const title = await page.locator('.poster.is-shacharis .onepage-title').first().innerText();
+        assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
+        assert(!/חשון|אייר/.test(title), 'No month name in the BHB title');
+        assert.equal(await page.locator('.poster.is-shacharis .onepage-sec-head').first().innerText(), 'שחרית');
+      }
       await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
       await settle();
       assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0,
@@ -127,6 +138,17 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     assert(await page.locator('#poster-ink-mono').isChecked());
     assert.equal(await page.locator('#poster-margin').inputValue(), '0.35');
     await measure(2);
+    for (const [oldGroup, newGroup] of [['בה"ב חשון · שחרית', choices[1]], ['בה"ב אייר · שחרית', choices[2]]]) {
+      await page.evaluate(group => {
+        const saved = JSON.parse(localStorage.getItem('zmanim-poster-bar-v1'));
+        saved.group = group; saved.sheet = null;
+        localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify(saved));
+      }, oldGroup);
+      await page.goto(origin + '/admin/?legacy-group=' + encodeURIComponent(oldGroup) + '#posters/all');
+      await page.locator('.poster.is-shacharis').first().waitFor(); await settle();
+      assert.equal(await page.locator('#poster-group').inputValue(), newGroup, 'Previously saved BHB choice survives the rename');
+      await measure(2);
+    }
     for (const key of ['asarashacharis', 'behabcheshvan', 'behabiyar']) {
       await page.goto(origin + '/admin/#posters/' + key); await page.locator('.poster.is-shacharis').first().waitFor(); await settle(); await measure(2);
     }

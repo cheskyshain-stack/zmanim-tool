@@ -4210,8 +4210,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: auto; font-size: 8pt; line-height: 1.45;
 }
 
-/* Morning-only handouts share the compact letterhead, title and section band.
-   Neutral room shading remains artwork when background graphics are disabled. */
+/* Morning-only handouts share the compact letterhead, title and section band. */
 .poster.is-halfpage .shacharis-handout-row { padding: 0.045in 0.08in; }
 .shacharis-handout-run {
   position: relative; display: flex; align-items: baseline; justify-content: space-between;
@@ -4219,8 +4218,6 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   font-size: calc(12pt * var(--op-scale)); font-weight: 700; line-height: 1.35;
   white-space: nowrap;
 }
-.shacharis-handout-run.is-highlighted { background: #ececec; }
-.shacharis-handout-shade { position: absolute; inset: 0; pointer-events: none; }
 .shacharis-handout-room, .shacharis-handout-time { position: relative; }
 .shacharis-handout-room { font-size: 0.85em; }
 .shacharis-handout-note { font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; margin-top: 0.035in; }
