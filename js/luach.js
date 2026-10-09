@@ -18,7 +18,9 @@ import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser, chartSpreads, spreadIndexForNow, CHART_EARLY_DAYS } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
-import { shulNow } from './zmanim/solar.js';
+import { shulNow, dateFromSerial } from './zmanim/solar.js';
+import { loadTables } from './data-loader.js';
+import { hasParsha } from './hebrew-calendar.js';
 
 const main = document.getElementById('main');
 /** Which week /week/ is currently showing, moved by Previous/This week/Next - see
@@ -295,6 +297,11 @@ const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
 
+const siteFooterHtml = (s) => `<footer class="luach-site-footer">
+  ${footHtml(s)}
+  <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
+</footer>`;
+
 /** The address, cut so that where it takes two lines the break falls between the shul's name
  *  and its street address.
  *
@@ -351,33 +358,14 @@ const DONATE = {
   name: 'Donate',
   heading: 'Donation Options',
   thanks: `Thank you for supporting ${SHUL_ENGLISH}.`,
-  /* What the shul is, for the donor deciding. Under the ways to give rather than over
-     them: it is not what the page is for, it is the reassurance somebody wants once they
-     have decided to give and before they type a card number.
-   *
-   * The tax ID is in it, and this is now the only place on the site it is written out. It
-   * was in the footer of every page before there was anywhere better for it: a number on
-   * its own with nothing saying what it was. Here it sits with the words it belongs to, so
-   * somebody copying it for an accountant copies it from a sentence that says what it is.
-   * The address is still left out, since the footer says it two lines below and saying it
-   * twice within an inch reads as a form rather than as a sentence.
-   *
-   * The digits are in a bdi. Nothing in this paragraph is Hebrew today, so nothing reorders
-   * today, but a tax ID is two numbers around a hyphen, which is exactly the shape that
-   * comes out backwards if a Hebrew word ever lands beside it. The isolation costs nothing
-   * and travels with the number wherever this line is moved to next.
-   *
-   * "to the extent permitted by law" is the standard wording and is not a hedge invented
-   * here: what a particular donor may actually deduct depends on their own return, not on
-   * the shul, and a flat promise that every donation is deductible is a claim the shul is
-   * not in a position to make for somebody else. */
-  legal: `${SHUL_ENGLISH} is a New Jersey 501(c)(3) nonprofit.
-    EIN: <bdi>${SHUL_TAX_ID}</bdi>. Donations are tax deductible to the extent
-    permitted by law.`,
+  // Keep the nonprofit information below the ways to give. The separate EIN row can be
+  // copied without copying the paragraph, and the deduction wording stays complete.
+  legal: `${SHUL_ENGLISH} is a New Jersey 501(c)(3) nonprofit.`,
+  deductible: 'Donations are tax deductible to the extent permitted by law.',
   ways: [
     {
-      title: 'Credit/Debit Card \u00b7 ACH',
-      blurb: 'Give securely online using your credit or debit card, or via ACH.',
+      title: 'Card \u00b7 ACH',
+      blurb: 'Credit card, debit card, or bank account',
       icon: 'card',
       accounts: [
         {
@@ -553,7 +541,7 @@ function nextUpHtml([minyan, candles]) {
 function backBar(where) {
   const schedulePage = where === 'chart' || where === 'schedules';
   return `<div class="luach-bar no-print">
-    <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : 'Menu'}</a>
+    <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : where === 'donate' ? 'Back to Home' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : where === 'donate' ? 'Home' : 'Menu'}</a>
     <h1 class="luach-bar-title">${escAttr(where === 'week' ? 'Zmanim' : PAGE_NAMES[where] || '')}</h1>
     ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
@@ -566,7 +554,7 @@ function backBar(where) {
  *  1280. On a phone the two are the same thing, which is how it went unnoticed. */
 function homeHtml(published) {
   const s = published.settings;
-  return `<div class="luach-bar luach-bar-plain no-print">${SHUL_PHOTO}</div>
+  return `<div class="luach-bar luach-bar-plain no-print"><div class="luach-home-bar-inner">${SHUL_PHOTO}<span class="luach-home-bar-name">${SHUL_ENGLISH}</span><nav class="luach-home-bar-nav" aria-label="Main navigation"><a href="/week/">Zmanim</a><a href="/chart/">Charts</a><a href="/donate/">Donate</a></nav></div></div>
     <header class="luach-masthead">
       <!-- The wordmark is a picture, so on its own it leaves this heading with no words in
            it. The English name goes in beside it, clipped out of the layout but not out of
@@ -575,22 +563,43 @@ function homeHtml(published) {
            this shul's, and a second place to type the name is a second place for it to end
            up written differently. -->
       <h1 class="luach-masthead-name"><svg class="luach-approved-name" viewBox="0 0 600 65" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
+      <p class="luach-place" lang="he" dir="rtl">קהל לב מנחם</p>
+      <p class="luach-home-date"></p>
     </header>
+    <div class="luach-home-layout">
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
-      <a class="luach-item" href="/week/">
-        ${ICON_CALENDAR_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}
+      <a class="luach-item luach-home-primary" href="/week/">
+        ${ICON_CALENDAR_CLOCK}<span class="luach-item-copy"><span class="luach-item-title">Zmanim</span><span class="luach-item-description">Daily minyanim &amp; Shabbos times</span></span>${CHEVRON}
       </a>
       <a class="luach-item" href="/donate/">
-        ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
+        ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>
     </nav>
-    ${rule()}
-    ${footHtml(s)}
-    <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p>
-  </div>`;
+    </div>
+    <figure class="luach-home-picture"><img src="/assets/shul-1400.jpg" width="1400" height="821" alt="Bais Medrash of Lakewood Commons" loading="lazy"><figcaption lang="he" dir="rtl">קהל לב מנחם · Lakewood Commons</figcaption></figure>
+    </div>
+    ${siteFooterHtml(s)}`;
+}
+
+/** Read both the date and parsha in the shul's calendar, including after a tab wakes. */
+async function refreshHomeDate(settings) {
+  const label = main.querySelector('.luach-home-date');
+  if (!label) return;
+  const { serial } = shulNow(new Date(), settings);
+  const date = dateFromSerial(serial);
+  const text = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
+  }).format(date);
+  label.textContent = text;
+  try {
+    const tables = await loadTables();
+    if (!label.isConnected) return;
+    const shabbos = serial + (6 - date.getUTCDay() + 7) % 7;
+    const parsha = hasParsha(shabbos, { ...settings, english: true }, tables);
+    label.textContent = text + (parsha ? ` · Parshas ${parsha}` : '');
+  } catch { /* The date remains useful if the calendar tables cannot be read. */ }
 }
 
 /** When the card next needs redrawing: the moment the number on it changes.
@@ -700,6 +709,7 @@ function startNextUp(published) {
     // the card could not come back when midnight rolled into a day that has one.
     const home = main.querySelector('.luach-home');
     if (!home) return stopNextUp(); // the page moved on
+    refreshHomeDate(settings);
     const items = nextUpState(published, settings);
     const html = nextUpHtml(items);
     const card = home.querySelector('.luach-next');
@@ -799,10 +809,10 @@ function wireChartAnnouncement(root) {
 }
 
 function renderHome(published) {
-  // The menu, and only the menu, is laid out to fill the screen (see is-home in app.css).
-  // The pages behind it are as tall as the board on them and must not be stretched.
+  // Home and Donate use the approved compact design; charts keep their own layout.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
   // The card is drawn here as well as by the ticker, so the row is asked here too rather
   // than waiting for the first tick, which may be an hour off.
@@ -1018,7 +1028,7 @@ function donateWayHtml(way) {
   const mark = way.iconImage
     ? `<img class="luach-give-mark-image" src="${escAttr(way.iconImage)}" alt="" width="40" height="40" decoding="async">`
     : giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
-  return `<details class="luach-give-card" name="luach-give">
+  return `<details class="luach-give-card" name="luach-give"${way.accounts?.length ? ' open' : ''}>
     <summary class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
       <div class="luach-give-body">
@@ -1176,35 +1186,20 @@ function wireDonateFrames(root) {
 function renderDonatePage(published) {
   stopNextUp();
   const s = resolveSettings(published.settings);
-  // is-give only trims the room under the address, which the page has no use for: it ends
-  // at the footer and there is nothing below to scroll to. See app.css.
   main.className = 'is-give';
-  /* The shul's own masthead and address, the same two the menu carries, so a donor who
-     lands here from a message rather than from the menu is looking at the shul's page and
-     not at an anonymous list of payment links. Written out rather than shared with
-     homeHtml: the menu's masthead sits under an empty navy cap and this one sits under the
-     back bar, and the two want different room above them.
-
-     One rule, in the masthead, exactly as on the menu. The heading below it carried its own
-     before, and with the masthead in front that read as two lines ruled off from nothing. */
   main.innerHTML = `${backBar('donate')}
     <div class="luach-home luach-give-page">
-      <header class="luach-masthead luach-give-masthead">
-        <!-- The wordmark is not a heading here, the way it is on the menu: the bar above
-             already carries this page's h1 and names it "Donate". Two h1s on one page is
-             one too many, and the shul's name is the site's mark rather than the title of
-             what is on the page. The alt text still says whose site it is. -->
-        <svg class="luach-approved-name" viewBox="0 0 600 65" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg>
-        ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
-      </header>
       <header class="luach-give-head-block">
         <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
         <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
       ${DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value).map(donateWayHtml).join('')}
-      <p class="luach-give-legal">${DONATE.legal}</p>
-      ${rule()}
-      ${footHtml(s)}
+      <div class="luach-give-legal">
+        <p>${escAttr(DONATE.legal)}</p>
+        <p class="luach-give-ein"><span>EIN: <bdi>${SHUL_TAX_ID}</bdi></span><button type="button" class="luach-copy-btn" data-copy="${SHUL_TAX_ID}">Copy EIN</button></p>
+        <p>${escAttr(DONATE.deductible)}</p>
+      </div>
+      ${siteFooterHtml(s)}
     </div>`;
   wireDonateFrames(main);
   wireDonateCopy(main);

@@ -5473,3 +5473,130 @@ body.is-luach #main .print-btn {
 body.is-luach #main .print-btn:hover:not(:disabled) { background:#e9ddbd; color:#15283f; border-color:#b8a06a; box-shadow:0 2px 5px rgb(21 40 63 / 8%); transform:none; }
 body.is-luach #main .print-btn:active:not(:disabled) { background:#e2d3ad; color:#15283f; box-shadow:none; transform:none; }
 body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
+
+/* Approved Home and Donate design. Screen-only scope preserves other public pages and paper. */
+@media screen {
+ body.is-luach:has(main:is(.is-home,.is-give)) {
+  --luach-navy:#142b46; --luach-ink:#142b46; --luach-cream:#faf7f0;
+  --luach-cap-height:64px; --luach-arc:0px;
+ }
+ body.is-luach main:is(.is-home,.is-give) { display:block; min-height:100dvh; padding:93px 18px 27px; }
+ body.is-luach main:is(.is-home,.is-give) .luach-bar {
+  height:64px; min-height:0; padding:0 20px; margin:0; background:#142b46;
+  border-bottom:2px solid #cbb681; align-items:center;
+ }
+ body.is-luach main:is(.is-home,.is-give) .luach-bar::after { display:none; }
+ body.is-luach main:is(.is-home,.is-give) .luach-bar::before { inset:0; }
+ .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
+ body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
+ .luach-home-bar-name,.luach-home-bar-nav { display:none; }
+ .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
+ .is-home .luach-approved-name text { font-size:32px; }
+ .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David Libre",serif !important; }
+ .luach-home-date { margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
+ .luach-home-layout { max-width:560px; margin:0 auto; }
+ .is-home .luach-home { display:block; flex:none; max-width:none; margin:0; }
+ .luach-home-picture { display:none; }
+ .is-home .luach-next {
+  background:#fff; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:16px;
+  padding:16px 0; margin:0 0 20px; gap:0; box-shadow:0 2px 8px #142b4603;
+ }
+ .is-home .luach-next-box { background:transparent; border:0; border-radius:0; padding:0 9px; }
+ .is-home .luach-next-head { color:#686e70; justify-content:center; }
+ .is-home .luach-next-head::before,.is-home .luach-next-head::after { display:none; }
+ .is-home .luach-next.is-paired { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(4,auto); gap:8px 0; }
+ /* Size containment prevents the shared rows from measuring the Hebrew and countdown. */
+ .is-home .luach-next.is-paired .luach-next-box { container-type:normal; row-gap:8px; grid-row:1 / 5; grid-column:1; }
+ .is-home .luach-next.is-paired .luach-next-box + .luach-next-box { grid-column:2; border-left:1px solid #e8e3d7; }
+ .is-home .luach-next.is-paired .luach-next-head { font:700 10px/1.25 Arial,sans-serif; letter-spacing:.065em; white-space:nowrap; }
+ .is-home .luach-next.is-paired .luach-next-time { font:700 34px/1.1 Georgia,serif; font-variant-numeric:tabular-nums; }
+ .is-home .luach-next.is-paired .luach-next-time small { font-size:.53em; margin-left:4px; }
+ .is-home .luach-next.is-paired .luach-next-description { min-height:0; gap:4px 8px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:22px; line-height:1.2; }
+ .is-home .luach-next.is-paired .luach-next-where { font-size:14px; line-height:1.3; }
+ .is-home .luach-next.is-paired .luach-next-when { min-height:0; margin:0; font:400 12px/1.4 Arial,sans-serif; color:#7d652d; }
+ @supports (grid-template-rows:subgrid) {
+  .is-home .luach-next.is-paired .luach-next-box { grid-template-rows:subgrid; }
+ }
+ .is-home .luach-menu { gap:12px; }
+ .is-home .luach-item { gap:16px; padding:18px 20px; min-height:74px; border:1px solid #e9e5dc; border-radius:16px; box-shadow:0 3px 10px #142b4606; }
+ .is-home .luach-item-icon { width:27px; height:27px; }
+ .luach-item-copy { flex:1; min-width:0; text-align:left; }
+ .is-home .luach-item-title { display:block; font:700 25px/1.2 Georgia,serif; }
+ .luach-item-description { display:block; margin-top:4px; font:400 12px/1.4 Arial,sans-serif; color:#64707c; }
+ .is-home .luach-home-primary { background:#142b46; border-color:#142b46; color:#fff; }
+ .is-home .luach-home-primary .luach-item-description,.is-home .luach-home-primary .luach-item-go { color:#d5dce5; opacity:1; }
+ .is-home .luach-item:hover { box-shadow:0 4px 14px #142b4610; }
+ .luach-site-footer { width:100%; max-width:1080px; margin:36px auto 0; padding:22px 0 0; border-top:1px solid #e5e2da; text-align:center; color:#576674; }
+ .luach-site-footer .luach-foot-part:first-child { display:block; font:400 15px/1.5 Georgia,serif; }
+ .luach-site-footer .luach-foot-part:last-child { display:block; margin:3px 0 0; font:400 12px/1.6 Arial,sans-serif; color:#576674; }
+ .luach-site-footer .luach-home-email { width:auto; margin:8px 0 0; font:400 12px/1.6 Arial,sans-serif; }
+ .luach-site-footer .luach-contact-email { color:#576674; min-height:30px; text-underline-offset:3px; }
+ .is-home .luach-site-footer { max-width:560px; }
+ body.is-luach main.is-give { padding-top:92px; }
+ .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:none; gap:12px; max-width:570px; width:100%; margin:0 auto; text-align:left; }
+ .is-give .luach-give-page:has(.luach-give-frame:not([hidden])) { max-width:48rem; }
+ .is-give .luach-give-head-block { margin:0 0 10px; }
+ .is-give .luach-give-heading { margin:0; text-align:left; font:700 30px/1.2 Georgia,serif; letter-spacing:0; }
+ .is-give .luach-give-thanks { margin:7px 0 0; text-align:left; font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
+ .is-give .luach-give-card { border:1px solid #e5e2da; border-radius:16px; box-shadow:none; overflow:hidden; }
+ .is-give .luach-give-head { gap:13px; padding:18px; min-height:81px; }
+ body.is-luach .is-give .luach-give-card > summary,body.is-luach .is-give .luach-give-card[open] > summary { border-bottom:0; }
+ .is-give .luach-give-mark { width:42px; height:42px; background:transparent; border:1px solid #d4bd86; }
+ .is-give .luach-give-mark.is-image { border:0; background:none; }
+ .is-give .luach-give-title { font:700 21px/1.3 Georgia,serif; }
+ .is-give .luach-give-blurb { margin:4px 0 0; font:400 12px/1.45 Arial,sans-serif; color:#64707c; opacity:1; }
+ .is-give .luach-give-chev { width:18px; height:18px; }
+ .is-give .luach-give-open { padding:0 17px 17px; background:#fff; border-top:0; }
+ .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #ede9e0; }
+ .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { min-height:54px; padding:13px 0; gap:15px; border:0; border-radius:0; background:transparent; box-shadow:none; }
+ .is-give .luach-give-account:last-child .luach-fund-row { padding-bottom:3px; }
+ .is-give .luach-account-title { font:700 17px/1.35 Georgia,serif; letter-spacing:0; }
+ .is-give .luach-fund-action { font:600 11px/1.4 Arial,sans-serif; color:#917536; }
+ .is-give .luach-fund-row:hover { background:#faf7f0; }
+ .is-give .luach-give-legal { max-width:none; margin:11px 0 0; text-align:left; font:400 12px/1.65 Arial,sans-serif; color:#64707c; opacity:1; }
+ .is-give .luach-give-legal p { margin:0; }
+ .is-give .luach-give-legal .luach-give-ein { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:8px 0; }
+ .luach-give-ein bdi { font-weight:700; }
+ .luach-give-ein .luach-copy-btn { margin-left:0; min-height:32px; padding:0 10px; background:#fff; border:1px solid #e5e2da; border-radius:7px; font:400 11px Arial,sans-serif; }
+ .is-give .luach-site-footer { margin-top:24px; }
+}
+@media screen and (max-width:34rem) {
+ .is-give .luach-give-frame { margin-inline:-17px; }
+}
+@media screen and (max-width:350px) {
+ body.is-luach main:is(.is-home,.is-give) { padding-inline:14px; }
+ .is-home .luach-next.is-paired .luach-next-head { font-size:9px; letter-spacing:.015em; }
+ .is-home .luach-next.is-paired .luach-next-time { font-size:30px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:20px; }
+ .is-home .luach-next.is-paired .luach-next-when { font-size:11px; }
+ .is-home .luach-item { padding:17px; }
+ .is-home .luach-item-title { font-size:24px; }
+ .is-home .luach-item-description { font-size:11px; }
+ .is-give .luach-give-head { padding:16px; }
+ .is-give .luach-give-title { font-size:19px; }
+ .is-give .luach-account-title { font-size:15px; }
+}
+@media screen and (min-width:760px) {
+ body.is-luach:has(main:is(.is-home,.is-give)) { --luach-cap-height:78px; }
+ body.is-luach main:is(.is-home,.is-give) .luach-bar { height:78px; }
+ .is-home .luach-home-bar-name { display:block; font:600 14px Georgia,serif; color:#fff; }
+ .is-home .luach-home-bar-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
+ .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
+ body.is-luach main.is-home { padding:142px 32px 27px; }
+ .is-home .luach-masthead { margin:0 auto 32px; }
+ .is-home .luach-masthead .luach-place { font-size:25px !important; }
+ .luach-home-date { font-size:13px; }
+ .luach-home-layout { max-width:1050px; display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:46px; align-items:center; }
+ .luach-home-picture { display:block; margin:0; }
+ .luach-home-picture img { display:block; width:100%; height:auto; border-radius:16px; box-shadow:0 4px 16px #142b460d; }
+ .luach-home-picture figcaption { margin-top:13px; text-align:center; color:#64707c; font:400 14px Georgia,"Frank Ruhl Libre",serif; }
+ .is-home .luach-next { padding:20px 0; margin-bottom:18px; }
+ .is-home .luach-next.is-paired .luach-next-head { font-size:11px; }
+ .is-home .luach-next.is-paired .luach-next-time { font-size:39px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:25px; }
+ .is-home .luach-next.is-paired .luach-next-when { font-size:13px; }
+ .is-home .luach-item { padding:20px 23px; min-height:84px; }
+ .is-home .luach-site-footer { max-width:1080px; margin-top:70px; padding-top:27px; }
+ body.is-luach main.is-give { padding-top:122px; }
+}
