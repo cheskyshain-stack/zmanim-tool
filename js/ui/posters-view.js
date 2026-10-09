@@ -25,7 +25,8 @@ import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildAsaraBTevesPoster, ASARA_TEXT } from '../posters/asarabteves.js';
-import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT } from '../posters/shacharis.js';
+import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT,
+  buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, roshChodeshShacharisTitle } from '../posters/shacharis.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
@@ -138,8 +139,13 @@ const POSTERS = [
     { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
     { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
     { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
-  ].map(({ key, label, build }) => ({
-    key, label, group: label,
+    ...ROSH_CHODESH_SHACHARIS_MONTHS.map(month => ({
+      key: `roshchodesh${month}`, label: roshChodeshShacharisTitle(month), group: 'ראש חודש',
+      dated: true,
+      build: (y, s) => buildRoshChodeshShacharisPoster(y, month, s),
+    })),
+  ].map(({ key, label, group = label, dated, build }) => ({
+    key, label, group, dated,
     // Supplementary morning handouts are picked separately from the complete schedules.
     handout: true,
     covers: y => `${label} ${hebrewYear(y)}`,
@@ -558,7 +564,8 @@ function postersByDate(year, settings, state) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  const sorted = [...all].sort((a, b) => {
+  // A month absent in this year, or entirely on Shabbos, has no weekday handout.
+  const sorted = all.filter(p => !p.dated || at.get(p).from != null).sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
@@ -1745,7 +1752,8 @@ function renderShacharisHandout(poster, settings) {
     </div>
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, rows), { shacharis: true });
+  const days = poster.dayLabel ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -2504,7 +2512,8 @@ let posterTables = null;
 export function posterRoute() {
   // The whole set keeps the key the run entry has always had, so a link written before it
   // became a switch still lands on it.
-  const handout = POSTERS.find(p => p.handout && p.group === chosenGroup);
+  const handout = POSTERS.find(p => p.handout && p.group === chosenGroup && p.key === chosen)
+    || POSTERS.find(p => p.handout && p.group === chosenGroup);
   const key = handout?.key || (chosenSheets === 'one' ? chosen : POSTERS.find((p) => p.last)?.key);
   if (!key) return [];
   const poster = POSTERS.find((p) => p.key === key);
@@ -2881,7 +2890,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   /* The whole year of them, or the one showing. Everything below reads `items`, so the
      switches, the Print button and the "nothing here yet" message all answer for what is
      actually in the run rather than for the occasion the picker happens to be on. */
-  const handout = group?.items.length === 1 && Boolean(group.items[0].handout);
+  const handout = Boolean(group?.items.length && group.items.every(p => p.handout));
   const scopeAll = !handout && chosenSheets !== 'one' && chosenScope === 'all';
   const items = scopeAll ? groups.flatMap((g) => g.items).filter(p => !p.handout) : (group ? group.items : []);
   // An occasion nobody has given times for yet. Everything past the picker is left off: a
@@ -2890,6 +2899,11 @@ export function renderPosters(container, state, routeChanged, tables) {
   const empty = items.length === 0;
   const runPoster = POSTERS.find((p) => p.last);
   const one = items.find((p) => p.key === chosen) || items[0] || null;
+  if (handout && one && chosen !== one.key) {
+    chosen = one.key;
+    rememberBar();
+    onRoute?.();
+  }
   // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
   const showAll = !handout && chosenSheets !== 'one';
   const onePage = !handout && chosenSheets === 'all';
@@ -2979,7 +2993,7 @@ export function renderPosters(container, state, routeChanged, tables) {
         // The compact layout uses either a full sheet or a half-page handout, by occasion.
         { value: 'all', label: 'Compact', on: chosenSheets === 'all' },
       ])}</div>`}
-      ${!empty && !showAll ? `<label>Which sheet
+      ${!empty && !showAll ? `<label>${handout && items.length > 1 ? 'Month' : 'Which sheet'}
         <select id="poster-pick">
           ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
         </select>

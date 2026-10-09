@@ -222,6 +222,17 @@ whole-year print runs. `tests/shacharis-handouts.mjs` checks 51 years of calenda
 room data; `tests/shacharis-handouts-print.cjs` checks actual half-page PDFs, Hebrew
 coordinates, content, copies, margins, saved choices, and original schedule retention.
 
+Rosh Chodesh morning handouts use that same design under the `ראש חודש` occasion,
+with a Month picker in calendar order. Print the month and Hebrew year in the title,
+and label the applicable weekdays. Use `nextRoshChodesh` for one- and two-day dates,
+including both leap-year Adars. Only Sunday through Friday use this weekday schedule;
+omit a month entirely on Shabbos and omit Tishrei, which has its Rosh Hashana poster.
+Read the standing times from `specialShacharisLines`; Teves reads the Chanukah
+poster's combined Rosh Chodesh row, including its first minyan time. Do not carry
+Asara's Selichos note into these charts. Preserve the selected month in the address
+and saved bar, falling back to an available month when the year changes. These are
+supplementary handouts and do not join full-year or public Special Schedule runs.
+
 The admin's **Explain times** switch stays available on every tab. Shared chart, week and
 poster renderers register their own time traces through `ui/time-explanations.js`; the
 congregation's page never installs that registry and emits no inspector markup. Clicks

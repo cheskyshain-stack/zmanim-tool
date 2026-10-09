@@ -16,7 +16,7 @@ const server = http.createServer((req, res) => {
   res.end(fs.readFileSync(file));
 });
 const choices = ['עשרה בטבת · שחרית', 'בה"ב אחר סוכות', 'בה"ב אחר פסח'];
-const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'בה"ב אחר סוכות', 'חנוכה',
+const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'ראש חודש', 'בה"ב אחר סוכות', 'חנוכה',
   'עשרה בטבת', 'עשרה בטבת · שחרית', 'פורים', 'פסח', 'בה"ב אחר פסח', 'שבועות', 'שבעה עשר בתמוז', 'תשעה באב'];
 const expected = [
   ['בית מדרש', '6:40'], ['בעזרת נשים', '7:00'], ['בית מדרש למטה', '7:15'],
@@ -63,10 +63,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       }
       await settle();
     };
-    const measure = async copies => {
+    const measure = async (copies, expectedRows = expected) => {
       const actual = await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-run').evaluateAll(rows => rows.map(row =>
         [row.querySelector('.shacharis-handout-room').textContent, row.querySelector('.shacharis-handout-time').textContent]));
-      assert.deepEqual(actual, expected, 'Every time is paired with its written room');
+      assert.deepEqual(actual, expectedRows, 'Every time is paired with its written room');
       assert.equal(await page.locator('.poster.is-shacharis').count(), copies);
       assert.equal(await page.locator('.poster.is-shacharis.is-onepage .page-header').count(), copies, 'Morning handouts use the compact letterhead');
       assert.equal(await page.locator('.poster.is-shacharis .onepage-title,.poster.is-shacharis .onepage-sec-head').count(), copies * 2,
@@ -82,7 +82,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.emulateMedia({ media: 'print' });
       const boxes = await page.locator('.poster.is-shacharis').evaluateAll(sheets => sheets.map(sheet => {
         const r = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
-        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-run,.shacharis-handout-note')]
+        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note')]
           .map(el => el.getBoundingClientRect());
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
@@ -129,6 +129,50 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         fs.writeFileSync(path.join(output, choiceIndex + '-one.pdf'), result.pdf);
       }
     }
+    const rcMeasured = [];
+    for (const year of [5785, 5787, 5790]) {
+      await page.locator('#poster-group').selectOption('ראש חודש');
+      await chooseYear(year);
+      const available = await page.evaluate(async year => {
+        const { buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS } = await import('/js/posters/shacharis.js');
+        const { loadState } = await import('/js/storage.js');
+        const { resolveSettings } = await import('/js/settings.js');
+        const settings = resolveSettings(loadState().settings);
+        return ROSH_CHODESH_SHACHARIS_MONTHS.map(month => buildRoshChodeshShacharisPoster(year, month, settings))
+          .filter(Boolean).sort((a, b) => a.span.from - b.span.from).map(poster => ({ month: poster.month,
+            title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]) }));
+      }, year);
+      assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
+        available.map(poster => 'roshchodesh' + poster.month), 'Only this year\'s weekday months appear, in date order');
+      assert.equal(await page.locator('#poster-pick').locator('..').evaluate(el => el.childNodes[0].textContent.trim()), 'Month');
+      for (const poster of available.filter(poster => [8, 9, 10, 13, 14].includes(poster.month))) {
+        for (const width of [1440, 375]) for (const copies of [1, 2]) {
+          await page.setViewportSize({ width, height: 1100 });
+          await page.locator('#poster-pick').selectOption('roshchodesh' + poster.month);
+          await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
+          await settle();
+          assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0);
+          assert((await page.locator('.onepage-title').first().innerText()).startsWith(poster.title));
+          assert.equal(await page.locator('.shacharis-handout-days').first().innerText(), poster.dayLabel);
+          assert.equal(await page.locator('.shacharis-handout-note').count(), 0, 'No fast-day Selichos note on Rosh Chodesh');
+          assert(page.url().endsWith('#posters/roshchodesh' + poster.month), 'The address identifies the selected month');
+          const result = await measure(copies, poster.rows);
+          rcMeasured.push({ year, month: poster.month, width, copies, typeSize: result.boxes[0].typeSize });
+          if (output && year === 5787 && width === 1440 && copies === 1) {
+            await page.locator('.poster.is-shacharis').screenshot({ path: path.join(output, 'rc-' + poster.month + '-poster.png') });
+            fs.writeFileSync(path.join(output, 'rc-' + poster.month + '-one.pdf'), result.pdf);
+          }
+        }
+      }
+    }
+    await chooseYear(5787);
+    await page.locator('#poster-pick').selectOption('roshchodesh14'); await settle();
+    await page.reload(); await page.locator('.poster.is-shacharis').first().waitFor(); await settle();
+    assert.equal(await page.locator('#poster-pick').inputValue(), 'roshchodesh14', 'Selected leap-year month survives reload');
+    await chooseYear(5786);
+    assert.equal(await page.locator('#poster-pick option[value=roshchodesh14]').count(), 0, 'Adar II disappears in a common year');
+    assert(page.url().endsWith('#posters/' + await page.locator('#poster-pick').inputValue()), 'The address follows the available replacement month');
+    await page.locator('#poster-group').selectOption(choices[2]); await settle();
     for (const margin of ['0.15', '0.75', '0.35']) {
       await page.locator('#poster-margin').selectOption(margin); await settle(); await measure(2);
     }
@@ -159,6 +203,6 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     assert.equal(await page.locator('.halfpage-body.is-asara .onepage-sec-head').first().innerText(), 'שחרית');
     assert((await page.locator('#poster-sheet').innerText()).includes('מנחה'));
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ origin, cases: measured.length, measured, errors }));
+    console.log(JSON.stringify({ origin, cases: measured.length, roshChodeshCases: rcMeasured.length, measured, rcMeasured, errors }));
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
