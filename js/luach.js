@@ -560,7 +560,7 @@ async function refreshHomeDate(settings) {
   const date = dateFromSerial(serial);
   const text = new Intl.DateTimeFormat('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
-  }).format(date);
+  }).format(date).replace(/^Saturday,/, 'Shabbos,');
   label.textContent = text;
   try {
     const tables = await loadTables();
