@@ -152,8 +152,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await settle();
       assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0,
         'A standalone half-page poster does not offer unrelated layouts');
-      const note = choiceIndex === 0 ? 'סליחות קודם שחרית'
-        : choiceIndex === 1 && year !== 5785 ? 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך, יום ב׳ וירא)' : null;
+      const note = choiceIndex === 0 || (choiceIndex === 1 && year !== 5785) ? 'סליחות קודם שחרית' : null;
       assert.deepEqual(await page.locator('.shacharis-handout-note').allTextContents(), note ? Array(copies).fill(note) : [],
         'Only the years and rounds with sunrise after 7:05 print the Selichos note');
       if (note) assert.equal(await page.locator('.shacharis-handout-row').filter({ has: page.locator('.shacharis-handout-note') })

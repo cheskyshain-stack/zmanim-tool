@@ -62,15 +62,15 @@ test('both BHB rounds use the chart calendar and special Shacharis schedule ever
 
 test('BHB Selichos notes cover all, none, or the specific qualifying dates in a round', () => {
   const note = (year, month, options = settings) => buildBehabShacharisPoster(year, month, options, tables).rows[0].timeNote;
-  assert.equal(note(5787, 8), 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך, יום ב׳ וירא)',
-    'All three current after-Sukkos dates qualify, grouped under their upcoming parsha');
+  assert.equal(note(5787, 8), 'סליחות קודם שחרית',
+    'When all three dates qualify, the common note has no weekday or parsha details');
   assert.equal(note(5785, 8), undefined, 'After the clock change all three dates have earlier Netz');
   assert.equal(note(5787, 2), undefined, 'After-Pesach sunrise is earlier than 7:05');
   assert.equal(note(5786, 8), 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך)',
     'A clock change before the third date must not apply the note to that date');
   assert.equal(note(5793, 8), 'סליחות קודם שחרית (יום ה׳ לך לך, יום ב׳ וירא)',
     'Only the later two dates cross the sunrise threshold');
-  assert.equal(note(5787, 2, { ...settings, longitude: -110 }), 'סליחות קודם שחרית (יום ב׳ וה׳ בהר, יום ב׳ בחוקותי)',
+  assert.equal(note(5787, 2, { ...settings, longitude: -110 }), 'סליחות קודם שחרית',
     'The same sunrise rule applies to the after-Pesach round when the calculation settings require it');
   assert.equal(note(5787, 8, { ...settings, latitude: 0 }), undefined,
     'An earlier sunrise from the configured location removes the note');
