@@ -409,7 +409,7 @@ const DONATE = {
          alt text below is what a tile shows when any of them does not arrive. Each url is
          the provider's own sign-in, since a donor here already has an account to spend. */
       providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: 'Choose your DAF provider and search for Bais Medrash of Lakewood Commons.',
+      how: `Choose your DAF provider and search using EIN ${SHUL_TAX_ID}.`,
       taxId: SHUL_TAX_ID,
     },
   ],
