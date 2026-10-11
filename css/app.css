@@ -1,4 +1,4 @@
-/* Two Hebrew serifs shipped with the app rather than assumed to be installed. Phones
+/* Hebrew serifs shipped with the app rather than assumed to be installed. Phones
    have none of David / Frank Ruehl / Times New Roman, so Hebrew on the printed chart
    fell back to the system UI font and looked nothing like it does on the desktop.
    Which one stands in for which choice is decided in sheet-view.js (HEBREW_STAND_IN) -
@@ -28,6 +28,15 @@
   font-weight: 400 700;
   font-display: swap;
   src: url('../assets/fonts/frank-ruhl-libre.woff2') format('woff2');
+}
+/* David CLM's upright Medium face gives the homepage subtitle a separated ק.
+   Its original font, copyright notices, and license are in assets/fonts/david-clm-source. */
+@font-face {
+  font-family: 'David CLM';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/david-clm-medium.woff2') format('woff2');
 }
 
 :root {
@@ -5494,7 +5503,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-home-bar-name,.luach-home-bar-nav { display:none; }
  .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
  .is-home .luach-approved-name text { font-size:32px; }
- .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David Libre",serif !important; }
+ .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David CLM","David Libre",serif !important; }
  .luach-home-date { min-height:1.5em; margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
  .luach-home-layout { max-width:560px; margin:0 auto; }
  .is-home .luach-home { display:block; flex:none; max-width:none; margin:0; }
