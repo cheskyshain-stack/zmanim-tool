@@ -14082,16 +14082,22 @@ function behabShacharisDates(year, month, settings) {
   return Array.from({ length: 17 }, (_, i) => first + i).filter(serial => hasBehab(serial, settings));
 }
 
-function buildBehabShacharisPoster(year, month, settings) {
+function buildBehabShacharisPoster(year, month, settings, tables) {
   const days = behabShacharisDates(year, month, settings);
   if (!days.length) return null;
   const rows = shacharisRoomRows(specialShacharisLines().flat());
   const selichosDays = days.filter(serial => asaraSelichosFirst(sunriseElev(dateFromSerial(serial), settings)));
   if (selichosDays.length) {
     // A round can cross daylight saving time or the 7:05 sunrise threshold.
-    const dates = selichosDays.length === days.length ? '' : ` (${selichosDays
-      .map(serial => jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]).join(', ')})`;
-    rows.find(row => row.text === '6:40').timeNote = ASARA_TEXT.selichosFirst + dates;
+    const weeks = new Map();
+    for (const serial of selichosDays) {
+      const shabbos = serial + 7 - excelWeekday(serial);
+      if (!weeks.has(shabbos)) weeks.set(shabbos, []);
+      weeks.get(shabbos).push(['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)] + '׳');
+    }
+    const labels = [...weeks].map(([shabbos, weekdays]) =>
+      `יום ${weekdays.join(' ו')} ${hasParsha(shabbos, { ...settings, english: false }, tables)}`);
+    rows.find(row => row.text === '6:40').timeNote = `${ASARA_TEXT.selichosFirst} (${labels.join(', ')})`;
   }
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
@@ -14659,8 +14665,8 @@ function yearLabel(y) {
 const POSTERS = [
   ...[
     { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
-    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
-    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
+    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s, posterTables) },
+    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s, posterTables) },
     ...ROSH_CHODESH_SHACHARIS_MONTHS.map(month => ({
       key: `roshchodesh${month}`, label: roshChodeshShacharisTitle(month), group: 'ראש חודש',
       dated: true,

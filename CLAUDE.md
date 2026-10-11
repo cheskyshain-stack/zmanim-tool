@@ -231,8 +231,9 @@ with the remembered one-or-two Copies per page switch. Spell out each
 room beside its time instead of printing location marks or a location key. Read the
 times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
 beside 6:40 when exact sunrise is later than 7:05, without rounding sunrise first.
-Check each of BHB's three dates separately. If only some qualify, name those Hebrew
-dates in the note; if all qualify, print the common note without repeating dates.
+Check each of BHB's three dates separately. Name the qualifying weekdays and their
+upcoming Shabbos parsha in the note, grouping days in the same week, for example
+`סליחות קודם שחרית (יום ב׳ וה׳ לך לך)`. Use Hebrew parsha names in either admin language.
 BHB dates come from the same `hasBehab` rule as the charts. All morning
 rows have a plain background, without alternating location shading. The Yom Tov
 picker orders all groups by the first date they cover, including BHB and undrawn

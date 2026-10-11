@@ -139,8 +139,8 @@ function yearLabel(y) {
 const POSTERS = [
   ...[
     { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
-    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s) },
-    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s) },
+    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s, posterTables) },
+    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s, posterTables) },
     ...ROSH_CHODESH_SHACHARIS_MONTHS.map(month => ({
       key: `roshchodesh${month}`, label: roshChodeshShacharisTitle(month), group: 'ראש חודש',
       dated: true,
