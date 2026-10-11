@@ -5,6 +5,8 @@ const http = require('node:http');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../dist');
+const output = process.env.CHANUKAH_OUTPUT;
+if (output) fs.mkdirSync(output, { recursive: true });
 const server = http.createServer((req, res) => {
   let file = path.resolve(root, '.' + req.url.split('?')[0]);
   if (!file.startsWith(root + path.sep)) { res.writeHead(403); return res.end(); }
@@ -23,7 +25,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     await context.addInitScript(() => {
-      localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse('2026-10-08T12:00:00Z') }));
+      const testTime = location.search.includes('future-print') ? '2043-12-01T12:00:00Z' : '2026-10-08T12:00:00Z';
+      localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse(testTime) }));
       if (!localStorage.getItem('zmanim-poster-bar-v1')) {
         localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, group: 'חנוכה', sheets: 'all', scope: 'one', margin: 0.35 }));
       }
@@ -52,12 +55,14 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         const { loadTables } = await import('/js/data-loader.js');
         const p = buildChanukahPoster(value, resolveSettings(loadState().settings), await loadTables());
         return [p.shacharisRows.flatMap(row => [row.vasikin.time, ...row.cells.slice(1).map(c => c.text)]),
-          p.weekdayMincha.map(t => toCell(t).text), p.maariv.map(t => toCell(t).text), p.erevShabbos.cells.map(c => c.text)]
+          [...p.weekdayMincha.map(t => toCell(t).text), ...p.sundayMinchaRows.flatMap(row => row.times.map(t => t.text))],
+          p.maariv.map(t => toCell(t).text), p.erevShabbos.cells.map(c => c.text)]
           .map(list => list.flatMap(text => text.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || []));
       }, value);
       const actual = await page.locator('.poster.is-halfpage').first().locator('.halfpage-body .onepage-sec').evaluateAll(sections => sections.map(s =>
         [...s.querySelectorAll('.onepage-times')].flatMap(t => t.textContent.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || [])));
       assert.deepEqual(actual, expected, 'Every minyan and merged Friday time retained in ' + value);
+      assert.match(await page.locator('.poster.is-halfpage').first().innerText(), /ביום א' בלבד|יום א' \S+/, 'The extra Mincha has a Sunday label');
       const netz = await page.evaluate(async value => {
         const { buildChanukahPoster } = await import('/js/posters/chanukah.js');
         const { loadState } = await import('/js/storage.js');
@@ -93,6 +98,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
       assert.equal(pdfPages(pdf), 1, 'One physical sheet, without a blank second page');
       assert.match(pdf.toString('latin1'), /\/MediaBox \[0 0 792 612\]/, 'Landscape Letter paper');
+      if (output && width === 1440 && value === 5787) {
+        fs.writeFileSync(path.join(output, 'half-' + copies + '.pdf'), pdf);
+        if (copies === 1) await page.locator('.poster.is-halfpage').screenshot({ path: path.join(output, 'half-poster.png') });
+      }
       await page.emulateMedia({ media: 'screen' });
     };
     const checkOriginal = async (width, value) => {
@@ -110,7 +119,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         return { title: p.erevShabbos.title, times: [
           [...p.shacharisRows.flatMap(row => [row.vasikin.time, ...row.cells.slice(1).map(c => c.text)]),
             ...p.shacharisRows.flatMap(row => (row.vasikin.netzDays || []).map(day => day.time))],
-          p.weekdayMincha.map(t => toCell(t).text), p.erevShabbos.cells.map(c => c.text), p.maariv.map(t => toCell(t).text)]
+          [...p.weekdayMincha.map(t => toCell(t).text), ...p.sundayMinchaRows.flatMap(row => row.times.map(t => t.text))],
+          p.erevShabbos.cells.map(c => c.text), p.maariv.map(t => toCell(t).text)]
           .map(list => list.flatMap(text => text.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || [])) };
       }, value);
       assert.deepEqual(await page.locator('.poster-set-head').allTextContents(), ['שחרית', 'מנחה', expected.title, 'מעריב']);
@@ -128,7 +138,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       });
       assert.deepEqual([box.x, box.y], [0, 0]);
       assert(Math.abs(box.width - 816) < 0.05 && Math.abs(box.height - 1056) < 0.05, 'Original full-page dimensions');
-      assert(box.legendBottom <= box.bottom + 0.5, 'Original notes stay inside the frame');
+      assert(box.legendBottom <= box.bottom + 0.5, 'Original notes stay inside the frame in ' + value + ': ' + JSON.stringify(box));
       assert(box.paper.includes('letter portrait'));
       const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
       assert.equal(pdfPages(pdf), 1, 'Original poster prints on one full page');
@@ -194,6 +204,24 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.locator('label[for=poster-sheets-each]').click(); await settle();
     assert.equal(await page.locator('.poster.is-halfpage,#poster-copies-one').count(), 0, 'A sheet each keeps every original poster in a whole-year run');
     assert.equal(await page.locator('.poster.is-chanukah').count(), 1);
+    // This short-Kislev year has two Sundays, with the second opening delayed to 12:35.
+    await page.clock.setFixedTime(new Date('2043-12-01T12:00:00Z'));
+    await page.goto(origin + '/admin/?future-print=5804#posters/all');
+    await page.locator('label[for=poster-scope-one]').click();
+    await page.locator('#poster-group').selectOption('חנוכה');
+    await page.locator('label[for=poster-sheets-all]').click();
+    for (const copies of ['one', 'two']) {
+      await page.locator(`label[for=poster-copies-${copies}]`).click();
+      await check(375, 5804);
+      const mincha = page.locator('.poster.is-halfpage').first().locator('.onepage-sec').nth(1);
+      assert.match(await mincha.innerText(), /12:30/);
+      assert.match(await mincha.innerText(), /12:35/);
+      assert.match(await mincha.innerText(), /כסלו/);
+      assert.match(await mincha.innerText(), /טבת/);
+    }
+    await page.locator('label[for=poster-sheets-one]').click(); await settle();
+    await checkOriginal(375, 5804);
+    await checkOriginal(1440, 5804);
     assert.deepEqual(errors, []);
     console.log('Verified half-Letter copies only under All on one; original full-page Just one and A sheet each; seven years, desktop and phone, saved choices and whole-year runs.');
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

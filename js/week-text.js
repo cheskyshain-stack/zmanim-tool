@@ -42,6 +42,7 @@ import { erevTimes, erevWhereMark } from './erev-text.js';
 import { weekdayMornings } from './posters/day.js';
 import { SLICHOS_TEXT } from './posters/slichos.js';
 import { hebrewDateExtended, dateFromHebrew, excelWeekday } from './hebrew-calendar.js';
+import { chanukahSundayMincha } from './posters/chanukah.js';
 
 /** The wording, as the shul writes it. The colons are theirs: the morning line has none and the
  *  other two do, in every one of the forty sent messages. */
@@ -189,6 +190,8 @@ export function weekText(shacharisCell, row, name, shabbosSerial, settings, afte
   const lines = [`${WK_TEXT.title} ${name}`.trim()];
   lines.push(...wkMornings(shacharisCell, shabbosSerial, settings));
   if (mincha) lines.push(`${WK_TEXT.mincha} ${mincha}`);
+  const sundayMincha = chanukahSundayMincha(shabbosSerial - 6, settings);
+  if (sundayMincha) lines.push(`Mincha (Sunday only): ${wkRow(sundayMincha.text())}`);
   if (maariv) lines.push(`${WK_TEXT.maariv} ${maariv}`);
   if (afterYomKippurLine) lines.push(afterYomKippurLine);
   return lines.join('\n');
