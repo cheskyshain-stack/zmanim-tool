@@ -188,9 +188,9 @@ function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
 
-  // 1:00 only runs on standard time. DST always flips on a Sunday, so all five days
-  // agree; .every() is just being explicit about which way a split week would go.
-  const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
+  // 1:00 only runs on standard time. Check the afternoon's clock: at midnight on
+  // the transition Sunday the workbook's local DST function still uses the old clock.
+  const standardTime = dates.every((d) => !Z.dstLocal(new Date(d.getTime() + 13 * 3600000), settings));
   const bmg = isBmgWeek(week.serial, settings);
 
   /* 1:15/1:20 and 1:35/1:40 are both weighed against the same value: מנחה גדולה לחומרא's

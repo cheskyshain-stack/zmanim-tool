@@ -33147,7 +33147,7 @@
   {
    "date": "2026-03-08",
    "serial": 46089,
-   "dst": true,
+   "dst": false,
    "sunrise": {
     "day": 0.30509504548644983,
     "time": "7:19"
@@ -54329,7 +54329,7 @@
   {
    "date": "2026-11-01",
    "serial": 46327,
-   "dst": false,
+   "dst": true,
    "sunrise": {
     "day": 0.2680952616698814,
     "time": "6:26"
@@ -76853,8 +76853,8 @@
    },
    {
     "date": "2026-03-08",
-    "dst": true,
-    "springWindow": true,
+    "dst": false,
+    "springWindow": false,
     "sunset": "6:56"
    },
    {
@@ -76901,7 +76901,7 @@
    },
    {
     "date": "2026-11-01",
-    "dst": false,
+    "dst": true,
     "springWindow": false,
     "sunset": "4:54"
    },
