@@ -137,8 +137,9 @@ the public site.
 
 ## What's ported from the workbook vs. simplified
 
-- All astronomical zmanim math and both sheets' column formulas are ported directly
-  from the workbook's own formulas.
+- Astronomical zmanim use the workbook's FUNCTIONS sheet, named formulas, SETTINGS
+  and time-zone table. The two chart tabs are schedule/layout examples. The saved
+  calculation reference and independent formula checks are described in [fixtures/README.md](fixtures/README.md).
 - The Hebrew calendar (dates, parsha-of-week, special Shabbosim) is also fully
   self-contained, ported from the workbook's own calendar tables/formulas - no
   external calendar library or internet connection required.

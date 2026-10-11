@@ -421,9 +421,12 @@ export function sukkosAfterDays(rh, settings) {
   let first = skSerial(rh, SK_AFTER_FIRST);
   while (excelWeekday(first) > SK_THURSDAY) first += 1;
   const days = [];
-  const clock = Z.dstLocal(dateFromSerial(first), settings);
+  // This groups afternoon schedules. Midnight still has the previous clock on a
+  // DST transition Sunday, so compare each day's afternoon instead.
+  const afternoon = serial => new Date(dateFromSerial(serial).getTime() + 13 * 3600000);
+  const clock = Z.dstLocal(afternoon(first), settings);
   for (let serial = first; excelWeekday(serial) <= SK_THURSDAY; serial += 1) {
-    if (Z.dstLocal(dateFromSerial(serial), settings) !== clock) break;
+    if (Z.dstLocal(afternoon(serial), settings) !== clock) break;
     days.push(serial);
   }
   return days;

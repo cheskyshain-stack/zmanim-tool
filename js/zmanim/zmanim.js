@@ -1,7 +1,7 @@
 // Named zman functions, ported 1:1 from the workbook's defined names.
 // Every function returns a fractional day (0-1) representing local time-of-day,
 // exactly like the Excel formulas do (add to a date's serial to get a date+time).
-import { excelSerial, dateFromSerial, calcJD, calcJDToJCent, equationOfTime, sunEvent, timezoneOffset } from './solar.js';
+import { excelSerial, dateFromSerial, calcJD, calcJDToJCent, equationOfTime, sunEvent, timezoneOffset, timezoneOffsetUTC } from './solar.js';
 
 const MIN = 1 / 1440; // one minute, as a fraction of a day
 
@@ -33,7 +33,7 @@ export function solarNoon(date, settings) {
   const tNew = calcJDToJCent(jDay - lon - eot1);
   const eot2 = equationOfTime(tNew);
   const noonUTC = 0.5 - lon - eot2;
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial + noonUTC), settings.timezone);
+  const { offsetHours } = timezoneOffsetUTC(new Date(dateFromSerial(serial).getTime() + (0.5 - lon) * 86400000), settings.timezone);
   return noonUTC + offsetHours / 24;
 }
 
@@ -44,18 +44,17 @@ export function dstLocal(date, settings) {
   return timezoneOffset(date, settings.timezone).isDst;
 }
 
-// Alos / Misheyakir (degree-based, off plain SUNRISE)
-export const alos16_1 = (date, settings) => sunrise(date, settings, 16.1);
-export const misheyakir10_2 = (date, settings) => sunrise(date, settings, 10.2);
+// The workbook's degree-based functions explicitly pass zero elevation to SUNRISE.
+export const alos16_1 = (date, settings) => sunEvent(true, date, 16.1, settings, false);
+export const misheyakir10_2 = (date, settings) => sunEvent(true, date, 10.2, settings, false);
 
 // Tzais (minute/degree-based, off SUNSET/SUNSET_elev)
 export const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN;
 export const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
 export const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
-export const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
-// Mirrors alos16_1 above: the מ"א day's own end, off plain SUNSET the same way alos16_1 is
-// off plain SUNRISE, rather than tzais50/60/72's SUNSET_elev-plus-minutes.
-export const tzais16_1 = (date, settings) => sunset(date, settings, 16.1);
+// These degree-based ends of day also explicitly use zero elevation in the workbook.
+export const tzaisGeonim8_5 = (date, settings) => sunEvent(false, date, 8.5, settings, false);
+export const tzais16_1 = (date, settings) => sunEvent(false, date, 16.1, settings, false);
 
 // ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
 export const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;

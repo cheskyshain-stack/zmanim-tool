@@ -4,7 +4,7 @@ workbook's defined names.
 Every function returns a fraction of a day representing a local time, exactly as the
 Excel formulas do: add it to a date's serial to get a date and time.
 """
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from . import solar
 
@@ -40,7 +40,8 @@ def solar_noon(d: date, s) -> float:
     eot1 = solar.equation_of_time(solar.calc_jd_to_jcent(j_day - lon))
     eot2 = solar.equation_of_time(solar.calc_jd_to_jcent(j_day - lon - eot1))
     noon_utc = 0.5 - lon - eot2
-    offset_hours, _ = solar.timezone_offset(solar.date_from_serial(serial + noon_utc), s.timezone)
+    instant = datetime.combine(solar.date_from_serial(serial), datetime.min.time()) + timedelta(days=0.5 - lon)
+    offset_hours, _ = solar.timezone_offset_utc(instant, s.timezone)
     return noon_utc + offset_hours / 24
 
 
@@ -49,16 +50,17 @@ def dst_local(d: date, s) -> bool:
     return solar.timezone_offset(d, s.timezone)[1]
 
 
-# Alos and Misheyakir, degree based, off plain SUNRISE.
-def alos_16_1(d, s): return sunrise(d, s, 16.1)
-def misheyakir_10_2(d, s): return sunrise(d, s, 10.2)
+# The workbook's degree-based zmanim explicitly use zero elevation.
+def alos_16_1(d, s): return solar.sun_event(True, d, 16.1, s, False)
+def misheyakir_10_2(d, s): return solar.sun_event(True, d, 10.2, s, False)
 
 
 # Tzais, minute and degree based, off SUNSET / SUNSET_elev.
 def tzais_50(d, s): return sunset_elev(d, s) + 50 * MIN
 def tzais_60(d, s): return sunset_elev(d, s) + 60 * MIN
 def tzais_72(d, s): return sunset_elev(d, s) + 72 * MIN
-def tzais_geonim_8_5(d, s): return sunset(d, s, 8.5)
+def tzais_geonim_8_5(d, s): return solar.sun_event(False, d, 8.5, s, False)
+def tzais_16_1(d, s): return solar.sun_event(False, d, 16.1, s, False)
 
 
 def alos_72(d, s): return sunrise_elev(d, s) - 72 * MIN
@@ -90,6 +92,10 @@ def mincha_gedola_30_min_after_chatzos(d, s):
 def mincha_gedola_lechumra(d, s):
     """MINCHA_GEDOLA_LECHUMRA: the later of the two."""
     return max(mincha_gedola(d, s), mincha_gedola_30_min_after_chatzos(d, s))
+
+
+def mincha_gedola_mga_16_1(d, s):
+    return _from_end_of_day(tzais_16_1(d, s), solar_noon(d, s), alos_16_1(d, s), 5.5 / 12, 5.5 / 6, s.use_astronomical_chatzos)
 
 
 def mincha_ketana(d, s):

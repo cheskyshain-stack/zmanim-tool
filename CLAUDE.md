@@ -2,9 +2,24 @@
 
 Printable zmanim boards for קהל לב מנחם (Bais Medrash Lakewood Commons, 44 Coles Way,
 Lakewood NJ). Three charts: שבת קיץ, שבת חורף, and a Weekday chart. Ported 1:1 from
-`../Lakewood Commons Zmanim tables.xlsx`, which is NOT in this repo but is the source of
-truth for every calculation. If a number looks wrong, the workbook decides, not a zmanim
-library.
+`../Lakewood Commons Zmanim tables.xlsx`, the user's supplied reference workbook.
+Its **FUNCTIONS** sheet, workbook defined names, **SETTINGS**, time zones and calendar
+tables are the source of truth for astronomical zmanim and calendar calculations.
+The two chart tabs are schedule and layout examples, not the calculation authority.
+Keep the user's later minyan schedules, rounding rules and configured shul location.
+If a calculated zman looks wrong, the calculation definitions decide, not a zmanim library.
+
+The supplied file's SHA256 is `64d2c2289a8b359cf1438a79dcaaf1a9798d6f46791e97db3b540e5293185c2f`.
+`fixtures/workbook-zmanim.json` preserves the exact shared named formulas, source cell
+locations, original Settings values and time-zone table, excluding both chart templates.
+Re-extract with `python scripts/extract-workbook-zmanim.py` (or pass the workbook path).
+`node --test tests/workbook-zmanim.mjs` independently evaluates those Excel definitions
+and compares the site's shared functions across a full year and elevation/chatzos settings.
+Degree-based Alos 16.1, Misheyakir 10.2 and Tzais 8.5/16.1 explicitly use zero elevation.
+Minute-based zmanim retain the workbook's elevation toggle. Preserve the UTC instant
+in `calcTIMEZONE`; use local wall time in `calcDST_LOCAL`. Both have 2am boundaries,
+and the workbook uses the standard UTC offset for both UTC transition thresholds.
+The actual homepage clock uses IANA timezone rules separately from that calculation rule.
 
 Live at https://baismedrashoflakewoodcommons.org (GitHub Pages from `main`, CNAME in the repo).
 It was on lczmanim.cjaffa.com until the shul took a domain of its own. The address is written
