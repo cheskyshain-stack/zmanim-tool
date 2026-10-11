@@ -704,65 +704,65 @@ function flattenNonEmpty(parts) {
   return flat.filter((x) => x !== '' && x != null);
 }
 
-/** Keep times in order while balancing line widths, with wider lines below narrower
- *  ones. `prefixes` holds each item's leading separator, removed at a line start.
- *  A leading note stays on the first line. If that makes increasing widths impossible,
- *  use the closest balance without changing the order or detaching the note. */
+/** Keep times in order and minimize the difference between printed line widths.
+ *  Prefer wider lines below only when the balance is equally good. `prefixes`
+ *  holds each item's separator, removed at a line start. Notes stay on the first line. */
 function balancedLineCuts(widths, { lines = 2, prefixes = [], lead = 0 } = {}) {
   const count = Math.min(widths.length, Math.max(1, Math.floor(lines)));
   if (count <= 1) return [];
   const sums = [0];
   widths.forEach(width => sums.push(sums.at(-1) + width));
   const lineWidth = (from, to) => sums[to] - sums[from] - (prefixes[from] || 0) + (from === 0 ? lead : 0);
-  const memo = new Map();
-  const finish = (from, left, previous) => {
-    const key = `${from}:${left}:${previous}`;
-    if (memo.has(key)) return memo.get(key);
-    if (left === 1) {
-      const last = lineWidth(from, widths.length);
-      const answer = last >= previous - 0.5 ? { last, cuts: [] } : null;
+  let best = null;
+  const consider = cuts => {
+    const ends = [0, ...cuts, widths.length];
+    const lengths = ends.slice(1).map((end, i) => lineWidth(ends[i], end));
+    const spread = Math.max(...lengths) - Math.min(...lengths);
+    const widest = Math.max(...lengths);
+    const lowerWeight = lengths.reduce((sum, width, i) => sum + i * width, 0);
+    if (!best || spread < best.spread - 0.001 || Math.abs(spread - best.spread) <= 0.001
+      && (widest < best.widest - 0.001 || Math.abs(widest - best.widest) <= 0.001
+        && lowerWeight > best.lowerWeight + 0.001)) {
+      best = { spread, widest, lowerWeight, cuts };
+    }
+  };
+  // Most lists have two lines. Compare every possible cut without imposing a direction.
+  if (count === 2) {
+    for (let end = 1; end < widths.length; end++) consider([end]);
+    return best.cuts;
+  }
+  // For longer lists, try each possible minimum line width. A memoized minimax
+  // partition finds its narrowest range without enumerating all combinations of cuts.
+  const minima = new Set();
+  for (let from = 0; from < widths.length; from++) {
+    for (let end = from + 1; end <= widths.length; end++) minima.add(lineWidth(from, end));
+  }
+  for (const minimum of minima) {
+    const memo = new Map();
+    const finish = (from, left) => {
+      const key = `${from}:${left}`;
+      if (memo.has(key)) return memo.get(key);
+      let answer = null;
+      for (let end = from + 1; end <= widths.length - left + 1; end++) {
+        if (left === 1 && end !== widths.length) continue;
+        const width = lineWidth(from, end);
+        if (width < minimum - 0.001) continue;
+        const rest = left === 1 ? { widest: 0, lowerWeight: 0, cuts: [] } : finish(end, left - 1);
+        if (!rest) continue;
+        const widest = Math.max(width, rest.widest);
+        const lowerWeight = (count - left) * width + rest.lowerWeight;
+        if (!answer || widest < answer.widest - 0.001 || Math.abs(widest - answer.widest) <= 0.001
+          && lowerWeight > answer.lowerWeight + 0.001) {
+          answer = { widest, lowerWeight, cuts: left === 1 ? [] : [end, ...rest.cuts] };
+        }
+      }
       memo.set(key, answer);
       return answer;
-    }
-    let answer = null;
-    for (let end = from + 1; end <= widths.length - left + 1; end++) {
-      const width = lineWidth(from, end);
-      if (width < previous - 0.5) continue;
-      const rest = finish(end, left - 1, width);
-      if (rest && (!answer || rest.last < answer.last - 0.001)) {
-        answer = { last: rest.last, cuts: [end, ...rest.cuts] };
-      }
-    }
-    memo.set(key, answer);
-    return answer;
-  };
-  let best = null;
-  for (let end = 1; end <= widths.length - count + 1; end++) {
-    const first = lineWidth(0, end), rest = finish(end, count - 1, first);
-    if (!rest) continue;
-    const spread = rest.last - first;
-    if (!best || spread < best.spread - 0.001
-      || Math.abs(spread - best.spread) <= 0.001 && rest.last < best.last - 0.001) {
-      best = { spread, last: rest.last, cuts: [end, ...rest.cuts] };
-    }
+    };
+    const result = finish(0, count);
+    if (result) consider(result.cuts);
   }
-  if (best) return best.cuts;
-
-  // A wide attached note can prevent increasing lines. Minimize the widest line then.
-  const fallbackMemo = new Map();
-  const fallback = (from, left) => {
-    if (left === 1) return { worst: lineWidth(from, widths.length), cuts: [] };
-    const key = `${from}:${left}`;
-    if (fallbackMemo.has(key)) return fallbackMemo.get(key);
-    let answer = null;
-    for (let end = from + 1; end <= widths.length - left + 1; end++) {
-      const rest = fallback(end, left - 1), worst = Math.max(lineWidth(from, end), rest.worst);
-      if (!answer || worst < answer.worst) answer = { worst, cuts: [end, ...rest.cuts] };
-    }
-    fallbackMemo.set(key, answer);
-    return answer;
-  };
-  return fallback(0, count).cuts;
+  return best.cuts;
 }
 
 /** A text-only estimate until the browser can measure the actual font and tags.
@@ -8630,6 +8630,9 @@ function balanceChartTimeLists(container) {
     first.replaceChildren(...items);
     while (first.nextElementSibling) first.nextElementSibling.remove();
     const { widths, prefixes } = measureTimeItems(items);
+    const available = parseFloat(getComputedStyle(list).width);
+    const fullWidth = widths.reduce((sum, width) => sum + width, 0) - (prefixes[0] || 0);
+    if (fullWidth <= available + 0.01) continue;
     const [cut] = balancedLineCuts(widths, { prefixes });
     if (!cut) continue;
     const bottom = document.createElement('span');
@@ -15917,7 +15920,7 @@ function ykAfterBox(poster) {
       </div>`;
 }
 
-/** Cuts a run of times in the box into two even lines, the shorter one on top, wherever the
+/** Cuts a run of times in the box into two even lines wherever the
  *  run does not fit on one.
  *
  *  Only the narrow sheet needs it: on the portrait pair the box has half a page to work in
@@ -16485,7 +16488,7 @@ const ONEPAGE_PER_LINE = 4;
  *  times split three and three is even only if all six are the same width, and they are not:
  *  a time carrying ** is wider than a bare one, and an underlined 10:30 is wider than 7:00.
  *  Three and three came out with one line visibly longer than the other. The shared
- *  balancer chooses the closest widths with wider lines below shorter ones.
+ *  balancer chooses the closest widths, preferring a wider lower line only on equal balance.
  *
  *  Measured after the sheet is on the page, the same as balanceRuns, because the answer is
  *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the

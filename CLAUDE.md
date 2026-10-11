@@ -318,9 +318,10 @@ Measure and shrink the full-size pages before applying Fit to screen. Measuring 
 phone's zoomed preview hid the overflow and put page 5's address on page 6. Browser
 coverage must start on a phone viewport and check footer placement in the actual PDF.
 All charts in a print job share the same top and bottom edges for double-sided printing.
-Automatic minyan lists balance their actual printed line widths, including tags and
-location marks. Keep times in chronological order and put wider lines below shorter
-ones. Use the shared width balancer for chart cells and poster lists; remeasure charts
+Automatic chart minyan lists stay on one line when they fit. When wrapping is needed,
+balance actual printed widths, including tags and location marks. Keep times in
+chronological order. Even widths take priority; prefer wider lines below only when
+the balance is equally good. Use the shared width balancer for chart cells and poster lists; remeasure charts
 when fonts arrive, styles change and before printing. Keep named zmanim and deliberate
 notes attached to their times, and retain manually arranged saved cells.
 Each physical chart page explains the location stars it prints: `*בעזרת נשים` and

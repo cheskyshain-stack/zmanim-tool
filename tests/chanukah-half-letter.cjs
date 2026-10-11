@@ -87,13 +87,27 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert(texts.every(text => text === texts[0]), 'Copies retain identical schedules and notes');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone preview fits');
       await page.emulateMedia({ media: 'print' });
-      const lineWidths = await page.locator('.poster.is-halfpage .onepage-times').evaluateAll(rows => rows.map(row =>
-        [...row.querySelectorAll('.onepage-line')].map(line => {
+      const balancedRows = await page.locator('.poster.is-halfpage .onepage-times').evaluateAll(rows => rows.map(row => {
+        const lines = [...row.querySelectorAll('.onepage-line')];
+        if (lines.length !== 2) return true;
+        const contents = lines.map(line => [...line.children]), items = contents.flat();
+        const printed = lines.map(line => {
           const times = [...line.querySelectorAll('.onepage-t')];
-          return times.length ? times.at(-1).getBoundingClientRect().right - times[0].getBoundingClientRect().left : 0;
-        })));
-      assert(lineWidths.every(widths => widths.every((width, i) => i === 0 || width >= widths[i - 1] - 1.5)),
-        'Wider time lines print below shorter ones');
+          return times.at(-1).getBoundingClientRect().right - times[0].getBoundingClientRect().left;
+        });
+        lines[0].replaceChildren(...items);
+        const widths = items.map(item => item.getBoundingClientRect().width);
+        const spacer = document.createElement('span'); spacer.className = 'onepage-t'; lines[0].append(spacer);
+        const separator = spacer.getBoundingClientRect().width; spacer.remove();
+        let best = Infinity;
+        for (let cut = 1; cut < widths.length; cut++) {
+          best = Math.min(best, Math.abs(widths.slice(0, cut).reduce((sum, w) => sum + w, 0)
+            - widths.slice(cut).reduce((sum, w) => sum + w, 0) + separator));
+        }
+        lines.forEach((line, i) => line.replaceChildren(...contents[i]));
+        return Math.abs(printed[0] - printed[1]) <= best + 1;
+      }));
+      assert(balancedRows.every(Boolean), 'Time lines use the most even actual printed widths');
       const boxes = await page.locator('.poster.is-halfpage').evaluateAll(sheets => sheets.map(sheet => {
         const rect = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scroll: sheet.scrollHeight,

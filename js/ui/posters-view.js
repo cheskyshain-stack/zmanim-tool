@@ -1273,7 +1273,7 @@ function ykAfterBox(poster) {
       </div>`;
 }
 
-/** Cuts a run of times in the box into two even lines, the shorter one on top, wherever the
+/** Cuts a run of times in the box into two even lines wherever the
  *  run does not fit on one.
  *
  *  Only the narrow sheet needs it: on the portrait pair the box has half a page to work in
@@ -1841,7 +1841,7 @@ const ONEPAGE_PER_LINE = 4;
  *  times split three and three is even only if all six are the same width, and they are not:
  *  a time carrying ** is wider than a bare one, and an underlined 10:30 is wider than 7:00.
  *  Three and three came out with one line visibly longer than the other. The shared
- *  balancer chooses the closest widths with wider lines below shorter ones.
+ *  balancer chooses the closest widths, preferring a wider lower line only on equal balance.
  *
  *  Measured after the sheet is on the page, the same as balanceRuns, because the answer is
  *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the

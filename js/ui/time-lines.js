@@ -33,6 +33,9 @@ export function balanceChartTimeLists(container) {
     first.replaceChildren(...items);
     while (first.nextElementSibling) first.nextElementSibling.remove();
     const { widths, prefixes } = measureTimeItems(items);
+    const available = parseFloat(getComputedStyle(list).width);
+    const fullWidth = widths.reduce((sum, width) => sum + width, 0) - (prefixes[0] || 0);
+    if (fullWidth <= available + 0.01) continue;
     const [cut] = balancedLineCuts(widths, { prefixes });
     if (!cut) continue;
     const bottom = document.createElement('span');
