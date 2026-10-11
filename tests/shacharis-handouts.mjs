@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
 import { hebrewDateExtended, excelWeekday, hasBehab, hasRoshChodesh, roshHashana } from '../js/hebrew-calendar.js';
 import { dateFromSerial } from '../js/zmanim/solar.js';
+import { sunriseElev } from '../js/zmanim/zmanim.js';
 import { buildAsaraBTevesPoster } from '../js/posters/asarabteves.js';
 import { buildAsaraShacharisPoster, buildBehabShacharisPoster, buildRoshChodeshShacharisPoster,
   ROSH_CHODESH_SHACHARIS_MONTHS } from '../js/posters/shacharis.js';
@@ -46,11 +47,28 @@ test('both BHB rounds use the chart calendar and special Shacharis schedule ever
       return date.year === year && date.month === month && hasBehab(serial, settings);
     }));
     assert.deepEqual(poster.span, { from: poster.days[0], to: poster.days[2] });
-    assert.equal(poster.rows.some(row => row.timeNote), false, 'Asara-specific Selichos notes do not spread to BHB');
+    const needsSelichos = poster.days.some(serial => sunriseElev(dateFromSerial(serial), settings) * 1440 > 425);
+    assert.equal(Boolean(poster.rows[0].timeNote), needsSelichos, 'BHB uses actual sunrise for the 6:40 Selichos note');
+    assert.equal(poster.rows.slice(1).some(row => row.timeNote), false, 'The Selichos note belongs only to 6:40');
   }
   assert.deepEqual(buildBehabShacharisPoster(5787, 8, settings).days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)),
     ['2026-10-19', '2026-10-22', '2026-10-26']);
   assert.equal(buildBehabShacharisPoster(5787, 9, settings), null);
+});
+
+test('BHB Selichos notes cover all, none, or the specific qualifying dates in a round', () => {
+  const note = (year, month, options = settings) => buildBehabShacharisPoster(year, month, options).rows[0].timeNote;
+  assert.equal(note(5787, 8), 'סליחות קודם שחרית', 'All three current after-Sukkos dates have Netz after 7:05');
+  assert.equal(note(5785, 8), undefined, 'After the clock change all three dates have earlier Netz');
+  assert.equal(note(5787, 2), undefined, 'After-Pesach sunrise is earlier than 7:05');
+  assert.equal(note(5786, 8), 'סליחות קודם שחרית (ה׳ חשון, ח׳ חשון)',
+    'A clock change before the third date must not apply the note to that date');
+  assert.equal(note(5793, 8), 'סליחות קודם שחרית (ט׳ חשון, י״ג חשון)',
+    'Only the later two dates cross the sunrise threshold');
+  assert.equal(note(5787, 2, { ...settings, longitude: -110 }), 'סליחות קודם שחרית',
+    'The same sunrise rule applies to the after-Pesach round when the calculation settings require it');
+  assert.equal(note(5787, 8, { ...settings, latitude: 0 }), undefined,
+    'An earlier sunrise from the configured location removes the note');
 });
 
 test('Rosh Chodesh handouts cover weekday dates in common and leap years, using the standing chart times', () => {

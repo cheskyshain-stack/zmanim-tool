@@ -1,5 +1,7 @@
-import { dateFromHebrew, hasBehab, roshHashana, excelWeekday, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
-import { buildAsaraBTevesPoster, ASARA_TEXT } from './asarabteves.js';
+import { dateFromHebrew, hasBehab, roshHashana, excelWeekday, jewishDateString, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
+import { dateFromSerial } from '../zmanim/solar.js';
+import { sunriseElev } from '../zmanim/zmanim.js';
+import { buildAsaraBTevesPoster, asaraSelichosFirst, ASARA_TEXT } from './asarabteves.js';
 import { specialShacharisLines } from './special-shacharis.js';
 import { nextRoshChodesh } from '../rosh-chodesh-text.js';
 import { buildChanukahPoster } from './chanukah.js';
@@ -41,11 +43,19 @@ export function behabShacharisDates(year, month, settings) {
 export function buildBehabShacharisPoster(year, month, settings) {
   const days = behabShacharisDates(year, month, settings);
   if (!days.length) return null;
+  const rows = shacharisRoomRows(specialShacharisLines().flat());
+  const selichosDays = days.filter(serial => asaraSelichosFirst(sunriseElev(dateFromSerial(serial), settings)));
+  if (selichosDays.length) {
+    // A round can cross daylight saving time or the 7:05 sunrise threshold.
+    const dates = selichosDays.length === days.length ? '' : ` (${selichosDays
+      .map(serial => jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]).join(', ')})`;
+    rows.find(row => row.text === '6:40').timeNote = ASARA_TEXT.selichosFirst + dates;
+  }
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
     subtitle: 'שחרית', showDates: true,
     span: { from: days[0], to: days.at(-1) }, days,
-    rows: shacharisRoomRows(specialShacharisLines().flat()),
+    rows,
   };
 }
 

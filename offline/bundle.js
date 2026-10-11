@@ -14085,11 +14085,19 @@ function behabShacharisDates(year, month, settings) {
 function buildBehabShacharisPoster(year, month, settings) {
   const days = behabShacharisDates(year, month, settings);
   if (!days.length) return null;
+  const rows = shacharisRoomRows(specialShacharisLines().flat());
+  const selichosDays = days.filter(serial => asaraSelichosFirst(sunriseElev(dateFromSerial(serial), settings)));
+  if (selichosDays.length) {
+    // A round can cross daylight saving time or the 7:05 sunrise threshold.
+    const dates = selichosDays.length === days.length ? '' : ` (${selichosDays
+      .map(serial => jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]).join(', ')})`;
+    rows.find(row => row.text === '6:40').timeNote = ASARA_TEXT.selichosFirst + dates;
+  }
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
     subtitle: 'שחרית', showDates: true,
     span: { from: days[0], to: days.at(-1) }, days,
-    rows: shacharisRoomRows(specialShacharisLines().flat()),
+    rows,
   };
 }
 
