@@ -1711,7 +1711,7 @@ const halfPageSection = (title, rows) => `<section class="onepage-sec">
 function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '' } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
-  const legend = shacharis ? [] : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
+  const legend = [...(shacharis ? [] : poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
 }

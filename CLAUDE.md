@@ -248,7 +248,10 @@ and a smaller Hebrew date underneath. Do not print an English date in this date 
 Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each
-room beside its time instead of printing location marks or a location key. Read the
+room beside its time instead of printing location marks or a location key. Include the
+standard compact rounding reminder under a bottom rule on every morning handout,
+including Rosh Chodesh. Anchor it at the bottom inside each copy's print margin;
+do not add location keys when the rooms are already written beside the times. Read the
 times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
 beside 6:40 when exact sunrise is later than 7:05, without rounding sunrise first.
 Check each of BHB's three dates separately. If all three qualify, print only
