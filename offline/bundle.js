@@ -14266,24 +14266,21 @@ function buildRoshChodeshShacharisPoster(year, month, settings) {
     from = rc.last + 1;
     if (rc.month !== month) continue;
     // Weekday handouts cover the weekday part of a two-day Rosh Chodesh.
-    // Keep Shabbos-only months visible with the Shabbos chart's own morning times.
-    const calendarDays = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i);
-    const weekdays = calendarDays.filter(serial => excelWeekday(serial) !== 7);
-    const shabbosOnly = !weekdays.length;
-    const days = shabbosOnly ? calendarDays : weekdays;
-    const chanukah = !shabbosOnly && month === 10
+    // Skip occasions that fall entirely on Shabbos.
+    const days = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i)
+      .filter(serial => excelWeekday(serial) !== 7);
+    if (!days.length) return null;
+    const chanukah = month === 10
       ? buildChanukahPoster(year, settings)?.shacharisRows.find(row => row.isRoshChodesh) : null;
-    const cells = shabbosOnly ? shacharisParts().times.map(trace => ({
-      text: trace.plain(), underlined: Boolean(trace.flags.underlined), mark: trace.flags.mark || '', trace,
-    })) : chanukah
+    const cells = chanukah
       ? chanukah.cells.map((cell, i) => i === 0
         ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
       : specialShacharisLines().flat();
     return {
-      hebrewYear: year, month, shabbosOnly,
+      hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
       subtitle: 'שחרית',
-      dayLabel: shabbosOnly ? 'שבת' : `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
+      dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
       span: { from: days[0], to: days.at(-1) }, days,
       rows: shacharisRoomRows(cells),
     };
@@ -15325,7 +15322,7 @@ function postersByDate(year, settings, state) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  // Omit months absent in this year; Shabbos-only months have their own morning times.
+  // Omit months absent in this year and occasions that fall entirely on Shabbos.
   const sorted = all.filter(p => !p.dated || at.get(p).from != null).sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);

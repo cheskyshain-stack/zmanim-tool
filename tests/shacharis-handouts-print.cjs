@@ -206,9 +206,15 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
             title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]) }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
-        available.map(poster => 'roshchodesh' + poster.month), 'All this year\'s months appear, including Shabbos-only months, in date order');
+        available.map(poster => 'roshchodesh' + poster.month), 'Months with weekday schedules appear in date order');
       assert.equal(await page.locator('#poster-pick').locator('..').evaluate(el => el.childNodes[0].textContent.trim()), 'Month');
-      assert(available.some(poster => poster.month === 11), 'Shevat is available every year');
+      const shevatWeekday = await page.evaluate(async year => {
+        const { dateFromHebrew, excelWeekday } = await import('/js/hebrew-calendar.js');
+        return excelWeekday(dateFromHebrew(1, 11, year));
+      }, year);
+      assert.equal(await page.locator('#poster-pick option[value=roshchodesh11]').count(), shevatWeekday === 7 ? 0 : 1,
+        'Skip Shevat when entirely on Shabbos, keeping its weekday occurrences in ' + year);
+      assert(available.every(poster => !poster.dayLabel.includes('שבת')), 'No Shabbos handouts appear');
       for (const poster of available.filter(poster => [8, 9, 10, 11, 13, 14].includes(poster.month))) {
         for (const width of [1440, 375]) for (const copies of [1, 2]) {
           await page.setViewportSize({ width, height: 1100 });
@@ -229,7 +235,15 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         }
       }
     }
+    await chooseYear(5786);
+    await page.locator('#poster-pick').selectOption('roshchodesh11'); await settle();
     await chooseYear(5787);
+    assert.equal(await page.locator('#poster-pick option[value=roshchodesh11]').count(), 0);
+    assert.notEqual(await page.locator('#poster-pick').inputValue(), 'roshchodesh11', 'A month now falling entirely on Shabbos switches to an available month');
+    const replacement = await page.locator('#poster-pick').inputValue();
+    assert(page.url().endsWith('#posters/' + replacement), 'The address follows the weekday replacement month');
+    await page.reload(); await page.locator('.poster.is-shacharis').first().waitFor(); await settle();
+    assert.equal(await page.locator('#poster-pick').inputValue(), replacement, 'The weekday replacement survives reload');
     await page.locator('#poster-pick').selectOption('roshchodesh14'); await settle();
     await page.reload(); await page.locator('.poster.is-shacharis').first().waitFor(); await settle();
     assert.equal(await page.locator('#poster-pick').inputValue(), 'roshchodesh14', 'Selected leap-year month survives reload');
