@@ -197,9 +197,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
             title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]) }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
-        available.map(poster => 'roshchodesh' + poster.month), 'Only this year\'s weekday months appear, in date order');
+        available.map(poster => 'roshchodesh' + poster.month), 'All this year\'s months appear, including Shabbos-only months, in date order');
       assert.equal(await page.locator('#poster-pick').locator('..').evaluate(el => el.childNodes[0].textContent.trim()), 'Month');
-      for (const poster of available.filter(poster => [8, 9, 10, 13, 14].includes(poster.month))) {
+      assert(available.some(poster => poster.month === 11), 'Shevat is available every year');
+      for (const poster of available.filter(poster => [8, 9, 10, 11, 13, 14].includes(poster.month))) {
         for (const width of [1440, 375]) for (const copies of [1, 2]) {
           await page.setViewportSize({ width, height: 1100 });
           await page.locator('#poster-pick').selectOption('roshchodesh' + poster.month);
