@@ -23,6 +23,8 @@
  *  The old route is not a relic. `document.execCommand('copy')` is deprecated and still the
  *  thing that works in the places the modern API is refused, which are exactly the places this
  *  shul's congregation reads the site from: a link opened inside WhatsApp. */
+import { keepPosition } from './keep-position.js';
+
 export async function copyToClipboard(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -44,10 +46,14 @@ export async function copyToClipboard(text) {
     box.style.opacity = '0';
     box.style.pointerEvents = 'none';
     document.body.appendChild(box);
-    box.select();
-    box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
-    const ok = document.execCommand('copy');
-    box.remove();
+    const ok = keepPosition(document.body, () => {
+      try {
+        box.focus({ preventScroll: true });
+        box.select();
+        box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
+        return document.execCommand('copy');
+      } finally { box.remove(); }
+    });
     if (ok) return true;
   } catch {
     // Nothing left to try. The caller shows the text instead.
@@ -99,9 +105,11 @@ export function wireCopyButton(btn, getText) {
     area.value = text;
     box.append(note, area);
     btn.insertAdjacentElement('afterend', box);
-    area.focus();
-    area.select();
-    area.setSelectionRange(0, String(text).length);
+    keepPosition(document.body, () => {
+      area.focus({ preventScroll: true });
+      area.select();
+      area.setSelectionRange(0, String(text).length);
+    }, { focus: false });
     btn.textContent = said;
   });
 }

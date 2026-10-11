@@ -389,6 +389,84 @@ function announcedNow(settings) {
   return live(settings).map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
 }
 
+// ==== ui/keep-position.js ====
+// Redraw controls in place, including their open panels and keyboard focus.
+// Restore synchronously so a later user scroll or page navigation is never undone.
+function findAgain(root, element) {
+  if (!element || !root.contains(element)) return () => null;
+  const tag = element.tagName.toLowerCase();
+  const quote = value => CSS.escape(String(value));
+  const row = element.closest('[data-id]');
+  const rowId = row?.dataset.id;
+  let selector;
+  if (element.id) selector = `#${quote(element.id)}`;
+  else if (element.name) selector = `${tag}[name="${quote(element.name)}"]`
+    + (/^(radio|checkbox)$/.test(element.type) ? `[value="${quote(element.value)}"]` : '');
+  else {
+    const data = [...element.attributes].find(attr => attr.name.startsWith('data-'));
+    const classes = [...element.classList].filter(name => !/^(is-|active$)/.test(name));
+    selector = data ? `${tag}[${data.name}="${quote(data.value)}"]`
+      : tag + classes.map(name => `.${quote(name)}`).join('');
+  }
+  const text = element.textContent;
+  return () => {
+    if (root.contains(element)) return element;
+    const scope = rowId ? root.querySelector(`[data-id="${quote(rowId)}"]`) : root;
+    const matches = [...(scope?.querySelectorAll(selector) || [])];
+    return matches.length === 1 ? matches[0] : matches.find(el => el.textContent === text) || null;
+  };
+}
+
+function visibleControl(root, control) {
+  if (control?.matches('input[type=radio],input[type=checkbox]')) {
+    return control.closest('label') || (control.id && root.querySelector(`label[for="${CSS.escape(control.id)}"]`)) || control;
+  }
+  return control;
+}
+
+function keepPosition(root, draw, { panels = true, focus = true } = {}) {
+  const x = window.scrollX, y = window.scrollY;
+  const active = root.contains(document.activeElement) ? document.activeElement : null;
+  const findControl = findAgain(root, active);
+  const before = visibleControl(root, active)?.getBoundingClientRect();
+  const anchored = before && before.height > 0 && before.top >= 0 && before.bottom <= window.innerHeight;
+  const expanded = panels ? [...root.querySelectorAll('details')].map(el => ({
+    find: findAgain(root, el), title: el.querySelector(':scope > summary')?.textContent, open: el.open,
+  })) : [];
+  const ancestors = [];
+  for (let panel = root.parentElement?.closest('details'); panel; panel = panel.parentElement?.closest('details')) ancestors.push(panel);
+  const stages = expanded.length || ancestors.length ? [root, ...ancestors].map(element => ({
+    element, restoring: element.classList.contains('is-restoring-position'),
+  })) : [];
+  stages.forEach(({ element }) => element.classList.add('is-restoring-position'));
+  try {
+    return draw();
+  } finally {
+    if (root.isConnected) {
+      // Some views replace className as well as their content. Restored open panels
+      // must already have their full height when the position is measured.
+      stages.forEach(({ element }) => element.classList.add('is-restoring-position'));
+      for (const panel of expanded) {
+        const same = panel.find() || [...root.querySelectorAll('details')]
+          .find(el => el.querySelector(':scope > summary')?.textContent === panel.title);
+        if (same) same.open = panel.open;
+      }
+      const same = findControl();
+      if (focus) {
+        const target = same?.disabled
+          ? same.closest('.poster-year-step,.week-nav-row,[role=group]')?.querySelector('button:not(:disabled),select:not(:disabled)')
+            || root.querySelector('button:not(:disabled),select:not(:disabled)')
+          : same;
+        target?.focus({ preventScroll: true });
+      }
+      const after = visibleControl(root, same)?.getBoundingClientRect();
+      const nextY = anchored && after?.height ? window.scrollY + after.top - before.top : y;
+      window.scrollTo({ left: x, top: nextY, behavior: 'instant' });
+    }
+    stages.forEach(({ element, restoring }) => element.classList.toggle('is-restoring-position', restoring));
+  }
+}
+
 // ==== ui/copy.js ====
 // Putting a message on the clipboard, in the four places this program offers to.
 //
@@ -415,6 +493,7 @@ function announcedNow(settings) {
  *  The old route is not a relic. `document.execCommand('copy')` is deprecated and still the
  *  thing that works in the places the modern API is refused, which are exactly the places this
  *  shul's congregation reads the site from: a link opened inside WhatsApp. */
+
 async function copyToClipboard(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -436,10 +515,14 @@ async function copyToClipboard(text) {
     box.style.opacity = '0';
     box.style.pointerEvents = 'none';
     document.body.appendChild(box);
-    box.select();
-    box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
-    const ok = document.execCommand('copy');
-    box.remove();
+    const ok = keepPosition(document.body, () => {
+      try {
+        box.focus({ preventScroll: true });
+        box.select();
+        box.setSelectionRange(0, text.length); // iOS ignores select() on a readonly field
+        return document.execCommand('copy');
+      } finally { box.remove(); }
+    });
     if (ok) return true;
   } catch {
     // Nothing left to try. The caller shows the text instead.
@@ -491,9 +574,11 @@ function wireCopyButton(btn, getText) {
     area.value = text;
     box.append(note, area);
     btn.insertAdjacentElement('afterend', box);
-    area.focus();
-    area.select();
-    area.setSelectionRange(0, String(text).length);
+    keepPosition(document.body, () => {
+      area.focus({ preventScroll: true });
+      area.select();
+      area.setSelectionRange(0, String(text).length);
+    }, { focus: false });
     btn.textContent = said;
   });
 }
@@ -11816,6 +11901,7 @@ function howFar(item) {
 
 
 
+
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
@@ -11962,7 +12048,7 @@ function spreadLabel(spread) {
  *  the last one set, so re-running it is not cumulative. */
 function fitChartToWindow(pagesEl) {
   const fit = pagesEl.parentElement;
-  const apply = () => {
+  const apply = () => keepPosition(pagesEl.parentElement, () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
@@ -11981,7 +12067,7 @@ function fitChartToWindow(pagesEl) {
       fit.style.height = `${Math.ceil(pagesEl.scrollHeight * scale)}px`;
       fit.style.overflow = 'hidden';
     }
-  };
+  }, { panels: false, focus: false });
   apply();
   requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
@@ -12007,7 +12093,7 @@ function renderChartBrowser(container, state, opts = {}) {
   const settings = resolveSettings(state.settings);
   let at = spreadIndexForNow(spreads, state, settings);
 
-  const draw = () => {
+  const draw = () => keepPosition(container, () => {
     // A board is 11in across. See setPrintPage for why the document's one page size is set
     // from the view rather than from a named page in the stylesheet.
     setPrintPage('letter landscape');
@@ -12075,7 +12161,7 @@ function renderChartBrowser(container, state, opts = {}) {
         draw();
       });
     }
-  };
+  });
   draw();
 }
 
@@ -12093,6 +12179,10 @@ function chartEsc(str) {
 
 // ==== ui/generate-view.js ====
 function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
+  return keepPosition(container, () => drawGenerate(container, state, tables, onGenerate, onOpenTab));
+}
+
+function drawGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   // Generate is where the app opens, so it's where someone who has never seen it lands.
@@ -12171,26 +12261,28 @@ function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
 
   container.querySelector('#gen-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const season = fd.get('season');
-    const hebrewYear = Number(fd.get('hebrewYear'));
-    const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
+    keepPosition(container, () => {
+      const fd = new FormData(e.target);
+      const season = fd.get('season');
+      const hebrewYear = Number(fd.get('hebrewYear'));
+      const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
 
-    // Step one folds into a one-line summary once it's answered, so step two isn't
-    // competing with a form you've already finished - the page used to just keep
-    // growing downward with everything still on screen at once.
-    container.querySelector('#gen-form').hidden = true;
-    container.querySelector('#step-one').innerHTML = `
-      <div class="step-summary">
-        <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
-        <button type="button" id="change-sheet">Change</button>
-      </div>`;
-    container.querySelector('#gen-steps').outerHTML = stepsBar(2);
-    container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate));
+      // Step one folds into a one-line summary once it's answered, so step two isn't
+      // competing with a form you've already finished - the page used to just keep
+      // growing downward with everything still on screen at once.
+      container.querySelector('#gen-form').hidden = true;
+      container.querySelector('#step-one').innerHTML = `
+        <div class="step-summary">
+          <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
+          <button type="button" id="change-sheet">Change</button>
+        </div>`;
+      container.querySelector('#gen-steps').outerHTML = stepsBar(2);
+      container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate, onOpenTab));
 
-    // No scrolling into view: collapsing step one keeps step two roughly where step one
-    // was, and scrolling to it pushed the step indicator off the top of the screen.
-    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+      // No scrolling into view: collapsing step one keeps step two roughly where step one
+      // was, and scrolling to it pushed the step indicator off the top of the screen.
+      renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+    });
   });
 }
 
@@ -17538,22 +17630,7 @@ function fitHalfPage(container) {
  *  and changes the page's height. Focus goes back to the select that was just used, so the
  *  next arrow key still moves it, and preventScroll keeps that from undoing the restore. */
 function redrawInPlace(container, state) {
-  const y = window.scrollY;
-  const focused = document.activeElement?.id || '';
-  renderPosters(container, state);
-  const same = focused ? container.querySelector(`#${focused}`) : null;
-  /* A button that has just disabled itself under the finger cannot take the focus back, and
-     without the second half of this it goes to the body, which puts a keyboard back at the
-     top of the page. The year stepper is where it happens: Today disables itself every time
-     it is pressed, and each of the two steps does at its end of the list. So the focus goes
-     to whatever is still pressable in the same box and the next key is still working the
-     year. Measured before this: pressing + up to the last year left document.activeElement
-     as BODY. */
-  const to = same && !same.disabled
-    ? same
-    : same?.closest('.poster-year-step')?.querySelector('button:not(:disabled)');
-  to?.focus({ preventScroll: true });
-  window.scrollTo(0, y);
+  keepPosition(container, () => renderPosters(container, state));
 }
 
 function currentSchedule(groups, state, settings, year, today) {
@@ -18462,6 +18539,10 @@ function renderImageCropper(container, currentDataUrl, onSave) {
  *  Null (the default) shows just the list - most visits here are to glance at the
  *  rules, not write one, and the creation form used to sit open below them permanently. */
 function renderRules(container, state, onChange, editingRuleId = null) {
+  return keepPosition(container, () => drawRules(container, state, onChange, editingRuleId));
+}
+
+function drawRules(container, state, onChange, editingRuleId) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
@@ -18509,7 +18590,6 @@ function renderRules(container, state, onChange, editingRuleId = null) {
   container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
   container.querySelector('#rule-add').addEventListener('click', () => {
     renderRules(container, state, onChange, 'new');
-    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 
   const list = container.querySelector('#rules-list');
@@ -18535,6 +18615,10 @@ function renderRules(container, state, onChange, editingRuleId = null) {
         .join('')
     : '<p class="hint">No rules yet.</p>';
 
+  // Edit beside the selected rule instead of scrolling away to a form under the list.
+  const row = prefill && [...list.querySelectorAll('.rule-row')].find(el => el.dataset.id === prefill.id);
+  if (row) row.after(container.querySelector('#rule-form-title'), container.querySelector('#rule-form'));
+
   list.querySelectorAll('.rule-enabled').forEach((cb) => {
     cb.addEventListener('change', (e) => {
       const id = e.target.closest('.rule-row').dataset.id;
@@ -18545,13 +18629,11 @@ function renderRules(container, state, onChange, editingRuleId = null) {
   list.querySelectorAll('.rule-edit').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       renderRules(container, state, onChange, e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
   list.querySelectorAll('.rule-clone').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });
   list.querySelectorAll('.rule-delete').forEach((btn) => {
@@ -22094,6 +22176,7 @@ function renderStatus(main) {
 // ==== ui/traffic-view.js ====
 // All displayed statistics share the Worker's explicit New York window and snapshot.
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
+
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
 const TRAFFIC_ADMIN_TRACKING_START = '2026-10-02T03:45:00Z';
@@ -22498,6 +22581,11 @@ function trafficContent(data, range) {
 
 /** The Traffic tab. A selection change never reuses a response for another window. */
 function renderTraffic(container, options = {}) {
+  return keepPosition(container, () => drawTraffic(container, options));
+}
+
+function drawTraffic(container, options) {
+  const loadingHeight = container.querySelector('#traffic-body')?.getBoundingClientRect().height || 0;
   trafficRequest?.abort();
   const revision = ++trafficRevision;
   if (!options.keepSnapshot || !trafficSnapshot) trafficSnapshot = new Date().toISOString();
@@ -22514,6 +22602,7 @@ function renderTraffic(container, options = {}) {
     </section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
   if (offline) return;
   const body = container.querySelector('#traffic-body');
+  if (loadingHeight) body.style.minHeight = `${loadingHeight}px`;
   const loadStatus = container.querySelector('#traffic-load-status');
   const refresh = container.querySelector('#traffic-refresh');
   const active = () => revision === trafficRevision && container.contains(body);
@@ -22549,7 +22638,10 @@ function renderTraffic(container, options = {}) {
   });
   const show = (data) => {
     if (!active()) return;
-    body.innerHTML = trafficContent(data, range);
+    keepPosition(container, () => {
+      body.innerHTML = trafficContent(data, range);
+      body.style.minHeight = '';
+    });
     body.setAttribute('aria-busy', 'false');
     refresh.disabled = false;
     const retryAt = trafficCooldown(data);
@@ -22584,8 +22676,11 @@ function renderTraffic(container, options = {}) {
       if (error.name === 'AbortError' || !active()) return;
       refresh.disabled = false;
       body.setAttribute('aria-busy', 'false');
-      body.innerHTML = trafficNotice('Statistics could not be loaded', error.message, 'error')
-        + '<p class="traffic-small">Your date selection is unchanged. Use Refresh data to retry. A failed request does not mean zero visits.</p>';
+      keepPosition(container, () => {
+        body.innerHTML = trafficNotice('Statistics could not be loaded', error.message, 'error')
+          + '<p class="traffic-small">Your date selection is unchanged. Use Refresh data to retry. A failed request does not mean zero visits.</p>';
+        body.style.minHeight = '';
+      });
       loadStatus.textContent = 'The record could not be loaded.';
     });
 }
@@ -22732,6 +22827,7 @@ function persist() {
 }
 
 function openTab(tab) {
+  if (tab === currentTab && !currentSheetId) return;
   currentTab = tab;
   currentSheetId = null;
   writeRoute();
@@ -22810,10 +22906,9 @@ let painted = { tab: null, sheet: null };
 
 function render() {
   const held = painted.tab === currentTab && painted.sheet === currentSheetId && !openPublish;
-  const y = window.scrollY;
   painted = { tab: currentTab, sheet: currentSheetId };
-  paint();
-  if (held) window.scrollTo(0, y);
+  if (held) keepPosition(main, paint);
+  else paint();
 }
 
 function paint() {

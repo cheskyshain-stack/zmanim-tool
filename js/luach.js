@@ -12,6 +12,7 @@ import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
+import { keepPosition } from './ui/keep-position.js';
 import { wireCopyButton, copyToClipboard } from './ui/copy.js';
 import { showBlocked } from './ui/blocked.js';
 import { renderWeek } from './ui/week-view.js';
@@ -795,7 +796,7 @@ function openTheDoor() {
 function renderWeekPage(published) {
   stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  const draw = () => {
+  const draw = () => keepPosition(main, () => {
     clearTimeout(nextUpTimer);
     // Keep the minute refresh from dismissing room details while someone reads them.
     if (main.querySelector('.reader-room-dialog[open]')) {
@@ -823,7 +824,7 @@ function renderWeekPage(published) {
       if (expanded.has(el.dataset.agendaKey)) el.open = expanded.get(el.dataset.agendaKey);
     }
     nextUpTimer = setTimeout(draw, 60000 - Date.now() % 60000 + 50);
-  };
+  });
   draw();
 }
 
@@ -953,15 +954,15 @@ function donateTabHtml(way, index) {
 /** Standard tab keyboard navigation, without replacing live payment frames. */
 function wireDonateTabs(root) {
   const tabs = [...root.querySelectorAll('.luach-payment-tab')];
-  const select = (tab, focus = false) => {
+  const select = (tab, focus = false) => keepPosition(root, () => {
     for (const item of tabs) {
       const active = item === tab;
       item.setAttribute('aria-selected', String(active));
       item.tabIndex = active ? 0 : -1;
       root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
     }
-    if (focus) tab.focus();
-  };
+    if (focus) tab.focus({ preventScroll: true });
+  }, { focus: false });
   for (const tab of tabs) {
     tab.addEventListener('click', () => select(tab));
     tab.addEventListener('keydown', event => {
@@ -1081,42 +1082,45 @@ function wireDonateFrames(root) {
     go.addEventListener('click', (e) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
       e.preventDefault();
-      const opening = panel.hidden;
-      for (const other of panels) if (other !== panel && !other.hidden) shut(other);
-      if (!opening) { shut(panel); return; }
-      // The account's own name where there is one, so the merchant forms are told apart
-      // by anything reading the frame's title out.
-      const title = accountOf(go).querySelector('.luach-account-title')
-        || card.querySelector('.luach-payment-heading');
-      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref, go.dataset.websiteLabel);
-      panel.hidden = false;
-      go.setAttribute('aria-expanded', 'true');
-      // Cardknox's narrow layouts still need 360px for their fixed-width sections.
-      // Resize the viewport rather than touching cross-origin payment content, and
-      // keep the same live frame when the phone rotates so entered fields survive.
-      const wrap = panel.querySelector('.luach-frame-wrap');
-      const fit = (width) => {
-        if (width > 0) wrap.style.setProperty('--luach-frame-scale', Math.min(1, width / 360));
-      };
-      fit(wrap.clientWidth);
-      const observer = new ResizeObserver(([entry]) => {
-        if (!panel.isConnected) { observer.disconnect(); return; }
-        fit(entry.contentRect.width);
+      keepPosition(root, () => {
+        const opening = panel.hidden;
+        for (const other of panels) if (other !== panel && !other.hidden) shut(other);
+        if (!opening) { shut(panel); return; }
+        // The account's own name where there is one, so the merchant forms are told apart
+        // by anything reading the frame's title out.
+        const title = accountOf(go).querySelector('.luach-account-title')
+          || card.querySelector('.luach-payment-heading');
+        panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref, go.dataset.websiteLabel);
+        panel.hidden = false;
+        go.setAttribute('aria-expanded', 'true');
+        // Cardknox's narrow layouts still need 360px for their fixed-width sections.
+        // Resize the viewport rather than touching cross-origin payment content, and
+        // keep the same live frame when the phone rotates so entered fields survive.
+        const wrap = panel.querySelector('.luach-frame-wrap');
+        const fit = (width) => {
+          if (width > 0) wrap.style.setProperty('--luach-frame-scale', Math.min(1, width / 360));
+        };
+        fit(wrap.clientWidth);
+        const observer = new ResizeObserver(([entry]) => {
+          if (!panel.isConnected) { observer.disconnect(); return; }
+          fit(entry.contentRect.width);
+        });
+        observer.observe(wrap);
+        frameFits.set(panel, observer);
+        panel.querySelector('.luach-frame-shut').addEventListener('click', () => keepPosition(root, () => {
+          shut(panel); go.focus({ preventScroll: true });
+        }));
+        // Uncover the form once it is there. A cross-origin frame tells us nothing about what
+        // it holds, but load still fires on the element, which is all this needs to know.
+        // The timer is for the case where it never does: better a blank frame under the help
+        // line asking whether anything is showing than a spinner turning for ever, which
+        // claims something is still on its way when nothing is.
+        const frame = panel.querySelector('.luach-frame');
+        const cover = panel.querySelector('.luach-frame-load');
+        const uncover = () => cover.remove();
+        frame.addEventListener('load', uncover, { once: true });
+        setTimeout(uncover, 20000);
       });
-      observer.observe(wrap);
-      frameFits.set(panel, observer);
-      panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
-      // Uncover the form once it is there. A cross-origin frame tells us nothing about what
-      // it holds, but load still fires on the element, which is all this needs to know.
-      // The timer is for the case where it never does: better a blank frame under the help
-      // line asking whether anything is showing than a spinner turning for ever, which
-      // claims something is still on its way when nothing is.
-      const frame = panel.querySelector('.luach-frame');
-      const cover = panel.querySelector('.luach-frame-load');
-      const uncover = () => cover.remove();
-      frame.addEventListener('load', uncover, { once: true });
-      setTimeout(uncover, 20000);
-      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }
 }

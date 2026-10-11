@@ -26,6 +26,15 @@ history turned out to be wrong and had to be retracted. Measure with
 **The user prints these boards.** A visual regression on paper is a real cost, not a
 cosmetic one. Layout invariants below are not preferences.
 
+Controls that update the current page must keep the clicked control in the same screen
+position, preserve open panels, and restore keyboard focus. Use `ui/keep-position.js`
+around redraws and late chart fitting. Restore synchronously so a later manual scroll
+or navigation is never pulled back. New pages still open at the top; pressing an already
+active page button stays put. Donation forms open below their fund without scrolling
+away from the button, and rule editors open beside their row. `tests/button-scroll.cjs`
+checks public and admin controls, copy fallbacks, and delayed statistics at phone and
+desktop widths.
+
 ## Deploy loop
 
 Every change follows this, in order:

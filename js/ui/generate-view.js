@@ -3,8 +3,13 @@ import { resolveSettings } from '../settings.js';
 import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 import { escText } from '../util.js';
+import { keepPosition } from './keep-position.js';
 
 export function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
+  return keepPosition(container, () => drawGenerate(container, state, tables, onGenerate, onOpenTab));
+}
+
+function drawGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   // Generate is where the app opens, so it's where someone who has never seen it lands.
@@ -83,26 +88,28 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
 
   container.querySelector('#gen-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const season = fd.get('season');
-    const hebrewYear = Number(fd.get('hebrewYear'));
-    const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
+    keepPosition(container, () => {
+      const fd = new FormData(e.target);
+      const season = fd.get('season');
+      const hebrewYear = Number(fd.get('hebrewYear'));
+      const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
 
-    // Step one folds into a one-line summary once it's answered, so step two isn't
-    // competing with a form you've already finished - the page used to just keep
-    // growing downward with everything still on screen at once.
-    container.querySelector('#gen-form').hidden = true;
-    container.querySelector('#step-one').innerHTML = `
-      <div class="step-summary">
-        <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
-        <button type="button" id="change-sheet">Change</button>
-      </div>`;
-    container.querySelector('#gen-steps').outerHTML = stepsBar(2);
-    container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate));
+      // Step one folds into a one-line summary once it's answered, so step two isn't
+      // competing with a form you've already finished - the page used to just keep
+      // growing downward with everything still on screen at once.
+      container.querySelector('#gen-form').hidden = true;
+      container.querySelector('#step-one').innerHTML = `
+        <div class="step-summary">
+          <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
+          <button type="button" id="change-sheet">Change</button>
+        </div>`;
+      container.querySelector('#gen-steps').outerHTML = stepsBar(2);
+      container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate, onOpenTab));
 
-    // No scrolling into view: collapsing step one keeps step two roughly where step one
-    // was, and scrolling to it pushed the step indicator off the top of the screen.
-    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+      // No scrolling into view: collapsing step one keeps step two roughly where step one
+      // was, and scrolling to it pushed the step indicator off the top of the screen.
+      renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+    });
   });
 }
 

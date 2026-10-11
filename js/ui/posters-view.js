@@ -1,4 +1,5 @@
 import { safeHeaderImage } from '../security.js';
+import { keepPosition } from './keep-position.js';
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
 // Two so far, שבת שובה and סליחות, and the tab is shaped for the others to follow rather
@@ -2872,22 +2873,7 @@ function fitHalfPage(container) {
  *  and changes the page's height. Focus goes back to the select that was just used, so the
  *  next arrow key still moves it, and preventScroll keeps that from undoing the restore. */
 function redrawInPlace(container, state) {
-  const y = window.scrollY;
-  const focused = document.activeElement?.id || '';
-  renderPosters(container, state);
-  const same = focused ? container.querySelector(`#${focused}`) : null;
-  /* A button that has just disabled itself under the finger cannot take the focus back, and
-     without the second half of this it goes to the body, which puts a keyboard back at the
-     top of the page. The year stepper is where it happens: Today disables itself every time
-     it is pressed, and each of the two steps does at its end of the list. So the focus goes
-     to whatever is still pressable in the same box and the next key is still working the
-     year. Measured before this: pressing + up to the last year left document.activeElement
-     as BODY. */
-  const to = same && !same.disabled
-    ? same
-    : same?.closest('.poster-year-step')?.querySelector('button:not(:disabled)');
-  to?.focus({ preventScroll: true });
-  window.scrollTo(0, y);
+  keepPosition(container, () => renderPosters(container, state));
 }
 
 function currentSchedule(groups, state, settings, year, today) {

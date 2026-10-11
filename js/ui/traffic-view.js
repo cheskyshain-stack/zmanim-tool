@@ -1,5 +1,6 @@
 // All displayed statistics share the Worker's explicit New York window and snapshot.
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
+import { keepPosition } from './keep-position.js';
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
 const TRAFFIC_ADMIN_TRACKING_START = '2026-10-02T03:45:00Z';
@@ -404,6 +405,11 @@ function trafficContent(data, range) {
 
 /** The Traffic tab. A selection change never reuses a response for another window. */
 export function renderTraffic(container, options = {}) {
+  return keepPosition(container, () => drawTraffic(container, options));
+}
+
+function drawTraffic(container, options) {
+  const loadingHeight = container.querySelector('#traffic-body')?.getBoundingClientRect().height || 0;
   trafficRequest?.abort();
   const revision = ++trafficRevision;
   if (!options.keepSnapshot || !trafficSnapshot) trafficSnapshot = new Date().toISOString();
@@ -420,6 +426,7 @@ export function renderTraffic(container, options = {}) {
     </section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
   if (offline) return;
   const body = container.querySelector('#traffic-body');
+  if (loadingHeight) body.style.minHeight = `${loadingHeight}px`;
   const loadStatus = container.querySelector('#traffic-load-status');
   const refresh = container.querySelector('#traffic-refresh');
   const active = () => revision === trafficRevision && container.contains(body);
@@ -455,7 +462,10 @@ export function renderTraffic(container, options = {}) {
   });
   const show = (data) => {
     if (!active()) return;
-    body.innerHTML = trafficContent(data, range);
+    keepPosition(container, () => {
+      body.innerHTML = trafficContent(data, range);
+      body.style.minHeight = '';
+    });
     body.setAttribute('aria-busy', 'false');
     refresh.disabled = false;
     const retryAt = trafficCooldown(data);
@@ -490,8 +500,11 @@ export function renderTraffic(container, options = {}) {
       if (error.name === 'AbortError' || !active()) return;
       refresh.disabled = false;
       body.setAttribute('aria-busy', 'false');
-      body.innerHTML = trafficNotice('Statistics could not be loaded', error.message, 'error')
-        + '<p class="traffic-small">Your date selection is unchanged. Use Refresh data to retry. A failed request does not mean zero visits.</p>';
+      keepPosition(container, () => {
+        body.innerHTML = trafficNotice('Statistics could not be loaded', error.message, 'error')
+          + '<p class="traffic-small">Your date selection is unchanged. Use Refresh data to retry. A failed request does not mean zero visits.</p>';
+        body.style.minHeight = '';
+      });
       loadStatus.textContent = 'The record could not be loaded.';
     });
 }

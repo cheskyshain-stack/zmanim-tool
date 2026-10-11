@@ -23,6 +23,7 @@ import { hebrewDateExtended, hasParsha, hasYomTov, chanukahYearFor } from '../he
 import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { wireCopyButton } from './copy.js';
+import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-text.js';
@@ -717,6 +718,10 @@ const TX_KIND_NAMES = {
 
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
+  return keepPosition(container, () => drawTexts(container, state, settings, tables));
+}
+
+function drawTexts(container, state, settings, tables) {
   const messages = [];
   const now = new Date();
   const today = shulNow(now, settings).serial;

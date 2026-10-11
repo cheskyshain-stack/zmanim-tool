@@ -14,7 +14,7 @@ class UITestDate extends UITestNativeDate {
   static now() { return uiNow; }
 }
 const context = vm.createContext({ Intl, Date: UITestDate, URL, URLSearchParams, Map, Set });
-vm.runInContext(source.replace('export function renderTraffic', 'function renderTraffic') + `
+vm.runInContext(source.replace(/^import .*;\n/gm, '').replace('export function renderTraffic', 'function renderTraffic') + `
 globalThis.trafficTest = {
   today: trafficToday, dates: trafficDates, validate: trafficValidateRange,
   referrer: trafficReferrer, dailyRows: trafficDailyRows, summary: trafficSummary,

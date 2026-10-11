@@ -454,6 +454,12 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
    double it up in Settings, where the sections are panels inside the form. */
 .form-grid > .panel { margin-bottom: 0; }
 /* Backup sits in its own form; keep it clear of the Save button above it. */
+/* Restoring a panel after a redraw must not replay the height animation and clamp
+   the page to a shorter intermediate height. Normal disclosure clicks still animate. */
+.is-restoring-position details::details-content,
+.is-restoring-position::details-content { transition: none !important; }
+.is-restoring-position .panel-body { transition: none !important; }
+
 #settings-backup { margin-top: 1rem; }
 .panel-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 /* The Rules screen is rendered whole inside a Settings panel, and it brings its own
