@@ -43,7 +43,7 @@ export function buildBehabShacharisPoster(year, month, settings) {
   if (!days.length) return null;
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
-    subtitle: 'שחרית',
+    subtitle: 'שחרית', showDates: true,
     span: { from: days[0], to: days.at(-1) }, days,
     rows: shacharisRoomRows(specialShacharisLines().flat()),
   };
