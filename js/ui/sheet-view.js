@@ -27,6 +27,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { chartReferenceDates } from '../zmanim/references.js';
+import { balanceChartTimeLists } from './time-lines.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -574,6 +575,7 @@ function atPaperSize(pagesEl, measure) {
  *  Rows share that height, with a taller header only where its content needs it. */
 function syncHeaderRowHeight(pagesEl) {
   atPaperSize(pagesEl, pages => {
+    balanceChartTimeLists(pagesEl);
     const layouts = pages.map(page => {
       const header = page.querySelector('.page-header');
       const footer = page.querySelector('.page-footer');
@@ -820,7 +822,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const overridden = overriddenKeys.has(c.key);
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
-          const html = overridden ? value : nl2br(value);
+          const html = overridden ? value : timeListCell(value, c.header);
           return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -832,7 +834,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // column - a hand-typed override, week.specialParsha, anything that reads row.I
         // directly - still sees the plain untagged time.
         const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
-        const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
+        const html = overriddenKeys.has(c.key) ? computedValue : timeListCell(computedValue, c.header);
         return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
@@ -1022,6 +1024,19 @@ function headerHtml(c) {
 // <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
+/** Minyan lists share one measured split. Named zmanim and manually arranged cells
+ *  keep their own lines, including a candle-lighting time above its sunset. */
+function timeListCell(value, header) {
+  if (!/מנחה|מעריב/.test(header)) return nl2br(value);
+  const items = String(value).split(/\s*[\n/]\s*/);
+  const tagLabels = new RegExp(`[${NEW_TAG_MID}${CHANUKAH_TAG_MID}][^${NEW_TAG_END}${CHANUKAH_TAG_END}]*[${NEW_TAG_END}${CHANUKAH_TAG_END}]`, 'g');
+  const timeOnly = item => /^\d{1,2}:\d{2}(?::\d{2})?\*{0,3}$/.test(item.replace(tagLabels, '')
+    .replace(/[\uE000-\uF8FF\u2066-\u2069]/g, '').trim());
+  if (items.length < 2 || !items.every(timeOnly)) return nl2br(value);
+  return '<span class="chart-time-list"><span class="chart-time-line">'
+    + items.map(item => `<span class="chart-time-item">${nl2br(item)}</span>`).join('') + '</span></span>';
+}
+
 function nl2br(str) {
   // Keep the three Tisha B'Av labels and times aligned in two shared columns.
   const evening = String(str).match(/^דרשה (\d{1,2}:\d{2})\nזמן 72 (\d{1,2}:\d{2})\nמעריב (\d{1,2}:\d{2})$/);

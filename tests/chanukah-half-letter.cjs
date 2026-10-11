@@ -87,6 +87,13 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert(texts.every(text => text === texts[0]), 'Copies retain identical schedules and notes');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone preview fits');
       await page.emulateMedia({ media: 'print' });
+      const lineWidths = await page.locator('.poster.is-halfpage .onepage-times').evaluateAll(rows => rows.map(row =>
+        [...row.querySelectorAll('.onepage-line')].map(line => {
+          const times = [...line.querySelectorAll('.onepage-t')];
+          return times.length ? times.at(-1).getBoundingClientRect().right - times[0].getBoundingClientRect().left : 0;
+        })));
+      assert(lineWidths.every(widths => widths.every((width, i) => i === 0 || width >= widths[i - 1] - 1.5)),
+        'Wider time lines print below shorter ones');
       const boxes = await page.locator('.poster.is-halfpage').evaluateAll(sheets => sheets.map(sheet => {
         const rect = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scroll: sheet.scrollHeight,
