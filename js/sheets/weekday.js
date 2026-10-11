@@ -553,9 +553,10 @@ export function buildWeekdayRow(week, settings) {
   const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
   const printOverrides = {
     ...(maariv.printText != null ? { B: maariv.printText } : {}),
+    // The Sunday tag adds width: keep its time and 1:00 above the four remaining times.
     ...(sundayMincha ? { C: splitLinesInHalf([
       chanukahTag(sundayMincha.text(), 'חנוכה יום א׳'), ...mincha.times.map(time => time.text()),
-    ]) } : {}),
+    ], undefined, 2) } : {}),
   };
   return {
     B: maariv.text,

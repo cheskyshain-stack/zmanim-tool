@@ -149,7 +149,9 @@ in five-minute steps until it is strictly after that Sunday's exact Mincha Gedol
 Lechumra, without rounding the limit down. Share this rule between the poster,
 weekday chart's Sunday-only note, daily schedule, next minyan, API, and weekly text.
 On the seasonal weekday chart, show the extra time inline with the other Mincha
-times, using the compact **חנוכה יום א׳** tag.
+times, using the compact **חנוכה יום א׳** tag. Balance this cell with the tagged time
+and 1:00 on the first line, followed by 1:15 / 1:35 / 1:50 / 4:15 below. Keep the
+original line breaks in other chart cells and poster lists.
 Label the extra time Sunday only on both full-page and half-page Chanukah posters.
 If Chanukah includes two Sundays with different extra times, label each with its
 Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.
