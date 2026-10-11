@@ -42,6 +42,8 @@ import { fontStackFor } from './sheet-view.js';
 import { hebrewLang, DAY_NAMES, SLASH, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
+import { attachZmanimReference } from './zmanim-references.js';
+import { posterReferenceDates } from '../zmanim/references.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -3085,6 +3087,11 @@ export function renderPosters(container, state, routeChanged, tables) {
     <div id="poster-own"></div>` : ''}`;
 
   const again = () => redrawInPlace(container, state);
+  const registerReferences = value => attachZmanimReference(container.querySelector('#poster-sheet'), {
+    title: poster.covers(year), days: posterReferenceDates(value), settings,
+    groups: handout || poster.key === 'slichos' || poster.key.startsWith('vasikin') ? ['shacharis'] : undefined,
+  });
+  if (built) registerReferences(built);
   // A year either side, and no further: the buttons at the ends are disabled rather than
   // wrapping round, so holding one down cannot walk off the list.
   const step = (by) => {
@@ -3222,6 +3229,7 @@ export function renderPosters(container, state, routeChanged, tables) {
       const src = poster.sources(state, settings).find((s) => s.year === year);
       const now = src ? src.build().poster : null;
       holder.innerHTML = now ? poster.render(now, settings) : '';
+      registerReferences(now);
       const what = container.querySelector('.poster-when-what');
       if (what && now) {
         what.textContent = poster.covers(year);

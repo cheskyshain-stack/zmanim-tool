@@ -188,6 +188,53 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 .time-explain-bar button[aria-pressed="true"] { background:#f0dfb3; color:#15283f; border-color:#f0dfb3; }
 .time-explain-bar span { color:#d4dce5; font-size:.72rem; line-height:1.45; }
 .time-explain-kind { font-weight:700; color:#17344d; margin:.6rem 0; }
+.zmanim-reference-bar button:disabled { opacity: .5; }
+.zmanim-reference-panel {
+  box-sizing: border-box; width: min(100%, 68rem); margin: 0 0 1.25rem;
+  padding: 1rem; border: 1px solid #d9dee5; border-top: 3px solid #ab914f;
+  border-radius: 12px; background: #fff; color: #17344d; direction: ltr;
+  box-shadow: 0 4px 18px rgba(20, 40, 60, .07);
+}
+.zmanim-reference-panel[hidden] { display: none; }
+.zmanim-reference-panel button, .zmanim-reference-panel select {
+  box-sizing: border-box; padding: .5rem .65rem; min-height: 38px;
+  font: inherit; color: #17344d; background: #fff; border: 1px solid #cfd7df; border-radius: 7px;
+}
+.zmanim-reference-panel button { cursor: pointer; }
+.zmanim-reference-panel button:disabled { cursor: default; color: #a6afb8; background: #f5f6f8; }
+.zmanim-reference-panel :is(button, select):focus-visible { outline: 2px solid #ab914f; outline-offset: 2px; }
+.zmanim-reference-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.zmanim-reference-heading h3 { margin: 0; font-size: 1.1rem; }
+.zmanim-reference-heading button { margin: 0; }
+.zmanim-reference-schedule { margin: .5rem 0; font-size: .88rem; }
+.zmanim-reference-context { display: block; margin-top: .65rem; font-size: .8rem; }
+.zmanim-reference-context select { display: block; width: 100%; min-width: 0; margin-top: .2rem; }
+.zmanim-reference-date-control { display: flex; align-items: end; gap: .5rem; margin-top: .65rem; }
+.zmanim-reference-date-control label { flex: 1; min-width: 0; font-size: .8rem; }
+.zmanim-reference-date-control select { display: block; box-sizing: border-box; width: 100%; min-width: 0; margin-top: .2rem; }
+.zmanim-reference-date-control button { flex: none; margin: 0; min-height: 42px; width: 42px; }
+.zmanim-reference-hebrew { margin-top: .35rem; text-align: center; font: 400 1.05rem/1.4 "David Libre", serif; }
+.zmanim-reference-groups { display: flex; flex-wrap: wrap; gap: .35rem; margin: .7rem 0; }
+.zmanim-reference-groups button { flex: 1; margin: 0; padding: .45rem .65rem; white-space: nowrap; font-size: .85rem; }
+.zmanim-reference-groups button[aria-pressed="true"] { color: #fff; background: #17344d; border-color: #17344d; }
+.zmanim-reference-groups > button:only-child { flex: 0 1 auto; min-width: 7rem; }
+.zmanim-reference-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+.zmanim-reference-values > div { min-width: 0; padding: .65rem; background: #f6f7f9; border-radius: 7px; }
+.zmanim-reference-values dt { font: 700 1rem/1.4 "David Libre", serif; text-align: left; }
+.zmanim-reference-values dd { margin: .2rem 0 0; font-size: 1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.zmanim-reference-values small { display: block; margin-top: .25rem; font-size: .7rem; line-height: 1.4; color: #63707c; }
+.zmanim-reference-note { margin: .65rem 0 0; font-size: .75rem; line-height: 1.4; color: #63707c; }
+.zmanim-reference-more { margin-top: .6rem; }
+.zmanim-reference-more summary { width: fit-content; cursor: pointer; font-size: .8rem; padding: .25rem 0; }
+.zmanim-reference-more[open] summary { margin-bottom: .35rem; }
+@media screen and (min-width: 901px) {
+  .zmanim-reference-panel { position: sticky; top: .5rem; z-index: 4; max-height: calc(100vh - 1rem); overflow-y: auto; }
+}
+@media screen and (max-width: 900px) {
+  .sidebar-foot:has(.zmanim-reference-bar) { flex-direction: column; align-items: stretch; }
+  .zmanim-reference-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .zmanim-reference-values dd { font-size: .86rem; }
+}
 @media screen {
   .time-explain-target { cursor:help !important; }
   .time-explain-target:hover { outline:1px dotted #a68a44; outline-offset:2px; }

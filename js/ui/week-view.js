@@ -38,6 +38,8 @@ import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheet
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
 import { chartSpreads, CHART_EARLY_DAYS } from './chart-view.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
+import { zmanimReferenceAttrs } from './zmanim-references.js';
+import { chartReferenceDates } from '../zmanim/references.js';
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -1645,7 +1647,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           : ''
       }
     </div>
-    <div class="week-cards">${onOneSheet ? sheetHtml : cardsHtml}</div>
+    <div class="week-cards"${zmanimReferenceAttrs({ title: weekTitle(showing, index, state, settings),
+      days: chartReferenceDates([{ serial: showing }]), settings, weeklyLimit: true })}>${onOneSheet ? sheetHtml : cardsHtml}</div>
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 

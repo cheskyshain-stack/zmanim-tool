@@ -8506,6 +8506,248 @@ function installTimeExplanations(main, host) {
   window.addEventListener('beforeprint', () => { if (dialog.open) dialog.close(); });
 }
 
+// ==== zmanim/references.js ====
+const ZMANIM_REFERENCE_GROUPS = {
+  shacharis: 'Shacharis', mincha: 'Mincha', maariv: 'Maariv', other: 'Other zmanim',
+};
+
+/** Dates actually covered by chart rows, including the weekdays which set the early
+ * Mincha limit. An anchor can be a holiday stand-in rather than a Shabbos. */
+function chartReferenceDates(weeks, weekday = false) {
+  return [...new Set(weeks.flatMap(week => {
+    const sunday = week.serial - (excelWeekday(week.serial) - 1);
+    return Array.from({ length: weekday ? 6 : 7 }, (_, i) => sunday + i);
+  }))].sort((a, b) => a - b);
+}
+
+/** Combined runs retain each schedule's dates; BHB and Rosh Chodesh keep their
+ * explicit days, without turning gaps into additional scheduled mornings. */
+function posterReferenceDates(poster) {
+  if (!poster) return [];
+  const children = poster.sheets || poster.items?.map(item => item.poster);
+  if (children) return [...new Set(children.flatMap(posterReferenceDates))].sort((a, b) => a - b);
+  if (poster.days?.length && poster.days.every(Number.isInteger)) return [...poster.days];
+  const { from, to } = poster.span || {};
+  if (!Number.isInteger(from) || !Number.isInteger(to) || to < from) return [];
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+/** These are references, not new schedule rules. Read the same named functions and
+ * Settings as the chart, retaining fractions until presentation. */
+function zmanimReferences(serial, settings, group, { weeklyLimit = false } = {}) {
+  const date = dateFromSerial(serial), refs = [];
+  const add = (key, label, value, note = '') => refs.push({ key, label, value, note });
+  const elevationNote = settings.elevation ? (settings.useElevation ? 'Elevation included' : 'Elevation excluded') : '';
+  const shkia = Z.sunsetElev(date, settings);
+  const sunsetRefs = () => {
+    add('shkia', 'שקיעה', shkia, elevationNote);
+    const elevated = Z.sunset(date, settings);
+    if (Math.abs(elevated - shkia) > 1e-9) add('shkia-elevation', 'שקיעה (עם גובה)', elevated, 'Elevation always included, as in the Shabbos Mincha formulas');
+  };
+  if (group === 'shacharis') {
+    const netz = Z.sunriseElev(date, settings);
+    add('netz', 'נץ החמה', netz, elevationNote);
+    const elevated = Z.sunrise(date, settings);
+    if (Math.abs(elevated - netz) > 1e-9) add('netz-elevation', 'נץ (עם גובה)', elevated, 'Elevation always included');
+    add('alos-16', 'עלות 16.1°', Z.alos16_1(date, settings));
+    add('alos-72', 'עלות 72', Z.alos72(date, settings));
+    add('misheyakir', 'משיכיר 10.2°', Z.misheyakir10_2(date, settings));
+    add('shma-mga', 'סוף זמן ק״ש מ״א 72', Z.sofZmanShmaMGA72(date, settings));
+    add('shma-gra', 'סוף זמן ק״ש גר״א', Z.sofZmanShmaGRA(date, settings));
+    add('tefila', 'סוף זמן תפילה גר״א', Z.sofZmanTfilaGRA(date, settings));
+  } else if (group === 'mincha') {
+    sunsetRefs();
+    add('chatzos', 'חצות', Z.solarNoon(date, settings), 'Astronomical midday');
+    add('gedola', 'מנחה גדולה גר״א', Z.minchaGedola(date, settings));
+    add('chatzos-30', 'חצות + 30 דקות', Z.minchaGedola30MinAfterChatzos(date, settings));
+    add('gedola-lechumra', 'מנחה גדולה לחומרא', Z.minchaGedolaLechumra(date, settings), 'Later of Gedola and Chatzos + 30');
+    if (weeklyLimit) add('gedola-week', 'מנחה גדולה: גבול שבועי', weekLatestMinchaGedola(serial, settings), 'Latest Sun–Fri, excluding Yom Tov; rounded to the nearest minute');
+    add('gedola-mga', 'מנחה גדולה מ״א 16.1°', Z.minchaGedolaMGA16_1(date, settings));
+    add('plag-gra', 'פלג גר״א', Z.plagHamincha(date, settings));
+    add('plag-mga', 'פלג מ״א (צאת 50)', Z.plagHaminchaCustom(Z.tzais50(date, settings), Z.alos16_1(date, settings)), 'Alos 16.1° to Shkiya + 50 minutes, as on the chart');
+    add('plag-mga-72', 'פלג מ״א 72', Z.plagHaminchaCustom(Z.tzais72(date, settings), Z.alos16_1(date, settings)), 'Alos 16.1° to Shkiya + 72 minutes, as on the chart');
+    add('ketana', 'מנחה קטנה', Z.minchaKetana(date, settings));
+    add('samuch-ketana', 'סמוך למנחה קטנה', Z.samuchLeminchaKetana(date, settings));
+  } else if (group === 'maariv') {
+    sunsetRefs();
+    for (const minutes of [35, 40, 50, 55, 60, 72]) {
+      add('shkia-plus-' + minutes, `שקיעה + ${minutes} דקות`, shkia + minutes / 1440, elevationNote);
+      const elevated = Z.sunset(date, settings);
+      if (Math.abs(elevated - shkia) > 1e-9) add('shkia-elevation-plus-' + minutes, `שקיעה עם גובה + ${minutes}`, elevated + minutes / 1440, 'Elevation always included, as in the Friday Maariv formulas');
+    }
+    add('tzais-8', 'צאת 8.5°', Z.tzaisGeonim8_5(date, settings));
+    add('tzais-16', 'צאת 16.1°', Z.tzais16_1(date, settings));
+  } else if (group === 'other') {
+    sunsetRefs();
+    add('candles', 'הדלקת נרות (לפני עיגול)', shkia - settings.candleLightingMinutes / 1440, `${settings.candleLightingMinutes} minutes before true sunset, before schedule rounding`);
+    const hours = nineHours(date, settings);
+    add('nine-gra', 'ט׳ שעות גר״א', hours.gra);
+    add('nine-mga', 'ט׳ שעות מ״א 72', hours.mga);
+  }
+  const secondary = {
+    shacharis: ['alos-16', 'alos-72', 'misheyakir'],
+    mincha: ['gedola-mga', 'plag-gra', 'plag-mga', 'plag-mga-72', 'ketana', 'samuch-ketana'],
+    maariv: ['shkia-plus-40', 'shkia-plus-55', 'shkia-elevation-plus-40', 'shkia-elevation-plus-55', 'tzais-8', 'tzais-16'],
+  }[group] || [];
+  return refs.map(ref => ({ ...ref, secondary: secondary.includes(ref.key) }));
+}
+
+/** Truncate at hundredths of a second so a reference cannot claim a later minute
+ * has arrived. AM/PM is explicit for comparing a full day's schedule. */
+function referenceClock(value) {
+  if (!Number.isFinite(value)) return 'Unavailable';
+  const hundredths = Math.floor((((value % 1) + 1) % 1) * 8640000 + 1e-5) % 8640000;
+  const hours = Math.floor(hundredths / 360000), minutes = Math.floor(hundredths / 6000) % 60;
+  const seconds = Math.floor(hundredths / 100) % 60, fraction = hundredths % 100;
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(fraction).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
+}
+
+// ==== ui/zmanim-references.js ====
+// Shared renderers register dates only when the admin installs this controller.
+let zmanimReferenceInstalled = false;
+let zmanimReferenceNext = 0;
+const zmanimReferenceContexts = new Map();
+const zmanimReferencePreference = 'zmanim-admin-show-zmanim';
+const referenceDateFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+
+function registerZmanimReference(context) {
+  if (!zmanimReferenceInstalled || !context.days?.length) return null;
+  const id = String(++zmanimReferenceNext);
+  zmanimReferenceContexts.set(id, { ...context, days: [...new Set(context.days)].sort((a, b) => a - b), registeredAt: Date.now() });
+  return id;
+}
+
+function zmanimReferenceAttrs(context) {
+  const id = registerZmanimReference(context);
+  return id ? ` data-zmanim-reference="${id}"` : '';
+}
+
+function attachZmanimReference(element, context) {
+  if (!element) return;
+  const id = registerZmanimReference(context);
+  if (id) element.dataset.zmanimReference = id; else element.removeAttribute('data-zmanim-reference');
+}
+
+const referenceDateLabel = serial => `${DAY_NAMES[excelWeekday(serial) - 1]}, ${referenceDateFormat.format(dateFromSerial(serial))}`;
+const referenceSignature = context => context.title + ':' + context.days.join(',');
+
+function installZmanimReferences(main, host) {
+  zmanimReferenceInstalled = true;
+  let enabled = false, selectedContext = '', selectedDay = null, selectedGroup = 'shacharis', moreOpen = false, queued = false;
+  try { enabled = localStorage.getItem(zmanimReferencePreference) === '1'; } catch { /* The view still works without storage. */ }
+  const bar = document.createElement('div');
+  bar.className = 'time-explain-bar zmanim-reference-bar no-print';
+  bar.innerHTML = '<button type="button" id="show-zmanim-toggle" aria-pressed="false">Show zmanim</button><span>Compare schedule times with the day’s zmanim.</span>';
+  host.appendChild(bar);
+  const toggle = bar.querySelector('button');
+  const panel = document.createElement('section');
+  panel.className = 'zmanim-reference-panel no-print';
+  panel.id = 'zmanim-reference-panel';
+  panel.setAttribute('aria-label', 'Zmanim for schedule comparison');
+  toggle.setAttribute('aria-controls', panel.id);
+
+  const contexts = () => [...main.querySelectorAll('[data-zmanim-reference]')].map(element => ({
+    element, context: zmanimReferenceContexts.get(element.dataset.zmanimReference),
+  })).filter(item => item.context);
+
+  const setEnabled = value => {
+    enabled = value;
+    try { localStorage.setItem(zmanimReferencePreference, enabled ? '1' : '0'); } catch { /* Optional preference. */ }
+    refresh();
+  };
+  const refresh = () => {
+    const available = contexts();
+    toggle.disabled = !available.length;
+    toggle.setAttribute('aria-pressed', String(enabled));
+    panel.hidden = !enabled || !available.length;
+    if (!enabled || !available.length) return;
+    const source = available[0].element;
+    const anchor = source.closest('.pages-fit') || source.closest('#poster-sheet,#pages,.week-cards') || source;
+    if (panel.nextElementSibling !== anchor) anchor.before(panel);
+    const active = available.find(item => referenceSignature(item.context) === selectedContext) || available[0];
+    const context = active.context;
+    selectedContext = referenceSignature(context);
+    if (!context.days.includes(selectedDay)) {
+      const today = shulNow(new Date(), context.settings).serial;
+      selectedDay = context.days.reduce((best, day) => Math.abs(day - today) < Math.abs(best - today) ? day : best);
+    }
+    const groups = context.groups || Object.keys(ZMANIM_REFERENCE_GROUPS);
+    if (!groups.includes(selectedGroup)) selectedGroup = groups[0];
+    const at = context.days.indexOf(selectedDay);
+    const refs = zmanimReferences(selectedDay, context.settings, selectedGroup, context);
+    const focused = panel.contains(document.activeElement) ? document.activeElement : null;
+    const focusSelector = focused?.id ? `#${focused.id}` : focused?.dataset.referenceGroup
+      ? `[data-reference-group="${focused.dataset.referenceGroup}"]` : null;
+    const valuesHtml = values => `<dl class="zmanim-reference-values">${values.map(ref => `<div data-reference-key="${ref.key}"><dt lang="he" dir="rtl">${escAttr(ref.label)}</dt>
+      <dd><bdi dir="ltr">${referenceClock(ref.value)}</bdi></dd>${ref.note ? `<small>${escAttr(ref.note)}</small>` : ''}</div>`).join('')}</dl>`;
+    panel.innerHTML = `<div class="zmanim-reference-heading"><h3>Compare zmanim</h3><button type="button" class="zmanim-reference-hide">Hide</button></div>
+      ${available.length > 1 ? `<label class="zmanim-reference-context">Schedule<select id="zmanim-reference-context">${available.map((item, i) =>
+        `<option value="${i}" ${item === active ? 'selected' : ''}>${escAttr(item.context.title)}</option>`).join('')}</select></label>` :
+        `<div class="zmanim-reference-schedule">${escAttr(context.title)}</div>`}
+      <div class="zmanim-reference-date-control"><button type="button" id="zmanim-reference-prev" aria-label="Previous date" ${at === 0 ? 'disabled' : ''}>←</button>
+        <label>Date<select id="zmanim-reference-date">${context.days.map(day => `<option value="${day}" ${day === selectedDay ? 'selected' : ''}>${escAttr(referenceDateLabel(day))}</option>`).join('')}</select></label>
+        <button type="button" id="zmanim-reference-next" aria-label="Next date" ${at === context.days.length - 1 ? 'disabled' : ''}>→</button></div>
+      <div class="zmanim-reference-hebrew" dir="rtl" lang="he">${escAttr(jewishDateString(selectedDay, false, context.settings.useGregorianBefore1582))}</div>
+      <div class="zmanim-reference-groups" aria-label="Choose zmanim to compare">${groups.map(group => `<button type="button" data-reference-group="${group}" aria-pressed="${group === selectedGroup}">${ZMANIM_REFERENCE_GROUPS[group]}</button>`).join('')}</div>
+      ${valuesHtml(refs.filter(ref => !ref.secondary))}
+      ${refs.some(ref => ref.secondary) ? `<details class="zmanim-reference-more" ${moreOpen ? 'open' : ''}><summary>More ${ZMANIM_REFERENCE_GROUPS[selectedGroup]} zmanim</summary>${valuesHtml(refs.filter(ref => ref.secondary))}</details>` : ''}
+      <p class="zmanim-reference-note">Exact zmanim before minute rounding, using this schedule’s location and calculation settings. ${context.weeklyLimit && selectedGroup === 'mincha' ? 'The weekly limit keeps the chart’s own rounding.' : ''}</p>`;
+    useStraightHebrewQuotes(panel);
+    panel.querySelector('.zmanim-reference-hide').onclick = () => setEnabled(false);
+    panel.querySelector('#zmanim-reference-context')?.addEventListener('change', event => {
+      selectedContext = referenceSignature(available[Number(event.target.value)].context); refresh();
+    });
+    panel.querySelector('#zmanim-reference-date').onchange = event => { selectedDay = Number(event.target.value); refresh(); };
+    panel.querySelector('#zmanim-reference-prev').onclick = () => { selectedDay = context.days[at - 1]; refresh(); };
+    panel.querySelector('#zmanim-reference-next').onclick = () => { selectedDay = context.days[at + 1]; refresh(); };
+    panel.querySelectorAll('[data-reference-group]').forEach(button => {
+      button.onclick = () => { selectedGroup = button.dataset.referenceGroup; moreOpen = false; refresh(); };
+    });
+    const more = panel.querySelector('.zmanim-reference-more');
+    if (more) more.ontoggle = () => { if (main.contains(more)) moreOpen = more.open; };
+    if (focusSelector) {
+      const control = panel.querySelector(focusSelector);
+      (control?.disabled ? panel.querySelector('#zmanim-reference-date') : control)?.focus({ preventScroll: true });
+    }
+    if (zmanimReferenceContexts.size > 500) {
+      const live = new Set(available.map(item => item.element.dataset.zmanimReference));
+      for (const [id, entry] of zmanimReferenceContexts) if (!live.has(id) && Date.now() - entry.registeredAt > 60000) zmanimReferenceContexts.delete(id);
+    }
+  };
+  toggle.onclick = () => setEnabled(!enabled);
+  new MutationObserver(records => {
+    if (queued || records.every(record => panel.contains(record.target))) return;
+    queued = true;
+    queueMicrotask(() => { queued = false; refresh(); });
+  }).observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-zmanim-reference'] });
+
+  // Clicking a seasonal cell picks its own date and tefillah without changing its
+  // value. Explain times retains its existing capture-phase click behavior.
+  main.addEventListener('click', event => {
+    if (!enabled) return;
+    const cell = event.target.closest('.cell[data-serial][data-season]');
+    const source = cell?.closest('[data-zmanim-reference]');
+    const context = source && zmanimReferenceContexts.get(source.dataset.zmanimReference);
+    if (!context) return;
+    const season = cell.dataset.season, key = cell.dataset.col;
+    const fridayKeys = season === 'kayitz' ? ['F', 'G', 'H', 'I', 'J', 'K', 'L'] : ['F', 'G', 'H', 'I'];
+    selectedContext = referenceSignature(context);
+    if (season !== 'weekday') selectedDay = Number(cell.dataset.serial) - (fridayKeys.includes(key) ? 1 : 0);
+    else {
+      const anchor = Number(cell.dataset.serial), sunday = anchor - (excelWeekday(anchor) - 1);
+      const days = context.days.filter(day => day >= sunday && day < sunday + 6);
+      if (!days.includes(selectedDay) && days.length) {
+        const today = shulNow(new Date(), context.settings).serial;
+        selectedDay = days.reduce((best, day) => Math.abs(day - today) < Math.abs(best - today) ? day : best);
+      }
+    }
+    selectedGroup = ['D', 'E'].includes(key) ? 'shacharis' : ['B', 'F'].includes(key) ? 'maariv' : key === 'H' ? 'other' : 'mincha';
+    moreOpen = selectedGroup === 'mincha' && (season === 'kayitz' ? ['I', 'J', 'K'].includes(key) : season === 'choref' && key === 'G');
+    refresh();
+  });
+  refresh();
+}
+
 // ==== ui/sheet-view.js ====
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -8625,6 +8867,8 @@ function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, sp
     fillChartLocationLegend(el);
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
+    attachZmanimReference(el, { title: `${sheetLabel(sheet)} · Page ${i + 1}`,
+      days: chartReferenceDates(pw, sheet.season === 'weekday'), settings, weeklyLimit: true });
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
     return el;
   });
@@ -14270,6 +14514,8 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
 
 
 
+
+
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
  *  change when somebody picks a different font for the board. fontStackFor() adds the
@@ -17312,6 +17558,11 @@ function renderPosters(container, state, routeChanged, tables) {
     <div id="poster-own"></div>` : ''}`;
 
   const again = () => redrawInPlace(container, state);
+  const registerReferences = value => attachZmanimReference(container.querySelector('#poster-sheet'), {
+    title: poster.covers(year), days: posterReferenceDates(value), settings,
+    groups: handout || poster.key === 'slichos' || poster.key.startsWith('vasikin') ? ['shacharis'] : undefined,
+  });
+  if (built) registerReferences(built);
   // A year either side, and no further: the buttons at the ends are disabled rather than
   // wrapping round, so holding one down cannot walk off the list.
   const step = (by) => {
@@ -17449,6 +17700,7 @@ function renderPosters(container, state, routeChanged, tables) {
       const src = poster.sources(state, settings).find((s) => s.year === year);
       const now = src ? src.build().poster : null;
       holder.innerHTML = now ? poster.render(now, settings) : '';
+      registerReferences(now);
       const what = container.querySelector('.poster-when-what');
       if (what && now) {
         what.textContent = poster.covers(year);
@@ -19564,6 +19816,8 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
 
 
 
+
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -21170,7 +21424,8 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
           : ''
       }
     </div>
-    <div class="week-cards">${onOneSheet ? sheetHtml : cardsHtml}</div>
+    <div class="week-cards"${zmanimReferenceAttrs({ title: weekTitle(showing, index, state, settings),
+      days: chartReferenceDates([{ serial: showing }]), settings, weeklyLimit: true })}>${onOneSheet ? sheetHtml : cardsHtml}</div>
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 
@@ -22180,6 +22435,7 @@ document.addEventListener(
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
+installZmanimReferences(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
 const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
