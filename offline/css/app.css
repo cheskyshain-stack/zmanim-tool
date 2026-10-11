@@ -5614,6 +5614,8 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-give-open { padding:0 17px 17px; background:#fff; border-top:0; }
  .is-give .luach-give-open:has(> .luach-daf-providers) { padding:18px 17px 22px; border-top:1px solid rgba(184,143,58,.42); }
  .is-give .luach-give-how { font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
+ .is-give .luach-copy { margin-top:12px; font:400 13px/1.45 Arial,sans-serif; }
+ .is-give .luach-copy .luach-copy-btn { min-height:44px; padding:0 10px; background:#fff; border:1px solid #e5e2da; border-radius:7px; font:400 12px Arial,sans-serif; }
  .is-give .luach-daf-providers { gap:10px; margin:18px 0 0; }
  .is-give .luach-daf-provider img { max-width:100%; }
  .is-give .luach-daf-provider img[alt="The Donors Fund"] { width:128px; }
@@ -5629,7 +5631,6 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-give-legal p { margin:0; }
  .is-give .luach-give-legal .luach-give-ein { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:8px 0; }
  .luach-give-ein bdi { font-weight:700; }
- .luach-give-ein .luach-copy-btn { margin-left:0; min-height:32px; padding:0 10px; background:#fff; border:1px solid #e5e2da; border-radius:7px; font:400 11px Arial,sans-serif; }
  .is-give .luach-site-footer { margin-top:24px; }
 }
 @media screen and (max-width:34rem) {

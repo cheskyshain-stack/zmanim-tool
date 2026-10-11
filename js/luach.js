@@ -409,7 +409,8 @@ const DONATE = {
          alt text below is what a tile shows when any of them does not arrive. Each url is
          the provider's own sign-in, since a donor here already has an account to spend. */
       providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: `Choose your DAF provider and search using EIN ${SHUL_TAX_ID}.`,
+      how: 'Choose your DAF provider and search using the EIN below.',
+      copy: { label: 'EIN', value: SHUL_TAX_ID, buttonLabel: 'Copy EIN' },
       taxId: SHUL_TAX_ID,
     },
   ],
@@ -971,7 +972,7 @@ function donateWayHtml(way) {
         ? `<p class="luach-copy">
             ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}:</span>` : ''}
             <span class="luach-copy-value">${escAttr(way.copy.value)}</span>
-            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}">Copy</button>` : ''}
+            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}">${escAttr(way.copy.buttonLabel || 'Copy')}</button>` : ''}
           </p>`
         : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
     : '';
@@ -1165,7 +1166,7 @@ function renderDonatePage(published) {
       ${DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value).map(donateWayHtml).join('')}
       <div class="luach-give-legal">
         <p>${escAttr(DONATE.legal)}</p>
-        <p class="luach-give-ein"><span>EIN: <bdi>${SHUL_TAX_ID}</bdi></span><button type="button" class="luach-copy-btn" data-copy="${SHUL_TAX_ID}">Copy EIN</button></p>
+        <p class="luach-give-ein"><span>EIN: <bdi>${SHUL_TAX_ID}</bdi></span></p>
         <p>${escAttr(DONATE.deductible)}</p>
       </div>
       ${siteFooterHtml(s)}
