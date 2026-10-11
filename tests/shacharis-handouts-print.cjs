@@ -76,18 +76,26 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert(await page.locator('.shacharis-handout-run').evaluateAll(rows => rows.every(row =>
         getComputedStyle(row).backgroundColor === 'rgba(0, 0, 0, 0)')), 'Every morning row has the same plain background');
       assert.equal(await page.locator('.poster.is-shacharis u').count(), 0, 'Rooms replace location underlines');
+      const footers = await page.locator('.poster.is-shacharis .poster-legend').allTextContents();
+      assert.equal(footers.length, copies, 'Every copy includes the standard compact footer');
+      assert(footers.every(text => text === 'All zmanim are rounded off. Please be מחמיר two minutes.'),
+        'Morning handouts include the rounding reminder without unused location keys');
       const texts = await page.locator('.poster.is-shacharis').allTextContents();
       assert(texts.every(text => text === texts[0] && !text.includes('*') && !/מנחה|מעריב/.test(text)), 'Only morning times, without location stars');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone preview fits');
       await page.emulateMedia({ media: 'print' });
       const boxes = await page.locator('.poster.is-shacharis').evaluateAll(sheets => sheets.map(sheet => {
         const r = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
-        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-date,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note')]
+        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-date,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note,.poster-legend')]
           .map(el => el.getBoundingClientRect());
+        const footer = sheet.querySelector('.poster-legend'), footerBox = footer.getBoundingClientRect();
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
             && c.y >= r.y + parseFloat(cs.paddingTop) - 1 && c.bottom <= r.bottom - parseFloat(cs.paddingBottom) + 1),
           overflow: sheet.scrollHeight > sheet.clientHeight || sheet.scrollWidth > sheet.clientWidth,
+          footerAtBottom: Math.abs(footerBox.bottom - (r.bottom - parseFloat(cs.paddingBottom))) <= 1,
+          footerClear: sheet.querySelector('.halfpage-body').getBoundingClientRect().bottom <= footerBox.top - 6,
+          footerRule: parseFloat(getComputedStyle(footer).borderTopWidth) > 0,
           datesFit: [...sheet.querySelectorAll('.shacharis-handout-date > div')]
             .every(label => label.scrollWidth <= label.clientWidth + 1),
           typeSize: parseFloat(getComputedStyle(sheet.querySelector('.shacharis-handout-run')).fontSize),
@@ -98,6 +106,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       for (const [i, box] of boxes.entries()) {
         assert.deepEqual([box.x, box.y, box.width, box.height], [i * 528, 0, 528, 816], 'Each copy is a real half Letter sheet');
         assert(box.inside && !box.overflow, 'Letterhead, rooms, times and note fit inside the print margins: ' + JSON.stringify(box));
+        assert(box.footerAtBottom && box.footerClear && box.footerRule, 'Ruled footer sits at the bottom, clear of the schedule: ' + JSON.stringify(box));
         assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
