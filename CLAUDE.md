@@ -257,6 +257,26 @@ the arithmetic, while times printed with seconds retain that precision.
 The separate Calculation guide was removed. Old `#calc` bookmarks open Seasonal charts;
 calculation details come from clicking a time with Explain times enabled.
 
+Admin also has a remembered **Show zmanim** switch for comparing every seasonal page,
+saved print layout, weekly schedule and special poster with the actual day's zmanim.
+Shared renderers register their own covered dates only after the admin installs
+`ui/zmanim-references.js`; public renderers emit no comparison metadata or controls.
+The screen-only panel sits immediately before the charts, outside all scaled or
+printed pages, and stays visible while scrolling on desktop. It selects the schedule,
+date and Shacharis/Mincha/Maariv group, with additional references under More zmanim.
+BHB exposes only its three mornings. Weekday chart rows include Sunday through Friday;
+Shabbos pages also include the weekdays which determine early Mincha. Clicking a chart
+cell chooses its tefillah and the correct Friday, Shabbos or weekday-row date.
+Read raw times from the same named solar functions and settings as the schedules,
+including the chart's actual MGA Plag reckonings, and show seconds before minute
+rounding. Distinguish the always-elevated sunrise/sunset where they differ from the
+zmanim elevation setting. The weekly Mincha Gedola limit uses the chart's shared rule
+and explicitly retains its nearest-minute rounding. This is a comparison tool, never
+a change to a schedule or to how any zman is rounded. `tests/zmanim-references.mjs`
+checks dates, reckonings and rounding boundaries; `tests/zmanim-references.cjs` checks
+all chart families, cell/date navigation, mobile widths, saved choices and unchanged
+actual PDF text, sizes and rows with the option on or off.
+
 Admin print layouts have a **Spring clock change** switch on winter charts (also when
 opening their Weekday companion). **Separate headers** gives weeks before spring DST
 their own winter columns and puts the summer header below them on the same page. The

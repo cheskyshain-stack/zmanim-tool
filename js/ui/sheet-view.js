@@ -25,6 +25,8 @@ import {
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
+import { attachZmanimReference } from './zmanim-references.js';
+import { chartReferenceDates } from '../zmanim/references.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -144,6 +146,8 @@ export function buildSheetPages(sheet, state, { readOnly = false, showMolad = fa
     fillChartLocationLegend(el);
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
+    attachZmanimReference(el, { title: `${sheetLabel(sheet)} · Page ${i + 1}`,
+      days: chartReferenceDates(pw, sheet.season === 'weekday'), settings, weeklyLimit: true });
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
     return el;
   });

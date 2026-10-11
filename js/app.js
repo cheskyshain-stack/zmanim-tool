@@ -16,6 +16,7 @@ import { renderAdminHome, ADMIN_NAV_SECTIONS, ADMIN_TAB_LABELS } from './ui/admi
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
 import { installTimeExplanations } from './ui/time-explanations.js';
+import { installZmanimReferences } from './ui/zmanim-references.js';
 
 const state = loadState();
 let tables = null;
@@ -54,6 +55,7 @@ document.addEventListener(
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
+installZmanimReferences(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
 const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
