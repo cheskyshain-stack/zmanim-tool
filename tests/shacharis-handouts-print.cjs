@@ -124,7 +124,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           const { loadState } = await import('/js/storage.js');
           const { resolveSettings } = await import('/js/settings.js');
           const { dateFromSerial } = await import('/js/zmanim/solar.js');
-          return buildBehabShacharisPoster(year, month, resolveSettings(loadState().settings)).days
+          const { loadTables } = await import('/js/data-loader.js');
+          return buildBehabShacharisPoster(year, month, resolveSettings(loadState().settings), await loadTables()).days
             .map(serial => dateFromSerial(serial).toISOString().slice(0, 10));
         }, { year, month: choiceIndex === 1 ? 8 : 2 });
         assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date')
@@ -151,7 +152,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await settle();
       assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0,
         'A standalone half-page poster does not offer unrelated layouts');
-      const note = choiceIndex === 0 || (choiceIndex === 1 && year !== 5785) ? 'סליחות קודם שחרית' : null;
+      const note = choiceIndex === 0 ? 'סליחות קודם שחרית'
+        : choiceIndex === 1 && year !== 5785 ? 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך, יום ב׳ וירא)' : null;
       assert.deepEqual(await page.locator('.shacharis-handout-note').allTextContents(), note ? Array(copies).fill(note) : [],
         'Only the years and rounds with sunrise after 7:05 print the Selichos note');
       if (note) assert.equal(await page.locator('.shacharis-handout-row').filter({ has: page.locator('.shacharis-handout-note') })
@@ -163,8 +165,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         fs.writeFileSync(path.join(output, choiceIndex + '-one.pdf'), result.pdf);
       }
     }
-    for (const [year, note] of [[5786, 'סליחות קודם שחרית (ה׳ חשון, ח׳ חשון)'],
-      [5793, 'סליחות קודם שחרית (ט׳ חשון, י"ג חשון)']]) {
+    for (const [year, note] of [[5786, 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך)'],
+      [5793, 'סליחות קודם שחרית (יום ה׳ לך לך, יום ב׳ וירא)']]) {
       await page.locator('#poster-group').selectOption(choices[1]);
       await chooseYear(year);
       for (const copies of [1, 2]) for (const margin of ['0.35', '0.75']) {

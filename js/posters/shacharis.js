@@ -1,4 +1,4 @@
-import { dateFromHebrew, hasBehab, roshHashana, excelWeekday, jewishDateString, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
+import { dateFromHebrew, hasBehab, hasParsha, roshHashana, excelWeekday, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import { sunriseElev } from '../zmanim/zmanim.js';
 import { buildAsaraBTevesPoster, asaraSelichosFirst, ASARA_TEXT } from './asarabteves.js';
@@ -40,16 +40,22 @@ export function behabShacharisDates(year, month, settings) {
   return Array.from({ length: 17 }, (_, i) => first + i).filter(serial => hasBehab(serial, settings));
 }
 
-export function buildBehabShacharisPoster(year, month, settings) {
+export function buildBehabShacharisPoster(year, month, settings, tables) {
   const days = behabShacharisDates(year, month, settings);
   if (!days.length) return null;
   const rows = shacharisRoomRows(specialShacharisLines().flat());
   const selichosDays = days.filter(serial => asaraSelichosFirst(sunriseElev(dateFromSerial(serial), settings)));
   if (selichosDays.length) {
     // A round can cross daylight saving time or the 7:05 sunrise threshold.
-    const dates = selichosDays.length === days.length ? '' : ` (${selichosDays
-      .map(serial => jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]).join(', ')})`;
-    rows.find(row => row.text === '6:40').timeNote = ASARA_TEXT.selichosFirst + dates;
+    const weeks = new Map();
+    for (const serial of selichosDays) {
+      const shabbos = serial + 7 - excelWeekday(serial);
+      if (!weeks.has(shabbos)) weeks.set(shabbos, []);
+      weeks.get(shabbos).push(['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)] + '׳');
+    }
+    const labels = [...weeks].map(([shabbos, weekdays]) =>
+      `יום ${weekdays.join(' ו')} ${hasParsha(shabbos, { ...settings, english: false }, tables)}`);
+    rows.find(row => row.text === '6:40').timeNote = `${ASARA_TEXT.selichosFirst} (${labels.join(', ')})`;
   }
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
