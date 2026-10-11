@@ -249,8 +249,10 @@ Print only `שחרית` in their section bar, without a month name. These always
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each
 room beside its time instead of printing location marks or a location key. Include the
-standard compact rounding reminder under a bottom rule on every morning handout,
-including Rosh Chodesh. Anchor it at the bottom inside each copy's print margin;
+shul name and address from `settings.footerAddress` under a bottom rule on every
+morning handout, including Rosh Chodesh. Put the name above the street address;
+this footer contains the address, without the compact rounding reminder.
+Anchor it at the bottom inside each copy's print margin;
 do not add location keys when the rooms are already written beside the times. Read the
 times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
 beside 6:40 when exact sunrise is later than 7:05, without rounding sunrise first.
