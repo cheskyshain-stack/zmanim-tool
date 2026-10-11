@@ -1884,9 +1884,9 @@ const CHANUKAH_TAG_START = '';
 const CHANUKAH_TAG_MID = '';
 const CHANUKAH_TAG_END = '';
 
-/** Wraps an already-formatted cell value so it renders inside the "חנוכה" tag. */
-function chanukahTag(text) {
-  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + 'חנוכה' + CHANUKAH_TAG_END;
+/** Wraps a cell value with a small label, defaulting to "חנוכה". */
+function chanukahTag(text, label = 'חנוכה') {
+  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + label + CHANUKAH_TAG_END;
 }
 
 // Same PUA mechanism again, for a span that should print smaller than the rest of its cell:
@@ -7858,7 +7858,7 @@ function buildWeekdayRow(week, settings) {
   const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
   const printOverrides = {
     ...(maariv.printText != null ? { B: maariv.printText } : {}),
-    ...(sundayMincha ? { C: `${chanukahTag(sundayMincha.text() + " ביום א' בלבד")}\n${mincha.text}` } : {}),
+    ...(sundayMincha ? { C: `${chanukahTag(sundayMincha.text(), 'יום א׳')}\n${mincha.text}` } : {}),
   };
   return {
     B: maariv.text,
