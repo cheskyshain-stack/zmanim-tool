@@ -17,7 +17,7 @@
 // The afternoon and evening never print a single star at all, so their own old ** already
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
-import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended, chanukahYearFor } from '../hebrew-calendar.js';
+import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended, chanukahYearFor, jewishDateString } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, formatTimeWithSeconds, floorToMinute } from '../format.js';
@@ -101,6 +101,25 @@ export function chanukahWeekdayMincha(referenceSerial, settings) {
   const late = fixedTime('4:15', { label: 'the fixed late מנחה before candle lighting, unchanged across every sampled year' }).underline();
 
   return [oneOclock, earlyMincha, mainMincha, oneFifty, late];
+}
+
+/** Sunday's extra Mincha starts at 12:30 and moves later in five-minute steps until
+ *  it is after that Sunday's exact Mincha Gedola Lechumra, without rounding the limit. */
+export function chanukahSundayOpening(minchaGedola) {
+  const limit = zman('מנחה גדולה לחומרא', minchaGedola, 'on this Sunday of חנוכה');
+  const minutes = Math.max(750, (Math.floor(minchaGedola * 1440 / 5 + 1e-9) + 1) * 5);
+  return clockTime(12, 30, 'the extra Sunday-only מנחה during חנוכה')
+    .laterOf(limit, 'the extra מנחה cannot start before מנחה גדולה לחומרא')
+    .steppedTo(minutes / 1440, {
+      by: 5, backwards: false,
+      until: 'strictly after this Sunday’s exact מנחה גדולה לחומרא',
+      untilAt: formatTimeWithSeconds(minchaGedola),
+    }).underline();
+}
+
+export function chanukahSundayMincha(serial, settings) {
+  if (excelWeekday(serial) !== 1 || !chanukahYearFor(serial, settings)) return null;
+  return chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings));
 }
 
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
@@ -595,20 +614,27 @@ export function buildChanukahPoster(year, settings, tables) {
   }
 
   const weekdayMincha = chanukahWeekdayMincha(days[0]?.serial ?? kislev25, settings);
+  const sundayMincha = [];
   for (const day of days) {
-    if (fridaySerials.has(day.serial) || day.serial === sundayAfterShabbos) continue;
+    if (fridaySerials.has(day.serial)) continue;
+    const extra = chanukahSundayMincha(day.serial, settings);
+    if (extra) {
+      sundayMincha.push({ serial: day.serial, time: extra });
+      M.list(day.serial, CH_TEXT.mincha, [toCell(extra)], AFTERNOON);
+    }
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
   }
-  /* The Sunday that opens the second week, where one falls inside the eight days, prints its
-     own early options on every sampled sheet - but which ones, and how many, is the one piece
-     of this sheet the old sheets disagree with each other about in a way the calendar does not
-     explain (see the two newest, תשפ״ה and תשפ״ו, against the two before them). Rather than
-     invent a rule the shul has not confirmed, this Sunday is given the same weekday מנחה menu
-     as every other day until that is settled - flagged here so it is not mistaken for a
-     verified number the way the rest of this sheet's times are. */
-  if (sundayAfterShabbos != null) {
-    M.list(sundayAfterShabbos, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
+  const sundayGroups = new Map();
+  for (const extra of sundayMincha) {
+    const key = extra.time.plain();
+    if (!sundayGroups.has(key)) sundayGroups.set(key, { time: extra.time, serials: [] });
+    sundayGroups.get(key).serials.push(extra.serial);
   }
+  const sundayMinchaRows = [...sundayGroups.values()].map(({ time, serials }) => ({
+    label: sundayGroups.size === 1 ? "ביום א' בלבד" : serials.map(serial =>
+      `יום א' ${jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]}`).join(' / '),
+    times: [toCell(time)],
+  }));
 
   const maariv = chanukahMaariv(year, settings);
   for (const day of days) {
@@ -630,6 +656,8 @@ export function buildChanukahPoster(year, settings, tables) {
     days,
     shacharisRows: combineShacharisRows(days),
     weekdayMincha,
+    sundayMincha,
+    sundayMinchaRows,
     maariv,
     erevShabbosList,
     erevShabbos: combineErevShabbos(erevShabbosList, settings, tables),

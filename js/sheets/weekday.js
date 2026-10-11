@@ -36,7 +36,7 @@ import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
 import { weekLatestMinchaGedola } from './common.js';
 import { isKayitzWeek } from './weeks.js';
-import { chanukahEarlyMaariv } from '../posters/chanukah.js';
+import { chanukahEarlyMaariv, chanukahSundayMincha } from '../posters/chanukah.js';
 import { formatTime, underlineTime, newMinyanTag, chanukahTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
@@ -550,19 +550,24 @@ export function buildWeekdayRow(week, settings) {
   }
   const maariv = maarivParts(week, settings);
   const mincha = minchaParts(week, settings);
+  const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
+  const printOverrides = {
+    ...(maariv.printText != null ? { B: maariv.printText } : {}),
+    ...(sundayMincha ? { C: `${chanukahTag(sundayMincha.text() + " ביום א' בלבד")}\n${mincha.text}` } : {}),
+  };
   return {
     B: maariv.text,
     C: mincha.text,
     /* The traces from that same pass, for the calculations page. E, the merged שחרית block,
        is not calculated at all: it is the schedule the program carries, printed as written,
        and the page says so rather than pretending there is working to show. */
-    traces: { B: maariv.times, C: mincha.times },
-    notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
+    traces: { B: maariv.times, C: [...(sundayMincha ? [sundayMincha] : []), ...mincha.times] },
+    notes: { B: maariv.note, C: sundayMincha ? "Regular times work for all five weekdays. The extra Chanukah Mincha is Sunday only, checked against that Sunday's exact מנחה גדולה לחומרא." : mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
     /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
        itself, which stays the plain text every other reader - the week card, "what is
        on next", the messages page - reads). See the note on maariv.printText above. */
-    printOverrides: maariv.printText != null ? { B: maariv.printText } : undefined,
+    printOverrides: Object.keys(printOverrides).length ? printOverrides : undefined,
   };
 }
 

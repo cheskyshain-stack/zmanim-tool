@@ -1688,7 +1688,8 @@ function chanukahBody(poster) {
     </div>`;
   const sections = [
     section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('') + netzBlockLines(poster)),
-    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
+    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)
+      + poster.sundayMinchaRows.map(row => chanukahRunLine(row.times, row.label)).join('')),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
@@ -1722,7 +1723,8 @@ function renderHalfChanukahPoster(poster, settings) {
   const sectionsHtml = halfPageSection(morning.title, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
         + (netz.length ? `<div class="halfpage-netz"><strong lang="he">${escAttr(CH_TEXT.netz)}</strong>
           <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
-    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row, label: '' })).join(''))).join('');
+    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row,
+      label: row.label === s.title ? '' : row.label })).join(''))).join('');
   return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml);
 }
 
@@ -2040,7 +2042,7 @@ const ONEPAGE_SECTIONS = {
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
       oneSection(CH_TEXT.shacharis, p.shacharisRows.flatMap((row) => [shacharisRow(row), ...netzRows(row)])),
-      oneLine(CH_TEXT.mincha, p.weekdayMincha.map(toCell)),
+      oneSection(CH_TEXT.mincha, [{ label: CH_TEXT.mincha, times: p.weekdayMincha.map(toCell) }, ...p.sundayMinchaRows]),
       oneLine(CH_TEXT.maariv, p.maariv.map(toCell)),
     ];
     if (p.erevShabbos) sections.push(oneLine(p.erevShabbos.title, p.erevShabbos.cells));
@@ -2770,10 +2772,11 @@ export function fitPoster(container) {
     // to be this way round. The סוכות sheet's type is set here for the same reason.
     fitOnePage(container);
     fitSukkos(container);
+    fitChanukah(container);
     fitHalfPage(container);
   };
   decide();
-  if (container.querySelector('.poster.is-halfpage')) {
+  if (container.querySelector('.poster.is-halfpage,.poster.is-chanukah')) {
     document.fonts.ready.then(() => { if (document.body.contains(all[0])) decide(); });
   }
   // Rotating a phone changes what fits. One listener, replaced each render so it always
@@ -2781,6 +2784,21 @@ export function fitPoster(container) {
   if (fitHandler) window.removeEventListener('resize', fitHandler);
   fitHandler = () => { if (document.body.contains(all[0])) decide(); };
   window.addEventListener('resize', fitHandler);
+}
+
+/** Retain the full-page poster's type while tightening section gaps only when the
+ *  Sunday addition would otherwise push its location notes beyond the print margin. */
+function fitChanukah(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-chanukah')) {
+    const zoom = sheet.style.zoom;
+    sheet.style.zoom = '1';
+    for (let gap = 0.3; gap >= 0.059; gap -= 0.02) {
+      sheet.style.setProperty('--chanukah-set-gap', `${gap}in`);
+      const limit = sheet.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sheet).paddingBottom);
+      if (sheet.querySelector('.poster-legend').getBoundingClientRect().bottom <= limit - 1) break;
+    }
+    sheet.style.zoom = zoom;
+  }
 }
 
 function fitHalfPage(container) {

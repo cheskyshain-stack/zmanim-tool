@@ -144,10 +144,20 @@ Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
 candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
 the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
 
+Every Sunday during Chanukah has an extra downstairs Mincha at 12:30. Move it later
+in five-minute steps until it is strictly after that Sunday's exact Mincha Gedola
+Lechumra, without rounding the limit down. Share this rule between the poster,
+weekday chart's Sunday-only note, daily schedule, next minyan, API, and weekly text.
+Label the extra time Sunday only on both full-page and half-page Chanukah posters.
+If Chanukah includes two Sundays with different extra times, label each with its
+Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.
+
 Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
 under **Compact** (previously **All on one**). **Just one** and **A sheet each** keep the original full-page
 portrait poster, including its original headings, spacing and location notes; they
 never show or apply the Copies per page switch, even when two copies was remembered.
+Keep the original full-page type sizes. Tighten section gaps only when the extra
+Sunday line needs room to keep the location notes within the print margins.
 The original poster's last schedule block has no trailing margin; the legend provides
 the gap so its location notes stay clear of the frame even with six sunrise references.
 The remembered **Copies per page** switch selects one copy on the left with the other

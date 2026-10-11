@@ -1276,7 +1276,7 @@ function hasBehab(serial, settings) {
   return '';
 }
 
-/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
+/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 or 3 Teves), and if
  *  so the Hebrew year to build that חנוכה's own poster or extras from. Both months land in
  *  the same AM year (Kislev and Teves both follow תשרי within one year's own count), so
  *  there is no year-boundary to special-case. Shared by the weekday chart, both שבת charts
@@ -1286,9 +1286,9 @@ function hasBehab(serial, settings) {
  *  fridayMainMinchaParts from common.js). */
 function chanukahYearFor(serial, settings) {
   const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
-  if (j.month === 9 && j.dayOfMonth >= 25) return j.year;
-  if (j.month === 10 && j.dayOfMonth <= 2) return j.year;
-  return null;
+  if (j.month !== 9 && j.month !== 10) return null;
+  const first = dateFromHebrew(25, 9, j.year);
+  return serial >= first && serial < first + 8 ? j.year : null;
 }
 
 /** HAS_TAANIS: the name of the fast falling on this date, else "".
@@ -4297,6 +4297,25 @@ function chanukahWeekdayMincha(referenceSerial, settings) {
   return [oneOclock, earlyMincha, mainMincha, oneFifty, late];
 }
 
+/** Sunday's extra Mincha starts at 12:30 and moves later in five-minute steps until
+ *  it is after that Sunday's exact Mincha Gedola Lechumra, without rounding the limit. */
+function chanukahSundayOpening(minchaGedola) {
+  const limit = zman('מנחה גדולה לחומרא', minchaGedola, 'on this Sunday of חנוכה');
+  const minutes = Math.max(750, (Math.floor(minchaGedola * 1440 / 5 + 1e-9) + 1) * 5);
+  return clockTime(12, 30, 'the extra Sunday-only מנחה during חנוכה')
+    .laterOf(limit, 'the extra מנחה cannot start before מנחה גדולה לחומרא')
+    .steppedTo(minutes / 1440, {
+      by: 5, backwards: false,
+      until: 'strictly after this Sunday’s exact מנחה גדולה לחומרא',
+      untilAt: formatTimeWithSeconds(minchaGedola),
+    }).underline();
+}
+
+function chanukahSundayMincha(serial, settings) {
+  if (excelWeekday(serial) !== 1 || !chanukahYearFor(serial, settings)) return null;
+  return chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings));
+}
+
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
  *  חנוכה, or is the שבת right in front of it (ערב חנוכה) - meaning חנוכה actually opens
  *  the night this שבת ends, so the first candle is lit at מוצאי שבת. That is only true
@@ -4789,20 +4808,27 @@ function buildChanukahPoster(year, settings, tables) {
   }
 
   const weekdayMincha = chanukahWeekdayMincha(days[0]?.serial ?? kislev25, settings);
+  const sundayMincha = [];
   for (const day of days) {
-    if (fridaySerials.has(day.serial) || day.serial === sundayAfterShabbos) continue;
+    if (fridaySerials.has(day.serial)) continue;
+    const extra = chanukahSundayMincha(day.serial, settings);
+    if (extra) {
+      sundayMincha.push({ serial: day.serial, time: extra });
+      M.list(day.serial, CH_TEXT.mincha, [toCell(extra)], AFTERNOON);
+    }
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
   }
-  /* The Sunday that opens the second week, where one falls inside the eight days, prints its
-     own early options on every sampled sheet - but which ones, and how many, is the one piece
-     of this sheet the old sheets disagree with each other about in a way the calendar does not
-     explain (see the two newest, תשפ״ה and תשפ״ו, against the two before them). Rather than
-     invent a rule the shul has not confirmed, this Sunday is given the same weekday מנחה menu
-     as every other day until that is settled - flagged here so it is not mistaken for a
-     verified number the way the rest of this sheet's times are. */
-  if (sundayAfterShabbos != null) {
-    M.list(sundayAfterShabbos, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
+  const sundayGroups = new Map();
+  for (const extra of sundayMincha) {
+    const key = extra.time.plain();
+    if (!sundayGroups.has(key)) sundayGroups.set(key, { time: extra.time, serials: [] });
+    sundayGroups.get(key).serials.push(extra.serial);
   }
+  const sundayMinchaRows = [...sundayGroups.values()].map(({ time, serials }) => ({
+    label: sundayGroups.size === 1 ? "ביום א' בלבד" : serials.map(serial =>
+      `יום א' ${jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]}`).join(' / '),
+    times: [toCell(time)],
+  }));
 
   const maariv = chanukahMaariv(year, settings);
   for (const day of days) {
@@ -4824,6 +4850,8 @@ function buildChanukahPoster(year, settings, tables) {
     days,
     shacharisRows: combineShacharisRows(days),
     weekdayMincha,
+    sundayMincha,
+    sundayMinchaRows,
     maariv,
     erevShabbosList,
     erevShabbos: combineErevShabbos(erevShabbosList, settings, tables),
@@ -7792,19 +7820,24 @@ function buildWeekdayRow(week, settings) {
   }
   const maariv = maarivParts(week, settings);
   const mincha = minchaParts(week, settings);
+  const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
+  const printOverrides = {
+    ...(maariv.printText != null ? { B: maariv.printText } : {}),
+    ...(sundayMincha ? { C: `${chanukahTag(sundayMincha.text() + " ביום א' בלבד")}\n${mincha.text}` } : {}),
+  };
   return {
     B: maariv.text,
     C: mincha.text,
     /* The traces from that same pass, for the calculations page. E, the merged שחרית block,
        is not calculated at all: it is the schedule the program carries, printed as written,
        and the page says so rather than pretending there is working to show. */
-    traces: { B: maariv.times, C: mincha.times },
-    notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
+    traces: { B: maariv.times, C: [...(sundayMincha ? [sundayMincha] : []), ...mincha.times] },
+    notes: { B: maariv.note, C: sundayMincha ? "Regular times work for all five weekdays. The extra Chanukah Mincha is Sunday only, checked against that Sunday's exact מנחה גדולה לחומרא." : mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
     /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
        itself, which stays the plain text every other reader - the week card, "what is
        on next", the messages page - reads). See the note on maariv.printText above. */
-    printOverrides: maariv.printText != null ? { B: maariv.printText } : undefined,
+    printOverrides: Object.keys(printOverrides).length ? printOverrides : undefined,
   };
 }
 
@@ -11315,6 +11348,7 @@ function rowFor(week, sheet, state, settings) {
 
 
 
+
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
  *  Not every column is a מנין. ס"ז קר"ש and הדלקת נרות are זמנים and are left out here;
@@ -11542,6 +11576,13 @@ function minyanimForDay(serial, state, settings) {
     const morning = specialShacharis(serial, settings);
     if (morning.length) out.push(...morning);
     else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
+  }
+  const sundayMincha = chanukahSundayMincha(serial, settings);
+  if (sundayMincha) {
+    const extra = parseCell(sundayMincha.text())[0];
+    if (!out.some(t => t.name === 'מנחה' && t.mins === extra.mins && t.place === extra.place)) {
+      out.push({ ...extra, name: 'מנחה' });
+    }
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;
@@ -16159,7 +16200,8 @@ function chanukahBody(poster) {
     </div>`;
   const sections = [
     section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('') + netzBlockLines(poster)),
-    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)),
+    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)
+      + poster.sundayMinchaRows.map(row => chanukahRunLine(row.times, row.label)).join('')),
     poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
     section(CH_TEXT.maariv, timeLine(poster.maariv)),
   ].filter(Boolean);
@@ -16193,7 +16235,8 @@ function renderHalfChanukahPoster(poster, settings) {
   const sectionsHtml = halfPageSection(morning.title, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
         + (netz.length ? `<div class="halfpage-netz"><strong lang="he">${escAttr(CH_TEXT.netz)}</strong>
           <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
-    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row, label: '' })).join(''))).join('');
+    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row,
+      label: row.label === s.title ? '' : row.label })).join(''))).join('');
   return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml);
 }
 
@@ -16511,7 +16554,7 @@ const ONEPAGE_SECTIONS = {
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
       oneSection(CH_TEXT.shacharis, p.shacharisRows.flatMap((row) => [shacharisRow(row), ...netzRows(row)])),
-      oneLine(CH_TEXT.mincha, p.weekdayMincha.map(toCell)),
+      oneSection(CH_TEXT.mincha, [{ label: CH_TEXT.mincha, times: p.weekdayMincha.map(toCell) }, ...p.sundayMinchaRows]),
       oneLine(CH_TEXT.maariv, p.maariv.map(toCell)),
     ];
     if (p.erevShabbos) sections.push(oneLine(p.erevShabbos.title, p.erevShabbos.cells));
@@ -17241,10 +17284,11 @@ function fitPoster(container) {
     // to be this way round. The סוכות sheet's type is set here for the same reason.
     fitOnePage(container);
     fitSukkos(container);
+    fitChanukah(container);
     fitHalfPage(container);
   };
   decide();
-  if (container.querySelector('.poster.is-halfpage')) {
+  if (container.querySelector('.poster.is-halfpage,.poster.is-chanukah')) {
     document.fonts.ready.then(() => { if (document.body.contains(all[0])) decide(); });
   }
   // Rotating a phone changes what fits. One listener, replaced each render so it always
@@ -17252,6 +17296,21 @@ function fitPoster(container) {
   if (fitHandler) window.removeEventListener('resize', fitHandler);
   fitHandler = () => { if (document.body.contains(all[0])) decide(); };
   window.addEventListener('resize', fitHandler);
+}
+
+/** Retain the full-page poster's type while tightening section gaps only when the
+ *  Sunday addition would otherwise push its location notes beyond the print margin. */
+function fitChanukah(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-chanukah')) {
+    const zoom = sheet.style.zoom;
+    sheet.style.zoom = '1';
+    for (let gap = 0.3; gap >= 0.059; gap -= 0.02) {
+      sheet.style.setProperty('--chanukah-set-gap', `${gap}in`);
+      const limit = sheet.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sheet).paddingBottom);
+      if (sheet.querySelector('.poster-legend').getBoundingClientRect().bottom <= limit - 1) break;
+    }
+    sheet.style.zoom = zoom;
+  }
 }
 
 function fitHalfPage(container) {

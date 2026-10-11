@@ -29,6 +29,7 @@ import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from './settings.js';
+import { chanukahSundayMincha } from './posters/chanukah.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -257,6 +258,13 @@ export function minyanimForDay(serial, state, settings) {
     const morning = specialShacharis(serial, settings);
     if (morning.length) out.push(...morning);
     else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
+  }
+  const sundayMincha = chanukahSundayMincha(serial, settings);
+  if (sundayMincha) {
+    const extra = parseCell(sundayMincha.text())[0];
+    if (!out.some(t => t.name === 'מנחה' && t.mins === extra.mins && t.place === extra.place)) {
+      out.push({ ...extra, name: 'מנחה' });
+    }
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;

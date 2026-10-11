@@ -466,7 +466,7 @@ export function hasBehab(serial, settings) {
   return '';
 }
 
-/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 Teves), and if
+/** Whether `serial` falls among the eight days of חנוכה (25 Kislev through 2 or 3 Teves), and if
  *  so the Hebrew year to build that חנוכה's own poster or extras from. Both months land in
  *  the same AM year (Kislev and Teves both follow תשרי within one year's own count), so
  *  there is no year-boundary to special-case. Shared by the weekday chart, both שבת charts
@@ -476,9 +476,9 @@ export function hasBehab(serial, settings) {
  *  fridayMainMinchaParts from common.js). */
 export function chanukahYearFor(serial, settings) {
   const j = hebrewDateExtended(serial, settings.useGregorianBefore1582);
-  if (j.month === 9 && j.dayOfMonth >= 25) return j.year;
-  if (j.month === 10 && j.dayOfMonth <= 2) return j.year;
-  return null;
+  if (j.month !== 9 && j.month !== 10) return null;
+  const first = dateFromHebrew(25, 9, j.year);
+  return serial >= first && serial < first + 8 ? j.year : null;
 }
 
 /** HAS_TAANIS: the name of the fast falling on this date, else "".
