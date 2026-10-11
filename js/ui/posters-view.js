@@ -568,7 +568,7 @@ function postersByDate(year, settings, state) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  // Omit months absent in this year; Shabbos-only months have their own morning times.
+  // Omit months absent in this year and occasions that fall entirely on Shabbos.
   const sorted = all.filter(p => !p.dated || at.get(p).from != null).sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);

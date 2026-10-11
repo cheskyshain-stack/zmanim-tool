@@ -9,7 +9,6 @@ import { buildAsaraBTevesPoster } from '../js/posters/asarabteves.js';
 import { buildAsaraShacharisPoster, buildBehabShacharisPoster, buildRoshChodeshShacharisPoster,
   ROSH_CHODESH_SHACHARIS_MONTHS } from '../js/posters/shacharis.js';
 import { buildChanukahPoster } from '../js/posters/chanukah.js';
-import { shacharisParts } from '../js/sheets/common.js';
 
 const readJSON = async name => JSON.parse(await readFile(new URL('../data/' + name, import.meta.url)));
 const [config, parshaChutz, parshaEY, parshaNames] = await Promise.all([
@@ -79,8 +78,8 @@ test('BHB Selichos notes cover all, none, or the specific qualifying dates in a 
     'The printed note stays Hebrew when the admin uses English');
 });
 
-test('Rosh Chodesh handouts cover weekday and Shabbos-only months using their respective chart times', () => {
-  let oneDay = false, twoDays = false, shabbosOnly = false, adarI = false, adarII = false;
+test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbos', () => {
+  let oneDay = false, twoDays = false, shabbosOnly = false, mixedShabbos = false, adarI = false, adarII = false;
   for (let year = 5784; year <= 5834; year++) {
     const months = new Map();
     for (let serial = roshHashana(year - 3761); serial < roshHashana(year - 3760); serial++) {
@@ -92,15 +91,16 @@ test('Rosh Chodesh handouts cover weekday and Shabbos-only months using their re
     }
     for (const month of ROSH_CHODESH_SHACHARIS_MONTHS) {
       const calendarDays = months.get(month) || [];
-      const weekdays = calendarDays.filter(serial => excelWeekday(serial) !== 7);
-      const days = weekdays.length ? weekdays : calendarDays;
+      const days = calendarDays.filter(serial => excelWeekday(serial) !== 7);
       const poster = buildRoshChodeshShacharisPoster(year, month, settings);
       if (!days.length) {
         assert.equal(poster, null);
+        if (calendarDays.length) shabbosOnly = true;
         continue;
       }
       if (days.length === 1) oneDay = true;
       if (days.length === 2) twoDays = true;
+      if (days.length < calendarDays.length) mixedShabbos = true;
       if (month === 13) adarI = true;
       if (month === 14) adarII = true;
       assert.deepEqual(poster.days, days);
@@ -109,13 +109,7 @@ test('Rosh Chodesh handouts cover weekday and Shabbos-only months using their re
       assert(poster.title.startsWith('ראש חודש '));
       assert.equal(poster.subtitle, 'שחרית');
       assert.equal(poster.rows.some(row => row.timeNote), false, 'No Asara Selichos note on Rosh Chodesh');
-      if (!weekdays.length) {
-        shabbosOnly = true;
-        assert.equal(poster.shabbosOnly, true);
-        assert.equal(poster.dayLabel, 'שבת');
-        assert.deepEqual(rows(poster), [['7:30', 'בית מדרש למטה'], ['8:15', 'בית מדרש']]);
-        assert.deepEqual(poster.rows.map(row => row.trace.steps), shacharisParts().times.map(trace => trace.steps));
-      } else if (month === 10) {
+      if (month === 10) {
         const chanukah = buildChanukahPoster(year, settings).shacharisRows.find(row => row.isRoshChodesh);
         assert.equal(poster.rows[0].text, chanukah.vasikin.time);
         assert.deepEqual(poster.rows.slice(1).map(row => row.text), chanukah.cells.slice(1).map(cell => cell.text));
@@ -125,14 +119,16 @@ test('Rosh Chodesh handouts cover weekday and Shabbos-only months using their re
     }
     assert.equal(buildRoshChodeshShacharisPoster(year, 7, settings), null, 'Rosh Hashana has its own schedule');
   }
-  assert(oneDay && twoDays && shabbosOnly && adarI && adarII, 'All calendar shapes were exercised');
+  assert(oneDay && twoDays && shabbosOnly && mixedShabbos && adarI && adarII, 'All calendar shapes were exercised');
   assert.equal(buildRoshChodeshShacharisPoster(null, 8, settings), null);
 });
 
-test('Shevat 5787 remains available on Shabbos with the Shabbos schedule', () => {
-  const poster = buildRoshChodeshShacharisPoster(5787, 11, settings);
-  assert.equal(poster.title, 'ראש חודש שבט');
-  assert.equal(poster.dayLabel, 'שבת');
-  assert.deepEqual(poster.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)), ['2027-01-09']);
-  assert.deepEqual(rows(poster), [['7:30', 'בית מדרש למטה'], ['8:15', 'בית מדרש']]);
+test('Shevat is omitted when entirely on Shabbos and remains available on weekdays', () => {
+  for (const year of [5787, 5790]) assert.equal(buildRoshChodeshShacharisPoster(year, 11, settings), null);
+  for (const year of [5785, 5786]) {
+    const poster = buildRoshChodeshShacharisPoster(year, 11, settings);
+    assert.equal(poster.title, 'ראש חודש שבט');
+    assert(poster.days.every(serial => excelWeekday(serial) !== 7));
+    assert.deepEqual(rows(poster), expected);
+  }
 });

@@ -271,9 +271,9 @@ coordinates, content, copies, margins, saved choices, and original schedule rete
 Rosh Chodesh morning handouts use that same design under the `ראש חודש` occasion,
 with a Month picker in calendar order. Print the month and Hebrew year in the title,
 and label the applicable weekdays. Use `nextRoshChodesh` for one- and two-day dates,
-including both leap-year Adars. Only Sunday through Friday use this weekday schedule;
-keep a month entirely on Shabbos visible with a `שבת` label and the regular Shabbos
-Shacharis times and rooms from `shacharisParts`. Omit Tishrei, which has its Rosh Hashana poster.
+including both leap-year Adars. These handouts cover Sunday through Friday only;
+skip a month when Rosh Chodesh falls entirely on Shabbos. Keep the weekday portion
+of a two-day Rosh Chodesh that also includes Shabbos. Omit Tishrei, which has its Rosh Hashana poster.
 Read the standing times from `specialShacharisLines`; Teves reads the Chanukah
 poster's combined Rosh Chodesh row, including its first minyan time. Do not carry
 Asara's Selichos note into these charts. Preserve the selected month in the address

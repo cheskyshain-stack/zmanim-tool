@@ -5,7 +5,6 @@ import { buildAsaraBTevesPoster, asaraSelichosFirst, ASARA_TEXT } from './asarab
 import { specialShacharisLines } from './special-shacharis.js';
 import { nextRoshChodesh } from '../rosh-chodesh-text.js';
 import { buildChanukahPoster } from './chanukah.js';
-import { shacharisParts } from '../sheets/common.js';
 
 export const BEHAB_SHACHARIS_TEXT = {
   afterSukkos: 'בה"ב אחר סוכות',
@@ -82,24 +81,21 @@ export function buildRoshChodeshShacharisPoster(year, month, settings) {
     from = rc.last + 1;
     if (rc.month !== month) continue;
     // Weekday handouts cover the weekday part of a two-day Rosh Chodesh.
-    // Keep Shabbos-only months visible with the Shabbos chart's own morning times.
-    const calendarDays = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i);
-    const weekdays = calendarDays.filter(serial => excelWeekday(serial) !== 7);
-    const shabbosOnly = !weekdays.length;
-    const days = shabbosOnly ? calendarDays : weekdays;
-    const chanukah = !shabbosOnly && month === 10
+    // Skip occasions that fall entirely on Shabbos.
+    const days = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i)
+      .filter(serial => excelWeekday(serial) !== 7);
+    if (!days.length) return null;
+    const chanukah = month === 10
       ? buildChanukahPoster(year, settings)?.shacharisRows.find(row => row.isRoshChodesh) : null;
-    const cells = shabbosOnly ? shacharisParts().times.map(trace => ({
-      text: trace.plain(), underlined: Boolean(trace.flags.underlined), mark: trace.flags.mark || '', trace,
-    })) : chanukah
+    const cells = chanukah
       ? chanukah.cells.map((cell, i) => i === 0
         ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
       : specialShacharisLines().flat();
     return {
-      hebrewYear: year, month, shabbosOnly,
+      hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
       subtitle: 'שחרית',
-      dayLabel: shabbosOnly ? 'שבת' : `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
+      dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
       span: { from: days[0], to: days.at(-1) }, days,
       rows: shacharisRoomRows(cells),
     };
