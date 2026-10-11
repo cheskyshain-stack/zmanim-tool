@@ -4297,8 +4297,8 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.08in;
   margin: 0 0 0.14in; text-align: center; font-size: 11pt; line-height: 1.4;
 }
-.shacharis-handout-date > div { font-weight: 700; white-space: nowrap; }
-.shacharis-handout-date > time { display: block; font-size: 9pt; white-space: nowrap; }
+.shacharis-handout-date > div { font-weight: 700; }
+.shacharis-handout-hebrew-date { display: block; font-size: 9pt; }
 .poster.is-halfpage .shacharis-handout-row { padding: 0.045in 0.08in; }
 .shacharis-handout-run {
   position: relative; display: flex; align-items: baseline; justify-content: space-between;
