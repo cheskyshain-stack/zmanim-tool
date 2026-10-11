@@ -97,77 +97,51 @@ export function flattenNonEmpty(parts) {
   return flat.filter((x) => x !== '' && x != null);
 }
 
-/** Keep times in order and minimize the difference between printed line widths.
- *  Prefer wider lines below only when the balance is equally good. `prefixes`
- *  holds each item's separator, removed at a line start. Notes stay on the first line. */
-export function balancedLineCuts(widths, { lines = 2, prefixes = [], lead = 0 } = {}) {
-  const count = Math.min(widths.length, Math.max(1, Math.floor(lines)));
-  if (count <= 1) return [];
-  const sums = [0];
-  widths.forEach(width => sums.push(sums.at(-1) + width));
-  const lineWidth = (from, to) => sums[to] - sums[from] - (prefixes[from] || 0) + (from === 0 ? lead : 0);
-  let best = null;
-  const consider = cuts => {
-    const ends = [0, ...cuts, widths.length];
-    const lengths = ends.slice(1).map((end, i) => lineWidth(ends[i], end));
-    const spread = Math.max(...lengths) - Math.min(...lengths);
-    const widest = Math.max(...lengths);
-    const lowerWeight = lengths.reduce((sum, width, i) => sum + i * width, 0);
-    if (!best || spread < best.spread - 0.001 || Math.abs(spread - best.spread) <= 0.001
-      && (widest < best.widest - 0.001 || Math.abs(widest - best.widest) <= 0.001
-        && lowerWeight > best.lowerWeight + 0.001)) {
-      best = { spread, widest, lowerWeight, cuts };
-    }
-  };
-  // Most lists have two lines. Compare every possible cut without imposing a direction.
-  if (count === 2) {
-    for (let end = 1; end < widths.length; end++) consider([end]);
-    return best.cuts;
-  }
-  // For longer lists, try each possible minimum line width. A memoized minimax
-  // partition finds its narrowest range without enumerating all combinations of cuts.
-  const minima = new Set();
-  for (let from = 0; from < widths.length; from++) {
-    for (let end = from + 1; end <= widths.length; end++) minima.add(lineWidth(from, end));
-  }
-  for (const minimum of minima) {
-    const memo = new Map();
-    const finish = (from, left) => {
-      const key = `${from}:${left}`;
-      if (memo.has(key)) return memo.get(key);
-      let answer = null;
-      for (let end = from + 1; end <= widths.length - left + 1; end++) {
-        if (left === 1 && end !== widths.length) continue;
-        const width = lineWidth(from, end);
-        if (width < minimum - 0.001) continue;
-        const rest = left === 1 ? { widest: 0, lowerWeight: 0, cuts: [] } : finish(end, left - 1);
-        if (!rest) continue;
-        const widest = Math.max(width, rest.widest);
-        const lowerWeight = (count - left) * width + rest.lowerWeight;
-        if (!answer || widest < answer.widest - 0.001 || Math.abs(widest - answer.widest) <= 0.001
-          && lowerWeight > answer.lowerWeight + 0.001) {
-          answer = { widest, lowerWeight, cuts: left === 1 ? [] : [end, ...rest.cuts] };
-        }
-      }
-      memo.set(key, answer);
-      return answer;
-    };
-    const result = finish(0, count);
-    if (result) consider(result.cuts);
-  }
-  return best.cuts;
-}
-
-/** A text-only estimate until the browser can measure the actual font and tags.
- *  Invisible formatting marks and underline lead-in spaces do not add width. */
+/** Splits a list of time options across two printed lines. The bottom line gets the
+ *  larger (or equal) half by default, floor(n/2) on top and ceil(n/2) below, which is
+ *  what every one of these columns has always done and reads as one consistent pattern
+ *  down the page.
+ *
+ *  That default is only overridden when it would read clearly lopsided by width - not
+ *  plain item count, since 10:00 is a whole item wider than 7:00 and a board full of one
+ *  but not the other (later evening times run longer than earlier afternoon ones) can
+ *  split lopsided even at an even item count. A בראשית מעריב line of
+ *  7:30/8:00/8:30/8:45/9:00 against 9:30/10:00/10:30/11:00/11:30/12:00 read as five short
+ *  items over six longer ones, the bottom line fifteen characters wider than the top
+ *  (measured) - moving the cut over one item narrows that to five, and only a gap that
+ *  much worse than the alternative (here, more than double it) is worth giving up the
+ *  bottom-heavier default for. A smaller gap stays bottom-heavy even if the other cut
+ *  would have measured a few characters closer, since the consistent pattern is worth
+ *  more than a handful of characters.
+ *
+ *  Only the two candidates nearest the middle are ever weighed (floor(n/2) and
+ *  ceil(n/2)), never a lopsided count-wise split in the name of a closer width. Character
+ *  count is the width proxy rather than a measured pixel width: this runs while the sheet
+ *  is being built, before there is a rendered cell to measure at all.
+ *
+ *  `cut` overrides the choice outright, for a caller with its own reason to want a
+ *  specific split regardless of what balances best - see the Weekday chart's "NEW" tag
+ *  (sheets/weekday.js), which is not plain text and so is not honestly weighed by
+ *  counting its characters. */
 export function splitLinesInHalf(items, delim = SLASH, cut = null) {
-  const visibleWidth = text => String(text).replace(/<[^>]*>/g, '')
-    .replace(/[\uE000-\uF8FF\u2066-\u2069]/g, '').trim().length;
-  const prefixes = items.map((_, i) => i ? delim.length : 0);
-  const resolvedCut = cut ?? balancedLineCuts(items.map((item, i) => visibleWidth(item) + prefixes[i]), { prefixes })[0] ?? items.length;
+  const resolvedCut = cut ?? bestSplitCut(items, delim);
   const line1 = items.slice(0, resolvedCut).join(delim);
   const line2 = items.slice(resolvedCut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
+}
+
+/** Bottom-heavier by default (see splitLinesInHalf), moved to top-heavier only when
+ *  staying bottom-heavy would leave a gap more than double the alternative's. */
+function bestSplitCut(items, delim) {
+  const lo = Math.floor(items.length / 2); // bottom gets the larger half
+  const hi = Math.ceil(items.length / 2); // top gets the larger half
+  if (lo === hi) return lo;
+  const widthDiff = (cut) => Math.abs(
+    items.slice(0, cut).join(delim).length - items.slice(cut).join(delim).length
+  );
+  const bottomHeavyGap = widthDiff(lo);
+  const topHeavyGap = widthDiff(hi);
+  return bottomHeavyGap > topHeavyGap * 2 ? hi : lo;
 }
 
 /** HTML escaping, in the two shapes this codebase actually uses.

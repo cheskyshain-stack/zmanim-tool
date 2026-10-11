@@ -963,11 +963,6 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--sheet-accent,
    pages in all: 1.35 leaves every page exactly at its unchanged height, 1.38 already
    overflows twenty of them. */
 .cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.35; direction: ltr; overflow-wrap: normal; word-break: normal; }
-.chart-time-list, .chart-time-line { display: block; }
-.chart-time-list { white-space: normal; }
-.chart-time-line { white-space: nowrap; }
-.chart-time-item { display: inline-block; }
-.chart-time-item + .chart-time-item::before { content: "\00a0/\00a0"; }
 td.ruled .cell { background: var(--ruled); }
 /* .ul is no longer emitted (see nl2br in sheet-view.js) but stays styled here so cells
    whose overrides were saved back when it was still in use keep their underlines. */
