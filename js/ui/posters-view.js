@@ -35,7 +35,7 @@ import { buildChanukahPoster, CH_TEXT, toCell } from '../posters/chanukah.js';
 import { buildOwnPoster } from '../posters/own.js';
 import { renderOwnEditor, newOwnSheet } from './own-view.js';
 import { saveState } from '../storage.js';
-import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday, dateFromHebrew } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday, dateFromHebrew, hasParsha } from '../hebrew-calendar.js';
 import { excelSerial, dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
@@ -1759,8 +1759,10 @@ function renderShacharisHandout(poster, settings) {
     const weekday = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)];
     const hebrew = jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0];
     const date = dateFromSerial(serial);
-    return `<div class="shacharis-handout-date"><div lang="he">יום ${weekday}' · ${escAttr(hebrew)}</div>
-      <time dir="ltr" lang="en" datetime="${date.toISOString().slice(0, 10)}">${escAttr(yearFmt.format(date))}</time></div>`;
+    const shabbos = serial + 7 - excelWeekday(serial);
+    const parsha = hasParsha(shabbos, { ...settings, english: false }, posterTables);
+    return `<div class="shacharis-handout-date" data-date="${date.toISOString().slice(0, 10)}"><div lang="he">יום ${weekday}' ${escAttr(parsha)}</div>
+      <span class="shacharis-handout-hebrew-date" lang="he">${escAttr(hebrew)}</span></div>`;
   }).join('')}</div>` : '';
   return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates });
 }
@@ -2507,9 +2509,8 @@ let chosenYear = null;
 // rather than passed through every redraw, since redrawInPlace calls back in on its own.
 let onRoute = null;
 // The Hebrew-calendar tables, handed in by app.js once it has loaded them and held here the
-// way onRoute is, since redrawInPlace calls back in without them. Only the שבת שובה poster
-// needs them, and only in a year with no chart saved: it has to know that Shabbos's parsha,
-// because a rule can be keyed on one.
+// way onRoute is, since redrawInPlace calls back in without them. The שבת שובה calculation
+// uses the parsha when no chart is saved, and the BHB date row names each week's parsha.
 let posterTables = null;
 
 /** Which poster is on screen and, if it is one that can be set either way up, which way.

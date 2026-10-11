@@ -213,7 +213,8 @@ Schedule, and the copyable fast-day message.
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
 Below the BHB title, print its three actual dates in chronological order from right
-to left, with Hebrew weekday and date above a smaller English date in each column.
+to left, with the Hebrew weekday and upcoming Shabbos parsha name on the first line
+and a smaller Hebrew date underneath. Do not print an English date in this date row.
 Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each

@@ -88,6 +88,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
             && c.y >= r.y + parseFloat(cs.paddingTop) - 1 && c.bottom <= r.bottom - parseFloat(cs.paddingBottom) + 1),
           overflow: sheet.scrollHeight > sheet.clientHeight || sheet.scrollWidth > sheet.clientWidth,
+          datesFit: [...sheet.querySelectorAll('.shacharis-handout-date > div')]
+            .every(label => label.scrollWidth <= label.clientWidth + 1),
           typeSize: parseFloat(getComputedStyle(sheet.querySelector('.shacharis-handout-run')).fontSize),
           rtl: [...sheet.querySelectorAll('.shacharis-handout-run')].every(row =>
             row.querySelector('.shacharis-handout-room').getBoundingClientRect().left >= row.querySelector('.shacharis-handout-time').getBoundingClientRect().right),
@@ -96,6 +98,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       for (const [i, box] of boxes.entries()) {
         assert.deepEqual([box.x, box.y, box.width, box.height], [i * 528, 0, 528, 816], 'Each copy is a real half Letter sheet');
         assert(box.inside && !box.overflow, 'Letterhead, rooms, times and note fit inside the print margins: ' + JSON.stringify(box));
+        assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
         assert(box.paper.includes('letter landscape'));
@@ -124,14 +127,22 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           return buildBehabShacharisPoster(year, month, resolveSettings(loadState().settings)).days
             .map(serial => dateFromSerial(serial).toISOString().slice(0, 10));
         }, { year, month: choiceIndex === 1 ? 8 : 2 });
-        assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date time')
-          .evaluateAll(dates => dates.map(date => date.dateTime)), expectedDates, 'All three actual BHB dates appear on the printed handout');
+        assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date')
+          .evaluateAll(dates => dates.map(date => date.dataset.date)), expectedDates, 'All three actual BHB dates appear on the printed handout');
+        const expectedParshas = year === 5785
+          ? choiceIndex === 1 ? ['וירא', 'וירא', 'חיי שרה'] : ['אחרי מות - קדושים', 'אחרי מות - קדושים', 'אמור']
+          : choiceIndex === 1 ? ['לך לך', 'לך לך', 'וירא'] : ['בהר', 'בהר', 'בחוקותי'];
+        assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
+          expectedParshas.map((parsha, index) => `יום ${index === 1 ? 'ה' : 'ב'}' ${parsha}`),
+          'Each BHB morning has its weekday and upcoming Shabbos parsha on the first line, including combined readings');
+        assert(!/[A-Za-z]|\b20\d{2}\b/.test(await page.locator('.shacharis-handout-dates').first().innerText()),
+          'Printed BHB dates and parshas are entirely Hebrew');
         const datePositions = await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date')
           .evaluateAll(dates => dates.map(date => date.getBoundingClientRect().x));
         assert(datePositions[0] > datePositions[1] && datePositions[1] > datePositions[2], 'BHB dates read chronologically from right to left');
         if (year === 5787 && choiceIndex === 1) {
-          assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
-            ["יום ב' · ח׳ חשון", 'יום ה\' · י"א חשון', 'יום ב\' · ט"ו חשון']);
+          assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-hebrew-date').allTextContents(),
+            ['ח׳ חשון', 'י"א חשון', 'ט"ו חשון'], 'The Hebrew date appears on its own underneath');
         }
       } else {
         assert.equal(await page.locator('.shacharis-handout-dates').count(), 0, 'Asara retains its existing title layout');
@@ -192,6 +203,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     assert.equal(await page.locator('#poster-pick option[value=roshchodesh14]').count(), 0, 'Adar II disappears in a common year');
     assert(page.url().endsWith('#posters/' + await page.locator('#poster-pick').inputValue()), 'The address follows the available replacement month');
     await page.locator('#poster-group').selectOption(choices[2]); await settle();
+    await chooseYear(5785); // Include the long אחרי מות - קדושים label at the largest margin.
     for (const margin of ['0.15', '0.75', '0.35']) {
       await page.locator('#poster-margin').selectOption(margin); await settle(); await measure(2);
     }
