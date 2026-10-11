@@ -223,9 +223,9 @@ const giveIcon = (key, cls) =>
  *  than one way to give and more than one thing to give to, so it opens a page of them
  *  instead, and this list is that page. Adding a way, or filling one in, is a line here.
  *
- *  Three ways to give, each a drawer that opens where it stands. Collapsed, a way is its
- *  mark, its name and a line saying what it is, so the whole page is three lines long and
- *  a donor picks before reading anything else. What is inside differs by way:
+ *  Payment methods share one panel, selected by the tabs above it. Card and ACH shows
+ *  every fund immediately; DAF shows its providers and the EIN they search for.
+ *  What is inside differs by way:
  *
  *  `accounts` is one or more payment pages, which is what the card and ACH way holds: the
  *  shul and the building fund bill through two separate merchant pages, so each is named
@@ -250,12 +250,7 @@ const giveIcon = (key, cls) =>
  *  its details are to follow, so the page says what exists rather than pretending it does
  *  not.
  */
-/** The shul's English name for donation text and accessible descriptions. */
-const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
-
-/** The shul's federal tax ID, in the footer of every page and on the Donors' Fund card.
- *  One constant for both: it is the number somebody types into another app to give money,
- *  and two places to write it is one place for a digit to go wrong. */
+/** One federal tax ID for the donation footer and DAF provider searches. */
 const SHUL_TAX_ID = '26-4527675';
 
 /** The footer that ends every page: the address.
@@ -276,9 +271,10 @@ const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
 
-const siteFooterHtml = (s) => `<footer class="luach-site-footer">
+const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer">
   ${footHtml(s)}
   <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
+  ${legal}
 </footer>`;
 
 /** The address, cut so that where it takes two lines the break falls between the shul's name
@@ -335,11 +331,9 @@ document.fonts.ready.then(updateFootDots);
 
 const DONATE = {
   name: 'Donate',
-  heading: 'Donation Options',
-  thanks: `Thank you for supporting ${SHUL_ENGLISH}.`,
-  // Keep the nonprofit information below the ways to give. The separate EIN row can be
-  // copied without copying the paragraph, and the deduction wording stays complete.
-  legal: `${SHUL_ENGLISH} is a New Jersey 501(c)(3) nonprofit.`,
+  heading: 'Donate',
+  thanks: 'Support our shul and community.',
+  legal: 'New Jersey 501(c)(3) nonprofit',
   deductible: 'Donations are tax deductible to the extent permitted by law.',
   ways: [
     {
@@ -398,18 +392,10 @@ const DONATE = {
       blurb: 'Donor Advised Fund',
       icon: 'shul',
       iconImage: '/assets/daf-providers-transparent.png',
-      /* Three of the four logos are the provider's own file on the provider's own server.
-         OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
-         on the tile visibly soft, which the user saw on a phone. So that one is ours:
-         assets/daf-ojc.png, built from the mark on OJC's own donor portal, which is the
-         page the tile links to and so the mark a donor sees next. The tile draws it about
-         99 x 40, so it is shipped 330 wide, over 3x for a phone. See the note on
-         .luach-daf-provider img in app.css for how it was made.
-         The other three stay remote until there is artwork to replace them with, and the
-         alt text below is what a tile shows when any of them does not arrive. Each url is
-         the provider's own sign-in, since a donor here already has an account to spend. */
-      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: 'Choose your DAF provider and search using the EIN below.',
+      // Keep the providers' original artwork locally so their tiles do not depend on
+      // another host loading. OJC's high-resolution portal mark remains a PNG.
+      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"/assets/daf-donors-fund.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"/assets/daf-pledger.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"/assets/daf-matbia.svg"}],
+      how: 'Search using the shul\u2019s EIN.',
       copy: { label: 'EIN', value: SHUL_TAX_ID, buttonLabel: 'Copy EIN' },
       taxId: SHUL_TAX_ID,
     },
@@ -918,32 +904,7 @@ function renderChartPage(published) {
   renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
 }
 
-/** The ways to give, one card each.
- *
- *  The same card the menu uses, so the page reads as part of the site rather than as a
- *  form bolted to it: a link carries the outward arrow the menu's own outward link used
- *  to, and something to copy carries no arrow at all, because nothing happens when it is
- *  pressed. A way whose details have not arrived yet says so in the smaller type, which is
- *  the honest thing to put there and disappears the moment the line above it is filled in.
- *
- *  Nothing is rendered from published data here, so this page works whatever is or is not
- *  on the site, which is the point: giving should not depend on there being a chart up. */
-/** One way to give.
- *
- *  The card is a card rather than a link, because more than one thing on it can be
- *  pressed: the funds it covers, the whole list of them, and Donate itself. A card that
- *  was one big link could hold only one of those.
- *
- *  The chips are the funds, named. They are not links and not buttons: the page they lead
- *  to asks which fund in a menu of its own, so a chip that looked pressable would promise
- *  to choose for you and then not. They are there to answer "is the thing I want in here",
- *  which is the question somebody has before they press Donate.
- *
- *  A way with nowhere to go yet carries no Donate button. A button that did nothing would
- *  be worse than the line saying its details are still to come. */
-/** One payment page inside the card and ACH drawer: its name, the funds it carries, and
- *  the button that opens it. Two of them, because the shul and the building fund bill
- *  through separate merchant pages and a donor has to land on the right one. */
+/** A named merchant page with its own inline form and external-link fallback. */
 function donateAccountHtml(acc) {
   const website = acc.websiteHref
     ? ` data-website-href="${escAttr(acc.websiteHref)}" data-website-label="${escAttr(acc.websiteLabel || 'Visit website')}"`
@@ -951,64 +912,71 @@ function donateAccountHtml(acc) {
   return `<div class="luach-give-account">
     <a class="luach-fund-row luach-give-go" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
-      <span class="luach-fund-action">Donate <span aria-hidden="true">&rarr;</span></span>
+      <span class="luach-fund-action" aria-hidden="true">&rarr;</span>
     </a>
     <div class="luach-give-frame" hidden></div>
   </div>`;
 }
 
-/** A way to give, as a drawer.
- *
- *  A native details rather than a div and a click handler: it opens on Enter and Space,
- *  says whether it is open without being told to, and a browser that finds text inside a
- *  closed one opens it by itself. The name attribute is what makes the three exclusive
- *  where it is supported, and where it is not the only cost is two open at once.
- *
- *  Closed, every way is the same three things: mark, name, one line. That is the whole
- *  page, so the choice is made before anything else is read. */
-function donateWayHtml(way) {
-  const copy = way.copy
-    ? (way.copy.value || way.copy.label
-        ? `<p class="luach-copy">
-            ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}:</span>` : ''}
-            <span class="luach-copy-value">${escAttr(way.copy.value)}</span>
-            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}">${escAttr(way.copy.buttonLabel || 'Copy')}</button>` : ''}
-          </p>`
-        : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
+/** One payment method, kept mounted so switching tabs preserves an entered form. */
+function donateWayHtml(way, index) {
+  const copy = way.copy?.value
+    ? `<div class="luach-copy">
+        <span class="luach-copy-info">
+          ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}</span>` : ''}
+          <bdi class="luach-copy-value">${escAttr(way.copy.value)}</bdi>
+        </span>
+        <button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}" aria-live="polite">${escAttr(way.copy.buttonLabel || 'Copy')}</button>
+      </div>`
     : '';
-  const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
-  /* The four logos are the providers' own files on the providers' own servers, so the one
-     thing that cannot be assumed is that they arrive: a filter that blocks one of those
-     four hosts, a provider that moves its artwork, a phone on a bad signal. The label was
-     taken off these tiles once the logos were drawing them, and with alt="" a tile that
-     loses its picture is an empty box with nothing in it to click with confidence. This is
-     the shul's donation page, so the name is the alt text: the logo when it comes, the
-     provider's name when it does not, and never a blank tile. */
   const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
-  const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
-  const soon = !accounts && !way.copy && !providers ? '<p class="luach-give-soon">Details to follow</p>' : '';
-  /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
-     a donor recognises the service before reading the title. Zelle keeps its purple, the
-     one colour on this page that is not the site's own. Both are set larger than the line
-     icons beside them: a logo drawn to fill its roundel looks shrunken at the size that
-     suits a line drawing. */
-  const brand = way.icon === 'zelle' || way.icon === 'swirl';
-  const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}${way.iconImage ? ' is-image' : ''}`;
-  const mark = way.iconImage
-    ? `<img class="luach-give-mark-image" src="${escAttr(way.iconImage)}" alt="" width="40" height="40" decoding="async">`
-    : giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
-  return `<details class="luach-give-card" name="luach-give">
-    <summary class="luach-give-head">
-      <span class="${markClass}" aria-hidden="true">${mark}</span>
-      <div class="luach-give-body">
-        <h3 class="luach-give-title">${escAttr(way.title)}</h3>
-        <p class="luach-give-blurb">${escAttr(way.blurb)}</p>
-      </div>
-      ${giveIcon('chev', 'luach-give-chev')}
-    </summary>
-    <div class="luach-give-open">${how}${copy}${providerGrid}${soon}${accounts}</div>
-  </details>`;
+  const heading = accounts ? 'Choose a fund' : providers ? 'Choose a provider' : `Give with ${way.title}`;
+  const intro = way.how || way.blurb;
+  return `<div class="luach-payment-panel${way.icon === 'zelle' ? ' is-zelle' : ''}" role="tabpanel" id="luach-panel-${way.icon}" aria-labelledby="luach-tab-${way.icon}" tabindex="0"${index ? ' hidden' : ''}>
+    ${way.icon === 'zelle' ? `<span class="luach-zelle-roundel" aria-hidden="true">${giveIcon('zelle', 'luach-zelle-logo')}</span>` : ''}
+    <h2 class="luach-payment-heading">${escAttr(heading)}</h2>
+    <p class="luach-payment-intro">${escAttr(intro)}</p>
+    ${copy}
+    ${providers ? `<div class="luach-daf-providers">${providers}</div>` : ''}
+    ${accounts ? `<div class="luach-give-accounts">${accounts}</div>` : ''}
+  </div>`;
+}
+
+function donateTabHtml(way, index) {
+  const mark = way.icon === 'card' || way.icon === 'zelle'
+    ? giveIcon(way.icon, `luach-payment-icon${way.icon === 'zelle' ? ' is-zelle' : ''}`)
+    : '';
+  return `<button type="button" class="luach-payment-tab" role="tab" id="luach-tab-${way.icon}" aria-selected="${!index}" aria-controls="luach-panel-${way.icon}" tabindex="${index ? -1 : 0}">${mark}${escAttr(way.title)}</button>`;
+}
+
+/** Standard tab keyboard navigation, without replacing live payment frames. */
+function wireDonateTabs(root) {
+  const tabs = [...root.querySelectorAll('.luach-payment-tab')];
+  const select = (tab, focus = false) => {
+    for (const item of tabs) {
+      const active = item === tab;
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+      root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
+    }
+    if (focus) tab.focus();
+  };
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => select(tab));
+    tab.addEventListener('keydown', event => {
+      const at = tabs.indexOf(tab);
+      let next;
+      if (event.key === 'ArrowRight') next = (at + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (at + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) {
+        event.preventDefault();
+        select(tabs[next], true);
+      }
+    });
+  }
 }
 
 /** Put a card's detail on the clipboard, since the app it is wanted in is a tap away.
@@ -1092,11 +1060,11 @@ function wireDonateFrames(root) {
   const panels = [...root.querySelectorAll('.luach-give-frame')];
   const frameFits = new Map();
   // Scoped to the account and not to the card, which is the whole of a bug this had: the
-  // card and ACH way holds two payment pages, so asking the card for "the" frame handed
-  // both Donate buttons the first one. Pressing Building Fund opened its form in the panel
+  // card and ACH way holds multiple payment pages, so asking the card for "the" frame
+  // handed every Donate button the first one. Pressing Building Fund opened its form in the panel
   // belonging to Give to the Shul, under that heading, which on a page about money is not a
   // cosmetic mix-up.
-  const accountOf = (el) => el.closest('.luach-give-account') || el.closest('.luach-give-card');
+  const accountOf = (el) => el.closest('.luach-give-account');
   const shut = (panel) => {
     frameFits.get(panel)?.disconnect();
     frameFits.delete(panel);
@@ -1106,7 +1074,7 @@ function wireDonateFrames(root) {
     if (go) go.setAttribute('aria-expanded', 'false');
   };
   for (const go of root.querySelectorAll('.luach-give-go')) {
-    const card = go.closest('.luach-give-card');
+    const card = go.closest('.luach-payment-panel');
     const panel = accountOf(go).querySelector('.luach-give-frame');
     if (!panel) continue;
     go.setAttribute('aria-expanded', 'false');
@@ -1116,10 +1084,10 @@ function wireDonateFrames(root) {
       const opening = panel.hidden;
       for (const other of panels) if (other !== panel && !other.hidden) shut(other);
       if (!opening) { shut(panel); return; }
-      // The account's own name where there is one, so two forms in one card are told apart
+      // The account's own name where there is one, so the merchant forms are told apart
       // by anything reading the frame's title out.
       const title = accountOf(go).querySelector('.luach-account-title')
-        || card.querySelector('.luach-give-title');
+        || card.querySelector('.luach-payment-heading');
       panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref, go.dataset.websiteLabel);
       panel.hidden = false;
       go.setAttribute('aria-expanded', 'true');
@@ -1156,21 +1124,26 @@ function wireDonateFrames(root) {
 function renderDonatePage(published) {
   stopNextUp();
   const s = resolveSettings(published.settings);
+  const ways = DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value);
   main.className = 'is-give';
   main.innerHTML = `${backBar('donate')}
     <div class="luach-home luach-give-page">
       <header class="luach-give-head-block">
-        <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
+        <h1 class="luach-give-heading">${escAttr(DONATE.heading)}</h1>
         <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
-      ${DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value).map(donateWayHtml).join('')}
-      <div class="luach-give-legal">
-        <p>${escAttr(DONATE.legal)}</p>
-        <p class="luach-give-ein"><span>EIN: <bdi>${SHUL_TAX_ID}</bdi></span></p>
+      <section class="luach-payments" aria-label="Donation options">
+        <div class="luach-payment-tabs" role="tablist" aria-label="Payment method" style="--payment-methods:${ways.length}">
+          ${ways.map(donateTabHtml).join('')}
+        </div>
+        ${ways.map(donateWayHtml).join('')}
+      </section>
+      ${siteFooterHtml(s, `<div class="luach-give-legal">
+        <p>${escAttr(DONATE.legal)} <span class="luach-give-ein">· EIN: <bdi>${SHUL_TAX_ID}</bdi></span></p>
         <p>${escAttr(DONATE.deductible)}</p>
-      </div>
-      ${siteFooterHtml(s)}
+      </div>`)}
     </div>`;
+  wireDonateTabs(main);
   wireDonateFrames(main);
   wireDonateCopy(main);
   openTheDoor();
