@@ -151,7 +151,11 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await settle();
       assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0,
         'A standalone half-page poster does not offer unrelated layouts');
-      assert.equal(await page.locator('.shacharis-handout-note').count(), choiceIndex === 0 ? copies : 0);
+      const note = choiceIndex === 0 || (choiceIndex === 1 && year !== 5785) ? 'סליחות קודם שחרית' : null;
+      assert.deepEqual(await page.locator('.shacharis-handout-note').allTextContents(), note ? Array(copies).fill(note) : [],
+        'Only the years and rounds with sunrise after 7:05 print the Selichos note');
+      if (note) assert.equal(await page.locator('.shacharis-handout-row').filter({ has: page.locator('.shacharis-handout-note') })
+        .locator('.shacharis-handout-time').first().innerText(), '6:40', 'The note stays with the 6:40 minyan');
       const result = await measure(copies);
       measured.push({ choice, year, width, copies, typeSize: result.boxes[0].typeSize });
       if (output && year === 5787 && width === 1440 && copies === 1) {
@@ -159,6 +163,24 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         fs.writeFileSync(path.join(output, choiceIndex + '-one.pdf'), result.pdf);
       }
     }
+    for (const [year, note] of [[5786, 'סליחות קודם שחרית (ה׳ חשון, ח׳ חשון)'],
+      [5793, 'סליחות קודם שחרית (ט׳ חשון, י"ג חשון)']]) {
+      await page.locator('#poster-group').selectOption(choices[1]);
+      await chooseYear(year);
+      for (const copies of [1, 2]) for (const margin of ['0.35', '0.75']) {
+        await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
+        await page.locator('#poster-margin').selectOption(margin); await settle();
+        assert.deepEqual(await page.locator('.shacharis-handout-note').allTextContents(), Array(copies).fill(note),
+          'A mixed round clearly prints only the dates that need Selichos before Shacharis');
+        const result = await measure(copies);
+        measured.push({ choice: choices[1], year, width: 375, copies, margin, note, typeSize: result.boxes[0].typeSize });
+        if (output && year === 5786 && copies === 1 && margin === '0.35') {
+          await page.locator('.poster.is-shacharis').screenshot({ path: path.join(output, 'mixed-dates-poster.png') });
+          fs.writeFileSync(path.join(output, 'mixed-dates-one.pdf'), result.pdf);
+        }
+      }
+    }
+    await page.locator('#poster-margin').selectOption('0.35'); await settle();
     const rcMeasured = [];
     for (const year of [5785, 5787, 5790]) {
       await page.locator('#poster-group').selectOption('ראש חודש');

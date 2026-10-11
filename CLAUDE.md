@@ -229,8 +229,11 @@ Print only `שחרית` in their section bar, without a month name. These always
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each
 room beside its time instead of printing location marks or a location key. Read the
-times from the seasonal special Shacharis list, and retain Asara's conditional 6:40
-Selichos note. BHB dates come from the same `hasBehab` rule as the charts. All morning
+times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
+beside 6:40 when exact sunrise is later than 7:05, without rounding sunrise first.
+Check each of BHB's three dates separately. If only some qualify, name those Hebrew
+dates in the note; if all qualify, print the common note without repeating dates.
+BHB dates come from the same `hasBehab` rule as the charts. All morning
 rows have a plain background, without alternating location shading. The Yom Tov
 picker orders all groups by the first date they cover, including BHB and undrawn
 occasions, and older saved BHB month labels map to their renamed choices. These supplementary handouts are
