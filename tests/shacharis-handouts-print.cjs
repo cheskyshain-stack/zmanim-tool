@@ -82,7 +82,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.emulateMedia({ media: 'print' });
       const boxes = await page.locator('.poster.is-shacharis').evaluateAll(sheets => sheets.map(sheet => {
         const r = sheet.getBoundingClientRect(), cs = getComputedStyle(sheet);
-        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note')]
+        const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-date,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note')]
           .map(el => el.getBoundingClientRect());
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
@@ -116,6 +116,25 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
         assert(!/חשון|אייר/.test(title), 'No month name in the BHB title');
         assert.equal(await page.locator('.poster.is-shacharis .onepage-sec-head').first().innerText(), 'שחרית');
+        const expectedDates = await page.evaluate(async ({ year, month }) => {
+          const { buildBehabShacharisPoster } = await import('/js/posters/shacharis.js');
+          const { loadState } = await import('/js/storage.js');
+          const { resolveSettings } = await import('/js/settings.js');
+          const { dateFromSerial } = await import('/js/zmanim/solar.js');
+          return buildBehabShacharisPoster(year, month, resolveSettings(loadState().settings)).days
+            .map(serial => dateFromSerial(serial).toISOString().slice(0, 10));
+        }, { year, month: choiceIndex === 1 ? 8 : 2 });
+        assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date time')
+          .evaluateAll(dates => dates.map(date => date.dateTime)), expectedDates, 'All three actual BHB dates appear on the printed handout');
+        const datePositions = await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date')
+          .evaluateAll(dates => dates.map(date => date.getBoundingClientRect().x));
+        assert(datePositions[0] > datePositions[1] && datePositions[1] > datePositions[2], 'BHB dates read chronologically from right to left');
+        if (year === 5787 && choiceIndex === 1) {
+          assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
+            ["יום ב' · ח׳ חשון", 'יום ה\' · י"א חשון', 'יום ב\' · ט"ו חשון']);
+        }
+      } else {
+        assert.equal(await page.locator('.shacharis-handout-dates').count(), 0, 'Asara retains its existing title layout');
       }
       await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
       await settle();

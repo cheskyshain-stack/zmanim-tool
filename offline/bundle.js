@@ -13802,7 +13802,7 @@ function buildBehabShacharisPoster(year, month, settings) {
   if (!days.length) return null;
   return {
     hebrewYear: year, title: month === 8 ? BEHAB_SHACHARIS_TEXT.afterSukkos : BEHAB_SHACHARIS_TEXT.afterPesach,
-    subtitle: 'שחרית',
+    subtitle: 'שחרית', showDates: true,
     span: { from: days[0], to: days.at(-1) }, days,
     rows: shacharisRoomRows(specialShacharisLines().flat()),
   };
@@ -15930,9 +15930,9 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, shacharis = false } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, shacharis = false, dates = '' } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    <div class="halfpage-body${asara ? ' is-asara' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
+    ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
   const legend = shacharis ? [] : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
@@ -15980,7 +15980,14 @@ function renderShacharisHandout(poster, settings) {
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
   const days = poster.dayLabel ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true });
+  const dates = poster.showDates ? `<div class="shacharis-handout-dates" dir="rtl">${poster.days.map(serial => {
+    const weekday = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)];
+    const hebrew = jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0];
+    const date = dateFromSerial(serial);
+    return `<div class="shacharis-handout-date"><div lang="he">יום ${weekday}' · ${escAttr(hebrew)}</div>
+      <time dir="ltr" lang="en" datetime="${date.toISOString().slice(0, 10)}">${escAttr(yearFmt.format(date))}</time></div>`;
+  }).join('')}</div>` : '';
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
