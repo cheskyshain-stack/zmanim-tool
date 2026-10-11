@@ -1706,9 +1706,9 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, shacharis = false, dates = '' } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '' } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
+    ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
   const legend = shacharis ? [] : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
@@ -1725,7 +1725,7 @@ function renderHalfChanukahPoster(poster, settings) {
           <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
     + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row,
       label: row.label === s.title ? '' : row.label })).join(''))).join('');
-  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml);
+  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml, { chanukah: true });
 }
 
 function renderHalfAsaraBTevesPoster(poster, settings) {
@@ -2042,10 +2042,9 @@ const ONEPAGE_SECTIONS = {
     const oneLine = (label, times) => oneSection(label, [{ label, times }]);
     const sections = [
       oneSection(CH_TEXT.shacharis, p.shacharisRows.flatMap((row) => [shacharisRow(row), ...netzRows(row)])),
-      oneSection(CH_TEXT.mincha, [{ label: CH_TEXT.mincha, times: p.weekdayMincha.map(toCell) }, ...p.sundayMinchaRows]),
+      oneSection(CH_TEXT.mincha, p.minchaRows),
       oneLine(CH_TEXT.maariv, p.maariv.map(toCell)),
     ];
-    if (p.erevShabbos) sections.push(oneLine(p.erevShabbos.title, p.erevShabbos.cells));
     return sections;
   },
 };
@@ -2809,6 +2808,9 @@ function fitHalfPage(container) {
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
     const legend = sheet.querySelector('.poster-legend');
+    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap']) {
+      sheet.style.removeProperty(property);
+    }
     const fits = () => {
       const cs = getComputedStyle(sheet);
       const rect = sheet.getBoundingClientRect();
@@ -2826,6 +2828,21 @@ function fitHalfPage(container) {
     for (let size = 1.5; size >= 1; size = Math.round((size - 0.025) * 1000) / 1000) {
       sheet.style.setProperty('--op-scale', size);
       if (fits()) break;
+    }
+    // Large print margins can need less row padding even at the minimum type size.
+    if (sheet.querySelector('.halfpage-body.is-chanukah') && !fits()) {
+      for (const padding of [0.055, 0.045, 0.035, 0.025]) {
+        sheet.style.setProperty('--halfpage-row-pad', `${padding}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const gap of [0.03, 0.02, 0.01]) {
+        sheet.style.setProperty('--halfpage-line-gap', `${gap}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const gap of [0.12, 0.1, 0.08]) {
+        sheet.style.setProperty('--halfpage-section-gap', `${gap}in`);
+        if (fits()) break;
+      }
     }
     wrapper.style.zoom = zoom;
   }

@@ -169,13 +169,20 @@ when a wider print margin reduces the space, keeping all three parts clear.
 Reserve the logo's aspect ratio before loading so the fit includes its full height.
 The Shacharis day-group labels are bold. Keep Shacharis together,
 including all sunrise day labels in a compact strip with clear gaps between each
-day/time pair, followed by Mincha, Maariv and
-Erev Shabbos. Its heading says **מנחה ערב שבת**, including on the original full-page
-poster, so the Friday times identify their tefillah. Its printed Erev Shabbos list ends at
+day/time pair, followed by one Mincha section and Maariv. In Compact mode, every
+Mincha day group has its complete menu under the single **מנחה** heading, including
+Sunday's extra time and Erev Shabbos. Order groups by their earliest actual date.
+Use weekday labels and Erev Shabbos parsha labels; when two Sundays or Fridays have
+different menus, keep separate rows with their own parsha names. The original
+full-page poster retains its separate **מנחה ערב שבת** heading. The printed Erev Shabbos list ends at
 3:00: omit the trailing candle-lighting reference from the shared poster menu, without
 adding a separate candle-lighting section. Retain the earlier Mincha times and location
 notes. Fit the type
 at full size and refit when fonts arrive; a phone's preview zoom must not reach paper.
+If a large margin leaves too little room at the minimum type size, tighten the
+compact Chanukah row padding, then extra line and section gaps, enough to keep all
+menus and the footer within the margin. Retain at least 9.5pt times, including years
+with two distinct Sunday menus at the largest margin.
 Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
 onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
 `tests/chanukah-half-letter.cjs` checks seven years, phone and desktop PDFs, margin

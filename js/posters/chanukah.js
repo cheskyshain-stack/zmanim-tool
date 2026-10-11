@@ -24,7 +24,7 @@ import { formatTime, formatTimeWithSeconds, floorToMinute } from '../format.js';
 import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
-import { minyanList, MORNING, AFTERNOON } from './minyanim.js';
+import { minyanList, clockMins, MORNING, AFTERNOON } from './minyanim.js';
 
 const CH_MIN = 1 / 1440;
 const CH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -588,6 +588,40 @@ function chanukahErevShabbosPairs(kislev25) {
   return pairs;
 }
 
+/** Complete Mincha menus for the compact handout, ordered by each group's first
+ *  actual date. Different Friday or Sunday menus must remain separate. */
+function compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbosList, settings, tables) {
+  const groups = new Map();
+  const record = (serial, kind, times) => {
+    const key = kind + JSON.stringify(times.map(({ text, underlined, mark }) => [text, underlined, mark]));
+    if (!groups.has(key)) groups.set(key, { kind, times, serials: [] });
+    groups.get(key).serials.push(serial);
+  };
+  for (const friday of erevShabbosList) record(friday.serial, 'friday', friday.times.slice(0, -1).map(toCell));
+  const base = weekdayMincha.map(toCell);
+  for (const day of days) {
+    const weekday = excelWeekday(day.serial);
+    if (weekday === CH_FRIDAY) continue;
+    const extra = sundayMincha.find(item => item.serial === day.serial);
+    const times = [...(extra ? [toCell(extra.time)] : []), ...base]
+      .sort((a, b) => clockMins(a.text, AFTERNOON) - clockMins(b.text, AFTERNOON));
+    record(day.serial, weekday === 1 ? 'sunday' : 'weekday', times);
+  }
+  const rows = [...groups.values()].sort((a, b) => a.serials[0] - b.serials[0]);
+  const multipleSundays = rows.filter(row => row.kind === 'sunday').length > 1;
+  for (const row of rows) {
+    const parshas = tables ? [...new Set(row.serials.map(serial =>
+      hasParsha(serial + 7 - excelWeekday(serial), { ...settings, english: false }, tables)))].filter(Boolean) : [];
+    const parshaLabel = parshas.length ? ` · פרשת ${parshas.join(' ו')}` : '';
+    row.label = row.kind === 'friday' ? CH_TEXT.erevShabbos + parshaLabel
+      : `יום ${[...new Set(row.serials.map(excelWeekday))].sort((a, b) => a - b)
+        .map(weekday => HE_DAY_LETTERS[weekday] + '׳').join(' ')}`;
+    if (row.kind === 'sunday' && multipleSundays) row.label += parshaLabel || ` · ${row.serials
+      .map(serial => jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]).join(' / ')}`;
+  }
+  return rows;
+}
+
 /** The finished poster for one Hebrew year. `tables` is the Hebrew-calendar parsha tables
  *  (`{parshaChutz, parshaEY, parshaNames}`), only needed to head the ערב שבת block by its
  *  own parsha; the sheet still builds and prints without it, just with a plainer heading. */
@@ -656,6 +690,7 @@ export function buildChanukahPoster(year, settings, tables) {
     days,
     shacharisRows: combineShacharisRows(days),
     weekdayMincha,
+    minchaRows: compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbosList, settings, tables),
     sundayMincha,
     sundayMinchaRows,
     maariv,
