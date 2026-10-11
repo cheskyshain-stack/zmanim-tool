@@ -997,7 +997,7 @@ function donateWayHtml(way) {
   const mark = way.iconImage
     ? `<img class="luach-give-mark-image" src="${escAttr(way.iconImage)}" alt="" width="40" height="40" decoding="async">`
     : giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
-  return `<details class="luach-give-card" name="luach-give"${way.accounts?.length ? ' open' : ''}>
+  return `<details class="luach-give-card" name="luach-give">
     <summary class="luach-give-head">
       <span class="${markClass}" aria-hidden="true">${mark}</span>
       <div class="luach-give-body">
