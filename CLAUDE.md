@@ -148,6 +148,7 @@ Every Sunday during Chanukah has an extra downstairs Mincha at 12:30. Move it la
 in five-minute steps until it is strictly after that Sunday's exact Mincha Gedola
 Lechumra, without rounding the limit down. Share this rule between the poster,
 weekday chart's Sunday-only note, daily schedule, next minyan, API, and weekly text.
+On the seasonal weekday chart, show the extra time with the compact **יום א׳** tag.
 Label the extra time Sunday only on both full-page and half-page Chanukah posters.
 If Chanukah includes two Sundays with different extra times, label each with its
 Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.

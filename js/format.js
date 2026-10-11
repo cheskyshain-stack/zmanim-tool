@@ -84,9 +84,9 @@ export const CHANUKAH_TAG_START = '';
 export const CHANUKAH_TAG_MID = '';
 export const CHANUKAH_TAG_END = '';
 
-/** Wraps an already-formatted cell value so it renders inside the "חנוכה" tag. */
-export function chanukahTag(text) {
-  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + 'חנוכה' + CHANUKAH_TAG_END;
+/** Wraps a cell value with a small label, defaulting to "חנוכה". */
+export function chanukahTag(text, label = 'חנוכה') {
+  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + label + CHANUKAH_TAG_END;
 }
 
 // Same PUA mechanism again, for a span that should print smaller than the rest of its cell:
