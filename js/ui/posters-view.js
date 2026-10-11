@@ -39,7 +39,8 @@ import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWee
 import { excelSerial, dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang, DAY_NAMES, SLASH, escAttr, useStraightHebrewQuotes } from '../util.js';
+import { hebrewLang, DAY_NAMES, SLASH, escAttr, useStraightHebrewQuotes, balancedLineCuts } from '../util.js';
+import { measureTimeItems } from './time-lines.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
@@ -1332,7 +1333,8 @@ function balanceRuns(container) {
     const afterNote = note
       ? times.findIndex((t) => note.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)
       : -1;
-    const cut = afterNote > 0 ? afterNote : Math.floor(times.length / 2);
+    const { widths, prefixes } = measureTimeItems(times);
+    const cut = afterNote > 0 ? afterNote : balancedLineCuts(widths, { prefixes, lead: note?.offsetWidth || 0 })[0];
     if (cut) cuts.push({ run, rest: times.slice(cut) });
   }
   for (const { run, rest } of cuts) {
@@ -1838,8 +1840,8 @@ const ONEPAGE_PER_LINE = 4;
  *  Where the cut goes is a question about width, not about how many times there are. Six
  *  times split three and three is even only if all six are the same width, and they are not:
  *  a time carrying ** is wider than a bare one, and an underlined 10:30 is wider than 7:00.
- *  Three and three came out with one line visibly longer than the other. So every cut is
- *  tried and the one that leaves the wider line narrowest wins.
+ *  Three and three came out with one line visibly longer than the other. The shared
+ *  balancer chooses the closest widths with wider lines below shorter ones.
  *
  *  Measured after the sheet is on the page, the same as balanceRuns, because the answer is
  *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the
@@ -1853,45 +1855,11 @@ const ONEPAGE_PER_LINE = 4;
  *  moved to the second line and the slashes work themselves out around the break. A slash
  *  written into the markup would be left stranded at the end of the first line. Same trick,
  *  and the same reason, as the box on the יום כיפור sheet. */
-/** Where to cut a run of the given widths into `lines` lines so the widest line is as narrow
- *  as it can be, as a list of indices to break at.
- *
- *  Every split is tried rather than the run divided evenly, because the times are not the same
- *  width: one carrying ** is wider than a bare one and an underlined 10:30 is wider than 7:00.
- *  Small enough to do exhaustively (a dozen times over three lines), and memoised on where the
- *  line starts and how many are left so it stays that way if a run ever gets longer.
- *
- *  `lead` is the width of anything already on the first line before the times, which on this
- *  sheet is the note in brackets some rows carry. */
-function evenCuts(wide, lead, lines) {
-  const memo = new Map();
-  const go = (from, left) => {
-    if (left === 1) {
-      return { worst: wide.slice(from).reduce((a, x) => a + x, from === 0 ? lead : 0), cuts: [] };
-    }
-    const key = `${from}:${left}`;
-    if (memo.has(key)) return memo.get(key);
-    let best = null;
-    let head = from === 0 ? lead : 0;
-    for (let i = from; i <= wide.length - left; i++) {
-      head += wide[i];
-      const rest = go(i + 1, left - 1);
-      const worst = Math.max(head, rest.worst);
-      // Strictly narrower to win, so a tie leaves the cut where it already is, which is the
-      // earlier one: fewer on the top line, the way round the shul asked for on the box.
-      if (!best || worst < best.worst) best = { worst, cuts: [i + 1, ...rest.cuts] };
-    }
-    memo.set(key, best);
-    return best;
-  };
-  return go(0, lines).cuts;
-}
-
 function balanceOnePageTimes(container) {
   for (const run of container.querySelectorAll('.onepage-line')) {
     const times = [...run.querySelectorAll(':scope > .onepage-t')];
     if (times.length <= ONEPAGE_PER_LINE) continue;
-    const wide = times.map((t) => t.offsetWidth);
+    const { widths, prefixes } = measureTimeItems(times);
     /* The note at the head of the run counts towards the first line, because it is on it.
        Left out, the two סליחות rows carrying one came out 180px against 109px: the note is
        79px of that first line and the cut was being chosen as though it were not there.
@@ -1913,7 +1881,7 @@ function balanceOnePageTimes(container) {
        It is the חול המועד מעריב that made this more than one cut: eleven and twelve times cut
        in half is six to a line, which ran to the column rule and past it. */
     const lines = Math.ceil(times.length / ONEPAGE_PER_LINE);
-    const cuts = evenCuts(wide, lead, lines);
+    const cuts = balancedLineCuts(widths, { lead, lines, prefixes });
     // The times before the first cut stay where they are; each cut after that is a line of its
     // own, put after the one before it so the run reads down the rows in order.
     let last = run;

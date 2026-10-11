@@ -704,51 +704,77 @@ function flattenNonEmpty(parts) {
   return flat.filter((x) => x !== '' && x != null);
 }
 
-/** Splits a list of time options across two printed lines. The bottom line gets the
- *  larger (or equal) half by default, floor(n/2) on top and ceil(n/2) below, which is
- *  what every one of these columns has always done and reads as one consistent pattern
- *  down the page.
- *
- *  That default is only overridden when it would read clearly lopsided by width - not
- *  plain item count, since 10:00 is a whole item wider than 7:00 and a board full of one
- *  but not the other (later evening times run longer than earlier afternoon ones) can
- *  split lopsided even at an even item count. A בראשית מעריב line of
- *  7:30/8:00/8:30/8:45/9:00 against 9:30/10:00/10:30/11:00/11:30/12:00 read as five short
- *  items over six longer ones, the bottom line fifteen characters wider than the top
- *  (measured) - moving the cut over one item narrows that to five, and only a gap that
- *  much worse than the alternative (here, more than double it) is worth giving up the
- *  bottom-heavier default for. A smaller gap stays bottom-heavy even if the other cut
- *  would have measured a few characters closer, since the consistent pattern is worth
- *  more than a handful of characters.
- *
- *  Only the two candidates nearest the middle are ever weighed (floor(n/2) and
- *  ceil(n/2)), never a lopsided count-wise split in the name of a closer width. Character
- *  count is the width proxy rather than a measured pixel width: this runs while the sheet
- *  is being built, before there is a rendered cell to measure at all.
- *
- *  `cut` overrides the choice outright, for a caller with its own reason to want a
- *  specific split regardless of what balances best - see the Weekday chart's "NEW" tag
- *  (sheets/weekday.js), which is not plain text and so is not honestly weighed by
- *  counting its characters. */
+/** Keep times in order while balancing line widths, with wider lines below narrower
+ *  ones. `prefixes` holds each item's leading separator, removed at a line start.
+ *  A leading note stays on the first line. If that makes increasing widths impossible,
+ *  use the closest balance without changing the order or detaching the note. */
+function balancedLineCuts(widths, { lines = 2, prefixes = [], lead = 0 } = {}) {
+  const count = Math.min(widths.length, Math.max(1, Math.floor(lines)));
+  if (count <= 1) return [];
+  const sums = [0];
+  widths.forEach(width => sums.push(sums.at(-1) + width));
+  const lineWidth = (from, to) => sums[to] - sums[from] - (prefixes[from] || 0) + (from === 0 ? lead : 0);
+  const memo = new Map();
+  const finish = (from, left, previous) => {
+    const key = `${from}:${left}:${previous}`;
+    if (memo.has(key)) return memo.get(key);
+    if (left === 1) {
+      const last = lineWidth(from, widths.length);
+      const answer = last >= previous - 0.5 ? { last, cuts: [] } : null;
+      memo.set(key, answer);
+      return answer;
+    }
+    let answer = null;
+    for (let end = from + 1; end <= widths.length - left + 1; end++) {
+      const width = lineWidth(from, end);
+      if (width < previous - 0.5) continue;
+      const rest = finish(end, left - 1, width);
+      if (rest && (!answer || rest.last < answer.last - 0.001)) {
+        answer = { last: rest.last, cuts: [end, ...rest.cuts] };
+      }
+    }
+    memo.set(key, answer);
+    return answer;
+  };
+  let best = null;
+  for (let end = 1; end <= widths.length - count + 1; end++) {
+    const first = lineWidth(0, end), rest = finish(end, count - 1, first);
+    if (!rest) continue;
+    const spread = rest.last - first;
+    if (!best || spread < best.spread - 0.001
+      || Math.abs(spread - best.spread) <= 0.001 && rest.last < best.last - 0.001) {
+      best = { spread, last: rest.last, cuts: [end, ...rest.cuts] };
+    }
+  }
+  if (best) return best.cuts;
+
+  // A wide attached note can prevent increasing lines. Minimize the widest line then.
+  const fallbackMemo = new Map();
+  const fallback = (from, left) => {
+    if (left === 1) return { worst: lineWidth(from, widths.length), cuts: [] };
+    const key = `${from}:${left}`;
+    if (fallbackMemo.has(key)) return fallbackMemo.get(key);
+    let answer = null;
+    for (let end = from + 1; end <= widths.length - left + 1; end++) {
+      const rest = fallback(end, left - 1), worst = Math.max(lineWidth(from, end), rest.worst);
+      if (!answer || worst < answer.worst) answer = { worst, cuts: [end, ...rest.cuts] };
+    }
+    fallbackMemo.set(key, answer);
+    return answer;
+  };
+  return fallback(0, count).cuts;
+}
+
+/** A text-only estimate until the browser can measure the actual font and tags.
+ *  Invisible formatting marks and underline lead-in spaces do not add width. */
 function splitLinesInHalf(items, delim = SLASH, cut = null) {
-  const resolvedCut = cut ?? bestSplitCut(items, delim);
+  const visibleWidth = text => String(text).replace(/<[^>]*>/g, '')
+    .replace(/[\uE000-\uF8FF\u2066-\u2069]/g, '').trim().length;
+  const prefixes = items.map((_, i) => i ? delim.length : 0);
+  const resolvedCut = cut ?? balancedLineCuts(items.map((item, i) => visibleWidth(item) + prefixes[i]), { prefixes })[0] ?? items.length;
   const line1 = items.slice(0, resolvedCut).join(delim);
   const line2 = items.slice(resolvedCut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
-}
-
-/** Bottom-heavier by default (see splitLinesInHalf), moved to top-heavier only when
- *  staying bottom-heavy would leave a gap more than double the alternative's. */
-function bestSplitCut(items, delim) {
-  const lo = Math.floor(items.length / 2); // bottom gets the larger half
-  const hi = Math.ceil(items.length / 2); // top gets the larger half
-  if (lo === hi) return lo;
-  const widthDiff = (cut) => Math.abs(
-    items.slice(0, cut).join(delim).length - items.slice(cut).join(delim).length
-  );
-  const bottomHeavyGap = widthDiff(lo);
-  const topHeavyGap = widthDiff(hi);
-  return bottomHeavyGap > topHeavyGap * 2 ? hi : lo;
 }
 
 /** HTML escaping, in the two shapes this codebase actually uses.
@@ -7736,14 +7762,8 @@ function maarivParts(week, settings) {
      cell rendering reaches for `printOverrides`, and only when this week's own column has
      not been typed over by hand.
      showNewBadge (קיץ only) and chanukahEarly (חורף only) can never both be true the same
-     week, so the two tags never have to share one line and the "NEW" cut below only ever
-     has to answer for kept's own slots. */
-  /* One fewer plain item on the tagged line than the even count split would give it
-     (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
-     line reading visibly wider than the other. 11:30 is always the last kept slot whenever
-     the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
-     already requires), so it always falls on the second line and ceil rather than floor is
-     always the direction that shortens it. */
+     week, so the two tags never have to share one list. */
+  // The chart measures the complete tags when balancing its printed lines.
   const printText = (showNewBadge || chanukahEarlyText)
     ? splitLinesInHalf([
         ...(chanukahEarlyText ? [chanukahTag(chanukahEarlyText)] : []),
@@ -7751,7 +7771,7 @@ function maarivParts(week, settings) {
           const rendered = renderTime(slot.mins, placeOf(slot));
           return showNewBadge && slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
         }),
-      ], undefined, showNewBadge ? Math.ceil(kept.length / 2) : null)
+      ])
     : null;
 
   return {
@@ -8576,6 +8596,49 @@ function installTimeExplanations(main, host) {
   window.addEventListener('beforeprint', () => { if (dialog.open) dialog.close(); });
 }
 
+// ==== ui/time-lines.js ====
+/** Used CSS widths retain fractions in paper pixels under phone zoom. Inline spans
+ *  fall back to offsetWidth, including on rotated posters. Emptying an item briefly
+ *  measures its CSS separator without counting it as time text. */
+function measureTimeItems(items) {
+  const widthOf = item => {
+    const width = parseFloat(getComputedStyle(item).width);
+    return Number.isFinite(width) ? width : item.offsetWidth;
+  };
+  const widths = items.map(widthOf);
+  const measured = new Map();
+  const prefixes = items.map(item => {
+    const style = getComputedStyle(item, '::before');
+    if (style.content === 'none' || style.content === 'normal') return 0;
+    const key = [style.content, style.fontFamily, style.fontSize, style.fontWeight,
+      style.letterSpacing, style.paddingLeft, style.paddingRight].join('|');
+    if (measured.has(key)) return measured.get(key);
+    const children = [...item.childNodes];
+    item.replaceChildren();
+    const width = widthOf(item);
+    item.replaceChildren(...children);
+    measured.set(key, width);
+    return width;
+  });
+  return { widths, prefixes };
+}
+
+function balanceChartTimeLists(container) {
+  for (const list of container.querySelectorAll('.chart-time-list')) {
+    const items = [...list.querySelectorAll('.chart-time-item')];
+    const first = list.firstElementChild;
+    first.replaceChildren(...items);
+    while (first.nextElementSibling) first.nextElementSibling.remove();
+    const { widths, prefixes } = measureTimeItems(items);
+    const [cut] = balancedLineCuts(widths, { prefixes });
+    if (!cut) continue;
+    const bottom = document.createElement('span');
+    bottom.className = 'chart-time-line';
+    bottom.append(...items.slice(cut));
+    first.after(bottom);
+  }
+}
+
 // ==== zmanim/references.js ====
 const ZMANIM_REFERENCE_GROUPS = {
   shacharis: 'Shacharis', mincha: 'Mincha', maariv: 'Maariv', other: 'Other zmanim',
@@ -9365,6 +9428,7 @@ function atPaperSize(pagesEl, measure) {
  *  Rows share that height, with a taller header only where its content needs it. */
 function syncHeaderRowHeight(pagesEl) {
   atPaperSize(pagesEl, pages => {
+    balanceChartTimeLists(pagesEl);
     const layouts = pages.map(page => {
       const header = page.querySelector('.page-header');
       const footer = page.querySelector('.page-footer');
@@ -9611,7 +9675,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const overridden = overriddenKeys.has(c.key);
           const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
-          const html = overridden ? value : nl2br(value);
+          const html = overridden ? value : timeListCell(value, c.header);
           return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
@@ -9623,7 +9687,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
         // column - a hand-typed override, week.specialParsha, anything that reads row.I
         // directly - still sees the plain untagged time.
         const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
-        const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
+        const html = overriddenKeys.has(c.key) ? computedValue : timeListCell(computedValue, c.header);
         return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
@@ -9813,6 +9877,19 @@ function headerHtml(c) {
 // <span> specifically so the underline toolbar (and Ctrl/Cmd+U) can *remove* it: those
 // go through execCommand, which only recognizes its own native markup and silently
 // no-ops on a class-based underline it doesn't know how to undo.
+/** Minyan lists share one measured split. Named zmanim and manually arranged cells
+ *  keep their own lines, including a candle-lighting time above its sunset. */
+function timeListCell(value, header) {
+  if (!/מנחה|מעריב/.test(header)) return nl2br(value);
+  const items = String(value).split(/\s*[\n/]\s*/);
+  const tagLabels = new RegExp(`[${NEW_TAG_MID}${CHANUKAH_TAG_MID}][^${NEW_TAG_END}${CHANUKAH_TAG_END}]*[${NEW_TAG_END}${CHANUKAH_TAG_END}]`, 'g');
+  const timeOnly = item => /^\d{1,2}:\d{2}(?::\d{2})?\*{0,3}$/.test(item.replace(tagLabels, '')
+    .replace(/[\uE000-\uF8FF\u2066-\u2069]/g, '').trim());
+  if (items.length < 2 || !items.every(timeOnly)) return nl2br(value);
+  return '<span class="chart-time-list"><span class="chart-time-line">'
+    + items.map(item => `<span class="chart-time-item">${nl2br(item)}</span>`).join('') + '</span></span>';
+}
+
 function nl2br(str) {
   // Keep the three Tisha B'Av labels and times aligned in two shared columns.
   const evening = String(str).match(/^דרשה (\d{1,2}:\d{2})\nזמן 72 (\d{1,2}:\d{2})\nמעריב (\d{1,2}:\d{2})$/);
@@ -14612,6 +14689,7 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
 
 
 
+
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
  *  change when somebody picks a different font for the board. fontStackFor() adds the
@@ -15899,7 +15977,8 @@ function balanceRuns(container) {
     const afterNote = note
       ? times.findIndex((t) => note.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)
       : -1;
-    const cut = afterNote > 0 ? afterNote : Math.floor(times.length / 2);
+    const { widths, prefixes } = measureTimeItems(times);
+    const cut = afterNote > 0 ? afterNote : balancedLineCuts(widths, { prefixes, lead: note?.offsetWidth || 0 })[0];
     if (cut) cuts.push({ run, rest: times.slice(cut) });
   }
   for (const { run, rest } of cuts) {
@@ -16405,8 +16484,8 @@ const ONEPAGE_PER_LINE = 4;
  *  Where the cut goes is a question about width, not about how many times there are. Six
  *  times split three and three is even only if all six are the same width, and they are not:
  *  a time carrying ** is wider than a bare one, and an underlined 10:30 is wider than 7:00.
- *  Three and three came out with one line visibly longer than the other. So every cut is
- *  tried and the one that leaves the wider line narrowest wins.
+ *  Three and three came out with one line visibly longer than the other. The shared
+ *  balancer chooses the closest widths with wider lines below shorter ones.
  *
  *  Measured after the sheet is on the page, the same as balanceRuns, because the answer is
  *  about what the browser actually drew. offsetWidth rather than a rect: a phone shrinks the
@@ -16420,45 +16499,11 @@ const ONEPAGE_PER_LINE = 4;
  *  moved to the second line and the slashes work themselves out around the break. A slash
  *  written into the markup would be left stranded at the end of the first line. Same trick,
  *  and the same reason, as the box on the יום כיפור sheet. */
-/** Where to cut a run of the given widths into `lines` lines so the widest line is as narrow
- *  as it can be, as a list of indices to break at.
- *
- *  Every split is tried rather than the run divided evenly, because the times are not the same
- *  width: one carrying ** is wider than a bare one and an underlined 10:30 is wider than 7:00.
- *  Small enough to do exhaustively (a dozen times over three lines), and memoised on where the
- *  line starts and how many are left so it stays that way if a run ever gets longer.
- *
- *  `lead` is the width of anything already on the first line before the times, which on this
- *  sheet is the note in brackets some rows carry. */
-function evenCuts(wide, lead, lines) {
-  const memo = new Map();
-  const go = (from, left) => {
-    if (left === 1) {
-      return { worst: wide.slice(from).reduce((a, x) => a + x, from === 0 ? lead : 0), cuts: [] };
-    }
-    const key = `${from}:${left}`;
-    if (memo.has(key)) return memo.get(key);
-    let best = null;
-    let head = from === 0 ? lead : 0;
-    for (let i = from; i <= wide.length - left; i++) {
-      head += wide[i];
-      const rest = go(i + 1, left - 1);
-      const worst = Math.max(head, rest.worst);
-      // Strictly narrower to win, so a tie leaves the cut where it already is, which is the
-      // earlier one: fewer on the top line, the way round the shul asked for on the box.
-      if (!best || worst < best.worst) best = { worst, cuts: [i + 1, ...rest.cuts] };
-    }
-    memo.set(key, best);
-    return best;
-  };
-  return go(0, lines).cuts;
-}
-
 function balanceOnePageTimes(container) {
   for (const run of container.querySelectorAll('.onepage-line')) {
     const times = [...run.querySelectorAll(':scope > .onepage-t')];
     if (times.length <= ONEPAGE_PER_LINE) continue;
-    const wide = times.map((t) => t.offsetWidth);
+    const { widths, prefixes } = measureTimeItems(times);
     /* The note at the head of the run counts towards the first line, because it is on it.
        Left out, the two סליחות rows carrying one came out 180px against 109px: the note is
        79px of that first line and the cut was being chosen as though it were not there.
@@ -16480,7 +16525,7 @@ function balanceOnePageTimes(container) {
        It is the חול המועד מעריב that made this more than one cut: eleven and twelve times cut
        in half is six to a line, which ran to the column rule and past it. */
     const lines = Math.ceil(times.length / ONEPAGE_PER_LINE);
-    const cuts = evenCuts(wide, lead, lines);
+    const cuts = balancedLineCuts(widths, { lead, lines, prefixes });
     // The times before the first cut stay where they are; each cut after that is a line of its
     // own, put after the one before it so the run reads down the rows in order.
     let last = run;

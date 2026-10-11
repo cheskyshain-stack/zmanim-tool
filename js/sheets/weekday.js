@@ -431,14 +431,8 @@ function maarivParts(week, settings) {
      cell rendering reaches for `printOverrides`, and only when this week's own column has
      not been typed over by hand.
      showNewBadge (קיץ only) and chanukahEarly (חורף only) can never both be true the same
-     week, so the two tags never have to share one line and the "NEW" cut below only ever
-     has to answer for kept's own slots. */
-  /* One fewer plain item on the tagged line than the even count split would give it
-     (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
-     line reading visibly wider than the other. 11:30 is always the last kept slot whenever
-     the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
-     already requires), so it always falls on the second line and ceil rather than floor is
-     always the direction that shortens it. */
+     week, so the two tags never have to share one list. */
+  // The chart measures the complete tags when balancing its printed lines.
   const printText = (showNewBadge || chanukahEarlyText)
     ? splitLinesInHalf([
         ...(chanukahEarlyText ? [chanukahTag(chanukahEarlyText)] : []),
@@ -446,7 +440,7 @@ function maarivParts(week, settings) {
           const rendered = renderTime(slot.mins, placeOf(slot));
           return showNewBadge && slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
         }),
-      ], undefined, showNewBadge ? Math.ceil(kept.length / 2) : null)
+      ])
     : null;
 
   return {
