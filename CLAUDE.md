@@ -487,10 +487,12 @@ Export/Import in Settings moves it between devices.
 
 ## Screen layout
 
-- Donation sections start closed. Keep Copy EIN only inside DAF, with the nonprofit
-  information and plain EIN at the bottom of the page. The footer follows expanded
-  content and uses spare height above it when the page is short. Zelle already has its
-  real brand mark in `GIVE_ICONS`; hide its option until recipient details are confirmed.
+- Donation payment methods use one tabbed panel, with Card · ACH selected initially
+  and all five funds visible. DAF shows its providers and the only Copy EIN button.
+  Keep the condensed nonprofit information and plain EIN inside the contact footer
+  at the bottom. The footer follows expanded forms and uses spare height above it
+  when the page is short. Switching methods preserves entered payment forms.
+  Zelle already has its real brand mark in `GIVE_ICONS`; hide its option until recipient details are confirmed.
 - `main:not(.is-sheet-view)` is capped at 62rem and left aligned against the sidebar.
   This is deliberate and was asked for twice: the point is not dragging the mouse from
   one edge of the screen to the other. **Do not centre it.** Centring was tried and
