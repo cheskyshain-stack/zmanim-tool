@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
       assert.equal(importMap(html)[name], importMap(expectedHTML)[name], name + ' has the tested version');
     }
     await page.locator('#poster-sheet .poster').waitFor();
-    const settle = () => page.evaluate(() => document.fonts.ready);
+    const settle = () => page.evaluate(() => { const advanced = document.querySelector('.special-print-settings'); if (advanced) advanced.open = true; return document.fonts.ready; });
     const chooseYear = async year => {
       while (Number(await page.locator('.poster-year-now').getAttribute('data-year')) !== year) {
         await page.locator(Number(await page.locator('.poster-year-now').getAttribute('data-year')) < year ? '#poster-year-next' : '#poster-year-back').click();
@@ -53,7 +53,9 @@ const server = http.createServer((req, res) => {
     };
     for (const width of [1440, 375]) for (const mode of ['one', 'each', 'all']) for (const year of [5785, 5786, 5787]) for (const copies of mode === 'all' ? [1, 2] : [1]) {
       await page.setViewportSize({ width, height: 1100 });
-      await page.locator(`label[for=poster-sheets-${mode}]`).click();
+      await page.locator(`label[for=poster-workflow-${mode === 'each' ? 'set' : 'single'}]`).click();
+      if (mode === 'each') await page.locator('label[for=poster-set-layout-original]').click();
+      else await page.locator(`label[for=poster-sheets-${mode}]`).click();
       await chooseYear(year);
       if (mode === 'all') {
         await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
@@ -121,7 +123,7 @@ const server = http.createServer((req, res) => {
       measured.push({ year, width, mode, copies, boxes });
     }
     // The phone inspector explains the new later rounding for sunset and both Maariv times.
-    await page.locator('#explain-times-toggle').click();
+    await page.locator('[data-poster-explain]').click();
     for (const [printed, before, offset] of [['4:35', '4:34:08', null], ['5:10', '5:09:08', 35], ['5:25', '5:24:08', 50]]) {
       const target = page.locator('#poster-sheet .poster').first().locator('[data-time-explain]')
         .filter({ hasText: new RegExp('^' + printed + '$') }).first();
@@ -137,7 +139,7 @@ const server = http.createServer((req, res) => {
       await page.keyboard.press('Escape');
       await dialog.waitFor({ state: 'hidden' });
     }
-    await page.locator('#explain-times-toggle').click();
+    await page.locator('[data-poster-explain]').click();
     // Copies and physical size survive reloads, large margins, and phone rotation.
     await page.reload(); await page.locator('.poster.is-halfpage').first().waitFor(); await settle();
     assert(await page.locator('#poster-copies-two').isChecked(), 'Two copies are remembered');

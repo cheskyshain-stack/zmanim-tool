@@ -36,7 +36,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.clock.setFixedTime(new Date('2026-10-08T12:00:00Z'));
     await page.goto(origin + '/admin/#posters/all');
     await page.locator('.poster.is-halfpage').waitFor();
-    const settle = () => page.evaluate(() => document.fonts.ready);
+    const settle = () => page.evaluate(() => { const advanced = document.querySelector('.special-print-settings'); if (advanced) advanced.open = true; return document.fonts.ready; });
     const year = () => page.locator('.poster-year-now').getAttribute('data-year').then(Number);
     const chooseYear = async value => {
       while (await year() !== value) await page.locator(await year() < value ? '#poster-year-next' : '#poster-year-back').click();
@@ -163,7 +163,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     }
     await chooseYear(5788);
     for (const mode of ['one', 'each', 'all']) {
-      await page.locator(`label[for=poster-sheets-${mode}]`).click();
+      await page.locator(`label[for=poster-workflow-${mode === 'each' ? 'set' : 'single'}]`).click();
+      if (mode === 'each') await page.locator('label[for=poster-set-layout-original]').click();
+      else await page.locator(`label[for=poster-sheets-${mode}]`).click();
       await settle();
       if (mode === 'all') {
         assert(await page.locator('#poster-copies-two').isChecked(), 'Returning to All on one retains the copy choice');
@@ -187,7 +189,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.reload(); await page.locator('.poster.is-halfpage').waitFor(); await settle();
     assert(await page.locator('#poster-copies-one').isChecked(), 'One copy remembered after reload');
     await page.locator('label[for=poster-copies-two]').click(); await settle();
-    const toggle = page.locator('#explain-times-toggle');
+    const toggle = page.locator('[data-poster-explain]');
     if (await toggle.getAttribute('aria-pressed') === 'false') await toggle.click();
     const secondTime = page.locator('.poster.is-halfpage').nth(1).locator('.onepage-sec').nth(1)
       .locator('.onepage-times [data-time-explain]').first();
@@ -199,6 +201,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.keyboard.press('Escape');
     await toggle.click();
     // A whole-year print run keeps portrait paper and every occasion on its own sheet.
+    await page.locator('label[for=poster-workflow-set]').click(); await settle();
     await page.locator('label[for=poster-scope-all]').click(); await settle();
     const count = await page.locator('.poster-all-item').count();
     assert(count > 1);
@@ -213,7 +216,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     assert.equal(pdfPages(run), count, 'Mixed run has one page per occasion');
     assert.match(run.toString('latin1'), /\/MediaBox \[0 0 612 792\]/);
     await page.emulateMedia({ media: 'screen' });
-    await page.locator('label[for=poster-sheets-each]').click(); await settle();
+    await page.locator('label[for=poster-set-layout-original]').click(); await settle();
     assert.equal(await page.locator('.poster.is-halfpage,#poster-copies-one').count(), 0, 'A sheet each keeps every original poster in a whole-year run');
     assert.equal(await page.locator('.poster.is-chanukah').count(), 1);
     // This short-Kislev year has two Sundays, with the second opening delayed to 12:35.
@@ -221,6 +224,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.goto(origin + '/admin/?future-print=5804#posters/all');
     await page.locator('label[for=poster-scope-one]').click();
     await page.locator('#poster-group').selectOption('חנוכה');
+    await page.locator('label[for=poster-workflow-single]').click();
     await page.locator('label[for=poster-sheets-all]').click();
     for (const copies of ['one', 'two']) {
       await page.locator(`label[for=poster-copies-${copies}]`).click();

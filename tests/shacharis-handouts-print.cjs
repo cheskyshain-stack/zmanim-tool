@@ -15,9 +15,9 @@ const server = http.createServer((req, res) => {
     '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2' })[path.extname(file)] || 'application/octet-stream');
   res.end(fs.readFileSync(file));
 });
-const choices = ['עשרה בטבת · שחרית', 'בה"ב אחר סוכות', 'בה"ב אחר פסח'];
-const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'ראש חודש', 'בה"ב אחר סוכות', 'חנוכה',
-  'עשרה בטבת', 'עשרה בטבת · שחרית', 'פורים', 'פסח', 'בה"ב אחר פסח', 'שבועות', 'שבעה עשר בתמוז', 'תשעה באב'];
+const choices = ['עשרה בטבת', 'בה"ב אחר סוכות', 'בה"ב אחר פסח'];
+const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות',
+  'ראש חודש', 'בה"ב אחר סוכות', 'חנוכה', 'עשרה בטבת', 'פורים', 'בה"ב אחר פסח', 'שבעה עשר בתמוז', 'תשעה באב'];
 const expected = [
   ['בית מדרש', '6:40'], ['בעזרת נשים', '7:00'], ['בית מדרש למטה', '7:15'],
   ['באולם השמחות', '7:35'], ['בית מדרש', '8:00'], ['בעזרת נשים', '8:20'], ['בית מדרש למטה', '8:40'],
@@ -56,7 +56,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       assert.equal(imports(html)[module], imports(localHTML)[module], 'Tested module is served');
     }
     await page.locator('.poster.is-shacharis').waitFor();
-    const settle = () => page.evaluate(() => document.fonts.ready);
+    const settle = () => page.evaluate(() => { const advanced = document.querySelector('.special-print-settings'); if (advanced) advanced.open = true; return document.fonts.ready; });
     const chooseYear = async year => {
       while (Number(await page.locator('.poster-year-now').getAttribute('data-year')) !== year) {
         await page.locator(Number(await page.locator('.poster-year-now').getAttribute('data-year')) < year ? '#poster-year-next' : '#poster-year-back').click();
@@ -112,8 +112,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     for (const [choiceIndex, choice] of choices.entries()) for (const year of [5785, 5787, 5790]) for (const width of [1440, 375]) for (const copies of [1, 2]) {
       await page.setViewportSize({ width, height: 1100 });
       await page.locator('#poster-group').selectOption(choice);
+      if (choiceIndex === 0) await page.locator('#poster-pick').selectOption('asarashacharis');
       await chooseYear(year);
-      assert.deepEqual(await page.locator('#poster-group option').allTextContents(), chronologicalChoices, 'Yom Tov picker is chronological in ' + year);
+      assert.deepEqual(await page.locator('#poster-group option').allTextContents(), chronologicalChoices, 'Each dropdown section is chronological in ' + year);
       if (choiceIndex > 0) {
         const title = await page.locator('.poster.is-shacharis .onepage-title').first().innerText();
         assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
@@ -251,7 +252,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.goto(origin + '/admin/#posters/' + key); await page.locator('.poster.is-shacharis').first().waitFor(); await settle(); await measure(2);
     }
     await page.locator('#poster-group').selectOption('עשרה בטבת'); await settle();
-    await page.locator('label[for=poster-scope-one]').click(); await settle();
+    await page.locator('#poster-pick').selectOption('asarabteves');
+    await page.locator('label[for=poster-sheets-all]').click(); await settle();
     assert.equal(await page.locator('.poster.is-shacharis').count(), 0, 'The full Asara schedule remains separate');
     assert.equal(await page.locator('.halfpage-body.is-asara').count(), 2, 'Existing compact Asara copies remain available');
     assert.equal(await page.locator('.halfpage-body.is-asara .onepage-sec-head').first().innerText(), 'שחרית');

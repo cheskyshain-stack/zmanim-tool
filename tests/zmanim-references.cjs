@@ -58,7 +58,7 @@ const pdfText = pdf => execFileSync('pdftotext', ['-layout', '-', '-'], { input:
     await page.goto(origin + '/admin/?count=off&b=' + Date.now() + '#charts');
     await page.locator('.pages .page').first().waitFor(); await settle();
     const before = await printed('.pages .page');
-    await page.locator('#show-zmanim-toggle').click();
+    await page.locator(await page.locator('[data-poster-zmanim]').count() ? '[data-poster-zmanim]' : '#show-zmanim-toggle').click();
     await page.locator('#zmanim-reference-date').waitFor(); await settle();
     assert.equal(await page.locator('#zmanim-reference-context option').count(), 2, 'Both Shabbos and Weekday charts are selectable');
     await chooseGroup('mincha');
@@ -104,12 +104,12 @@ const pdfText = pdf => execFileSync('pdftotext', ['-layout', '-', '-'], { input:
     assert.deepEqual(await page.locator('#zmanim-reference-date option').allTextContents(),
       ['Monday, Oct 19, 2026', 'Thursday, Oct 22, 2026', 'Monday, Oct 26, 2026']);
     const bhbOn = await printed('.poster.is-shacharis');
-    await page.locator('#show-zmanim-toggle').click(); await settle();
+    await page.locator(await page.locator('[data-poster-zmanim]').count() ? '[data-poster-zmanim]' : '#show-zmanim-toggle').click(); await settle();
     const bhbOff = await printed('.poster.is-shacharis');
     assert.deepEqual(bhbOn.geometry, bhbOff.geometry);
     assert.equal(bhbOn.text, bhbOff.text, 'The half-page PDF retains the same dates and minyanim');
     assert.equal(bhbOn.pages, 1);
-    await page.locator('#show-zmanim-toggle').click();
+    await page.locator(await page.locator('[data-poster-zmanim]').count() ? '[data-poster-zmanim]' : '#show-zmanim-toggle').click();
     if (output) await page.locator('#zmanim-reference-panel').screenshot({ path: path.join(output, 'bhb-panel.png') });
     checked.push('BHB dates and half-page printing');
 
@@ -154,7 +154,7 @@ const pdfText = pdf => execFileSync('pdftotext', ['-layout', '-', '-'], { input:
     await chooseGroup('mincha');
     await page.locator('#zmanim-reference-context').selectOption('2'); await settle(); await noOverflow();
     const savedOn = await printed('#pages .page');
-    await page.locator('#show-zmanim-toggle').click(); await settle();
+    await page.locator(await page.locator('[data-poster-zmanim]').count() ? '[data-poster-zmanim]' : '#show-zmanim-toggle').click(); await settle();
     const savedOff = await printed('#pages .page');
     assert.deepEqual(savedOn.geometry, savedOff.geometry);
     assert.equal(savedOn.text, savedOff.text);

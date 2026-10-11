@@ -285,6 +285,25 @@ the arithmetic, while times printed with seconds retain that precision.
 The separate Calculation guide was removed. Old `#calc` bookmarks open Seasonal charts;
 calculation details come from clicking a time with Explain times enabled.
 
+Special schedules uses **One schedule** and **Print a set**. Keep the year and
+occasion minus/plus/Current controls, and the margin minus/plus/Original controls.
+The occasion dropdown has Yom Tov and Other schedules sections, each chronological.
+Asara's Shacharis handout is selected under Asara's Schedule picker. This is a UI
+alias only: shared public poster builders keep their original occasion groups.
+Current includes active and upcoming morning handouts and picks the actual Rosh
+Chodesh month. Printing sets uses named checkboxes, with paired alternatives off
+by default. Whole-year sets exclude morning handouts, and combined sets keep the
+separate Vasikin announcement. Their half-page posters rotate onto portrait Letter
+paper through the existing mixed-run print rules. Changing selections must not
+change calculated times or the physical poster designs.
+
+Special schedules places Check zmanim and Explain times beside the preview, backed
+by the shared controllers. Other admin screens retain their sidebar switches.
+Clear the special-screen and half-Letter classes when leaving the screen. Print
+settings collapse on screen, while all selection controls and custom editors stay
+outside printed content. `tests/special-schedules-navigation.cjs` covers the new
+controls, migrations, named selections, mobile widths and physical page counts.
+
 Admin also has a remembered **Show zmanim** switch for comparing every seasonal page,
 saved print layout, weekly schedule and special poster with the actual day's zmanim.
 Shared renderers register their own covered dates only after the admin installs

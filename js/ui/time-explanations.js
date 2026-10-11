@@ -72,6 +72,12 @@ export function installTimeExplanations(main, host) {
   document.body.appendChild(dialog);
 
   const refresh = () => {
+    bar.hidden = Boolean(main.querySelector('[data-poster-explain]'));
+    for (const button of main.querySelectorAll('[data-poster-explain]')) {
+      button.disabled = !main.querySelector('[data-time-explain]');
+      button.setAttribute('aria-pressed', String(enabled));
+      button.onclick = () => toggle.click();
+    }
     const live = new Set();
     for (const el of main.querySelectorAll('[data-time-explain]')) {
       live.add(el.dataset.timeExplain);
