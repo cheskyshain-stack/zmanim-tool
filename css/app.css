@@ -4258,7 +4258,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   aspect-ratio: 1776 / 237;
 }
 .poster.is-halfpage .onepage-title { font-size: 18pt; margin-bottom: 0.12in; }
-.halfpage-body { width: 100%; display: flex; flex-direction: column; gap: 0.14in; }
+.halfpage-body { width: 100%; display: flex; flex-direction: column; gap: var(--halfpage-section-gap, 0.14in); }
 .poster.is-halfpage .halfpage-body.is-asara {
   flex: 1 0 auto; justify-content: center;
   gap: 0.16in; margin-bottom: 0.16in;
@@ -4269,12 +4269,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .poster.is-halfpage .onepage-sec-head { text-align: center; }
 .poster.is-halfpage .onepage-row {
-  display: block; padding: 0.065in 0.08in;
+  display: block; padding: var(--halfpage-row-pad, 0.065in) 0.08in;
   line-height: 1.35;
 }
 .poster.is-halfpage .onepage-label:empty { display: none; }
 .poster.is-halfpage .onepage-label { display: block; font-size: 0.8em; font-weight: 700; margin-bottom: 0.025in; }
 .poster.is-halfpage .onepage-times { text-align: center; }
+.poster.is-halfpage .onepage-line + .onepage-line { margin-top: calc(var(--halfpage-line-gap, 0.04in) * var(--op-scale)); }
 .halfpage-zman {
   display: flex; justify-content: center; align-items: baseline; gap: 0.12in;
   font-size: calc(9.5pt * var(--op-scale));

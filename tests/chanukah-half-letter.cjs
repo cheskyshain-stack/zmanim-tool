@@ -55,14 +55,25 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         const { loadTables } = await import('/js/data-loader.js');
         const p = buildChanukahPoster(value, resolveSettings(loadState().settings), await loadTables());
         return [p.shacharisRows.flatMap(row => [row.vasikin.time, ...row.cells.slice(1).map(c => c.text)]),
-          [...p.weekdayMincha.map(t => toCell(t).text), ...p.sundayMinchaRows.flatMap(row => row.times.map(t => t.text))],
-          p.maariv.map(t => toCell(t).text), p.erevShabbos.cells.map(c => c.text)]
+          p.minchaRows.flatMap(row => row.times.map(t => t.text)),
+          p.maariv.map(t => toCell(t).text)]
           .map(list => list.flatMap(text => text.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || []));
       }, value);
       const actual = await page.locator('.poster.is-halfpage').first().locator('.halfpage-body .onepage-sec').evaluateAll(sections => sections.map(s =>
         [...s.querySelectorAll('.onepage-times')].flatMap(t => t.textContent.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || [])));
       assert.deepEqual(actual, expected, 'Every minyan and merged Friday time retained in ' + value);
-      assert.match(await page.locator('.poster.is-halfpage').first().innerText(), /ביום א' בלבד|יום א' \S+/, 'The extra Mincha has a Sunday label');
+      assert.deepEqual(await page.locator('.poster.is-halfpage').first().locator('.onepage-sec-head').allTextContents(),
+        ['שחרית', 'מנחה', 'מעריב'], 'All compact Mincha menus share one section');
+      const expectedLabels = await page.evaluate(async value => {
+        const { buildChanukahPoster } = await import('/js/posters/chanukah.js');
+        const { loadState } = await import('/js/storage.js');
+        const { resolveSettings } = await import('/js/settings.js');
+        const { loadTables } = await import('/js/data-loader.js');
+        return buildChanukahPoster(value, resolveSettings(loadState().settings), await loadTables()).minchaRows.map(row => row.label);
+      }, value);
+      assert.deepEqual(await page.locator('.poster.is-halfpage').first().locator('.onepage-sec').nth(1)
+        .locator('.onepage-label').allTextContents(), expectedLabels, 'Each full Mincha menu has its day group in calendar order');
+      assert.match(await page.locator('.poster.is-halfpage').first().innerText(), /יום א׳/, 'The extra Mincha has a Sunday label');
       const netz = await page.evaluate(async value => {
         const { buildChanukahPoster } = await import('/js/posters/chanukah.js');
         const { loadState } = await import('/js/storage.js');
@@ -178,11 +189,12 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.locator('label[for=poster-copies-two]').click(); await settle();
     const toggle = page.locator('#explain-times-toggle');
     if (await toggle.getAttribute('aria-pressed') === 'false') await toggle.click();
-    const secondTime = page.locator('.poster.is-halfpage').nth(1).locator('.onepage-times [data-time-explain]').first();
+    const secondTime = page.locator('.poster.is-halfpage').nth(1).locator('.onepage-sec').nth(1)
+      .locator('.onepage-times [data-time-explain]').first();
     const printed = await secondTime.innerText();
     await secondTime.click();
     await page.locator('.time-explain-dialog[open]').waitFor();
-    assert.equal(await page.locator('.calc-open-printed').innerText(), printed, 'Second copy retains its own clickable time explanation');
+    assert.equal(await page.locator('.calc-open-printed').innerText(), printed, 'The grouped Mincha on the second copy retains its own clickable time explanation');
     assert(!await page.locator('.time-explain-dialog').innerText().then(text => text.includes('Calculation not recorded')));
     await page.keyboard.press('Escape');
     await toggle.click();
@@ -213,11 +225,21 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     for (const copies of ['one', 'two']) {
       await page.locator(`label[for=poster-copies-${copies}]`).click();
       await check(375, 5804);
+      await page.locator('#poster-margin').selectOption('0.75'); await settle();
+      await check(375, 5804);
+      await page.locator('#poster-margin').selectOption('0.35'); await settle();
       const mincha = page.locator('.poster.is-halfpage').first().locator('.onepage-sec').nth(1);
       assert.match(await mincha.innerText(), /12:30/);
       assert.match(await mincha.innerText(), /12:35/);
-      assert.match(await mincha.innerText(), /כסלו/);
-      assert.match(await mincha.innerText(), /טבת/);
+      const sundays = await mincha.locator('.onepage-row').evaluateAll(rows => rows.map(row => ({
+        label: row.querySelector('.onepage-label').textContent,
+        times: row.querySelector('.onepage-times').textContent.match(/\d{1,2}:\d{2}/g),
+      })).filter(row => row.label.startsWith('יום א׳')));
+      assert.equal(sundays.length, 2, 'The two different Sunday menus remain separate');
+      assert(sundays.every(row => row.label.includes('פרשת')) && sundays[0].label !== sundays[1].label,
+        'Each different Sunday menu identifies its own parsha');
+      assert.deepEqual(sundays.map(row => row.times[0]), ['12:30', '12:35']);
+      assert(sundays.every(row => row.times.length === 6), 'Both Sundays include the complete standing menu');
     }
     await page.locator('label[for=poster-sheets-one]').click(); await settle();
     await checkOriginal(375, 5804);
