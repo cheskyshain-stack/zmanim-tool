@@ -64,7 +64,7 @@ test('poster, chart note, daily schedule, weekly agenda, message and API share S
   const index = readerWeekIndex(state), shabbos = sunday + 6, week = index.get(shabbos).week;
   const row = buildWeekdayRow(week, settings);
   assert(!row.C.includes('12:30'), 'The standing weekday menu is unchanged');
-  assert.match(row.printOverrides.C, /12:30.*חנוכה יום א׳.*1:00.*1:15/);
+  assert.match(row.printOverrides.C, /12:30.*חנוכה יום א׳.*1:00[^\n]*\n.*1:15.*1:35.*1:50.*4:15/);
   assert(minyanimForDay(sunday, state, settings).some(event => event.name === 'מנחה' && event.mins === 750 && event.place === 'למטה'));
   assert(!minyanimForDay(sunday + 1, state, settings).some(event => event.name === 'מנחה' && event.mins === 750));
   assert.match(weekText(WEEKDAY_SHACHARIS, row, "P' Miketz - Chanuka", shabbos, settings), /Mincha \(Sunday only\): 12:30d/);
