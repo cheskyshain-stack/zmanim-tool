@@ -10,6 +10,7 @@
 // Shared between the congregation's site and the admin's This week screen, so the two
 // cannot drift apart.
 import { resolveSettings } from '../settings.js';
+import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
 import { buildSheetPages, syncPageHeights } from './sheet-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -166,7 +167,7 @@ export function spreadLabel(spread) {
  *  the last one set, so re-running it is not cumulative. */
 function fitChartToWindow(pagesEl) {
   const fit = pagesEl.parentElement;
-  const apply = () => {
+  const apply = () => keepPosition(pagesEl.parentElement, () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
@@ -185,7 +186,7 @@ function fitChartToWindow(pagesEl) {
       fit.style.height = `${Math.ceil(pagesEl.scrollHeight * scale)}px`;
       fit.style.overflow = 'hidden';
     }
-  };
+  }, { panels: false, focus: false });
   apply();
   requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
@@ -211,7 +212,7 @@ export function renderChartBrowser(container, state, opts = {}) {
   const settings = resolveSettings(state.settings);
   let at = spreadIndexForNow(spreads, state, settings);
 
-  const draw = () => {
+  const draw = () => keepPosition(container, () => {
     // A board is 11in across. See setPrintPage for why the document's one page size is set
     // from the view rather than from a named page in the stylesheet.
     setPrintPage('letter landscape');
@@ -279,7 +280,7 @@ export function renderChartBrowser(container, state, opts = {}) {
         draw();
       });
     }
-  };
+  });
   draw();
 }
 

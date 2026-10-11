@@ -17,6 +17,7 @@ import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
 import { installTimeExplanations } from './ui/time-explanations.js';
 import { installZmanimReferences } from './ui/zmanim-references.js';
+import { keepPosition } from './ui/keep-position.js';
 
 const state = loadState();
 let tables = null;
@@ -156,6 +157,7 @@ function persist() {
 }
 
 function openTab(tab) {
+  if (tab === currentTab && !currentSheetId) return;
   currentTab = tab;
   currentSheetId = null;
   writeRoute();
@@ -234,10 +236,9 @@ let painted = { tab: null, sheet: null };
 
 function render() {
   const held = painted.tab === currentTab && painted.sheet === currentSheetId && !openPublish;
-  const y = window.scrollY;
   painted = { tab: currentTab, sheet: currentSheetId };
-  paint();
-  if (held) window.scrollTo(0, y);
+  if (held) keepPosition(main, paint);
+  else paint();
 }
 
 function paint() {
