@@ -5626,10 +5626,13 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-give-accounts { margin-top:13px; }
  .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #eeeae1; }
  .is-give .luach-give-account:first-child { border-top:0; }
- .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { min-height:51px; padding:12px 0; gap:14px; border:0; border-radius:0; background:transparent; box-shadow:none; text-align:left; }
+ .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { width:calc(100% + 20px); min-height:51px; margin-inline:-10px; padding:12px 10px; gap:14px; border:0; border-radius:8px; background:transparent; box-shadow:none; text-align:left; }
  .is-give .luach-account-title { font:700 17px/1.35 Georgia,serif; letter-spacing:0; }
  .is-give .luach-fund-action { color:#987b3e; font:400 20px/1.2 Arial,sans-serif; }
- .is-give .luach-fund-row:hover .luach-account-title { text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:4px; }
+ /* A fund stays understated during touch and while its form is open. */
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) { background:#f5f3ed; color:#142b46; border-color:transparent; box-shadow:none; }
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) .luach-account-title { color:#142b46; opacity:1; text-decoration:none; }
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) .luach-fund-action { color:#987b3e; opacity:1; }
  .luach-payment-panel.is-zelle { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
  .luach-zelle-roundel { display:flex; align-items:center; justify-content:center; width:70px; height:70px; margin-bottom:15px; border-radius:50%; background:#6d1ed4; color:#fff; }
  .luach-zelle-logo { width:43px; height:43px; }
