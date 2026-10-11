@@ -59,6 +59,13 @@ export function installZmanimReferences(main, host) {
     const available = contexts();
     toggle.disabled = !available.length;
     toggle.setAttribute('aria-pressed', String(enabled));
+    bar.hidden = Boolean(main.querySelector('[data-poster-zmanim]'));
+    for (const button of main.querySelectorAll('[data-poster-zmanim]')) {
+      button.disabled = toggle.disabled;
+      button.setAttribute('aria-pressed', String(enabled));
+      button.setAttribute('aria-controls', panel.id);
+      button.onclick = () => setEnabled(!enabled);
+    }
     panel.hidden = !enabled || !available.length;
     if (!enabled || !available.length) return;
     const source = available[0].element;

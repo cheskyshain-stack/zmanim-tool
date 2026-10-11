@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
       await page.waitForTimeout(100);
     };
     const switchOn = async () => {
-      const toggle = page.locator('#explain-times-toggle');
+      const toggle = page.locator(await page.locator('[data-poster-explain]').count() ? '[data-poster-explain]' : '#explain-times-toggle');
       if (await toggle.getAttribute('aria-pressed') === 'false') await toggle.click();
     };
     const clickTime = async (locator, index = 0) => {
@@ -147,7 +147,8 @@ const server = http.createServer((req, res) => {
 
     for (const key of ['pesach', 'shuva', 'roshhashana', 'yomkippur', 'slichos', 'tzomgedalia', 'sukkos', 'chanukah', 'vasikinboth', 'afteryk', 'sukkosshuava']) {
       await page.goto(origin + '/admin/#posters/' + key); await settled(); await switchOn();
-      assert.equal(await page.locator('#poster-pick').inputValue(), key, 'The intended poster is open');
+      if (await page.locator('#poster-pick').count()) assert.equal(await page.locator('#poster-pick').inputValue(), key, 'The intended poster is open');
+      else assert(page.url().endsWith('#posters/' + key), 'Single-option poster opens directly');
       const targets = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d{1,2}:\d{2}/ });
       assert(await targets.count(), key + ' has inspectable times');
       // Check every rendered time, including notes and combined cells.

@@ -1,3 +1,4 @@
+import { occasionOptions } from './special-schedule-controls.js';
 // The editor for a sheet the shul writes itself. See posters/own.js for what a sheet is.
 //
 // Pickers rather than a page of empty boxes, which is what was asked for: the block's day,
@@ -104,7 +105,7 @@ export function renderOwnEditor(container, sheet, occasions, { onChange, onDelet
       <div class="own-top">
         <label>What the sheet is called<input class="own-name" value="${escAttr(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
         <label>Where it sits in the year<select class="own-group">
-          ${occasions.map((o) => `<option value="${escAttr(o)}" ${sheet.group === o ? 'selected' : ''}>${escAttr(o)}</option>`).join('')}
+          ${occasionOptions(occasions, sheet.group)}
         </select></label>
       </div>
       <div class="own-blocks">${(sheet.blocks || []).map(blockHtml).join('')}</div>

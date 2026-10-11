@@ -4319,6 +4319,63 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    no year (the shul wants it clean), so this is the one place that answers "is this the
    right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
    and the English one under each other so neither has to be worked out from the other. */
+.time-explain-bar[hidden] { display: none !important; }
+
+@media screen {
+  .is-special-schedules { max-width: 88rem; }
+  .special-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+  .special-heading h2 { margin: 0 0 0.35rem; }
+  .special-heading p { margin: 0; }
+  .special-heading button { flex-shrink: 0; }
+  .special-workflow { max-width: 26rem; margin-bottom: 1.2rem; }
+  .special-workflow .week-switch-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .special-layout { display: grid; grid-template-columns: minmax(20rem, 23rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .special-controls, .special-preview { min-width: 0; }
+  .special-controls { padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .special-controls .poster-bar { display: grid; gap: 1rem; margin: 0; }
+  .special-controls .poster-bar > *, .special-controls .poster-bar label, .special-controls .poster-year { min-width: 0; width: 100%; }
+  .special-controls .poster-year { justify-items: stretch; }
+  .special-controls .poster-year-step { width: 100%; }
+  .special-controls .poster-year-step button { padding-inline: 0.65rem; font-size: 0.9rem; flex-shrink: 0; }
+  .special-controls .poster-year-step .poster-year-reset { padding-inline: 0.6rem; font-size: 0.8rem; }
+  .special-controls .poster-year-step select { min-width: 0; width: 0; flex: 1; padding-inline-start: 0.6rem; font-size: 0.9rem; }
+  .special-controls .poster-bar .poster-year-step select { min-width: 0; }
+  .special-controls .poster-year-now { padding: 0; min-width: 0; flex: 1; }
+  .special-controls .poster-year-now select { width: 100%; font-size: 0.8rem; border: 0; }
+  .special-controls .poster-bar > label select { width: 100%; min-width: 0; }
+  .special-print-settings { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+  .special-print-settings summary { color: var(--muted); font-weight: 600; cursor: pointer; }
+  .special-print-settings > div { display: grid; gap: 1rem; padding-top: 0.85rem; }
+  .special-print-action { display: flex; align-items: center; gap: 0.75rem; }
+  .special-print-action span { font-size: var(--fs-xs); color: var(--muted); }
+  .special-preview-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+  .special-preview-tools h3 { margin: 0 auto 0 0; }
+  .special-preview-tools button { font-size: var(--fs-sm); padding: 0.4rem 0.6rem; }
+  .special-preview-tools button[aria-pressed="true"] { background: var(--ui-accent-soft); border-color: var(--ui-accent); }
+  .special-preview .poster-when { max-width: none; }
+  .special-preview .zmanim-reference-panel { position: static; }
+  .special-set-list h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .special-set-actions { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .special-set-actions button, .special-set-entry > button { font-size: var(--fs-xs); padding: 0.35rem 0.5rem; }
+  .special-set-entry { display: flex; align-items: center; gap: 0.5rem; padding-block: 0.7rem; border-bottom: 1px solid var(--border); }
+  .special-set-entry label { display: flex !important; align-items: center; gap: 0.6rem; cursor: pointer; }
+  .special-set-entry input { flex-shrink: 0; width: 1.05rem; height: 1.05rem; accent-color: var(--ui-accent); }
+  .special-set-entry span { min-width: 0; flex: 1; }
+  .special-set-entry bdi { color: var(--ink); display: block; }
+  .special-set-entry small { display: block; margin-top: 0.2rem; font-weight: normal; letter-spacing: 0; }
+  .special-controls .own-editor { padding: 0; border: 0; }
+  .special-controls .own-top { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .special-controls .own-editor input, .special-controls .own-editor select { min-width: 0; max-width: 100%; }
+  .special-controls .own-blocks { overflow-x: auto; }
+  @media (max-width: 1050px) {
+    .special-layout { grid-template-columns: minmax(0, 1fr); }
+    .special-heading { align-items: start; flex-direction: column; gap: 0.65rem; }
+    .special-heading button { font-size: var(--fs-xs); padding: 0.45rem 0.6rem; }
+    .special-workflow { max-width: none; }
+    .special-controls { padding: 0.8rem; }
+  }
+}
+
 .poster-when {
   margin: 0 0 1.1rem; padding: 0.7rem 0.9rem;
   border-inline-start: 3px solid var(--accent);

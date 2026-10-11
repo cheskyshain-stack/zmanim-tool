@@ -44,6 +44,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { posterReferenceDates } from '../zmanim/references.js';
+import { specialScheduleControls } from './special-schedule-controls.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -2493,13 +2494,12 @@ function fitSukkos(container) {
 // has been picked, which is how a fresh load and a change of occasion both land on the first
 // sheet of the list without this having to know what that is.
 let chosen = null;
-/* How much is on screen and on how much paper: 'one' is a single sheet, 'each' is every sheet
-   one to a page, 'all' is every one of them on a single sheet.
-   One control rather than two, because there were only ever three answers. It was a pair of
-   switches, which is four boxes, and the fourth was dead: a single sheet has no layout to
-   choose and the second switch went away whenever the first said one. Three points on one
-   axis is what it always was. */
+// Preserve the original layout values in saved preferences. The workflow distinguishes
+// a single compact poster from a print set using combined posters.
 let chosenSheets = 'one';
+let chosenWorkflow = 'single';
+let chosenSetSelection = {};
+let printSettingsOpen = false;
 // Which yom tov. One so far, and the picker has one answer, but the posters have been grouped
 // by it from the start and the next set drawn will land in the next group.
 let chosenGroup = null;
@@ -2523,9 +2523,9 @@ let posterTables = null;
 export function posterRoute() {
   // The whole set keeps the key the run entry has always had, so a link written before it
   // became a switch still lands on it.
-  const handout = POSTERS.find(p => p.handout && p.group === chosenGroup && p.key === chosen)
-    || POSTERS.find(p => p.handout && p.group === chosenGroup);
-  const key = handout?.key || (chosenSheets === 'one' ? chosen : POSTERS.find((p) => p.last)?.key);
+  const handout = chosenWorkflow === 'set' ? null : POSTERS.find(p => p.handout && p.key === chosen)
+    || (chosenWorkflow === 'single' ? POSTERS.find(p => p.handout && p.group === chosenGroup) : null);
+  const key = chosenWorkflow === 'set' ? 'all' : handout?.key || (chosenSheets === 'one' ? chosen : 'all');
   if (!key) return [];
   const poster = POSTERS.find((p) => p.key === key);
   return poster?.orientations ? [key, chosenOrientation] : [key];
@@ -2541,6 +2541,7 @@ export function setPosterRoute(parts = []) {
   // A sheet of your own is not in the table, so it is recognised by its key. Which occasion
   // it sits under is not in the address either, and is whatever was remembered.
   if (String(key).startsWith('own:')) {
+    chosenWorkflow = 'single';
     chosenSheets = 'one';
     chosen = key;
     conflictPick = 0;
@@ -2551,8 +2552,10 @@ export function setPosterRoute(parts = []) {
   if (poster?.last) {
     // A link to the whole set says only that, not which of the two ways of laying it out, so
     // whichever was left standing is kept.
-    if (chosenSheets === 'one') chosenSheets = 'each';
+    const morning = POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup));
+    if (chosenSheets === 'one' && !morning) { chosenSheets = 'each'; chosenWorkflow = 'set'; }
   } else if (poster) {
+    chosenWorkflow = 'single';
     if (!poster.handout) chosenSheets = 'one';
     chosen = key;
     // The occasion goes with the sheet, so a link to one of another yom tov's brings its own
@@ -2617,6 +2620,14 @@ function recallBar() {
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
     if (saved.copiesPerPage === 1 || saved.copiesPerPage === 2) chosenCopiesPerPage = saved.copiesPerPage;
     if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
+    if (saved.workflow === 'single' || saved.workflow === 'set') chosenWorkflow = saved.workflow;
+    else chosenWorkflow = chosenSheets === 'each' || chosenSheets === 'all' && chosenScope === 'all' ? 'set' : 'single';
+    // Old handout links used Compact and Whole year even though they printed one morning.
+    if (!saved.workflow && POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup))) chosenWorkflow = 'single';
+    if (saved.setSelection && typeof saved.setSelection === 'object' && !Array.isArray(saved.setSelection)) {
+      chosenSetSelection = Object.fromEntries(Object.entries(saved.setSelection).filter(([key, value]) => typeof value === 'boolean' && key.length < 200));
+    }
+    if (typeof saved.advanced === 'boolean') printSettingsOpen = saved.advanced;
     if (Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
       chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
@@ -2635,6 +2646,7 @@ function rememberBar() {
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
       margin: chosenMargin, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
+      workflow: chosenWorkflow, setSelection: chosenSetSelection, advanced: printSettingsOpen,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -2878,6 +2890,64 @@ function redrawInPlace(container, state) {
   window.scrollTo(0, y);
 }
 
+function currentSchedule(groups, state, settings, year, today) {
+  const candidates = [];
+  for (const group of groups) for (const poster of group.items) {
+    if (poster.extra || poster.combined) continue;
+    const from = poster.starts?.(year, settings);
+    if (!Number.isFinite(from)) continue;
+    if (from < today) {
+      const value = poster.sources(state, settings).find(s => s.year === year)?.build().poster;
+      if (!value?.span || value.span.to < today) continue;
+    }
+    candidates.push({ name: group.name, key: poster.key, from: Math.max(from, today) });
+  }
+  return candidates.sort((a, b) => a.from - b.from)[0] || null;
+}
+
+function selectedScheduleRun(groups, state, settings, year, compact) {
+  const entries = [];
+  for (const group of groups) {
+    const originals = group.items.filter(p => !p.handout);
+    if (compact && originals.length) {
+      const result = buildEveryPoster(state, settings, year, { combined: false, group: group.name });
+      entries.push({ id: `combined:${group.name}`, group: group.name, label: group.name, compact: true,
+        half: originals.length === 1 && HALF_PAGE_POSTERS.has(originals[0].key),
+        value: result.poster, missing: result.missing,
+        render: (value, st) => renderOnePagePoster(value, st, { halfLetter: true }),
+      });
+    }
+    for (const poster of group.items) {
+      // Combined schedules replace originals. Vasikin has its own announcement.
+      if (compact && originals.length && !poster.handout && poster.key !== 'vasikinboth') continue;
+      // The full Asara schedule's morning handout is a separate, explicit choice.
+      if (poster.handout && originals.length) continue;
+      const result = poster.sources(state, settings).find(s => s.year === year)?.build() || {};
+      entries.push({ id: `poster:${poster.key}`, group: group.name, label: poster.label, poster,
+        paired: Boolean(poster.combined), handout: Boolean(poster.handout),
+        value: result.poster, missing: result.missing || (!result.poster ? 'Not available for this year' : null),
+        render: poster.render,
+      });
+    }
+  }
+  for (const entry of entries) entry.selected = !entry.missing && (chosenSetSelection[entry.id] ?? (!entry.paired || chosenCombined));
+  const pages = entries.filter(e => e.selected);
+  const spans = pages.map(p => p.value?.span).filter(Boolean);
+  return { entries, result: pages.length ? { poster: { pages, hebrewYear: year,
+    span: spans.length ? { from: Math.min(...spans.map(s => s.from)), to: Math.max(...spans.map(s => s.to)) } : null,
+  } } : { missing: 'Select at least one available schedule to print.' } };
+}
+
+function renderSelectedRun(value, settings, { landscape = false } = {}) {
+  return `<div class="poster-all">${value.pages.map(page => {
+    const turned = landscape && page.poster?.orientations;
+    return `<div class="poster-all-item${turned ? ' is-sideways' : ''}">
+      <p class="poster-all-name no-print" dir="auto">${escAttr(page.label)}</p>
+      ${page.render(page.value, settings, { landscape: turned })}
+    </div>`;
+  }).join('')}</div>`;
+}
+
 export function renderPosters(container, state, routeChanged, tables) {
   recallBar();
   if (routeChanged !== undefined) onRoute = routeChanged;
@@ -2910,64 +2980,48 @@ export function renderPosters(container, state, routeChanged, tables) {
     ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name))
       .map(([name, g]) => ({ name, items: g.items, firstStart: g.firstStart, lastStart: g.lastStart })),
   ].sort((a, b) => (a.firstStart ?? Infinity) - (b.firstStart ?? Infinity));
-  /* The occasion that is on, which the Current button goes back to.
-     The first one of the year still ahead of today, by the last day any of its sheets opens
-     on: in אלול that is the ימים נוראים, whose יום כיפור sheet is still to come, and once
-     יו"כ is past it is סוכות. Past the whole year it stays on the last occasion that has
-     sheets rather than falling back to the first, since that is the one whose paper is still
-     on the wall. The year picker has rolled to the next year by then anyway (see
-     posterYears), which puts everything ahead again.
-     Off the days postersByDate already worked out, so nothing is built for it. */
-  const withSheets = groups.filter((g) => g.items.length && g.lastStart != null && !g.items.every(p => p.handout));
+  // Asara's morning handout belongs in its Schedule picker, not a second occasion.
+  const visibleGroups = groups.filter(g => g.name !== 'עשרה בטבת · שחרית').map(g => g.name === 'עשרה בטבת'
+    ? { ...g, items: [...g.items, ...(drawn.get('עשרה בטבת · שחרית')?.items || [])] } : g);
+  if (chosenGroup === 'עשרה בטבת · שחרית') { chosenGroup = 'עשרה בטבת'; chosen = chosen || 'asarashacharis'; }
   const nowSerial = shulNow(new Date(), settings).serial;
-  const current = withSheets.find((g) => g.lastStart >= nowSerial)
-    || withSheets[withSheets.length - 1] || null;
-
-  const group = groups.find((g) => g.name === chosenGroup) || groups[0];
-  // Where the occasion showing sits in that list, which is what the two steppers move along
-  // and what disables one of them at either end.
-  const gAt = groups.indexOf(group);
-  /* Written back, so the occasion the picker is showing and the occasion the run is built from
-     are one name. Nothing has been picked on a fresh load and chosenGroup is null, which the
-     line above resolves to the first occasion for the picker's sake; the run read the null and
-     built every sheet of the year under it. */
+  const current = currentSchedule(visibleGroups, state, settings, year, nowSerial);
+  const group = visibleGroups.find(g => g.name === chosenGroup) || visibleGroups.find(g => g.name === current?.name) || visibleGroups[0];
+  const gAt = visibleGroups.indexOf(group);
   if (group) chosenGroup = group.name;
-  /* The whole year of them, or the one showing. Everything below reads `items`, so the
-     switches, the Print button and the "nothing here yet" message all answer for what is
-     actually in the run rather than for the occasion the picker happens to be on. */
-  const handout = Boolean(group?.items.length && group.items.every(p => p.handout));
-  const scopeAll = !handout && chosenSheets !== 'one' && chosenScope === 'all';
-  const items = scopeAll ? groups.flatMap((g) => g.items).filter(p => !p.handout) : (group ? group.items : []);
-  // An occasion nobody has given times for yet. Everything past the picker is left off: a
-  // Sheets switch over nothing, or a Print button that would hand over a blank page, is a
-  // control that lies about what is there.
-  const empty = items.length === 0;
-  const runPoster = POSTERS.find((p) => p.last);
-  const one = items.find((p) => p.key === chosen) || items[0] || null;
-  if (handout && one && chosen !== one.key) {
+  if (chosenWorkflow === 'single') chosenScope = 'one';
+  const scopeAll = chosenWorkflow === 'set' && chosenScope === 'all';
+  const items = group?.items || [];
+  const one = items.find(p => p.key === chosen) || items[0] || null;
+  if (chosenWorkflow === 'single' && one && chosen !== one.key && chosen !== '__combined__') {
     chosen = one.key;
-    rememberBar();
-    onRoute?.();
+    if (one.handout) { rememberBar(); onRoute?.(); }
   }
-  // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
-  const showAll = !handout && chosenSheets !== 'one';
-  const onePage = !handout && chosenSheets === 'all';
-  const poster = empty ? null : showAll ? runPoster : one;
-  const halfLetter = handout || (onePage && !scopeAll && items.length === 1 && HALF_PAGE_POSTERS.has(items[0].key));
-
-  /* Which of the further switches this sheet actually reads, and whether the occasion showing
-     has anything for them to decide. Both belong to the run rather than to a single sheet.
-     A switch over nothing is a control that lies about what is there: סוכות has no sheet that
-     carries two schedules and none that can be turned, so it was being offered the choice of
-     leaving out sheets it does not have and of paper it cannot use. Asked of the occasion's own
-     sheets rather than written down, so an occasion drawn later gets the right answer by
-     carrying the right flags. */
-  const hasCombined = items.some((p) => p.combined);
-  const canTurn = !onePage && (showAll
-    // In a run, the way up only means something when a sheet that can be turned is in it, which
-    // is what the two-in-one switch decides for the ones that are both.
-    ? items.some((p) => p.orientations && (chosenCombined || !p.combined))
-    : Boolean(poster?.orientations));
+  const handout = Boolean(one?.handout);
+  const showAll = chosenWorkflow === 'set' || chosenSheets === 'all' && !handout;
+  const onePage = chosenSheets === 'all' && (chosenWorkflow === 'set' || !handout);
+  const wholeOccasion = chosenWorkflow === 'single' && onePage && (chosen === '__combined__'
+    || items.length > 1 && !HALF_PAGE_POSTERS.has(one?.key) && one?.key !== 'pesach' && !handout);
+  const runPoster = POSTERS.find(p => p.last);
+  const selection = chosenWorkflow === 'set' ? selectedScheduleRun(scopeAll ? visibleGroups.filter(g => g.items.some(p => !p.handout)) : group ? [group] : [], state, settings, year, onePage) : null;
+  const empty = chosenWorkflow === 'set' ? !selection.entries.length : !items.length;
+  const poster = empty ? null : chosenWorkflow === 'set' ? {
+    ...runPoster,
+    covers: () => `Print set ${hebrewYear(year)}`,
+    sources: () => [{ year, build: () => selection.result }],
+    render: (value, st, opts) => renderSelectedRun(value, st, opts),
+  } : showAll ? {
+    ...runPoster, covers: () => `${group.name} ${hebrewYear(year)}`,
+    sources: !wholeOccasion && one && (HALF_PAGE_POSTERS.has(one.key) || one.key === 'pesach')
+      ? () => [{ year, build: () => {
+        const result = one.sources(state, settings).find(s => s.year === year)?.build() || {};
+        return result.poster ? { poster: { hebrewYear: year, title: group.name, span: result.poster.span,
+          items: [{ key: one.key, label: one.label, poster: result.poster, render: one.render }], notBuilt: [], leftOut: [],
+        } } : result;
+      } }] : runPoster.sources,
+  } : one;
+  const halfLetter = chosenWorkflow === 'single' && (handout || onePage && !wholeOccasion && HALF_PAGE_POSTERS.has(one?.key));
+  const canTurn = !onePage && (chosenWorkflow === 'set' ? selection.entries.some(e => e.selected && e.poster?.orientations) : Boolean(one?.orientations));
 
   const sources = poster ? poster.sources(state, settings) : [];
   const source = sources.find((s) => s.year === year)
@@ -2975,124 +3029,18 @@ export function renderPosters(container, state, routeChanged, tables) {
   const result = poster && source ? source.build() : { missing: 'No year to build from.' };
   const built = result.poster || null;
 
-  container.className = `is-sheet-view${halfLetter ? ' is-half-letter-print' : ''}`;
-  container.innerHTML = `
-    <h2 class="no-print">Posters</h2>
-    <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. What changes with the year is worked out rather than typed, so a poster is right the year it is printed and every year after.</p>
-    <div class="poster-bar no-print">
-      <div class="poster-year">
-        <span class="poster-year-label" id="poster-year-label">Year</span>
-        <div class="poster-year-step" role="group" aria-labelledby="poster-year-label">
-          <button type="button" id="poster-year-back" aria-label="The year before"
-            ${at <= 0 ? 'disabled' : ''}>&minus;</button>
-          <!-- data-year is the number behind the label, which is written as תשפ״ז and a
-               Gregorian date. aria-live, so a screen reader is told the year changed rather
-               than the page silently becoming a different one. -->
-          <span class="poster-year-now" data-year="${year}" aria-live="polite">${escAttr(yearLabel(year))}</span>
-          <button type="button" id="poster-year-next" aria-label="The year after"
-            ${at >= years.length - 1 ? 'disabled' : ''}>+</button>
-          <!-- Back to the year a fresh load opens on, after stepping off it to look at
-               another one. Called Today because that is what the same button is called on
-               This week and on the wall chart, and because the year it lands on is the one
-               that is current for printing rather than the calendar's own: in אלול it is
-               next year's sheets that are wanted. Disabled where it is already there, the
-               way the two steppers are at the ends of the list, so it keeps its place in
-               the box rather than the bar changing shape as the year moves. -->
-          <button type="button" id="poster-year-today" class="poster-year-reset"
-            aria-label="The current Hebrew year" ${year === preferred ? 'disabled' : ''}>Current</button>
-        </div>
-      </div>
-      <!-- The occasion, in the same box as the year: a step either side of a control that is
-           still the whole list. The two are one question asked twice, "which sheet am I
-           printing", and the year already answers it this way. A dropdown alone made you open
-           a menu of nine and read it to move one occasion, and there are only ever a few
-           between the one showing and the one wanted. -->
-      ${scopeAll ? '' : `<div class="poster-year">
-        <span class="poster-year-label" id="poster-group-label">Yom tov</span>
-        <div class="poster-year-step">
-          <button type="button" id="poster-group-back" aria-label="The yom tov before"
-            ${gAt <= 0 ? 'disabled' : ''}>&minus;</button>
-          <select id="poster-group" aria-labelledby="poster-group-label">
-            ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
-          </select>
-          <button type="button" id="poster-group-next" aria-label="The yom tov after"
-            ${gAt >= groups.length - 1 ? 'disabled' : ''}>+</button>
-          <!-- Back to the occasion that is on, the same way the year's button goes back to
-               the year coming up. Left off entirely where there is no occasion to go back
-               to, rather than sat there dead: the year's is always answerable and this one
-               is not. -->
-          ${current ? `<button type="button" id="poster-group-now" class="poster-year-reset"
-            aria-label="The yom tov on now"
-            ${group && current.name === group.name ? 'disabled' : ''}>Current</button>` : ''}
-        </div>
-      </div>`}
-      <!-- One yom tov or the whole year of them. Only over a run: on a single sheet there is
-           nothing for it to decide, and it is the picker above that says which sheet. -->
-      ${!handout && chosenSheets !== 'one' ? `<div class="poster-bar-switch">${switchHtml('poster-scope', 'Yom tovim', [
-        { value: 'one', label: 'Just this one', on: !scopeAll },
-        { value: 'all', label: 'All of them', on: scopeAll },
-      ])}</div>` : ''}
-      ${empty || handout ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
-        { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
-        { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
-        // The compact layout uses either a full sheet or a half-page handout, by occasion.
-        { value: 'all', label: 'Compact', on: chosenSheets === 'all' },
-      ])}</div>`}
-      ${!empty && !showAll ? `<label>${handout && items.length > 1 ? 'Month' : 'Which sheet'}
-        <select id="poster-pick">
-          ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
-        </select>
-      </label>` : ''}
-      <!-- The margin, built like the year and the yom tov beside it: a step either side of a
-           control that is still the whole list, and a reset at the end. Only on the one-page
-           sheet, which is the only one that reads it.
-
-           A stepper because the number nobody can work out from here is how much of the paper
-           the printer refuses to mark. Whoever is standing at the machine can see that in one
-           print, so they get to walk it in a step at a time rather than ask for a number. -->
-      ${!empty && (onePage || halfLetter) ? `<div class="poster-year">
-        <span class="poster-year-label" id="poster-margin-label">Margin</span>
-        <div class="poster-year-step">
-          <button type="button" id="poster-margin-back" aria-label="A narrower margin"
-            ${chosenMargin <= OP_PAD_MIN + 1e-9 ? 'disabled' : ''}>&minus;</button>
-          <select id="poster-margin" aria-labelledby="poster-margin-label">
-            ${padSteps().map((v) => `<option value="${v}" ${Math.abs(v - chosenMargin) < 1e-9 ? 'selected' : ''}>${padLabel(v)}</option>`).join('')}
-          </select>
-          <button type="button" id="poster-margin-next" aria-label="A wider margin"
-            ${chosenMargin >= OP_PAD_MAX - 1e-9 ? 'disabled' : ''}>+</button>
-          <button type="button" id="poster-margin-reset" class="poster-year-reset"
-            aria-label="Back to the margin the sheet ships with"
-            ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
-        </div>
-      </div>` : ''}
-      ${!empty && (onePage || halfLetter) ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
-        { value: 'colour', label: 'Colour', on: chosenInk !== 'mono' },
-        // Two words, which is what a side of a switch holds on a phone. The photo keeps its
-        // colour either way and the switch does not try to say so: the sheet in front of you
-        // shows it.
-        { value: 'mono', label: 'Black and white', on: chosenInk === 'mono' },
-      ])}</div>` : ''}
-      ${!empty && halfLetter ? `<div class="poster-bar-switch">${switchHtml('poster-copies', 'Copies per page', [
-        { value: 'one', label: 'One', on: chosenCopiesPerPage === 1 },
-        { value: 'two', label: 'Two', on: chosenCopiesPerPage === 2 },
-      ])}</div>` : ''}
-      ${!empty && onePage && !halfLetter ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
-        // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
-        // and "Start at a day" both sit inside that where a sentence would not.
-        { value: 'even', label: 'Split evenly', on: chosenBreak === 'even' },
-        { value: 'day', label: 'Start at a day', on: chosenBreak === 'day' },
-      ])}</div>` : ''}
-      ${!empty && showAll && !onePage && hasCombined ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
-        { value: 'no', label: 'Leave out', on: !chosenCombined },
-        { value: 'yes', label: 'Include', on: chosenCombined },
-      ])}</div>` : ''}
-      ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Paper', [
-        { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
-        { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
-      ])}</div>` : ''}
-      ${built ? printButtonHtml() : ''}
-      ${built && poster.erevText ? '<button type="button" class="copy-btn" id="poster-copy-btn">Copy text</button>' : ''}
-    </div>
+  container.className = `is-sheet-view is-special-schedules${halfLetter ? ' is-half-letter-print' : ''}`;
+  container.innerHTML = specialScheduleControls({
+    year, years, at, preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`, yearFullLabel: yearLabel,
+    groups: visibleGroups, group, gAt, current,
+    workflow: chosenWorkflow, scopeAll, empty, items, one, onePage, handout, halfLetter, canTurn, wholeOccasion,
+    asara: group?.name === 'עשרה בטבת', halfFormat: HALF_PAGE_POSTERS.has(one?.key),
+    setEntries: selection?.entries || [], pageCount: built?.pages?.length || 0,
+    copies: chosenCopiesPerPage, advanced: printSettingsOpen,
+    margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD,
+    padSteps: padSteps(), padLabel, ink: chosenInk, brk: chosenBreak, orientation: chosenOrientation,
+    built, copyText: poster?.erevText,
+  }) + `
     ${built ? (() => { const w = poster.when(built); return `
       <div class="poster-when no-print">
         <div class="poster-when-what"${hebrewLang(poster.covers(year))}>${escAttr(poster.covers(year))}</div>
@@ -3116,18 +3064,46 @@ export function renderPosters(container, state, routeChanged, tables) {
     <div id="poster-sheet">${!empty && built
       ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: onePage })
       : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
-    ${!showAll ? `<div class="poster-own-bar no-print">
-      ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}
-      <span class="hint">A sheet of your own is typed here and prints on this same page. Its blocks are dated by the Hebrew date, so it comes back every year, and a line can hang off a זמן instead of being typed.</span>
-    </div>
-    <div id="poster-own"></div>` : ''}`;
+    </section></div>`;
 
   const again = () => redrawInPlace(container, state);
-  const registerReferences = value => attachZmanimReference(container.querySelector('#poster-sheet'), {
-    title: poster.covers(year), days: posterReferenceDates(value), settings,
-    groups: handout || poster.key === 'slichos' || poster.key.startsWith('vasikin') ? ['shacharis'] : undefined,
-  });
+  const registerReferences = value => {
+    const holder = container.querySelector('#poster-sheet');
+    if (value?.pages) value.pages.forEach((page, i) => attachZmanimReference(holder.querySelectorAll('.poster-all-item')[i], {
+      title: page.label, days: posterReferenceDates(page.value), settings,
+      groups: page.poster?.handout || page.poster?.key === 'slichos' || page.poster?.key.startsWith('vasikin') ? ['shacharis'] : undefined,
+    }));
+    else attachZmanimReference(holder, {
+      title: poster.covers(year), days: posterReferenceDates(value), settings,
+      groups: handout || poster.key === 'slichos' || poster.key.startsWith('vasikin') ? ['shacharis'] : undefined,
+    });
+  };
   if (built) registerReferences(built);
+  const commitChoice = () => { conflictPick = 0; rememberBar(); onRoute?.(); again(); };
+  wireSwitch(container, 'poster-workflow', value => {
+    chosenWorkflow = value;
+    if (value === 'set' && chosenSheets === 'one') chosenSheets = 'each';
+    if (value === 'single') { chosenSheets = 'one'; chosenScope = 'one'; }
+    commitChoice();
+  });
+  wireSwitch(container, 'poster-set-layout', value => { chosenSheets = value === 'combined' ? 'all' : 'each'; commitChoice(); });
+  container.querySelector('#poster-year')?.addEventListener('change', event => { chosenYear = Number(event.target.value); commitChoice(); });
+  container.querySelector('.special-print-settings')?.addEventListener('toggle', event => {
+    if (!container.contains(event.target)) return;
+    printSettingsOpen = event.target.open; rememberBar();
+  });
+  container.querySelectorAll('[data-set-key]').forEach(input => input.addEventListener('change', () => {
+    chosenSetSelection[input.dataset.setKey] = input.checked; rememberBar(); again();
+  }));
+  container.querySelectorAll('[data-set-select]').forEach(button => button.addEventListener('click', () => {
+    selection.entries.filter(e => !e.missing).forEach(e => { chosenSetSelection[e.id] = button.dataset.setSelect === 'all'; });
+    rememberBar(); again();
+  }));
+  container.querySelectorAll('[data-set-review]').forEach(button => button.addEventListener('click', () => {
+    const entry = selection.entries.find(e => e.id === button.dataset.setReview);
+    chosenWorkflow = 'single'; chosenScope = 'one'; chosenGroup = entry.group;
+    chosen = entry.poster?.key || (entry.compact && !entry.half ? '__combined__' : null); chosenSheets = entry.compact ? 'all' : 'one'; commitChoice();
+  }));
   // A year either side, and no further: the buttons at the ends are disabled rather than
   // wrapping round, so holding one down cannot walk off the list.
   const step = (by) => {
@@ -3152,30 +3128,22 @@ export function renderPosters(container, state, routeChanged, tables) {
   /* The occasion, from the two steppers or from the list. Both end in the same place, so the
      one that does the work takes a name and the three ways in hand it one.
      No wrapping at the ends, like the year's: holding a button down cannot walk off the list. */
-  const toGroup = (name) => {
+  const toGroup = (name, key = null) => {
     if (name == null) return;
     chosenGroup = name;
     // The sheet chosen belongs to the occasion that was showing, so it is let go of here
     // rather than left pointing into a list it is not in any more.
-    chosen = null;
+    chosen = key;
+    if (chosenWorkflow === 'single') chosenSheets = 'one';
     conflictPick = 0;
     rememberBar();
     onRoute?.();
     again();
   };
-  container.querySelector('#poster-group-now')?.addEventListener('click', () => toGroup(current?.name));
-  container.querySelector('#poster-group-back')?.addEventListener('click', () => toGroup(groups[gAt - 1]?.name));
-  container.querySelector('#poster-group-next')?.addEventListener('click', () => toGroup(groups[gAt + 1]?.name));
-  container.querySelector('#poster-group')?.addEventListener('change', (e) => {
-    chosenGroup = e.target.value;
-    // The sheet chosen belongs to the occasion that was showing, so it is let go of here
-    // rather than left pointing into a list it is not in any more.
-    chosen = null;
-    conflictPick = 0;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
+  container.querySelector('#poster-group-now')?.addEventListener('click', () => toGroup(current?.name, current?.key));
+  container.querySelector('#poster-group-back')?.addEventListener('click', () => toGroup(visibleGroups[gAt - 1]?.name));
+  container.querySelector('#poster-group-next')?.addEventListener('click', () => toGroup(visibleGroups[gAt + 1]?.name));
+  container.querySelector('#poster-group')?.addEventListener('change', e => toGroup(e.target.value));
   wireSwitch(container, 'poster-sheets', (value) => {
     chosenSheets = value;
     conflictPick = 0;
@@ -3185,6 +3153,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   });
   container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
     chosen = e.target.value;
+    chosenSheets = e.target.value === '__combined__' ? 'all' : 'one';
     conflictPick = 0;
     rememberBar();
     onRoute?.();
@@ -3232,11 +3201,6 @@ export function renderPosters(container, state, routeChanged, tables) {
   container.querySelector('#poster-margin-next')?.addEventListener('click', () => toMargin(chosenMargin + OP_PAD_STEP));
   container.querySelector('#poster-margin-reset')?.addEventListener('click', () => toMargin(OP_PAD));
   container.querySelector('#poster-margin')?.addEventListener('change', (e) => toMargin(Number(e.target.value)));
-  wireSwitch(container, 'poster-combined', (value) => {
-    chosenCombined = value === 'yes';
-    rememberBar();
-    again();
-  });
   container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
     conflictPick = Number(e.target.value) || 0;
     again();
@@ -3248,6 +3212,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     const sheet = newOwnSheet(group?.name || POSTER_GROUP_DEFAULT);
     state.own = [...(state.own || []), sheet];
     saveState(state);
+    chosenWorkflow = 'single';
     chosenSheets = 'one';
     chosen = `own:${sheet.id}`;
     chosenGroup = sheet.group;
@@ -3275,7 +3240,7 @@ export function renderPosters(container, state, routeChanged, tables) {
       }
       layoutPosters(container);
     };
-    renderOwnEditor(container.querySelector('#poster-own'), poster.own, POSTER_OCCASIONS, {
+    renderOwnEditor(container.querySelector('#poster-own'), poster.own, visibleGroups.map(g => g.name), {
       onChange: (hard) => {
         saveState(state);
         if (hard) again(); else drawSheet();
