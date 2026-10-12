@@ -276,6 +276,7 @@ const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer">
   ${footHtml(s)}
   <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
   ${legal}
+  <p class="luach-calculation-credit no-print">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
 </footer>`;
 
 /** The address, cut so that where it takes two lines the break falls between the shul's name
