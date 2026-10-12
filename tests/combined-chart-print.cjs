@@ -47,7 +47,8 @@ function pdfContent(pdf, label) {
         assert.ok(Number(word[1]) >= -0.1 && Number(word[2]) >= -0.1 && Number(word[3]) <= width + 0.1 && Number(word[4]) <= height + 0.1,
           label + ': printed text stays on the paper: ' + word[5]);
       }
-      return { width, height, words: words.map(word => word[5]).sort() };
+      const inkWidth = Math.max(...words.map(word => Number(word[3]))) - Math.min(...words.map(word => Number(word[1])));
+      return { width, height, inkWidth, words: words.map(word => word[5]).sort() };
     });
 }
 
@@ -56,13 +57,16 @@ async function smallerPaperPdfs(page, reference, label) {
   for (const paper of [
     { label: 'letter-landscape', size: 'letter landscape', width: 792, height: 612, margin: '0' },
     { label: 'letter-portrait', size: 'letter portrait', width: 612, height: 792, margin: '0' },
-    { label: 'letter-margins', size: 'letter landscape', width: 792, height: 612, margin: '0.25in' }
+    { label: 'letter-margins', size: 'letter landscape', width: 792, height: 612, margin: '0.25in', marginPoints: 18 },
+    { label: 'service-letter', format: 'Letter', landscape: true, width: 792, height: 612 },
+    { label: 'service-ledger', format: 'Ledger', landscape: false, width: 1224, height: 792 }
   ]) {
     // Android's print service can retain its own paper instead of honoring @page.
     // Override the requested size so native printing must lay out on that smaller box.
-    const override = await page.addStyleTag({ content: `@page { size: ${paper.size}; margin: ${paper.margin}; }` });
+    const override = paper.size ? await page.addStyleTag({ content: `@page { size: ${paper.size}; margin: ${paper.margin}; }` }) : null;
     try {
-      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+      const pdf = await page.pdf({ preferCSSPageSize: !paper.format, printBackground: true,
+        ...(paper.format ? { format: paper.format, landscape: paper.landscape } : {}) });
       const actual = pdfContent(pdf, label + '-' + paper.label);
       assert.equal(actual.length, original.length, label + ': same physical page count on ' + paper.label);
       actual.forEach((physical, index) => {
@@ -70,9 +74,13 @@ async function smallerPaperPdfs(page, reference, label) {
         assert.equal(physical.height, paper.height);
         assert.deepEqual(physical.words, original[index].words,
           label + ': every time, heading, parsha, room mark and footer survives ' + paper.label);
+        const ratio = physical.inkWidth / (physical.width - 2 * (paper.marginPoints || 0));
+        const referenceRatio = original[index].inkWidth / original[index].width;
+        assert.ok(Math.abs(ratio - referenceRatio) < 0.003,
+          label + ': uses the available paper width on ' + paper.label + ': ' + ratio + ' vs ' + referenceRatio);
       });
       if (artifacts) fs.writeFileSync(path.join(artifacts, label + '-' + paper.label + '.pdf'), pdf);
-    } finally { await override.evaluate(el => el.remove()); }
+    } finally { if (override) await override.evaluate(el => el.remove()); }
   }
 }
 
@@ -170,9 +178,15 @@ function assertGeometry(frames, count, label) {
     const publicPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
     nativePdf(publicPdf, 1, 1224, 792, 'public-combined');
     await smallerPaperPdfs(page, publicPdf, 'public');
+    const misleadingQueries = await page.addStyleTag({ content: '@media print { .pages { width: 60% !important; } .page.is-combined-chart { zoom: 0.6 !important; } }' });
+    try {
+      await smallerPaperPdfs(page, publicPdf, 'misleading-phone-queries');
+    } finally { await misleadingQueries.evaluate(el => el.remove()); }
     await page.reload(); await page.locator('.is-combined-chart').waitFor();
     assert.equal(await page.locator('#chart-print-layout').inputValue(), 'combined', 'Choice survives refresh');
     await page.locator('#chart-print-layout').selectOption('separate');
+    assert.equal(await page.locator('#combined-chart-print-run').count(), 0, 'Switching layout clears the print copy');
+    assert.ok(!await page.locator('body').evaluate(el => el.classList.contains('has-combined-chart-print')), 'Original printing restored');
     nativePdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }), 2, 792, 612, 'public-separate');
 
     await page.goto(origin + '/admin/#charts'); await page.locator('#chart-print-layout').waitFor();
@@ -245,6 +259,11 @@ function assertGeometry(frames, count, label) {
       if (fixture.split || (fixture.year === 5787 && fixture.season === 'kayitz' && !fixture.language)) {
         await smallerPaperPdfs(page, fixturePdf, label);
       }
+      if (fixture.split) {
+        await page.locator('#pages > .page').nth(1).evaluate(el => el.classList.add('page-excluded'));
+        nativePdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }), source.count - 1, 1224, 792, 'excluded-middle-page');
+        await page.locator('#pages > .page').nth(1).evaluate(el => el.classList.remove('page-excluded'));
+      }
       const after = await page.evaluate(() => JSON.stringify(window.combinedFixture.state));
       assert.equal(after, source.before, label + ': printing does not change saved schedules or styles');
       console.log(JSON.stringify({ label, pages: source.count, weeks: source.dates.length, font: frames[0].fontSize }));
@@ -265,6 +284,7 @@ function assertGeometry(frames, count, label) {
       assert.equal(await phone.locator('.chart-print-paper-hint').count(), 1, 'Phone explains the full-size paper selection');
       await phone.locator('a[href="/week/"]').first().click();
       await phone.locator('.weekly-reader').waitFor();
+      assert.equal(await phone.locator('#combined-chart-print-run').count(), 0, 'Changing view clears the print copy');
       assert.match(await phone.locator('#print-page-size').textContent(), /letter portrait/, 'Leaving the chart restores the other page paper size');
     }
     assert.deepEqual(errors, [], 'No browser errors');

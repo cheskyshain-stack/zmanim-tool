@@ -3601,7 +3601,60 @@ function chartPrintLayoutHtml(value, canCombine = true) {
       <option value="combined" ${value === 'combined' ? 'selected' : ''} ${canCombine ? '' : 'disabled'}>Together · 11 × 17</option>
     </select>
   </label>${value === 'combined' && canCombine
-    ? '<p class="hint chart-print-paper-hint no-print">For full size, choose 11 × 17 (Tabloid) paper in the print dialog.</p>' : ''}`;
+    ? '<p class="hint chart-print-paper-hint no-print">For full size, choose Ledger (17 × 11) or 11 × 17 landscape in the print dialog.</p>' : ''}`;
+}
+
+// ==== ui/combined-chart-print.js ====
+const COMBINED_PRINT_ID = 'combined-chart-print-run';
+const COMBINED_PRINT_CLASS = 'has-combined-chart-print';
+const COMBINED_SVG_NS = 'http://www.w3.org/2000/svg';
+
+function clearCombinedChartPrint() {
+  document.getElementById(COMBINED_PRINT_ID)?.remove();
+  document.body.classList.remove(COMBINED_PRINT_CLASS);
+}
+
+function prepareCombinedChartPrint() {
+  clearCombinedChartPrint();
+  const pages = [...document.querySelectorAll('.pages > .page.is-combined-chart')]
+    .filter(page => !page.classList.contains('page-excluded') && page.getClientRects().length);
+  if (!pages.length) return;
+  const run = document.createElement('div');
+  run.id = COMBINED_PRINT_ID;
+  run.className = 'combined-chart-print-run';
+  run.setAttribute('aria-hidden', 'true');
+  for (const page of pages) {
+    const frame = document.createElement('div');
+    frame.className = 'combined-chart-print-frame';
+    const svg = document.createElementNS(COMBINED_SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 1632 1056');
+    svg.setAttribute('width', '1632');
+    svg.setAttribute('height', '1056');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
+    const content = document.createElementNS(COMBINED_SVG_NS, 'foreignObject');
+    content.setAttribute('width', '1632');
+    content.setAttribute('height', '1056');
+    const copy = page.cloneNode(true);
+    copy.style.setProperty('zoom', '1', 'important');
+    content.appendChild(copy);
+    svg.appendChild(content);
+    frame.appendChild(svg);
+    run.appendChild(frame);
+  }
+  document.body.appendChild(run);
+  document.body.classList.add(COMBINED_PRINT_CLASS);
+  // Keep this hidden copy until the next draw or print. Android can return from
+  // window.print() before it re-renders the job for a changed paper selection.
+}
+
+/** Register after the view's paper fitting, so the copied layout is final. The SVG
+ *  viewport fits the real containing block without querying a phone viewport or
+ *  adding a second scale when Android fits the requested page to its chosen paper.
+ *  This is the original HTML layout, retaining its fonts, rules and PDF text. */
+function wireCombinedChartPrint() {
+  clearCombinedChartPrint();
+  window.removeEventListener('beforeprint', prepareCombinedChartPrint);
+  window.addEventListener('beforeprint', prepareCombinedChartPrint);
 }
 
 // ==== ui/nav-helpers.js ====
@@ -4139,6 +4192,7 @@ function wirePrintButton(root, id = 'print-btn') {
    with no JavaScript gets, and it is the charts' orientation because the charts are the
    thing this site is for. */
 function setPrintPage(size) {
+  clearCombinedChartPrint();
   let el = document.getElementById('print-page-size');
   if (!el) {
     el = document.createElement('style');
@@ -9516,6 +9570,7 @@ function renderSheet(container, state, sheet, onChange) {
     if (document.body.contains(pagesEl)) fitPaper();
   };
   window.addEventListener('beforeprint', chartBeforePrintHandler);
+  wireCombinedChartPrint();
 
   // Fit the paper at full size first. Measuring the phone's reduced preview hid an
   // overflowing mixed-header page and let its address print above the next header.
@@ -12135,6 +12190,7 @@ function howFar(item) {
 
 
 
+
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
@@ -12387,6 +12443,7 @@ function renderChartBrowser(container, state, opts = {}) {
       orientation: 'landscape',
       size: combinedPrint ? [17, 11] : [11, 8.5],
     });
+    wireCombinedChartPrint();
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
