@@ -303,6 +303,13 @@
   .poster-half-sheet { margin: 0; box-shadow: none; zoom: 1 !important; }
   body:has(.is-half-letter-print) .poster-half-sheet { width: 11in; height: 8.5in; }
   .poster.is-halfpage { margin: 0; zoom: 1 !important; }
+  /* Paired handouts share landscape paper across the complete print run. */
+  body:has(.is-half-paired-print),
+  body:has(.is-half-paired-print) .app-shell,
+  body:has(.is-half-paired-print) main { height: auto; overflow: visible; }
+  .poster-paired-page { break-after: page; break-inside: avoid; }
+  .poster-paired-page:last-child { break-after: auto; }
+  .poster-paired-page + .poster-paired-page { margin-top: 0; }
   /* Mixed runs retain portrait paper. Turn this small handout onto the top half of
      that sheet, still at its actual size, rather than changing every other poster. */
   body:not(:has(.is-half-letter-print)) .poster-all .poster-half-sheet {

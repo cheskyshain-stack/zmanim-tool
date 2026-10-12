@@ -1,6 +1,7 @@
 import { escAttr } from '../util.js';
 import { switchHtml } from './switch.js';
 import { printButtonHtml } from './print-page.js';
+import { halfPagePairControls } from './half-page-pairs.js';
 
 const YOM_TOV = new Set(['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות']);
 
@@ -24,11 +25,12 @@ export function specialScheduleControls(c) {
     || c.workflow === 'set' && c.setEntries.some(e => e.poster?.own);
   const fullFormat = c.one?.key === 'pesach' ? 'Original poster' : 'Full page';
   const compactFormat = c.one?.key === 'pesach' ? 'Condensed poster' : 'Half page';
-  return `<div class="special-heading no-print"><div><h2>Special schedules</h2><p class="hint">Choose a schedule to review, or select a set to print.</p></div>
-    <button type="button" id="poster-own-new">+ Custom schedule</button></div>
+  return `<div class="special-heading no-print"><div><h2>Special schedules</h2><p class="hint">Choose a schedule, print a set, or pair half pages.</p></div>
+    ${c.workflow === 'halves' ? '' : '<button type="button" id="poster-own-new">+ Custom schedule</button>'}</div>
     <div class="special-workflow no-print">${switchHtml('poster-workflow', 'View', [
       { value: 'single', label: 'One schedule', on: c.workflow === 'single' },
       { value: 'set', label: 'Print a set', on: c.workflow === 'set' },
+      { value: 'halves', label: 'Pair half pages', on: c.workflow === 'halves' },
     ])}</div>
     <div class="special-layout"><section class="special-controls no-print" aria-label="Schedule selection"><div class="poster-bar">
       <div class="poster-year"><span class="poster-year-label" id="poster-year-label">Year</span>
@@ -41,7 +43,7 @@ export function specialScheduleControls(c) {
       ${c.workflow === 'set' ? toggle('poster-scope', 'Print', [
         { value: 'one', label: 'This occasion', on: !c.scopeAll }, { value: 'all', label: 'Whole year', on: c.scopeAll },
       ]) : ''}
-      ${c.scopeAll ? '' : `<div class="poster-year"><span class="poster-year-label" id="poster-group-label">Occasion</span>
+      ${c.scopeAll || c.workflow === 'halves' ? '' : `<div class="poster-year"><span class="poster-year-label" id="poster-group-label">Occasion</span>
         <div class="poster-year-step" role="group" aria-labelledby="poster-group-label">
           <button type="button" id="poster-group-back" aria-label="Previous occasion" ${c.gAt === 0 ? 'disabled' : ''}>&minus;</button>
           <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.group?.name)}</select>
@@ -55,7 +57,7 @@ export function specialScheduleControls(c) {
       ${c.workflow === 'set' ? toggle('poster-set-layout', 'Layout', [
         { value: 'original', label: 'Original posters', on: !c.onePage }, { value: 'combined', label: 'Combined', on: c.onePage },
       ]) : ''}
-      ${!c.empty && c.halfLetter || c.workflow === 'set' && c.setEntries.some(e => e.handout || e.half) ? toggle('poster-copies', 'Copies per page', [
+      ${c.workflow !== 'halves' && (!c.empty && c.halfLetter || c.workflow === 'set' && c.setEntries.some(e => e.handout || e.half)) ? toggle('poster-copies', 'Copies per page', [
         { value: 'one', label: 'One', on: c.copies === 1 }, { value: 'two', label: 'Two', on: c.copies === 2 },
       ]) : ''}
       ${!c.empty ? `<details class="special-print-settings" ${c.advanced ? 'open' : ''}><summary>Print settings</summary><div>
@@ -69,7 +71,7 @@ export function specialScheduleControls(c) {
         ${c.canTurn ? toggle('poster-orient', 'Paper', [{ value: 'portrait', label: 'Portrait', on: c.orientation === 'portrait' }, { value: 'landscape', label: 'Landscape', on: c.orientation === 'landscape' }]) : ''}
         ${!canPad && !c.canTurn ? '<p class="hint">This poster uses its original Letter layout.</p>' : ''}
       </div></details>` : ''}
-      ${c.built ? `<div class="special-print-action">${printButtonHtml()}<span>${c.workflow === 'set' ? `${c.pageCount} ${c.pageCount === 1 ? 'sheet' : 'sheets'} selected` : c.halfLetter ? '5½ × 8½ inches per copy' : '8½ × 11 inches'}</span></div>` : ''}
+      ${c.built ? `<div class="special-print-action">${printButtonHtml()}<span>${c.workflow === 'halves' ? `${c.halfPlan.pages.length} ${c.halfPlan.pages.length === 1 ? 'sheet' : 'sheets'} · ${c.halfPlan.halfCount} half pages` : c.workflow === 'set' ? `${c.pageCount} ${c.pageCount === 1 ? 'sheet' : 'sheets'} selected` : c.halfLetter ? '5½ × 8½ inches per copy' : '8½ × 11 inches'}</span></div>` : ''}
       ${c.built && c.copyText ? '<button type="button" class="copy-btn" id="poster-copy-btn">Copy text</button>' : ''}
       ${c.workflow === 'set' ? `<div class="special-set-list"><h3>Included schedules</h3>
         <div class="special-set-actions"><button type="button" data-set-select="all">Select all</button><button type="button" data-set-select="none">Clear</button></div>
@@ -77,6 +79,7 @@ export function specialScheduleControls(c) {
         ${c.scopeAll ? '<p class="hint">Morning handouts are selected separately under One schedule. Vasikin stays a separate poster in combined sets.</p>' : ''}
         ${!c.setEntries.length ? '<p class="hint">No schedules are set up for this occasion yet.</p>' : ''}
       </div>` : ''}
+      ${c.workflow === 'halves' ? halfPagePairControls(c.halfPairs, c.halfEntries, c.halfPlan) : ''}
       <div id="poster-own"></div>
     </div></section><section class="special-preview" aria-label="Schedule preview">
       <div class="special-preview-tools no-print"><h3>Preview</h3><button type="button" data-poster-zmanim aria-pressed="false">Check zmanim</button><button type="button" data-poster-explain aria-pressed="false">Explain times</button></div>`;

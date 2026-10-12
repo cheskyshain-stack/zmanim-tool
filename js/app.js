@@ -248,7 +248,7 @@ function paint() {
   // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
   main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
-  if (currentTab !== 'posters' || currentSheetId) main.classList.remove('is-special-schedules', 'is-half-letter-print');
+  if (currentTab !== 'posters' || currentSheetId) main.classList.remove('is-special-schedules', 'is-half-letter-print', 'is-half-paired-print');
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
