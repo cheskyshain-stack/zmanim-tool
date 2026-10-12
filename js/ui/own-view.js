@@ -13,7 +13,7 @@ import { newId } from '../storage.js';
 import { escAttr } from '../util.js';
 import {
   OWN_MONTHS, OWN_ZMANIM, OWN_ROUNDING, OWN_LABELS, OWN_HEADINGS,
-  ownBlankBlock, ownBlankRow, ownRuleText,
+  ownBlankBlock, ownBlankRow, ownRuleText, ownRoundingFor,
 } from '../posters/own.js';
 
 /** A fresh sheet, under the occasion the picker is on. */
@@ -60,7 +60,7 @@ function rowHtml(row, bi, ri) {
           ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escAttr(z.label)}</option>`).join('')}
         </select>
         <select class="own-round" aria-label="Rounding">
-          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escAttr(r.label)}</option>`).join('')}
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${ownRoundingFor(row).key === r.key ? 'selected' : ''} ${zman && row.zman === 'minchaGedola' && !['up', 'up5'].includes(r.key) ? 'disabled' : ''}>${escAttr(r.label)}</option>`).join('')}
         </select>
       </span>
       <button type="button" class="own-del-row" title="Take this line off">&times;</button>
@@ -164,7 +164,17 @@ export function renderOwnEditor(container, sheet, occasions, { onChange, onDelet
   on('.own-month', 'change', (el) => { at(el).block.month = Number(el.value); soft(); });
   on('.own-mode', 'change', (el) => { at(el).row.mode = el.value; hard(); });
   on('.own-text', 'input', (el) => { at(el).row.text = el.value; soft(); });
-  on('.own-zman', 'change', (el) => { at(el).row.zman = el.value; soft(); });
+  on('.own-zman', 'change', (el) => {
+    const row = at(el).row;
+    row.zman = el.value;
+    row.round = ownRoundingFor(row).key;
+    const rounding = el.closest('.own-rule').querySelector('.own-round');
+    for (const option of rounding.options) {
+      option.disabled = row.zman === 'minchaGedola' && !['up', 'up5'].includes(option.value);
+    }
+    rounding.value = row.round;
+    soft();
+  });
   on('.own-round', 'change', (el) => { at(el).row.round = el.value; soft(); });
   // The minutes and the side of the זמן are one number here and two controls on screen, which
   // is the way round that reads: nobody writes "minus twenty minutes before שקיעה".

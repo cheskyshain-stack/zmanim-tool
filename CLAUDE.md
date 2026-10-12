@@ -151,6 +151,18 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+All Mincha Gedola-based schedule rules use **Mincha Gedola Lechumra**, the later
+of Gra Mincha Gedola and astronomical Chatzos plus 30 regular minutes. The weekly
+Sunday-Friday limit excludes full Yom Tov and rounds up to the whole minute.
+Friday's 12:30 opening uses that Friday's Lechumra value and rounds directly up
+to five minutes, preserving seconds until rounding. Holiday opening checks also
+round their lower limit up, never to the nearest minute. Custom calculated Mincha
+Gedola rows use Lechumra and offer only upward one- or five-minute rounding;
+older saved rounding choices resolve the same way. Keep the MGA 16.1° calculation
+available as a comparison zman and retain the workbook definitions themselves.
+`tests/mincha-gedola-lechumra.mjs` checks limits, seasonal branches, holiday
+openings, downstream schedules and legacy custom rows.
+
 Chart printing has a remembered **Print layout** picker: **Separate pages · Letter**
 keeps the original interleaved pages; **Together · Letter** joins each paired page
 on one landscape Letter sheet; **Together · 11 × 17** uses landscape Tabloid.
@@ -411,7 +423,7 @@ Read raw times from the same named solar functions and settings as the schedules
 including the chart's actual MGA Plag reckonings, and show seconds before minute
 rounding. Distinguish the always-elevated sunrise/sunset where they differ from the
 zmanim elevation setting. The weekly Mincha Gedola limit uses the chart's shared rule
-and explicitly retains its nearest-minute rounding. This is a comparison tool, never
+and explicitly retains its upward whole-minute rounding. This is a comparison tool, never
 a change to a schedule or to how any zman is rounded. `tests/zmanim-references.mjs`
 checks dates, reckonings and rounding boundaries; `tests/zmanim-references.cjs` checks
 all chart families, cell/date navigation, mobile widths, saved choices and unchanged

@@ -56,7 +56,7 @@ test('all three Plag references use the same reckonings as the seasonal chart', 
     }
     assert(refs['gedola-lechumra'].value >= refs.gedola.value);
     assert(refs['gedola-lechumra'].value >= refs['chatzos-30'].value);
-    assert.match(refs['gedola-week'].note, /rounded to the nearest minute/);
+    assert.match(refs['gedola-week'].note, /rounded up to the whole minute/);
   }
 });
 

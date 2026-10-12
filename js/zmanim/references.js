@@ -58,7 +58,7 @@ export function zmanimReferences(serial, settings, group, { weeklyLimit = false 
     add('gedola', 'מנחה גדולה גר״א', Z.minchaGedola(date, settings));
     add('chatzos-30', 'חצות + 30 דקות', Z.minchaGedola30MinAfterChatzos(date, settings));
     add('gedola-lechumra', 'מנחה גדולה לחומרא', Z.minchaGedolaLechumra(date, settings), 'Later of Gedola and Chatzos + 30');
-    if (weeklyLimit) add('gedola-week', 'מנחה גדולה: גבול שבועי', weekLatestMinchaGedola(serial, settings), 'Latest Sun–Fri, excluding Yom Tov; rounded to the nearest minute');
+    if (weeklyLimit) add('gedola-week', 'מנחה גדולה לחומרא: גבול שבועי', weekLatestMinchaGedola(serial, settings), 'Latest Sun–Fri, excluding Yom Tov; rounded up to the whole minute');
     add('gedola-mga', 'מנחה גדולה מ״א 16.1°', Z.minchaGedolaMGA16_1(date, settings));
     add('plag-gra', 'פלג גר״א', Z.plagHamincha(date, settings));
     add('plag-mga', 'פלג מ״א (צאת 50)', Z.plagHaminchaCustom(Z.tzais50(date, settings), Z.alos16_1(date, settings)), 'Alos 16.1° to Shkiya + 50 minutes, as on the chart');

@@ -2600,14 +2600,8 @@ function inPlagWindow(serial, settings) {
  *  elsewhere (afterSukkosRow, afterYomKippurRow, or a שבוע-של-חול-המועד block) rather than
  *  reaching this function's Sun-Fri window at all.
  *
- *  **Rounded to the minute, the way every board here is.** The callers weigh this against
- *  round clock times (1:15, 1:20, 1:35, 1:40) and the boards themselves say "all zmanim
- *  are rounded off, please be מחמיר two minutes" - so a day whose exact מנחה גדולה is
- *  twenty seconds past 1:15 is still 1:15 by the board's own stated precision, and ought
- *  to be read as 1:15 here too rather than as a fraction of a minute nobody is holding
- *  the printed time to. Left unrounded, בראשית תשפ"ז stayed at 1:20 even once שמחת תורה
- *  was excluded above: the next latest day, Monday, sits at 1:15 and twenty seconds, which
- *  is 1:15 on the board and was still failing an exact <= 1:15 test.
+ *  Round up to the whole minute. A printed early Mincha must clear the exact
+ *  מנחה גדולה לחומרא, including its seconds, on every covered day.
  *
  *  One answer for the whole week, asked once and used by both charts' early מנחה slots -
  *  sheets/weekday.js's own early מנחה and this file's Erev Shabbos one - so the two cannot
@@ -2618,7 +2612,7 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
   const days = [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
   const regular = days.filter((d) => !isAssurMelacha(d, settings));
   const latest = Math.max(...(regular.length ? regular : days).map((d) => Z.minchaGedolaLechumra(dateFromSerial(d), settings)));
-  return Math.round(latest * 1440) / 1440;
+  return ceilToMinute(latest);
 }
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
@@ -2629,9 +2623,7 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
  *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
  *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
- *  before מנחה גדולה, read the מ"א way (עלות
- *  ט״ז.1° to שקיעה ט״ז.1°, not sunrise/sunset) and rounded up to the next five minutes - its
- *  own floor, not weekLatestMinchaGedola's GRA-based one below.
+ *  before that Friday's מנחה גדולה לחומרא, rounded up to the next five minutes.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -2645,16 +2637,11 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *  week to week through a season; the shul asked for two round numbers instead, the same
  *  1:35/1:40 the weekday board already gives. */
 function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
-  /* The floor under 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
-     to שקיעה ט״ז.1° rather than sunrise/sunset - rounded up to the next five minutes, the
-     minute itself rather than the second: 12:20:59 is still 12:20, only 12:21:00 reaches
-     12:25. Asked for directly in place of the GRA-based מנחה גדולה לחומרא this used to read. */
-  const mglVal = Z.minchaGedolaMGA16_1(fridayDate, settings);
+  const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה (מ"א ט״ז.1°)', mglVal,
-    'half a proportional (מ"א) hour after חצות, the day measured from עלות ט״ז.1° to שקיעה ט״ז.1°')
-    .floorToStep(1, 'seconds are not held against it - the minute this falls in is what counts')
-    .ceilToStep(5, 'rounded up to the next five minutes');
+  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
+    'on this Friday: the later of Gra Mincha Gedola and thirty regular minutes after חצות')
+    .ceilToStep(5, 'rounded up to the next five minutes, retaining the seconds until rounding');
   /* Short, because the מנחה גדולה it is weighed against now explains itself. */
   const notBefore = 'a מנחה is never offered before it';
 
@@ -5430,15 +5417,8 @@ function chartLine(cell, traces) {
 // shul asked for the same rule on both and one rule in one place is the only way that holds.
 
 const EM_MIN = 1 / 1440;
-/** A day fraction snapped to the minute it prints as.
- *
- *  Both the move and the quarter of an hour are measured on the printed minute rather than on
- *  the raw זמן, and that is not a nicety. מנחה גדולה is a fraction of a second as well as a
- *  minute: in תשפ"ז it falls at 1:20 and 24 seconds, which prints as 1:20 and is a clean
- *  fifteen minutes in front of the 1:35, while the unrounded number is 14 minutes 36 and was
- *  dropping the מנין the shul asked to keep. Rounded to the same minute formatTime would show,
- *  the arithmetic on the paper and the arithmetic here are one thing. */
-const emPrinted = (t) => Math.round(t * 1440) / 1440;
+/** Round the lower limit up so a printed opening never precedes the exact zman. */
+const emPrinted = (t) => ceilToMinute(t);
 
 /** The two times an afternoon is allowed to open at, earliest first. */
 const EM_FIRST = (13 * 60 + 15) * EM_MIN;
@@ -5465,8 +5445,9 @@ function openingMincha(minchaGedola, next) {
  *  The same three comparisons in the same order as above, so the two cannot come apart. */
 function openingMinchaTrace(minchaGedola, next) {
   const gedola = emPrinted(minchaGedola);
-  const held = 'a מנין is never offered before מנחה גדולה, measured on the minute it prints as rather than on the raw זמן';
-  const mg = () => zman('מנחה גדולה לחומרא', gedola, 'the latest of every day this one printed list has to hold for');
+  const held = 'a מנין is never offered before the exact מנחה גדולה לחומרא, including its seconds';
+  const mg = () => zman('מנחה גדולה לחומרא', minchaGedola, 'the latest of every day this one printed list has to hold for')
+    .ceil('round up to the whole minute so the opening never precedes the exact zman');
 
   if (EM_FIRST >= gedola - 1e-9) {
     return clockTime(13, 15, 'the earlier of the two times an afternoon may open at').laterOf(mg(), held);
@@ -8805,7 +8786,7 @@ function zmanimReferences(serial, settings, group, { weeklyLimit = false } = {})
     add('gedola', 'מנחה גדולה גר״א', Z.minchaGedola(date, settings));
     add('chatzos-30', 'חצות + 30 דקות', Z.minchaGedola30MinAfterChatzos(date, settings));
     add('gedola-lechumra', 'מנחה גדולה לחומרא', Z.minchaGedolaLechumra(date, settings), 'Later of Gedola and Chatzos + 30');
-    if (weeklyLimit) add('gedola-week', 'מנחה גדולה: גבול שבועי', weekLatestMinchaGedola(serial, settings), 'Latest Sun–Fri, excluding Yom Tov; rounded to the nearest minute');
+    if (weeklyLimit) add('gedola-week', 'מנחה גדולה לחומרא: גבול שבועי', weekLatestMinchaGedola(serial, settings), 'Latest Sun–Fri, excluding Yom Tov; rounded up to the whole minute');
     add('gedola-mga', 'מנחה גדולה מ״א 16.1°', Z.minchaGedolaMGA16_1(date, settings));
     add('plag-gra', 'פלג גר״א', Z.plagHamincha(date, settings));
     add('plag-mga', 'פלג מ״א (צאת 50)', Z.plagHaminchaCustom(Z.tzais50(date, settings), Z.alos16_1(date, settings)), 'Alos 16.1° to Shkiya + 50 minutes, as on the chart');
@@ -14188,7 +14169,7 @@ const OWN_ZMANIM = [
   { key: 'shmaGra', label: 'סוף זמן ק"ש גר"א', at: (d, s) => Z.sofZmanShmaGRA(d, s) },
   { key: 'tfilaGra', label: 'סוף זמן תפילה גר"א', at: (d, s) => Z.sofZmanTfilaGRA(d, s) },
   { key: 'chatzos', label: 'חצות', at: (d, s) => Z.solarNoon(d, s) },
-  { key: 'minchaGedola', label: 'מנחה גדולה', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
+  { key: 'minchaGedola', label: 'מנחה גדולה לחומרא', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
   { key: 'minchaKetana', label: 'מנחה קטנה', at: (d, s) => Z.minchaKetana(d, s) },
   { key: 'plag', label: 'פלג המנחה', at: (d, s) => Z.plagHamincha(d, s) },
   { key: 'shkia', label: 'שקיעה', at: (d, s) => Z.sunsetElev(d, s) },
@@ -14209,6 +14190,13 @@ const OWN_ROUNDING = [
   { key: 'down5', label: 'Down to the last 5 minutes', apply: (t) => Math.floor(t * 288) / 288 },
   { key: 'up5', label: 'Up to the next 5 minutes', apply: (t) => Math.ceil(t * 288) / 288 },
 ];
+
+/** Mincha Gedola rows round later, including rows saved with an older rounding choice. */
+function ownRoundingFor(row) {
+  const selected = OWN_ROUNDING.find(round => round.key === row.round) || OWN_ROUNDING[0];
+  if (row.mode !== 'zman' || row.zman !== 'minchaGedola') return selected;
+  return OWN_ROUNDING.find(round => round.key === (selected.key.endsWith('5') ? 'up5' : 'up'));
+}
 
 /** The names a row is likely to want, so a sheet is picked rather than spelled. Anything not
  *  here is typed instead: the list is a shortcut, not a fence. Off the shul's own sheets. */
@@ -14254,7 +14242,7 @@ function ownRowTimes(row, serial, settings) {
   if (row.mode !== 'zman') return parseTimes(row.text);
   const selectedZman = OWN_ZMANIM.find((z) => z.key === row.zman);
   if (!selectedZman) return [];
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const round = ownRoundingFor(row);
   const day = dateFromSerial(serial);
   let traced = row.zman === 'candles'
     ? zman('שקיעה', Z.sunsetElev(day, settings)).minus(settings.candleLightingMinutes ?? 18, 'the candle-lighting setting')
@@ -14279,7 +14267,7 @@ function ownRuleText(row) {
   if (!zman) return '';
   const mins = Number(row.offset) || 0;
   const when = mins === 0 ? 'at' : `${Math.abs(mins)} minutes ${mins < 0 ? 'before' : 'after'}`;
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const round = ownRoundingFor(row);
   return `${when} ${zman.label}, ${round.label.toLowerCase()}`;
 }
 
@@ -15012,7 +15000,7 @@ function rowHtml(row, bi, ri) {
           ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escAttr(z.label)}</option>`).join('')}
         </select>
         <select class="own-round" aria-label="Rounding">
-          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escAttr(r.label)}</option>`).join('')}
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${ownRoundingFor(row).key === r.key ? 'selected' : ''} ${zman && row.zman === 'minchaGedola' && !['up', 'up5'].includes(r.key) ? 'disabled' : ''}>${escAttr(r.label)}</option>`).join('')}
         </select>
       </span>
       <button type="button" class="own-del-row" title="Take this line off">&times;</button>
@@ -15116,7 +15104,17 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
   on('.own-month', 'change', (el) => { at(el).block.month = Number(el.value); soft(); });
   on('.own-mode', 'change', (el) => { at(el).row.mode = el.value; hard(); });
   on('.own-text', 'input', (el) => { at(el).row.text = el.value; soft(); });
-  on('.own-zman', 'change', (el) => { at(el).row.zman = el.value; soft(); });
+  on('.own-zman', 'change', (el) => {
+    const row = at(el).row;
+    row.zman = el.value;
+    row.round = ownRoundingFor(row).key;
+    const rounding = el.closest('.own-rule').querySelector('.own-round');
+    for (const option of rounding.options) {
+      option.disabled = row.zman === 'minchaGedola' && !['up', 'up5'].includes(option.value);
+    }
+    rounding.value = row.round;
+    soft();
+  });
   on('.own-round', 'change', (el) => { at(el).row.round = el.value; soft(); });
   // The minutes and the side of the זמן are one number here and two controls on screen, which
   // is the way round that reads: nobody writes "minus twenty minutes before שקיעה".

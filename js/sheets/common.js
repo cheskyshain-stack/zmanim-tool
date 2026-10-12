@@ -66,14 +66,8 @@ export function inPlagWindow(serial, settings) {
  *  elsewhere (afterSukkosRow, afterYomKippurRow, or a שבוע-של-חול-המועד block) rather than
  *  reaching this function's Sun-Fri window at all.
  *
- *  **Rounded to the minute, the way every board here is.** The callers weigh this against
- *  round clock times (1:15, 1:20, 1:35, 1:40) and the boards themselves say "all zmanim
- *  are rounded off, please be מחמיר two minutes" - so a day whose exact מנחה גדולה is
- *  twenty seconds past 1:15 is still 1:15 by the board's own stated precision, and ought
- *  to be read as 1:15 here too rather than as a fraction of a minute nobody is holding
- *  the printed time to. Left unrounded, בראשית תשפ"ז stayed at 1:20 even once שמחת תורה
- *  was excluded above: the next latest day, Monday, sits at 1:15 and twenty seconds, which
- *  is 1:15 on the board and was still failing an exact <= 1:15 test.
+ *  Round up to the whole minute. A printed early Mincha must clear the exact
+ *  מנחה גדולה לחומרא, including its seconds, on every covered day.
  *
  *  One answer for the whole week, asked once and used by both charts' early מנחה slots -
  *  sheets/weekday.js's own early מנחה and this file's Erev Shabbos one - so the two cannot
@@ -84,7 +78,7 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
   const days = [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
   const regular = days.filter((d) => !isAssurMelacha(d, settings));
   const latest = Math.max(...(regular.length ? regular : days).map((d) => Z.minchaGedolaLechumra(dateFromSerial(d), settings)));
-  return Math.round(latest * 1440) / 1440;
+  return ceilToMinute(latest);
 }
 
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
@@ -95,9 +89,7 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
  *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
  *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
- *  before מנחה גדולה, read the מ"א way (עלות
- *  ט״ז.1° to שקיעה ט״ז.1°, not sunrise/sunset) and rounded up to the next five minutes - its
- *  own floor, not weekLatestMinchaGedola's GRA-based one below.
+ *  before that Friday's מנחה גדולה לחומרא, rounded up to the next five minutes.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -111,16 +103,11 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *  week to week through a season; the shul asked for two round numbers instead, the same
  *  1:35/1:40 the weekday board already gives. */
 export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
-  /* The floor under 12:30 (below) is מנחה גדולה measured the מ"א way - עלות ט״ז.1°
-     to שקיעה ט״ז.1° rather than sunrise/sunset - rounded up to the next five minutes, the
-     minute itself rather than the second: 12:20:59 is still 12:20, only 12:21:00 reaches
-     12:25. Asked for directly in place of the GRA-based מנחה גדולה לחומרא this used to read. */
-  const mglVal = Z.minchaGedolaMGA16_1(fridayDate, settings);
+  const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
-  const mgl = () => zman('מנחה גדולה (מ"א ט״ז.1°)', mglVal,
-    'half a proportional (מ"א) hour after חצות, the day measured from עלות ט״ז.1° to שקיעה ט״ז.1°')
-    .floorToStep(1, 'seconds are not held against it - the minute this falls in is what counts')
-    .ceilToStep(5, 'rounded up to the next five minutes');
+  const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
+    'on this Friday: the later of Gra Mincha Gedola and thirty regular minutes after חצות')
+    .ceilToStep(5, 'rounded up to the next five minutes, retaining the seconds until rounding');
   /* Short, because the מנחה גדולה it is weighed against now explains itself. */
   const notBefore = 'a מנחה is never offered before it';
 
