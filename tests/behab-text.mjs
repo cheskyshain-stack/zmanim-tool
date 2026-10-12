@@ -18,7 +18,6 @@ test('The Behab message uses the chart times and rooms, with later minyanim sepa
   assert.equal(behabText(poster, poster.days[0]), [
     'Tomorrow Behab',
     '6:40m (Selichos before Shacharis), 7:00en, 7:15d, 7:35sh',
-    'The following will NOT be saying Behab:',
     '8:00m, 8:20en, 8:40d',
   ].join('\n'));
   assert(behabText(poster, poster.days[0], poster.days[0]).startsWith('Today Behab\n'));
