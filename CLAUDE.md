@@ -152,8 +152,11 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 ## Layout invariants for the charts
 
 Chart printing has a remembered **Print layout** picker: **Separate pages · Letter**
-keeps the original interleaved pages; **Together · 11 × 17** joins each paired page
-on one landscape Tabloid sheet. Weekdays are on the right, Shabbos and Friday on
+keeps the original interleaved pages; **Together · Letter** joins each paired page
+on one landscape Letter sheet; **Together · 11 × 17** uses landscape Tabloid.
+Both combined choices have matching screen and physical paper dimensions and retain
+every source cell. Fit Letter independently instead of printing a shrunken Tabloid
+preview. Preserve previously remembered choices. Weekdays are on the right, Shabbos and Friday on
 the left, and the parsha appears once at the far right. The upper headings are
 **שבת** and **ימות החול**; Friday has no separate upper heading. Do not add dates
 to the parsha cells. Preserve the original special-parsha, Chanukah and molad notes.
@@ -161,8 +164,9 @@ Use the shared source chart cells, including rules, saved overrides, announced
 values, room marks and explanation attributes. Join rows by their actual serial,
 keeping weekday-only holiday rows with an empty Shabbos side. Keep the single
 weekday morning panel and one location legend, rounding note and address per page.
-The combined pages measure 1632 by 1056px (17 by 11 inches), while separate pages
-remain 1056 by 816px. Measure at paper size and fit the entire job without changing
+Combined Tabloid pages measure 1632 by 1056px (17 by 11 inches); combined Letter
+and separate pages measure 1056 by 816px (11 by 8.5 inches).
+Measure at the selected paper size and fit the entire job without changing
 saved font sizes. Week rows are equal within a page, including across split DST
 sections. The two heading rows have their own natural heights. The combined morning
 panel inherits the chart font size even though it sits outside the table. Include
@@ -175,11 +179,15 @@ The Android print service may retain Letter paper despite the selected Tabloid
 layout. Its print queries can report different dimensions from the final sheet,
 and a CSS zoom fit was applied again by the print service, leaving a small chart
 in the corner. For combined jobs only, copy the fitted HTML into a print-only SVG
-viewBox and let its percentage width fit the actual containing block. Retain native
+viewBox and let its percentage width and height fit the actual containing block.
+Give the print-only html/body/run a definite percentage height, so each frame can
+fit both dimensions even with printer margins. Cap each frame at the selected size.
+Retain native
 PDF text, fonts and all original layout. Register this after the paper fitting.
 Keep the hidden print copy until the next draw or print, since Android can re-render
 the job after window.print() returns. setPrintPage clears it on view changes.
-The combined picker names Android's landscape **Ledger (17 × 11)** paper.
+The combined picker names **Letter and Landscape** for the Letter option, and
+Android's landscape **Ledger (17 × 11)** paper for the larger option.
 Browser checks must test the actual printed width as well as complete text and
 page counts on portrait/landscape Letter, with margins, and full-size Tabloid.
 Check both an overridden @page and a print service resizing the requested paper.

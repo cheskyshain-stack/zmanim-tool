@@ -830,6 +830,8 @@ table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size
 .week-nav-print-one .chart-print-layout { flex-basis: 100%; justify-content: center; }
 .week-nav-print-one .chart-print-paper-hint { flex-basis: 100%; margin: 0; text-align: center; font: 400 12px Arial,sans-serif; }
 .page.is-combined-chart { width: 17in; min-height: 11in; }
+.page.is-combined-chart.is-combined-letter { width: 11in; min-height: 8.5in; }
+.is-combined-letter th, .is-combined-letter td { padding-inline: 0.02in; }
 .combined-chart-body { display: flex; flex-direction: column; gap: 0.12in; position: relative; flex: none; }
 .combined-chart-body > table { flex: none; table-layout: fixed; }
 .is-combined-chart .combined-group-head th { font-size: calc(var(--sheet-font-size) + 4pt); line-height: 1.15; }

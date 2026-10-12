@@ -50,6 +50,7 @@
   }
   .page:last-child { page-break-after: auto; }
   .page.is-combined-chart { width: 17in; height: 11in; min-height: 0; zoom: 1 !important; }
+  .page.is-combined-chart.is-combined-letter { width: 11in; height: 8.5in; }
   .cell { outline: none; }
   .page .footer-text { color: #000; }
 }
@@ -102,10 +103,11 @@
   /* SVG scales the original HTML to the actual paper width. CSS zoom based on
      print queries was shrinking it again when Android also resized the page. */
   body.has-combined-chart-print > :not(.combined-chart-print-run) { display: none !important; }
-  .combined-chart-print-run { display: block; width: 100%; margin: 0; }
-  .combined-chart-print-frame { width: 100%; max-width: 17in; margin: 0 auto; break-after: page; break-inside: avoid; }
+  html:has(body.has-combined-chart-print), body.has-combined-chart-print { height: 100%; }
+  .combined-chart-print-run { display: block; width: 100%; height: 100%; margin: 0; }
+  .combined-chart-print-frame { width: 100%; height: 100%; max-width: 17in; max-height: 11in; margin: 0 auto; break-after: page; break-inside: avoid; }
   .combined-chart-print-frame:last-child { break-after: auto; }
-  .combined-chart-print-frame > svg { display: block; width: 100%; height: auto; }
+  .combined-chart-print-frame > svg { display: block; width: 100%; height: 100%; }
   .combined-chart-print-run .page { zoom: 1 !important; break-after: auto; page-break-after: auto; }
 }
 

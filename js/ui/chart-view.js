@@ -13,7 +13,7 @@ import { resolveSettings } from '../settings.js';
 import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
 import { buildSheetPages, buildCombinedChartPages, syncPageHeights } from './sheet-view.js';
-import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
 import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
@@ -225,8 +225,10 @@ export function renderChartBrowser(container, state, opts = {}) {
       container.innerHTML = `<p class="hint">${empty}</p>`;
       return;
     }
-    const combinedPrint = printLayout === 'combined' && Boolean(spread.weekday);
-    setPrintPage(combinedPrint ? '17in 11in' : 'letter landscape');
+    const activeLayout = spread.weekday ? printLayout : 'separate';
+    const combinedPrint = isCombinedChartLayout(activeLayout);
+    const printSize = chartPrintSize(activeLayout);
+    setPrintPage(printSize.css);
     const label = spreadLabel(spread);
     container.innerHTML = `
       <div class="week-nav no-print">
@@ -243,19 +245,19 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>`}
-        <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(combinedPrint ? 'combined' : 'separate', Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
+        <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(activeLayout, Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
     useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
-    const shabbos = combinedPrint ? buildCombinedChartPages(spread.sheet, spread.weekday, state, { readOnly: true })
+    const shabbos = combinedPrint ? buildCombinedChartPages(spread.sheet, spread.weekday, state, { readOnly: true, printLayout: activeLayout })
       : buildSheetPages(spread.sheet, state, { readOnly: true });
     const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     fitChartToWindow(pagesEl);
     container.querySelector('#chart-print-layout').addEventListener('change', event => {
-      printLayout = event.target.value === 'combined' ? 'combined' : 'separate';
-      rememberChartPrintLayout(printLayout);
+      rememberChartPrintLayout(event.target.value);
+      printLayout = chartPrintLayout();
       draw();
     });
 
@@ -273,7 +275,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       name: () => pdfName(label.english),
       sheet: '.page',
       orientation: 'landscape',
-      size: combinedPrint ? [17, 11] : [11, 8.5],
+      size: [printSize.width, printSize.height],
     });
     wireCombinedChartPrint();
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
