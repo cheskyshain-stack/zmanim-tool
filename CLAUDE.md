@@ -401,6 +401,8 @@ for this view. Retain the year minus/plus/Current controls and margin/ink settin
 Render every half through its original renderer at 5.5in by 8.5in. Paired sets use
 landscape Letter paper for the entire run, with two halves per physical sheet and no
 rotation. Ignore the single-schedule duplicate-copy preference in this workflow.
+Half-page footers use 7.5pt regular-weight text, including the shul name and address
+on morning handouts.
 Morning handouts remain excluded from the original whole-year set and public runs.
 Do not silently drop a selected schedule that is unavailable after a year change;
 show its pairing's warning and require another choice or Blank before enabling Print.
