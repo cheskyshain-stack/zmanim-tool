@@ -4241,6 +4241,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    landscape paper is added only for print, leaving the other half blank for cutting. */
 .poster-half-sheet { width: 5.5in; height: 8.5in; margin: 0 auto; display: flex; direction: ltr; }
 .poster-half-sheet.is-two-copies { width: 11in; }
+.poster-half-sheet.is-paired { width: 11in; }
+.poster-half-slot { width: 5.5in; height: 8.5in; flex: 0 0 5.5in; }
+.poster-half-slot.is-blank { display: grid; place-items: center; background: white; color: var(--muted); }
+.poster-paired-page + .poster-paired-page { margin-top: 1.5rem; }
 .poster.is-halfpage {
   width: 5.5in; height: 8.5in;
   flex: 0 0 5.5in;
@@ -4336,7 +4340,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .special-heading h2 { margin: 0 0 0.35rem; }
   .special-heading p { margin: 0; }
   .special-heading button { flex-shrink: 0; }
-  .special-workflow { max-width: 26rem; margin-bottom: 1.2rem; }
+  .special-workflow { max-width: 36rem; margin-bottom: 1.2rem; }
   .special-workflow .week-switch-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .special-layout { display: grid; grid-template-columns: minmax(20rem, 23rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
   .special-controls, .special-preview { min-width: 0; }
@@ -4372,6 +4376,18 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .special-set-entry span { min-width: 0; flex: 1; }
   .special-set-entry bdi { color: var(--ink); display: block; }
   .special-set-entry small { display: block; margin-top: 0.2rem; font-weight: normal; letter-spacing: 0; }
+  .special-half-pairs h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .special-half-pairs > .hint { font-size: var(--fs-xs); line-height: 1.5; }
+  .special-half-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-block: 0.75rem; }
+  .special-half-pairs button { font-size: var(--fs-xs); padding: 0.35rem 0.5rem; }
+  .special-half-pair { border-top: 1px solid var(--border); padding-block: 0.85rem; }
+  .special-half-pair-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+  .special-half-pair-head h4 { margin: 0; font-size: var(--fs-sm); }
+  .special-half-pair-head > div { display: flex; gap: 0.25rem; }
+  .special-half-pickers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; margin-bottom: 0.5rem; }
+  .special-half-pickers label { font-size: var(--fs-xs); }
+  .special-controls .special-half-pickers select { width: 100%; min-width: 0; font-size: var(--fs-sm); padding-inline: 0.4rem 1.8rem; }
+  .special-half-error { color: #9d3030; font-size: var(--fs-xs); line-height: 1.5; margin: 0.5rem 0 0; }
   .special-controls .own-editor { padding: 0; border: 0; }
   .special-controls .own-top { display: grid; grid-template-columns: minmax(0, 1fr); }
   .special-controls .own-editor input, .special-controls .own-editor select { min-width: 0; max-width: 100%; }

@@ -334,6 +334,24 @@ settings collapse on screen, while all selection controls and custom editors sta
 outside printed content. `tests/special-schedules-navigation.cjs` covers the new
 controls, migrations, named selections, mobile widths and physical page counts.
 
+**Pair half pages** is a third admin workflow for Chanukah and Asara B'Teves compact
+posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
+Choose each sheet's left and right schedule, swap halves, reorder or remove sheets,
+leave either half blank, or pair the same schedule with itself. **Add all half pages**
+appends every remaining available half-page schedule without changing existing pairs.
+Keep the pairing layout and its year in the remembered poster bar; use `#posters/halfpages`
+for this view. Retain the year minus/plus/Current controls and margin/ink settings.
+Render every half through its original renderer at 5.5in by 8.5in. Paired sets use
+landscape Letter paper for the entire run, with two halves per physical sheet and no
+rotation. Ignore the single-schedule duplicate-copy preference in this workflow.
+Morning handouts remain excluded from the original whole-year set and public runs.
+Do not silently drop a selected schedule that is unavailable after a year change;
+show its pairing's warning and require another choice or Blank before enabling Print.
+Each selected half has its own Check zmanim context. Clear `is-half-paired-print`
+when leaving Special schedules. `tests/half-page-pairs.cjs` checks exact half-sheet
+coordinates and PDF page counts, all available schedules, content equality with
+single-schedule handouts, remembered pairings, controls and 320/375/1440px widths.
+
 Admin also has a remembered **Show zmanim** switch for comparing every seasonal page,
 saved print layout, weekly schedule and special poster with the actual day's zmanim.
 Shared renderers register their own covered dates only after the admin installs

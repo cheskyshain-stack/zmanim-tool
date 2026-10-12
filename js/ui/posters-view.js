@@ -46,6 +46,7 @@ import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanat
 import { attachZmanimReference } from './zmanim-references.js';
 import { posterReferenceDates } from '../zmanim/references.js';
 import { specialScheduleControls } from './special-schedule-controls.js';
+import { newHalfPagePair, normalizeHalfPagePairs, addAllHalfPages, halfPagePlan } from './half-page-pairs.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -1708,7 +1709,7 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '' } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '', standalone = false } = {}) {
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
   // Put the shul's name and street address on separate lines on the morning handouts.
@@ -1716,12 +1717,13 @@ function halfPageShell(poster, settings, title, sections, { asara = false, chanu
   const legend = shacharis ? (address ? [{ dir: 'ltr', text: address }] : [])
     : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
   const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
+  if (standalone) return html;
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
 }
 
 /** A handout on half a Letter sheet. Keep the morning groups together and put their
  *  sunrise references in one strip, rather than spending a table row on each day. */
-function renderHalfChanukahPoster(poster, settings) {
+function renderHalfChanukahPoster(poster, settings, options = {}) {
   const sections = ONEPAGE_SECTIONS.chanukah(poster);
   const morning = sections[0];
   const netz = poster.shacharisRows.flatMap((row) => row.vasikin.netzDays || []);
@@ -1730,10 +1732,10 @@ function renderHalfChanukahPoster(poster, settings) {
           <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
     + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row,
       label: row.label === s.title ? '' : row.label })).join(''))).join('');
-  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml, { chanukah: true });
+  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml, { chanukah: true, ...options });
 }
 
-function renderHalfAsaraBTevesPoster(poster, settings) {
+function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
   const sections = [];
   let notes = [];
   for (const s of poster.sets) {
@@ -1749,11 +1751,11 @@ function renderHalfAsaraBTevesPoster(poster, settings) {
   }
   // On Friday, candle lighting and sunset stay together below Mincha.
   if (notes.length) sections.push(`<div class="asara-block">${notes.join('')}</div>`);
-  return halfPageShell(poster, settings, poster.title, sections.join(''), { asara: true });
+  return halfPageShell(poster, settings, poster.title, sections.join(''), { asara: true, ...options });
 }
 
 /** The same compact half-sheet as the complete schedules, with rooms beside each time. */
-function renderShacharisHandout(poster, settings) {
+function renderShacharisHandout(poster, settings, options = {}) {
   const rows = poster.rows.map(row => `<div class="onepage-row shacharis-handout-row">
     <div class="shacharis-handout-run">
       <bdi class="shacharis-handout-room" dir="rtl" lang="he">${escAttr(row.room)}</bdi>
@@ -1771,7 +1773,7 @@ function renderShacharisHandout(poster, settings) {
     return `<div class="shacharis-handout-date" data-date="${date.toISOString().slice(0, 10)}"><div lang="he">יום ${weekday}' ${escAttr(parsha)}</div>
       <span class="shacharis-handout-hebrew-date" lang="he">${escAttr(hebrew)}</span></div>`;
   }).join('')}</div>` : '';
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates });
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates, ...options });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -2503,6 +2505,7 @@ let chosen = null;
 let chosenSheets = 'one';
 let chosenWorkflow = 'single';
 let chosenSetSelection = {};
+let chosenHalfPagePairs = null;
 let printSettingsOpen = false;
 // Which yom tov. One so far, and the picker has one answer, but the posters have been grouped
 // by it from the start and the next set drawn will land in the next group.
@@ -2525,6 +2528,7 @@ let posterTables = null;
  *  the right answer on a fresh load; carrying a year in the address would mean a link that
  *  goes stale. */
 export function posterRoute() {
+  if (chosenWorkflow === 'halves') return ['halfpages'];
   // The whole set keeps the key the run entry has always had, so a link written before it
   // became a switch still lands on it.
   const handout = chosenWorkflow === 'set' ? null : POSTERS.find(p => p.handout && p.key === chosen)
@@ -2542,6 +2546,11 @@ export function setPosterRoute(parts = []) {
   // and which way up, and everything it does not say is left as it was left.
   recallBar();
   const [key, orient] = parts;
+  if (key === 'halfpages') {
+    chosenWorkflow = 'halves';
+    rememberBar();
+    return;
+  }
   // A sheet of your own is not in the table, so it is recognised by its key. Which occasion
   // it sits under is not in the address either, and is whatever was remembered.
   if (String(key).startsWith('own:')) {
@@ -2554,6 +2563,7 @@ export function setPosterRoute(parts = []) {
   }
   const poster = POSTERS.find((p) => p.key === key);
   if (poster?.last) {
+    if (chosenWorkflow === 'halves') chosenWorkflow = 'set';
     // A link to the whole set says only that, not which of the two ways of laying it out, so
     // whichever was left standing is kept.
     const morning = POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup));
@@ -2624,13 +2634,15 @@ function recallBar() {
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
     if (saved.copiesPerPage === 1 || saved.copiesPerPage === 2) chosenCopiesPerPage = saved.copiesPerPage;
     if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
-    if (saved.workflow === 'single' || saved.workflow === 'set') chosenWorkflow = saved.workflow;
+    if (['single', 'set', 'halves'].includes(saved.workflow)) chosenWorkflow = saved.workflow;
     else chosenWorkflow = chosenSheets === 'each' || chosenSheets === 'all' && chosenScope === 'all' ? 'set' : 'single';
     // Old handout links used Compact and Whole year even though they printed one morning.
     if (!saved.workflow && POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup))) chosenWorkflow = 'single';
     if (saved.setSelection && typeof saved.setSelection === 'object' && !Array.isArray(saved.setSelection)) {
       chosenSetSelection = Object.fromEntries(Object.entries(saved.setSelection).filter(([key, value]) => typeof value === 'boolean' && key.length < 200));
     }
+    chosenHalfPagePairs = normalizeHalfPagePairs(saved.halfPagePairs,
+      POSTERS.filter(poster => poster.handout || HALF_PAGE_POSTERS.has(poster.key)).map(poster => poster.key));
     if (typeof saved.advanced === 'boolean') printSettingsOpen = saved.advanced;
     if (Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
@@ -2650,7 +2662,7 @@ function rememberBar() {
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
       margin: chosenMargin, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
-      workflow: chosenWorkflow, setSelection: chosenSetSelection, advanced: printSettingsOpen,
+      workflow: chosenWorkflow, setSelection: chosenSetSelection, halfPagePairs: chosenHalfPagePairs, advanced: printSettingsOpen,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -2818,7 +2830,7 @@ function fitChanukah(container) {
 
 function fitHalfPage(container) {
   for (const sheet of container.querySelectorAll('.poster.is-halfpage')) {
-    const wrapper = sheet.parentElement;
+    const wrapper = sheet.closest('.poster-half-sheet') || sheet.parentElement;
     const zoom = wrapper.style.zoom;
     wrapper.style.zoom = '1';
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
@@ -2937,6 +2949,24 @@ function renderSelectedRun(value, settings, { landscape = false } = {}) {
   }).join('')}</div>`;
 }
 
+function halfPageEntries(state, settings, year) {
+  return POSTERS.filter(poster => poster.handout || HALF_PAGE_POSTERS.has(poster.key)).map(poster => {
+    const result = poster.sources(state, settings).find(source => source.year === year)?.build() || {};
+    return { key: poster.key, label: poster.label, handout: Boolean(poster.handout), value: result.poster,
+      render: poster.handout ? renderShacharisHandout
+        : poster.key === 'chanukah' ? renderHalfChanukahPoster : renderHalfAsaraBTevesPoster };
+  }).sort((a, b) => (a.value?.span?.from ?? Infinity) - (b.value?.span?.from ?? Infinity));
+}
+
+function renderHalfPagePairs(value, settings) {
+  const half = (entry, side) => `<div class="poster-half-slot${entry?.value ? '' : ' is-blank'}" data-half-side="${side}"${entry ? ` data-half-key="${escAttr(entry.key)}"` : ''}>
+    ${entry?.value ? entry.render(entry.value, settings, { standalone: true }) : '<span class="no-print">Blank half</span>'}</div>`;
+  return `<div class="poster-half-pages">${value.halfSheets.map((page, i) => `<div class="poster-paired-page" data-id="${escAttr(page.id)}">
+    <p class="poster-all-name no-print">Sheet ${i + 1}: <bdi dir="auto">${escAttr(page.left?.label || 'Blank')}</bdi> + <bdi dir="auto">${escAttr(page.right?.label || 'Blank')}</bdi></p>
+    <div class="poster-half-sheet is-paired">${half(page.left, 'left')}${half(page.right, 'right')}</div>
+  </div>`).join('')}</div>`;
+}
+
 export function renderPosters(container, state, routeChanged, tables) {
   recallBar();
   if (routeChanged !== undefined) onRoute = routeChanged;
@@ -2993,8 +3023,21 @@ export function renderPosters(container, state, routeChanged, tables) {
     || items.length > 1 && !HALF_PAGE_POSTERS.has(one?.key) && one?.key !== 'pesach' && !handout);
   const runPoster = POSTERS.find(p => p.last);
   const selection = chosenWorkflow === 'set' ? selectedScheduleRun(scopeAll ? visibleGroups.filter(g => g.items.some(p => !p.handout)) : group ? [group] : [], state, settings, year, onePage) : null;
-  const empty = chosenWorkflow === 'set' ? !selection.entries.length : !items.length;
-  const poster = empty ? null : chosenWorkflow === 'set' ? {
+  const pairing = chosenWorkflow === 'halves';
+  const halfEntries = pairing ? halfPageEntries(state, settings, year) : [];
+  if (pairing && chosenHalfPagePairs === null) {
+    chosenHalfPagePairs = [newHalfPagePair('chanukah', 'asarabteves')];
+    rememberBar();
+  }
+  const halfPlan = pairing ? halfPagePlan(chosenHalfPagePairs, halfEntries) : null;
+  const empty = pairing ? !halfEntries.length : chosenWorkflow === 'set' ? !selection.entries.length : !items.length;
+  const poster = empty ? null : pairing ? {
+    ...runPoster, covers: () => `Paired half pages ${hebrewYear(year)}`,
+    sources: () => [{ year, build: () => halfPlan.issues.length ? { missing: 'Replace the unavailable schedules in your pairings before printing.' }
+      : halfPlan.pages.length ? { poster: { halfSheets: halfPlan.pages, span: halfPlan.span, hebrewYear: year } }
+      : { missing: 'Choose at least one schedule to print.' } }],
+    render: renderHalfPagePairs,
+  } : chosenWorkflow === 'set' ? {
     ...runPoster,
     covers: () => `Print set ${hebrewYear(year)}`,
     sources: () => [{ year, build: () => selection.result }],
@@ -3009,8 +3052,8 @@ export function renderPosters(container, state, routeChanged, tables) {
         } } : result;
       } }] : runPoster.sources,
   } : one;
-  const halfLetter = chosenWorkflow === 'single' && (handout || onePage && !wholeOccasion && HALF_PAGE_POSTERS.has(one?.key));
-  const canTurn = !onePage && (chosenWorkflow === 'set' ? selection.entries.some(e => e.selected && e.poster?.orientations) : Boolean(one?.orientations));
+  const halfLetter = pairing || chosenWorkflow === 'single' && (handout || onePage && !wholeOccasion && HALF_PAGE_POSTERS.has(one?.key));
+  const canTurn = !pairing && !onePage && (chosenWorkflow === 'set' ? selection.entries.some(e => e.selected && e.poster?.orientations) : Boolean(one?.orientations));
 
   const sources = poster ? poster.sources(state, settings) : [];
   const source = sources.find((s) => s.year === year)
@@ -3018,13 +3061,14 @@ export function renderPosters(container, state, routeChanged, tables) {
   const result = poster && source ? source.build() : { missing: 'No year to build from.' };
   const built = result.poster || null;
 
-  container.className = `is-sheet-view is-special-schedules${halfLetter ? ' is-half-letter-print' : ''}`;
+  container.className = `is-sheet-view is-special-schedules${halfLetter ? ' is-half-letter-print' : ''}${pairing ? ' is-half-paired-print' : ''}`;
   container.innerHTML = specialScheduleControls({
     year, years, at, preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`, yearFullLabel: yearLabel,
     groups: visibleGroups, group, gAt, current,
     workflow: chosenWorkflow, scopeAll, empty, items, one, onePage, handout, halfLetter, canTurn, wholeOccasion,
     asara: group?.name === 'עשרה בטבת', halfFormat: HALF_PAGE_POSTERS.has(one?.key),
     setEntries: selection?.entries || [], pageCount: built?.pages?.length || 0,
+    halfPairs: chosenHalfPagePairs || [], halfEntries, halfPlan,
     copies: chosenCopiesPerPage, advanced: printSettingsOpen,
     margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD,
     padSteps: padSteps(), padLabel, ink: chosenInk, brk: chosenBreak, orientation: chosenOrientation,
@@ -3047,7 +3091,7 @@ export function renderPosters(container, state, routeChanged, tables) {
       : ''}
     <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
          without redrawing the panel the caret is in. -->
-    ${built && halfLetter ? `<p class="hint no-print">5½ × 8½ inches per copy. ${chosenCopiesPerPage === 2
+    ${built && halfLetter ? `<p class="hint no-print">5½ × 8½ inches per copy. ${pairing ? 'Your selected pairs print side by side on landscape Letter paper.' : chosenCopiesPerPage === 2
       ? 'Two copies print side by side on landscape Letter paper.'
       : 'Prints on the left half of landscape Letter paper.'} Cut at the middle of the sheet.</p>` : ''}
     <div id="poster-sheet">${!empty && built
@@ -3058,7 +3102,17 @@ export function renderPosters(container, state, routeChanged, tables) {
   const again = () => redrawInPlace(container, state);
   const registerReferences = value => {
     const holder = container.querySelector('#poster-sheet');
-    if (value?.pages) value.pages.forEach((page, i) => attachZmanimReference(holder.querySelectorAll('.poster-all-item')[i], {
+    if (value?.halfSheets) value.halfSheets.forEach((page, i) => {
+      for (const side of ['left', 'right']) {
+        const entry = page[side];
+        if (!entry?.value) continue;
+        attachZmanimReference(holder.querySelectorAll('.poster-paired-page')[i].querySelector(`[data-half-side="${side}"]`), {
+          title: `Sheet ${i + 1} ${side}: ${entry.label}`, days: posterReferenceDates(entry.value), settings,
+          groups: entry.handout ? ['shacharis'] : undefined,
+        });
+      }
+    });
+    else if (value?.pages) value.pages.forEach((page, i) => attachZmanimReference(holder.querySelectorAll('.poster-all-item')[i], {
       title: page.label, days: posterReferenceDates(page.value), settings,
       groups: page.poster?.handout || page.poster?.key === 'slichos' || page.poster?.key.startsWith('vasikin') ? ['shacharis'] : undefined,
     }));
@@ -3075,6 +3129,25 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (value === 'single') { chosenSheets = 'one'; chosenScope = 'one'; }
     commitChoice();
   });
+  container.querySelectorAll('select[data-half-side]').forEach(select => select.addEventListener('change', () => {
+    const pair = chosenHalfPagePairs.find(row => row.id === select.dataset.pairId);
+    pair[select.dataset.halfSide] = select.value;
+    commitChoice();
+  }));
+  container.querySelectorAll('[data-half-action]').forEach(button => button.addEventListener('click', () => {
+    const action = button.dataset.halfAction;
+    const at = chosenHalfPagePairs.findIndex(pair => pair.id === button.closest('[data-id]')?.dataset.id);
+    if (action === 'add') chosenHalfPagePairs.push(newHalfPagePair());
+    if (action === 'all') chosenHalfPagePairs = addAllHalfPages(chosenHalfPagePairs, halfEntries);
+    if (action === 'clear') chosenHalfPagePairs = [];
+    if (action === 'remove' && at >= 0) chosenHalfPagePairs.splice(at, 1);
+    if (action === 'swap' && at >= 0) [chosenHalfPagePairs[at].left, chosenHalfPagePairs[at].right] = [chosenHalfPagePairs[at].right, chosenHalfPagePairs[at].left];
+    const to = at + (action === 'up' ? -1 : 1);
+    if (['up', 'down'].includes(action) && at >= 0 && to >= 0 && to < chosenHalfPagePairs.length) {
+      [chosenHalfPagePairs[at], chosenHalfPagePairs[to]] = [chosenHalfPagePairs[to], chosenHalfPagePairs[at]];
+    }
+    commitChoice();
+  }));
   wireSwitch(container, 'poster-set-layout', value => { chosenSheets = value === 'combined' ? 'all' : 'each'; commitChoice(); });
   container.querySelector('#poster-year')?.addEventListener('change', event => { chosenYear = Number(event.target.value); commitChoice(); });
   container.querySelector('.special-print-settings')?.addEventListener('toggle', event => {
