@@ -172,14 +172,17 @@ when leaving the chart. `tests/combined-chart-print.cjs` verifies both chart typ
 holiday rows, room marks, overrides, rules, clock changes, margins, molad, no added
 dates, remembered choices and actual desktop/phone PDF sizes and page counts.
 The Android print service may retain Letter paper despite the selected Tabloid
-layout. Combined pages must fit the real print container in both orientations,
-including printer margins, and remain full size on landscape Tabloid. Use print-only
-container query units for the width rather than the phone's reported viewport width.
-The `tan(atan2(a,b))` ratio also works on older phones without typed calc division.
-Keep the smaller-paper fallback for older browsers. The combined picker reminds the
-user to select 11 × 17 (Tabloid) paper for full size. Browser checks must override
-the requested paper with Letter and compare every printed time and footer with the
-Tabloid PDF, not only print with preferCSSPageSize and assume Android honors it.
+layout. Its print queries can report different dimensions from the final sheet,
+and a CSS zoom fit was applied again by the print service, leaving a small chart
+in the corner. For combined jobs only, copy the fitted HTML into a print-only SVG
+viewBox and let its percentage width fit the actual containing block. Retain native
+PDF text, fonts and all original layout. Register this after the paper fitting.
+Keep the hidden print copy until the next draw or print, since Android can re-render
+the job after window.print() returns. setPrintPage clears it on view changes.
+The combined picker names Android's landscape **Ledger (17 × 11)** paper.
+Browser checks must test the actual printed width as well as complete text and
+page counts on portrait/landscape Letter, with margins, and full-size Tabloid.
+Check both an overridden @page and a print service resizing the requested paper.
 
 The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
 shadows, plus black print text on white paper. Upgrade the old blue-gray default in

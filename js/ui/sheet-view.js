@@ -28,6 +28,7 @@ import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations
 import { attachZmanimReference } from './zmanim-references.js';
 import { chartReferenceDates } from '../zmanim/references.js';
 import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
+import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { keepPosition } from './keep-position.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
@@ -617,6 +618,7 @@ export function renderSheet(container, state, sheet, onChange) {
     if (document.body.contains(pagesEl)) fitPaper();
   };
   window.addEventListener('beforeprint', chartBeforePrintHandler);
+  wireCombinedChartPrint();
 
   // Fit the paper at full size first. Measuring the phone's reduced preview hid an
   // overflowing mixed-header page and let its address print above the next header.

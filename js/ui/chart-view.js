@@ -14,6 +14,7 @@ import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
 import { buildSheetPages, buildCombinedChartPages, syncPageHeights } from './sheet-view.js';
 import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
+import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
@@ -274,6 +275,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       orientation: 'landscape',
       size: combinedPrint ? [17, 11] : [11, 8.5],
     });
+    wireCombinedChartPrint();
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
