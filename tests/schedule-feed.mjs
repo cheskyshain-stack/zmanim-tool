@@ -43,7 +43,8 @@ test('keeps the entire current day, including morning and midnight services', ()
   const today = early.days[0];
   assert.ok(today.events.some(e => e.category === 'maariv' && e.time === '00:00'));
   assert.ok(today.events.some(e => e.category === 'shacharis' && e.time === '07:00'));
-  assert.ok(today.events.some(e => e.category === 'mincha' && e.time === '13:15'));
+  assert.ok(today.events.some(e => e.category === 'mincha' && e.time === '13:20'));
+  assert.ok(!today.events.some(e => e.category === 'mincha' && e.time === '13:15'), 'The opening clears exact Mincha Gedola Lechumra');
 });
 
 test('advances at New York midnight, including both daylight saving offsets', () => {

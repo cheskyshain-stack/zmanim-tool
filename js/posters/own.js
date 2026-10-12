@@ -51,7 +51,7 @@ export const OWN_ZMANIM = [
   { key: 'shmaGra', label: 'סוף זמן ק"ש גר"א', at: (d, s) => Z.sofZmanShmaGRA(d, s) },
   { key: 'tfilaGra', label: 'סוף זמן תפילה גר"א', at: (d, s) => Z.sofZmanTfilaGRA(d, s) },
   { key: 'chatzos', label: 'חצות', at: (d, s) => Z.solarNoon(d, s) },
-  { key: 'minchaGedola', label: 'מנחה גדולה', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
+  { key: 'minchaGedola', label: 'מנחה גדולה לחומרא', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
   { key: 'minchaKetana', label: 'מנחה קטנה', at: (d, s) => Z.minchaKetana(d, s) },
   { key: 'plag', label: 'פלג המנחה', at: (d, s) => Z.plagHamincha(d, s) },
   { key: 'shkia', label: 'שקיעה', at: (d, s) => Z.sunsetElev(d, s) },
@@ -72,6 +72,13 @@ export const OWN_ROUNDING = [
   { key: 'down5', label: 'Down to the last 5 minutes', apply: (t) => Math.floor(t * 288) / 288 },
   { key: 'up5', label: 'Up to the next 5 minutes', apply: (t) => Math.ceil(t * 288) / 288 },
 ];
+
+/** Mincha Gedola rows round later, including rows saved with an older rounding choice. */
+export function ownRoundingFor(row) {
+  const selected = OWN_ROUNDING.find(round => round.key === row.round) || OWN_ROUNDING[0];
+  if (row.mode !== 'zman' || row.zman !== 'minchaGedola') return selected;
+  return OWN_ROUNDING.find(round => round.key === (selected.key.endsWith('5') ? 'up5' : 'up'));
+}
 
 /** The names a row is likely to want, so a sheet is picked rather than spelled. Anything not
  *  here is typed instead: the list is a shortcut, not a fence. Off the shul's own sheets. */
@@ -117,7 +124,7 @@ export function ownRowTimes(row, serial, settings) {
   if (row.mode !== 'zman') return parseTimes(row.text);
   const selectedZman = OWN_ZMANIM.find((z) => z.key === row.zman);
   if (!selectedZman) return [];
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const round = ownRoundingFor(row);
   const day = dateFromSerial(serial);
   let traced = row.zman === 'candles'
     ? zman('שקיעה', Z.sunsetElev(day, settings)).minus(settings.candleLightingMinutes ?? 18, 'the candle-lighting setting')
@@ -142,7 +149,7 @@ export function ownRuleText(row) {
   if (!zman) return '';
   const mins = Number(row.offset) || 0;
   const when = mins === 0 ? 'at' : `${Math.abs(mins)} minutes ${mins < 0 ? 'before' : 'after'}`;
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const round = ownRoundingFor(row);
   return `${when} ${zman.label}, ${round.label.toLowerCase()}`;
 }
 
