@@ -29,6 +29,7 @@ import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-text.js';
 import { shulNow } from '../zmanim/solar.js';
 import { tzomGedaliaText, asaraBTevesText, chartFastText, fastsBetween } from '../taanis-text.js';
+import { behabMessagesBetween } from '../behab-text.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildAsaraBTevesPoster } from '../posters/asarabteves.js';
 import { buildWeekdayRow, chanukahDaysInWeek } from '../sheets/weekday.js';
@@ -703,7 +704,7 @@ function txCard(msg) {
  *
  *  Only the year view has them. The four day window is a handful of cards and filtering that
  *  would be two buttons over almost nothing. */
-const txKinds = { parsha: true, week: true, yomtov: true, taanis: true, roshchodesh: true };
+const txKinds = { parsha: true, week: true, yomtov: true, taanis: true, roshchodesh: true, behab: true };
 
 /** The weekly message is its own switch rather than part of Parsha, asked for: it is the week's
  *  own schedule and the Erev Shabbos one is Friday's, they are checked for different things, and
@@ -714,6 +715,7 @@ const TX_KIND_NAMES = {
   yomtov: 'Yom Tov',
   taanis: 'Taanis',
   roshchodesh: 'Rosh Chodesh',
+  behab: 'Behab',
 };
 
 /** The screen. */
@@ -802,6 +804,11 @@ function drawTexts(container, state, settings, tables) {
     messages.push(...yomTov());
     messages.push(...txRoshChodesh(settings, today, 1));
   }
+
+  messages.push(...behabMessagesBetween(today, today + (txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS), settings, tables).map(message => ({
+    id: `behab-${message.day}`, kind: 'behab', serial: message.day - 1,
+    name: 'Behab', when: `${message.round} · ${hebrewYear(message.year)}`, text: message.text,
+  })));
 
   /* Everything in date order, which is the order they get sent in and the only order somebody
      looking for "what comes after סוכות" can read. It used to be the yom tov ones and then the

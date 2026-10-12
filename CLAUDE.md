@@ -884,6 +884,22 @@ and listed in `DIST_TREES`.
 - The shul is feeding these over time as they send them. Each new one is a builder plus an
   entry in `renderTexts`.
 
+The BHB messages (`js/behab-text.js`) read the existing BHB Shacharis handout for
+each of the three mornings after Sukkos and after Pesach. The first four chart
+minyanim say Behab; list the remaining three under **The following will NOT be
+saying Behab**, following the supplied shul message. Keep the chart's times and
+room marks, including `sh` for its 7:35 hall minyan, rather than the older message's
+extra 6:50 minyan or different room wording. Carry the 6:40 Selichos-before-Shacharis
+note only on that morning's qualifying date, using the handout's `selichosDays`
+metadata. The message computes no zman. Use Tomorrow Behab for the message sent
+the night before, and Today Behab on the actual date. Each morning has its own card
+in the existing four-day window and a separate Behab filter in the year view.
+Past mornings disappear from both views. Preserve editable text, copying the edited
+content, rebuilding fresh text on refresh, and the standalone Messages page without
+links or a PIN. `tests/behab-text.mjs` verifies both annual rounds across 51 years
+and date-specific notes; `tests/behab-text-page.cjs` covers actual mobile/desktop
+cards, date windows, filtering, editing and copying.
+
 ## The PIN on the admin
 
 `/admin/` asks for four digits before it draws anything, remembered on that device for three
