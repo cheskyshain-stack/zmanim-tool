@@ -945,8 +945,7 @@ and listed in `DIST_TREES`.
 
 The BHB messages (`js/behab-text.js`) read the existing BHB Shacharis handout for
 each of the three mornings after Sukkos and after Pesach. The first four chart
-minyanim say Behab; list the remaining three under **The following will NOT be
-saying Behab**, following the supplied shul message. Keep the chart's times and
+minyanim say Behab; list the remaining three on a separate line. Keep the chart's times and
 room marks, including `sh` for its 7:35 hall minyan, rather than the older message's
 extra 6:50 minyan or different room wording. Carry the 6:40 Selichos-before-Shacharis
 note only on that morning's qualifying date, using the handout's `selichosDays`
