@@ -12,7 +12,8 @@
 import { resolveSettings } from '../settings.js';
 import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
-import { buildSheetPages, syncPageHeights } from './sheet-view.js';
+import { buildSheetPages, buildCombinedChartPages, syncPageHeights } from './sheet-view.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
@@ -211,11 +212,10 @@ export function renderChartBrowser(container, state, opts = {}) {
   // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
   const settings = resolveSettings(state.settings);
   let at = spreadIndexForNow(spreads, state, settings);
+  let printLayout = chartPrintLayout();
 
   const draw = () => keepPosition(container, () => {
-    // A board is 11in across. See setPrintPage for why the document's one page size is set
-    // from the view rather than from a named page in the stylesheet.
-    setPrintPage('letter landscape');
+    // This view chooses one paper size for the whole print job.
     // Asked every draw rather than once, so the redraw that follows the taps comes out
     // with the navigation on it.
     const held = confine && !navUnlocked();
@@ -224,6 +224,8 @@ export function renderChartBrowser(container, state, opts = {}) {
       container.innerHTML = `<p class="hint">${empty}</p>`;
       return;
     }
+    const combinedPrint = printLayout === 'combined' && Boolean(spread.weekday);
+    setPrintPage(combinedPrint ? '17in 11in' : 'letter landscape');
     const label = spreadLabel(spread);
     container.innerHTML = `
       <div class="week-nav no-print">
@@ -240,15 +242,21 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>`}
-        <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
+        <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(combinedPrint ? 'combined' : 'separate', Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
     useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
-    const shabbos = buildSheetPages(spread.sheet, state, { readOnly: true });
-    const chol = buildSheetPages(spread.weekday, state, { readOnly: true });
+    const shabbos = combinedPrint ? buildCombinedChartPages(spread.sheet, spread.weekday, state, { readOnly: true })
+      : buildSheetPages(spread.sheet, state, { readOnly: true });
+    const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     fitChartToWindow(pagesEl);
+    container.querySelector('#chart-print-layout').addEventListener('change', event => {
+      printLayout = event.target.value === 'combined' ? 'combined' : 'separate';
+      rememberChartPrintLayout(printLayout);
+      draw();
+    });
 
     const go = (next) => {
       if (next < 0 || next >= spreads.length) return;
@@ -264,7 +272,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       name: () => pdfName(label.english),
       sheet: '.page',
       orientation: 'landscape',
-      size: [11, 8.5],
+      size: combinedPrint ? [17, 11] : [11, 8.5],
     });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));

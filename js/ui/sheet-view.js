@@ -27,9 +27,12 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { chartReferenceDates } from '../zmanim/references.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
+import { keepPosition } from './keep-position.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
+const COMBINED_CHART_FONT_SCALE = 1.2;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
   ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
 function chartMarginControl(key, label, value, original) {
@@ -153,14 +156,215 @@ export function buildSheetPages(sheet, state, { readOnly = false, showMolad = fa
   });
 }
 
+/** Join the existing rendered cells by date, keeping their rules, saved values and
+ * explanation attributes. A weekday-only holiday row keeps an empty Shabbos side. */
+export function buildCombinedChartPages(shabbos, weekday, state, options = {}) {
+  if (!shabbos || !weekday) return [];
+  const primaryPages = buildSheetPages(shabbos, state, options);
+  const weekdayPages = buildSheetPages(weekday, state, options);
+  const settings = resolveSettings(state.settings);
+  const fallbackColumns = shabbos.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
+  return Array.from({ length: Math.max(primaryPages.length, weekdayPages.length) }, (_, index) => {
+    const original = primaryPages[index] || weekdayPages[index];
+    const page = document.createElement('div');
+    page.className = 'page is-combined-chart';
+    page.dataset.sheetLabel = sheetLabel(shabbos);
+    page.dataset.pageIndex = index;
+    const primaryTables = [...(primaryPages[index]?.querySelectorAll('table') || [])];
+    const weekdayTable = weekdayPages[index]?.querySelector('table');
+    const weekdayRows = combinedChartRows(weekdayTable);
+    const sections = primaryTables.length ? primaryTables : [null];
+    const summerColumns = sections.some(table => table?.querySelector('col[data-colkey="J"]'))
+      || (!primaryTables.length && shabbos.season === 'kayitz');
+    const rightWidths = summerColumns ? { B: 14.5, C: 11.5, E: 10.5 } : { B: 16, C: 13, E: 13.3 };
+    const parshaWidth = options.showMolad ? 10 : 8;
+    const body = document.createElement('div');
+    body.className = 'combined-chart-body';
+    const allWeeks = new Map();
+    sections.forEach((sourceTable, sectionIndex) => {
+      const primaryRows = combinedChartRows(sourceTable);
+      const next = sections[sectionIndex + 1];
+      const upper = next ? Math.min(...combinedChartRows(next).keys()) : Infinity;
+      const lower = sectionIndex ? Math.min(...primaryRows.keys()) : -Infinity;
+      const dates = [...new Set([...primaryRows.keys(), ...weekdayRows.keys()])]
+        .filter(serial => serial >= lower && serial < upper).sort((a, b) => a - b);
+      if (!dates.length) return;
+      const definitions = sourceTable ? [...sourceTable.querySelectorAll('colgroup col')]
+        .filter(col => col.dataset.colkey !== 'parsha').map(col => {
+          const position = [...sourceTable.querySelectorAll('colgroup col')].indexOf(col);
+          return { key: col.dataset.colkey, head: sourceTable.querySelectorAll('thead tr:last-child th')[position] };
+        }).sort((a, b) => a.key.localeCompare(b.key))
+        : fallbackColumns.map(column => ({ key: column.key, label: column.header, column }));
+      const table = document.createElement('table');
+      table.className = 'combined-chart-table';
+      table.dir = 'ltr';
+      const weights = definitions.some(definition => definition.key === 'J')
+        ? { B: 100, C: 175, D: 100, E: 90, F: 65, G: 100, H: 85, I: 75, J: 75, K: 75, L: 175 }
+        : { B: 90, C: 95, D: 100, E: 90, F: 55, G: 65, H: 80, I: 170, L: 170 };
+      const weightFor = definition => Number(shabbos.columnWidths?.[definition.key]) > 0
+        ? Number(shabbos.columnWidths[definition.key]) : weights[definition.key] || 90;
+      const weightSum = definitions.reduce((sum, definition) => sum + weightFor(definition), 0);
+      const leftWidth = 100 - parshaWidth - Object.values(rightWidths).reduce((sum, width) => sum + width, 0);
+      table.innerHTML = `<colgroup>${definitions.map(definition => `<col data-colkey="${definition.key}" style="width:${leftWidth * weightFor(definition) / weightSum}%">`).join('')}
+        ${['B', 'C', 'E'].map(key => `<col data-colkey="weekday:${key}" style="width:${rightWidths[key]}%">`).join('')}
+        <col data-colkey="parsha" style="width:${parshaWidth}%"></colgroup>
+        <thead><tr class="combined-group-head"><th colspan="${definitions.length}" lang="he">שבת</th>
+          <th colspan="3" lang="he">ימות החול</th><th rowspan="2" lang="he">פרשה</th></tr>
+          <tr class="combined-service-head"></tr></thead><tbody></tbody>`;
+      const header = table.querySelector('.combined-service-head');
+      for (const definition of definitions) {
+        const cell = definition.head?.cloneNode(true) || document.createElement('th');
+        if (!definition.head) cell.innerHTML = markHeaderRoom(headerHtml(definition.column));
+        header.append(cell);
+      }
+      for (const key of ['B', 'C', 'E']) {
+        const colPosition = [...(weekdayTable?.querySelectorAll('colgroup col') || [])]
+          .findIndex(col => col.dataset.colkey === key);
+        const cell = weekdayTable?.querySelectorAll('thead th')[colPosition]?.cloneNode(true) || document.createElement('th');
+        if (colPosition < 0) cell.textContent = WEEKDAY_COLUMNS.find(column => column.key === key).header;
+        cell.classList.add('combined-weekday-head');
+        header.append(cell);
+      }
+      for (const serial of dates) {
+        const primary = primaryRows.get(serial), chol = weekdayRows.get(serial);
+        const row = document.createElement('tr');
+        row.dataset.weekSerial = serial;
+        for (const definition of definitions) row.append(primary?.cells.get(definition.key)?.cloneNode(true) || document.createElement('td'));
+        for (const key of ['B', 'C', 'E']) {
+          const cell = key !== 'E' && chol?.cells.get(key) ? chol.cells.get(key).cloneNode(true) : document.createElement('td');
+          cell.classList.add('combined-weekday-cell');
+          cell.dataset.combinedCol = key;
+          row.append(cell);
+        }
+        const parsha = (primary?.parsha || chol?.parsha)?.cloneNode(true) || document.createElement('td');
+        parsha.classList.add('parsha-cell', 'combined-parsha');
+        parsha.style.minWidth = '0';
+        row.append(parsha);
+        table.tBodies[0].append(row);
+        allWeeks.set(serial, { serial });
+      }
+      body.append(table);
+    });
+    const panel = weekdayPages[index]?.querySelector('.shacharis-panel')?.cloneNode(true);
+    if (panel) {
+      panel.classList.add('combined-morning-panel');
+      body.append(panel);
+    }
+    const footer = (primaryPages[index] || primaryPages[0] || original).querySelector('.page-footer').cloneNode(true);
+    footer.querySelector('.chart-location-legend')?.remove();
+    page.append(original.querySelector('.page-header').cloneNode(true), body, footer);
+    fillChartLocationLegend(page);
+    attachZmanimReference(page, { title: `${sheetLabel(shabbos)} · Weekday · Page ${index + 1}`,
+      days: chartReferenceDates([...allWeeks.values()]), settings, weeklyLimit: true });
+    applyStyle(page, shabbos.style, chartInk(state));
+    useStraightHebrewQuotes(page);
+    return page;
+  });
+}
+
+function combinedChartRows(table) {
+  const result = new Map();
+  if (!table) return result;
+  const columns = [...table.querySelectorAll('colgroup col')].map(col => col.dataset.colkey);
+  for (const row of table.querySelectorAll('tbody tr')) {
+    const cells = new Map(columns.map((key, index) => [key, row.children[index]]));
+    result.set(Number(row.dataset.weekSerial), { cells, parsha: cells.get('parsha') });
+  }
+  return result;
+}
+
+/** The combined paper has two heading rows and may retain the winter/summer split.
+ * Measure it at full size, including actual text bounds, before fitting a preview. */
+function syncCombinedChartHeights(pagesEl) {
+  atPaperSize(pagesEl, pages => {
+    const originals = pages.map(page => Number(page.dataset.combinedBaseFont) || 12);
+    let scale = 1;
+    for (;;) {
+      pages.forEach((page, index) => page.style.setProperty('--sheet-font-size', `${originals[index] * scale}pt`));
+      const layouts = pages.map(page => {
+        const header = page.querySelector('.page-header'), footer = page.querySelector('.page-footer');
+        const body = page.querySelector('.combined-chart-body'), tables = [...body.querySelectorAll('table')];
+        [header, footer, body, ...tables].forEach(element => { element.style.height = ''; element.style.flex = 'none'; });
+        page.querySelectorAll('tr').forEach(row => { row.style.height = ''; });
+        page.querySelectorAll('.parsha-cell-name,.parsha-cell-sub').forEach(element => { element.style.marginTop = ''; });
+        const box = page.getBoundingClientRect(), style = getComputedStyle(page);
+        const paddingTop = header.getBoundingClientRect().top - box.top;
+        const paddingBottom = parseFloat(style.paddingBottom) || 0;
+        const headerGap = body.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+        const footerGap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom;
+        return { page, header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap,
+          top: paddingTop + header.getBoundingClientRect().height + headerGap,
+          bottom: 11 * 96 - paddingBottom - footer.getBoundingClientRect().height - footerGap };
+      });
+      const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
+      const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
+      const available = Math.max(0, bottom - top);
+      for (const layout of layouts) {
+        const { header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap } = layout;
+        header.style.height = `${top - paddingTop - headerGap}px`;
+        footer.style.height = `${11 * 96 - bottom - paddingBottom - footerGap}px`;
+        const gap = parseFloat(getComputedStyle(body).rowGap) || 0;
+        const heads = tables.map(table => [...table.tHead.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+        const borders = tables.map(table => table.getBoundingClientRect().height
+          - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+        const rows = tables.flatMap(table => [...table.tBodies[0].rows]);
+        const height = Math.max(...rows.map(row => row.getBoundingClientRect().height), 0,
+          (available - gap * (tables.length - 1) - heads.reduce((sum, value) => sum + value, 0)
+            - borders.reduce((sum, value) => sum + value, 0)) / rows.length);
+        rows.forEach(row => { row.style.height = `${height}px`; });
+        tables.forEach((table, index) => {
+          table.style.height = `${heads[index] + height * table.tBodies[0].rows.length + borders[index]}px`;
+        });
+        const used = tables.slice(0, -1).reduce((sum, table) => sum + table.getBoundingClientRect().height, 0);
+        tables.at(-1).style.height = `${Math.max(0, available - used - gap * (tables.length - 1))}px`;
+        body.style.height = `${available}px`;
+        const panel = body.querySelector('.combined-morning-panel');
+        if (panel) {
+          const cell = tables[0].querySelector('td[data-combined-col="E"]');
+          const first = rows[0].getBoundingClientRect(), last = rows.at(-1).getBoundingClientRect();
+          const region = body.getBoundingClientRect(), column = cell.getBoundingClientRect();
+          panel.style.top = `${first.top - region.top + first.height * 0.35}px`;
+          panel.style.height = `${last.bottom - first.top - (first.height + last.height) * 0.35}px`;
+          panel.style.left = `${column.left - region.left + column.width * 0.04}px`;
+          panel.style.width = `${column.width * 0.92}px`;
+        }
+      }
+      centerMoladNotes(pagesEl);
+      const overflow = layouts.some(({ page, body }) => body.scrollHeight > body.clientHeight + 1
+        || page.getBoundingClientRect().height > 11 * 96 + 0.01 || combinedChartInkOverflows(page));
+      if (!overflow || scale <= 0.1) break;
+      scale = Math.max(0.1, scale - 0.02);
+    }
+    pages.forEach(page => { page.dataset.combinedFitScale = scale; });
+  });
+}
+
+function combinedChartInkOverflows(page) {
+  const holders = [...page.querySelectorAll('table th,table td:not([data-combined-col="E"]),.combined-morning-panel')];
+  return holders.some(holder => {
+    const box = holder.getBoundingClientRect();
+    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+    for (let node; (node = walker.nextNode());) {
+      if (!node.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) {
+        if (rect.width && (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1)) return true;
+      }
+    }
+    return false;
+  });
+}
+
 /** Explain the location marks on this physical page, after any DST sections are joined.
  *  Reading the rendered tables includes rules, saved edits and the weekday morning panel.
  *  Each Hebrew label is isolated with its own stars so the two meanings stay together. */
 function fillChartLocationLegend(page) {
-  const marks = new Set([...page.querySelectorAll('table')].flatMap(table =>
+  const printed = [...page.querySelectorAll('table,.combined-morning-panel')];
+  const marks = new Set(printed.flatMap(table =>
     [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])));
   const footer = page.querySelector('.footer-text');
-  const hasDownstairs = [...page.querySelectorAll('table u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent));
+  const hasDownstairs = printed.some(region => [...region.querySelectorAll('u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent)));
   // Rebuild standard location keys from this page, including ones in an older custom
   // footer. Other custom notes stay intact; the full downstairs sentence and only
   // the room stars this page uses share one line.
@@ -212,6 +416,10 @@ function fillChartLocationLegend(page) {
 /** Makes every row on every page the same height. Must run with the pages in the
  *  document: heights read 0 on a detached element. */
 export function syncPageHeights(pagesEl) {
+  if (pagesEl.querySelector('.is-combined-chart')) {
+    syncCombinedChartHeights(pagesEl);
+    return;
+  }
   syncHeaderRowHeight(pagesEl);
 }
 
@@ -241,13 +449,16 @@ export function renderSheet(container, state, sheet, onChange) {
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const winterSheet = sheet.season === 'choref' ? sheet : companion?.season === 'choref' ? companion : null;
   if (winterSheet && !winterSheet.style) winterSheet.style = { ...state.settings.sheetStyle };
+  const printLayout = chartPrintLayout(Boolean(companion));
+  const combinedPrint = printLayout === 'combined';
 
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
-  setPrintPage('letter landscape');
+  setPrintPage(combinedPrint ? '17in 11in' : 'letter landscape');
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
+      ${chartPrintLayoutHtml(printLayout, Boolean(companion))}
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
     </div>
     <div id="chart-layout-panel" class="panel no-print">
@@ -286,6 +497,10 @@ export function renderSheet(container, state, sheet, onChange) {
   useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  container.querySelector('#chart-print-layout').addEventListener('change', event => {
+    rememberChartPrintLayout(event.target.value);
+    keepPosition(container, () => renderSheet(container, state, sheet, onChange));
+  });
 
 
   // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
@@ -300,8 +515,12 @@ export function renderSheet(container, state, sheet, onChange) {
     showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(sh?.style?.splitSpringDst),
   });
   const shabbosFirst = sheet.season === 'weekday' && companion;
-  const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
-  const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
+  const primarySheet = shabbosFirst ? companion : sheet;
+  const weekdaySheet = shabbosFirst ? sheet : companion;
+  const primaryPages = combinedPrint ? buildCombinedChartPages(primarySheet, weekdaySheet, state, {
+    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(primarySheet?.style?.splitSpringDst),
+  }) : buildPagesFor(primarySheet);
+  const companionPages = combinedPrint ? [] : buildPagesFor(weekdaySheet);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
     if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
@@ -346,10 +565,10 @@ export function renderSheet(container, state, sheet, onChange) {
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
   const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
-  const FIT_TOLERANCE = 8.5 * 96; // even sub-pixel overflow can shift the duplex chart frame
+  const FIT_TOLERANCE = (combinedPrint ? 11 : 8.5) * 96;
   const applyFitScale = (scale) => {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
-    syncHeaderRowHeight(pagesEl);
+    syncPageHeights(pagesEl);
   };
   const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE);
   const fitPaper = () => {
@@ -368,7 +587,7 @@ export function renderSheet(container, state, sheet, onChange) {
       if (overflowPages.length) {
         const items = overflowPages.map((el) => {
           const height = el.getBoundingClientRect().height;
-          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - 8.5 * 96)}px over one sheet)`;
+          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - FIT_TOLERANCE)}px over one sheet)`;
         });
         overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
         overflowWarningEl.hidden = false;
@@ -377,6 +596,7 @@ export function renderSheet(container, state, sheet, onChange) {
         overflowWarningEl.hidden = true;
       }
       const fitNoticeEl = container.querySelector('#page-fit-notice');
+      if (combinedPrint) fitScale = Math.min(...pageEls.map(el => Number(el.dataset.combinedFitScale) || 1)) * COMBINED_CHART_FONT_SCALE;
       if (!overflowPages.length && fitScale < 1) {
         fitNoticeEl.textContent = `This chart's text is shrunk to ${Math.round(fitScale * 100)}% of the chosen size so every page fits on one sheet.`;
         fitNoticeEl.hidden = false;
@@ -403,8 +623,9 @@ export function renderSheet(container, state, sheet, onChange) {
   autoFit(container);
 
   const restyleOwnPages = () => {
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
-    syncHeaderRowHeight(pagesEl);
+    const selector = combinedPrint ? '.page' : `.page[data-sheet-label="${sheetLabel(sheet)}"]`;
+    pagesEl.querySelectorAll(selector).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
+    syncPageHeights(pagesEl);
   };
 
   // Persists sheet.style as the app's "last used" style too, so the next *newly
@@ -541,7 +762,9 @@ function applyStyle(target, style, ink = style.ink) {
   const colour = LEGACY_ACCENT_COLORS.includes(savedAccent) ? DEFAULT_ACCENT_COLOR : savedAccent;
   const accent = ink === 'mono' ? grayChartAccent(colour) : colour;
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
-  target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
+  const fontSize = (Number(style.fontSizePt) || 10) * (target.classList.contains('is-combined-chart') ? COMBINED_CHART_FONT_SCALE : 1);
+  target.style.setProperty('--sheet-font-size', fontSize + 'pt');
+  if (target.classList.contains('is-combined-chart')) target.dataset.combinedBaseFont = fontSize;
   target.style.setProperty('--sheet-header-scale', style.headerScale);
   target.style.setProperty('--sheet-accent', accent);
   target.style.setProperty('--sheet-head-ink', headerInkFor(accent));
@@ -554,7 +777,7 @@ function atPaperSize(pagesEl, measure) {
   const styles = [
     [pagesEl, 'zoom', '1'], [pagesEl, 'transform', 'none'],
     ...pages.flatMap(page => [
-      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', '8.5in'],
+      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', page.classList.contains('is-combined-chart') ? '11in' : '8.5in'],
     ]),
   ].map(([el, name, temporary]) => ({ el, name, temporary,
     value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) }));
@@ -943,7 +1166,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           + `<div class="parsha-cell-sub">${[mevarchimNote, erevChanukahNote].filter(Boolean).join('<br>')}</div>`
         : nl2br(parshaCell) + [mevarchimNote, erevChanukahNote].filter(Boolean).map((n) => '<br>' + n).join('');
       const parshaTd = `<td class="${parshaClass}"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
-      return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
+      return `<tr data-week-serial="${Number(week.serial)}">${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');
   const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;

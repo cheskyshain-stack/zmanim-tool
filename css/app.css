@@ -824,6 +824,22 @@ table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size
 /* Two headers on one winter print page, with row heights shared across both tables. */
 .chart-sections { display: flex; flex-direction: column; flex: 1; gap: 0.12in; }
 .chart-sections > table { flex: none; }
+.chart-print-layout { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font: 400 14px Arial,sans-serif; }
+.chart-print-layout select { width: auto; max-width: 100%; font: inherit; }
+.week-nav-print-one { flex-wrap: wrap; }
+.week-nav-print-one .chart-print-layout { flex-basis: 100%; justify-content: center; }
+.page.is-combined-chart { width: 17in; min-height: 11in; }
+.combined-chart-body { display: flex; flex-direction: column; gap: 0.12in; position: relative; flex: none; }
+.combined-chart-body > table { flex: none; table-layout: fixed; }
+.is-combined-chart .combined-group-head th { font-size: calc(var(--sheet-font-size) + 4pt); line-height: 1.15; }
+.is-combined-chart .combined-service-head th { font-size: calc(var(--sheet-font-size) + 2pt); }
+.is-combined-chart .combined-weekday-cell[data-combined-col="B"],
+.is-combined-chart .combined-weekday-head:nth-last-child(3),
+.is-combined-chart .combined-group-head th:nth-child(2) { border-left: 2px solid #aaa; }
+.is-combined-chart .combined-parsha { min-width: 0; border-left: 2px solid #aaa; }
+.is-combined-chart .parsha-note.is-molad { white-space: normal; }
+.combined-chart-body .combined-morning-panel { right: auto; padding: 0.12in 0.035in; font-size: var(--sheet-font-size); }
+.combined-morning-panel .shacharis-panel-in { max-width: 100%; }
 /* The grid is heavier on a phone than on a desktop and this is not the place it can be
    fixed. Shrinking the page to fit does not thin these rules: a border is never painted
    thinner than one pixel however small the zoom, so at 0.34 the 1px rule still lands on

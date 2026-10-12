@@ -18,6 +18,7 @@ import { isOpen, renderLock } from './ui/lock.js';
 import { installTimeExplanations } from './ui/time-explanations.js';
 import { installZmanimReferences } from './ui/zmanim-references.js';
 import { keepPosition } from './ui/keep-position.js';
+import { setPrintPage } from './ui/print-page.js';
 
 const state = loadState();
 let tables = null;
@@ -242,6 +243,7 @@ function render() {
 }
 
 function paint() {
+  setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
   // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,

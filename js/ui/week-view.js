@@ -1562,6 +1562,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     .filter(s => availableSerials.includes(s));
   const at = serials.indexOf(showing);
   if (luach) {
+    setPrintPage('letter portrait');
     renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange,
       title: index.get(showing).week.parsha ? weekTitle(showing, index) : 'זמני השבוע' });
     return;

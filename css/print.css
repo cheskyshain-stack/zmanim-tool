@@ -49,6 +49,7 @@
     break-after: page;
   }
   .page:last-child { page-break-after: auto; }
+  .page.is-combined-chart { width: 17in; height: 11in; min-height: 0; zoom: 1 !important; }
   .cell { outline: none; }
   .page .footer-text { color: #000; }
 }
