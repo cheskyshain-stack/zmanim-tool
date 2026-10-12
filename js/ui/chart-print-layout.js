@@ -19,5 +19,6 @@ export function chartPrintLayoutHtml(value, canCombine = true) {
       <option value="separate" ${value !== 'combined' ? 'selected' : ''}>Separate pages · Letter</option>
       <option value="combined" ${value === 'combined' ? 'selected' : ''} ${canCombine ? '' : 'disabled'}>Together · 11 × 17</option>
     </select>
-  </label>`;
+  </label>${value === 'combined' && canCombine
+    ? '<p class="hint chart-print-paper-hint no-print">For full size, choose 11 × 17 (Tabloid) paper in the print dialog.</p>' : ''}`;
 }

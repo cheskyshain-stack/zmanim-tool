@@ -97,6 +97,26 @@
   }
 }
 
+/* Android print services can keep Letter paper even when @page requests Tabloid.
+   Fit the combined chart to the actual containing block, not the phone's viewport.
+   Keep a safe fallback for older browsers without container query units. */
+@media print and (max-width: 16.99in) {
+  .page.is-combined-chart { zoom: 0.6 !important; }
+}
+@media print and (max-width: 10.99in) {
+  .page.is-combined-chart { zoom: 0.46 !important; }
+}
+@supports (container-type: inline-size) and (zoom: tan(atan2(1px, 2px))) {
+  @media print {
+    .pages:has(.is-combined-chart) { container-type: inline-size; }
+    .page.is-combined-chart {
+      /* tan(atan2(a,b)) is a/b, including on phone browsers that cannot divide
+         lengths in calc(). Fit both dimensions without enlarging Tabloid pages. */
+      zoom: min(1, tan(atan2(100cqw, 17in)), tan(atan2(100vh, 11in))) !important;
+    }
+  }
+}
+
 @media print {
   /* Browsers drop background colours when printing unless told otherwise, which would
      wipe the dark header row, the tinted parsha column and the striped body rows - the
