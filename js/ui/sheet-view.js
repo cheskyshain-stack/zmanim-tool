@@ -27,7 +27,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { chartReferenceDates } from '../zmanim/references.js';
-import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout } from './chart-print-layout.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
 import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { keepPosition } from './keep-position.js';
 
@@ -169,6 +169,8 @@ export function buildCombinedChartPages(shabbos, weekday, state, options = {}) {
     const original = primaryPages[index] || weekdayPages[index];
     const page = document.createElement('div');
     page.className = 'page is-combined-chart';
+    page.dataset.chartPrintLayout = options.printLayout === 'combined-letter' ? 'combined-letter' : 'combined';
+    page.classList.toggle('is-combined-letter', page.dataset.chartPrintLayout === 'combined-letter');
     page.dataset.sheetLabel = sheetLabel(shabbos);
     page.dataset.pageIndex = index;
     const primaryTables = [...(primaryPages[index]?.querySelectorAll('table') || [])];
@@ -278,6 +280,7 @@ function combinedChartRows(table) {
  * Measure it at full size, including actual text bounds, before fitting a preview. */
 function syncCombinedChartHeights(pagesEl) {
   atPaperSize(pagesEl, pages => {
+    const paperHeight = chartPrintSize(pages[0].dataset.chartPrintLayout).height * 96;
     const originals = pages.map(page => Number(page.dataset.combinedBaseFont) || 12);
     let scale = 1;
     for (;;) {
@@ -295,7 +298,7 @@ function syncCombinedChartHeights(pagesEl) {
         const footerGap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom;
         return { page, header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap,
           top: paddingTop + header.getBoundingClientRect().height + headerGap,
-          bottom: 11 * 96 - paddingBottom - footer.getBoundingClientRect().height - footerGap };
+          bottom: paperHeight - paddingBottom - footer.getBoundingClientRect().height - footerGap };
       });
       const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
       const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
@@ -303,7 +306,7 @@ function syncCombinedChartHeights(pagesEl) {
       for (const layout of layouts) {
         const { header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap } = layout;
         header.style.height = `${top - paddingTop - headerGap}px`;
-        footer.style.height = `${11 * 96 - bottom - paddingBottom - footerGap}px`;
+        footer.style.height = `${paperHeight - bottom - paddingBottom - footerGap}px`;
         const gap = parseFloat(getComputedStyle(body).rowGap) || 0;
         const heads = tables.map(table => [...table.tHead.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
         const borders = tables.map(table => table.getBoundingClientRect().height
@@ -332,7 +335,7 @@ function syncCombinedChartHeights(pagesEl) {
       }
       centerMoladNotes(pagesEl);
       const overflow = layouts.some(({ page, body }) => body.scrollHeight > body.clientHeight + 1
-        || page.getBoundingClientRect().height > 11 * 96 + 0.01 || combinedChartInkOverflows(page));
+        || page.getBoundingClientRect().height > paperHeight + 0.01 || combinedChartInkOverflows(page));
       if (!overflow || scale <= 0.1) break;
       scale = Math.max(0.1, scale - 0.02);
     }
@@ -451,11 +454,12 @@ export function renderSheet(container, state, sheet, onChange) {
   const winterSheet = sheet.season === 'choref' ? sheet : companion?.season === 'choref' ? companion : null;
   if (winterSheet && !winterSheet.style) winterSheet.style = { ...state.settings.sheetStyle };
   const printLayout = chartPrintLayout(Boolean(companion));
-  const combinedPrint = printLayout === 'combined';
+  const combinedPrint = isCombinedChartLayout(printLayout);
+  const printSize = chartPrintSize(printLayout);
 
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
-  setPrintPage(combinedPrint ? '17in 11in' : 'letter landscape');
+  setPrintPage(printSize.css);
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
@@ -519,7 +523,7 @@ export function renderSheet(container, state, sheet, onChange) {
   const primarySheet = shabbosFirst ? companion : sheet;
   const weekdaySheet = shabbosFirst ? sheet : companion;
   const primaryPages = combinedPrint ? buildCombinedChartPages(primarySheet, weekdaySheet, state, {
-    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(primarySheet?.style?.splitSpringDst),
+    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(primarySheet?.style?.splitSpringDst), printLayout,
   }) : buildPagesFor(primarySheet);
   const companionPages = combinedPrint ? [] : buildPagesFor(weekdaySheet);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
@@ -566,7 +570,7 @@ export function renderSheet(container, state, sheet, onChange) {
   const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
   const FIT_FLOOR = 0.1;
   const FIT_STEP = 0.02;
-  const FIT_TOLERANCE = (combinedPrint ? 11 : 8.5) * 96;
+  const FIT_TOLERANCE = printSize.height * 96;
   const applyFitScale = (scale) => {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncPageHeights(pagesEl);
@@ -779,7 +783,8 @@ function atPaperSize(pagesEl, measure) {
   const styles = [
     [pagesEl, 'zoom', '1'], [pagesEl, 'transform', 'none'],
     ...pages.flatMap(page => [
-      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', page.classList.contains('is-combined-chart') ? '11in' : '8.5in'],
+      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', page.classList.contains('is-combined-chart')
+        ? `${chartPrintSize(page.dataset.chartPrintLayout).height}in` : '8.5in'],
     ]),
   ].map(([el, name, temporary]) => ({ el, name, temporary,
     value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) }));

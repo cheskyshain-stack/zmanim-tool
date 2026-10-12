@@ -48,7 +48,12 @@ function pdfContent(pdf, label) {
           label + ': printed text stays on the paper: ' + word[5]);
       }
       const inkWidth = Math.max(...words.map(word => Number(word[3]))) - Math.min(...words.map(word => Number(word[1])));
-      return { width, height, inkWidth, words: words.map(word => word[5]).sort() };
+      // Poppler can split a clock time beside a zero-width bidi isolate at some font sizes.
+      const normalizedWords = words.map(word => word[5]).join(' ').replace(/[\u2066-\u2069]/g, '')
+        .replace(/\b(\d{1,2})\s*:\s*(\d{2})(?:\s*:\s*(\d{2}))?/g,
+          (_, hours, minutes, seconds) => `${hours}:${minutes}${seconds ? ':' + seconds : ''}`)
+        .trim().split(/\s+/).sort();
+      return { width, height, inkWidth, normalizedWords, words: words.map(word => word[5]).sort() };
     });
 }
 
@@ -72,9 +77,11 @@ async function smallerPaperPdfs(page, reference, label) {
       actual.forEach((physical, index) => {
         assert.equal(physical.width, paper.width);
         assert.equal(physical.height, paper.height);
-        assert.deepEqual(physical.words, original[index].words,
+        assert.deepEqual(physical.normalizedWords, original[index].normalizedWords,
           label + ': every time, heading, parsha, room mark and footer survives ' + paper.label);
-        const ratio = physical.inkWidth / (physical.width - 2 * (paper.marginPoints || 0));
+        const ratio = physical.inkWidth / Math.min(original[index].width,
+          physical.width - 2 * (paper.marginPoints || 0),
+          (physical.height - 2 * (paper.marginPoints || 0)) * original[index].width / original[index].height);
         const referenceRatio = original[index].inkWidth / original[index].width;
         assert.ok(Math.abs(ratio - referenceRatio) < 0.003,
           label + ': uses the available paper width on ' + paper.label + ': ' + ratio + ' vs ' + referenceRatio);
@@ -132,11 +139,11 @@ async function chartGeometry(page, selector) {
   });
 }
 
-function assertGeometry(frames, count, label) {
+function assertGeometry(frames, count, label, size = [1632, 1056]) {
   assert.equal(frames.length, count, label + ': preview pages');
   for (const frame of frames) {
-    assert.equal(frame.width, 1632, label + ': 17 inch width');
-    assert.ok(Math.abs(frame.height - 1056) < 0.05, label + ': 11 inch height');
+    assert.equal(frame.width, size[0], label + ': preview paper width');
+    assert.ok(Math.abs(frame.height - size[1]) < 0.05, label + ': preview paper height');
     assert.ok(Math.max(...frame.rows) - Math.min(...frame.rows) < 1, label + ': equal week rows');
     assert.equal(frame.labels, frame.totalRows, label + ': one parsha per row');
     assert.equal(frame.uniqueDates, frame.totalRows, label + ': matching dates appear once');
@@ -184,6 +191,18 @@ function assertGeometry(frames, count, label) {
     } finally { await misleadingQueries.evaluate(el => el.remove()); }
     await page.reload(); await page.locator('.is-combined-chart').waitFor();
     assert.equal(await page.locator('#chart-print-layout').inputValue(), 'combined', 'Choice survives refresh');
+    await page.locator('#chart-print-layout').selectOption('combined-letter');
+    await page.evaluate(() => document.fonts.ready);
+    assertGeometry(await chartGeometry(page, '.pages'), 1, 'public-letter', [1056, 816]);
+    const letterCells = await page.locator('.pages').evaluate(host => [...host.querySelectorAll('.cell')].map(cell => ({ serial: cell.dataset.serial, col: cell.dataset.col, season: cell.dataset.season, html: cell.innerHTML })));
+    assert.deepEqual(sortCells(letterCells), sortCells(originalPublic), 'Letter option keeps all source cells');
+    assert.match(await page.locator('#print-page-size').textContent(), /letter landscape/);
+    const letterPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    nativePdf(letterPdf, 1, 792, 612, 'public-combined-letter');
+    assert.deepEqual(pdfContent(letterPdf, 'letter')[0].normalizedWords, pdfContent(publicPdf, 'tabloid')[0].normalizedWords, 'Letter prints all the information');
+    await smallerPaperPdfs(page, letterPdf, 'public-letter');
+    await page.reload(); await page.locator('.is-combined-letter').waitFor();
+    assert.equal(await page.locator('#chart-print-layout').inputValue(), 'combined-letter', 'Letter choice survives refresh');
     await page.locator('#chart-print-layout').selectOption('separate');
     assert.equal(await page.locator('#combined-chart-print-run').count(), 0, 'Switching layout clears the print copy');
     assert.ok(!await page.locator('body').evaluate(el => el.classList.contains('has-combined-chart-print')), 'Original printing restored');
@@ -197,7 +216,12 @@ function assertGeometry(frames, count, label) {
       { year: 5787, season: 'choref', molad: 'compact', pad: 0.75, ink: 'mono' },
       { year: 5787, season: 'kayitz', language: 'en', pad: 0.15 },
       { year: 5787, season: 'choref', count: 1 },
-      { year: 5787, season: 'choref', edits: true }
+      { year: 5787, season: 'choref', edits: true },
+      { year: 5787, season: 'choref', layout: 'combined-letter' },
+      { year: 5787, season: 'kayitz', layout: 'combined-letter' },
+      { year: 5786, season: 'choref', split: true, layout: 'combined-letter' },
+      { year: 5787, season: 'choref', edits: true, layout: 'combined-letter' },
+      { year: 5784, season: 'choref', molad: 'yiddish', pad: 0.75, layout: 'combined-letter' }
     ]) {
       const label = Object.entries(fixture).map(([key, value]) => key + '-' + value).join('_');
       const source = await page.evaluate(async fixture => {
@@ -224,7 +248,7 @@ function assertGeometry(frames, count, label) {
         const values = originals.flatMap(original => [...original.querySelectorAll('.cell')].map(cell => ({ serial: cell.dataset.serial, col: cell.dataset.col, season: cell.dataset.season, html: cell.innerHTML })));
         const dates = [...new Set(originals.flatMap(original => [...original.querySelectorAll('tbody tr')].map(row => row.dataset.weekSerial)))].sort();
         window.combinedFixture = { state, shabbos, weekday };
-        localStorage.setItem('zmanim-chart-print-layout', 'combined');
+        localStorage.setItem('zmanim-chart-print-layout', fixture.layout || 'combined');
         const host = document.querySelector('main'); host.classList.add('is-sheet-view');
         renderSheet(host, state, shabbos, () => renderSheet(host, state, shabbos, () => {}));
         await document.fonts.ready;
@@ -242,26 +266,27 @@ function assertGeometry(frames, count, label) {
         console.log(JSON.stringify({ label, frames: frames.map(({ times, ...rest }) => rest) }));
         if (artifacts) await page.screenshot({ path: path.join(artifacts, label + '-overflow.png'), fullPage: true });
       }
-      assertGeometry(frames, source.count, label);
-      if (!fixture.count && !fixture.molad && fixture.pad == null) {
+      const letter = fixture.layout === 'combined-letter';
+      assertGeometry(frames, source.count, label, letter ? [1056, 816] : [1632, 1056]);
+      if (!letter && !fixture.count && !fixture.molad && fixture.pad == null) {
         assert.ok(parseFloat(frames[0].fontSize) >= 9.5, label + ': normal charts keep readable type');
       }
       await page.locator('#chart-print-layout').focus();
       await page.evaluate(() => window.scrollTo(0, 25));
       const y = await page.locator('#chart-print-layout').evaluate(el => el.getBoundingClientRect().top);
       await page.locator('#chart-print-layout').selectOption('separate');
-      await page.locator('#chart-print-layout').selectOption('combined');
+      await page.locator('#chart-print-layout').selectOption(fixture.layout || 'combined');
       const nextY = await page.locator('#chart-print-layout').evaluate(el => el.getBoundingClientRect().top);
       assert.ok(Math.abs(nextY - y) < 2, label + ': print picker stays in place');
       assert.equal(await page.evaluate(() => document.activeElement.id), 'chart-print-layout', label + ': keyboard focus restored');
       const fixturePdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
-      nativePdf(fixturePdf, source.count, 1224, 792, label);
+      nativePdf(fixturePdf, source.count, letter ? 792 : 1224, letter ? 612 : 792, label);
       if (fixture.split || (fixture.year === 5787 && fixture.season === 'kayitz' && !fixture.language)) {
         await smallerPaperPdfs(page, fixturePdf, label);
       }
       if (fixture.split) {
         await page.locator('#pages > .page').nth(1).evaluate(el => el.classList.add('page-excluded'));
-        nativePdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }), source.count - 1, 1224, 792, 'excluded-middle-page');
+        nativePdf(await page.pdf({ preferCSSPageSize: true, printBackground: true }), source.count - 1, letter ? 792 : 1224, letter ? 612 : 792, 'excluded-middle-page' + (letter ? '-letter' : ''));
         await page.locator('#pages > .page').nth(1).evaluate(el => el.classList.remove('page-excluded'));
       }
       const after = await page.evaluate(() => JSON.stringify(window.combinedFixture.state));
@@ -281,6 +306,12 @@ function assertGeometry(frames, count, label) {
       const phonePdf = await phone.pdf({ preferCSSPageSize: true, printBackground: true });
       nativePdf(phonePdf, 1, 1224, 792, 'phone-' + width);
       await smallerPaperPdfs(phone, phonePdf, 'phone-' + width);
+      await phone.locator('#chart-print-layout').selectOption('combined-letter');
+      await phone.evaluate(() => document.fonts.ready);
+      assertGeometry(await chartGeometry(phone, '.pages'), 1, 'phone-letter-' + width, [1056, 816]);
+      const phoneLetterPdf = await phone.pdf({ preferCSSPageSize: true, printBackground: true });
+      nativePdf(phoneLetterPdf, 1, 792, 612, 'phone-letter-' + width);
+      assert.deepEqual(pdfContent(phoneLetterPdf, 'letter')[0].normalizedWords, pdfContent(phonePdf, 'tabloid')[0].normalizedWords, 'Phone Letter prints all chart information');
       assert.equal(await phone.locator('.chart-print-paper-hint').count(), 1, 'Phone explains the full-size paper selection');
       await phone.locator('a[href="/week/"]').first().click();
       await phone.locator('.weekly-reader').waitFor();

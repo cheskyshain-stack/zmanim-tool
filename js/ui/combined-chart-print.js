@@ -1,3 +1,5 @@
+import { chartPrintSize } from './chart-print-layout.js';
+
 const COMBINED_PRINT_ID = 'combined-chart-print-run';
 const COMBINED_PRINT_CLASS = 'has-combined-chart-print';
 const COMBINED_SVG_NS = 'http://www.w3.org/2000/svg';
@@ -19,14 +21,18 @@ function prepareCombinedChartPrint() {
   for (const page of pages) {
     const frame = document.createElement('div');
     frame.className = 'combined-chart-print-frame';
+    const size = chartPrintSize(page.dataset.chartPrintLayout);
+    const width = size.width * 96, height = size.height * 96;
+    frame.style.maxWidth = `${size.width}in`;
+    frame.style.maxHeight = `${size.height}in`;
     const svg = document.createElementNS(COMBINED_SVG_NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 1632 1056');
-    svg.setAttribute('width', '1632');
-    svg.setAttribute('height', '1056');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
     svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
     const content = document.createElementNS(COMBINED_SVG_NS, 'foreignObject');
-    content.setAttribute('width', '1632');
-    content.setAttribute('height', '1056');
+    content.setAttribute('width', width);
+    content.setAttribute('height', height);
     const copy = page.cloneNode(true);
     copy.style.setProperty('zoom', '1', 'important');
     content.appendChild(copy);
