@@ -5677,6 +5677,8 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-site-footer .luach-foot-part:last-child { display:block; margin:3px 0 0; font:400 12px/1.6 Arial,sans-serif; color:#576674; }
  .luach-site-footer .luach-home-email { width:auto; margin:8px 0 0; font:400 12px/1.6 Arial,sans-serif; }
  .luach-site-footer .luach-contact-email { color:#576674; min-height:30px; text-underline-offset:3px; }
+ .luach-calculation-credit { margin:16px 0 0; font:400 12px/1.65 Arial,sans-serif; color:#64707c; }
+ .luach-calculation-credit a { color:#576674; text-underline-offset:3px; }
  .is-home .luach-site-footer { max-width:560px; }
  body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:90px; padding-bottom:24px; }
  .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; margin:0 auto; text-align:left; }
