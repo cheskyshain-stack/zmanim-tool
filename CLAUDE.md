@@ -151,6 +151,27 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
+Chart printing has a remembered **Print layout** picker: **Separate pages · Letter**
+keeps the original interleaved pages; **Together · 11 × 17** joins each paired page
+on one landscape Tabloid sheet. Weekdays are on the right, Shabbos and Friday on
+the left, and the parsha appears once at the far right. The upper headings are
+**שבת** and **ימות החול**; Friday has no separate upper heading. Do not add dates
+to the parsha cells. Preserve the original special-parsha, Chanukah and molad notes.
+Use the shared source chart cells, including rules, saved overrides, announced
+values, room marks and explanation attributes. Join rows by their actual serial,
+keeping weekday-only holiday rows with an empty Shabbos side. Keep the single
+weekday morning panel and one location legend, rounding note and address per page.
+The combined pages measure 1632 by 1056px (17 by 11 inches), while separate pages
+remain 1056 by 816px. Measure at paper size and fit the entire job without changing
+saved font sizes. Week rows are equal within a page, including across split DST
+sections. The two heading rows have their own natural heights. The combined morning
+panel inherits the chart font size even though it sits outside the table. Include
+its room stars when building the location legend. Keep controls and screen fitting
+off paper, preserve scroll and focus on layout changes, and reset the paper size
+when leaving the chart. `tests/combined-chart-print.cjs` verifies both chart types,
+holiday rows, room marks, overrides, rules, clock changes, margins, molad, no added
+dates, remembered choices and actual desktop/phone PDF sizes and page counts.
+
 The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
 shadows, plus black print text on white paper. Upgrade the old blue-gray default in
 saved charts and published settings. Black and white mode sets gray colour values

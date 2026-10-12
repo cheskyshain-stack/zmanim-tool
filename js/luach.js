@@ -1207,6 +1207,7 @@ function stampPage(where) {
 
 function route(published, { preserveWeekShowing = false } = {}) {
   const where = whereAmI();
+  setPrintPage('letter landscape');
   // One address per page. Arriving on /#week leaves the bar reading /#week, which is a
   // second way of writing an address that already has a first one: replaceState rather
   // than pushState, so the back button still goes back where it came from rather than
