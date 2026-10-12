@@ -171,6 +171,15 @@ off paper, preserve scroll and focus on layout changes, and reset the paper size
 when leaving the chart. `tests/combined-chart-print.cjs` verifies both chart types,
 holiday rows, room marks, overrides, rules, clock changes, margins, molad, no added
 dates, remembered choices and actual desktop/phone PDF sizes and page counts.
+The Android print service may retain Letter paper despite the selected Tabloid
+layout. Combined pages must fit the real print container in both orientations,
+including printer margins, and remain full size on landscape Tabloid. Use print-only
+container query units for the width rather than the phone's reported viewport width.
+The `tan(atan2(a,b))` ratio also works on older phones without typed calc division.
+Keep the smaller-paper fallback for older browsers. The combined picker reminds the
+user to select 11 × 17 (Tabloid) paper for full size. Browser checks must override
+the requested paper with Letter and compare every printed time and footer with the
+Tabloid PDF, not only print with preferCSSPageSize and assume Android honors it.
 
 The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
 shadows, plus black print text on white paper. Upgrade the old blue-gray default in
