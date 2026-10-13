@@ -40,7 +40,7 @@ export function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>Special schedules and messages</summary>
       <div class="panel-body">
-        <p><strong>Special schedules</strong> starts with Year, Occasion and a New design / Old design switch. New design is the default. A page with only one design remains available with either choice.</p>
+        <p><strong>Special schedules</strong> starts with Year, Occasion and a New design / Old design switch. New design uses the compact page and is the default; Old design uses the bordered poster. A page with only one design remains available with either choice.</p>
         <p>Use <strong>Add another page</strong> beside the open schedule to print more pages together. Half-page schedules also offer <strong>Add on the other half</strong>. Asara B’Teves has three schedule choices at the top.</p>
         <p><strong>Schedule messages</strong> opens the separate page for preparing and copying schedule messages.</p>
       </div>

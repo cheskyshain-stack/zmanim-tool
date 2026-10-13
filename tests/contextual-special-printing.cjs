@@ -112,6 +112,29 @@ const server = http.createServer((req, res) => {
       if (output) await page.screenshot({ path: path.join(output, `${width}-controls.png`), fullPage: true });
       await noOverflow();
 
+      // Paired schedules must also honor New = compact, including old saved selections.
+      for (const year of [5785, 5787, 5790]) for (const key of ['pair', 'slichostzom', 'yomkippur']) {
+        await page.evaluate(({ year, key }) => localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({
+          year, sheet: key, group: 'ראש השנה יום כיפור', design: 'new', orientation: 'landscape',
+          printPages: [{ id: 'paired-design', left: key, right: '' }],
+        })), { year, key });
+        await page.goto(origin + `/admin/?paired=${key}-${year}#posters/${key}/landscape`); await settle();
+        const compact = page.locator('.poster.is-onepage');
+        assert.equal(await compact.count(), 1, 'New paired design uses the compact page');
+        assert.equal(await page.locator('.poster.is-pair,#poster-orient-label').count(), 0, 'New paired design does not use the bordered poster or its orientation controls');
+        assert(await compact.evaluate(poster => ['::before', '::after'].every(part => getComputedStyle(poster, part).content === 'none')), 'Compact page has no decorative poster border');
+        const compactTimes = await times();
+        if (output && year === 5787 && key === 'pair') await page.screenshot({ path: path.join(output, `${width}-paired-compact.png`), fullPage: true });
+        await noOverflow(); await print(`${key}-${year}-compact`, 1, false);
+        await radio('poster-design', 'old');
+        assert.equal(await page.locator(key === 'yomkippur' ? '.poster:not(.is-onepage)' : '.poster.is-pair.is-landscape').count(), 1, 'Old design restores the framed poster and supported saved orientation');
+        assert.deepEqual(await times(), compactTimes, 'Paired designs contain exactly the same schedule times');
+        await print(`${key}-${year}-old`, 1, false);
+        await radio('poster-design', 'new'); await page.reload(); await settle();
+        assert.equal(await page.locator('.poster.is-onepage').count(), 1, 'Reload retains the compact paired design');
+        assert.deepEqual(await times(), compactTimes, 'Returning to compact keeps every paired schedule time');
+      }
+
       // A removed chart layout in browser storage must open as separate Letter pages.
       for (const remembered of ['combined', 'combined-letter']) {
         await page.evaluate(value => localStorage.setItem('zmanim-chart-print-layout', value), remembered);
