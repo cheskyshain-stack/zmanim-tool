@@ -754,6 +754,23 @@ it on ערב ראש השנה, where the card named the מנין off the sheet an
 
 ## The messages page, `/texts/`
 
+The full message audit is covered by `tests/text-message-sources.mjs` (51 calendar
+years, all 13 holiday/full-fast formats, chart edits and room marks) and
+`tests/text-message-audit.cjs` (real year views, Rosh Chodesh weekday portions,
+partial Chanukah weeks, latest saved charts, Yizkor, editable text and copying).
+Rosh Hashana and Yom Kippur messages read their built `erevLines`, including
+Chatzos, rather than reparsing template constants. Every Friday room marker uses
+the shared room key, including a star placed after a closing underline tag.
+When several saved weekday charts cover a week, the newest `createdAt` wins.
+Rosh Chodesh messages read `buildRoshChodeshShacharisPoster` rows and dates:
+omit Shabbos-only months, keep only the weekday portion of mixed dates, and use
+the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
+morning group through Friday, including ordinary mornings in partial weeks and
+the separate Rosh Chodesh group. The Chanukah chart panel and messages use the
+complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
+with its existing averaging/floor rule and corresponding explanation trace.
+Do not return to independently rounding a day when quoting that combined row.
+
 The chat messages the shul sends out, on a page of their own. **A third entry page beside
 `index.html` and `admin/index.html`**, with its own entry module (`js/texts-app.js`) and its
 own view (`js/ui/texts-view.js`), stamped by `build-offline.py` exactly the way the admin is
@@ -844,8 +861,8 @@ and listed in `DIST_TREES`.
   One thing deliberately not built: three of the seventeen, in חשון, טבת and שבט, open
   "6:50m&ns, [Netz 7:15]" instead, where the bracket is sunrise and the מנין is sunrise less twenty
   five minutes. Neither number is on a chart, so neither is built.
-- **The year view has five switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
-  Taanis and Rosh Chodesh**, and everything on it is in **date order**, which is the order these get
+- **The year view has six switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
+  Taanis, Rosh Chodesh and Behab**, and everything on it is in **date order**, which is the order these get
   sent in. All on to begin with, and turning them all off says so rather than looking broken.
   The weekly message is its own switch rather than part of Erev Shabbos, asked for: they are the
   week's schedule and Friday's, they are checked for different things, and fifty of each on one

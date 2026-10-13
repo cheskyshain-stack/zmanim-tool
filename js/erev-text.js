@@ -96,7 +96,9 @@ export function erevTimes(value) {
     // to the raw cell for the characters just after it.
     const m = /^(\d{1,2}:\d{2})(\*{0,2})/.exec(text.slice(i));
     if (m) {
-      out.push({ text: m[1], mark: m[2], underlined, line, before: text.slice(0, i) });
+      const after = text.slice(i + m[0].length);
+      const mark = m[2] || (after.startsWith(UL_END) ? /^\*{1,2}/.exec(after.slice(1))?.[0] : '') || '';
+      out.push({ text: m[1], mark, underlined, line, before: text.slice(0, i) });
       i += m[0].length - 1;
     }
   }
@@ -164,10 +166,11 @@ function erevDrasha(columns, row) {
   return null;
 }
 
-/** d, m or en: where this מנין davens, for a column whose heading already says the room. */
+/** d, m, en or sh: explicit marks win over a column heading's default room. */
 function erevWhere(kind, time) {
+  if (time.mark) return erevWhereMark(time);
   if (kind === 'ezrasNashim') return 'en';
-  return time.underlined ? 'd' : 'm';
+  return erevWhereMark(time);
 }
 
 /** The message for one week.

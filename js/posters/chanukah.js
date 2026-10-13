@@ -410,6 +410,16 @@ export function combineShacharisRows(days) {
   return rows;
 }
 
+/** The agreed morning rows on the posted eight-day schedule. Panels and messages
+ *  must read its first minyan, rather than independently rounding individual days. */
+export function chanukahPostedShacharisRows(year, settings, days = null) {
+  const start = dateFromHebrew(25, 9, year);
+  const source = days || Array.from({ length: 8 }, (_, offset) => start + offset)
+    .filter(serial => excelWeekday(serial) !== CH_SHABBOS)
+    .map(serial => chanukahShacharisDay(serial, settings));
+  return combineShacharisRows(source);
+}
+
 /** `days`' own combined morning(s) (see combineShacharisRows), as the wall chart prints
  *  them rather than as the poster does: plain lines of times, no label in front of them,
  *  ready for shacharisGridHtml to set in columns. A wall-chart row is already dated by its
@@ -428,27 +438,10 @@ export function combineShacharisRows(days) {
  *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
  *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks.
  *
- *  `mergeAll: true` is that same one row's own reason again, reached a second way: even with
- *  Rosh Chodesh out, the remaining days can still fail to share one exact line - נץ moves
- *  daily, so ותיקין's own rounding can land a minute apart on two days that agree on
- *  everything else, and combineShacharisRows still calls that two groups rather than one
- *  (measured: a 45px row asked to hold both ran to 68px, the same overflow a Rosh Chodesh
- *  day makes). Asked to merge, every day is one group regardless of where it agrees or not,
- *  the disagreeing position slash-joined the way a live choice between two times is written
- *  anywhere else on this sheet - one two-line block, always, whatever the days underneath
- *  it are actually doing. The poster keeps the fuller day-by-day picture; this row does not
- *  have the room for it. */
-/* A wall-chart cell is one column of shacharisGridHtml's own grid, and never two stacked
-   values in it: shacharisGridHtml counts every digit:digit run in a line to decide how many
-   columns the line needs, so a merged cell that disagrees ("6:49 / 6:50", two days a minute
-   apart) reads as two columns instead of one and throws the whole row's grid out of true -
-   measured live, on a Rosh Chodesh pair whose own נץ moves a minute between the two days: the
-   line came out four columns wide instead of three, jammed against the line below it. The
-   poster prints the same disagreement as a real choice (chanukahRunLine in posters-view.js,
-   which lists cells as plain text rather than gridding them, so it has no such limit); this
-   is the one context that cannot. The earlier of the two is kept, which the chart's own
-   footer already asks a reader to allow for ("All zmanim are rounded off. Please be מחמיר
-   two minutes.") - a day apart on ותיקין is well inside that. */
+ *  `mergeAll: true` keeps one block for the supplied kind of morning. The first
+ *  minyan always comes from the complete poster's agreed row, including its existing
+ *  average/floor rule, so a split page or partial week cannot choose a different minute.
+ *  Other positions still use one value per grid cell. */
 const firstOf = (text) => text.split(SLASH)[0];
 
 /** The wall chart's own שחרית panel never writes a slash between its times - WEEKDAY_SHACHARIS
@@ -464,13 +457,19 @@ export function chanukahScheduleLines(days, settings, { includeRoshChodesh = tru
   const cellHtml = (c) => `${c.underlined ? `<u>${firstOf(c.text)}</u>` : firstOf(c.text)}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
     .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
-  if (mergeAll) {
-    if (!dayObjs.length) return '';
-    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+  if (!dayObjs.length) return '';
+  const posted = chanukahPostedShacharisRows(chanukahYearFor(dayObjs[0].serial, settings), settings);
+  const linesFor = row => {
+    const first = posted.find(source => source.isRoshChodesh === row.isRoshChodesh)?.vasikin.time;
+    const cells = row.cells.map((cell, index) => index === 0 && first ? { ...cell, text: first } : cell);
     return splitLinesInHalf(cells.map(cellHtml), SH_PANEL_SPACE);
+  };
+  if (mergeAll) {
+    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+    return linesFor({ cells, isRoshChodesh: dayObjs[0].isRoshChodesh });
   }
   return combineShacharisRows(dayObjs)
-    .map((row) => splitLinesInHalf(row.cells.map(cellHtml), SH_PANEL_SPACE))
+    .map(linesFor)
     .join('\n\n');
 }
 
@@ -688,7 +687,7 @@ export function buildChanukahPoster(year, settings, tables) {
     hebrewYear: year,
     span: { from: erevShabbosPairs.some((p) => p.fridaySerial < kislev25) ? kislev25 - 1 : kislev25, to: kislev25 + 7 },
     days,
-    shacharisRows: combineShacharisRows(days),
+    shacharisRows: chanukahPostedShacharisRows(year, settings, days),
     weekdayMincha,
     minchaRows: compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbosList, settings, tables),
     sundayMincha,

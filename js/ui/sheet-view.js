@@ -3,11 +3,11 @@ import {
   resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR, LEGACY_ACCENT_COLORS,
   WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
 } from '../settings.js';
-import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel, excelWeekday } from '../hebrew-calendar.js';
+import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel, excelWeekday, chanukahYearFor } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
-import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay } from '../posters/chanukah.js';
+import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay, chanukahPostedShacharisRows } from '../posters/chanukah.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { hebrewLang, escText, escAttr, useStraightHebrewQuotes } from '../util.js';
@@ -993,6 +993,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
   const panelTraces = isWeekday ? [
     ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...[...new Set(chanukahPageDays.map(serial => chanukahYearFor(serial, settings)))].flatMap(year =>
+      chanukahPostedShacharisRows(year, settings).map(row => row.vasikin.trace)),
     ...chanukahPageDays.flatMap(serial => {
       const day = chanukahShacharisDay(serial, settings);
       return [...day.lines, zman('נץ', day.netz)];
