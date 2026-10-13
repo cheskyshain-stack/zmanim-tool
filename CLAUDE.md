@@ -452,6 +452,10 @@ Teves uses this same rule within the Chanukah poster; its Rosh Chodesh row must
 not average the earliest start. Keep all later minyanim and room marks unchanged.
 Seasonal chart panels, weekly cards/One sheet, messages and upcoming minyanim
 share these times. Group equal seasonal panel schedules and label the months.
+When BHB is present and a Rosh Chodesh block matches the complete standing
+schedule, including room marks, print that schedule once under a shared heading,
+for example `בה"ב · ר"ח חשון וכסלו`. Use one ר"ח prefix and a ו before the final
+month; retain separate blocks whenever their printed times or rooms differ.
 Upcoming Rosh Chodesh minyanim read traced morning values directly: the first
 two can share a start in different rooms, and must not roll the second into PM.
 `tests/shacharis-handouts.mjs` checks all weekday occasions across 51 years;
