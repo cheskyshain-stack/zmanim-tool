@@ -52,12 +52,17 @@ const server = http.createServer((req, res) => {
         const expected = await expectedMonths(year);
         assert.deepEqual(await keys(), expected);
         assert.equal(await page.locator('.special-job-page').count(), expected.length);
-        assert.equal(await page.locator('#poster-group').inputValue(), 'all:roshchodesh');
+        assert.equal(await page.locator('#poster-group').inputValue(), 'ראש חודש');
         assert.equal(await page.locator('#poster-pick').inputValue(), 'all:roshchodesh');
         assert.equal((await saved()).collection, 'roshchodesh');
         assert(page.url().endsWith('#posters/category/roshchodesh'));
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         return expected;
+      };
+      const openAllMonths = async () => {
+        if (await page.locator('#poster-group').inputValue() === 'ראש חודש') await page.locator('#poster-pick').selectOption('all:roshchodesh');
+        else await page.locator('#poster-group').selectOption('ראש חודש');
+        await settle();
       };
       const printSet = async (name, count, landscape) => {
         await page.emulateMedia({ media: 'print' }); await settle();
@@ -69,6 +74,7 @@ const server = http.createServer((req, res) => {
         checks.push({ width, print: name, pages: count });
       };
       await page.goto(origin + '/admin/#posters/roshchodesh8'); await page.locator('#poster-group').waitFor(); await settle();
+      assert.deepEqual(await page.locator('#poster-group optgroup[label="Rosh Chodesh"] option').allTextContents(), ['ראש חודש']);
       assert.equal(await page.locator('#poster-pick option[value="all:roshchodesh"]').count(), 1);
       await page.locator('#poster-pick').selectOption('all:roshchodesh'); await settle();
       let months = await expectAllMonths(5787);
@@ -90,11 +96,11 @@ const server = http.createServer((req, res) => {
       months = await expectAllMonths(5787);
       await page.locator('#poster-pick').selectOption(months[0]); await settle();
       assert.deepEqual(await keys(), [months[0]]); assert.equal((await saved()).collection, null);
-      await page.locator('#poster-group').selectOption('all:roshchodesh'); await settle();
+      await openAllMonths();
       await expectAllMonths(5787);
       await page.locator('#poster-page-next').click(); await settle();
       assert.deepEqual(await keys(), [months[0]], 'Next from All opens the first month individually');
-      await page.locator('#poster-group').selectOption('all:roshchodesh'); await settle();
+      await openAllMonths();
       await page.locator('#poster-page-now').click(); await settle();
       assert.equal((await saved()).collection, null);
       assert.equal((await keys()).length, 1); assert(months.includes((await keys())[0]));
@@ -124,12 +130,12 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#poster-group').inputValue(), 'all:yomtov');
       assert.deepEqual(await keys(), holidays);
       await page.goForward(); await settle(); assert.deepEqual(await keys(), ['pesach']);
-      await page.locator('#poster-group').selectOption('all:roshchodesh'); await settle();
+      await openAllMonths();
       await page.locator('[data-job-action=remove]').first().click(); await settle();
       assert.deepEqual(await keys(), months.slice(1)); assert.equal((await saved()).collection, null);
       await page.reload(); await page.locator('#poster-group').waitFor(); await settle();
       assert.deepEqual(await keys(), months.slice(1), 'Removed month is not restored on reload');
-      await page.locator('#poster-group').selectOption('all:roshchodesh'); await settle();
+      await openAllMonths();
       const restoredIds = (await saved()).printPages.map(page => page.id);
       await page.locator('[data-job-action=page]').first().click(); await settle();
       assert.deepEqual((await saved()).printPages.map(page => page.id), restoredIds);
@@ -140,7 +146,7 @@ const server = http.createServer((req, res) => {
       assert((await keys()).includes('behabcheshvan'));
       await page.reload(); await page.locator('#poster-group').waitFor(); await settle();
       assert.equal((await keys()).length, months.length + 1);
-      await page.locator('#poster-group').selectOption('all:roshchodesh'); await settle();
+      await openAllMonths();
       await expectAllMonths(5787);
       if (output) {
         await page.evaluate(() => scrollTo(0, 0));
