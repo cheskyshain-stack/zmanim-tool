@@ -30,7 +30,10 @@ const server = http.createServer((req, res) => {
       if (!process.env.SPECIAL_JOB_ORIGIN) await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
-      const settle = () => page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
+      const settle = async () => {
+        await page.locator('.poster,.page').first().waitFor({ state: 'attached' });
+        await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
+      };
       const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'No horizontal overflow at ' + width);
       const radio = async (key, value) => { await page.locator(`label[for="${key}-${value}"]`).click(); await settle(); await noOverflow(); };
       const times = () => page.locator('.poster').evaluateAll(posters => posters.flatMap(poster => poster.innerText.match(/\d{1,2}:\d{2}(?::\d{2})?/g) || []).sort());
