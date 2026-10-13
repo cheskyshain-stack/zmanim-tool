@@ -305,7 +305,19 @@ with modest fixed gaps instead of distributing three blocks across the page.
 Retain comfortable leading within each list. Keep weekday sunset beside Maariv,
 and Friday candle lighting and sunset together below Mincha. Leave a clear gap
 above the location notes, and fit the schedule at the actual printed size.
-Do not draw divider lines between time rows within a half-page Asara tefillah.
+Do not draw divider lines between compact time rows within a half-page Asara tefillah.
+Asara's full-schedule **Half page** format has a remembered **Shacharis layout** choice:
+**Compact times** (the existing default) or **Shacharis with locations**. The latter
+uses the morning handout's seven time/room rows and conditional Selichos note, followed
+by the original compact Mincha, sunset and Maariv. Friday retains its own Mincha,
+candle lighting and sunset and does not gain a weekday Maariv section. Use subtle row
+rules only in this detailed morning section. Preserve every later location mark and
+limit the footer's star key to marks actually used by Mincha/Maariv. Center the full
+weekday/parsha and tefillah group between the fixed title and 6.5pt regular footer.
+At wide margins, reduce only the afternoon row padding if the minimum type size still
+needs room. `tests/asara-locations-print.cjs` checks the option, original times/marks,
+Friday rules, native Letter pages, centered fit, margin extremes, copies, saved styles,
+pairing and swaps, comparison groups, and control position/focus at phone/desktop widths.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
 51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
 checks both reference layouts, phone and desktop printing, all sheet modes, the
@@ -314,9 +326,11 @@ Schedule, and the copyable fast-day message.
 
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
-Below the BHB title, print its three actual dates in chronological order from right
-to left, with the Hebrew weekday and upcoming Shabbos parsha name on the first line
-and a smaller Hebrew date underneath. Do not print an English date in this date row.
+Below the BHB title, name its actual weekdays and upcoming Shabbos parsha. Combine
+days belonging to the same upcoming Shabbos, for example `יום ב' ה' לך לך`, then
+`יום ב' וירא`, reading chronologically from right to left. Do not print a calendar
+date or month underneath. The same grouped weekday/parsha header is used by Rosh
+Chodesh and Asara morning handouts and both complete Asara half-page layouts.
 Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
 Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
 with the remembered one-or-two Copies per page switch. Spell out each
@@ -395,9 +409,10 @@ controls, migrations, named selections, mobile widths and physical page counts.
 posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
 Morning handouts center their dates and schedule together between the title rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
-Rosh Chodesh and fast-day morning handouts use BHB's Hebrew weekday and upcoming
-Shabbos parsha above the Hebrew date, before the Shacharis section. Center a single
-date and give each date its own equal-width column on two- or three-day handouts.
+Rosh Chodesh and fast-day morning handouts use BHB's grouped Hebrew weekday and
+upcoming Shabbos parsha before the Shacharis section, without a date/month subline.
+Center one week's label and give separate weeks equal-width columns. For example,
+two Rosh Chodesh days in the same week appear as `יום א' ב' נח`.
 Remove the duplicate weekday label below the Rosh Chodesh section heading. Keep
 skipping the Shabbos portion of Rosh Chodesh as before.
 Declare standard `justify-content: center` before `safe center` so browsers that do
@@ -406,7 +421,10 @@ The shared renderer must use the same centering for individual, duplicate, paire
 mixed print sets. Fuller handouts fit within the available space through the existing
 type-size fitter rather than stretching their rows.
 Choose each sheet's left and right schedule, swap halves, reorder or remove sheets,
-leave either half blank, or pair the same schedule with itself. **Add all half pages**
+leave either half blank, or pair the same schedule with itself. An Asara selection
+has its own **Shacharis layout** choice per half, remembered as `leftShacharis` or
+`rightShacharis` and carried with that half when swapping. The single-schedule
+preference does not change existing pairs. **Add all half pages**
 appends every remaining available half-page schedule without changing existing pairs.
 Keep the pairing layout and its year in the remembered poster bar; use `#posters/halfpages`
 for this view. Retain the year minus/plus/Current controls and margin/ink settings.

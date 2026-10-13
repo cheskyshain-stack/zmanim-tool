@@ -11,6 +11,9 @@ export function normalizeHalfPagePairs(value, keys) {
   const allowed = new Set(keys), ids = new Set();
   return value.slice(0, 128).filter(row => row && typeof row === 'object').map(row => {
     const pair = newHalfPagePair(allowed.has(row.left) ? row.left : '', allowed.has(row.right) ? row.right : '');
+    for (const side of ['left', 'right']) {
+      if (pair[side] === 'asarabteves' && row[`${side}Shacharis`] === 'locations') pair[`${side}Shacharis`] = 'locations';
+    }
     if (typeof row.id === 'string' && /^[\w-]{1,80}$/.test(row.id) && !ids.has(row.id)) pair.id = row.id;
     ids.add(pair.id);
     return pair;
@@ -36,7 +39,11 @@ export function halfPagePlan(pairs, entries) {
   const byKey = new Map(entries.map(entry => [entry.key, entry]));
   const pages = [], issues = [];
   for (const pair of pairs) {
-    const left = byKey.get(pair.left), right = byKey.get(pair.right);
+    const selected = side => {
+      const entry = byKey.get(pair[side]);
+      return entry ? { ...entry, shacharisLayout: pair[`${side}Shacharis`] === 'locations' ? 'locations' : 'compact' } : undefined;
+    };
+    const left = selected('left'), right = selected('right');
     for (const [side, key, entry] of [['left', pair.left, left], ['right', pair.right, right]]) {
       if (key && !entry?.value) issues.push({ id: pair.id, side, message: `${entry?.label || key} is not available for this year. Choose another schedule or leave this half blank.` });
     }
@@ -51,8 +58,11 @@ export function halfPagePlan(pairs, entries) {
 export function halfPagePairControls(pairs, entries, plan) {
   const placed = new Set(pairs.flatMap(pair => [pair.left, pair.right]));
   const allPlaced = entries.filter(entry => entry.value).every(entry => placed.has(entry.key));
-  const picker = (pair, side) => `<label>${side === 'left' ? 'Left half' : 'Right half'}<select id="half-${escAttr(pair.id)}-${side}" data-half-side="${side}" data-pair-id="${escAttr(pair.id)}">
-    <option value="">Blank</option>${entries.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === pair[side] ? 'selected' : ''} ${!entry.value ? 'disabled' : ''}>${escAttr(entry.label)}${entry.value ? '' : ' (unavailable)'}</option>`).join('')}</select></label>`;
+  const picker = (pair, side) => `<div><label>${side === 'left' ? 'Left half' : 'Right half'}<select id="half-${escAttr(pair.id)}-${side}" data-half-side="${side}" data-pair-id="${escAttr(pair.id)}">
+    <option value="">Blank</option>${entries.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === pair[side] ? 'selected' : ''} ${!entry.value ? 'disabled' : ''}>${escAttr(entry.label)}${entry.value ? '' : ' (unavailable)'}</option>`).join('')}</select>
+    </label>${pair[side] === 'asarabteves' ? `<label>Shacharis layout<select id="half-${escAttr(pair.id)}-${side}-shacharis" data-half-shacharis="${side}" data-pair-id="${escAttr(pair.id)}">
+      <option value="compact" ${pair[`${side}Shacharis`] !== 'locations' ? 'selected' : ''}>Compact times</option>
+      <option value="locations" ${pair[`${side}Shacharis`] === 'locations' ? 'selected' : ''}>Shacharis with locations</option></select></label>` : ''}</div>`;
   return `<div class="special-half-pairs"><h3>Pair half pages</h3>
     <p class="hint">Choose the left and right schedule for each sheet. Each half keeps its own design and prints at 5½ × 8½ inches.</p>
     <div class="special-half-actions"><button type="button" id="half-add-all" data-half-action="all" ${allPlaced ? 'disabled' : ''}>Add all half pages</button><button type="button" id="half-add-sheet" data-half-action="add">+ Sheet</button><button type="button" id="half-clear" data-half-action="clear" ${!pairs.length ? 'disabled' : ''}>Clear</button></div>

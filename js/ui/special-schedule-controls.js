@@ -57,6 +57,9 @@ export function specialScheduleControls(c) {
       ${c.workflow === 'set' ? toggle('poster-set-layout', 'Layout', [
         { value: 'original', label: 'Original posters', on: !c.onePage }, { value: 'combined', label: 'Combined', on: c.onePage },
       ]) : ''}
+      ${c.workflow === 'single' && c.one?.key === 'asarabteves' && c.halfLetter ? `<label>Shacharis layout<select id="poster-asara-shacharis">
+        <option value="compact" ${c.asaraShacharis !== 'locations' ? 'selected' : ''}>Compact times</option>
+        <option value="locations" ${c.asaraShacharis === 'locations' ? 'selected' : ''}>Shacharis with locations</option></select></label>` : ''}
       ${c.workflow !== 'halves' && (!c.empty && c.halfLetter || c.workflow === 'set' && c.setEntries.some(e => e.handout || e.half)) ? toggle('poster-copies', 'Copies per page', [
         { value: 'one', label: 'One', on: c.copies === 1 }, { value: 'two', label: 'Two', on: c.copies === 2 },
       ]) : ''}
