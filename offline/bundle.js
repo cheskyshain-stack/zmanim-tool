@@ -5953,7 +5953,7 @@ const YK_TEXT = {
   shacharis: { label: 'שחרית', times: '7:30' },
   hamelech: { label: 'המלך', times: '8:30' },
   krias: { name: 'ס"ז ק"ש' },
-  yizkor: { label: 'יזכור בערך', times: '11:55' },
+  yizkor: { label: 'יזכור בערך', times: '11:50' },
   mincha: 'מנחה',
   neila: 'נעילה',
   /* A third מעריב for anyone who has not davened yet, on every year's sheet. The name alone:
