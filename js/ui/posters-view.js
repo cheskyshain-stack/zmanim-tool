@@ -1791,9 +1791,10 @@ function shacharisRowsHtml(rows) {
 
 function shacharisDaysHtml(days, settings) {
   const groups = shacharisDayGroups(days, settings, posterTables);
-  return `<div class="shacharis-handout-dates" dir="rtl" style="--handout-date-columns:${groups.length}">${groups.map(group =>
-    `<div class="shacharis-handout-date" data-dates="${group.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' ')}"><div lang="he">${escAttr(group.label)}</div></div>`
-  ).join('')}</div>`;
+  const label = groups.map(group => group.label).join(' ו');
+  return `<div class="shacharis-handout-dates" dir="rtl">
+    <div class="shacharis-handout-date" data-dates="${days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' ')}"><div lang="he">${escAttr(label)}</div></div>
+  </div>`;
 }
 
 /** The same compact half-sheet as the complete schedules, with rooms beside each time. */

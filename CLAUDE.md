@@ -352,8 +352,11 @@ Friday rules, native Letter pages, widest margin, saved styles, pairing and swap
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
 Below the BHB title, name its actual weekdays and upcoming Shabbos parsha. Combine
-days belonging to the same upcoming Shabbos with a ו, for example `יום ב' וה' לך לך`, then
-`יום ב' וירא`, reading chronologically from right to left. Do not print a calendar
+days belonging to the same upcoming Shabbos with a ו, and join all groups into one
+centered header, for example `יום ב' וה' לך לך ויום ב' וירא`, reading chronologically
+from right to left. Keep all three BHB days together, rather than spreading the two
+parsha groups across columns. Longer headers may wrap naturally within the full
+width of the handout at wide print margins. Do not print a calendar
 date or month underneath. The same grouped weekday/parsha header is used by Rosh
 Chodesh and Asara morning handouts and both complete Asara half-page layouts.
 Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
