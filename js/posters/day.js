@@ -29,6 +29,7 @@ import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
 import { buildAsaraBTevesPoster } from './asarabteves.js';
+import { buildShivaAsarTammuzPoster, shivaAsarTammuzSerial } from './shiva-asar-tammuz.js';
 import { buildSukkosPoster } from './sukkos.js';
 import { buildPesachPoster } from './pesach.js';
 import { slichosMornings, slichosWeekLines } from './slichos.js';
@@ -55,11 +56,19 @@ const SEASON_BEFORE = 16;
  *  candle lighting and the horizon, and a stale sheet would be worse than a slow one. */
 let built = null;
 let asaraBuilt = null;
+let tammuzBuilt = null;
 function asaraFor(year, settings) {
   if (asaraBuilt && asaraBuilt.year === year && asaraBuilt.settings === settings) return asaraBuilt.poster;
   let poster = null;
   try { poster = buildAsaraBTevesPoster(year, settings); } catch { poster = null; }
   asaraBuilt = { year, settings, poster };
+  return poster;
+}
+
+function tammuzFor(year, settings) {
+  if (tammuzBuilt?.year === year && tammuzBuilt.settings === settings) return tammuzBuilt.poster;
+  const poster = buildShivaAsarTammuzPoster(year, settings);
+  tammuzBuilt = { year, settings, poster };
   return poster;
 }
 
@@ -137,6 +146,9 @@ export function specialMinyanim(serial, settings) {
   const here = hebrew.year;
   if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
     return (asaraFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
+  }
+  if (hebrew.month === 4 && serial === shivaAsarTammuzSerial(here)) {
+    return (tammuzFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
   }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);

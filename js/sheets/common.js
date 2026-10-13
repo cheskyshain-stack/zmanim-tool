@@ -10,8 +10,8 @@ import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
 /** Asara B'Teves: retain sunset's seconds until the requested final rounding. */
-export function asaraLastMinchaTrace(shkia, friday = false) {
-  const base = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+export function asaraLastMinchaTrace(shkia, friday = false, title = "Asara B'Teves") {
+  const base = zman('שקיעה', shkia, `on ${title}, at the shul's elevation`);
   return friday
     ? base.minus(25, 'the Friday fast\'s last Mincha is twenty-five minutes before sunset')
       .floor('remove the seconds, without rounding up')
