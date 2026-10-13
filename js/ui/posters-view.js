@@ -1710,8 +1710,9 @@ const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
 function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '', standalone = false } = {}) {
+  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
-    ${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
+    ${shacharis ? `<div class="halfpage-content">${schedule}</div>` : schedule}`;
   // Put the shul's name and street address on separate lines on the morning handouts.
   const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
   const legend = shacharis ? (address ? [{ dir: 'ltr', text: address }] : [])

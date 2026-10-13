@@ -393,6 +393,11 @@ controls, migrations, named selections, mobile widths and physical page counts.
 
 **Pair half pages** is a third admin workflow for Chanukah and Asara B'Teves compact
 posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
+Morning handouts center their dates and schedule together between the title rule and
+the footer rule. Keep the header and footer fixed and retain the existing row spacing.
+The shared renderer must use the same centering for individual, duplicate, paired and
+mixed print sets. Fuller handouts fit within the available space through the existing
+type-size fitter rather than stretching their rows.
 Choose each sheet's left and right schedule, swap halves, reorder or remove sheets,
 leave either half blank, or pair the same schedule with itself. **Add all half pages**
 appends every remaining available half-page schedule without changing existing pairs.
