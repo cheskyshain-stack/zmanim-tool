@@ -1780,10 +1780,12 @@ function renderHalfSchedulePoster(poster, key, settings, options = {}) {
 function shacharisRowsHtml(rows) {
   return rows.map(row => `<div class="onepage-row shacharis-handout-row">
     <div class="shacharis-handout-run">
-      <bdi class="shacharis-handout-room" dir="rtl" lang="he">${escAttr(row.room)}</bdi>
+      <div class="shacharis-handout-location" dir="rtl">
+        <bdi class="shacharis-handout-room" lang="he">${escAttr(row.room)}</bdi>
+        ${row.timeNote ? `<bdi class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</bdi>` : ''}
+      </div>
       <bdi class="shacharis-handout-time" dir="ltr">${timeHtml({ ...row, mark: '', underlined: false, timeNote: null })}</bdi>
     </div>
-    ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
 }
 

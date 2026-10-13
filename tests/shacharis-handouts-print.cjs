@@ -111,6 +111,14 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           typeSize: parseFloat(getComputedStyle(sheet.querySelector('.shacharis-handout-run')).fontSize),
           rtl: [...sheet.querySelectorAll('.shacharis-handout-run')].every(row =>
             row.querySelector('.shacharis-handout-room').getBoundingClientRect().left >= row.querySelector('.shacharis-handout-time').getBoundingClientRect().right),
+          notesBesideRoom: [...sheet.querySelectorAll('.shacharis-handout-note')].every(note => {
+            const row = note.closest('.shacharis-handout-run');
+            const room = row.querySelector('.shacharis-handout-room').getBoundingClientRect();
+            const time = row.querySelector('.shacharis-handout-time').getBoundingClientRect();
+            const n = note.getBoundingClientRect();
+            return n.right < room.left && n.left > time.right && n.top < room.bottom
+              && (note.textContent.includes('(') || n.height < parseFloat(getComputedStyle(note).lineHeight) * 1.5);
+          }),
           paper: document.getElementById('print-page-size').textContent };
       }));
       for (const [i, box] of boxes.entries()) {
@@ -120,6 +128,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert(Math.abs(box.footerTypeSize - 6.5 * 96 / 72) < 0.01, 'Morning handouts retain the approved fixed 6.5pt footer');
         assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
+        assert(box.notesBesideRoom, 'Selichos note is beside the room, clear of the time; short notes remain on one line');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
         assert(box.paper.includes('letter landscape'));
       }
@@ -226,7 +235,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
         available.map(poster => 'roshchodesh' + poster.month), 'Months with weekday schedules appear in date order');
-      assert.equal(await page.locator('#poster-pick').locator('..').evaluate(el => el.childNodes[0].textContent.trim()), 'Month');
+      assert.equal(await page.locator('#poster-page-label').innerText(), 'Month');
       const shevatWeekday = await page.evaluate(async year => {
         const { dateFromHebrew, excelWeekday } = await import('/js/hebrew-calendar.js');
         return excelWeekday(dateFromHebrew(1, 11, year));
