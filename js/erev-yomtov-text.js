@@ -16,10 +16,10 @@
 //
 // Where each piece comes from, all of it out of buildRoshHashanaPoster:
 //
-//   Selichos      RH_TEXT.slichos.times, the סליחות מנין on ערב ר"ה.
+//   Selichos      the poster's erevLines, the סליחות מנין on ערב ר"ה.
 //   Chatzos       the poster's own חצות, cut to the minute rather than rounded, because no
 //                 printed זמן should say חצות is a minute later than it is.
-//   Mincha        RH_TEXT.erevMincha.times, the afternoon menu.
+//   Mincha        the poster's erevLines, the afternoon menu.
 //   Hadlakas      the first day's block, its candles line: שקיעה less the shul's candle
 //                 lighting minutes.
 //   Mincha        the same block's nightMincha: שקיעה less fifteen. It is after candle
@@ -37,10 +37,8 @@
 import { RH_TEXT } from './posters/roshhashana.js';
 import { blockHasEiruv } from './posters/eiruv.js';
 import { VS_TEXT } from './posters/vasikin.js';
-import { YK_TEXT } from './posters/yomkippur.js';
 import { PS_TEXT } from './posters/pesach.js';
 import { SK_TEXT } from './posters/sukkos.js';
-import { parseTimes } from './posters/slichos.js';
 import { erevWhereMark } from './erev-text.js';
 
 /** The room the ותיקין מנין davens in, said the way the message says it.
@@ -170,17 +168,20 @@ function ytYizkorLines(rows, holiday) {
  *  missing a line is one somebody can see is short; a message carrying a time nobody
  *  computed is one they cannot. */
 export function erevRoshHashanaText(poster) {
+  if (!poster) return '';
   const first = poster?.blocks?.[0];
   const timeFor = (calc) => first?.lines?.find((l) => l.calc === calc)?.times?.[0];
+  const erevLine = label => poster.erevLines?.find(row => row.label === label);
 
   const lines = ['Erev Rosh Hashana'];
 
-  const slichos = parseTimes(RH_TEXT.slichos.times);
+  const slichos = erevLine(RH_TEXT.slichos.label)?.times || [];
   if (slichos.length) lines.push(`Selichos ${ytList(slichos)}`);
 
-  if (poster?.chatzos) lines.push(`Chatzos ${poster.chatzos}`);
+  const chatzos = erevLine(RH_TEXT.chatzos)?.times?.[0]?.text;
+  if (chatzos) lines.push(`Chatzos ${chatzos}`);
 
-  const mincha = parseTimes(RH_TEXT.erevMincha.times);
+  const mincha = erevLine(RH_TEXT.erevMincha.label)?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   /* Off the sheet's own ערב heading, which is the day the עירוב is made on. It used to ask the
@@ -224,14 +225,15 @@ const YT_SIGN_OFF_YK =
  *
  *  @param poster - straight from buildYomKippurPoster. */
 export function erevYomKippurText(poster) {
+  if (!poster) return '';
   const timeFor = (calc) => poster?.dayLines?.find((l) => l.calc === calc)?.times?.[0];
 
   const lines = ['Erev Yom Kippur'];
 
-  const selichos = parseTimes(YK_TEXT.erevShacharis.times);
+  const selichos = poster.erevLines?.find(row => row.calc === 'erevShacharis')?.times || [];
   if (selichos.length) lines.push(`Selichos ${ytList(selichos)}`);
 
-  const mincha = parseTimes(YK_TEXT.erevMincha.times);
+  const mincha = poster.erevLines?.find(row => row.calc === 'erevMincha')?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   const candles = timeFor('candles');

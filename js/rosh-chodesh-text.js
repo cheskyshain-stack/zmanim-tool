@@ -60,7 +60,7 @@ export const RC_TEXT = {
  *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
  *  not one to send, so the caller drops the card rather than sending the heading on its own. */
 export function roshChodeshShacharis(shacharisCell) {
-  const times = erevTimes(shacharisCell);
+  const times = Array.isArray(shacharisCell) ? shacharisCell : erevTimes(shacharisCell);
   if (!times.length) return '';
   return times.map((t) => t.text + erevWhereMark(t)).join(', ');
 }

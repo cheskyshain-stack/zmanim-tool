@@ -30,10 +30,10 @@ import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-te
 import { shulNow } from '../zmanim/solar.js';
 import { tzomGedaliaText, asaraBTevesText, chartFastText, fastsBetween } from '../taanis-text.js';
 import { behabMessagesBetween } from '../behab-text.js';
+import { buildRoshChodeshShacharisPoster } from '../posters/shacharis.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
 import { buildAsaraBTevesPoster } from '../posters/asarabteves.js';
 import { buildWeekdayRow, chanukahDaysInWeek } from '../sheets/weekday.js';
-import { chanukahScheduleLines } from '../posters/chanukah.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
 import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText, hoshanaRabbaText } from '../erev-yomtov-text.js';
@@ -220,10 +220,9 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  built the way the chart builds them and then have any saved sheet's overrides laid over, so a
  *  cell somebody corrected by hand reaches the message. The morning is not part of that row: it
  *  is the Settings schedule the chart prints as one merged cell, the סליחות season's own lists
- *  where the week is in one (see wkMornings in week-text.js), or - asked for directly, after the
- *  wall chart's own Shacharis panel had been carrying it for a while with no message to match -
- *  חנוכה's own morning on the one week every one of whose five weekdays is חנוכה. That week
- *  keeps its parsha name and adds Chanuka to the message heading.
+ *  where the week is in one, or חנוכה's posted mornings, grouped by their actual weekdays
+ *  through Friday (see wkMornings in week-text.js). A full Chanukah
+ *  week keeps its parsha name and adds Chanuka to the message heading.
  *
  *  Sent on the Sunday, which is six days before the Shabbos. See TX_WEEK_FROM for how long it
  *  stands.
@@ -233,18 +232,12 @@ function txWeek(state, settings, tables, entry, now) {
   const shabbos = entry.week.serial;
   /* A full Chanuka week keeps its parsha name: "Week of P' Miketz - Chanuka".
      The same five-day test decides whether the Weekday chart adds "· חנוכה" to its row.
-     A week only partly חנוכה keeps its own ordinary morning and plain parsha label.
-     The morning itself is chanukahScheduleLines on those same five days, merged into the one
-     line the wall chart's own full-week row prints (mergeAll: true, see chanukahPanelBlocks)
-     and with Rosh Chodesh left out of the merge (includeRoshChodesh: false) where that week
-     also carries one: ROSH CHODESH already sends its own message, and this page does not say
-     a מנין twice. */
+     Partial weeks keep their plain parsha label. weekText names the ordinary, Chanukah
+     and Rosh Chodesh mornings separately, using the chart panel's shared posted schedule. */
   const chanukahDays = chanukahDaysInWeek(shabbos, settings);
   const isChanukahWeek = chanukahDays.length === 5;
   const name = txWeekName(entry.week, settings, tables) + (isChanukahWeek ? ' - Chanuka' : '');
-  const shacharisCell = isChanukahWeek
-    ? chanukahScheduleLines(chanukahDays, settings, { includeRoshChodesh: false, mergeAll: true })
-    : WEEKDAY_SHACHARIS;
+  const shacharisCell = WEEKDAY_SHACHARIS;
   const built = buildWeekdayRow(entry.week, settings);
   /* Overrides only where a saved Weekday chart actually covers this week. mergeRow wants a real
      sheet to read them off and throws on null, and most weeks here have no saved chart at all:
@@ -536,23 +529,22 @@ function txCholHamoedPesach(rhYear, settings, today) {
 function txRoshChodesh(settings, today, howMany = 1) {
   const out = [];
   let from = today;
-  /* The chart's own ר"ח schedule, read from where the chart reads it: the program's copy of the
-     second schedule, which is the same source upcoming.js and the wall chart use for the same
-     list. See WEEKDAY_SHACHARIS_SPECIAL in settings.js. */
-  const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
+  /* Read the handout's weekday dates and rows, including Chanukah's own Teves morning.
+     A month whose entire Rosh Chodesh falls on Shabbos has no weekday handout or message. */
   for (let i = 0; i < howMany; i += 1) {
     const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
     if (!rc) break;
     from = rc.last + 1;
-    if (!txDaysInWindow(rc.first, rc.last, today)) continue;
-    const text = roshChodeshText(rc, shacharisCell);
+    const poster = buildRoshChodeshShacharisPoster(rc.year, rc.month, settings);
+    if (!poster || !txDaysInWindow(poster.span.from, poster.span.to, today)) continue;
+    const text = roshChodeshText(rc, poster.rows);
     if (!text) continue;
     out.push({
       id: `rosh-chodesh-${rc.year}-${rc.month}`,
       kind: 'roshchodesh',
       // The first day, which is the day it is about. The shul sends it the night before or that
       // morning, and the four day window covers both.
-      serial: rc.first,
+      serial: poster.span.from,
       name: `Rosh Chodesh ${roshChodeshMonthName(rc.month)}`,
       when: hebrewYear(rc.year),
       text,

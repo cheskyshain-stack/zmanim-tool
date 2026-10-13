@@ -43,7 +43,8 @@ export function weekIndex(state) {
  *  is the only chart that has the week at all. */
 export function weekdayChartFor(sheet, serial, state) {
   if (sheet) return weekdayCompanionOf(sheet, state);
-  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
+  return state.sheets.filter((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
 }
 
 /** The weekday chart generated alongside a given Shabbos sheet, if there is one. */

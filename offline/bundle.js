@@ -4743,6 +4743,16 @@ function combineShacharisRows(days) {
   return rows;
 }
 
+/** The agreed morning rows on the posted eight-day schedule. Panels and messages
+ *  must read its first minyan, rather than independently rounding individual days. */
+function chanukahPostedShacharisRows(year, settings, days = null) {
+  const start = dateFromHebrew(25, 9, year);
+  const source = days || Array.from({ length: 8 }, (_, offset) => start + offset)
+    .filter(serial => excelWeekday(serial) !== CH_SHABBOS)
+    .map(serial => chanukahShacharisDay(serial, settings));
+  return combineShacharisRows(source);
+}
+
 /** `days`' own combined morning(s) (see combineShacharisRows), as the wall chart prints
  *  them rather than as the poster does: plain lines of times, no label in front of them,
  *  ready for shacharisGridHtml to set in columns. A wall-chart row is already dated by its
@@ -4761,27 +4771,10 @@ function combineShacharisRows(days) {
  *  A Rosh Chodesh day inside that week still has its own morning on the Special Schedules
  *  poster (buildChanukahPoster), which is asked without this flag and keeps both blocks.
  *
- *  `mergeAll: true` is that same one row's own reason again, reached a second way: even with
- *  Rosh Chodesh out, the remaining days can still fail to share one exact line - נץ moves
- *  daily, so ותיקין's own rounding can land a minute apart on two days that agree on
- *  everything else, and combineShacharisRows still calls that two groups rather than one
- *  (measured: a 45px row asked to hold both ran to 68px, the same overflow a Rosh Chodesh
- *  day makes). Asked to merge, every day is one group regardless of where it agrees or not,
- *  the disagreeing position slash-joined the way a live choice between two times is written
- *  anywhere else on this sheet - one two-line block, always, whatever the days underneath
- *  it are actually doing. The poster keeps the fuller day-by-day picture; this row does not
- *  have the room for it. */
-/* A wall-chart cell is one column of shacharisGridHtml's own grid, and never two stacked
-   values in it: shacharisGridHtml counts every digit:digit run in a line to decide how many
-   columns the line needs, so a merged cell that disagrees ("6:49 / 6:50", two days a minute
-   apart) reads as two columns instead of one and throws the whole row's grid out of true -
-   measured live, on a Rosh Chodesh pair whose own נץ moves a minute between the two days: the
-   line came out four columns wide instead of three, jammed against the line below it. The
-   poster prints the same disagreement as a real choice (chanukahRunLine in posters-view.js,
-   which lists cells as plain text rather than gridding them, so it has no such limit); this
-   is the one context that cannot. The earlier of the two is kept, which the chart's own
-   footer already asks a reader to allow for ("All zmanim are rounded off. Please be מחמיר
-   two minutes.") - a day apart on ותיקין is well inside that. */
+ *  `mergeAll: true` keeps one block for the supplied kind of morning. The first
+ *  minyan always comes from the complete poster's agreed row, including its existing
+ *  average/floor rule, so a split page or partial week cannot choose a different minute.
+ *  Other positions still use one value per grid cell. */
 const firstOf = (text) => text.split(SLASH)[0];
 
 /** The wall chart's own שחרית panel never writes a slash between its times - WEEKDAY_SHACHARIS
@@ -4797,13 +4790,19 @@ function chanukahScheduleLines(days, settings, { includeRoshChodesh = true, merg
   const cellHtml = (c) => `${c.underlined ? `<u>${firstOf(c.text)}</u>` : firstOf(c.text)}${c.mark || ''}`;
   const dayObjs = days.map((d) => chanukahShacharisDay(d, settings))
     .filter((d) => includeRoshChodesh || !d.isRoshChodesh);
-  if (mergeAll) {
-    if (!dayObjs.length) return '';
-    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+  if (!dayObjs.length) return '';
+  const posted = chanukahPostedShacharisRows(chanukahYearFor(dayObjs[0].serial, settings), settings);
+  const linesFor = row => {
+    const first = posted.find(source => source.isRoshChodesh === row.isRoshChodesh)?.vasikin.time;
+    const cells = row.cells.map((cell, index) => index === 0 && first ? { ...cell, text: first } : cell);
     return splitLinesInHalf(cells.map(cellHtml), SH_PANEL_SPACE);
+  };
+  if (mergeAll) {
+    const cells = dayObjs[0].lines.map((_, k) => mergedCell(dayObjs.map((d) => d.lines[k])));
+    return linesFor({ cells, isRoshChodesh: dayObjs[0].isRoshChodesh });
   }
   return combineShacharisRows(dayObjs)
-    .map((row) => splitLinesInHalf(row.cells.map(cellHtml), SH_PANEL_SPACE))
+    .map(linesFor)
     .join('\n\n');
 }
 
@@ -5021,7 +5020,7 @@ function buildChanukahPoster(year, settings, tables) {
     hebrewYear: year,
     span: { from: erevShabbosPairs.some((p) => p.fridaySerial < kislev25) ? kislev25 - 1 : kislev25, to: kislev25 + 7 },
     days,
-    shacharisRows: combineShacharisRows(days),
+    shacharisRows: chanukahPostedShacharisRows(year, settings, days),
     weekdayMincha,
     minchaRows: compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbosList, settings, tables),
     sundayMincha,
@@ -9931,6 +9930,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
   const panelTraces = isWeekday ? [
     ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...[...new Set(chanukahPageDays.map(serial => chanukahYearFor(serial, settings)))].flatMap(year =>
+      chanukahPostedShacharisRows(year, settings).map(row => row.vasikin.trace)),
     ...chanukahPageDays.flatMap(serial => {
       const day = chanukahShacharisDay(serial, settings);
       return [...day.lines, zman('נץ', day.netz)];
@@ -11704,7 +11705,8 @@ function weekIndex(state) {
  *  is the only chart that has the week at all. */
 function weekdayChartFor(sheet, serial, state) {
   if (sheet) return weekdayCompanionOf(sheet, state);
-  return state.sheets.find((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial)) || null;
+  return state.sheets.filter((s) => s.season === 'weekday' && s.weeks.some((w) => w.serial === serial))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
 }
 
 /** The weekday chart generated alongside a given Shabbos sheet, if there is one. */
@@ -13175,7 +13177,9 @@ function erevTimes(value) {
     // to the raw cell for the characters just after it.
     const m = /^(\d{1,2}:\d{2})(\*{0,2})/.exec(text.slice(i));
     if (m) {
-      out.push({ text: m[1], mark: m[2], underlined, line, before: text.slice(0, i) });
+      const after = text.slice(i + m[0].length);
+      const mark = m[2] || (after.startsWith(UL_END) ? /^\*{1,2}/.exec(after.slice(1))?.[0] : '') || '';
+      out.push({ text: m[1], mark, underlined, line, before: text.slice(0, i) });
       i += m[0].length - 1;
     }
   }
@@ -13243,10 +13247,11 @@ function erevDrasha(columns, row) {
   return null;
 }
 
-/** d, m or en: where this מנין davens, for a column whose heading already says the room. */
+/** d, m, en or sh: explicit marks win over a column heading's default room. */
 function erevWhere(kind, time) {
+  if (time.mark) return erevWhereMark(time);
   if (kind === 'ezrasNashim') return 'en';
-  return time.underlined ? 'd' : 'm';
+  return erevWhereMark(time);
 }
 
 /** The message for one week.
@@ -13556,10 +13561,10 @@ function buildVasikinPoster(year, settings, which = 'rh') {
 //
 // Where each piece comes from, all of it out of buildRoshHashanaPoster:
 //
-//   Selichos      RH_TEXT.slichos.times, the סליחות מנין on ערב ר"ה.
+//   Selichos      the poster's erevLines, the סליחות מנין on ערב ר"ה.
 //   Chatzos       the poster's own חצות, cut to the minute rather than rounded, because no
 //                 printed זמן should say חצות is a minute later than it is.
-//   Mincha        RH_TEXT.erevMincha.times, the afternoon menu.
+//   Mincha        the poster's erevLines, the afternoon menu.
 //   Hadlakas      the first day's block, its candles line: שקיעה less the shul's candle
 //                 lighting minutes.
 //   Mincha        the same block's nightMincha: שקיעה less fifteen. It is after candle
@@ -13573,8 +13578,6 @@ function buildVasikinPoster(year, settings, which = 'rh') {
 //
 // Names here are prefixed rather than shared with erev-text.js on purpose: the offline build
 // flattens every module into one scope, where a second const of the same name is a hard error.
-
-
 
 
 
@@ -13709,17 +13712,20 @@ function ytYizkorLines(rows, holiday) {
  *  missing a line is one somebody can see is short; a message carrying a time nobody
  *  computed is one they cannot. */
 function erevRoshHashanaText(poster) {
+  if (!poster) return '';
   const first = poster?.blocks?.[0];
   const timeFor = (calc) => first?.lines?.find((l) => l.calc === calc)?.times?.[0];
+  const erevLine = label => poster.erevLines?.find(row => row.label === label);
 
   const lines = ['Erev Rosh Hashana'];
 
-  const slichos = parseTimes(RH_TEXT.slichos.times);
+  const slichos = erevLine(RH_TEXT.slichos.label)?.times || [];
   if (slichos.length) lines.push(`Selichos ${ytList(slichos)}`);
 
-  if (poster?.chatzos) lines.push(`Chatzos ${poster.chatzos}`);
+  const chatzos = erevLine(RH_TEXT.chatzos)?.times?.[0]?.text;
+  if (chatzos) lines.push(`Chatzos ${chatzos}`);
 
-  const mincha = parseTimes(RH_TEXT.erevMincha.times);
+  const mincha = erevLine(RH_TEXT.erevMincha.label)?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   /* Off the sheet's own ערב heading, which is the day the עירוב is made on. It used to ask the
@@ -13763,14 +13769,15 @@ const YT_SIGN_OFF_YK =
  *
  *  @param poster - straight from buildYomKippurPoster. */
 function erevYomKippurText(poster) {
+  if (!poster) return '';
   const timeFor = (calc) => poster?.dayLines?.find((l) => l.calc === calc)?.times?.[0];
 
   const lines = ['Erev Yom Kippur'];
 
-  const selichos = parseTimes(YK_TEXT.erevShacharis.times);
+  const selichos = poster.erevLines?.find(row => row.calc === 'erevShacharis')?.times || [];
   if (selichos.length) lines.push(`Selichos ${ytList(selichos)}`);
 
-  const mincha = parseTimes(YK_TEXT.erevMincha.times);
+  const mincha = poster.erevLines?.find(row => row.calc === 'erevMincha')?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   const candles = timeFor('candles');
@@ -14438,7 +14445,7 @@ const RC_TEXT = {
  *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
  *  not one to send, so the caller drops the card rather than sending the heading on its own. */
 function roshChodeshShacharis(shacharisCell) {
-  const times = erevTimes(shacharisCell);
+  const times = Array.isArray(shacharisCell) ? shacharisCell : erevTimes(shacharisCell);
   if (!times.length) return '';
   return times.map((t) => t.text + erevWhereMark(t)).join(', ');
 }

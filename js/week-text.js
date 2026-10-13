@@ -41,8 +41,10 @@
 import { erevTimes, erevWhereMark } from './erev-text.js';
 import { weekdayMornings } from './posters/day.js';
 import { SLICHOS_TEXT } from './posters/slichos.js';
-import { hebrewDateExtended, dateFromHebrew, excelWeekday } from './hebrew-calendar.js';
-import { chanukahSundayMincha } from './posters/chanukah.js';
+import { hebrewDateExtended, dateFromHebrew, excelWeekday, hasRoshChodesh } from './hebrew-calendar.js';
+import { chanukahSundayMincha, chanukahScheduleLines } from './posters/chanukah.js';
+import { chanukahDaysThroughFriday } from './sheets/weekday.js';
+import { DAY_NAMES } from './util.js';
 
 /** The wording, as the shul writes it. The colons are theirs: the morning line has none and the
  *  other two do, in every one of the forty sent messages. */
@@ -137,6 +139,21 @@ function wkRow(cell) {
  *  ר"ח and בה"ב days are deliberately not here, though the card draws them: ROSH CHODESH is its
  *  own message on this page, and no sent weekly message has ever named one. */
 function wkMornings(shacharisCell, shabbosSerial, settings) {
+  const chanukah = chanukahDaysThroughFriday(shabbosSerial, settings);
+  if (chanukah.length) {
+    const sunday = shabbosSerial - (excelWeekday(shabbosSerial) - 1);
+    const ordinary = Array.from({ length: 6 }, (_, offset) => sunday + offset).filter(day => !chanukah.includes(day));
+    const names = days => days.map(day => DAY_NAMES[excelWeekday(day) - 1]).join(', ');
+    const lines = [];
+    if (ordinary.length) lines.push(`${WK_TEXT.shacharis} (${names(ordinary)}) ${wkRow(shacharisCell)}`);
+    for (const [roshChodesh, label] of [[false, 'Chanuka'], [true, 'Rosh Chodesh Teves - Chanuka']]) {
+      const days = chanukah.filter(day => Boolean(hasRoshChodesh(day, settings)) === roshChodesh);
+      if (!days.length) continue;
+      const times = wkRow(chanukahScheduleLines(days, settings, { mergeAll: true }));
+      if (times) lines.push(`${WK_TEXT.shacharis} (${label}; ${names(days)}) ${times}`);
+    }
+    return lines;
+  }
   let block = null;
   try {
     block = weekdayMornings(shabbosSerial, settings, shacharisCell, null);
