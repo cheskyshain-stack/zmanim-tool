@@ -8,7 +8,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
 import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay, chanukahPostedShacharisRows } from '../posters/chanukah.js';
-import { roshChodeshSchedule } from '../posters/special-shacharis.js';
+import { roshChodeshSchedule } from '../posters/rosh-chodesh-schedule.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { hebrewLang, escText, escAttr, useStraightHebrewQuotes } from '../util.js';
@@ -982,8 +982,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // mornings keep their standing schedule; Teves remains in the Chanukah block.
     kinds.roshChodesh = false;
     const rcHeading = block => {
-      const months = block.months.map(month => JEWISH_MONTHS_HE[month - 1]);
-      return `ר"ח ${months.length === 1 ? months[0] : `${months.slice(0, -1).join(', ')} ו${months.at(-1)}`}`;
+      if (block.months.length > 1) return 'ראש חודש';
+      return `ר"ח ${JEWISH_MONTHS_HE[block.months[0] - 1]}`;
     };
     const matchingRoshChodesh = kinds.behab || kinds.taanis
       ? roshChodeshBlocks.find(block => block.html === WEEKDAY_SHACHARIS_SPECIAL) : null;

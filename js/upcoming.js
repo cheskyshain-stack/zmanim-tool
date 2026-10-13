@@ -23,14 +23,14 @@ import { formatTime, UL_START, UL_END } from './format.js';
 import { DAY_NAMES } from './util.js';
 import { KAYITZ_COLUMNS } from './sheets/kayitz.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
-import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
+import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis, chanukahYearFor } from './hebrew-calendar.js';
 import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
-import { roshChodeshSchedule } from './posters/special-shacharis.js';
+import { roshChodeshSchedule } from './posters/rosh-chodesh-schedule.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from './settings.js';
-import { chanukahSundayMincha } from './posters/chanukah.js';
+import { chanukahSundayMincha, chanukahPostedShacharisRows } from './posters/chanukah.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -136,6 +136,15 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
  *  second, earlier schedule, which the card prints as its own line. Whichever one applies to this
  *  particular day is the one to read. See WEEKDAY_SHACHARIS in settings.js. */
 function weekdayShacharis(serial, settings) {
+  const chanukahYear = chanukahYearFor(serial, settings);
+  if (chanukahYear) {
+    const posted = chanukahPostedShacharisRows(chanukahYear, settings)
+      .find(row => row.isRoshChodesh === Boolean(hasRoshChodesh(serial, settings)));
+    if (posted) return posted.cells.map(cell => ({
+      mins: Math.round((cell.trace || cell.traces[0]).value * 1440),
+      place: PLACES[cell.mark || (cell.underlined ? 'u' : '')] || '',
+    }));
+  }
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
   const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;

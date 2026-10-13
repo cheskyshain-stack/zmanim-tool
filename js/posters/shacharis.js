@@ -2,9 +2,9 @@ import { dateFromHebrew, hasBehab, hasParsha, roshHashana, excelWeekday, JEWISH_
 import { dateFromSerial } from '../zmanim/solar.js';
 import { sunriseElev } from '../zmanim/zmanim.js';
 import { buildAsaraBTevesPoster, asaraSelichosFirst, ASARA_TEXT } from './asarabteves.js';
-import { specialShacharisLines, roshChodeshSchedule } from './special-shacharis.js';
+import { specialShacharisLines } from './special-shacharis.js';
+import { roshChodeshSchedule } from './rosh-chodesh-schedule.js';
 import { nextRoshChodesh } from '../rosh-chodesh-text.js';
-import { buildChanukahPoster } from './chanukah.js';
 
 export const BEHAB_SHACHARIS_TEXT = {
   afterSukkos: 'בה"ב אחר סוכות',
@@ -100,12 +100,7 @@ export function buildRoshChodeshShacharisPoster(year, month, settings) {
     const days = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i)
       .filter(serial => excelWeekday(serial) !== 7);
     if (!days.length) return null;
-    const chanukah = month === 10
-      ? buildChanukahPoster(year, settings)?.shacharisRows.find(row => row.isRoshChodesh) : null;
-    const cells = chanukah
-      ? chanukah.cells.map((cell, i) => i === 0
-        ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
-      : roshChodeshSchedule(days[0], settings).lines.flat();
+    const cells = roshChodeshSchedule(days[0], settings).lines.flat();
     return {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
