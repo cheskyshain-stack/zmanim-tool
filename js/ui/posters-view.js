@@ -2817,8 +2817,10 @@ export function fitPoster(container) {
     fitHalfPage(container);
   };
   decide();
-  if (container.querySelector('.poster.is-halfpage,.poster.is-chanukah')) {
-    document.fonts.ready.then(() => { if (document.body.contains(all[0])) decide(); });
+  if (document.fonts.status !== 'loaded' && container.querySelector('.poster.is-halfpage,.poster.is-chanukah')) {
+    document.fonts.ready.then(() => {
+      if (document.body.contains(all[0])) keepPosition(container, decide);
+    });
   }
   // Rotating a phone changes what fits. One listener, replaced each render so it always
   // points at the posters currently on screen.

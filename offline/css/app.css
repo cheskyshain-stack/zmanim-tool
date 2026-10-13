@@ -4376,17 +4376,21 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .special-workflow .week-switch-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .special-layout { display: grid; grid-template-columns: minmax(20rem, 23rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
   .special-controls, .special-preview { min-width: 0; }
-  .special-controls { padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .special-controls { width: 100%; max-width: 30rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
   .special-controls .poster-bar { display: grid; gap: 1rem; margin: 0; }
   .special-controls .poster-bar > *, .special-controls .poster-bar label, .special-controls .poster-year { min-width: 0; width: 100%; }
   .special-controls .poster-year { justify-items: stretch; }
+  .special-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 2rem; }
+  .special-field-reset { min-width: 4.5rem; min-height: 2rem; padding: 0.25rem 0.5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ui-accent); font-family: inherit; font-size: 0.8rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
+  .special-field-reset:hover:not(:disabled) { background: var(--ui-accent-soft); }
+  .special-field-reset:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  .special-field-reset:disabled { color: var(--muted); opacity: 0.55; cursor: default; }
   .special-controls .poster-year-step { width: 100%; }
-  .special-controls .poster-year-step button { padding-inline: 0.65rem; font-size: 0.9rem; flex-shrink: 0; }
-  .special-controls .poster-year-step .poster-year-reset { padding-inline: 0.6rem; font-size: 0.8rem; }
-  .special-controls .poster-year-step select { min-width: 0; width: 0; flex: 1; padding-inline-start: 0.6rem; font-size: 0.9rem; }
+  .special-controls .poster-year-step button { flex: 0 0 2.75rem; min-height: 2.75rem; padding: 0; border-inline-start: 1px solid var(--border); font-size: 1.1rem; }
+  .special-controls .poster-year-step select { min-width: 0; width: 0; flex: 1; min-height: 2.75rem; border-inline: 0; padding-inline-start: 0.75rem; font-size: 0.95rem; }
   .special-controls .poster-bar .poster-year-step select { min-width: 0; }
-  .special-controls .poster-year-now { padding: 0; min-width: 0; flex: 1; }
-  .special-controls .poster-year-now select { width: 100%; font-size: 0.8rem; border: 0; }
+  .special-controls .poster-year-now { padding: 0; min-width: 0; flex: 1; border-inline: 0; }
+  .special-controls .poster-year-now select { width: 100%; border: 0; }
   .special-controls .poster-bar > label select { width: 100%; min-width: 0; }
   .special-print-settings { border-top: 1px solid var(--border); padding-top: 0.75rem; }
   .special-print-settings summary { color: var(--muted); font-weight: 600; cursor: pointer; }
@@ -4424,6 +4428,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   .special-controls .own-top { display: grid; grid-template-columns: minmax(0, 1fr); }
   .special-controls .own-editor input, .special-controls .own-editor select { min-width: 0; max-width: 100%; }
   .special-controls .own-blocks { overflow-x: auto; }
+  @media (pointer: coarse) {
+    .special-field-reset { min-height: 2.75rem; }
+  }
   @media (max-width: 1050px) {
     .special-layout { grid-template-columns: minmax(0, 1fr); }
     .special-heading { align-items: start; flex-direction: column; gap: 0.65rem; }
