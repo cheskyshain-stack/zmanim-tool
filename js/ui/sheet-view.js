@@ -35,6 +35,9 @@ import { setupSavedChartPrintNavigation } from './print-navigation-layouts.js';
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
 const COMBINED_CHART_FONT_SCALE = 1.2;
+// Fractional screen placement can make an 816px DOMRect read 816.00024px.
+// Ignore floating-point noise, while still detecting a real 1/64px layout excess.
+const PAGE_HEIGHT_EPSILON = 1 / 256;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
   ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
 function chartMarginControl(key, label, value, original) {
@@ -336,7 +339,7 @@ function syncCombinedChartHeights(pagesEl) {
       }
       centerMoladNotes(pagesEl);
       const overflow = layouts.some(({ page, body }) => body.scrollHeight > body.clientHeight + 1
-        || page.getBoundingClientRect().height > paperHeight + 0.01 || combinedChartInkOverflows(page));
+        || page.getBoundingClientRect().height > paperHeight + PAGE_HEIGHT_EPSILON || combinedChartInkOverflows(page));
       if (!overflow || scale <= 0.1) break;
       scale = Math.max(0.1, scale - 0.02);
     }
@@ -576,7 +579,7 @@ export function renderSheet(container, state, sheet, onChange) {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncPageHeights(pagesEl);
   };
-  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE);
+  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE + PAGE_HEIGHT_EPSILON);
   const fitPaper = () => {
     if (!document.body.contains(pagesEl)) return;
     atPaperSize(pagesEl, () => {
@@ -593,9 +596,9 @@ export function renderSheet(container, state, sheet, onChange) {
       if (overflowPages.length) {
         const items = overflowPages.map((el) => {
           const height = el.getBoundingClientRect().height;
-          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.round(height - FIT_TOLERANCE)}px over one sheet)`;
+          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.ceil(height - FIT_TOLERANCE)}px over one sheet)`;
         });
-        overflowWarningEl.textContent = `This chart has more on a page than one sheet of paper holds, even shrunk as far as it can go and stay legible: ${items.join('; ')}. Go back to Print layouts and move some weeks to another page.`;
+        overflowWarningEl.textContent = `This chart still has content taller than one sheet after fitting: ${items.join('; ')}. Adjust the weeks per page to move some weeks to another page.`;
         overflowWarningEl.hidden = false;
       } else {
         overflowWarningEl.textContent = '';
