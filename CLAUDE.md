@@ -426,8 +426,17 @@ and label the applicable weekdays. Use `nextRoshChodesh` for one- and two-day da
 including both leap-year Adars. These handouts cover Sunday through Friday only;
 skip a month when Rosh Chodesh falls entirely on Shabbos. Keep the weekday portion
 of a two-day Rosh Chodesh that also includes Shabbos. Omit Tishrei, which has its Rosh Hashana poster.
-Read the standing times from `specialShacharisLines`; Teves reads the Chanukah
-poster's combined Rosh Chodesh row, including its first minyan time. Do not carry
+Read Rosh Chodesh times from `roshChodeshSchedule` in `posters/special-shacharis.js`.
+The first two minyanim use the later of their standing times (6:40 and 7:00) and
+the latest weekday sunrise minus 25 minutes, rounded upward to a whole minute.
+Use the workbook's `sunriseElev` with the configured location and elevation settings.
+For two-day occasions, ignore any Shabbos date when finding the latest sunrise.
+Teves uses this same rule within the Chanukah poster; its Rosh Chodesh row must
+not average the earliest start. Keep all later minyanim and room marks unchanged.
+Seasonal chart panels, weekly cards/One sheet, messages and upcoming minyanim
+share these times. Group equal seasonal panel schedules and label the months.
+`tests/shacharis-handouts.mjs` checks all weekday occasions across 51 years;
+`tests/rosh-chodesh-netz-floor.mjs` checks rounding boundaries and shared views. Do not carry
 Asara's Selichos note into these charts. Preserve the selected month in the address
 and saved bar, falling back to an available month when the year changes. These are
 supplementary handouts and do not join full-year or public Special Schedule runs.
@@ -807,7 +816,8 @@ the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
 morning group through Friday, including ordinary mornings in partial weeks and
 the separate Rosh Chodesh group. The Chanukah chart panel and messages use the
 complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
-with its existing averaging/floor rule and corresponding explanation trace.
+with its averaging/floor rule for ordinary Chanukah days and the strict
+latest-weekday netz-minus-25 floor for Rosh Chodesh, with matching traces.
 Do not return to independently rounding a day when quoting that combined row.
 
 The chat messages the shul sends out, on a page of their own. **A third entry page beside
@@ -882,24 +892,13 @@ and listed in `DIST_TREES`.
   locale (`txDateLabel`, UTC parts throughout, since a serial is a whole day and a local midnight
   lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
   is only times, so one carrying last year's looked exactly like one carrying this year's.
-- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads its שחרית off the wall chart, from
-  `WEEKDAY_SHACHARIS_SPECIAL`, the second schedule the chart prints on a ר"ח, a בה"ב and a
-  תענית. The letters come off that cell's own marks (`erevWhereMark`), so editing the schedule in
-  Settings moves the message with it. No times of its own: it broke that rule twice and the shul
-  caught both.
-  It carried a hand-written copy of the schedule, and the copy had a **6:50 בעזרת נשים the chart has
-  not got**, so the message announced a מנין the board does not show. And it carried the
-  `(T"T 7:25)` every one of the seventeen sent messages has, which is on no chart at all, so nothing
-  here knows how that time is arrived at or what would move it.
-  What it does work out is the calendar, not the clock: the month, and the day ראש חודש starts on,
-  which is the thirtieth of the month before wherever that month has one. **תשרי is skipped**, its
-  ראש חודש being ראש השנה, which has its own message. אב is written "Menachem Av" and חשון
-  "Mar Cheshvon" (`RC_TEXT.spelling`); `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the
-  charts. Where the chart has no second schedule the card is dropped rather than sent as a heading
-  with no times under it.
-  One thing deliberately not built: three of the seventeen, in חשון, טבת and שבט, open
-  "6:50m&ns, [Netz 7:15]" instead, where the bracket is sunrise and the מנין is sunrise less twenty
-  five minutes. Neither number is on a chart, so neither is built.
+- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads the shared morning handout
+  rows. The first two minyanim obey the netz-minus-25 earliest start and all rooms
+  come from the same marks (`erevWhereMark`). Do not keep a second copy of the
+  times or add a T"T minyan that is absent from the charts.
+  Omit Tishrei and Shabbos-only months. Keep the message spellings "Menachem Av"
+  and "Mar Cheshvon" in `RC_TEXT.spelling`; chart month names stay unchanged.
+
 - **The year view has six switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
   Taanis, Rosh Chodesh and Behab**, and everything on it is in **date order**, which is the order these get
   sent in. All on to begin with, and turning them all off says so rather than looking broken.
