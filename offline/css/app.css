@@ -5806,3 +5806,21 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-fund-row { min-height:52px; }
  .is-give .luach-site-footer::before { margin-top:15px; }
 }
+
+@media screen {
+  .special-asara-options .week-switch { width: 100%; }
+  .special-controls .special-asara-options .week-switch-side { min-width: 0; white-space: normal; font-size: 0.75rem; padding: 0.5rem 0.2rem; display: flex; align-items: center; justify-content: center; }
+  .special-print-job { gap: 1.6rem; }
+  .special-job-page { width: 100%; min-width: 0; }
+  .special-job-heading { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
+  .special-job-heading h4 { margin: 0 auto 0 0; font-size: 1rem; }
+  .special-job-heading > div, .special-job-actions, .special-add-all { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .special-job-heading button, .special-job-actions button, .special-add-all button { font-size: var(--fs-xs); padding: 0.4rem 0.6rem; }
+  .special-job-actions { margin-top: 0.8rem; }
+  .special-job-half { width: 100%; display: flex; justify-content: center; }
+  .special-add-page { display: grid; gap: 0.7rem; margin-top: 0.7rem; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .special-add-page h4 { margin: 0; }
+  .special-add-page label { min-width: 0; font-size: var(--fs-sm); }
+  .special-add-page select { width: 100%; min-width: 0; display: block; margin-top: 0.3rem; }
+  .special-add-all { border-top: 1px solid var(--border); padding-top: 0.7rem; }
+}

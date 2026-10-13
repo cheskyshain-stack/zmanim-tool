@@ -112,11 +112,12 @@ const server = http.createServer((req, res) => {
       await clickInPlace('#poster-year-today', 'Return to Current year');
       await clickInPlace('#poster-group-next', 'Special schedule occasion +');
       await clickInPlace('#poster-group-back', 'Special schedule occasion -');
-      await page.locator('label[for=poster-workflow-single]').click();
       await page.locator('#poster-group').selectOption('חנוכה');
-      await page.locator('label[for=poster-sheets-all]').click();
+      await page.locator('label[for=poster-design-new]').click();
       await page.locator('.special-print-settings').evaluate(el => { el.open = true; });
-      await clickInPlace('label[for=poster-copies-two]', 'Two copies');
+      await clickInPlace('label[for=poster-design-old]', 'Old poster design');
+      await clickInPlace('label[for=poster-design-new]', 'New poster design');
+      await page.locator('.special-print-settings').evaluate(el => { el.open = true; });
       await clickInPlace('#poster-margin-next', 'Margin +');
       assert(await page.locator('.special-print-settings').evaluate(el => el.open), 'Special print panel stays open');
       await visit('/admin/#settings');

@@ -384,3 +384,18 @@
   .poster.is-landscape { zoom: 1 !important; }
   .poster.is-halfpage { zoom: 1 !important; }
 }
+
+@media print {
+  .special-print-job { display: block; }
+  .special-print-job .special-job-page { display: block; margin: 0; padding: 0; }
+  .special-print-job .poster-all-item { break-after: page; break-inside: avoid; }
+  .special-print-job .poster-all-item.is-last-print-frame { break-after: auto; }
+  .special-job-half-mixed { position: relative; width: 8.5in; height: 11in; }
+  body:not(:has(.is-half-letter-print)) .special-job-half-mixed .poster-half-sheet {
+    position: absolute; width: 11in; height: 8.5in; top: 0; left: 0;
+    transform-origin: 0 0; transform: translateY(11in) rotate(-90deg);
+  }
+  body:not(:has(.is-half-letter-print)) .special-job-half-mixed .poster.is-halfpage {
+    position: static; transform: none;
+  }
+}
