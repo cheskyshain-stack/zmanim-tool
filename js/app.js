@@ -77,12 +77,14 @@ const tabLabels = ADMIN_TAB_LABELS;
 const routeTabs = new Set(tabs);
 
 function routeParts() {
-  return location.hash.replace(/^#/, '').split('/').filter(Boolean);
+  return location.hash.replace(/^#/, '').split('/').filter(Boolean).map(part => {
+    try { return decodeURIComponent(part); } catch { return part; }
+  });
 }
 
 /** What the address should say for what is on screen now. */
 function currentRoute() {
-  return ['', currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].join('/').replace('/', '#');
+  return '#' + [currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].map(encodeURIComponent).join('/');
 }
 
 /** Put it there. Assigning location.hash, so this leaves a history entry and back works. */

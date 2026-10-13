@@ -1706,12 +1706,12 @@ function renderChanukahPoster(poster, settings) {
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
-const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
+const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'slichos', 'tzomgedalia', 'afteryk']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
-  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
+  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     ${shacharis ? `<div class="halfpage-content">${schedule}</div>` : schedule}`;
   // Put the shul's name and street address on separate lines on the morning handouts.
@@ -1764,6 +1764,17 @@ function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
   ] : poster.legend;
   const content = detailed ? `<div class="asara-detailed-sections">${sections.join('')}</div>` : sections.join('');
   return halfPageShell({ ...poster, legend }, settings, poster.title, content, { asara: true, ...options });
+}
+
+function renderHalfSchedulePoster(poster, key, settings, options = {}) {
+  if (key === 'chanukah') return renderHalfChanukahPoster(poster, settings, options);
+  if (key === 'asarabteves') return renderHalfAsaraBTevesPoster(poster, settings, options);
+  if (key === 'tzomgedalia') return renderHalfAsaraBTevesPoster({ ...poster, title: TZG_TEXT.title }, settings, options);
+  const sections = key === 'slichos'
+    ? poster.rows.map(row => oneSection(row.label, [{ ...row, label: '' }]))
+    : ['shacharis', 'mincha', 'maariv'].map(tefillah => oneSection(YK_TEXT.afterBig[tefillah], [{ label: '', times: poster.after[tefillah] }]));
+  return halfPageShell(poster, settings, key === 'slichos' ? SLICHOS_TEXT.title : YK_TEXT.afterHeading,
+    sections.map(section => halfPageSection(section.title, section.rows.map(onePageRows).join(''))).join(''), { small: true, ...options });
 }
 
 function shacharisRowsHtml(rows) {
@@ -2139,9 +2150,7 @@ function onePageRows(r) {
 function renderOnePagePoster(built, settings, { halfLetter = false, asaraShacharis = 'compact' } = {}) {
   if (halfLetter && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key)) {
     const item = built.items[0];
-    return item.key === 'chanukah'
-      ? renderHalfChanukahPoster(item.poster, settings)
-      : renderHalfAsaraBTevesPoster(item.poster, settings, { asaraShacharis });
+    return renderHalfSchedulePoster(item.poster, item.key, settings, { asaraShacharis });
   }
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
@@ -2872,7 +2881,7 @@ function fitHalfPage(container) {
       }
     }
     // Large print margins can need less row padding even at the minimum type size.
-    if (sheet.querySelector('.halfpage-body.is-chanukah') && !fits()) {
+    if (sheet.querySelector('.halfpage-body.is-chanukah,.halfpage-body.is-small-schedule') && !fits()) {
       for (const padding of [0.055, 0.045, 0.035, 0.025]) {
         sheet.style.setProperty('--halfpage-row-pad', `${padding}in`);
         if (fits()) break;
@@ -2905,10 +2914,10 @@ function redrawInPlace(container, state) {
   keepPosition(container, () => renderPosters(container, state));
 }
 
-function currentSchedule(groups, state, settings, year, today) {
+function currentSchedule(groups, state, settings, year, today, { includeExtra = false } = {}) {
   const candidates = [];
   for (const group of groups) for (const poster of group.items) {
-    if (poster.extra || poster.combined) continue;
+    if (poster.extra && !includeExtra || poster.combined) continue;
     const from = poster.starts?.(year, settings);
     if (!Number.isFinite(from)) continue;
     if (from < today) {
@@ -2987,8 +2996,7 @@ function resolveSpecialPage(entry, settings, year) {
     || chosenDesign === 'new' && (half || original?.key !== 'shuva' && Boolean(ONEPAGE_SECTIONS[original?.key]));
   const render = () => {
     if (original?.handout) return renderShacharisHandout(entry.value, settings, { standalone: true });
-    if (half) return original.key === 'chanukah' ? renderHalfChanukahPoster(entry.value, settings, { standalone: true })
-      : renderHalfAsaraBTevesPoster(entry.value, settings, { standalone: true, asaraShacharis: entry.locations ? 'locations' : 'compact' });
+    if (half) return renderHalfSchedulePoster(entry.value, original.key, settings, { standalone: true, asaraShacharis: entry.locations ? 'locations' : 'compact' });
     if (modern && original?.key === 'slichos') return renderOnePagePoster({
       own: true, hebrewYear: year, title: entry.label, span: entry.value.span,
       sections: [oneSection(SLICHOS_TEXT.title, entry.value.rows)], legend: entry.value.legend,
@@ -3096,6 +3104,9 @@ export function renderPosters(container, state, routeChanged, tables) {
     || groups.find(group => group.name === current?.name) || groups[0];
   const choices = catalog.filter(entry => entry.group === group?.name && !entry.locations && (!entry.poster?.dated || entry.value || entry.key === selectedKey));
   const primary = selectedEntry || choices.find(entry => entry.value) || choices[0];
+  const pageChoices = choices.filter(entry => entry.value), pAt = pageChoices.findIndex(entry => entry.key === primary?.key);
+  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(new Date(), settings).serial, { includeExtra: true })?.key
+    || pageChoices[0]?.key;
   chosenGroup = group?.name;
   chosen = primary?.key || null;
   if (!chosenPrintPages.length && primary) chosenPrintPages = [newPrintPage(primary.key, chosenCopiesPerPage === 2 && resolve(primary.key)?.half ? primary.key : '')];
@@ -3107,6 +3118,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   container.className = `is-sheet-view is-special-schedules${plan.landscape ? ' is-half-letter-print is-half-paired-print' : ''}`;
   container.innerHTML = specialScheduleControls({ year, years, at: years.indexOf(year), preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`,
     groups, group, gAt: groups.indexOf(group), current, selected: primary?.key, choices, design: chosenDesign,
+    pAt, pCount: pageChoices.length, pageCurrent,
     asara: group?.name === 'עשרה בטבת', count: plan.frames.length, landscape: plan.landscape,
     printable: Boolean(plan.frames.length && !plan.issues.length), advanced: printSettingsOpen,
     margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD, padSteps: padSteps(), padLabel,
@@ -3145,6 +3157,9 @@ export function renderPosters(container, state, routeChanged, tables) {
   container.querySelector('#poster-group-next').addEventListener('click', () => toGroup(groups[groups.indexOf(group) + 1]?.name));
   container.querySelector('#poster-group-now').addEventListener('click', () => toGroup(current?.name, current?.key));
   container.querySelector('#poster-pick')?.addEventListener('change', event => selectPrimary(event.target.value));
+  container.querySelector('#poster-page-back')?.addEventListener('click', () => selectPrimary(pageChoices[pAt - 1]?.key));
+  container.querySelector('#poster-page-next')?.addEventListener('click', () => selectPrimary(pageChoices[pAt + 1]?.key));
+  container.querySelector('#poster-page-now')?.addEventListener('click', () => selectPrimary(pageCurrent));
   container.querySelector('#poster-conflict')?.addEventListener('change', event => { conflictPick = Number(event.target.value) || 0; again(); });
   wireSwitch(container, 'poster-design', value => { chosenDesign = value === 'old' ? 'old' : 'new'; pendingAddition = null; commit(); });
   wireSwitch(container, 'poster-asara-option', value => selectPrimary(value === 'shacharis' ? 'asarashacharis' : value === 'locations' ? 'asaralocations' : 'asarabteves'));
