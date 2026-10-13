@@ -4,6 +4,19 @@ import { printButtonHtml } from './print-page.js';
 
 const YOM_TOV = new Set(['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות']);
 const NORAIM_OCCASIONS = new Set(['slichos', 'roshhashana', 'tzomgedalia', 'shuva', 'yomkippur', 'afteryk']);
+export const SPECIAL_COLLECTIONS = [
+  { kind: 'yomtov', value: 'all:yomtov', name: 'All Yom Tov', category: 'Yom Tov' },
+  { kind: 'roshchodesh', value: 'all:roshchodesh', name: 'All Rosh Chodesh', category: 'Rosh Chodesh' },
+];
+
+export function specialCollectionEntries(catalog, kind) {
+  return catalog.filter(entry => {
+    if (!entry.value || entry.whole || entry.locations || entry.poster?.combined || entry.poster?.extra) return false;
+    if (kind === 'roshchodesh') return entry.group === 'ראש חודש' && entry.poster?.dated;
+    if (kind !== 'yomtov' || !YOM_TOV.has(entry.group)) return false;
+    return entry.group !== 'ראש השנה יום כיפור' || ['roshhashana', 'yomkippur'].includes(entry.key);
+  }).sort((a, b) => (a.value.span?.from ?? Infinity) - (b.value.span?.from ?? Infinity));
+}
 
 // Keep the underlying poster groups and saved keys while exposing direct occasions.
 export function specialOccasionChoices(groups, catalog, { selectedKey = null, availableOnly = false } = {}) {
@@ -36,11 +49,11 @@ export function specialOccasionChoices(groups, catalog, { selectedKey = null, av
 }
 
 // Keep chronological order within each section, including custom occasions.
-export function occasionOptions(groups, selected) {
+export function occasionOptions(groups, selected, collections = []) {
   const choices = groups.map(group => typeof group === 'string' ? { name: group } : group);
   return ['Yom Tov', 'Rosh Chodesh', 'Other schedules'].map(label => {
-    const members = choices.filter(choice => (choice.category || (choice.name === 'ראש חודש' ? 'Rosh Chodesh'
-      : YOM_TOV.has(choice.name) ? 'Yom Tov' : 'Other schedules')) === label);
+    const members = [...collections.filter(choice => choice.category === label), ...choices.filter(choice => (choice.category || (choice.name === 'ראש חודש' ? 'Rosh Chodesh'
+      : YOM_TOV.has(choice.name) ? 'Yom Tov' : 'Other schedules')) === label)];
     return members.length ? `<optgroup label="${label}">${members.map(choice =>
       `<option value="${escAttr(choice.value ?? choice.name)}" ${(choice.value ?? choice.name) === selected ? 'selected' : ''} ${choice.disabled ? 'disabled' : ''}>${escAttr(choice.name)}</option>`).join('')}</optgroup>` : '';
   }).join('');
@@ -58,9 +71,9 @@ export function specialScheduleControls(c) {
           <button type="button" id="poster-year-next" aria-label="Next year" ${c.at === c.years.length - 1 ? 'disabled' : ''}>+</button>
         </div></div>
       <div class="poster-year" role="group" aria-labelledby="poster-group-label"><div class="special-field-heading"><span class="poster-year-label" id="poster-group-label">Occasion</span>
-        <button type="button" id="poster-group-now" class="special-field-reset" aria-label="Current occasion" ${!c.current || c.current.name === c.group?.name && c.current.key === c.selected ? 'disabled' : ''}>Current</button></div>
+        <button type="button" id="poster-group-now" class="special-field-reset" aria-label="Current occasion" ${!c.current || !c.collection && c.current.name === c.group?.name && c.current.key === c.selected ? 'disabled' : ''}>Current</button></div>
         <div class="poster-year-step">
-          <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.occasionValue)}</select>
+          <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.occasionValue, c.collections)}</select>
           <button type="button" id="poster-group-back" aria-label="Previous occasion" ${c.gAt === 0 ? 'disabled' : ''}>&minus;</button>
           <button type="button" id="poster-group-next" aria-label="Next occasion" ${c.gAt === c.groups.length - 1 ? 'disabled' : ''}>+</button>
         </div></div>
@@ -69,13 +82,14 @@ export function specialScheduleControls(c) {
         { value: 'full', label: 'Regular schedule', on: c.selected === 'asarabteves' },
         { value: 'shacharis', label: 'Shacharis only', on: c.selected === 'asarashacharis' },
         { value: 'locations', label: 'Shacharis locations + Mincha/Maariv', on: c.selected === 'asaralocations' },
-      ])}</div>` : c.choices.length > 1 ? `<div class="poster-year" role="group" aria-labelledby="poster-page-label"><div class="special-field-heading"><span class="poster-year-label" id="poster-page-label">${c.group?.name === 'ראש חודש' ? 'Month' : 'Page'}</span>
-        <button type="button" id="poster-page-now" class="special-field-reset" aria-label="Current ${c.group?.name === 'ראש חודש' ? 'month' : 'page'}" ${!c.pageCurrent || c.pageCurrent === c.selected ? 'disabled' : ''}>Current</button></div>
+      ])}</div>` : c.choices.length > 1 || c.group?.name === 'ראש חודש' ? `<div class="poster-year" role="group" aria-labelledby="poster-page-label"><div class="special-field-heading"><span class="poster-year-label" id="poster-page-label">${c.group?.name === 'ראש חודש' ? 'Month' : 'Page'}</span>
+        <button type="button" id="poster-page-now" class="special-field-reset" aria-label="Current ${c.group?.name === 'ראש חודש' ? 'month' : 'page'}" ${!c.pageCurrent || !c.allMonths && c.pageCurrent === c.selected ? 'disabled' : ''}>Current</button></div>
         <div class="poster-year-step">
-          <select id="poster-pick" aria-labelledby="poster-page-label">${c.choices.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === c.selected ? 'selected' : ''} ${entry.value ? '' : 'disabled'}>${escAttr(entry.label)}</option>`).join('')}</select>
+          <select id="poster-pick" aria-labelledby="poster-page-label">${c.group?.name === 'ראש חודש' ? `<option value="all:roshchodesh" ${c.allMonths ? 'selected' : ''} ${c.choices.some(entry => entry.value && entry.poster?.dated) ? '' : 'disabled'}>All Rosh Chodesh</option>` : ''}${c.choices.map(entry => `<option value="${escAttr(entry.key)}" ${!c.allMonths && entry.key === c.selected ? 'selected' : ''} ${entry.value ? '' : 'disabled'}>${escAttr(entry.label)}</option>`).join('')}</select>
           <button type="button" id="poster-page-back" aria-label="Previous page" ${c.pAt <= 0 ? 'disabled' : ''}>&minus;</button>
           <button type="button" id="poster-page-next" aria-label="Next page" ${c.pAt >= c.pCount - 1 ? 'disabled' : ''}>+</button>
         </div></div>` : ''}
+      ${c.unavailable?.length ? `<p class="hint">No schedule is available yet for ${c.unavailable.map(name => `<bdi dir="auto">${escAttr(name)}</bdi>`).join(', ')}.</p>` : ''}
       ${c.conflict ? `<label>Chart to use<select id="poster-conflict">${c.conflict.map((chart, index) => `<option value="${index}" ${index === c.conflictPick ? 'selected' : ''}>${escAttr(c.chartLabel(chart.sheet))}</option>`).join('')}</select></label>` : ''}
       ${c.canPad || c.canTurn ? `<details class="special-print-settings" ${c.advanced ? 'open' : ''}><summary>Print settings</summary><div>
         ${c.canPad ? `<div class="poster-year" role="group" aria-labelledby="poster-margin-label"><div class="special-field-heading"><span id="poster-margin-label">Margin</span>
