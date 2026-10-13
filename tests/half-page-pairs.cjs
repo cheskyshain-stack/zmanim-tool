@@ -45,8 +45,17 @@ const pageCount = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []
           const r = sheet.getBoundingClientRect();
           return { width: r.width, height: r.height, halves: [...sheet.querySelectorAll('.poster-half-slot')].map(slot => {
             const box = slot.getBoundingClientRect(), poster = slot.querySelector('.poster');
+            const content = poster?.querySelector('.halfpage-content');
+            const centered = content ? (() => {
+              const title = poster.querySelector('.onepage-title').getBoundingClientRect();
+              const footer = poster.querySelector('.poster-legend').getBoundingClientRect();
+              const first = content.firstElementChild.getBoundingClientRect();
+              const last = content.lastElementChild.getBoundingClientRect();
+              return { topGap: first.top - title.bottom, bottomGap: footer.top - last.bottom };
+            })() : null;
             return { x: box.left - r.left, y: box.top - r.top, width: box.width, height: box.height,
               key: slot.dataset.halfKey || '', text: poster?.innerText || '',
+              centered,
               overflow: Boolean(poster && (poster.scrollWidth > poster.clientWidth + 1 || poster.scrollHeight > poster.clientHeight + 1)) };
           }) };
         }));
@@ -55,6 +64,12 @@ const pageCount = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []
           assert.deepEqual([sheet.width, sheet.height], [1056, 816], label + ': landscape Letter');
           assert.deepEqual(sheet.halves.map(half => [half.x, half.y, half.width, half.height]), [[0, 0, 528, 816], [528, 0, 528, 816]], label + ': exact side-by-side halves');
           assert(sheet.halves.every(half => !half.overflow), label + ': content fits');
+          for (const half of sheet.halves.filter(half => half.centered)) {
+            assert(half.centered.topGap >= -0.5 && half.centered.bottomGap >= -0.5,
+              label + ': morning handout stays between its title and footer');
+            assert(Math.abs(half.centered.topGap - half.centered.bottomGap) < 1,
+              label + ': dates and schedule are vertically centered: ' + JSON.stringify(half.centered));
+          }
         }
         const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
         assert.equal(pageCount(pdf), count, label + ': no split or blank physical pages');
