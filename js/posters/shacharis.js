@@ -15,12 +15,27 @@ export const ROSH_CHODESH_SHACHARIS_MONTHS = [8, 9, 10, 11, 12, 13, 14, 1, 2, 3,
 export const roshChodeshShacharisTitle = month => `ראש חודש ${JEWISH_MONTHS_HE[month - 1]}`;
 
 /** Resolve the chart's marks into words for a poster that needs no location key. */
-function shacharisRoomRows(cells) {
+export function shacharisRoomRows(cells) {
   return cells.map(cell => ({
     ...cell,
     room: cell.mark === '**' ? 'באולם השמחות' : cell.mark === '*' ? 'בעזרת נשים'
       : cell.underlined ? 'בית מדרש למטה' : 'בית מדרש',
   }));
+}
+
+/** Name the weekdays once for each upcoming Shabbos, without calendar dates. */
+export function shacharisDayGroups(days, settings, tables) {
+  const weeks = new Map();
+  for (const serial of days) {
+    const shabbos = serial + 7 - excelWeekday(serial);
+    if (!weeks.has(shabbos)) weeks.set(shabbos, []);
+    weeks.get(shabbos).push(serial);
+  }
+  return [...weeks].map(([shabbos, dates]) => {
+    const parsha = hasParsha(shabbos, { ...settings, english: false }, tables);
+    const weekdays = dates.map(serial => ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)] + "'");
+    return { days: dates, label: `יום ${weekdays.join(' ')} ${parsha}` };
+  });
 }
 
 export function buildAsaraShacharisPoster(year, settings) {

@@ -7,7 +7,7 @@ import { dateFromSerial } from '../js/zmanim/solar.js';
 import { sunriseElev } from '../js/zmanim/zmanim.js';
 import { buildAsaraBTevesPoster } from '../js/posters/asarabteves.js';
 import { buildAsaraShacharisPoster, buildBehabShacharisPoster, buildRoshChodeshShacharisPoster,
-  ROSH_CHODESH_SHACHARIS_MONTHS } from '../js/posters/shacharis.js';
+  ROSH_CHODESH_SHACHARIS_MONTHS, shacharisDayGroups } from '../js/posters/shacharis.js';
 import { buildChanukahPoster } from '../js/posters/chanukah.js';
 
 const readJSON = async name => JSON.parse(await readFile(new URL('../data/' + name, import.meta.url)));
@@ -134,4 +134,16 @@ test('Shevat is omitted when entirely on Shabbos and remains available on weekda
     assert(poster.days.every(serial => excelWeekday(serial) !== 7));
     assert.deepEqual(rows(poster), expected);
   }
+});
+
+
+test('Weekday/parsha headers combine the same week and retain distinct weeks', () => {
+  const bhb = buildBehabShacharisPoster(5787, 8, settings, tables);
+  const groups = shacharisDayGroups(bhb.days, settings, tables);
+  assert.deepEqual(groups.map(group => group.label), ["יום ב' ה' לך לך", "יום ב' וירא"]);
+  assert.deepEqual(groups.flatMap(group => group.days), bhb.days);
+  const rc = buildRoshChodeshShacharisPoster(5787, 8, settings);
+  assert.deepEqual(shacharisDayGroups(rc.days, settings, tables).map(group => group.label), ["יום א' ב' נח"]);
+  const fast = buildAsaraShacharisPoster(5790, settings);
+  assert.deepEqual(shacharisDayGroups(fast.days, settings, tables).map(group => group.label), ["יום א' ויחי"]);
 });

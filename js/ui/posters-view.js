@@ -26,7 +26,7 @@ import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildAsaraBTevesPoster, ASARA_TEXT } from '../posters/asarabteves.js';
-import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT,
+import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT, shacharisRoomRows, shacharisDayGroups,
   buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, roshChodeshShacharisTitle } from '../posters/shacharis.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
@@ -1009,12 +1009,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false, halfpage = false, shacharis = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false, halfpage = false, shacharis = false, asaraDetailed = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
     + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
-    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}${shacharis ? ' is-shacharis' : ''}`;
+    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}${shacharis ? ' is-shacharis' : ''}${asaraDetailed ? ' is-asara-detailed' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -1709,7 +1709,7 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '', standalone = false } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
   const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}">${sections}</div>`;
   const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
     ${shacharis ? `<div class="halfpage-content">${schedule}</div>` : schedule}`;
@@ -1717,7 +1717,7 @@ function halfPageShell(poster, settings, title, sections, { asara = false, chanu
   const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
   const legend = shacharis ? (address ? [{ dir: 'ltr', text: address }] : [])
     : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
-  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis });
+  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis, asaraDetailed: asara && asaraShacharis === 'locations' });
   if (standalone) return html;
   return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
 }
@@ -1737,14 +1737,17 @@ function renderHalfChanukahPoster(poster, settings, options = {}) {
 }
 
 function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
-  const sections = [];
+  const detailed = options.asaraShacharis === 'locations';
+  const sections = [shacharisDaysHtml([poster.span.from], settings)];
   let notes = [];
   for (const s of poster.sets) {
     if (s.note) {
       notes.push(`<div class="halfpage-zman" lang="he"><span>${escAttr(s.note.label)}</span>
         <bdi dir="ltr">${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></div>`);
     } else {
-      const section = halfPageSection(s.head, s.lines.map(times => onePageRows({ label: '', times })).join(''));
+      const section = halfPageSection(s.head, detailed && s.calc === 'shacharis'
+        ? shacharisRowsHtml(shacharisRoomRows(s.lines.flat()))
+        : s.lines.map(times => onePageRows({ label: '', times })).join(''));
       // Keep sunset beside Maariv rather than distributing it as an isolated block.
       sections.push(notes.length ? `<div class="asara-block">${notes.join('')}${section}</div>` : section);
       notes = [];
@@ -1752,28 +1755,38 @@ function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
   }
   // On Friday, candle lighting and sunset stay together below Mincha.
   if (notes.length) sections.push(`<div class="asara-block">${notes.join('')}</div>`);
-  return halfPageShell(poster, settings, poster.title, sections.join(''), { asara: true, ...options });
+  const later = poster.sets.filter(set => set.calc !== 'shacharis').flatMap(set => set.lines?.flat() || []);
+  const stars = ['*', '**'].filter(mark => later.some(time => time.mark === mark));
+  const legend = detailed ? [
+    ...poster.legend.filter(line => line.dir !== 'rtl'),
+    ...(stars.length ? [{ dir: 'rtl', text: stars.map(mark => mark === '*' ? '*בעזרת נשים' : '**באולם השמחות').join(' ') }] : []),
+  ] : poster.legend;
+  const content = detailed ? `<div class="asara-detailed-sections">${sections.join('')}</div>` : sections.join('');
+  return halfPageShell({ ...poster, legend }, settings, poster.title, content, { asara: true, ...options });
 }
 
-/** The same compact half-sheet as the complete schedules, with rooms beside each time. */
-function renderShacharisHandout(poster, settings, options = {}) {
-  const rows = poster.rows.map(row => `<div class="onepage-row shacharis-handout-row">
+function shacharisRowsHtml(rows) {
+  return rows.map(row => `<div class="onepage-row shacharis-handout-row">
     <div class="shacharis-handout-run">
       <bdi class="shacharis-handout-room" dir="rtl" lang="he">${escAttr(row.room)}</bdi>
       <bdi class="shacharis-handout-time" dir="ltr">${timeHtml({ ...row, mark: '', underlined: false, timeNote: null })}</bdi>
     </div>
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
+}
+
+function shacharisDaysHtml(days, settings) {
+  const groups = shacharisDayGroups(days, settings, posterTables);
+  return `<div class="shacharis-handout-dates" dir="rtl" style="--handout-date-columns:${groups.length}">${groups.map(group =>
+    `<div class="shacharis-handout-date" data-dates="${group.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' ')}"><div lang="he">${escAttr(group.label)}</div></div>`
+  ).join('')}</div>`;
+}
+
+/** The same compact half-sheet as the complete schedules, with rooms beside each time. */
+function renderShacharisHandout(poster, settings, options = {}) {
+  const rows = shacharisRowsHtml(poster.rows);
   const days = poster.dayLabel && !poster.showDates ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
-  const dates = poster.showDates ? `<div class="shacharis-handout-dates" dir="rtl" style="--handout-date-columns:${poster.days.length}">${poster.days.map(serial => {
-    const weekday = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)];
-    const hebrew = jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0];
-    const date = dateFromSerial(serial);
-    const shabbos = serial + 7 - excelWeekday(serial);
-    const parsha = hasParsha(shabbos, { ...settings, english: false }, posterTables);
-    return `<div class="shacharis-handout-date" data-date="${date.toISOString().slice(0, 10)}"><div lang="he">יום ${weekday}' ${escAttr(parsha)}</div>
-      <span class="shacharis-handout-hebrew-date" lang="he">${escAttr(hebrew)}</span></div>`;
-  }).join('')}</div>` : '';
+  const dates = poster.showDates ? shacharisDaysHtml(poster.days, settings) : '';
   return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates, ...options });
 }
 
@@ -2118,12 +2131,12 @@ function onePageRows(r) {
  *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
  *
  *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
-function renderOnePagePoster(built, settings, { halfLetter = false } = {}) {
+function renderOnePagePoster(built, settings, { halfLetter = false, asaraShacharis = 'compact' } = {}) {
   if (halfLetter && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key)) {
     const item = built.items[0];
     return item.key === 'chanukah'
       ? renderHalfChanukahPoster(item.poster, settings)
-      : renderHalfAsaraBTevesPoster(item.poster, settings);
+      : renderHalfAsaraBTevesPoster(item.poster, settings, { asaraShacharis });
   }
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
@@ -2634,6 +2647,7 @@ function recallBar() {
     // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
     if (saved.copiesPerPage === 1 || saved.copiesPerPage === 2) chosenCopiesPerPage = saved.copiesPerPage;
+    if (saved.asaraShacharis === 'locations') chosenAsaraShacharis = 'locations';
     if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
     if (['single', 'set', 'halves'].includes(saved.workflow)) chosenWorkflow = saved.workflow;
     else chosenWorkflow = chosenSheets === 'each' || chosenSheets === 'all' && chosenScope === 'all' ? 'set' : 'single';
@@ -2664,6 +2678,7 @@ function rememberBar() {
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
       margin: chosenMargin, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
       workflow: chosenWorkflow, setSelection: chosenSetSelection, halfPagePairs: chosenHalfPagePairs, advanced: printSettingsOpen,
+      asaraShacharis: chosenAsaraShacharis,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -2676,6 +2691,7 @@ function rememberBar() {
    in the address: the orientation is there because it decides what paper comes out, and this
    only decides how many sheets. */
 let chosenCombined = false;
+let chosenAsaraShacharis = 'compact';
 /* Where the one-page sheet's second column is allowed to start.
    'even' cuts wherever the two columns come closest to level, which can fall inside a day: the
    rest of that day carries over to the head of the second column with no heading on it, since
@@ -2837,7 +2853,7 @@ function fitHalfPage(container) {
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
     const legend = sheet.querySelector('.poster-legend');
-    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap']) {
+    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad']) {
       sheet.style.removeProperty(property);
     }
     const fits = () => {
@@ -2845,18 +2861,26 @@ function fitHalfPage(container) {
       const rect = sheet.getBoundingClientRect();
       const limit = rect.bottom - parseFloat(cs.paddingBottom);
       const body = sheet.querySelector('.halfpage-body');
+      const content = body.querySelector('.asara-detailed-sections') || body;
       const inside = [...sheet.querySelectorAll('.shacharis-handout-run')].every(row => {
         const r = row.getBoundingClientRect();
         return r.left >= rect.left + parseFloat(cs.paddingLeft) - 0.5
           && r.right <= rect.right - parseFloat(cs.paddingRight) + 0.5;
       });
       return (!legend || legend.getBoundingClientRect().bottom <= limit + 0.5)
-        && body.getBoundingClientRect().bottom <= (legend ? legend.getBoundingClientRect().top - 6 : limit + 0.5)
+        && content.getBoundingClientRect().top >= body.getBoundingClientRect().top - 0.5
+        && content.getBoundingClientRect().bottom <= (legend ? legend.getBoundingClientRect().top - 6 : limit + 0.5)
         && inside && sheet.scrollWidth <= sheet.clientWidth && sheet.scrollHeight <= sheet.clientHeight;
     };
     for (let size = 1.5; size >= 1; size = Math.round((size - 0.025) * 1000) / 1000) {
       sheet.style.setProperty('--op-scale', size);
       if (fits()) break;
+    }
+    if (sheet.classList.contains('is-asara-detailed') && !fits()) {
+      for (const padding of [0.09, 0.075, 0.065, 0.05]) {
+        sheet.style.setProperty('--asara-row-pad', `${padding}in`);
+        if (fits()) break;
+      }
     }
     // Large print margins can need less row padding even at the minimum type size.
     if (sheet.querySelector('.halfpage-body.is-chanukah') && !fits()) {
@@ -2961,7 +2985,7 @@ function halfPageEntries(state, settings, year) {
 
 function renderHalfPagePairs(value, settings) {
   const half = (entry, side) => `<div class="poster-half-slot${entry?.value ? '' : ' is-blank'}" data-half-side="${side}"${entry ? ` data-half-key="${escAttr(entry.key)}"` : ''}>
-    ${entry?.value ? entry.render(entry.value, settings, { standalone: true }) : '<span class="no-print">Blank half</span>'}</div>`;
+    ${entry?.value ? entry.render(entry.value, settings, { standalone: true, asaraShacharis: entry.shacharisLayout }) : '<span class="no-print">Blank half</span>'}</div>`;
   return `<div class="poster-half-pages">${value.halfSheets.map((page, i) => `<div class="poster-paired-page" data-id="${escAttr(page.id)}">
     <p class="poster-all-name no-print">Sheet ${i + 1}: <bdi dir="auto">${escAttr(page.left?.label || 'Blank')}</bdi> + <bdi dir="auto">${escAttr(page.right?.label || 'Blank')}</bdi></p>
     <div class="poster-half-sheet is-paired">${half(page.left, 'left')}${half(page.right, 'right')}</div>
@@ -3070,7 +3094,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     asara: group?.name === 'עשרה בטבת', halfFormat: HALF_PAGE_POSTERS.has(one?.key),
     setEntries: selection?.entries || [], pageCount: built?.pages?.length || 0,
     halfPairs: chosenHalfPagePairs || [], halfEntries, halfPlan,
-    copies: chosenCopiesPerPage, advanced: printSettingsOpen,
+    copies: chosenCopiesPerPage, advanced: printSettingsOpen, asaraShacharis: chosenAsaraShacharis,
     margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD,
     padSteps: padSteps(), padLabel, ink: chosenInk, brk: chosenBreak, orientation: chosenOrientation,
     built, copyText: poster?.erevText,
@@ -3096,7 +3120,8 @@ export function renderPosters(container, state, routeChanged, tables) {
       ? 'Two copies print side by side on landscape Letter paper.'
       : 'Prints on the left half of landscape Letter paper.'} Cut at the middle of the sheet.</p>` : ''}
     <div id="poster-sheet">${!empty && built
-      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: onePage })
+      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape', halfLetter: onePage,
+        asaraShacharis: chosenWorkflow === 'single' ? chosenAsaraShacharis : 'compact' })
       : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
     </section></div>`;
 
@@ -3133,8 +3158,20 @@ export function renderPosters(container, state, routeChanged, tables) {
   container.querySelectorAll('select[data-half-side]').forEach(select => select.addEventListener('change', () => {
     const pair = chosenHalfPagePairs.find(row => row.id === select.dataset.pairId);
     pair[select.dataset.halfSide] = select.value;
+    if (select.value !== 'asarabteves') delete pair[`${select.dataset.halfSide}Shacharis`];
     commitChoice();
   }));
+  container.querySelectorAll('select[data-half-shacharis]').forEach(select => select.addEventListener('change', () => {
+    const pair = chosenHalfPagePairs.find(row => row.id === select.dataset.pairId);
+    const key = `${select.dataset.halfShacharis}Shacharis`;
+    if (select.value === 'locations') pair[key] = 'locations';
+    else delete pair[key];
+    commitChoice();
+  }));
+  container.querySelector('#poster-asara-shacharis')?.addEventListener('change', event => {
+    chosenAsaraShacharis = event.target.value;
+    commitChoice();
+  });
   container.querySelectorAll('[data-half-action]').forEach(button => button.addEventListener('click', () => {
     const action = button.dataset.halfAction;
     const at = chosenHalfPagePairs.findIndex(pair => pair.id === button.closest('[data-id]')?.dataset.id);
@@ -3142,7 +3179,11 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (action === 'all') chosenHalfPagePairs = addAllHalfPages(chosenHalfPagePairs, halfEntries);
     if (action === 'clear') chosenHalfPagePairs = [];
     if (action === 'remove' && at >= 0) chosenHalfPagePairs.splice(at, 1);
-    if (action === 'swap' && at >= 0) [chosenHalfPagePairs[at].left, chosenHalfPagePairs[at].right] = [chosenHalfPagePairs[at].right, chosenHalfPagePairs[at].left];
+    if (action === 'swap' && at >= 0) {
+      const pair = chosenHalfPagePairs[at];
+      [pair.left, pair.right] = [pair.right, pair.left];
+      [pair.leftShacharis, pair.rightShacharis] = [pair.rightShacharis, pair.leftShacharis];
+    }
     const to = at + (action === 'up' ? -1 : 1);
     if (['up', 'down'].includes(action) && at >= 0 && to >= 0 && to < chosenHalfPagePairs.length) {
       [chosenHalfPagePairs[at], chosenHalfPagePairs[to]] = [chosenHalfPagePairs[to], chosenHalfPagePairs[at]];
