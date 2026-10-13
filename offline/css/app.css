@@ -4312,7 +4312,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-halfpage.is-shacharis .onepage-title { margin-bottom: 0; }
 .poster.is-halfpage.is-shacharis > .halfpage-content {
   width: 100%; flex: 1 1 auto; min-height: 0;
-  display: flex; flex-direction: column; justify-content: safe center;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
 }
 .halfpage-content > * { flex: 0 0 auto; }
 .poster.is-halfpage.is-shacharis .poster-legend {

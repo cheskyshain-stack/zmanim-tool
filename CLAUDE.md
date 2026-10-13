@@ -395,6 +395,8 @@ controls, migrations, named selections, mobile widths and physical page counts.
 posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
 Morning handouts center their dates and schedule together between the title rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
+Declare standard `justify-content: center` before `safe center` so browsers that do
+not support overflow-safe alignment still center the morning handouts on screen.
 The shared renderer must use the same centering for individual, duplicate, paired and
 mixed print sets. Fuller handouts fit within the available space through the existing
 type-size fitter rather than stretching their rows.
