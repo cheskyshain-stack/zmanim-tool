@@ -27,6 +27,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await context.addInitScript(() => {
       const testTime = location.search.includes('future-print') ? '2043-12-01T12:00:00Z' : '2026-10-08T12:00:00Z';
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse(testTime) }));
+      localStorage.setItem('zmanim-print-navigation', 'classic');
       if (!localStorage.getItem('zmanim-poster-bar-v1')) {
         localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, group: 'חנוכה', sheets: 'all', scope: 'one', margin: 0.35 }));
       }

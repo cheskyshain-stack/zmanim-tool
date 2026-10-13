@@ -23,6 +23,7 @@ const server = http.createServer((req, res) => {
       const context = await browser.newContext({ viewport: { width, height: 1000 } });
       await context.addInitScript(() => {
         localStorage.setItem('zmanim-nocount', '1');
+        localStorage.setItem('zmanim-print-navigation', 'classic');
         localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse('2026-10-13T12:00:00Z') }));
         if (!localStorage.getItem('zmanim-poster-bar-v1')) localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({
           year: 5790, group: 'עשרה בטבת', sheet: 'asarabteves', sheets: 'all', workflow: 'single', margin: 0.15,

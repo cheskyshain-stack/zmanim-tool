@@ -168,6 +168,7 @@ function assertGeometry(frames, count, label, size = [1632, 1056]) {
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     await context.addInitScript(() => {
       localStorage.setItem('zmanim-nocount', '1');
+      localStorage.setItem('zmanim-print-navigation', 'classic');
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.UTC(2026, 9, 12, 15, 10) - 1000 }));
     });
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));

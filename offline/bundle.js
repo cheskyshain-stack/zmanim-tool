@@ -4146,6 +4146,476 @@ function wirePdfButton(root, opts = {}) {
   });
 }
 
+// ==== ui/page-break-controls.js ====
+function pageBreakControls(sheet, companion, apply) {
+  const panel = document.createElement('details');
+  panel.className = 'print-page-breaks';
+  panel.id = 'print-page-breaks';
+  panel.innerHTML = `<summary>Adjust weeks per page</summary><div class="print-page-breaks-body">
+    <label for="print-page-count">Number of pages</label><div class="print-number-step">
+      <button type="button" id="print-page-count-less" aria-label="Fewer pages">−</button>
+      <input id="print-page-count" type="number" min="1" max="8" value="${sheet.pageSizes.length}">
+      <button type="button" id="print-page-count-more" aria-label="More pages">+</button></div>
+    <div class="print-page-counts"></div><p class="print-page-allocation" role="status"></p>
+    <button type="button" id="print-apply-page-breaks">Apply page breaks</button></div>`;
+  let sizes = [...sheet.pageSizes];
+  const inputs = panel.querySelector('.print-page-counts');
+  const count = panel.querySelector('#print-page-count');
+  const validate = () => {
+    const error = validatePageSizes(sheet.weeks.length, sizes);
+    const text = panel.querySelector('.print-page-allocation');
+    text.textContent = error || `All ${sheet.weeks.length} weeks are included.`;
+    text.classList.toggle('is-invalid', Boolean(error));
+    panel.querySelector('#print-apply-page-breaks').disabled = Boolean(error);
+    panel.querySelector('#print-page-count-less').disabled = sizes.length <= 1;
+    panel.querySelector('#print-page-count-more').disabled = sizes.length >= 8;
+  };
+  const rows = () => {
+    inputs.replaceChildren();
+    sizes.forEach((size, index) => {
+      const field = document.createElement('label');
+      field.textContent = `Page ${index + 1} weeks`;
+      const step = document.createElement('div');
+      step.className = 'print-number-step';
+      step.innerHTML = `<button type="button" aria-label="Fewer weeks on page ${index + 1}">−</button>
+        <input id="print-page-weeks-${index}" type="number" min="0" value="${size}">
+        <button type="button" aria-label="More weeks on page ${index + 1}">+</button>`;
+      const input = step.querySelector('input');
+      const change = value => { sizes[index] = Math.max(0, Math.trunc(Number(value) || 0)); input.value = sizes[index]; validate(); };
+      input.addEventListener('input', () => change(input.value));
+      step.firstElementChild.addEventListener('click', () => change(sizes[index] - 1));
+      step.lastElementChild.addEventListener('click', () => change(sizes[index] + 1));
+      field.htmlFor = input.id;
+      field.append(step);
+      inputs.append(field);
+    });
+    validate();
+  };
+  const changeCount = value => {
+    count.value = Math.max(1, Math.min(8, Math.trunc(Number(value) || 1)));
+    sizes = defaultPageSizes(sheet.weeks.length, Number(count.value), sheet.season);
+    rows();
+  };
+  count.addEventListener('change', () => changeCount(count.value));
+  panel.querySelector('#print-page-count-less').addEventListener('click', () => changeCount(sizes.length - 1));
+  panel.querySelector('#print-page-count-more').addEventListener('click', () => changeCount(sizes.length + 1));
+  panel.querySelector('#print-apply-page-breaks').addEventListener('click', () => {
+    if (validatePageSizes(sheet.weeks.length, sizes)) return;
+    sheet.pageSizes = [...sizes];
+    if (companion) companion.pageSizes = alignPageSizesTo(sheet.weeks, sizes, companion.weeks);
+    apply();
+  });
+  rows();
+  return panel;
+}
+
+// ==== ui/print-setup.js ====
+const MODE_KEY = 'zmanim-print-navigation';
+const TAB_KEY = 'zmanim-print-navigation-tabs';
+let modeFallback = null;
+let tabsFallback = {};
+
+function preservePreviousChoices() {
+  try {
+    const key = 'zmanim-print-choices-before-simple-v1';
+    if (localStorage.getItem(key)) return;
+    const state = JSON.parse(localStorage.getItem('zmanim-app-state-v1') || '{}');
+    localStorage.setItem(key, JSON.stringify({
+      baseline: '82793f6e19e91e3a71de3c40a575d6d9a9696636',
+      posterBar: localStorage.getItem('zmanim-poster-bar-v1'),
+      chartLayout: localStorage.getItem('zmanim-chart-print-layout'),
+      chartDefaults: Object.fromEntries(['sheetStyle', 'chartInk', 'showMolad', 'moladFormat']
+        .filter(key => state.settings && key in state.settings).map(key => [key, state.settings[key]])),
+      layouts: (state.sheets || []).map(sheet => ({ id: sheet.id, pageSizes: sheet.pageSizes, style: sheet.style })),
+    }));
+  } catch { /* Never erase preferences when browser storage is unavailable or full. */ }
+}
+
+function previousPrintSetup() {
+  try { return (modeFallback ?? localStorage.getItem(MODE_KEY)) === 'classic'; }
+  catch { return modeFallback === 'classic'; }
+}
+
+function rememberMode(mode) {
+  modeFallback = mode;
+  try { localStorage.setItem(MODE_KEY, mode); } catch { /* Use the session fallback. */ }
+}
+
+function rememberedTabs() {
+  try { return { ...JSON.parse(localStorage.getItem(TAB_KEY) || '{}'), ...tabsFallback }; }
+  catch { return tabsFallback; }
+}
+
+function rememberTab(key, tab) {
+  tabsFallback[key] = tab;
+  try { localStorage.setItem(TAB_KEY, JSON.stringify(rememberedTabs())); } catch { /* Use the session fallback. */ }
+}
+
+function printSetupNote(text) {
+  const note = document.createElement('p');
+  note.className = 'print-setup-note';
+  note.textContent = text;
+  return note;
+}
+
+function printSetupLink(text, href) {
+  const link = document.createElement('a');
+  link.className = 'print-setup-link';
+  link.textContent = text;
+  link.href = href;
+  return link;
+}
+
+// Move the existing controls with their listeners. The renderers and saved settings
+// remain authoritative, and a redraw can still restore the original control layout.
+function setupPrintNavigation(root, {
+  key, anchor, mount, context = [], schedules = [], pages = [], appearance = [],
+  actions = [], onRedraw, defaults = 'schedules', summaries = {}, searchLinks = [],
+  enhance, summary, refresh,
+}) {
+  if (!anchor || root.querySelector('.print-setup-mode-row')) return;
+  const previous = previousPrintSetup();
+  if (previous) root.classList.remove('has-simple-print');
+  const modeRow = document.createElement('div');
+  modeRow.className = 'print-setup-mode-row no-print';
+  modeRow.innerHTML = `<button type="button" id="print-navigation-mode" class="print-setup-mode">${previous ? 'Use new print setup' : 'Use previous print setup'}</button>`;
+  const modeButton = modeRow.querySelector('button');
+  modeButton.addEventListener('click', () => {
+    rememberMode(previous ? 'simple' : 'classic');
+    keepPosition(root, onRedraw);
+  });
+  anchor.before(modeRow);
+  if (previous) return;
+
+  preservePreviousChoices();
+
+  root.classList.add('has-simple-print');
+  const setup = document.createElement('section');
+  setup.className = 'print-setup no-print';
+  setup.setAttribute('aria-label', 'Print setup');
+  setup.innerHTML = `<div class="print-setup-heading"><h3>Print setup</h3><button type="button" id="print-setup-find">Find a setting</button></div>
+    <div class="print-setup-context"></div>
+    <div class="print-setup-search" hidden><label for="print-setup-search">Find a print setting</label>
+      <input id="print-setup-search" type="search" placeholder="Try margins, Molad, half pages…"><div class="print-setup-results"></div></div>
+    <div class="print-setup-tabs" role="tablist" aria-label="Print settings sections">
+      ${['schedules', 'pages', 'appearance'].map(tab => `<button type="button" id="print-tab-${tab}" role="tab" data-print-tab="${tab}"
+        aria-controls="print-pane-${tab}">${tab[0].toUpperCase() + tab.slice(1)}<small>${escAttr(summaries[tab] || '')}</small></button>`).join('')}
+    </div>
+    ${['schedules', 'pages', 'appearance'].map(tab => `<section id="print-pane-${tab}" role="tabpanel" aria-labelledby="print-tab-${tab}" class="print-setup-pane" data-print-pane="${tab}"></section>`).join('')}
+    <div class="print-setup-actions"><div class="print-setup-job"><strong id="print-setup-summary"></strong><small id="print-setup-paper"></small></div><div class="print-setup-buttons"></div></div>`;
+  (mount || anchor.parentElement).insertBefore(setup, mount ? null : anchor);
+  modeRow.remove();
+  setup.querySelector('.print-setup-heading').append(modeRow);
+  for (const node of context.filter(Boolean)) setup.querySelector('.print-setup-context').append(node);
+  for (const [tab, nodes] of Object.entries({ schedules, pages, appearance })) {
+    const pane = setup.querySelector(`[data-print-pane="${tab}"]`);
+    for (const node of nodes.filter(Boolean)) pane.append(node);
+    if (!pane.children.length) pane.append(printSetupNote(tab === 'appearance'
+      ? 'This format uses its established printed appearance.' : 'This layout sets these options automatically.'));
+  }
+  for (const node of actions.filter(Boolean)) setup.querySelector('.print-setup-buttons').append(node);
+  enhance?.(setup);
+
+  let active = rememberedTabs()[key];
+  if (!['schedules', 'pages', 'appearance'].includes(active)) active = defaults;
+  const selectTab = (tab, focus = false) => keepPosition(root, () => {
+    active = tab;
+    rememberTab(key, tab);
+    for (const button of setup.querySelectorAll('[data-print-tab]')) {
+      const selected = button.dataset.printTab === tab;
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const pane of setup.querySelectorAll('[data-print-pane]')) pane.hidden = pane.dataset.printPane !== tab;
+    if (focus) setup.querySelector(`[data-print-tab="${tab}"]`).focus({ preventScroll: true });
+  }, { panels: false, focus: false });
+  for (const button of setup.querySelectorAll('[data-print-tab]')) {
+    button.addEventListener('click', () => selectTab(button.dataset.printTab));
+    button.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const names = ['schedules', 'pages', 'appearance'];
+      const at = names.indexOf(active);
+      selectTab(event.key === 'Home' ? names[0] : event.key === 'End' ? names[2]
+        : names[(at + (event.key === 'ArrowRight' ? 1 : 2)) % 3], true);
+    });
+  }
+  selectTab(active);
+
+  const updateSummary = () => {
+    const job = summary?.() || {};
+    setup.querySelector('#print-setup-summary').textContent = job.text || 'Print the selected pages';
+    setup.querySelector('#print-setup-paper').textContent = job.paper || 'Use the paper size shown in the preview';
+  };
+  updateSummary();
+  setup.addEventListener('change', () => { refresh?.(setup); updateSummary(); });
+  refresh?.(setup);
+
+  const search = setup.querySelector('#print-setup-search');
+  const results = setup.querySelector('.print-setup-results');
+  const describe = control => {
+    const labelled = control.getAttribute('aria-labelledby');
+    const ids = labelled?.split(/\s+/).map(id => root.querySelector(`#${CSS.escape(id)}`)?.textContent).filter(Boolean).join(' ');
+    const label = control.labels?.[0]?.firstChild?.textContent || control.closest('label')?.firstChild?.textContent;
+    const group = control.closest('.poster-bar-switch,.print-setup-field');
+    const question = group?.querySelector('.week-switch-label')?.textContent;
+    return (control.getAttribute('aria-label') || ids || (control.type === 'radio' && question ? `${question}: ${label}` : label) || question
+      || control.textContent || '').trim().replace(/\s+/g, ' ');
+  };
+  const findResults = () => {
+    const query = search.value.trim().toLocaleLowerCase();
+    const entries = [];
+    const seen = new Set();
+    for (const control of setup.querySelectorAll('[data-print-pane] select,[data-print-pane] input,[data-print-pane] summary,[data-print-pane] button,[data-print-pane] a')) {
+      if (control.type === 'radio' && !control.checked) continue;
+      if (control.hidden || control.closest('[data-print-search-hidden]')) continue;
+      const pane = control.closest('[data-print-pane]');
+      const hidden = control.closest('[hidden]');
+      if (hidden && hidden !== pane) continue;
+      const tab = pane.dataset.printPane;
+      const label = describe(control);
+      if (!label || seen.has(label)) continue;
+      const words = label + ' ' + (control.tagName === 'SELECT' ? [...control.options].map(option => option.text).join(' ') : '');
+      if (query && !words.toLocaleLowerCase().includes(query)) continue;
+      seen.add(label);
+      entries.push({ label, tab, control });
+    }
+    for (const entry of searchLinks) if (!query || `${entry.label} ${entry.words || ''}`.toLocaleLowerCase().includes(query)) entries.push(entry);
+    results.replaceChildren();
+    for (const entry of entries.slice(0, 12)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'print-setup-result';
+      button.innerHTML = `<strong>${escAttr(entry.label)}</strong><small>${escAttr(entry.tab ? entry.tab[0].toUpperCase() + entry.tab.slice(1) : entry.where || 'Another print screen')}</small>`;
+      button.addEventListener('click', () => {
+        if (entry.open) { entry.open(); return; }
+        selectTab(entry.tab);
+        setup.querySelector('.print-setup-search').hidden = true;
+        let target = entry.control;
+        for (let panel = target.closest('details'); panel && setup.contains(panel); panel = panel.parentElement?.closest('details')) panel.open = true;
+        if (target.type === 'radio' && target.id) target = root.querySelector(`label[for="${CSS.escape(target.id)}"]`) || target;
+        target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        entry.control.focus({ preventScroll: true });
+        target.classList.add('print-setup-highlight');
+        setTimeout(() => target.classList.remove('print-setup-highlight'), 1800);
+      });
+      results.append(button);
+    }
+    if (!results.children.length) results.append(printSetupNote('No matching option for this layout. Try another schedule or format.'));
+  };
+  setup.querySelector('#print-setup-find').addEventListener('click', () => keepPosition(root, () => {
+    const box = setup.querySelector('.print-setup-search');
+    box.hidden = !box.hidden;
+    if (!box.hidden) { findResults(); search.focus({ preventScroll: true }); }
+  }, { panels: false, focus: false }));
+  search.addEventListener('input', findResults);
+  return { selectTab, updateSummary, setup };
+}
+
+function currentPrintSummary(root) {
+  const css = document.querySelector('#print-page-size')?.textContent || '';
+  const wide = css.includes('17in');
+  const landscape = wide || css.includes('landscape');
+  const size = wide ? '11 × 17' : 'Letter';
+  const count = root.querySelectorAll('.poster-paired-page').length || root.querySelectorAll('.poster-all-item').length
+    || root.querySelectorAll('.poster-half-sheet').length || root.querySelectorAll('.page').length
+    || root.querySelectorAll('.week-pair').length || root.querySelectorAll('.week-card').length
+    || root.querySelectorAll('.poster').length;
+  return { text: count ? `${count} ${count === 1 ? 'sheet' : 'sheets'} · ${size} · ${landscape ? 'Landscape' : 'Portrait'}` : 'Choose schedules to print',
+    paper: `Print dialog: ${wide ? 'Ledger / Tabloid' : 'Letter'} paper${landscape ? ', landscape' : ', portrait'}` };
+}
+
+// ==== ui/print-navigation-layouts.js ====
+const switchField = (root, key) => root.querySelector(`#${key}-label`)?.closest('.poster-bar-switch')
+  || root.querySelector(`#${key}-label`)?.parentElement;
+const labelField = (root, key) => root.querySelector(`#${key}`)?.closest('label');
+const yearField = (root, key) => root.querySelector(`#${key}`)?.closest('.poster-year');
+const relabelSwitch = (root, key, question, labels) => {
+  const title = root.querySelector(`#${key}-label`);
+  if (title) title.textContent = question;
+  for (const [value, text] of Object.entries(labels)) {
+    const label = root.querySelector(`label[for="${key}-${value}"]`);
+    if (label) label.textContent = text;
+  }
+};
+const otherScreens = () => [
+  { label: 'Weeks per page and saved chart layouts', words: 'season summer winter pages page breaks', where: 'Seasonal charts', open: () => { location.hash = '#generate'; } },
+  { label: 'Molad and Molad wording', words: 'Hebrew Yiddish', where: 'Saved chart appearance', open: () => { location.hash = '#saved'; } },
+  { label: 'Shared header and footer', words: 'letterhead photo logo address', where: 'Schedule settings', open: () => { location.hash = '#settings'; } },
+];
+
+function setupSpecialPrintNavigation(root, redraw) {
+  const bar = root.querySelector('.special-controls > .poster-bar');
+  if (!bar) return;
+  const classic = previousPrintSetup();
+  const settings = root.querySelector('.special-print-settings');
+  const workflow = root.querySelector('.special-workflow');
+  const half = root.querySelector('.special-half-pairs');
+  const picker = root.querySelector('#poster-pick');
+  const combinedOption = picker?.querySelector('option[value="__combined__"]');
+  const copies = switchField(root, 'poster-copies');
+  const pages = [switchField(root, 'poster-sheets'), switchField(root, 'poster-set-layout'), copies,
+    switchField(root, 'poster-break'), switchField(root, 'poster-orient'), half];
+  const ink = switchField(root, 'poster-ink');
+  const appearance = [labelField(root, 'poster-asara-shacharis'), ink, settings];
+  const schedules = [workflow, switchField(root, 'poster-scope'), yearField(root, 'poster-group'), labelField(root, 'poster-pick'),
+    root.querySelector('.special-set-list'), root.querySelector('#poster-own')];
+  if (root.querySelector('#poster-own-new')) schedules.push(root.querySelector('#poster-own-new'));
+  const navigation = setupPrintNavigation(root, {
+    key: 'special', anchor: bar, mount: root.querySelector('.special-controls'),
+    context: [yearField(root, 'poster-year')], schedules, pages, appearance,
+    actions: [root.querySelector('#print-btn')], onRedraw: redraw,
+    defaults: root.querySelector('#poster-workflow-halves')?.checked ? 'pages' : 'schedules',
+    summaries: { schedules: 'Choose sheets', pages: 'Size + arrangement', appearance: 'Ink + details' },
+    searchLinks: otherScreens(), summary: () => currentPrintSummary(root),
+    enhance: setup => {
+      relabelSwitch(root, 'poster-workflow', 'Print selection', { single: 'One schedule', set: 'Several schedules', halves: 'Half-page handouts' });
+      relabelSwitch(root, 'poster-set-layout', 'Arrange occasions', { original: 'Separate posters', combined: 'One poster per occasion' });
+      relabelSwitch(root, 'poster-sheets', 'Printed size', {});
+      relabelSwitch(root, 'poster-copies', 'Right half', { one: 'Blank', two: 'Same handout' });
+      relabelSwitch(root, 'poster-orient', 'Poster orientation', {});
+      if (combinedOption) {
+        combinedOption.textContent = 'Whole occasion on one poster';
+        combinedOption.hidden = true;
+        const arrangement = document.createElement('label');
+        arrangement.className = 'print-setup-field';
+        arrangement.textContent = 'Occasion arrangement';
+        const select = document.createElement('select');
+        select.id = 'print-occasion-arrangement';
+        select.innerHTML = '<option value="original">Selected poster</option><option value="combined">Whole occasion on one poster</option>';
+        select.value = picker.value === '__combined__' ? 'combined' : 'original';
+        select.addEventListener('change', () => {
+          picker.value = select.value === 'combined' ? '__combined__' : [...picker.options].find(option => option.value !== '__combined__').value;
+          picker.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        arrangement.append(select);
+        setup.querySelector('[data-print-pane="pages"]').prepend(arrangement);
+      }
+      if (copies) {
+        const pairDifferent = document.createElement('button');
+        pairDifferent.type = 'button';
+        pairDifferent.id = 'print-pair-different';
+        pairDifferent.textContent = 'Arrange different handouts';
+        pairDifferent.addEventListener('click', () => root.querySelector('#poster-workflow-halves')?.click());
+        copies.after(pairDifferent);
+      }
+      if (half) {
+        const addAll = half.querySelector('#half-add-all');
+        if (addAll) setup.querySelector('[data-print-pane="schedules"]').prepend(addAll);
+        half.querySelectorAll('.special-half-pair').forEach((pair, index) => {
+          for (const select of pair.querySelectorAll('select[data-half-shacharis]')) {
+            const field = select.closest('label');
+            field.firstChild.textContent = `Sheet ${index + 1}, ${select.dataset.halfShacharis} half: Shacharis locations`;
+            setup.querySelector('[data-print-pane="appearance"]').prepend(field);
+          }
+          const right = pair.querySelector('select[data-half-side="right"]');
+          const left = pair.querySelector('select[data-half-side="left"]');
+          if (right && left) {
+            const same = document.createElement('option');
+            same.value = '__same__';
+            same.textContent = 'Same as left';
+            right.options[0].after(same);
+            const layout = side => root.querySelector(`#half-${CSS.escape(pair.dataset.id)}-${side}-shacharis`)?.value || 'compact';
+            if (right.value && right.value === left.value && layout('left') === layout('right')) right.value = '__same__';
+          }
+        });
+      }
+      if (settings) {
+        if (yearField(root, 'poster-margin')) settings.querySelector('summary').textContent = 'Margins';
+        else settings.remove();
+      }
+      const own = root.querySelector('.own-editor');
+      if (own) { own.querySelector('summary').textContent = 'Edit custom schedule'; own.open = false; }
+      setup.querySelector('[data-print-pane="appearance"]').append(printSetupLink('Shared header and footer settings', '#settings'));
+      const copy = root.querySelector('#poster-copy-btn');
+      if (copy) root.querySelector('.special-preview-tools')?.append(copy);
+      bar.hidden = !bar.children.length;
+      const oldAction = root.querySelector('.special-print-action');
+      if (oldAction) oldAction.hidden = true;
+    },
+  });
+  if (!classic && navigation) root.querySelector('.special-controls').classList.add('has-print-setup');
+  return navigation;
+}
+
+function setupSavedChartPrintNavigation(root, { sheet, primary, companion, redraw, apply }) {
+  const anchor = root.querySelector('#chart-layout-panel');
+  if (!anchor) return;
+  const previous = previousPrintSetup();
+  const pageBreaks = pageBreakControls(primary, companion, apply);
+  const navigation = setupPrintNavigation(root, {
+    key: 'saved-chart', anchor, onRedraw: redraw, defaults: 'pages',
+    schedules: [printSetupNote(`${primary.season === 'kayitz' ? 'Summer' : primary.season === 'choref' ? 'Winter' : 'Weekday'} chart · ${primary.hebrewYear} · ${primary.weeks.length} weeks`),
+      printSetupLink('Open saved layouts', '#saved'), printSetupLink('View automatic seasonal charts', '#charts')],
+    pages: [labelField(root, 'chart-print-layout'), pageBreaks, switchField(root, 'chart-dst-headers')],
+    appearance: [yearField(root, 'chart-pad-y'), yearField(root, 'chart-pad-x'), switchField(root, 'chart-ink'),
+      switchField(root, 'chart-molad'), switchField(root, 'chart-molad-format'),
+      printSetupNote('Margins apply to this chart. Ink and Molad apply to your admin chart print copies on this device.'),
+      printSetupLink('Shared header and footer settings', '#settings')],
+    actions: [root.querySelector('#print-btn')], summary: () => currentPrintSummary(root),
+    summaries: { schedules: 'Saved layout', pages: 'Paper + weeks', appearance: 'Margins + Molad' },
+    searchLinks: [{ label: 'Molad wording', words: 'Molad format Hebrew Yiddish', where: 'Appearance', open: () => {
+      navigation.selectTab('appearance');
+      if (!root.querySelector('#chart-molad-on').checked) {
+        const field = switchField(root, 'chart-molad');
+        if (!field.querySelector('.print-setup-note')) field.append(printSetupNote('Turn Molad on to choose Hebrew or Yiddish wording.'));
+        field.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      }
+    } }, ...otherScreens().filter(link => !link.words.includes('Hebrew'))],
+    enhance: () => { anchor.hidden = true; },
+    refresh: () => {
+      const field = switchField(root, 'chart-molad-format');
+      if (field) field.hidden = !root.querySelector('#chart-molad-on')?.checked;
+    },
+  });
+  if (!previous && navigation) root.querySelector('.sheet-toolbar').classList.add('print-setup-back');
+  return navigation;
+}
+
+function setupAutomaticChartPrintNavigation(root, { redraw, customize }) {
+  const anchor = root.querySelector('.week-nav-row.week-nav-print-one');
+  if (!anchor) return;
+  const makeCopy = document.createElement('button');
+  makeCopy.type = 'button';
+  makeCopy.id = 'print-customize-chart';
+  makeCopy.textContent = 'Customise a local print copy';
+  makeCopy.addEventListener('click', customize);
+  return setupPrintNavigation(root, {
+    key: 'automatic-chart', anchor, onRedraw: redraw, defaults: 'pages',
+    schedules: [printSetupNote('The current seasonal chart is selected. Use Previous, Today and Next to choose another stretch.'),
+      printSetupLink('Open saved layouts', '#saved')],
+    pages: [labelField(root, 'chart-print-layout'), makeCopy],
+    appearance: [printSetupNote('To adjust margins, ink or Molad, customise a local print copy.'),
+      printSetupLink('Shared header and footer settings', '#settings')],
+    actions: [root.querySelector('#print-btn'), root.querySelector('#pdf-btn')],
+    summary: () => currentPrintSummary(root), summaries: { schedules: 'Current chart', pages: 'Letter / 11×17', appearance: 'Print copy settings' },
+    searchLinks: [{ label: 'Weeks per page, margins, ink and Molad', words: 'page breaks allocation Yiddish format', where: 'Local print copy', open: customize }, ...otherScreens()],
+    enhance: () => { anchor.hidden = true; },
+  });
+}
+
+function setupWeeklyPrintNavigation(root, redraw) {
+  const anchor = root.querySelector('.week-print-panel');
+  if (!anchor) return;
+  const navigation = setupPrintNavigation(root, {
+    key: 'weekly', anchor, onRedraw: redraw, defaults: 'pages',
+    schedules: [printSetupNote('Use Previous, This week and Next to choose the week.'), root.querySelector('#week-print-rest')],
+    pages: [root.querySelector('.week-switches')],
+    appearance: [printSetupNote('This weekly layout keeps its established appearance and fits Letter paper automatically.'),
+      printSetupLink('Shared header and footer settings', '#settings')],
+    actions: [root.querySelector('#print-btn'), root.querySelector('#pdf-btn')],
+    summaries: { schedules: 'This week / remaining', pages: 'Separate / together', appearance: 'Shared letterhead' },
+    searchLinks: otherScreens(), summary: () => currentPrintSummary(root),
+    enhance: () => {
+      relabelSwitch(root, 'week-layout', 'Shabbos + weekdays', { charts: 'Separate pages', combined: 'Together on Letter' });
+      anchor.hidden = true;
+      const copy = root.querySelector('#week-copy-btn');
+      if (copy) root.querySelector('.week-nav')?.append(copy);
+    },
+  });
+  return navigation;
+}
+
 // ==== ui/print-page.js ====
 // Printing.
 //
@@ -9627,6 +10097,12 @@ function renderSheet(container, state, sheet, onChange) {
     onChange({ save: true });
   });
 
+  setupSavedChartPrintNavigation(container, {
+    sheet, primary: primarySheet, companion: weekdaySheet,
+    redraw: () => renderSheet(container, state, sheet, onChange),
+    apply: () => keepPosition(container, () => onChange({ save: true })),
+  });
+
 }
 
 const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season === 'choref' ? 'שבת חורף' : 'Weekday');
@@ -12194,6 +12670,7 @@ function howFar(item) {
 
 
 
+
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
@@ -12449,6 +12926,9 @@ function renderChartBrowser(container, state, opts = {}) {
       size: [printSize.width, printSize.height],
     });
     wireCombinedChartPrint();
+    if (opts.admin) setupAutomaticChartPrintNavigation(container, {
+      redraw: draw, customize: () => opts.onCustomize?.(spread.sheet, spread.weekday),
+    });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
@@ -12832,22 +13312,30 @@ function renderGuide(container, onOpenTab) {
       </div>
     </details>
     <details class="panel">
+      <summary>Find print settings</summary>
+      <div class="panel-body">
+        <p>Weekly schedules, seasonal charts and special schedules share a <strong>Print setup</strong> panel. <strong>Schedules</strong> chooses what to print, <strong>Pages</strong> sets paper and arrangement, and <strong>Appearance</strong> contains margins, ink and other details available for that format.</p>
+        <p>Use <strong>Find a setting</strong> to jump to an option. The print bar shows the sheet count and paper size. Keep the matching paper and orientation in your printer's dialog.</p>
+        <p><strong>Use previous print setup</strong> returns to the earlier menus. Switching menus keeps your saved schedules and print choices. The choice is remembered on this device.</p>
+      </div>
+    </details>
+    <details class="panel">
       <summary>Print a chart with your own page splits</summary>
       <div class="panel-body">
         <ol>
-          <li>Open <strong>Seasonal charts → Print layouts</strong>.</li>
-          <li>Choose the season and Hebrew year, then continue.</li>
-          <li>Adjust the number of weeks on each page and open the charts.</li>
+          <li>Open <strong>Seasonal charts → View charts</strong> and choose the chart.</li>
+          <li>In <strong>Print setup → Pages</strong>, choose <strong>Customise a local print copy</strong>.</li>
+          <li>Open <strong>Adjust weeks per page</strong>, choose the page count and weeks, then apply the page breaks.</li>
           <li>Use <strong>Print / Save as PDF</strong>.</li>
         </ol>
-        <p>Your print layout is saved on this device. Chart cells are read-only.</p>
+        <p>Your print layout is saved on this device. Chart cells are read-only. You can also begin with <strong>Seasonal charts → Print layouts</strong> to select a season and Hebrew year.</p>
       </div>
     </details>
     <details class="panel">
       <summary>Printing and PDFs</summary>
       <div class="panel-body">
-        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. For season charts, use Letter paper in landscape and enable background graphics.</p>
-        <p>Shabbos pages print first in each pair, followed by the matching weekday page. Padding changes the space around the chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
+        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. Seasonal charts offer separate Letter pages, Shabbos and weekdays together on landscape Letter, or together on landscape 11 × 17 paper (Ledger / Tabloid). Enable background graphics.</p>
+        <p>Separate pages print Shabbos first in each pair, followed by the matching weekday page. Padding changes the space around a saved chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
       </div>
     </details>
     <details class="panel">
@@ -15190,6 +15678,7 @@ function renderOwnEditor(container, sheet, occasions, { onChange, onDelete }) {
 // A poster is a real 8.5in by 11in page in the document, the same way a chart page is, so
 // what is on the screen is what comes out of the printer and there is no second layout to
 // keep in step. See .poster in app.css and the @page rule in print.css.
+
 
 
 
@@ -18332,8 +18821,13 @@ function renderPosters(container, state, routeChanged, tables) {
   });
   container.querySelectorAll('select[data-half-side]').forEach(select => select.addEventListener('change', () => {
     const pair = chosenHalfPagePairs.find(row => row.id === select.dataset.pairId);
-    pair[select.dataset.halfSide] = select.value;
-    if (select.value !== 'asarabteves') delete pair[`${select.dataset.halfSide}Shacharis`];
+    const same = select.dataset.halfSide === 'right' && select.value === '__same__';
+    pair[select.dataset.halfSide] = same ? pair.left : select.value;
+    if (same) {
+      if (pair.leftShacharis) pair.rightShacharis = pair.leftShacharis;
+      else delete pair.rightShacharis;
+    }
+    if (pair[select.dataset.halfSide] !== 'asarabteves') delete pair[`${select.dataset.halfSide}Shacharis`];
     commitChoice();
   }));
   container.querySelectorAll('select[data-half-shacharis]').forEach(select => select.addEventListener('change', () => {
@@ -18557,8 +19051,10 @@ function renderPosters(container, state, routeChanged, tables) {
     }
     // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
     // is what the congregation's page calls as well so the two cannot come to differ.
+    setupSpecialPrintNavigation(container, again);
     layoutPosters(container);
   }
+  else setupSpecialPrintNavigation(container, again);
 }
 
 // ==== ui/program-view.js ====
@@ -20632,6 +21128,7 @@ function renderWeeklyReader(container, { showing, index, state, settings, serial
 
 
 
+
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
  *
@@ -22452,6 +22949,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
+  if (!luach) setupWeeklyPrintNavigation(container, () => onSerialChange(showing));
 
   // Arriving from "Publishing" on Saved sheets: the panel is already open, but it sits
   // below a full week card, so without this you land on the card with no sign that
@@ -23450,6 +23948,7 @@ function render() {
 
 function paint() {
   setPrintPage('letter landscape');
+  main.classList.remove('has-simple-print');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
   // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
@@ -23503,7 +24002,22 @@ function paint() {
     );
   } else if (currentTab === 'charts') {
     main.innerHTML = '<h2 class="no-print">Seasonal charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print layouts for your own page splits, or Saved copies to reopen a chart saved on this device.</p><div id="season-chart-view"></div>';
-    renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), { confine: false });
+    renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), {
+      confine: false, admin: true,
+      onCustomize: (original, weekday) => {
+        const id = newId();
+        const createdAt = new Date().toISOString();
+        const makeCopy = source => ({ ...source, automatic: false, createdAt,
+          weeks: source.weeks.map(week => ({ ...week })), pageSizes: [...source.pageSizes],
+          style: { ...source.style }, overrides: { ...source.overrides } });
+        const copy = { ...makeCopy(original), id };
+        state.sheets.push(copy);
+        if (weekday) state.sheets.push({ ...makeCopy(weekday), id: newId(), linkedSheetId: id });
+        persist();
+        currentSheetId = id;
+        render();
+      },
+    });
   } else if (currentTab === 'generate') {
     renderGenerate(
       main,

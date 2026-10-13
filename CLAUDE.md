@@ -54,6 +54,41 @@ away from the button, and rule editors open beside their row. `tests/button-scro
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
 
+## Print navigation and the retained setup
+
+Admin weekly schedules, seasonal charts, saved chart layouts and special schedules
+share a **Print setup** panel with **Schedules**, **Pages** and **Appearance** tabs.
+`js/ui/print-setup.js` moves the existing controls with their listeners; adapters in
+`js/ui/print-navigation-layouts.js` leave schedule renderers and stored choices
+authoritative. Keep the original template paths intact. Public website print menus
+retain their existing layout. All navigation markup is `no-print` and its CSS is
+screen-only, including the mobile print bar.
+
+**Use previous print setup** restores the earlier menus, with a remembered global
+`zmanim-print-navigation` value of `classic`. The default is the new setup, and
+**Use new print setup** switches back. Switching never clears schedule data or print
+preferences. The original code is also preserved on the remote branch
+`backup/print-navigation-2026-10-12`, based on `82793f6e19e91e3a71de3c40a575d6d9a9696636`.
+Before opening the new menus for the first time, preserve the original print choices
+once in `zmanim-print-choices-before-simple-v1`. Do not overwrite this snapshot.
+
+Tabs are remembered by print family in `zmanim-print-navigation-tabs`. Retain year
+and occasion minus/plus/Current controls, position and focus on redraw, and searchable
+conditional settings. Finding an option must not turn it on. A disabled Molad keeps
+its wording hidden, with an explanatory search result rather than changing the value.
+
+Saved charts expose **Adjust weeks per page** in Pages through
+`js/ui/page-break-controls.js`, using the original pagination helpers and aligning
+the companion weekday chart without replacing weeks, overrides or style. Automatic
+charts offer **Customise a local print copy** to create a saved pair before editing
+these choices. Special handouts offer **Same as left** for the right half; save the
+actual schedule key and copy the left Shacharis style, never the synthetic option key.
+
+`tests/print-navigation.cjs` checks both menus on phone and desktop, saved choices,
+search and page breaks, and compares actual native PDF text, paper sizes, page counts
+and printed geometry between interfaces. The older browser fixtures explicitly
+select `classic` to continue verifying the retained controls and print invariants.
+
 ## Deploy loop
 
 Every change follows this, in order:

@@ -34,6 +34,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     await context.addInitScript(() => {
       localStorage.setItem('zmanim-nocount', '1');
+      localStorage.setItem('zmanim-print-navigation', 'classic');
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse('2026-10-09T12:00:00Z') }));
       if (!localStorage.getItem('zmanim-poster-bar-v1')) localStorage.setItem('zmanim-poster-bar-v1',
         JSON.stringify({ year: 5787, group: 'עשרה בטבת · שחרית', sheets: 'all', scope: 'all', margin: 0.35 }));
