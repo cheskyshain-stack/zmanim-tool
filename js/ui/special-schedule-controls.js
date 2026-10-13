@@ -22,7 +22,8 @@ export function specialOccasionChoices(groups, catalog, { selectedKey = null, av
       }
     } else if (group.name === 'ראש חודש') {
       for (const entry of entries) {
-        if (!entry.poster?.dated || !entry.value && (availableOnly || entry.key !== selectedKey)) continue;
+        if (!entry.poster?.dated && entry.key !== selectedKey) continue;
+        if (!entry.value && (availableOnly || entry.key !== selectedKey)) continue;
         choices.push(posterChoice(entry, 'Rosh Chodesh'));
       }
     } else {

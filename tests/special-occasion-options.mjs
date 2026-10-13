@@ -41,6 +41,10 @@ test('saved paired and whole-occasion pages have a correctly classified selected
     const choice = specialOccasionChoices(groups, catalog, { selectedKey: key }).find(choice => choice.key === key);
     assert.equal(choice.category, category); assert.equal(choice.value, 'poster:' + key);
   }
+  const custom = entry('own:rc', 'Saved Rosh Chodesh schedule', 'ראש חודש', 30, { poster: { own: { id: 'rc' } } });
+  const choices = specialOccasionChoices(groups, [...catalog, custom], { selectedKey: custom.key });
+  assert.equal(choices.find(choice => choice.key === custom.key).category, 'Rosh Chodesh');
+  assert.equal(choices.find(choice => choice.key === custom.key).name, custom.label);
 });
 
 test('missing weekday months are omitted and queued missing pages remain identifiable', () => {
