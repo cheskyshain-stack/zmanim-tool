@@ -819,6 +819,8 @@ and listed in `DIST_TREES`.
   rather than the day itself, which is what the sort runs on.
 - **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is
   הושענא רבה's, five blocks in, and every block before it carries the same three calcs (`ytBlock`).
+  On Shabbos, Yizkor is approximately 9:40 downstairs (weekday 9:10 plus 30 minutes)
+  and 11:05 in the main Bais Medrash (weekday 10:25 plus 40 minutes).
   Its sent message carries **no sign-off**, where every other one ends on a fixed line, and that is
   written the way it was sent. Its afternoon is the sheet's and **the sheet disagrees with the
   message that was sent**: the shul asked for the whole run to be למטה (the main בית מדרש is being
