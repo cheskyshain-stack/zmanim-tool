@@ -9942,7 +9942,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const months = block.months.map(month => JEWISH_MONTHS_HE[month - 1]);
       return `ר"ח ${months.length === 1 ? months[0] : `${months.slice(0, -1).join(', ')} ו${months.at(-1)}`}`;
     };
-    const matchingRoshChodesh = kinds.behab
+    const matchingRoshChodesh = kinds.behab || kinds.taanis
       ? roshChodeshBlocks.find(block => block.html === WEEKDAY_SHACHARIS_SPECIAL) : null;
     const heading = [specialShacharisHeading(kinds), matchingRoshChodesh ? rcHeading(matchingRoshChodesh) : '']
       .filter(Boolean).join(' · ');
