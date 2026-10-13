@@ -3938,6 +3938,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      for that comes from. */
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
 }
+.poster.is-pair .poster-legend {
+  font-size: 7.5pt; font-weight: 400; line-height: 1.45;
+}
 
 /* --- The whole season on one sheet ---------------------------------------------------
    Ten blocks of times where a poster carries one, so everything here is the opposite of what
@@ -4157,29 +4160,12 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: 0.1in;
   padding-top: 0.05in;
   border-top: 1.5pt solid var(--op-rule);
-  /* Smaller than every line of the schedule, on every year. Asked for: a key that reads
-     larger than the times takes the page over.
-
-     It has to be scaled to manage that. A row is 9.5pt times --op-scale, and the fit runs
-     that scale from 0.90 to 1.25 across the years, so the schedule itself is anywhere from
-     8.55pt to 11.87pt. Against a flat 9.5pt key that came out at 0.80 of the row on the
-     busiest year and 1.11 on the lightest, where the note about where to daven was set
-     larger than the מנינים it is about. Measured on all twenty sheets.
-
-     0.8 of the row, which is 7.6pt before the scale: that is the ratio the busiest year
-     already had and liked, held on every year now instead of drifting. The floor is there
-     because a key still has to be read on the tightest year, and it only bites below 0.92,
-     where it leaves the key at 7pt against a 8.55pt row, still the smaller of the two.
-
-     The reckoning names over a pair of זמנים (מ"א, גר"א) are smaller than this and are meant
-     to be. They are labels on a time rather than a line of the schedule.
-
-     Not the week's One sheet below, which carries this same design and was not asked about.
-     Its type is fitted by a different rule (fitWeekSheet), its rows are far larger than its
-     key already, and changing it would move the size the week prints at. */
-  font-size: max(7pt, calc(7.6pt * var(--op-scale)));
+  /* The footer keeps one physical size even when the schedule is fitted for a fuller year. */
+  font-size: 7.5pt; font-weight: 400; line-height: 1.45;
 }
-.poster.is-onepage.is-weeksheet .poster-legend { font-size: 10.5pt; }
+.poster.is-onepage.is-weeksheet .poster-legend {
+  font-size: 10.5pt; font-weight: 700; line-height: 1.5;
+}
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
 /* Air between the lines of a run that has been cut in two or three, and only there.
@@ -4319,7 +4305,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .halfpage-netz .poster-netz-day + .poster-netz-day { margin-inline-start: 0; }
 .halfpage-netz .poster-netz-day-label { font-size: 0.65em; }
 .poster.is-halfpage .poster-legend {
-  margin-top: auto; font-size: 7.5pt; font-weight: 400; line-height: 1.45;
+  margin-top: auto; font-size: 6.5pt; font-weight: 400; line-height: 1.45;
 }
 
 /* Morning-only handouts share the compact letterhead, title and section band. */
