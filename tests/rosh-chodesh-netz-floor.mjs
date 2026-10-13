@@ -11,9 +11,14 @@ import { weekdayMornings } from '../js/posters/day.js';
 import { roshChodeshText } from '../js/rosh-chodesh-text.js';
 import { erevTimes } from '../js/erev-text.js';
 import { buildChanukahPoster, chanukahScheduleLines } from '../js/posters/chanukah.js';
+import { buildAutomaticCharts } from '../js/publish.js';
+import { minyanimForDay } from '../js/upcoming.js';
 
 const config = JSON.parse(await readFile(new URL('../data/published.json', import.meta.url)));
 const settings = resolveSettings(config.settings);
+const tables = Object.fromEntries(await Promise.all([
+  ['parshaChutz', 'parsha_chutz'], ['parshaEy', 'parsha_ey'], ['parshaNames', 'parsha_names'], ['specialDays', 'special_days'],
+].map(async ([key, file]) => [key, JSON.parse(await readFile(new URL('../data/' + file + '.json', import.meta.url)))])));
 const minutes = text => { const [hour, minute] = text.split(':').map(Number); return hour * 60 + minute; };
 
 function settingsForSunrise(days, targetMinutes) {
@@ -47,6 +52,18 @@ test('first and second minyan floors round upward at second-level boundaries', (
     assert.deepEqual(chanukah.cells.map(cell => cell.text), poster.rows.map(row => row.text));
     assert.equal(chanukah.vasikin.time, first, 'The posted Rosh Chodesh start is not averaged downward');
     assert.equal(erevTimes(chanukahScheduleLines(poster.days.slice(0, 1), options, { mergeAll: true }))[1].text, second);
+  }
+});
+
+test('equal first and second starts retain both morning minyanim in their own rooms', () => {
+  const state = buildAutomaticCharts(config, tables, new Date('2024-11-01T12:00:00Z'));
+  const options = resolveSettings(state.settings);
+  const poster = buildRoshChodeshShacharisPoster(5785, 8, options);
+  assert.deepEqual(poster.rows.slice(0, 2).map(row => row.text), ['7:02', '7:02']);
+  for (const day of poster.days) {
+    const mornings = minyanimForDay(day, state, options).filter(event => event.name === 'שחרית');
+    assert.deepEqual(mornings.map(event => event.mins), [422, 422, 435, 455, 480, 500, 520]);
+    assert.deepEqual(mornings.map(event => event.place), ['', 'בעזר״נ', 'למטה', 'באולם השמחות', '', 'בעזר״נ', 'למטה']);
   }
 });
 

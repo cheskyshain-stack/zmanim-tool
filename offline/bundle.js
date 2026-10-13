@@ -11899,7 +11899,11 @@ function weekdayShacharis(serial, settings) {
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
   const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;
-  const text = rc?.html || (special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS);
+  // Two rooms may start at the same adjusted time. Read the shared morning
+  // values directly so the generic cell parser cannot roll the second into PM.
+  if (rc) return rc.lines.flat().map(cell => ({ mins: Math.round(cell.trace.value * 1440),
+    place: PLACES[cell.mark || (cell.underlined ? 'u' : '')] || '' }));
+  const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
   // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
   // carries, so it is turned back into the sentinel form parseCell reads before the times are
   // picked out of it.
