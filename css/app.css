@@ -4350,7 +4350,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .halfpage-body.is-asara .shacharis-handout-dates { margin-bottom: 0; }
 .poster.is-halfpage.is-asara-detailed .poster-legend { margin-top: 0; }
 .poster.is-halfpage .halfpage-body.is-asara .shacharis-handout-row {
-  padding: 0.045in 0.08in; line-height: 1.35; border-bottom: 1px solid var(--op-hair);
+  padding: var(--asara-morning-pad, 0.045in) 0.08in; line-height: 1.35; border-bottom: 1px solid var(--op-hair);
 }
 .poster.is-halfpage .halfpage-body.is-asara .shacharis-handout-row:last-child { border-bottom: 0; }
 

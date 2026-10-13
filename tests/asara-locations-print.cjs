@@ -95,7 +95,7 @@ const server = http.createServer((req, res) => {
         await page.emulateMedia({ media: 'screen' }); await settle();
         results.push({ width, label, boxes });
       };
-      for (const year of [5790, 5785]) for (const margin of ['0.15', '0.5']) for (const copies of [1, 2]) {
+      for (const year of [5790, 5785]) for (const margin of ['0.15', '0.5', '0.75']) for (const copies of [1, 2]) {
         await page.locator('#poster-year').selectOption(String(year)); await settle();
         await page.locator('.special-print-settings').evaluate(el => { el.open = true; });
         await page.locator('#poster-margin').selectOption(margin); await settle();
