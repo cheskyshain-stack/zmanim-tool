@@ -395,6 +395,11 @@ controls, migrations, named selections, mobile widths and physical page counts.
 posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
 Morning handouts center their dates and schedule together between the title rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
+Rosh Chodesh and fast-day morning handouts use BHB's Hebrew weekday and upcoming
+Shabbos parsha above the Hebrew date, before the Shacharis section. Center a single
+date and give each date its own equal-width column on two- or three-day handouts.
+Remove the duplicate weekday label below the Rosh Chodesh section heading. Keep
+skipping the Shabbos portion of Rosh Chodesh as before.
 Declare standard `justify-content: center` before `safe center` so browsers that do
 not support overflow-safe alignment still center the morning handouts on screen.
 The shared renderer must use the same centering for individual, duplicate, paired and

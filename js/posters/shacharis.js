@@ -28,7 +28,7 @@ export function buildAsaraShacharisPoster(year, settings) {
   if (!full) return null;
   return {
     hebrewYear: year, title: ASARA_TEXT.title, subtitle: ASARA_TEXT.shacharis,
-    span: full.span,
+    span: full.span, days: [full.span.from], showDates: true,
     rows: shacharisRoomRows(full.sets.find(set => set.calc === 'shacharis').lines.flat()),
   };
 }
@@ -94,7 +94,7 @@ export function buildRoshChodeshShacharisPoster(year, month, settings) {
     return {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
-      subtitle: 'שחרית',
+      subtitle: 'שחרית', showDates: true,
       dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
       span: { from: days[0], to: days.at(-1) }, days,
       rows: shacharisRoomRows(cells),

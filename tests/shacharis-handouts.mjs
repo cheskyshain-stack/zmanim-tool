@@ -27,6 +27,8 @@ test('Asara handouts retain the full poster morning times, rooms and conditional
     const full = buildAsaraBTevesPoster(year, settings), morning = buildAsaraShacharisPoster(year, settings);
     assert.deepEqual(rows(morning), expected);
     assert.deepEqual(morning.span, full.span);
+    assert.deepEqual(morning.days, [full.span.from]);
+    assert.equal(morning.showDates, true);
     assert.deepEqual(morning.rows.map(({ text, mark, underlined, timeNote }) => ({ text, mark, underlined, timeNote })),
       full.sets.find(set => set.calc === 'shacharis').lines.flat().map(({ text, mark, underlined, timeNote }) => ({ text, mark, underlined, timeNote })));
     assert.equal(morning.title, 'עשרה בטבת');
@@ -104,6 +106,7 @@ test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbo
       if (month === 13) adarI = true;
       if (month === 14) adarII = true;
       assert.deepEqual(poster.days, days);
+      assert.equal(poster.showDates, true);
       assert.deepEqual(poster.span, { from: days[0], to: days.at(-1) });
       assert.equal(poster.month, month);
       assert(poster.title.startsWith('ראש חודש '));
