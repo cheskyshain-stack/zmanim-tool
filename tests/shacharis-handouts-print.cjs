@@ -143,8 +143,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await chooseYear(year);
       const sections = await page.locator('#poster-group optgroup').evaluateAll(groups => groups.map(group => ({ label: group.label, names: [...group.children].map(option => option.textContent) })));
       assert.deepEqual(sections.map(section => section.label), ['Yom Tov', 'Rosh Chodesh', 'Other schedules']);
-      assert.deepEqual(sections[0].names, ['ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
-      assert(sections[1].names.every(name => name.startsWith('ראש חודש ')), 'Rosh Chodesh contains its individual months');
+      assert.deepEqual(sections[0].names, ['All Yom Tov', 'ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
+      assert.equal(sections[1].names[0], 'All Rosh Chodesh');
+      assert(sections[1].names.slice(1).every(name => name.startsWith('ראש חודש ')), 'Rosh Chodesh contains All and its individual months');
       if (choiceIndex > 0) {
         const title = await page.locator('.poster.is-shacharis .onepage-title').first().innerText();
         assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
@@ -239,7 +240,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
               title: shacharisDayGroups(poster.days, settings, tables).map(group => group.label).join(' ו') }] }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
-        available.map(poster => 'roshchodesh' + poster.month), 'Months with weekday schedules appear in date order');
+        ['all:roshchodesh', ...available.map(poster => 'roshchodesh' + poster.month)], 'All and the weekday months appear in date order');
       assert.equal(await page.locator('#poster-page-label').innerText(), 'Month');
       const shevatWeekday = await page.evaluate(async year => {
         const { dateFromHebrew, excelWeekday } = await import('/js/hebrew-calendar.js');

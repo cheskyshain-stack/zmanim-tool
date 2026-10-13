@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { specialOccasionChoices, occasionOptions } from '../js/ui/special-schedule-controls.js';
+import { specialOccasionChoices, occasionOptions, SPECIAL_COLLECTIONS, specialCollectionEntries } from '../js/ui/special-schedule-controls.js';
 
 const groups = [
   { name: 'ראש השנה יום כיפור', firstStart: 1 }, { name: 'סוכות', firstStart: 15 },
@@ -62,4 +62,22 @@ test('addition pickers offer only available sources and preserve safe option lab
   assert(!html.includes('ראש חודש שבט'));
   const custom = occasionOptions([{ name: 'Custom <script>', value: 'one"two', category: 'Other schedules' }]);
   assert(!custom.includes('<script>')); assert(custom.includes('value="one&quot;two"'));
+});
+
+test('All collections use available original schedules without duplicated or unrelated pages', () => {
+  const before = JSON.stringify(catalog);
+  assert.deepEqual(specialCollectionEntries(catalog, 'yomtov').map(entry => entry.key),
+    ['roshhashana', 'yomkippur', 'sukkos', 'pesach']);
+  assert.deepEqual(specialCollectionEntries(catalog, 'roshchodesh').map(entry => entry.key),
+    ['roshchodesh8', 'roshchodesh9', 'roshchodesh13', 'roshchodesh14']);
+  assert.deepEqual(specialCollectionEntries(catalog, 'unknown'), []);
+  assert.equal(JSON.stringify(catalog), before);
+});
+
+test('All options lead their own sections and are omitted from single-page addition pickers', () => {
+  const choices = specialOccasionChoices(groups, catalog);
+  const html = occasionOptions(choices, 'all:roshchodesh', SPECIAL_COLLECTIONS);
+  assert(html.includes('<optgroup label="Yom Tov"><option value="all:yomtov"'));
+  assert(html.includes('<optgroup label="Rosh Chodesh"><option value="all:roshchodesh" selected'));
+  assert(!occasionOptions(choices, 'poster:roshchodesh8').includes('value="all:'));
 });
