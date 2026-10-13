@@ -16,8 +16,6 @@ const server = http.createServer((req, res) => {
   res.end(fs.readFileSync(file));
 });
 const choices = ['עשרה בטבת', 'בה"ב אחר סוכות', 'בה"ב אחר פסח'];
-const chronologicalChoices = ['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות',
-  'ראש חודש', 'בה"ב אחר סוכות', 'חנוכה', 'עשרה בטבת', 'פורים', 'בה"ב אחר פסח', 'שבעה עשר בתמוז', 'תשעה באב'];
 const expected = [
   ['בית מדרש', '6:40'], ['בעזרת נשים', '7:00'], ['בית מדרש למטה', '7:15'],
   ['באולם השמחות', '7:35'], ['בית מדרש', '8:00'], ['בעזרת נשים', '8:20'], ['בית מדרש למטה', '8:40'],
@@ -143,7 +141,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.locator('#poster-group').selectOption(choice);
       if (choiceIndex === 0) await page.locator('label[for=poster-asara-option-shacharis]').click();
       await chooseYear(year);
-      assert.deepEqual(await page.locator('#poster-group option').allTextContents(), chronologicalChoices, 'Each dropdown section is chronological in ' + year);
+      const sections = await page.locator('#poster-group optgroup').evaluateAll(groups => groups.map(group => ({ label: group.label, names: [...group.children].map(option => option.textContent) })));
+      assert.deepEqual(sections.map(section => section.label), ['Yom Tov', 'Rosh Chodesh', 'Other schedules']);
+      assert.deepEqual(sections[0].names, ['ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
+      assert(sections[1].names.every(name => name.startsWith('ראש חודש ')), 'Rosh Chodesh contains its individual months');
       if (choiceIndex > 0) {
         const title = await page.locator('.poster.is-shacharis .onepage-title').first().innerText();
         assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
@@ -221,7 +222,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.locator('#poster-margin').selectOption('0.35'); await settle();
     const rcMeasured = [];
     for (const year of [5785, 5787, 5790]) {
-      await page.locator('#poster-group').selectOption('ראש חודש');
+      await page.locator('#poster-group').selectOption('poster:roshchodesh8');
       await chooseYear(year);
       const available = await page.evaluate(async year => {
         const { buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, shacharisDayGroups } = await import('/js/posters/shacharis.js');

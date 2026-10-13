@@ -235,7 +235,7 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.evaluate(() => document.activeElement.className), 'own-name', 'Editing an existing schedule retains focus');
         assert.equal(await page.locator('#poster-own-new').count(), 0);
         await print('retained-custom', 1, false);
-        await page.locator('#poster-group').selectOption('ראש השנה יום כיפור'); await settle();
+        await page.locator('#poster-group').selectOption('poster:roshhashana'); await settle();
         await page.locator('#poster-pick').selectOption('slichos'); await settle();
         const allSlichosTimes = await times();
         await radio('poster-design', 'old');
@@ -245,7 +245,7 @@ const server = http.createServer((req, res) => {
       // interfere with their remembered admin unlock timestamp.
       await page.goto(origin + '/admin/#posters/slichos'); await settle();
       await page.clock.setFixedTime(new Date('2026-09-23T16:00:00Z'));
-      await page.locator('#poster-group').selectOption('ראש השנה יום כיפור'); await settle();
+      await page.locator('#poster-group').selectOption('poster:roshhashana'); await settle();
       await page.locator('#poster-page-now').click(); await settle();
       assert.equal(await page.locator('#poster-pick').inputValue(), 'afteryk', 'Current page includes the active schedule after Yom Kippur');
       await context.close();

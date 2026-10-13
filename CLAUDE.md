@@ -73,6 +73,15 @@ Standalone Yom Kippur and its paired page also retain the after-Yom-Kippur sched
 in compact form. The whole-occasion page has that section separately, so do not repeat it there.
 Pages with just one design remain available with either selection. Keep
 plus/minus/Current controls and position/focus during changes.
+The Occasion dropdown has Yom Tov, Rosh Chodesh and Other schedules sections.
+Rosh Hashana and Yom Kippur are direct separate choices; Selichos, Tzom Gedalia,
+Shabbos Shuva and the after-Yom-Kippur page are separate other occasions.
+Rosh Chodesh lists each available month for the selected year directly, including
+both leap-year Adars and omitting Shabbos-only handouts. Keep the Month stepper.
+Use `specialOccasionChoices` for the main and Add-page dropdowns. Direct dropdown
+values use `poster:` without changing the canonical saved poster keys, group names
+or routes. Older paired/whole-occasion selections remain accessible and appear in
+the dropdown while selected. Plus/minus follow the expanded chronological choices.
 Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
 Current chooses the active or next page within the selected occasion, falling back
 to its first available page when that occasion has ended. Hebrew occasion routes

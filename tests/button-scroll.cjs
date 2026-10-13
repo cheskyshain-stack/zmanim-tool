@@ -112,7 +112,7 @@ const server = http.createServer((req, res) => {
       await clickInPlace('#poster-year-today', 'Return to Current year');
       await clickInPlace('#poster-group-next', 'Special schedule occasion +');
       await clickInPlace('#poster-group-back', 'Special schedule occasion -');
-      await page.locator('#poster-group').selectOption('ראש השנה יום כיפור');
+      await page.locator('#poster-group').selectOption('poster:roshhashana');
       await clickInPlace('#poster-page-next', 'Special schedule page +');
       await clickInPlace('#poster-page-back', 'Special schedule page -');
       await clickInPlace('#poster-page-next', 'Select another special schedule page');

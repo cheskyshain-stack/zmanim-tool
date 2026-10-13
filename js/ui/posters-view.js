@@ -45,7 +45,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { posterReferenceDates } from '../zmanim/references.js';
-import { specialScheduleControls, occasionOptions } from './special-schedule-controls.js';
+import { specialScheduleControls, occasionOptions, specialOccasionChoices } from './special-schedule-controls.js';
 import { normalizeHalfPagePairs } from './half-page-pairs.js';
 import { newPrintPage, normalizePrintPages, specialPrintPlan } from './special-print-job.js';
 
@@ -3058,15 +3058,17 @@ function printAdditionHtml(page, groups, catalog, resolve) {
   if (pendingAddition?.after !== page.id) return '';
   const half = pendingAddition.side !== 'page';
   const available = catalog.filter(entry => entry.value && (!half || resolve(entry.key)?.half));
-  const availableGroups = groups.filter(group => available.some(entry => entry.group === group.name));
-  const group = availableGroups.find(group => group.name === pendingAddition.group) || availableGroups[0];
+  const occasions = specialOccasionChoices(groups, available, { selectedKey: pendingAddition.key, availableOnly: true });
+  const occasion = (pendingAddition.key && occasions.find(choice => choice.key === pendingAddition.key))
+    || occasions.find(choice => !choice.key && choice.group === pendingAddition.group) || occasions[0];
+  const group = groups.find(group => group.name === occasion?.group);
   const choices = available.filter(entry => entry.group === group?.name);
   const selected = choices.find(entry => entry.key === pendingAddition.key) || choices[0];
   pendingAddition.group = group?.name;
   pendingAddition.key = selected?.key;
   return `<form class="special-add-page no-print" id="add-form-${escAttr(page.id)}" data-add-after="${escAttr(page.id)}">
     <h4>${half ? 'Add a schedule on the other half' : 'Add another page'}</h4>
-    <label>Occasion<select id="add-occasion-${escAttr(page.id)}" data-add-group>${occasionOptions(availableGroups, group?.name)}</select></label>
+    <label>Occasion<select id="add-occasion-${escAttr(page.id)}" data-add-group>${occasionOptions(occasions, occasion?.value)}</select></label>
     <label>Page<select id="add-choice-${escAttr(page.id)}" data-add-choice>${choices.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === selected?.key ? 'selected' : ''}>${escAttr(entry.label)}</option>`).join('')}</select></label>
     <div class="actions"><button type="submit" class="btn-primary" ${selected ? '' : 'disabled'}>Add ${half ? 'to other half' : 'page'}</button><button type="button" data-job-action="cancel" data-job-id="${escAttr(page.id)}">Cancel</button></div>
     ${half ? '' : `<div class="special-add-all"><button type="button" data-job-action="all-halves" data-job-id="${escAttr(page.id)}">Add all half-page schedules</button><button type="button" data-job-action="all" data-job-id="${escAttr(page.id)}">Add all available pages</button></div>`}
@@ -3147,6 +3149,10 @@ export function renderPosters(container, state, routeChanged, tables) {
   const pageChoices = choices.filter(entry => entry.value), pAt = pageChoices.findIndex(entry => entry.key === primary?.key);
   const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(new Date(), settings).serial, { includeExtra: true })?.key
     || pageChoices[0]?.key;
+  const occasions = specialOccasionChoices(groups, catalog, { selectedKey: primary?.key });
+  const occasion = (primary?.key && occasions.find(choice => choice.key === primary.key))
+    || occasions.find(choice => !choice.key && choice.group === group?.name);
+  const occasionAt = occasions.indexOf(occasion);
   chosenGroup = group?.name;
   chosen = primary?.key || null;
   if (!chosenPrintPages.length && primary) chosenPrintPages = [newPrintPage(primary.key, chosenCopiesPerPage === 2 && resolve(primary.key)?.half ? primary.key : '')];
@@ -3157,7 +3163,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   const own = primary?.poster?.own;
   container.className = `is-sheet-view is-special-schedules${plan.landscape ? ' is-half-letter-print is-half-paired-print' : ''}`;
   container.innerHTML = specialScheduleControls({ year, years, at: years.indexOf(year), preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`,
-    groups, group, gAt: groups.indexOf(group), current, selected: primary?.key, choices, design: chosenDesign,
+    groups: occasions, group, occasionValue: occasion?.value, gAt: occasionAt, current, selected: primary?.key, choices, design: chosenDesign,
     pAt, pCount: pageChoices.length, pageCurrent,
     asara: group?.name === 'עשרה בטבת', count: plan.frames.length, landscape: plan.landscape,
     printable: Boolean(plan.frames.length && !plan.issues.length), advanced: printSettingsOpen,
@@ -3187,14 +3193,18 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (entry) selectPrimary(entry.key);
     else { chosenGroup = name; chosen = null; chosenPrintPages = []; pendingAddition = null; commit(); }
   };
+  const toOccasion = value => {
+    const choice = occasions.find(choice => choice.value === value);
+    if (choice) toGroup(choice.group, choice.key);
+  };
   container.querySelector('#poster-year').addEventListener('change', event => { chosenYear = Number(event.target.value); pendingAddition = null; commit(); });
   for (const [id, offset] of [['poster-year-back', -1], ['poster-year-next', 1]]) container.querySelector('#' + id).addEventListener('click', () => {
     const next = years[years.indexOf(year) + offset]; if (next != null) { chosenYear = next; pendingAddition = null; commit(); }
   });
   container.querySelector('#poster-year-today').addEventListener('click', () => { chosenYear = null; pendingAddition = null; commit(); });
-  container.querySelector('#poster-group').addEventListener('change', event => toGroup(event.target.value));
-  container.querySelector('#poster-group-back').addEventListener('click', () => toGroup(groups[groups.indexOf(group) - 1]?.name));
-  container.querySelector('#poster-group-next').addEventListener('click', () => toGroup(groups[groups.indexOf(group) + 1]?.name));
+  container.querySelector('#poster-group').addEventListener('change', event => toOccasion(event.target.value));
+  container.querySelector('#poster-group-back').addEventListener('click', () => toOccasion(occasions[occasionAt - 1]?.value));
+  container.querySelector('#poster-group-next').addEventListener('click', () => toOccasion(occasions[occasionAt + 1]?.value));
   container.querySelector('#poster-group-now').addEventListener('click', () => toGroup(current?.name, current?.key));
   container.querySelector('#poster-pick')?.addEventListener('change', event => selectPrimary(event.target.value));
   container.querySelector('#poster-page-back')?.addEventListener('click', () => selectPrimary(pageChoices[pAt - 1]?.key));
@@ -3257,8 +3267,14 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (addedPageId) revealPrintAddition(container, addedPageId);
   }));
   const addition = container.querySelector('.special-add-page');
-  addition?.querySelector('[data-add-group]').addEventListener('change', event => { pendingAddition.group = event.target.value; pendingAddition.key = null; again(); });
-  addition?.querySelector('[data-add-choice]').addEventListener('change', event => { pendingAddition.key = event.target.value; });
+  addition?.querySelector('[data-add-group]').addEventListener('change', event => {
+    const half = pendingAddition.side !== 'page';
+    const available = catalog.filter(entry => entry.value && (!half || resolve(entry.key)?.half));
+    const choice = specialOccasionChoices(groups, available, { selectedKey: pendingAddition.key, availableOnly: true })
+      .find(choice => choice.value === event.target.value);
+    if (choice) { pendingAddition.group = choice.group; pendingAddition.key = choice.key || null; again(); }
+  });
+  addition?.querySelector('[data-add-choice]').addEventListener('change', event => { pendingAddition.key = event.target.value; again(); });
   addition?.addEventListener('submit', event => {
     event.preventDefault();
     const index = chosenPrintPages.findIndex(page => page.id === pendingAddition.after);

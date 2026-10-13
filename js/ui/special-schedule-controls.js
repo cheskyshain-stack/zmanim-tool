@@ -3,14 +3,45 @@ import { switchHtml } from './switch.js';
 import { printButtonHtml } from './print-page.js';
 
 const YOM_TOV = new Set(['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות']);
+const NORAIM_OCCASIONS = new Set(['slichos', 'roshhashana', 'tzomgedalia', 'shuva', 'yomkippur', 'afteryk']);
+
+// Keep the underlying poster groups and saved keys while exposing direct occasions.
+export function specialOccasionChoices(groups, catalog, { selectedKey = null, availableOnly = false } = {}) {
+  const choices = [];
+  const posterChoice = (entry, category) => ({ value: `poster:${entry.key}`, key: entry.key,
+    name: entry.whole ? `${entry.group} · ${entry.label}` : entry.label, group: entry.group,
+    category, from: entry.value?.span?.from ?? Infinity, disabled: !entry.value });
+  for (const group of groups) {
+    const entries = catalog.filter(entry => entry.group === group.name);
+    if (group.name === 'ראש השנה יום כיפור') {
+      for (const entry of entries) {
+        if (!NORAIM_OCCASIONS.has(entry.key) && entry.key !== selectedKey) continue;
+        if (availableOnly && !entry.value) continue;
+        choices.push(posterChoice(entry, ['roshhashana', 'yomkippur', 'pair', 'vasikinboth'].includes(entry.key) || entry.whole
+          ? 'Yom Tov' : 'Other schedules'));
+      }
+    } else if (group.name === 'ראש חודש') {
+      for (const entry of entries) {
+        if (!entry.poster?.dated || !entry.value && (availableOnly || entry.key !== selectedKey)) continue;
+        choices.push(posterChoice(entry, 'Rosh Chodesh'));
+      }
+    } else {
+      if (availableOnly && !entries.some(entry => entry.value)) continue;
+      choices.push({ value: group.name, name: group.name, group: group.name,
+        category: YOM_TOV.has(group.name) ? 'Yom Tov' : 'Other schedules', from: group.firstStart ?? Infinity });
+    }
+  }
+  return choices.sort((a, b) => a.from - b.from);
+}
 
 // Keep chronological order within each section, including custom occasions.
 export function occasionOptions(groups, selected) {
-  const names = groups.map(group => typeof group === 'string' ? group : group.name);
-  return [['Yom Tov', true], ['Other schedules', false]].map(([label, yomTov]) => {
-    const members = names.filter(name => YOM_TOV.has(name) === yomTov);
-    return members.length ? `<optgroup label="${label}">${members.map(name =>
-      `<option value="${escAttr(name)}" ${name === selected ? 'selected' : ''}>${escAttr(name)}</option>`).join('')}</optgroup>` : '';
+  const choices = groups.map(group => typeof group === 'string' ? { name: group } : group);
+  return ['Yom Tov', 'Rosh Chodesh', 'Other schedules'].map(label => {
+    const members = choices.filter(choice => (choice.category || (choice.name === 'ראש חודש' ? 'Rosh Chodesh'
+      : YOM_TOV.has(choice.name) ? 'Yom Tov' : 'Other schedules')) === label);
+    return members.length ? `<optgroup label="${label}">${members.map(choice =>
+      `<option value="${escAttr(choice.value ?? choice.name)}" ${(choice.value ?? choice.name) === selected ? 'selected' : ''} ${choice.disabled ? 'disabled' : ''}>${escAttr(choice.name)}</option>`).join('')}</optgroup>` : '';
   }).join('');
 }
 
@@ -28,7 +59,7 @@ export function specialScheduleControls(c) {
       <div class="poster-year"><span class="poster-year-label" id="poster-group-label">Occasion</span>
         <div class="poster-year-step" role="group" aria-labelledby="poster-group-label">
           <button type="button" id="poster-group-back" aria-label="Previous occasion" ${c.gAt === 0 ? 'disabled' : ''}>&minus;</button>
-          <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.group?.name)}</select>
+          <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.occasionValue)}</select>
           <button type="button" id="poster-group-next" aria-label="Next occasion" ${c.gAt === c.groups.length - 1 ? 'disabled' : ''}>+</button>
           <button type="button" id="poster-group-now" class="poster-year-reset" ${!c.current || c.current.name === c.group?.name && c.current.key === c.selected ? 'disabled' : ''}>Current</button>
         </div></div>
