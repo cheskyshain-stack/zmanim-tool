@@ -393,7 +393,7 @@ do not add location keys when the rooms are already written beside the times. Re
 times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
 beside the written location in the 6:40 row when exact sunrise is later than 7:05,
 without rounding sunrise first. Keep the short note on the same baseline as the room,
-in smaller type. Longer notes identifying particular BHB dates wrap within that
+in smaller type, separated from the location by a middle dot. Longer notes identifying particular BHB dates wrap within that
 location group, clear of the time at the left.
 Check each of BHB's three dates separately. If all three qualify, print only
 `סליחות קודם שחרית`. If only some qualify, add their weekdays and upcoming Shabbos

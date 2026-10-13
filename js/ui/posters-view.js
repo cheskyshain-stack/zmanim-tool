@@ -1782,7 +1782,7 @@ function shacharisRowsHtml(rows) {
     <div class="shacharis-handout-run">
       <div class="shacharis-handout-location" dir="rtl">
         <bdi class="shacharis-handout-room" lang="he">${escAttr(row.room)}</bdi>
-        ${row.timeNote ? `<bdi class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</bdi>` : ''}
+        ${row.timeNote ? `<span class="shacharis-handout-separator" aria-hidden="true">&middot;</span><bdi class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</bdi>` : ''}
       </div>
       <bdi class="shacharis-handout-time" dir="ltr">${timeHtml({ ...row, mark: '', underlined: false, timeNote: null })}</bdi>
     </div>
