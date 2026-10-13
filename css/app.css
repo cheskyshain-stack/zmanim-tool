@@ -4340,6 +4340,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .shacharis-handout-location { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
 .shacharis-handout-room, .shacharis-handout-time { flex: 0 0 auto; }
 .shacharis-handout-room { font-size: 0.85em; }
+.shacharis-handout-separator { flex: 0 0 auto; font-size: calc(9pt * var(--op-scale)); }
 .shacharis-handout-days {
   text-align: center; font-size: calc(9pt * var(--op-scale)); font-weight: 700;
   line-height: 1.3; padding-top: 0.035in;
