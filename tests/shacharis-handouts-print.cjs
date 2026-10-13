@@ -164,13 +164,17 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           ? choiceIndex === 1 ? ['וירא', 'וירא', 'חיי שרה'] : ['אחרי מות - קדושים', 'אחרי מות - קדושים', 'אמור']
           : choiceIndex === 1 ? ['לך לך', 'לך לך', 'וירא'] : ['בהר', 'בהר', 'בחוקותי'];
         assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
-          [`יום ב' וה' ${expectedParshas[0]}`, `יום ב' ${expectedParshas[2]}`],
+          [`יום ב' וה' ${expectedParshas[0]} ויום ב' ${expectedParshas[2]}`],
           'Each BHB morning has its weekday and upcoming Shabbos parsha on the first line, including combined readings');
         assert(!/[A-Za-z]|\b20\d{2}\b/.test(await page.locator('.shacharis-handout-dates').first().innerText()),
           'Printed BHB dates and parshas are entirely Hebrew');
-        const datePositions = await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date')
-          .evaluateAll(dates => dates.map(date => date.getBoundingClientRect().x));
-        assert(datePositions.length === 2 && datePositions[0] > datePositions[1], 'BHB dates read chronologically from right to left');
+        assert.equal(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date').count(), 1,
+          'All three BHB days share one header');
+        assert(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').evaluate(label => {
+          const range = document.createRange(); range.selectNodeContents(label);
+          const text = range.getBoundingClientRect(), box = label.getBoundingClientRect();
+          return Math.abs((text.left + text.right) / 2 - (box.left + box.right) / 2) < 1 && range.getClientRects().length === 1;
+        }), 'The complete BHB header is centered on one line at the normal print margin');
         if (year === 5787 && choiceIndex === 1) {
           assert.equal(await page.locator('.shacharis-handout-hebrew-date').count(), 0, 'Calendar dates are omitted');
         }
@@ -230,8 +234,8 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         return ROSH_CHODESH_SHACHARIS_MONTHS.map(month => buildRoshChodeshShacharisPoster(year, month, settings))
           .filter(Boolean).sort((a, b) => a.span.from - b.span.from).map(poster => ({ month: poster.month,
             title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]),
-            dates: shacharisDayGroups(poster.days, settings, tables).map(group => ({
-              dates: group.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' '), title: group.label })) }));
+            dates: [{ dates: poster.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' '),
+              title: shacharisDayGroups(poster.days, settings, tables).map(group => group.label).join(' ו') }] }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
         available.map(poster => 'roshchodesh' + poster.month), 'Months with weekday schedules appear in date order');
