@@ -57,6 +57,15 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     }
     await page.locator('.poster.is-shacharis').waitFor();
     const settle = () => page.evaluate(() => { const advanced = document.querySelector('.special-print-settings'); if (advanced) advanced.open = true; return document.fonts.ready; });
+    const setCopies = async copies => {
+      if (await page.locator('[data-job-action=remove-right]').count()) {
+        await page.locator('[data-job-action=remove-right]').first().click(); await settle();
+      }
+      if (copies === 2) {
+        await page.locator('[data-job-action=half]').first().click();
+        await page.locator('.special-add-page button[type=submit]').click(); await settle();
+      }
+    };
     const chooseYear = async year => {
       while (Number(await page.locator('.poster-year-now').getAttribute('data-year')) !== year) {
         await page.locator(Number(await page.locator('.poster-year-now').getAttribute('data-year')) < year ? '#poster-year-next' : '#poster-year-back').click();
@@ -123,7 +132,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     for (const [choiceIndex, choice] of choices.entries()) for (const year of [5785, 5787, 5790]) for (const width of [1440, 375]) for (const copies of [1, 2]) {
       await page.setViewportSize({ width, height: 1100 });
       await page.locator('#poster-group').selectOption(choice);
-      if (choiceIndex === 0) await page.locator('#poster-pick').selectOption('asarashacharis');
+      if (choiceIndex === 0) await page.locator('label[for=poster-asara-option-shacharis]').click();
       await chooseYear(year);
       assert.deepEqual(await page.locator('#poster-group option').allTextContents(), chronologicalChoices, 'Each dropdown section is chronological in ' + year);
       if (choiceIndex > 0) {
@@ -163,7 +172,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert.equal(await header.locator('.shacharis-handout-hebrew-date').count(), 0);
         assert.equal(await header.locator('.shacharis-handout-date').count(), 1);
       }
-      await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
+      await setCopies(copies);
       await settle();
       assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0,
         'A standalone half-page poster does not offer unrelated layouts');
@@ -184,7 +193,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await page.locator('#poster-group').selectOption(choices[1]);
       await chooseYear(year);
       for (const copies of [1, 2]) for (const margin of ['0.35', '0.75']) {
-        await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
+        await setCopies(copies);
         await page.locator('#poster-margin').selectOption(margin); await settle();
         assert.deepEqual(await page.locator('.shacharis-handout-note').allTextContents(), Array(copies).fill(note),
           'A mixed round clearly prints only the dates that need Selichos before Shacharis');
@@ -229,7 +238,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         for (const width of [1440, 375]) for (const copies of [1, 2]) {
           await page.setViewportSize({ width, height: 1100 });
           await page.locator('#poster-pick').selectOption('roshchodesh' + poster.month);
-          await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
+          await setCopies(copies);
           await settle();
           assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0);
           assert((await page.locator('.onepage-title').first().innerText()).startsWith(poster.title));
@@ -253,6 +262,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         }
       }
     }
+    await setCopies(1);
     await chooseYear(5786);
     await page.locator('#poster-pick').selectOption('roshchodesh11'); await settle();
     await chooseYear(5787);
@@ -270,19 +280,20 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     assert(page.url().endsWith('#posters/' + await page.locator('#poster-pick').inputValue()), 'The address follows the available replacement month');
     await page.locator('#poster-group').selectOption(choices[2]); await settle();
     await chooseYear(5785); // Include the long אחרי מות - קדושים label at the largest margin.
+    await setCopies(2);
     for (const margin of ['0.15', '0.75', '0.35']) {
       await page.locator('#poster-margin').selectOption(margin); await settle(); await measure(2);
     }
     await page.locator('label[for=poster-ink-mono]').click(); await settle(); await measure(2);
     await page.reload(); await page.locator('.poster.is-shacharis').first().waitFor(); await settle();
-    assert(await page.locator('#poster-copies-two').isChecked(), 'Copies setting survives reload');
+    assert.equal(await page.locator('.poster.is-shacharis').count(), 2, 'Paired copy survives reload');
     assert(await page.locator('#poster-ink-mono').isChecked());
     assert.equal(await page.locator('#poster-margin').inputValue(), '0.35');
     await measure(2);
     for (const [oldGroup, newGroup] of [['בה"ב חשון · שחרית', choices[1]], ['בה"ב אייר · שחרית', choices[2]]]) {
       await page.evaluate(group => {
         const saved = JSON.parse(localStorage.getItem('zmanim-poster-bar-v1'));
-        saved.group = group; saved.sheet = null;
+        saved.group = group; saved.sheet = null; delete saved.printPages; saved.copiesPerPage = 2;
         localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify(saved));
       }, oldGroup);
       await page.goto(origin + '/admin/?legacy-group=' + encodeURIComponent(oldGroup) + '#posters/all');
@@ -291,11 +302,10 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       await measure(2);
     }
     for (const key of ['asarashacharis', 'behabcheshvan', 'behabiyar']) {
-      await page.goto(origin + '/admin/#posters/' + key); await page.locator('.poster.is-shacharis').first().waitFor(); await settle(); await measure(2);
+      await page.goto(origin + '/admin/#posters/' + key); await page.locator('.poster.is-shacharis').first().waitFor(); await settle(); await setCopies(2); await measure(2);
     }
     await page.locator('#poster-group').selectOption('עשרה בטבת'); await settle();
-    await page.locator('#poster-pick').selectOption('asarabteves');
-    await page.locator('label[for=poster-sheets-all]').click(); await settle();
+    await page.locator('label[for=poster-asara-option-full]').click(); await setCopies(2); await settle();
     assert.equal(await page.locator('.poster.is-shacharis').count(), 0, 'The full Asara schedule remains separate');
     assert.equal(await page.locator('.halfpage-body.is-asara').count(), 2, 'Existing compact Asara copies remain available');
     assert.equal(await page.locator('.halfpage-body.is-asara .onepage-sec-head').first().innerText(), 'שחרית');

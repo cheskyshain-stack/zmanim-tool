@@ -147,6 +147,7 @@ const server = http.createServer((req, res) => {
 
     for (const key of ['pesach', 'shuva', 'roshhashana', 'yomkippur', 'slichos', 'tzomgedalia', 'sukkos', 'chanukah', 'vasikinboth', 'afteryk', 'sukkosshuava']) {
       await page.goto(origin + '/admin/#posters/' + key); await settled(); await switchOn();
+      await page.locator('label[for=poster-design-old]').click(); await settled();
       if (await page.locator('#poster-pick').count()) assert.equal(await page.locator('#poster-pick').inputValue(), key, 'The intended poster is open');
       else assert(page.url().endsWith('#posters/' + key), 'Single-option poster opens directly');
       const targets = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d{1,2}:\d{2}/ });
@@ -181,12 +182,13 @@ const server = http.createServer((req, res) => {
     assert.match(await clickTime(ownTimes.nth(2)), /18 minutes[\s\S]*Add\s+3 minutes/); await close();
 
     await page.goto(origin + '/admin/#posters/chanukah'); await settled();
-    await page.locator('label[for=poster-sheets-all]').click(); await settled(); await switchOn();
+    await page.locator('label[for=poster-design-new]').click(); await settled(); await switchOn();
     const combined = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d{1,2}:\d{2}/ });
     for (let i = 0; i < await combined.count(); i++) { await clickTime(combined.nth(i)); await close(); }
     console.log('Verified custom schedules, appended rules, weekly One sheet and combined Chanukah');
 
     await page.goto(origin + '/admin/#posters/pesach'); await settled(); await switchOn();
+    await page.locator('label[for=poster-design-old]').click(); await settled();
     const drasha = page.locator('.poster-row').filter({ hasText: 'דרשה' }).locator('[data-time-explain]').first();
     assert.match(await clickTime(drasha), /28 minutes[\s\S]*down to a 5 minute mark/); await close();
     const target = page.locator('#poster-sheet [data-time-explain]').filter({ hasText: /\d:\d\d/ }).first();

@@ -54,19 +54,44 @@ away from the button, and rule editors open beside their row. `tests/button-scro
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
 
-## Restored print controls
+## Special schedules and chart printing
 
-The user rejected the shared Schedules/Pages/Appearance navigation and requested the
-earlier setup preserved at `backup/print-navigation-2026-10-12`, based on
-`82793f6e19e91e3a71de3c40a575d6d9a9696636`. Restore its original weekly, seasonal,
-saved-chart and special-schedule controls, including plus/minus/Current, pairing,
-custom schedules, Molad and all paper options. The newer navigation adapters and
-mode switch are removed; old stored navigation preferences are ignored.
+The rejected Schedules/Pages/Appearance navigation remains removed. Special schedules
+now start with **Year**, **Occasion**, and one **New design / Old design** switch.
+New design is the default; Old design uses the framed original where available.
+Pages with just one design remain available with either selection. Keep
+plus/minus/Current controls and position/focus during changes.
 
-Keep the later chart-fitting correction below. Preserve saved chart data, overrides,
-page splits and print choices rather than importing an old browser snapshot.
-`tests/saved-chart-fit.cjs` checks all four restored interfaces with absent, simple
-and classic stored preferences, as well as readable chart fonts and actual PDFs.
+The **+ Custom schedule** button is removed. Retain already saved custom sheets and
+editing them. Asara B'Teves has three top choices: regular Shacharis/Mincha/Maariv,
+Shacharis only, and Shacharis with locations plus Mincha/Maariv on one page.
+Use the original full/half-page renderers and calculations. On Friday, retain that
+Friday's canonical schedule rather than adding weekday Maariv times.
+
+Each open page offers **Add another page**. Half pages also offer **Add on the other
+half**. The inline picker replaces separate Print a set / Pair half pages screens.
+It also offers bulk additions; reuse empty halves and avoid duplicate selections.
+`js/ui/special-print-job.js` retains logical selections when a design needs separate
+physical sheets. Mixed jobs use portrait Letter with half-page pairs turned together;
+all-half jobs use landscape Letter. Keep real 5.5 x 8.5 inch halves and fixed footers.
+Remember jobs in `zmanim-poster-bar-v1.printPages`, preserving old settings and migrating
+old pairings, location styles, sets and duplicate copies. Skip Shabbos-only Rosh
+Chodesh selections in a standalone handout when stepping to a new year; explicitly
+queued unavailable pages must be resolved before printing.
+
+Seasonal charts and saved charts use **Separate pages · Letter**. Together on Letter
+and 11 x 17 choices are removed; old remembered combined values fall back to separate
+pages without changing stored charts. Weekly schedule cards keep their own layout
+options. Keep the fractional-measurement correction below.
+
+Current browser checks: `tests/contextual-special-printing.cjs` covers the new controls,
+all Asara choices, fallbacks, additions, pairing, bulk jobs, migration, existing custom
+sheets, fixed footers and actual PDF geometry. `tests/shacharis-handouts-print.cjs`
+checks the complete BHB/Asara/Rosh Chodesh handouts, and `tests/button-scroll.cjs`,
+`tests/time-explanations.cjs` and `tests/saved-chart-fit.cjs` retain their broader checks.
+The older control-specific suites for retired workflow/copy/combined-chart pickers
+are consolidated into these current tests. Their prior fixtures remain in Git history.
+The original setup remains backed up at `backup/print-navigation-2026-10-12`.
 
 ## Deploy loop
 
@@ -177,46 +202,12 @@ available as a comparison zman and retain the workbook definitions themselves.
 `tests/mincha-gedola-lechumra.mjs` checks limits, seasonal branches, holiday
 openings, downstream schedules and legacy custom rows.
 
-Chart printing has a remembered **Print layout** picker: **Separate pages · Letter**
-keeps the original interleaved pages; **Together · Letter** joins each paired page
-on one landscape Letter sheet; **Together · 11 × 17** uses landscape Tabloid.
-Both combined choices have matching screen and physical paper dimensions and retain
-every source cell. Fit Letter independently instead of printing a shrunken Tabloid
-preview. Preserve previously remembered choices. Weekdays are on the right, Shabbos and Friday on
-the left, and the parsha appears once at the far right. The upper headings are
-**שבת** and **ימות החול**; Friday has no separate upper heading. Do not add dates
-to the parsha cells. Preserve the original special-parsha, Chanukah and molad notes.
-Use the shared source chart cells, including rules, saved overrides, announced
-values, room marks and explanation attributes. Join rows by their actual serial,
-keeping weekday-only holiday rows with an empty Shabbos side. Keep the single
-weekday morning panel and one location legend, rounding note and address per page.
-Combined Tabloid pages measure 1632 by 1056px (17 by 11 inches); combined Letter
-and separate pages measure 1056 by 816px (11 by 8.5 inches).
-Measure at the selected paper size and fit the entire job without changing
-saved font sizes. Week rows are equal within a page, including across split DST
-sections. The two heading rows have their own natural heights. The combined morning
-panel inherits the chart font size even though it sits outside the table. Include
-its room stars when building the location legend. Keep controls and screen fitting
-off paper, preserve scroll and focus on layout changes, and reset the paper size
-when leaving the chart. `tests/combined-chart-print.cjs` verifies both chart types,
-holiday rows, room marks, overrides, rules, clock changes, margins, molad, no added
-dates, remembered choices and actual desktop/phone PDF sizes and page counts.
-The Android print service may retain Letter paper despite the selected Tabloid
-layout. Its print queries can report different dimensions from the final sheet,
-and a CSS zoom fit was applied again by the print service, leaving a small chart
-in the corner. For combined jobs only, copy the fitted HTML into a print-only SVG
-viewBox and let its percentage width and height fit the actual containing block.
-Give the print-only html/body/run a definite percentage height, so each frame can
-fit both dimensions even with printer margins. Cap each frame at the selected size.
-Retain native
-PDF text, fonts and all original layout. Register this after the paper fitting.
-Keep the hidden print copy until the next draw or print, since Android can re-render
-the job after window.print() returns. setPrintPage clears it on view changes.
-The combined picker names **Letter and Landscape** for the Letter option, and
-Android's landscape **Ledger (17 × 11)** paper for the larger option.
-Browser checks must test the actual printed width as well as complete text and
-page counts on portrait/landscape Letter, with margins, and full-size Tabloid.
-Check both an overridden @page and a print service resizing the requested paper.
+Chart printing uses separate landscape Letter pages, with Shabbos page 1 followed
+by its matching weekday page 1, and so on. Each physical chart is 1056 by 816px
+(11 by 8.5 inches). Preserve every source cell, saved override, rule, room mark,
+Molad note and explanation attribute. Keep print controls and screen scaling off
+paper. Previously stored combined-layout preferences must not restore those removed
+choices. The legacy combined renderer remains internal; no live chart picker uses it.
 
 When fitting chart height, ignore DOMRect differences smaller than 1/256 CSS pixel.
 Fractional screen placement can
@@ -261,15 +252,15 @@ If Chanukah includes two Sundays with different extra times, label each with its
 Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.
 
 Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
-under **Compact** (previously **All on one**). **Just one** and **A sheet each** keep the original full-page
+under **New design**. **Old design** keeps the original full-page
 portrait poster, including its original headings, spacing and location notes; they
 never show or apply the Copies per page switch, even when two copies was remembered.
 Keep the original full-page type sizes. Tighten section gaps only when the extra
 Sunday line needs room to keep the location notes within the print margins.
 The original poster's last schedule block has no trailing margin; the legend provides
 the gap so its location notes stay clear of the frame even with six sunrise references.
-The remembered **Copies per page** switch selects one copy on the left with the other
-half blank, or two identical copies side by side for a manual cut. The default is one;
+The contextual **Add on the other half** action selects another handout, including
+a second copy of the same page, for a manual cut. The default is one;
 both choices keep the same design and physical size.
 The half-page letterhead uses a larger 2.7in wordmark, with balanced 0.9in corner
 columns for the photo and rabbi's line. Let the wordmark shrink within its column
@@ -277,7 +268,7 @@ when a wider print margin reduces the space, keeping all three parts clear.
 Reserve the logo's aspect ratio before loading so the fit includes its full height.
 The Shacharis day-group labels are bold. Keep Shacharis together,
 including all sunrise day labels in a compact strip with clear gaps between each
-day/time pair, followed by one Mincha section and Maariv. In Compact mode, every
+day/time pair, followed by one Mincha section and Maariv. In New design, every
 Mincha day group has its complete menu under the single **מנחה** heading, including
 Sunday's extra time and Erev Shabbos. Order groups by their earliest actual date.
 Use weekday labels and Erev Shabbos parsha labels; when two Sundays or Fridays have
@@ -293,9 +284,9 @@ menus and the footer within the margin. Retain at least 9.5pt times, including y
 with two distinct Sunday menus at the largest margin.
 Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
 onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
-`tests/chanukah-half-letter.cjs` checks seven years, phone and desktop PDFs, margin
-controls, all three sheet modes, one and two copies, remembered choices, content retention
-and mixed-run pagination.
+`tests/contextual-special-printing.cjs` checks native half-page and mixed-job
+pagination, both designs, additions, remembered choices, margin extremes and content
+retention at phone and desktop widths.
 
 The after-Sukkos extra 9:00 Maariv is kept through Thursday, October 8, 2026 in Lakewood
 and omitted from Friday onward, including future years previewed before that date.
@@ -318,19 +309,19 @@ the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle
 lighting and sunset, without a weekday Maariv block; the weekly page and next-minyan
 engine retain the chart's regular Friday-night Maariv. The same builder feeds the
 posters, public Special Schedules, weekly agenda, schedule API and fast-day message.
-Its admin **Compact** mode uses the same 5.5in by 8.5in half-page handout and
-remembered one-or-two Copies per page switch as Chanukah. Keep the Selichos note
-beside 6:40 and retain every time and location mark. **Just one**, **A sheet each**
-and public Special Schedules retain the original full-page poster. Mixed whole-year
-Compact runs rotate both handouts onto their own portrait page, as for Chanukah.
+Its admin **New design** uses the same 5.5in by 8.5in half-page handout as Chanukah.
+Add another schedule, or the same one, through Add on the other half. Keep the
+Selichos note beside 6:40 and every time and location mark. **Old design** and public
+Special Schedules retain the original full-page poster. Mixed jobs rotate complete
+half-page pairs together onto their own portrait sheet.
 The Asara half-page body keeps the tefillah blocks together as a centered group,
 with modest fixed gaps instead of distributing three blocks across the page.
 Retain comfortable leading within each list. Keep weekday sunset beside Maariv,
 and Friday candle lighting and sunset together below Mincha. Leave a clear gap
 above the location notes, and fit the schedule at the actual printed size.
 Do not draw divider lines between compact time rows within a half-page Asara tefillah.
-Asara's full-schedule **Half page** format has a remembered **Shacharis layout** choice:
-**Compact times** (the existing default) or **Shacharis with locations**. The latter
+Asara's three top schedule choices include the regular compact full schedule and
+**Shacharis locations + Mincha/Maariv**, as well as morning only. The detailed option
 uses the morning handout's seven time/room rows and conditional Selichos note, followed
 by the original compact Mincha, sunset and Maariv. Friday retains its own Mincha,
 candle lighting and sunset and does not gain a weekday Maariv section. Use subtle row
@@ -340,14 +331,10 @@ weekday/parsha and tefillah group between the fixed title and 6.5pt regular foot
 At wide margins, reduce afternoon row padding if the minimum type size still needs
 room, then detailed morning outer padding only when needed. Keep the inner room/time
 spacing and font sizes. Verify the full permitted 0.75in margin, not only 0.5in.
-`tests/asara-locations-print.cjs` checks the option, original times/marks,
-Friday rules, native Letter pages, centered fit, margin extremes, copies, saved styles,
-pairing and swaps, comparison groups, and control position/focus at phone/desktop widths.
-`tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
-51 calendar years, rooms, and shared schedule output. `tests/asara-bteves-print.cjs`
-checks both reference layouts, phone and desktop printing, all sheet modes, the
-conditional note, half-page copies and saved choices, margins, the public Special
-Schedule, and the copyable fast-day message.
+`tests/contextual-special-printing.cjs` checks the variants, original times/marks,
+Friday rules, native Letter pages, widest margin, saved styles, pairing and swaps.
+`tests/asara-bteves.mjs` checks reference years, sunrise and rounding boundaries,
+51 calendar years, rooms and shared schedule output.
 
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
@@ -411,27 +398,16 @@ the arithmetic, while times printed with seconds retain that precision.
 The separate Calculation guide was removed. Old `#calc` bookmarks open Seasonal charts;
 calculation details come from clicking a time with Explain times enabled.
 
-Special schedules uses **One schedule** and **Print a set**. Keep the year and
-occasion minus/plus/Current controls, and the margin minus/plus/Original controls.
-The occasion dropdown has Yom Tov and Other schedules sections, each chronological.
-Asara's Shacharis handout is selected under Asara's Schedule picker. This is a UI
-alias only: shared public poster builders keep their original occasion groups.
-Current includes active and upcoming morning handouts and picks the actual Rosh
-Chodesh month. Printing sets uses named checkboxes, with paired alternatives off
-by default. Whole-year sets exclude morning handouts, and combined sets keep the
-separate Vasikin announcement. Their half-page posters rotate onto portrait Letter
-paper through the existing mixed-run print rules. Changing selections must not
-change calculated times or the physical poster designs.
+Special schedules keeps Year, Occasion and Design first. The occasion dropdown has
+Yom Tov and Other schedules sections, each chronological. Current includes active
+and upcoming morning handouts and selects the actual Rosh Chodesh month. Asara's
+three options share its occasion; public builders keep their existing group names.
+Check zmanim and Explain times stay beside the preview, backed by shared controllers.
+Other admin screens retain their sidebar switches. Clear special-screen and
+half-Letter classes when leaving the screen. Controls and existing custom editors
+stay off paper. Pages are added beside their preview instead of on separate setup
+screens; physical sheets are calculated from the selected designs and placements.
 
-Special schedules places Check zmanim and Explain times beside the preview, backed
-by the shared controllers. Other admin screens retain their sidebar switches.
-Clear the special-screen and half-Letter classes when leaving the screen. Print
-settings collapse on screen, while all selection controls and custom editors stay
-outside printed content. `tests/special-schedules-navigation.cjs` covers the new
-controls, migrations, named selections, mobile widths and physical page counts.
-
-**Pair half pages** is a third admin workflow for Chanukah and Asara B'Teves compact
-posters and every existing Shacharis handout, including BHB and weekday Rosh Chodesh.
 Morning handouts center their dates and schedule together between the title rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
 Rosh Chodesh and fast-day morning handouts use BHB's grouped Hebrew weekday and
@@ -445,29 +421,25 @@ not support overflow-safe alignment still center the morning handouts on screen.
 The shared renderer must use the same centering for individual, duplicate, paired and
 mixed print sets. Fuller handouts fit within the available space through the existing
 type-size fitter rather than stretching their rows.
-Choose each sheet's left and right schedule, swap halves, reorder or remove sheets,
-leave either half blank, or pair the same schedule with itself. An Asara selection
-has its own **Shacharis layout** choice per half, remembered as `leftShacharis` or
-`rightShacharis` and carried with that half when swapping. The single-schedule
-preference does not change existing pairs. **Add all half pages**
-appends every remaining available half-page schedule without changing existing pairs.
-Keep the pairing layout and its year in the remembered poster bar; use `#posters/halfpages`
-for this view. Retain the year minus/plus/Current controls and margin/ink settings.
-Render every half through its original renderer at 5.5in by 8.5in. Paired sets use
-landscape Letter paper for the entire run, with two halves per physical sheet and no
-rotation. Ignore the single-schedule duplicate-copy preference in this workflow.
+Choose the other half or a new sheet through the contextual add picker. Retain swaps,
+page ordering, removal and separation. Asara location styles travel with their
+selection as the stable `asaralocations` key in printPages. Old leftShacharis /
+rightShacharis preferences migrate without losing their layout. Bulk half-page
+additions fill existing empty halves, then append remaining schedules chronologically.
+All-half jobs use landscape Letter; mixed jobs turn the full pair canvas together
+on portrait Letter. Render actual halves at 5.5 by 8.5 inches throughout.
+
 Half-page footers use fixed 6.5pt regular-weight text, including the shul name and
 address on morning handouts. Combined special schedules and paired full-page posters
 use fixed 7.5pt regular-weight footers, independent of the fitted schedule font size.
 Chanukah's location note uses the same "All underlined מנינים will be בבית מדרש למטה"
 wording as the other special schedules. The weekly One sheet retains its own footer style.
-Morning handouts remain excluded from the original whole-year set and public runs.
-Do not silently drop a selected schedule that is unavailable after a year change;
-show its pairing's warning and require another choice or Blank before enabling Print.
-Each selected half has its own Check zmanim context. Clear `is-half-paired-print`
-when leaving Special schedules. `tests/half-page-pairs.cjs` checks exact half-sheet
-coordinates and PDF page counts, all available schedules, content equality with
-single-schedule handouts, remembered pairings, controls and 320/375/1440px widths.
+Bulk addition offers all half-page schedules or all available pages. Skip missing
+entries when building a bulk job. Explicit unavailable selections in existing jobs
+warn and disable Print until resolved. Comparison contexts include all dates on each
+physical sheet. Clear is-half-paired-print when leaving Special schedules.
+`tests/contextual-special-printing.cjs` verifies actual PDF page counts, slot geometry,
+fixed footer type, all available schedules, remembered selections and mobile widths.
 
 Admin also has a remembered **Show zmanim** switch for comparing every seasonal page,
 saved print layout, weekly schedule and special poster with the actual day's zmanim.
