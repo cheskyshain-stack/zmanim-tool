@@ -83,6 +83,12 @@ values use `poster:` without changing the canonical saved poster keys, group nam
 or routes. Older paired/whole-occasion selections remain accessible and appear in
 the dropdown while selected. Plus/minus follow the expanded chronological choices.
 Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
+Keep the selection panel compact, capped at 30rem rather than filling a wide screen.
+Each dropdown comes first with its minus/plus pair on the right; Current sits beside
+the field label. Margin uses the same layout with Original. Phone touch buttons
+remain at least 44px tall. These are screen controls, not printed layout changes.
+Font-ready preview fitting preserves its current scroll position synchronously,
+including after a reset moves focus to that field's dropdown.
 Current chooses the active or next page within the selected occasion, falling back
 to its first available page when that occasion has ended. Hebrew occasion routes
 must encode individual URL segments and decode them before comparing or selecting,
