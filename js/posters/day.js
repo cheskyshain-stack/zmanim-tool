@@ -23,8 +23,9 @@
 // charts overlap: the sheet works them off the שבת חורף chart's own columns, so what it hands
 // over is the chart's answer with the two lines the chart has no column for added. Every other
 // day it covers is one the charts do not have.
-import { roshHashana, hebrewDateExtended, specialDaysInWeek, hasRoshChodesh } from '../hebrew-calendar.js';
-import { roshChodeshSchedule } from './special-shacharis.js';
+import { roshHashana, hebrewDateExtended, specialDaysInWeek, hasRoshChodesh, chanukahYearFor } from '../hebrew-calendar.js';
+import { roshChodeshSchedule } from './rosh-chodesh-schedule.js';
+import { chanukahScheduleLines } from './chanukah.js';
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
@@ -231,6 +232,11 @@ export function specialShacharis(serial, settings) {
 export function weekdayMornings(shabbosSerial, settings, everyday, special) {
   const lines = slichosWeekLines(shabbosSerial, settings);
   const season = lines.some((g) => differsFromSchedule(g.html, everyday)) ? lines : [];
+  const chanukahDays = Array.from({ length: 6 }, (_, index) => shabbosSerial - 6 + index)
+    .filter(day => chanukahYearFor(day, settings) && !hasRoshChodesh(day, settings));
+  if (chanukahDays.length) season.push({ name: 'חנוכה',
+    day: chanukahDays.map(day => DAY_NAMES[day - shabbosSerial + 6]).join(', '),
+    html: chanukahScheduleLines(chanukahDays, settings, { includeRoshChodesh: false, mergeAll: true }) });
   const days = specialDaysInWeek(shabbosSerial, settings);
   const fasts = days.filter((d) => d.fast);
   const rest = days.filter((d) => !d.fast);

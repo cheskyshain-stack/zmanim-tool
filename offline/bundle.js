@@ -4680,9 +4680,12 @@ function specialShacharisLines() {
 
 const RC_BEFORE_NETZ_MINUTES = 25;
 
+const specialShacharisHtml = lines => lines.map(line => line.map(cell =>
+  `${cell.underlined ? `<u>${cell.text}</u>` : cell.text}${cell.mark}`).join(' ')).join('\n');
+
 /** One schedule for the whole weekday portion of a Rosh Chodesh. The later
  * sunrise governs both dates, and rounding up never crosses the earliest start. */
-function roshChodeshSchedule(serial, settings) {
+function roshChodeshBaseSchedule(serial, settings) {
   const at = hebrewDateExtended(serial, settings.useGregorianBefore1582);
   if (![1, 30].includes(at.dayOfMonth)) return null;
   const before = hebrewDateExtended(serial - 1, settings.useGregorianBefore1582);
@@ -4705,7 +4708,7 @@ function roshChodeshSchedule(serial, settings) {
     return { ...cell, text: trace.plain(), trace };
   }));
   return { days, month, title: `ר"ח ${JEWISH_MONTHS_HE[month - 1]}`, lines,
-    html: lines.map(line => line.map(cell => `${cell.underlined ? `<u>${cell.text}</u>` : cell.text}${cell.mark}`).join(' ')).join('\n') };
+    html: specialShacharisHtml(lines) };
 }
 
 // ==== posters/chanukah.js ====
@@ -4772,7 +4775,7 @@ const CH_REGULAR_SHIFT_MINUTES = 10;
 
 /** The historical 6:40 Rosh Chodesh baseline, retained only for the candidate
  * average that ordinary Chanukah rows already use. Posted Rosh Chodesh rows use
- * roshChodeshSchedule and are never averaged below their latest weekday floor. */
+ * the shared Chanukah average when all weekday candidates are pushed by netz. */
 const CH_RC_FLOOR_MINUTES = 20;
 
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
@@ -4903,7 +4906,7 @@ function chanukahShacharisDay(serial, settings) {
   const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
     .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
     .round('to the closer minute');
-  const rcSchedule = isRoshChodesh ? roshChodeshSchedule(serial, settings) : null;
+  const rcSchedule = isRoshChodesh ? roshChodeshBaseSchedule(serial, settings) : null;
   const vasikin = rcSchedule ? rcSchedule.lines[0][0].trace : vasikinNetz.laterOf(
     before10(7, 0, "the everyday board's own first morning minyan"),
     'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
@@ -5083,12 +5086,13 @@ function combineShacharisRows(days) {
     const cells = group[0].isRoshChodesh ? group[0].lines.map(toCell)
       : group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
     const vasikin = chanukahVasikinBetween(group, shared, allPushed ? days : undefined);
-    // Rosh Chodesh has a strict earliest start, so its posted row uses the latest
-    // weekday sunrise rather than Chanukah's ordinary-day average.
-    if (group[0].isRoshChodesh) {
+    // When every weekday morning is pushed by netz, both kinds use the same
+    // average. Otherwise Rosh Chodesh retains its latest-weekday earliest start.
+    if (group[0].isRoshChodesh && !allPushed) {
       vasikin.time = cells[0].text;
       vasikin.trace = group[0].lines[0];
     }
+    cells[0] = toCell(vasikin.trace);
     return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin };
   };
   const rows = [];
@@ -5390,6 +5394,22 @@ function buildChanukahPoster(year, settings, tables) {
       { dir: 'rtl', text: '*בעזרת נשים    **באולם השמחות' },
     ],
   };
+}
+
+// ==== posters/rosh-chodesh-schedule.js ====
+/** The posted Rosh Chodesh morning, including Chanukah's shared first-minute
+ * average. The Chanukah calculation itself reads the base schedule, avoiding
+ * recursion. Every chart, handout, message and upcoming time quotes this result. */
+function roshChodeshSchedule(serial, settings) {
+  const schedule = roshChodeshBaseSchedule(serial, settings);
+  if (!schedule || schedule.month !== 10) return schedule;
+  const year = hebrewDateExtended(serial, settings.useGregorianBefore1582).year;
+  const posted = chanukahPostedShacharisRows(year, settings).find(row => row.isRoshChodesh);
+  if (!posted) return schedule;
+  let index = 0;
+  const lines = schedule.lines.map(line => line.map(cell => index++ === 0
+    ? { ...cell, text: posted.vasikin.time, trace: posted.vasikin.trace } : cell));
+  return { ...schedule, lines, html: specialShacharisHtml(lines) };
 }
 
 // ==== sheets/choref.js ====
@@ -9939,8 +9959,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // mornings keep their standing schedule; Teves remains in the Chanukah block.
     kinds.roshChodesh = false;
     const rcHeading = block => {
-      const months = block.months.map(month => JEWISH_MONTHS_HE[month - 1]);
-      return `ר"ח ${months.length === 1 ? months[0] : `${months.slice(0, -1).join(', ')} ו${months.at(-1)}`}`;
+      if (block.months.length > 1) return 'ראש חודש';
+      return `ר"ח ${JEWISH_MONTHS_HE[block.months[0] - 1]}`;
     };
     const matchingRoshChodesh = kinds.behab || kinds.taanis
       ? roshChodeshBlocks.find(block => block.html === WEEKDAY_SHACHARIS_SPECIAL) : null;
@@ -11500,6 +11520,7 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -11695,6 +11716,11 @@ function specialShacharis(serial, settings) {
 function weekdayMornings(shabbosSerial, settings, everyday, special) {
   const lines = slichosWeekLines(shabbosSerial, settings);
   const season = lines.some((g) => differsFromSchedule(g.html, everyday)) ? lines : [];
+  const chanukahDays = Array.from({ length: 6 }, (_, index) => shabbosSerial - 6 + index)
+    .filter(day => chanukahYearFor(day, settings) && !hasRoshChodesh(day, settings));
+  if (chanukahDays.length) season.push({ name: 'חנוכה',
+    day: chanukahDays.map(day => DAY_NAMES[day - shabbosSerial + 6]).join(', '),
+    html: chanukahScheduleLines(chanukahDays, settings, { includeRoshChodesh: false, mergeAll: true }) });
   const days = specialDaysInWeek(shabbosSerial, settings);
   const fasts = days.filter((d) => d.fast);
   const rest = days.filter((d) => !d.fast);
@@ -11940,6 +11966,15 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
  *  second, earlier schedule, which the card prints as its own line. Whichever one applies to this
  *  particular day is the one to read. See WEEKDAY_SHACHARIS in settings.js. */
 function weekdayShacharis(serial, settings) {
+  const chanukahYear = chanukahYearFor(serial, settings);
+  if (chanukahYear) {
+    const posted = chanukahPostedShacharisRows(chanukahYear, settings)
+      .find(row => row.isRoshChodesh === Boolean(hasRoshChodesh(serial, settings)));
+    if (posted) return posted.cells.map(cell => ({
+      mins: Math.round((cell.trace || cell.traces[0]).value * 1440),
+      place: PLACES[cell.mark || (cell.underlined ? 'u' : '')] || '',
+    }));
+  }
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
   const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;
@@ -14625,12 +14660,7 @@ function buildRoshChodeshShacharisPoster(year, month, settings) {
     const days = Array.from({ length: rc.last - rc.first + 1 }, (_, i) => rc.first + i)
       .filter(serial => excelWeekday(serial) !== 7);
     if (!days.length) return null;
-    const chanukah = month === 10
-      ? buildChanukahPoster(year, settings)?.shacharisRows.find(row => row.isRoshChodesh) : null;
-    const cells = chanukah
-      ? chanukah.cells.map((cell, i) => i === 0
-        ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
-      : roshChodeshSchedule(days[0], settings).lines.flat();
+    const cells = roshChodeshSchedule(days[0], settings).lines.flat();
     return {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),

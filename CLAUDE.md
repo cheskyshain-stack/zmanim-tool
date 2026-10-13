@@ -443,19 +443,29 @@ and label the applicable weekdays. Use `nextRoshChodesh` for one- and two-day da
 including both leap-year Adars. These handouts cover Sunday through Friday only;
 skip a month when Rosh Chodesh falls entirely on Shabbos. Keep the weekday portion
 of a two-day Rosh Chodesh that also includes Shabbos. Omit Tishrei, which has its Rosh Hashana poster.
-Read Rosh Chodesh times from `roshChodeshSchedule` in `posters/special-shacharis.js`.
+Read posted Rosh Chodesh times from `roshChodeshSchedule` in `posters/rosh-chodesh-schedule.js`.
 The first two minyanim use the later of their standing times (6:40 and 7:00) and
 the latest weekday sunrise minus 25 minutes, rounded upward to a whole minute.
 Use the workbook's `sunriseElev` with the configured location and elevation settings.
 For two-day occasions, ignore any Shabbos date when finding the latest sunrise.
-Teves uses this same rule within the Chanukah poster; its Rosh Chodesh row must
-not average the earliest start. Keep all later minyanim and room marks unchanged.
+For Chanukah, when all weekday candidates are pushed later by netz, both ordinary
+and Rosh Chodesh first-minyan rows use one average of all those days' unrounded
+candidates, rounded down to a whole minute. This is the user's requested
+Chanukah exception to the first Rosh Chodesh minyan's latest-day floor. Keep
+the second Rosh Chodesh minyan's limit and all later times/room marks. Otherwise
+Teves retains its latest-weekday first-minyan floor. The shared posted provider
+quotes the complete Chanukah row, including on partial weeks and split charts.
+`tests/chanukah-shared-average.mjs` covers 51 years, daily views and the screenshot
+year 5788, where both first rows print 6:53. The base calculation stays separate
+in `special-shacharis.js` so building the posted Chanukah rows cannot recurse.
 Seasonal chart panels, weekly cards/One sheet, messages and upcoming minyanim
-share these times. Group equal seasonal panel schedules and label the months.
+share these times. Group equal seasonal panel schedules. When several Rosh Chodesh
+months share one block on a chart, label that block `ראש חודש` without month names.
+Keep a single-month block labelled by its month when it has its own schedule.
 When BHB or Taanis is present and a Rosh Chodesh block matches the complete standing
 schedule, including room marks, print that schedule once under a shared heading,
-for example `בה"ב · ר"ח חשון וכסלו` or `תענ"צ · ר"ח תמוז ואב`. Use one ר"ח prefix and a ו before the final
-month; retain separate blocks whenever their printed times or rooms differ.
+for example `בה"ב · ראש חודש` or `תענ"צ · ראש חודש` for matching multiple months.
+Retain separate blocks whenever their printed times or rooms differ.
 Upcoming Rosh Chodesh minyanim read traced morning values directly: the first
 two can share a start in different rooms, and must not roll the second into PM.
 `tests/shacharis-handouts.mjs` checks all weekday occasions across 51 years;
@@ -839,8 +849,9 @@ the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
 morning group through Friday, including ordinary mornings in partial weeks and
 the separate Rosh Chodesh group. The Chanukah chart panel and messages use the
 complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
-with its averaging/floor rule for ordinary Chanukah days and the strict
-latest-weekday netz-minus-25 floor for Rosh Chodesh, with matching traces.
+with its averaging/floor rule for ordinary Chanukah days. Both first rows use the
+same full-period average when all weekday candidates are pushed by netz; otherwise
+Rosh Chodesh uses its latest-weekday netz-minus-25 floor, with matching traces.
 Do not return to independently rounding a day when quoting that combined row.
 
 The chat messages the shul sends out, on a page of their own. **A third entry page beside

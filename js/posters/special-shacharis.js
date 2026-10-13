@@ -18,9 +18,12 @@ export function specialShacharisLines() {
 
 export const RC_BEFORE_NETZ_MINUTES = 25;
 
+export const specialShacharisHtml = lines => lines.map(line => line.map(cell =>
+  `${cell.underlined ? `<u>${cell.text}</u>` : cell.text}${cell.mark}`).join(' ')).join('\n');
+
 /** One schedule for the whole weekday portion of a Rosh Chodesh. The later
  * sunrise governs both dates, and rounding up never crosses the earliest start. */
-export function roshChodeshSchedule(serial, settings) {
+export function roshChodeshBaseSchedule(serial, settings) {
   const at = hebrewDateExtended(serial, settings.useGregorianBefore1582);
   if (![1, 30].includes(at.dayOfMonth)) return null;
   const before = hebrewDateExtended(serial - 1, settings.useGregorianBefore1582);
@@ -43,5 +46,5 @@ export function roshChodeshSchedule(serial, settings) {
     return { ...cell, text: trace.plain(), trace };
   }));
   return { days, month, title: `ר"ח ${JEWISH_MONTHS_HE[month - 1]}`, lines,
-    html: lines.map(line => line.map(cell => `${cell.underlined ? `<u>${cell.text}</u>` : cell.text}${cell.mark}`).join(' ')).join('\n') };
+    html: specialShacharisHtml(lines) };
 }

@@ -5,12 +5,12 @@ import { resolveSettings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '.
 import { excelWeekday } from '../js/hebrew-calendar.js';
 import { dateFromSerial } from '../js/zmanim/solar.js';
 import { sunriseElev } from '../js/zmanim/zmanim.js';
-import { roshChodeshSchedule } from '../js/posters/special-shacharis.js';
+import { roshChodeshSchedule } from '../js/posters/rosh-chodesh-schedule.js';
 import { buildRoshChodeshShacharisPoster } from '../js/posters/shacharis.js';
 import { weekdayMornings } from '../js/posters/day.js';
 import { roshChodeshText } from '../js/rosh-chodesh-text.js';
 import { erevTimes } from '../js/erev-text.js';
-import { buildChanukahPoster, chanukahScheduleLines } from '../js/posters/chanukah.js';
+import { buildChanukahPoster } from '../js/posters/chanukah.js';
 import { buildAutomaticCharts } from '../js/publish.js';
 import { minyanimForDay } from '../js/upcoming.js';
 
@@ -33,13 +33,13 @@ function settingsForSunrise(days, targetMinutes) {
 }
 
 test('first and second minyan floors round upward at second-level boundaries', () => {
-  const reference = buildRoshChodeshShacharisPoster(5787, 10, settings);
+  const reference = buildRoshChodeshShacharisPoster(5785, 8, settings);
   for (const [sunrise, first, second] of [
     [424.999, '6:40', '7:00'], [425, '6:40', '7:00'], [425.001, '6:41', '7:00'],
     [444.999, '7:00', '7:00'], [445, '7:00', '7:00'], [445.001, '7:01', '7:01'],
   ]) {
     const options = settingsForSunrise(reference.days, sunrise);
-    const poster = buildRoshChodeshShacharisPoster(5787, 10, options);
+    const poster = buildRoshChodeshShacharisPoster(5785, 8, options);
     assert.deepEqual(poster.rows.slice(0, 2).map(row => row.text), [first, second]);
     assert.deepEqual(poster.rows.slice(2).map(row => row.text), ['7:15', '7:35', '8:00', '8:20', '8:40']);
     assert.deepEqual(poster.rows.map(row => row.mark), ['', '*', '', '**', '', '*', '']);
@@ -48,10 +48,6 @@ test('first and second minyan floors round upward at second-level boundaries', (
       assert(minutes(row.text) >= sunriseElev(dateFromSerial(day), options) * 1440 - 25 - 1e-7);
       assert(row.trace.describe().steps.some(step => step.kind === 'pick'), 'The explanation records the earliest-start comparison');
     }
-    const chanukah = buildChanukahPoster(5787, options).shacharisRows.find(row => row.isRoshChodesh);
-    assert.deepEqual(chanukah.cells.map(cell => cell.text), poster.rows.map(row => row.text));
-    assert.equal(chanukah.vasikin.time, first, 'The posted Rosh Chodesh start is not averaged downward');
-    assert.equal(erevTimes(chanukahScheduleLines(poster.days.slice(0, 1), options, { mergeAll: true }))[1].text, second);
   }
 });
 
@@ -89,7 +85,8 @@ test('configured elevation and location are used and Shabbos does not set a week
     if (!poster) continue;
     assert(poster.days.every(day => excelWeekday(day) !== 7));
     const limit = Math.ceil(Math.max(...poster.days.map(day => sunriseElev(dateFromSerial(day), options) * 1440)) - 25 - 1e-7);
-    assert.equal(minutes(poster.rows[0].text), Math.max(400, limit));
+    const sharedChanukah = month === 10 && buildChanukahPoster(year, options).days.every(day => day.netzBinding);
+    if (!sharedChanukah) assert.equal(minutes(poster.rows[0].text), Math.max(400, limit));
     assert.equal(minutes(poster.rows[1].text), Math.max(420, limit));
   }
 });

@@ -35,7 +35,7 @@ const server = http.createServer((req, res) => {
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       };
       await open('2026-08-25T16:00:00Z');
-      for (const year of [5785, 5787, 5790]) {
+      for (const year of [5785, 5787, 5788, 5790]) {
         const fixture = await page.evaluate(async year => {
           const { roshHashana } = await import('/js/hebrew-calendar.js');
           return new Date(Date.UTC(1899, 11, 30) + (roshHashana(year - 3761) - 16) * 86400000 + 16 * 3600000).toISOString();

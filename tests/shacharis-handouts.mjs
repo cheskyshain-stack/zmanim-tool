@@ -23,9 +23,14 @@ const expected = [
 const rows = poster => poster.rows.map(row => [row.text, row.room]);
 const expectedRoshChodesh = (poster, options = settings) => {
   const floor = Math.ceil(Math.max(...poster.days.map(day => sunriseElev(dateFromSerial(day), options) * 1440)) - 25 - 1e-7);
+  const chanukah = poster.month === 10 ? buildChanukahPoster(poster.hebrewYear, options) : null;
+  const sharedAverage = chanukah?.days.every(day => day.netzBinding) ? Math.floor(chanukah.days.reduce((sum, day) =>
+    sum + Math.max(sunriseElev(dateFromSerial(day.serial), options) * 1440 - 25,
+      hasRoshChodesh(day.serial, options) ? 400 : 410), 0) / chanukah.days.length + 1e-7) : null;
   return expected.map(([time, room], index) => {
     const [hour, minute] = time.split(':').map(Number);
-    const start = index < 2 ? Math.max(hour * 60 + minute, floor) : hour * 60 + minute;
+    const start = index === 0 && sharedAverage !== null ? sharedAverage
+      : index < 2 ? Math.max(hour * 60 + minute, floor) : hour * 60 + minute;
     return [`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`, room];
   });
 };
@@ -127,8 +132,9 @@ test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbo
         assert.deepEqual(poster.rows.map(row => row.room), expected.map(row => row[1]));
         assert(poster.title.endsWith(' · חנוכה'));
       }
-      assert.deepEqual(rows(poster), expectedRoshChodesh(poster), 'Both early minyanim obey the latest weekday netz');
-      for (const day of days) for (const row of poster.rows.slice(0, 2)) {
+      assert.deepEqual(rows(poster), expectedRoshChodesh(poster), 'The weekday limits and shared Chanukah average agree');
+      const sharedChanukah = month === 10 && buildChanukahPoster(year, settings).days.every(day => day.netzBinding);
+      for (const day of days) for (const row of poster.rows.slice(sharedChanukah ? 1 : 0, 2)) {
         assert(row.trace.value * 1440 >= sunriseElev(dateFromSerial(day), settings) * 1440 - 25 - 1e-7);
       }
     }

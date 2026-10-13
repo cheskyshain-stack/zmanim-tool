@@ -25,7 +25,7 @@ import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
 import { minyanList, clockMins, MORNING, AFTERNOON } from './minyanim.js';
-import { roshChodeshSchedule } from './special-shacharis.js';
+import { roshChodeshBaseSchedule } from './special-shacharis.js';
 
 const CH_MIN = 1 / 1440;
 const CH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -63,7 +63,7 @@ const CH_REGULAR_SHIFT_MINUTES = 10;
 
 /** The historical 6:40 Rosh Chodesh baseline, retained only for the candidate
  * average that ordinary Chanukah rows already use. Posted Rosh Chodesh rows use
- * roshChodeshSchedule and are never averaged below their latest weekday floor. */
+ * the shared Chanukah average when all weekday candidates are pushed by netz. */
 const CH_RC_FLOOR_MINUTES = 20;
 
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
@@ -194,7 +194,7 @@ export function chanukahShacharisDay(serial, settings) {
   const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
     .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
     .round('to the closer minute');
-  const rcSchedule = isRoshChodesh ? roshChodeshSchedule(serial, settings) : null;
+  const rcSchedule = isRoshChodesh ? roshChodeshBaseSchedule(serial, settings) : null;
   const vasikin = rcSchedule ? rcSchedule.lines[0][0].trace : vasikinNetz.laterOf(
     before10(7, 0, "the everyday board's own first morning minyan"),
     'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
@@ -374,12 +374,13 @@ export function combineShacharisRows(days) {
     const cells = group[0].isRoshChodesh ? group[0].lines.map(toCell)
       : group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
     const vasikin = chanukahVasikinBetween(group, shared, allPushed ? days : undefined);
-    // Rosh Chodesh has a strict earliest start, so its posted row uses the latest
-    // weekday sunrise rather than Chanukah's ordinary-day average.
-    if (group[0].isRoshChodesh) {
+    // When every weekday morning is pushed by netz, both kinds use the same
+    // average. Otherwise Rosh Chodesh retains its latest-weekday earliest start.
+    if (group[0].isRoshChodesh && !allPushed) {
       vasikin.time = cells[0].text;
       vasikin.trace = group[0].lines[0];
     }
+    cells[0] = toCell(vasikin.trace);
     return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin };
   };
   const rows = [];
