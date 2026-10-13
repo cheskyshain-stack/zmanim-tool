@@ -37,7 +37,13 @@ export function specialScheduleControls(c) {
         { value: 'full', label: 'Regular schedule', on: c.selected === 'asarabteves' },
         { value: 'shacharis', label: 'Shacharis only', on: c.selected === 'asarashacharis' },
         { value: 'locations', label: 'Shacharis locations + Mincha/Maariv', on: c.selected === 'asaralocations' },
-      ])}</div>` : c.choices.length > 1 ? `<label>${c.group?.name === 'ראש חודש' ? 'Month' : 'Page'}<select id="poster-pick">${c.choices.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === c.selected ? 'selected' : ''} ${entry.value ? '' : 'disabled'}>${escAttr(entry.label)}</option>`).join('')}</select></label>` : ''}
+      ])}</div>` : c.choices.length > 1 ? `<div class="poster-year"><span class="poster-year-label" id="poster-page-label">${c.group?.name === 'ראש חודש' ? 'Month' : 'Page'}</span>
+        <div class="poster-year-step" role="group" aria-labelledby="poster-page-label">
+          <button type="button" id="poster-page-back" aria-label="Previous page" ${c.pAt <= 0 ? 'disabled' : ''}>&minus;</button>
+          <select id="poster-pick" aria-labelledby="poster-page-label">${c.choices.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === c.selected ? 'selected' : ''} ${entry.value ? '' : 'disabled'}>${escAttr(entry.label)}</option>`).join('')}</select>
+          <button type="button" id="poster-page-next" aria-label="Next page" ${c.pAt >= c.pCount - 1 ? 'disabled' : ''}>+</button>
+          <button type="button" id="poster-page-now" class="poster-year-reset" ${!c.pageCurrent || c.pageCurrent === c.selected ? 'disabled' : ''}>Current</button>
+        </div></div>` : ''}
       ${c.conflict ? `<label>Chart to use<select id="poster-conflict">${c.conflict.map((chart, index) => `<option value="${index}" ${index === c.conflictPick ? 'selected' : ''}>${escAttr(c.chartLabel(chart.sheet))}</option>`).join('')}</select></label>` : ''}
       ${c.canPad || c.canTurn ? `<details class="special-print-settings" ${c.advanced ? 'open' : ''}><summary>Print settings</summary><div>
         ${c.canPad ? `<div class="poster-year"><span id="poster-margin-label">Margin</span><div class="poster-year-step">

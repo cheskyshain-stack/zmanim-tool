@@ -138,6 +138,53 @@ const server = http.createServer((req, res) => {
         assert.deepEqual(await times(), compactTimes, 'Returning to compact keeps every paired schedule time');
       }
 
+      for (const year of [5785, 5787, 5790]) for (const key of ['slichos', 'tzomgedalia', 'afteryk']) {
+        await page.evaluate(({ year, key }) => localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({
+          year, sheet: key, design: 'new', printPages: [{ id: 'small-page', left: key, right: '' }],
+        })), { year, key });
+        await page.goto(origin + `/admin/?small=${key}-${year}#posters/${key}`); await settle();
+        assert.equal(await page.locator('.poster.is-halfpage').count(), 1, 'Small schedules use the half-page design');
+        assert.equal(await page.locator('[data-job-action=half]').count(), 1, 'Small schedules offer the other half');
+        assert.equal(await page.locator('#poster-break-label').count(), 0, 'Half pages do not offer a second column');
+        const halfTimes = await times();
+        await print(`${key}-${year}-half`, 1, true);
+        if (width === 375 && year === 5787) {
+          await page.locator('.special-print-settings summary').click();
+          await page.locator('#poster-margin').selectOption('0.75'); await settle();
+          await print(`${key}-${year}-half-wide-margin`, 1, true);
+          if (output) await page.screenshot({ path: path.join(output, `${width}-${key}-half.png`), fullPage: true });
+        }
+        await radio('poster-design', 'old');
+        assert.equal(await page.locator('.poster.is-halfpage').count(), 0, 'Old small-schedule posters remain full size');
+        assert.deepEqual(await times(), halfTimes, 'Half-page and old designs keep exactly the same times');
+        await print(`${key}-${year}-old`, 1, false);
+      }
+
+      await page.evaluate(() => localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, design: 'new',
+        sheet: 'slichos', printPages: [{ id: 'whole-occasion', left: 'slichos', right: '' }] })));
+      await page.goto(origin + '/admin/?whole=1#posters/slichos'); await settle();
+      const wholeKey = 'occasion:ראש השנה יום כיפור';
+      await page.locator('#poster-pick').selectOption(wholeKey); await settle();
+      assert.equal(await page.locator('#poster-pick').inputValue(), wholeKey, 'Hebrew whole-occasion selection stays selected');
+      assert.equal(decodeURIComponent(new URL(page.url()).hash), '#posters/occasion/ראש השנה יום כיפור');
+      assert.equal(await page.locator('.poster.is-onepage:not(.is-halfpage)').count(), 1);
+      const wholeHeadings = (await page.locator('.onepage-sec-head').allTextContents()).join('\n');
+      assert(['סליחות', 'ראש השנה', 'צום גדליה', 'שובה', 'יום כיפור', 'אחר יום כיפור'].every(heading => wholeHeadings.includes(heading)),
+        'The whole occasion contains its core schedule sections: ' + wholeHeadings);
+      await print('whole-yomim-noraim', 1, false);
+      await page.reload(); await settle();
+      assert.equal(await page.locator('#poster-pick').inputValue(), wholeKey, 'Reload retains the whole-occasion page');
+      await page.locator('#poster-pick').selectOption('roshhashana'); await settle();
+      await page.goBack(); await page.waitForFunction(key => document.querySelector('#poster-pick')?.value === key, wholeKey); await settle();
+      await page.goForward(); await page.waitForFunction(() => document.querySelector('#poster-pick')?.value === 'roshhashana'); await settle();
+      await page.locator('#poster-group').selectOption('סוכות'); await settle();
+      await page.locator('#poster-pick').selectOption('occasion:סוכות'); await settle();
+      await print('whole-sukkos', 1, false);
+      await page.reload(); await settle();
+      assert.equal(await page.locator('#poster-pick').inputValue(), 'occasion:סוכות');
+      const wholeTimes = await times(); await radio('poster-design', 'old');
+      assert.deepEqual(await times(), wholeTimes, 'The whole-occasion page remains available with its only design');
+      await print('whole-sukkos-fallback', 1, false);
       // A removed chart layout in browser storage must open as separate Letter pages.
       for (const remembered of ['combined', 'combined-letter']) {
         await page.evaluate(value => localStorage.setItem('zmanim-chart-print-layout', value), remembered);
@@ -168,8 +215,8 @@ const server = http.createServer((req, res) => {
         await print('separated-pair', 2, true);
         await page.locator('[data-job-action=page]').first().click();
         await page.locator('[data-job-action=all-halves]').click(); await settle();
-        assert.equal(await page.locator('.poster.is-halfpage').count(), 16, 'Bulk handouts retain all available schedules without duplicating the detailed Asara variant');
-        await print('all-half-pages', 8, true);
+        assert.equal(await page.locator('.poster.is-halfpage').count(), 19, 'Bulk handouts include the three new small schedules without duplicating the detailed Asara variant');
+        await print('all-half-pages', 10, true);
         await page.locator('[data-job-action=page]').first().click(); await page.locator('[data-job-action=all]').click(); await settle();
         await print('all-available-pages', await page.locator('[data-job-frame]').count(), false);
 
@@ -194,6 +241,13 @@ const server = http.createServer((req, res) => {
         await radio('poster-design', 'old');
         assert.deepEqual(await times(), allSlichosTimes, 'Standalone Selichos keeps every morning under either design');
       }
+      // Test calendar navigation after reload fixtures, so this fixed clock does not
+      // interfere with their remembered admin unlock timestamp.
+      await page.goto(origin + '/admin/#posters/slichos'); await settle();
+      await page.clock.setFixedTime(new Date('2026-09-23T16:00:00Z'));
+      await page.locator('#poster-group').selectOption('ראש השנה יום כיפור'); await settle();
+      await page.locator('#poster-page-now').click(); await settle();
+      assert.equal(await page.locator('#poster-pick').inputValue(), 'afteryk', 'Current page includes the active schedule after Yom Kippur');
       await context.close();
     }
     assert.deepEqual(errors, []);

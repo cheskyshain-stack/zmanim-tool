@@ -4274,6 +4274,10 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .poster.is-halfpage .onepage-title { font-size: 18pt; margin-bottom: 0.12in; }
 .halfpage-body { width: 100%; display: flex; flex-direction: column; gap: var(--halfpage-section-gap, 0.14in); }
+.poster.is-halfpage .halfpage-body.is-small-schedule {
+  flex: 1 0 auto; justify-content: center; justify-content: safe center;
+  margin-bottom: 0.16in;
+}
 .poster.is-halfpage .halfpage-body.is-asara {
   flex: 1 0 auto; justify-content: center;
   gap: 0.16in; margin-bottom: 0.16in;

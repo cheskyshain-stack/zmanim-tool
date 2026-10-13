@@ -66,6 +66,14 @@ Standalone Yom Kippur and its paired page also retain the after-Yom-Kippur sched
 in compact form. The whole-occasion page has that section separately, so do not repeat it there.
 Pages with just one design remain available with either selection. Keep
 plus/minus/Current controls and position/focus during changes.
+Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
+Current chooses the active or next page within the selected occasion, falling back
+to its first available page when that occasion has ended. Hebrew occasion routes
+must encode individual URL segments and decode them before comparing or selecting,
+so whole-occasion pages survive selection, reload and browser Back/Forward.
+Under New design, standalone Selichos, Tzom Gedalia and the schedule after Yom Kippur
+use real half-page handouts, with all rows and notes retained. Their Old design stays
+full size. Reuse the same margin/ink controls, pairing and regular 6.5pt footer size.
 
 The **+ Custom schedule** button is removed. Retain already saved custom sheets and
 editing them. Asara B'Teves has three top choices: regular Shacharis/Mincha/Maariv,
