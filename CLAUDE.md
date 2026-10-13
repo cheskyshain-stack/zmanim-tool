@@ -58,7 +58,12 @@ desktop widths.
 
 The rejected Schedules/Pages/Appearance navigation remains removed. Special schedules
 now start with **Year**, **Occasion**, and one **New design / Old design** switch.
-New design is the default; Old design uses the framed original where available.
+New design uses the compact page and is the default; Old design uses the framed original where available.
+This includes both paired posters, Rosh Hashanah/Yom Kippur and Selichos/Tzom Gedalia.
+Their compact rows come from the same paired builders, with every Selichos morning
+retained on its standalone pair. Do not fall back to the framed pair under New design.
+Standalone Yom Kippur and its paired page also retain the after-Yom-Kippur schedule
+in compact form. The whole-occasion page has that section separately, so do not repeat it there.
 Pages with just one design remain available with either selection. Keep
 plus/minus/Current controls and position/focus during changes.
 

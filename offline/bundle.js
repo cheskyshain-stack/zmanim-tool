@@ -12851,7 +12851,7 @@ function renderGuide(container, onOpenTab) {
     <details class="panel">
       <summary>Special schedules and messages</summary>
       <div class="panel-body">
-        <p><strong>Special schedules</strong> starts with Year, Occasion and a New design / Old design switch. New design is the default. A page with only one design remains available with either choice.</p>
+        <p><strong>Special schedules</strong> starts with Year, Occasion and a New design / Old design switch. New design uses the compact page and is the default; Old design uses the bordered poster. A page with only one design remains available with either choice.</p>
         <p>Use <strong>Add another page</strong> beside the open schedule to print more pages together. Half-page schedules also offer <strong>Add on the other half</strong>. Asara B’Teves has three schedule choices at the top.</p>
         <p><strong>Schedule messages</strong> opens the separate page for preparing and copying schedule messages.</p>
       </div>
@@ -17185,6 +17185,10 @@ const ONEPAGE_SECTIONS = {
     // the row inside says only which תפילה it is.
     oneSection(p.nextMorning.label, [{ label: YK_TEXT.shacharis.label, times: p.nextMorning.times }]),
   ],
+  // Paired posters use these same compact rows under New design. Keep the paired
+  // Selichos sheet complete, since the rest of the occasion is not on this page.
+  pair: (p) => [...ONEPAGE_SECTIONS.roshhashana(p.rh), ...ONEPAGE_SECTIONS.yomkippur(p.yk), ...ONEPAGE_SECTIONS.afteryk(p.yk)],
+  slichostzom: (p) => [oneSection(SLICHOS_TEXT.title, p.slichos.rows), ...ONEPAGE_SECTIONS.tzomgedalia(p.tzom)],
   /* Every block on this sheet is its own name, on both occasions. They used to carry the yom
      tov in front of them, "ראש השנה - יום א'", because one sheet holds two of them and "יום א'"
      alone does not say which; but the blocks run in date order and each yom tov opens with its
@@ -18157,6 +18161,10 @@ function resolveSpecialPage(entry, settings, year) {
     if (modern && original?.key === 'slichos') return renderOnePagePoster({
       own: true, hebrewYear: year, title: entry.label, span: entry.value.span,
       sections: [oneSection(SLICHOS_TEXT.title, entry.value.rows)], legend: entry.value.legend,
+    }, settings);
+    if (modern && original?.key === 'yomkippur') return renderOnePagePoster({
+      own: true, hebrewYear: year, title: entry.label, span: entry.value.span,
+      sections: [...ONEPAGE_SECTIONS.yomkippur(entry.value), ...ONEPAGE_SECTIONS.afteryk(entry.value)], legend: entry.value.legend,
     }, settings);
     if (modern) return renderOnePagePoster(entry.whole || original?.own ? entry.value : {
       hebrewYear: year, title: entry.label, span: entry.value.span,
