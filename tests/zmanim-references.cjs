@@ -29,7 +29,6 @@ const pdfText = pdf => execFileSync('pdftotext', ['-layout', '-', '-'], { input:
       route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     await context.addInitScript(() => {
       localStorage.setItem('zmanim-nocount', '1');
-      localStorage.setItem('zmanim-print-navigation', 'classic');
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse('2026-10-11T12:00:00Z') }));
     });
     const page = await context.newPage(), errors = [], checked = [];

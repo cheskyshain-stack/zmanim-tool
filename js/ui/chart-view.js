@@ -22,7 +22,6 @@ import { currentSerial, wireSwipe, wireSecretTaps, navUnlocked, unlockNav } from
 import { jewishDateString } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import { useStraightHebrewQuotes } from '../util.js';
-import { setupAutomaticChartPrintNavigation } from './print-navigation-layouts.js';
 
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
@@ -279,9 +278,6 @@ export function renderChartBrowser(container, state, opts = {}) {
       size: [printSize.width, printSize.height],
     });
     wireCombinedChartPrint();
-    if (opts.admin) setupAutomaticChartPrintNavigation(container, {
-      redraw: draw, customize: () => opts.onCustomize?.(spread.sheet, spread.weekday),
-    });
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));

@@ -54,40 +54,19 @@ away from the button, and rule editors open beside their row. `tests/button-scro
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
 
-## Print navigation and the retained setup
+## Restored print controls
 
-Admin weekly schedules, seasonal charts, saved chart layouts and special schedules
-share a **Print setup** panel with **Schedules**, **Pages** and **Appearance** tabs.
-`js/ui/print-setup.js` moves the existing controls with their listeners; adapters in
-`js/ui/print-navigation-layouts.js` leave schedule renderers and stored choices
-authoritative. Keep the original template paths intact. Public website print menus
-retain their existing layout. All navigation markup is `no-print` and its CSS is
-screen-only, including the mobile print bar.
+The user rejected the shared Schedules/Pages/Appearance navigation and requested the
+earlier setup preserved at `backup/print-navigation-2026-10-12`, based on
+`82793f6e19e91e3a71de3c40a575d6d9a9696636`. Restore its original weekly, seasonal,
+saved-chart and special-schedule controls, including plus/minus/Current, pairing,
+custom schedules, Molad and all paper options. The newer navigation adapters and
+mode switch are removed; old stored navigation preferences are ignored.
 
-**Use previous print setup** restores the earlier menus, with a remembered global
-`zmanim-print-navigation` value of `classic`. The default is the new setup, and
-**Use new print setup** switches back. Switching never clears schedule data or print
-preferences. The original code is also preserved on the remote branch
-`backup/print-navigation-2026-10-12`, based on `82793f6e19e91e3a71de3c40a575d6d9a9696636`.
-Before opening the new menus for the first time, preserve the original print choices
-once in `zmanim-print-choices-before-simple-v1`. Do not overwrite this snapshot.
-
-Tabs are remembered by print family in `zmanim-print-navigation-tabs`. Retain year
-and occasion minus/plus/Current controls, position and focus on redraw, and searchable
-conditional settings. Finding an option must not turn it on. A disabled Molad keeps
-its wording hidden, with an explanatory search result rather than changing the value.
-
-Saved charts expose **Adjust weeks per page** in Pages through
-`js/ui/page-break-controls.js`, using the original pagination helpers and aligning
-the companion weekday chart without replacing weeks, overrides or style. Automatic
-charts offer **Customise a local print copy** to create a saved pair before editing
-these choices. Special handouts offer **Same as left** for the right half; save the
-actual schedule key and copy the left Shacharis style, never the synthetic option key.
-
-`tests/print-navigation.cjs` checks both menus on phone and desktop, saved choices,
-search and page breaks, and compares actual native PDF text, paper sizes, page counts
-and printed geometry between interfaces. The older browser fixtures explicitly
-select `classic` to continue verifying the retained controls and print invariants.
+Keep the later chart-fitting correction below. Preserve saved chart data, overrides,
+page splits and print choices rather than importing an old browser snapshot.
+`tests/saved-chart-fit.cjs` checks all four restored interfaces with absent, simple
+and classic stored preferences, as well as readable chart fonts and actual PDFs.
 
 ## Deploy loop
 
@@ -245,7 +224,7 @@ report an exact 816px page as 816.00024px; a strict comparison repeatedly shrink
 every page to the 10% floor and falsely warns of zero pixels of overflow. Always
 start each fit from the saved font size, keep detecting genuine content overflow,
 and leave saved styles untouched. `tests/saved-chart-fit.cjs` reproduces fractional
-placement in both menu layouts on mobile/desktop and verifies full-size fonts,
+placement in the restored controls on mobile/desktop and verifies full-size fonts,
 recovery, saved data and native six-page landscape Letter PDFs.
 
 The standard chart palette uses neutral gray (`#cecece`) with neutral borders and

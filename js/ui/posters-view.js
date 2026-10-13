@@ -47,7 +47,6 @@ import { attachZmanimReference } from './zmanim-references.js';
 import { posterReferenceDates } from '../zmanim/references.js';
 import { specialScheduleControls } from './special-schedule-controls.js';
 import { newHalfPagePair, normalizeHalfPagePairs, addAllHalfPages, halfPagePlan } from './half-page-pairs.js';
-import { setupSpecialPrintNavigation } from './print-navigation-layouts.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -3162,13 +3161,8 @@ export function renderPosters(container, state, routeChanged, tables) {
   });
   container.querySelectorAll('select[data-half-side]').forEach(select => select.addEventListener('change', () => {
     const pair = chosenHalfPagePairs.find(row => row.id === select.dataset.pairId);
-    const same = select.dataset.halfSide === 'right' && select.value === '__same__';
-    pair[select.dataset.halfSide] = same ? pair.left : select.value;
-    if (same) {
-      if (pair.leftShacharis) pair.rightShacharis = pair.leftShacharis;
-      else delete pair.rightShacharis;
-    }
-    if (pair[select.dataset.halfSide] !== 'asarabteves') delete pair[`${select.dataset.halfSide}Shacharis`];
+    pair[select.dataset.halfSide] = select.value;
+    if (select.value !== 'asarabteves') delete pair[`${select.dataset.halfSide}Shacharis`];
     commitChoice();
   }));
   container.querySelectorAll('select[data-half-shacharis]').forEach(select => select.addEventListener('change', () => {
@@ -3392,8 +3386,6 @@ export function renderPosters(container, state, routeChanged, tables) {
     }
     // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
     // is what the congregation's page calls as well so the two cannot come to differ.
-    setupSpecialPrintNavigation(container, again);
     layoutPosters(container);
   }
-  else setupSpecialPrintNavigation(container, again);
 }

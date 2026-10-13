@@ -26,7 +26,6 @@ import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSit
 import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
-import { setupWeeklyPrintNavigation } from './print-navigation-layouts.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
 import { announcedWeekCell } from '../announced.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
@@ -1862,7 +1861,6 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   container.querySelector('#week-today')?.addEventListener('click', () => onSerialChange(null));
   container.querySelector('#week-prev')?.addEventListener('click', () => onSerialChange(serials[at - 1]));
   container.querySelector('#week-next')?.addEventListener('click', () => onSerialChange(serials[at + 1]));
-  if (!luach) setupWeeklyPrintNavigation(container, () => onSerialChange(showing));
 
   // Arriving from "Publishing" on Saved sheets: the panel is already open, but it sits
   // below a full week card, so without this you land on the card with no sign that
