@@ -30,6 +30,7 @@ import { chartReferenceDates } from '../zmanim/references.js';
 import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
 import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { keepPosition } from './keep-position.js';
+import { setupSavedChartPrintNavigation } from './print-navigation-layouts.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
@@ -675,6 +676,12 @@ export function renderSheet(container, state, sheet, onChange) {
     winterSheet.style.splitSpringDst = value === 'separate';
     state.settings.sheetStyle.splitSpringDst = winterSheet.style.splitSpringDst;
     onChange({ save: true });
+  });
+
+  setupSavedChartPrintNavigation(container, {
+    sheet, primary: primarySheet, companion: weekdaySheet,
+    redraw: () => renderSheet(container, state, sheet, onChange),
+    apply: () => keepPosition(container, () => onChange({ save: true })),
   });
 
 }

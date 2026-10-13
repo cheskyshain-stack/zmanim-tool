@@ -12,22 +12,30 @@ export function renderGuide(container, onOpenTab) {
       </div>
     </details>
     <details class="panel">
+      <summary>Find print settings</summary>
+      <div class="panel-body">
+        <p>Weekly schedules, seasonal charts and special schedules share a <strong>Print setup</strong> panel. <strong>Schedules</strong> chooses what to print, <strong>Pages</strong> sets paper and arrangement, and <strong>Appearance</strong> contains margins, ink and other details available for that format.</p>
+        <p>Use <strong>Find a setting</strong> to jump to an option. The print bar shows the sheet count and paper size. Keep the matching paper and orientation in your printer's dialog.</p>
+        <p><strong>Use previous print setup</strong> returns to the earlier menus. Switching menus keeps your saved schedules and print choices. The choice is remembered on this device.</p>
+      </div>
+    </details>
+    <details class="panel">
       <summary>Print a chart with your own page splits</summary>
       <div class="panel-body">
         <ol>
-          <li>Open <strong>Seasonal charts → Print layouts</strong>.</li>
-          <li>Choose the season and Hebrew year, then continue.</li>
-          <li>Adjust the number of weeks on each page and open the charts.</li>
+          <li>Open <strong>Seasonal charts → View charts</strong> and choose the chart.</li>
+          <li>In <strong>Print setup → Pages</strong>, choose <strong>Customise a local print copy</strong>.</li>
+          <li>Open <strong>Adjust weeks per page</strong>, choose the page count and weeks, then apply the page breaks.</li>
           <li>Use <strong>Print / Save as PDF</strong>.</li>
         </ol>
-        <p>Your print layout is saved on this device. Chart cells are read-only.</p>
+        <p>Your print layout is saved on this device. Chart cells are read-only. You can also begin with <strong>Seasonal charts → Print layouts</strong> to select a season and Hebrew year.</p>
       </div>
     </details>
     <details class="panel">
       <summary>Printing and PDFs</summary>
       <div class="panel-body">
-        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. For season charts, use Letter paper in landscape and enable background graphics.</p>
-        <p>Shabbos pages print first in each pair, followed by the matching weekday page. Padding changes the space around the chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
+        <p>Use <strong>Print / Save as PDF</strong>, then choose your printer or Save as PDF. Seasonal charts offer separate Letter pages, Shabbos and weekdays together on landscape Letter, or together on landscape 11 × 17 paper (Ledger / Tabloid). Enable background graphics.</p>
+        <p>Separate pages print Shabbos first in each pair, followed by the matching weekday page. Padding changes the space around a saved chart. Black and white applies to all chart pages, while the building picture stays in colour.</p>
       </div>
     </details>
     <details class="panel">
