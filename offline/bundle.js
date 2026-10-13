@@ -18024,7 +18024,7 @@ function fitHalfPage(container) {
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
     const legend = sheet.querySelector('.poster-legend');
-    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad']) {
+    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad', '--asara-morning-pad']) {
       sheet.style.removeProperty(property);
     }
     const fits = () => {
@@ -18050,6 +18050,10 @@ function fitHalfPage(container) {
     if (sheet.classList.contains('is-asara-detailed') && !fits()) {
       for (const padding of [0.09, 0.075, 0.065, 0.05]) {
         sheet.style.setProperty('--asara-row-pad', `${padding}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const padding of [0.035, 0.025, 0.015]) {
+        sheet.style.setProperty('--asara-morning-pad', `${padding}in`);
         if (fits()) break;
       }
     }

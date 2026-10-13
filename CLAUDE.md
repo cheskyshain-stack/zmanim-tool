@@ -314,8 +314,10 @@ candle lighting and sunset and does not gain a weekday Maariv section. Use subtl
 rules only in this detailed morning section. Preserve every later location mark and
 limit the footer's star key to marks actually used by Mincha/Maariv. Center the full
 weekday/parsha and tefillah group between the fixed title and 6.5pt regular footer.
-At wide margins, reduce only the afternoon row padding if the minimum type size still
-needs room. `tests/asara-locations-print.cjs` checks the option, original times/marks,
+At wide margins, reduce afternoon row padding if the minimum type size still needs
+room, then detailed morning outer padding only when needed. Keep the inner room/time
+spacing and font sizes. Verify the full permitted 0.75in margin, not only 0.5in.
+`tests/asara-locations-print.cjs` checks the option, original times/marks,
 Friday rules, native Letter pages, centered fit, margin extremes, copies, saved styles,
 pairing and swaps, comparison groups, and control position/focus at phone/desktop widths.
 `tests/asara-bteves.mjs` checks the reference years, sunrise and rounding boundaries,
