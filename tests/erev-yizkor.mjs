@@ -22,7 +22,7 @@ test('Shemini Atzeres on Shabbos matches the requested message', () => {
     'Mincha 1:20d, 1:35d, 1:50d, 2:15d, 3:00d',
     'Hadlakas Neiros 6:19',
     'Mincha 6:22m',
-    'Yizkor on Shemini Atzeres, approximately 9:40d 10:55m.',
+    'Yizkor on Shemini Atzeres, approximately 9:40d 11:05m.',
   ].join('\n'));
 });
 
