@@ -140,10 +140,10 @@ test('Shevat is omitted when entirely on Shabbos and remains available on weekda
 test('Weekday/parsha headers combine the same week and retain distinct weeks', () => {
   const bhb = buildBehabShacharisPoster(5787, 8, settings, tables);
   const groups = shacharisDayGroups(bhb.days, settings, tables);
-  assert.deepEqual(groups.map(group => group.label), ["יום ב' ה' לך לך", "יום ב' וירא"]);
+  assert.deepEqual(groups.map(group => group.label), ["יום ב' וה' לך לך", "יום ב' וירא"]);
   assert.deepEqual(groups.flatMap(group => group.days), bhb.days);
   const rc = buildRoshChodeshShacharisPoster(5787, 8, settings);
-  assert.deepEqual(shacharisDayGroups(rc.days, settings, tables).map(group => group.label), ["יום א' ב' נח"]);
+  assert.deepEqual(shacharisDayGroups(rc.days, settings, tables).map(group => group.label), ["יום א' וב' נח"]);
   const fast = buildAsaraShacharisPoster(5790, settings);
   assert.deepEqual(shacharisDayGroups(fast.days, settings, tables).map(group => group.label), ["יום א' ויחי"]);
 });

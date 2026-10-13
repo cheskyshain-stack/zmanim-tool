@@ -14528,7 +14528,7 @@ function shacharisDayGroups(days, settings, tables) {
   return [...weeks].map(([shabbos, dates]) => {
     const parsha = hasParsha(shabbos, { ...settings, english: false }, tables);
     const weekdays = dates.map(serial => ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)] + "'");
-    return { days: dates, label: `יום ${weekdays.join(' ')} ${parsha}` };
+    return { days: dates, label: `יום ${weekdays.join(' ו')} ${parsha}` };
   });
 }
 
@@ -14604,7 +14604,7 @@ function buildRoshChodeshShacharisPoster(year, month, settings) {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
       subtitle: 'שחרית', showDates: true,
-      dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ')}`,
+      dayLabel: `יום ${days.map(serial => `${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}'`).join(' ו')}`,
       span: { from: days[0], to: days.at(-1) }, days,
       rows: shacharisRoomRows(cells),
     };

@@ -164,7 +164,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           ? choiceIndex === 1 ? ['וירא', 'וירא', 'חיי שרה'] : ['אחרי מות - קדושים', 'אחרי מות - קדושים', 'אמור']
           : choiceIndex === 1 ? ['לך לך', 'לך לך', 'וירא'] : ['בהר', 'בהר', 'בחוקותי'];
         assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
-          [`יום ב' ה' ${expectedParshas[0]}`, `יום ב' ${expectedParshas[2]}`],
+          [`יום ב' וה' ${expectedParshas[0]}`, `יום ב' ${expectedParshas[2]}`],
           'Each BHB morning has its weekday and upcoming Shabbos parsha on the first line, including combined readings');
         assert(!/[A-Za-z]|\b20\d{2}\b/.test(await page.locator('.shacharis-handout-dates').first().innerText()),
           'Printed BHB dates and parshas are entirely Hebrew');
