@@ -53,6 +53,13 @@ active page button stays put. Donation forms open below their fund without scrol
 away from the button, and rule editors open beside their row. `tests/button-scroll.cjs`
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
+Adding a special-schedule page deliberately scrolls: smoothly reveal the inline
+picker, then the added page or updated half-page pair. Bulk additions reveal the
+first added or filled page. Focus the picker or preview heading without an extra
+focus scroll, honor reduced motion, and cancel animation on user wheel, touch,
+pointer or keyboard input. Remove interruption listeners when scrolling ends or a
+new reveal starts. Do not schedule a later scroll that could pull the user back
+after a manual scroll.
 
 ## Special schedules and chart printing
 

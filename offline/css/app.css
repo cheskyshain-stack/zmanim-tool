@@ -5818,6 +5818,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
   .special-controls .special-asara-options .week-switch-side { min-width: 0; white-space: normal; font-size: 0.75rem; padding: 0.5rem 0.2rem; display: flex; align-items: center; justify-content: center; }
   .special-print-job { gap: 1.6rem; }
   .special-job-page { width: 100%; min-width: 0; }
+  .special-job-page, .special-add-page { scroll-margin-top: 1rem; }
   .special-job-heading { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
   .special-job-heading h4 { margin: 0 auto 0 0; font-size: 1rem; }
   .special-job-heading > div, .special-job-actions, .special-add-all { display: flex; flex-wrap: wrap; gap: 0.4rem; }

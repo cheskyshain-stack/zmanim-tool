@@ -2917,6 +2917,43 @@ function redrawInPlace(container, state) {
   keepPosition(container, () => renderPosters(container, state));
 }
 
+let additionScrollController = null;
+
+/** Adding schedules deliberately reveals the picker or preview after the redraw. */
+function revealPrintAddition(container, id, picker = false) {
+  const target = container.querySelector(picker ? `#add-form-${CSS.escape(id)}`
+    : `.special-job-page[data-job-id="${CSS.escape(id)}"]`);
+  if (!target) return;
+  additionScrollController?.abort();
+  additionScrollController = null;
+  const focus = target.querySelector(picker ? 'select' : '.special-job-heading h4');
+  focus?.focus({ preventScroll: true });
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const destination = Math.max(0, Math.min(document.scrollingElement.scrollHeight - window.innerHeight,
+    window.scrollY + target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0)));
+  if (!reducedMotion && Math.abs(window.scrollY - destination) > 1) {
+    const controller = new AbortController();
+    additionScrollController = controller;
+    const finish = () => {
+      controller.abort();
+      if (additionScrollController === controller) additionScrollController = null;
+    };
+    const interrupt = () => {
+      finish();
+      window.scrollTo({ left: window.scrollX, top: window.scrollY, behavior: 'instant' });
+    };
+    for (const event of ['wheel', 'touchmove', 'pointerdown', 'keydown']) {
+      window.addEventListener(event, interrupt, { capture: true, passive: true, signal: controller.signal });
+    }
+    // An earlier position restore can queue scrollend before this animation starts.
+    window.addEventListener('scrollend', () => {
+      if (Math.abs(window.scrollY - destination) < 2) finish();
+    }, { signal: controller.signal });
+  }
+  target.scrollIntoView({ block: 'start', inline: 'nearest',
+    behavior: reducedMotion ? 'instant' : 'smooth' });
+}
+
 function currentSchedule(groups, state, settings, year, today, { includeExtra = false } = {}) {
   const candidates = [];
   for (const group of groups) for (const poster of group.items) {
@@ -3045,7 +3082,7 @@ function renderSpecialPrintJob(pages, plan, groups, catalog, resolve, year) {
     const dates = span.length ? when(Math.min(...span.map(s => s.from)), Math.max(...span.map(s => s.to))) : null;
     const canPair = first?.half && !(page.left && page.right);
     return `<section class="special-job-page" data-job-id="${escAttr(page.id)}">
-      <div class="special-job-heading no-print"><h4>Page ${index + 1}${first ? `: <bdi dir="auto">${escAttr(first.label)}</bdi>` : ''}</h4><div>
+      <div class="special-job-heading no-print"><h4 tabindex="-1">Page ${index + 1}${first ? `: <bdi dir="auto">${escAttr(first.label)}</bdi>` : ''}</h4><div>
         ${pages.length > 1 ? `<button type="button" data-job-action="up" data-job-id="${escAttr(page.id)}" aria-label="Move page ${index + 1} up" ${index === 0 ? 'disabled' : ''}>↑</button><button type="button" data-job-action="down" data-job-id="${escAttr(page.id)}" aria-label="Move page ${index + 1} down" ${index === pages.length - 1 ? 'disabled' : ''}>↓</button><button type="button" data-job-action="remove" data-job-id="${escAttr(page.id)}">Remove page</button>` : ''}
         ${page.left && page.right ? `<button type="button" data-job-action="unpair" data-job-id="${escAttr(page.id)}">Separate pages</button><button type="button" data-job-action="swap" data-job-id="${escAttr(page.id)}">Swap halves</button><button type="button" data-job-action="remove-right" data-job-id="${escAttr(page.id)}">Remove second schedule</button>` : ''}
       </div></div>
@@ -3181,9 +3218,11 @@ export function renderPosters(container, state, routeChanged, tables) {
     const index = chosenPrintPages.findIndex(page => page.id === button.dataset.jobId), page = chosenPrintPages[index];
     const action = button.dataset.jobAction;
     if (action === 'page' || action === 'half') {
-      pendingAddition = { after: page.id, side: action === 'page' ? 'page' : page.left ? 'right' : 'left', group: byKey.get(page.left || page.right)?.group, key: page.left || page.right }; again(); return;
+      pendingAddition = { after: page.id, side: action === 'page' ? 'page' : page.left ? 'right' : 'left', group: byKey.get(page.left || page.right)?.group, key: page.left || page.right };
+      again(); revealPrintAddition(container, page.id, true); return;
     }
     if (action === 'cancel') { pendingAddition = null; again(); return; }
+    let addedPageId = null;
     if (action === 'remove') chosenPrintPages.splice(index, 1);
     if (action === 'remove-right') page.right = '';
     if (action === 'swap') [page.left, page.right] = [page.right, page.left];
@@ -3202,6 +3241,7 @@ export function renderPosters(container, state, routeChanged, tables) {
         if (!available.length) break;
         if ([existing.left, existing.right].filter(Boolean).every(key => resolve(key)?.half) && !(existing.left && existing.right)) {
           existing[existing.left ? 'right' : 'left'] = available.shift().key;
+          addedPageId ||= existing.id;
         }
       }
       const additions = [];
@@ -3211,8 +3251,10 @@ export function renderPosters(container, state, routeChanged, tables) {
         else additions.push(newPrintPage(entry.key));
       }
       chosenPrintPages.splice(index + 1, 0, ...additions);
+      addedPageId ||= additions[0]?.id;
     }
     pendingAddition = null; chosen = chosenPrintPages[0]?.left || chosenPrintPages[0]?.right || null; commit();
+    if (addedPageId) revealPrintAddition(container, addedPageId);
   }));
   const addition = container.querySelector('.special-add-page');
   addition?.querySelector('[data-add-group]').addEventListener('change', event => { pendingAddition.group = event.target.value; pendingAddition.key = null; again(); });
@@ -3220,9 +3262,16 @@ export function renderPosters(container, state, routeChanged, tables) {
   addition?.addEventListener('submit', event => {
     event.preventDefault();
     const index = chosenPrintPages.findIndex(page => page.id === pendingAddition.after);
-    if (pendingAddition.side === 'page') chosenPrintPages.splice(index + 1, 0, newPrintPage(pendingAddition.key));
-    else chosenPrintPages[index][pendingAddition.side] = pendingAddition.key;
+    let addedPageId;
+    if (pendingAddition.side === 'page') {
+      const page = newPrintPage(pendingAddition.key);
+      chosenPrintPages.splice(index + 1, 0, page); addedPageId = page.id;
+    } else {
+      chosenPrintPages[index][pendingAddition.side] = pendingAddition.key;
+      addedPageId = chosenPrintPages[index].id;
+    }
     pendingAddition = null; commit();
+    revealPrintAddition(container, addedPageId);
   });
   for (const frame of plan.frames) {
     const holder = container.querySelector(`[data-job-frame="${CSS.escape(frame.id)}"]`);
