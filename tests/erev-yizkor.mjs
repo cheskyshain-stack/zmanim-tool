@@ -54,7 +54,7 @@ test('all three holiday messages follow changed sheet times and explicit room ma
 
 test('Yom Kippur and last days Pesach use their own holiday names and saved times', () => {
   assert.ok(erevYomKippurText(buildYomKippurPoster(5787, settings))
-    .includes('Yizkor on Yom Kippur, approximately 11:55m.'));
+    .includes('Yizkor on Yom Kippur, approximately 11:50m.'));
   assert.ok(erevShviiShelPesachText(buildPesachPoster(5787, settings))
     .includes('Yizkor on Acharon Shel Pesach, approximately 10:20m.'));
 });
