@@ -1764,8 +1764,8 @@ function renderShacharisHandout(poster, settings, options = {}) {
     </div>
     ${row.timeNote ? `<div class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</div>` : ''}
   </div>`).join('');
-  const days = poster.dayLabel ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
-  const dates = poster.showDates ? `<div class="shacharis-handout-dates" dir="rtl">${poster.days.map(serial => {
+  const days = poster.dayLabel && !poster.showDates ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
+  const dates = poster.showDates ? `<div class="shacharis-handout-dates" dir="rtl" style="--handout-date-columns:${poster.days.length}">${poster.days.map(serial => {
     const weekday = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'שבת'][excelWeekday(serial)];
     const hebrew = jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0];
     const date = dateFromSerial(serial);

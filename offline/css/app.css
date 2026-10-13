@@ -4321,7 +4321,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: 0; line-height: 1.35; white-space: pre-line;
 }
 .shacharis-handout-dates {
-  width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.08in;
+  width: 100%; display: grid; grid-template-columns: repeat(var(--handout-date-columns, 3), minmax(0, 1fr)); gap: 0.08in;
   margin: 0 0 0.14in; text-align: center; font-size: 11pt; line-height: 1.4;
 }
 .shacharis-handout-date > div { font-weight: 700; }

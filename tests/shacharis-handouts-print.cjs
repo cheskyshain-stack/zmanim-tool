@@ -108,7 +108,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert.deepEqual([box.x, box.y, box.width, box.height], [i * 528, 0, 528, 816], 'Each copy is a real half Letter sheet');
         assert(box.inside && !box.overflow, 'Letterhead, rooms, times and note fit inside the print margins: ' + JSON.stringify(box));
         assert(box.footerAtBottom && box.footerClear && box.footerRule, 'Ruled footer sits at the bottom, clear of the schedule: ' + JSON.stringify(box));
-        assert(box.footerTypeSize >= 14, 'The shul name and address remain readable at the physical printed size');
+        assert(Math.abs(box.footerTypeSize - 6.5 * 96 / 72) < 0.01, 'Morning handouts retain the approved fixed 6.5pt footer');
         assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
@@ -158,7 +158,11 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
             ['ח׳ חשון', 'י"א חשון', 'ט"ו חשון'], 'The Hebrew date appears on its own underneath');
         }
       } else {
-        assert.equal(await page.locator('.shacharis-handout-dates').count(), 0, 'Asara retains its existing title layout');
+        const header = page.locator('.poster.is-shacharis').first();
+        assert.deepEqual(await header.locator('.shacharis-handout-date > div').allTextContents(),
+          [`יום ${year === 5785 ? 'ו' : 'א'}' ויחי`], 'Asara shows its actual weekday and upcoming parsha');
+        assert.deepEqual(await header.locator('.shacharis-handout-hebrew-date').allTextContents(), ['י׳ טבת']);
+        assert.equal(await header.locator('.shacharis-handout-date').count(), 1);
       }
       await page.locator(`label[for=poster-copies-${copies === 1 ? 'one' : 'two'}]`).click();
       await settle();
@@ -202,10 +206,17 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         const { buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS } = await import('/js/posters/shacharis.js');
         const { loadState } = await import('/js/storage.js');
         const { resolveSettings } = await import('/js/settings.js');
+        const { excelWeekday, hasParsha, jewishDateString } = await import('/js/hebrew-calendar.js');
+        const { dateFromSerial } = await import('/js/zmanim/solar.js');
+        const { loadTables } = await import('/js/data-loader.js');
         const settings = resolveSettings(loadState().settings);
+        const tables = await loadTables();
         return ROSH_CHODESH_SHACHARIS_MONTHS.map(month => buildRoshChodeshShacharisPoster(year, month, settings))
           .filter(Boolean).sort((a, b) => a.span.from - b.span.from).map(poster => ({ month: poster.month,
-            title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]) }));
+            title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]),
+            dates: poster.days.map(serial => ({ date: dateFromSerial(serial).toISOString().slice(0, 10),
+              title: `יום ${['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו'][excelWeekday(serial)]}' ${hasParsha(serial + 7 - excelWeekday(serial), { ...settings, english: false }, tables)}`,
+              hebrew: jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0].replace(/״/g, '"') })) }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
         available.map(poster => 'roshchodesh' + poster.month), 'Months with weekday schedules appear in date order');
@@ -225,7 +236,15 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           await settle();
           assert.equal(await page.locator('input[name=poster-sheets],input[name=poster-scope],input[name=poster-break]').count(), 0);
           assert((await page.locator('.onepage-title').first().innerText()).startsWith(poster.title));
-          assert.equal(await page.locator('.shacharis-handout-days').first().innerText(), poster.dayLabel);
+          assert.equal(await page.locator('.shacharis-handout-days').count(), 0, 'The weekday appears once in the date header');
+          const dates = page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date');
+          assert.deepEqual(await dates.evaluateAll(nodes => nodes.map(node => node.dataset.date)), poster.dates.map(day => day.date));
+          assert.deepEqual(await dates.locator(':scope > div').allTextContents(), poster.dates.map(day => day.title));
+          assert.deepEqual(await dates.locator('.shacharis-handout-hebrew-date').allTextContents(), poster.dates.map(day => day.hebrew));
+          const columns = await dates.evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return { x: r.x, width: r.width }; }));
+          assert(columns.every(column => Math.abs(column.width - columns[0].width) < 1), 'Equal-width date columns');
+          if (columns.length === 2) assert(columns[0].x > columns[1].x, 'Two Rosh Chodesh dates read from right to left');
+          assert(!/[A-Za-z]|\b20\d{2}\b/.test(await page.locator('.shacharis-handout-dates').first().innerText()), 'Rosh Chodesh dates and parshas stay Hebrew');
           assert.equal(await page.locator('.shacharis-handout-note').count(), 0, 'No fast-day Selichos note on Rosh Chodesh');
           assert(page.url().endsWith('#posters/roshchodesh' + poster.month), 'The address identifies the selected month');
           const result = await measure(copies, poster.rows);
