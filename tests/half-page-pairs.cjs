@@ -46,6 +46,7 @@ const pageCount = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []
           return { width: r.width, height: r.height, halves: [...sheet.querySelectorAll('.poster-half-slot')].map(slot => {
             const box = slot.getBoundingClientRect(), poster = slot.querySelector('.poster');
             const content = poster?.querySelector('.halfpage-content');
+            const legendStyle = poster ? getComputedStyle(poster.querySelector('.poster-legend')) : null;
             const centered = content ? (() => {
               const title = poster.querySelector('.onepage-title').getBoundingClientRect();
               const footer = poster.querySelector('.poster-legend').getBoundingClientRect();
@@ -55,6 +56,7 @@ const pageCount = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []
             })() : null;
             return { x: box.left - r.left, y: box.top - r.top, width: box.width, height: box.height,
               key: slot.dataset.halfKey || '', text: poster?.innerText || '',
+              footerSize: legendStyle?.fontSize, footerWeight: legendStyle?.fontWeight,
               centered,
               overflow: Boolean(poster && (poster.scrollWidth > poster.clientWidth + 1 || poster.scrollHeight > poster.clientHeight + 1)) };
           }) };
@@ -64,6 +66,13 @@ const pageCount = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []
           assert.deepEqual([sheet.width, sheet.height], [1056, 816], label + ': landscape Letter');
           assert.deepEqual(sheet.halves.map(half => [half.x, half.y, half.width, half.height]), [[0, 0, 528, 816], [528, 0, 528, 816]], label + ': exact side-by-side halves');
           assert(sheet.halves.every(half => !half.overflow), label + ': content fits');
+          for (const half of sheet.halves.filter(half => half.key)) {
+            assert(Math.abs(parseFloat(half.footerSize) - 6.5 * 96 / 72) < 0.01,
+              label + ': every half-page footer is fixed at 6.5pt');
+            assert.equal(half.footerWeight, '400', label + ': regular-weight footer');
+            if (half.key === 'chanukah') assert(half.text.includes('All underlined מנינים will be בבית מדרש למטה'),
+              label + ': Chanukah uses the shared location-note wording');
+          }
           for (const half of sheet.halves.filter(half => half.centered)) {
             assert(half.centered.topGap >= -0.5 && half.centered.bottomGap >= -0.5,
               label + ': morning handout stays between its title and footer');

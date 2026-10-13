@@ -406,8 +406,11 @@ for this view. Retain the year minus/plus/Current controls and margin/ink settin
 Render every half through its original renderer at 5.5in by 8.5in. Paired sets use
 landscape Letter paper for the entire run, with two halves per physical sheet and no
 rotation. Ignore the single-schedule duplicate-copy preference in this workflow.
-Half-page footers use 7.5pt regular-weight text, including the shul name and address
-on morning handouts.
+Half-page footers use fixed 6.5pt regular-weight text, including the shul name and
+address on morning handouts. Combined special schedules and paired full-page posters
+use fixed 7.5pt regular-weight footers, independent of the fitted schedule font size.
+Chanukah's location note uses the same "All underlined מנינים will be בבית מדרש למטה"
+wording as the other special schedules. The weekly One sheet retains its own footer style.
 Morning handouts remain excluded from the original whole-year set and public runs.
 Do not silently drop a selected schedule that is unavailable after a year change;
 show its pairing's warning and require another choice or Blank before enabling Print.

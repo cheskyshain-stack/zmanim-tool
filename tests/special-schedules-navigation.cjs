@@ -40,9 +40,17 @@ const pages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).le
         await page.emulateMedia({ media: 'print' });
         const boxes = await page.locator(selector).evaluateAll(sheets => sheets.map(sheet => {
           const r = sheet.getBoundingClientRect();
-          return { width: r.width, height: r.height, overflow: sheet.scrollHeight > sheet.clientHeight + 1 || sheet.scrollWidth > sheet.clientWidth + 1 };
+          const legend = sheet.querySelector('.poster-legend'), cs = legend ? getComputedStyle(legend) : null;
+          const footerPt = sheet.classList.contains('is-halfpage') ? 6.5
+            : sheet.classList.contains('is-onepage') && !sheet.classList.contains('is-weeksheet') || sheet.classList.contains('is-pair') ? 7.5 : null;
+          return { width: r.width, height: r.height, overflow: sheet.scrollHeight > sheet.clientHeight + 1 || sheet.scrollWidth > sheet.clientWidth + 1,
+            footerPt, footerSize: cs?.fontSize, footerWeight: cs?.fontWeight };
         }));
         assert(boxes.every(box => !box.overflow), 'Printed content stays inside each page: ' + JSON.stringify(boxes));
+        for (const box of boxes.filter(box => box.footerPt && box.footerSize)) {
+          assert(Math.abs(parseFloat(box.footerSize) - box.footerPt * 96 / 72) < 0.01, 'Consistent fixed footer size');
+          assert.equal(box.footerWeight, '400', 'Regular-weight footer');
+        }
         const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
         assert.equal(pages(pdf), count, 'Exact number of physical pages');
         assert.match(pdf.toString('latin1'), landscape ? /\/MediaBox \[0 0 792 612\]/ : /\/MediaBox \[0 0 612 792\]/);

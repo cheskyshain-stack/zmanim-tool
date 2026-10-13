@@ -5044,7 +5044,7 @@ function buildChanukahPoster(year, settings, tables) {
     sundayAfterShabbos,
     minyanim: M.out,
     legend: [
-      { dir: 'ltr', text: 'Underlined מנינים are in בית מדרש למטה' },
+      { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' },
       { dir: 'rtl', text: '*בעזרת נשים    **באולם השמחות' },
     ],
   };
