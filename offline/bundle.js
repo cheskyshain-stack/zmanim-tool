@@ -9926,9 +9926,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       const schedule = roshChodeshSchedule(serial, settings);
       const block = roshChodeshBlocks.find(block => block.html === schedule.html);
       if (block) {
-        if (!block.titles.includes(schedule.title)) block.titles.push(schedule.title);
+        if (!block.months.includes(schedule.month)) block.months.push(schedule.month);
         block.traces.push(...schedule.lines.flat().map(cell => cell.trace));
-      } else roshChodeshBlocks.push({ html: schedule.html, titles: [schedule.title],
+      } else roshChodeshBlocks.push({ html: schedule.html, months: [schedule.month],
         traces: schedule.lines.flat().map(cell => cell.trace) });
     }
   }
@@ -9938,7 +9938,14 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     // Rosh Chodesh now has dated, sunrise-aware blocks of its own. BHB and fast
     // mornings keep their standing schedule; Teves remains in the Chanukah block.
     kinds.roshChodesh = false;
-    const heading = specialShacharisHeading(kinds);
+    const rcHeading = block => {
+      const months = block.months.map(month => JEWISH_MONTHS_HE[month - 1]);
+      return `ר"ח ${months.length === 1 ? months[0] : `${months.slice(0, -1).join(', ')} ו${months.at(-1)}`}`;
+    };
+    const matchingRoshChodesh = kinds.behab
+      ? roshChodeshBlocks.find(block => block.html === WEEKDAY_SHACHARIS_SPECIAL) : null;
+    const heading = [specialShacharisHeading(kinds), matchingRoshChodesh ? rcHeading(matchingRoshChodesh) : '']
+      .filter(Boolean).join(' · ');
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
     const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
     // Both of חנוכה's own blocks, heading and schedule together, inside one light-background
@@ -9948,7 +9955,8 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
       + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
     const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
-    const rcHtml = roshChodeshBlocks.map(block => `\n\n<u>${escText(block.titles.join(' · '))}</u>\n${block.html}`).join('');
+    const rcHtml = roshChodeshBlocks.filter(block => block !== matchingRoshChodesh)
+      .map(block => `\n\n<u>${escText(rcHeading(block))}</u>\n${block.html}`).join('');
     return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + rcHtml + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
