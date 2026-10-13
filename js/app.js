@@ -1,5 +1,5 @@
 import { buildAutomaticCharts } from './publish.js';
-import { loadState, saveState, newId } from './storage.js';
+import { loadState, saveState } from './storage.js';
 import { loadTables, showDataError } from './data-loader.js';
 import { renderSettings } from './ui/settings-view.js';
 import { renderGenerate } from './ui/generate-view.js';
@@ -244,7 +244,6 @@ function render() {
 
 function paint() {
   setPrintPage('letter landscape');
-  main.classList.remove('has-simple-print');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
   // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
@@ -298,22 +297,7 @@ function paint() {
     );
   } else if (currentTab === 'charts') {
     main.innerHTML = '<h2 class="no-print">Seasonal charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print layouts for your own page splits, or Saved copies to reopen a chart saved on this device.</p><div id="season-chart-view"></div>';
-    renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), {
-      confine: false, admin: true,
-      onCustomize: (original, weekday) => {
-        const id = newId();
-        const createdAt = new Date().toISOString();
-        const makeCopy = source => ({ ...source, automatic: false, createdAt,
-          weeks: source.weeks.map(week => ({ ...week })), pageSizes: [...source.pageSizes],
-          style: { ...source.style }, overrides: { ...source.overrides } });
-        const copy = { ...makeCopy(original), id };
-        state.sheets.push(copy);
-        if (weekday) state.sheets.push({ ...makeCopy(weekday), id: newId(), linkedSheetId: id });
-        persist();
-        currentSheetId = id;
-        render();
-      },
-    });
+    renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), { confine: false });
   } else if (currentTab === 'generate') {
     renderGenerate(
       main,

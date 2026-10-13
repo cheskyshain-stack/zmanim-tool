@@ -144,7 +144,7 @@ async function verifyBackgroundsOff(page, label) {
     const origin = 'http://127.0.0.1:' + server.address().port;
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
-    await context.addInitScript(() => { localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })); localStorage.setItem('zmanim-print-navigation', 'classic'); });
+    await context.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(origin + '/chart/?count=off');
@@ -197,7 +197,7 @@ async function verifyBackgroundsOff(page, label) {
       isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await phoneContext.route('**/*', route => route.request().url().startsWith(origin + '/')
       || route.request().url().startsWith('data:') ? route.continue() : route.abort());
-    await phoneContext.addInitScript(() => { localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })); localStorage.setItem('zmanim-print-navigation', 'classic'); });
+    await phoneContext.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
     const phone = await phoneContext.newPage();
     phone.on('pageerror', error => errors.push('Phone: ' + error.message));
     await phone.goto(origin + '/admin/#generate');

@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
     const origin = 'http://127.0.0.1:' + server.address().port;
     const context = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
-    await context.addInitScript(() => { localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })); localStorage.setItem('zmanim-print-navigation', 'classic'); });
+    await context.addInitScript(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() })));
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const settled = async () => {
