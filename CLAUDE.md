@@ -239,6 +239,15 @@ Browser checks must test the actual printed width as well as complete text and
 page counts on portrait/landscape Letter, with margins, and full-size Tabloid.
 Check both an overridden @page and a print service resizing the requested paper.
 
+When fitting chart height, ignore DOMRect differences smaller than 1/256 CSS pixel.
+Fractional screen placement can
+report an exact 816px page as 816.00024px; a strict comparison repeatedly shrinks
+every page to the 10% floor and falsely warns of zero pixels of overflow. Always
+start each fit from the saved font size, keep detecting genuine content overflow,
+and leave saved styles untouched. `tests/saved-chart-fit.cjs` reproduces fractional
+placement in both menu layouts on mobile/desktop and verifies full-size fonts,
+recovery, saved data and native six-page landscape Letter PDFs.
+
 The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
 shadows, plus black print text on white paper. Upgrade the old blue-gray default in
 saved charts and published settings. Black and white mode sets gray colour values
