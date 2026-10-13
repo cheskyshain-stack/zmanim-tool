@@ -1457,8 +1457,8 @@ function weekCardsHtml(showing, index, state, settings) {
       for (const d of mornings.fasts) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
-      if (mornings.others) {
-        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: WEEKDAY_SHACHARIS_SPECIAL });
+      for (const group of mornings.otherGroups) {
+        groups.push({ label: group.days.map(dayLabel).join('<br>'), html: group.html });
       }
       parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }

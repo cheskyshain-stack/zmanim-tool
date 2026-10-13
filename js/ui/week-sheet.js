@@ -229,11 +229,11 @@ function weekSpecialShacharis(showing, state, settings) {
   const out = [];
   for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
   for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
-  if (mornings.others) {
+  for (const group of mornings.otherGroups) {
     out.push({
-      label: mornings.others.map((d) => name(d)).join(' · '),
-      html: WEEKDAY_SHACHARIS_SPECIAL,
-      days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
+      label: group.days.map((d) => name(d)).join(' · '),
+      html: group.html,
+      days: `(${[...new Set(group.days.map((d) => d.day))].join(', ')})`,
     });
   }
   return { lines: out, everydayStands: mornings.everydayStands };

@@ -28,6 +28,7 @@ import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
+import { roshChodeshSchedule } from './posters/special-shacharis.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from './settings.js';
 import { chanukahSundayMincha } from './posters/chanukah.js';
 
@@ -137,7 +138,8 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
 function weekdayShacharis(serial, settings) {
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
-  const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
+  const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;
+  const text = rc?.html || (special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS);
   // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
   // carries, so it is turned back into the sentinel form parseCell reads before the times are
   // picked out of it.

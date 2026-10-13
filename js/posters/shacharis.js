@@ -2,7 +2,7 @@ import { dateFromHebrew, hasBehab, hasParsha, roshHashana, excelWeekday, JEWISH_
 import { dateFromSerial } from '../zmanim/solar.js';
 import { sunriseElev } from '../zmanim/zmanim.js';
 import { buildAsaraBTevesPoster, asaraSelichosFirst, ASARA_TEXT } from './asarabteves.js';
-import { specialShacharisLines } from './special-shacharis.js';
+import { specialShacharisLines, roshChodeshSchedule } from './special-shacharis.js';
 import { nextRoshChodesh } from '../rosh-chodesh-text.js';
 import { buildChanukahPoster } from './chanukah.js';
 
@@ -105,7 +105,7 @@ export function buildRoshChodeshShacharisPoster(year, month, settings) {
     const cells = chanukah
       ? chanukah.cells.map((cell, i) => i === 0
         ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
-      : specialShacharisLines().flat();
+      : roshChodeshSchedule(days[0], settings).lines.flat();
     return {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),

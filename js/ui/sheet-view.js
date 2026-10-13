@@ -8,6 +8,7 @@ import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
 import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
 import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay, chanukahPostedShacharisRows } from '../posters/chanukah.js';
+import { roshChodeshSchedule } from '../posters/special-shacharis.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { hebrewLang, escText, escAttr, useStraightHebrewQuotes } from '../util.js';
@@ -959,25 +960,27 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     ? pageWeeks.flatMap((w) => chanukahDaysThroughFriday(w.serial, settings))
     : [];
 
+  const roshChodeshBlocks = [];
+  if (isWeekday) {
+    const chanukahSet = new Set(chanukahPageDays);
+    for (const week of pageWeeks) for (let offset = 6; offset >= 1; offset--) {
+      const serial = week.serial - offset;
+      if (!hasRoshChodesh(serial, settings) || chanukahSet.has(serial)) continue;
+      const schedule = roshChodeshSchedule(serial, settings);
+      const block = roshChodeshBlocks.find(block => block.html === schedule.html);
+      if (block) {
+        if (!block.titles.includes(schedule.title)) block.titles.push(schedule.title);
+        block.traces.push(...schedule.lines.flat().map(cell => cell.trace));
+      } else roshChodeshBlocks.push({ html: schedule.html, titles: [schedule.title],
+        traces: schedule.lines.flat().map(cell => cell.trace) });
+    }
+  }
   const panelHtml = (() => {
     if (!isWeekday) return '';
     const kinds = specialShacharisKinds(pageWeeks.map((w) => w.serial), settings);
-    /* ר"ח טבת always falls entirely inside חנוכה's own eight days, so where it is the
-       *only* ר"ח on the page, the standing "ר"ח ובה"ב" block would only repeat what the
-       חנוכה-aware block below already says. Suppressed only then: a page that also holds
-       some other ר"ח (שבט's, say) still gets the standing block for that one, since this
-       page's Rosh Chodesh days are not all חנוכה's. */
-    if (kinds.roshChodesh && chanukahPageDays.length) {
-      const chanukahSet = new Set(chanukahPageDays);
-      const otherRoshChodesh = pageWeeks.some((w) => {
-        for (let offset = 6; offset >= 1; offset -= 1) {
-          const serial = w.serial - offset;
-          if (hasRoshChodesh(serial, settings) && !chanukahSet.has(serial)) return true;
-        }
-        return false;
-      });
-      if (!otherRoshChodesh) kinds.roshChodesh = false;
-    }
+    // Rosh Chodesh now has dated, sunrise-aware blocks of its own. BHB and fast
+    // mornings keep their standing schedule; Teves remains in the Chanukah block.
+    kinds.roshChodesh = false;
     const heading = specialShacharisHeading(kinds);
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
     const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
@@ -988,11 +991,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
       + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
     const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
-    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
+    const rcHtml = roshChodeshBlocks.map(block => `\n\n<u>${escText(block.titles.join(' · '))}</u>\n${block.html}`).join('');
+    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + rcHtml + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
   const panelTraces = isWeekday ? [
     ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...roshChodeshBlocks.flatMap(block => block.traces),
     ...[...new Set(chanukahPageDays.map(serial => chanukahYearFor(serial, settings)))].flatMap(year =>
       chanukahPostedShacharisRows(year, settings).map(row => row.vasikin.trace)),
     ...chanukahPageDays.flatMap(serial => {

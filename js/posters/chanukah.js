@@ -25,6 +25,7 @@ import { SLASH, splitLinesInHalf } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 import { T, weekLatestMinchaGedola, fridayMainMinchaParts, candleLightingParts } from '../sheets/common.js';
 import { minyanList, clockMins, MORNING, AFTERNOON } from './minyanim.js';
+import { roshChodeshSchedule } from './special-shacharis.js';
 
 const CH_MIN = 1 / 1440;
 const CH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
@@ -60,12 +61,9 @@ export const CH_VASIKIN_BEFORE_NETZ = 25;
  *  that dropped away starting תשפ״ב and never came back, so they are not part of this rule. */
 const CH_REGULAR_SHIFT_MINUTES = 10;
 
-/** Rosh Chodesh's own floor: the ותיקין minyan is never more than 20 minutes earlier than
- *  Rosh Chodesh's own 7:00 (the schedule's own second line, unmoved - see chanukahShacharisDay),
- *  the same shape the everyday board's own floor is, asked for directly after a year (תשצ"ג)
- *  where נץ minus 25 alone printed 6:37, 23 minutes ahead of the 7:00 beside it. Its own number
- *  rather than CH_REGULAR_SHIFT_MINUTES's ten: a Rosh Chodesh morning already opens earlier than
- *  an ordinary one by design, and the floor asked for is wider, not the same one moved over. */
+/** The historical 6:40 Rosh Chodesh baseline, retained only for the candidate
+ * average that ordinary Chanukah rows already use. Posted Rosh Chodesh rows use
+ * roshChodeshSchedule and are never averaged below their latest weekday floor. */
 const CH_RC_FLOOR_MINUTES = 20;
 
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
@@ -182,18 +180,9 @@ function chanukahMaariv(hebrewYear, settings) {
   return [early, ...regular, main, ...late];
 }
 
-/** One day of the morning: the ותיקין time first, then either the everyday board's own two
- *  lines (shifted ten minutes on the first) or, on Rosh Chodesh, the Rosh Chodesh schedule
- *  unmoved, including its own middle 8:00.
- *
- *  Both kinds of day carry a floor: a non-Rosh-Chodesh morning is never earlier than the
- *  everyday board's own first minyan (7:00) moved ten minutes earlier, and a Rosh Chodesh
- *  morning is never more than CH_RC_FLOOR_MINUTES (20) earlier than Rosh Chodesh's own 7:00 -
- *  נץ minus 25 only when that is the later of the two either way. Confirmed against a year
- *  (תשפ״ז) where נץ falls early enough that נץ minus 25 alone would print a non-Rosh-Chodesh
- *  morning earlier than 6:50, which the sheet does not do, and a year (תשצ"ג) where the same
- *  thing happened to Rosh Chodesh's own morning - 6:37, 23 minutes ahead of the 7:00 beside
- *  it - which asked for its own floor rather than none at all. */
+/** Ordinary Chanukah mornings keep their ten-minute shift and first-minyan floor.
+ * Rosh Chodesh uses its shared schedule: both early minyanim must clear the latest
+ * weekday netz minus 25 minutes, rounded upward, while later times keep their rooms. */
 export function chanukahShacharisDay(serial, settings) {
   const netz = Z.sunriseElev(dateFromSerial(serial), settings);
   const rchLabel = hasRoshChodesh(serial, settings);
@@ -205,33 +194,15 @@ export function chanukahShacharisDay(serial, settings) {
   const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
     .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
     .round('to the closer minute');
-  const vasikin = isRoshChodesh
-    ? vasikinNetz.laterOf(
-      clockTime(7, 0, "Rosh Chodesh's own second morning minyan, unmoved").minus(CH_RC_FLOOR_MINUTES,
-        `${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00, the floor its own first minyan does not cross`),
-      `the ותיקין minyan is never more than ${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00`)
-    : vasikinNetz.laterOf(
-      before10(7, 0, "the everyday board's own first morning minyan"),
-      'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
-  /* Whether נץ is actually why this day's ותיקין prints when it does, asked for directly:
-     a day the floor wins is a day the shul's own everyday minyan (or Rosh Chodesh's own) is
-     on the board same as any other, and נץ had nothing to do with the printed time - naming
-     it there is a fact nobody asked for beside a time that needed no explaining. Read off
-     vasikin's own last step rather than compared again here, so this can never disagree with
-     which candidate laterOf actually kept - true for either kind of day now that both carry
-     a floor to have won instead of נץ. */
-  const netzBinding = vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
+  const rcSchedule = isRoshChodesh ? roshChodeshSchedule(serial, settings) : null;
+  const vasikin = rcSchedule ? rcSchedule.lines[0][0].trace : vasikinNetz.laterOf(
+    before10(7, 0, "the everyday board's own first morning minyan"),
+    'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
+  const netzBinding = isRoshChodesh ? vasikin.value > T(6, 40)
+    : vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
   const lines = isRoshChodesh
-    ? [
-      vasikin,
-      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
-      clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
-      clockTime(8, 0, "the Rosh Chodesh schedule's own 8:00, unmoved"),
-      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
-    ]
+    ? rcSchedule.lines.flat().map(cell => cell.trace)
     : [
       vasikin,
       before10(7, 20, "the everyday board's own second morning minyan").mark('*'),
@@ -400,8 +371,16 @@ export function combineShacharisRows(days) {
   const allPushed = days.length > 0 && days.every((d) => d.netzBinding);
   const shared = allPushed ? averageBetween(days) : undefined;
   const row = (group, label) => {
-    const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared, allPushed ? days : undefined) };
+    const cells = group[0].isRoshChodesh ? group[0].lines.map(toCell)
+      : group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
+    const vasikin = chanukahVasikinBetween(group, shared, allPushed ? days : undefined);
+    // Rosh Chodesh has a strict earliest start, so its posted row uses the latest
+    // weekday sunrise rather than Chanukah's ordinary-day average.
+    if (group[0].isRoshChodesh) {
+      vasikin.time = cells[0].text;
+      vasikin.trace = group[0].lines[0];
+    }
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin };
   };
   const rows = [];
   if (other.length) rows.push(row(other, `יום ${dayList(other)}`));

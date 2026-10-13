@@ -1,34 +1,5 @@
-// The ROSH CHODESH message, as a block of text somebody can paste into a chat.
-//
-// The shul sends one before every ראש חודש, seventeen of them in the history this was built
-// from, and it is one line:
-//
-//   ROSH CHODESH Nissan Shacharis 6:40m, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
-//
-// **Every time in it comes off the wall chart**, WEEKDAY_SHACHARIS_SPECIAL, which is the
-// second schedule the chart prints on a ר"ח, a בה"ב and a תענית. Nothing here computes a time and
-// nothing here keeps its own copy of one. That is the rule the whole messages page runs on, and
-// this file broke it twice before the shul caught both:
-//
-//   It carried its own copy of the schedule, and the copy had a 6:50 בעזרת נשים the chart has not
-//   got, so the message announced a מנין the board does not show. A second copy of a schedule
-//   disagrees with the board the moment anybody edits either one, and the board is what people
-//   daven from.
-//
-//   It carried the "(T"T 7:25)" that every one of the seventeen sent messages has. That one is on
-//   no chart at all, so nothing here knows how it is arrived at or what would move it, and a line
-//   that is right until the year it quietly is not is worse than a line that was never there.
-//
-// What this does work out is the calendar, not the clock: which month it is, and the day ראש חודש
-// starts on, which is the thirtieth of the month before wherever that month has one. Those are
-// the parts a person gets wrong, and they are not times.
-//
-// One thing the seventeen show that is deliberately not built. Three of them, in חשון, טבת and
-// שבט, open "6:50m&ns, [Netz 7:15]" instead. Both of those numbers are real: the bracket is
-// sunrise and the מנין is sunrise less twenty five minutes, which is why it reads 6:50 one year
-// and 6:51 the next. It looks like a winter rule and it is not one, because כסלו, in the middle
-// of that stretch, uses the ordinary form. Three examples cannot say which months take it, and in
-// any case neither number is on a chart, so neither is built.
+// Rosh Chodesh messages quote the shared handout rows, including the first two
+// minyanim's netz-minus-25 floor. Room letters come from the same location marks.
 
 import { JEWISH_MONTHS_EN, hebrewDateExtended } from './hebrew-calendar.js';
 import { erevTimes, erevWhereMark } from './erev-text.js';
@@ -44,21 +15,8 @@ export const RC_TEXT = {
   spelling: { Av: 'Menachem Av', Cheshvan: 'Mar Cheshvon' },
 };
 
-/** The מנינים, read off the wall chart's own ר"ח schedule.
- *
- *  **`WEEKDAY_SHACHARIS_SPECIAL` in settings.js, which is the cell the chart prints on a ר"ח, a
- *  בה"ב and a תענית.** This carried its own copy of that list for a while and it should not have. The shul
- *  caught it on one time: the copy had a 6:50 בעזרת נשים that the chart has not got, so the message
- *  was announcing a מנין the board does not show. A second copy of a schedule is a schedule that
- *  will disagree with the board the first time somebody edits one of them, and the board is the one
- *  people daven from.
- *
- *  So the letters come off the chart's own marks rather than being typed beside the times:
- *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Change that one
- *  schedule and this message follows it, which is the whole point.
- *
- *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
- *  not one to send, so the caller drops the card rather than sending the heading on its own. */
+/** Read times and rooms from the supplied chart/handout cells. Underlined is d,
+ * one star is en, two is sh, and unmarked is m. An empty schedule has no message. */
 export function roshChodeshShacharis(shacharisCell) {
   const times = Array.isArray(shacharisCell) ? shacharisCell : erevTimes(shacharisCell);
   if (!times.length) return '';
@@ -104,7 +62,7 @@ export function nextRoshChodesh(from, useGregorianBefore1582 = false) {
 /** The message.
  *
  *  @param rc - straight from nextRoshChodesh.
- *  @param shacharisCell - the chart's own ר"ח schedule, WEEKDAY_SHACHARIS_SPECIAL. */
+ *  @param shacharisCell - the shared Rosh Chodesh handout rows. */
 export function roshChodeshText(rc, shacharisCell) {
   if (!rc) return '';
   const name = roshChodeshMonthName(rc.month);

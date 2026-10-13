@@ -67,7 +67,7 @@ const server = http.createServer((req, res) => {
         if (year === 5787) {
           assert(get('erev-yk-5787').includes('11:50m'));
           assert(get('erev-shmini-5787').includes('9:40d 11:05m'));
-          assert(get('rosh-chodesh-5787-10').includes('6:43m'));
+          assert(get('rosh-chodesh-5787-10').includes('6:44m'));
         }
         const chanukahWeeks = messages.filter(message => /^week-/.test(message.id) && /Shacharis \(.*Chanuka/.test(message.text));
         const expectedWeeks = await page.evaluate(async year => {

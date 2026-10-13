@@ -4332,6 +4332,382 @@ function minyanList() {
   };
 }
 
+// ==== posters/slichos.js ====
+// The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
+//
+// The times on it are the shul's own minyan slots and are not on the zmanim board, so
+// unlike the שבת שובה poster there is no cell to read them out of. They are the table
+// below. What is worked out here is the part that was wrong every few years when this was
+// a Word file: which days each line actually covers.
+//
+// Two lines carry a note that the first מנין is five minutes earlier on the days there is
+// קריאת התורה, because the davening runs longer. On the hand-made posters that note was
+// typed as "יום ב' וה'" or "יום ב'" and left alone the next year, and the days it names
+// change with the day ר"ה falls on. So it is computed.
+//
+// The marks are the boards' marks, not the old poster's. The Word posters used * for
+// בעזרת נשים, ** for למטה and *** for אולם השמחות; the app writes plain for the main בית
+// מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
+// is written in the app's system, so somebody holding the poster and the chart is reading
+// one set of marks.
+
+
+
+/** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
+const DOW_SUNDAY = 1;
+const DOW_MONDAY = 2;
+const DOW_THURSDAY = 5;
+const DOW_SHABBOS = 7;
+
+/** The days the Torah is read at shacharis, which is why those mornings start earlier.
+ *  Named in the order the note says them. */
+const KRIAS_HATORAH = [
+  { dow: DOW_MONDAY, he: "יום ב'", both: "יום ב'" },
+  { dow: DOW_THURSDAY, he: "יום ה'", both: "וה'" },
+];
+
+/** ר"ה of a Hebrew year, as an Excel serial. roshHashana() takes the year with the 3761
+ *  taken off it, which is how the workbook's own defined name is written. */
+const roshHashanaSerial = (hebrewYearNum) => roshHashana(hebrewYearNum - 3761);
+
+/** The first morning of סליחות.
+ *
+ *  They begin on a Sunday (the מוצ"ש before it is the first night), and if the Sunday
+ *  before ר"ה would leave fewer than four days they begin the Sunday before that. Which
+ *  is why the run is four days in some years and nine in others. */
+function slichosStart(hebrewYearNum) {
+  const erev = roshHashanaSerial(hebrewYearNum) - 1; // 29 אלול
+  let start = erev - (excelWeekday(erev) - DOW_SUNDAY); // the Sunday on or before it
+  if (erev - start + 1 < 4) start -= 7;
+  return start;
+}
+
+/** צום גדליה: 3 תשרי, pushed to the 4th when the 3rd is Shabbos. Returned as a day of
+ *  תשרי rather than a serial, since that is how the days around it are counted here. */
+function tzomGedaliaDay(rh) {
+  return excelWeekday(rh + 2) === DOW_SHABBOS ? 4 : 3;
+}
+
+/** The mornings each of the two multi-day lines covers, as Excel weekdays.
+ *
+ *  סליחות is every סליחות morning after that first Sunday, up to but not including ערב ר"ה,
+ *  which has a line of its own. עשי"ת is 3 to 8 תשרי, less Shabbos and less צום גדליה,
+ *  which also have their own lines, and less ערב יו"כ on the 9th.
+ *
+ *  Both skip Shabbos, which has no weekday shacharis to print. */
+function posterDays(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+
+  const slichos = [];
+  for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
+
+  const tzom = tzomGedaliaDay(rh);
+  /* The days themselves as well as which weekday each is. The whole-occasion sheet places the
+     עשי"ת block by the first of them, and working that out a second time somewhere else is a
+     second walk that can disagree with this one about which mornings the block covers. */
+  const aseresDays = [];
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    aseresDays.push(d);
+  }
+  return { slichos, aseres: aseresDays.map(excelWeekday), aseresDays };
+}
+
+/** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
+ *  and what time the first מנין is on them.
+ *
+ *  Nothing at all if neither falls in the range, which does happen: the four-day סליחות of
+ *  a year ר"ה is on Thursday runs Sunday to Wednesday and never reaches a Thursday, and the
+ *  עשי"ת of a year ר"ה is on Shabbos runs Tuesday to Friday and never reaches a Monday. */
+function kriasHatorahNote(days, time) {
+  if (!time) return '';
+  const hit = KRIAS_HATORAH.filter((d) => days.includes(d.dow));
+  if (!hit.length) return '';
+  // "יום ב' וה'" when both, and each on its own reads as itself.
+  const named = hit.length === 2 ? `${hit[0].both} ${hit[1].both}` : hit[0].he;
+  return `(${named} ${time})`;
+}
+
+/** The poster, line by line, in the order it is hung.
+ *
+ *  `times` is written the way a chart cell is: a plain time is the main בית מדרש, <u> is
+ *  למטה, a trailing * is בעזרת נשים and ** is באולם השמחות. `earlier` is the five-minutes-
+ *  earlier first מנין on a קריאת התורה morning, and `days` says which range decides which
+ *  of those mornings the line actually has.
+ *
+ *  Here rather than in settings, the same as the שבת שובה wording: these are the shul's
+ *  fixed מנין slots and they have not moved in the posters we have. The year's worth of
+ *  it that does change is computed above. */
+const SLICHOS_ROWS = [
+  { label: 'דרשה מאת הרב שליט"א', times: '12:30' },
+  { label: 'סליחות מוצ"ש', times: '12:55' },
+  { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
+  { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
+  { elsewhere: true, label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
+  { elsewhere: true, label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
+  { moved: true, label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
+  { elsewhere: true, label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
+];
+
+/** The lines of this sheet that are a whole day somewhere else.
+ *
+ *  On the סליחות sheet itself they belong. It is hung on its own, and a sheet that ran from
+ *  the first סליחות to ערב יו"כ and then said nothing about the three days in the middle of
+ *  that stretch would be a sheet with holes in it.
+ *
+ *  On the sheet that carries every poster at once they do not: ערב ראש השנה, צום גדליה and
+ *  ערב יום כיפור each have a block of their own further down it, with the same מנינים and the
+ *  rest of the day besides, so listing them up here says the same times twice.
+ *
+ *  Derived from the table rather than written out beside it, so rewording a row's label
+ *  cannot leave this pointing at a line that no longer exists. */
+const SLICHOS_ELSEWHERE = SLICHOS_ROWS.filter((r) => r.elsewhere).map((r) => r.label);
+
+/** The line of this sheet that is a block of its own on the all-on-one sheet.
+ *
+ *  עשי"ת is a stretch of ordinary mornings rather than a day, so here it is one line among
+ *  the rest. On the sheet that carries every poster at once it is a block, placed between the
+ *  two days it runs between: see renderOnePagePoster. */
+const SLICHOS_MOVED = SLICHOS_ROWS.filter((r) => r.moved).map((r) => r.label);
+
+const SLICHOS_TEXT = {
+  title: 'סליחות',
+  // What the first day's morning is called on the congregation's "what is on next". סליחות
+  // is a prayer added to שחרית, so every other morning in the season is offered under that
+  // name; the first day has none, its סליחות having been said the night before, and its
+  // morning is a plain שחרית on a schedule of its own.
+  shacharis: 'שחרית',
+};
+
+/** The label of a row in SLICHOS_ROWS, so a caller can pick one out without matching on
+ *  wording that may be reworded. */
+const rowNamed = (label) => SLICHOS_ROWS.find((r) => r.label === label);
+
+/** The morning schedule of every day in the סליחות season, day by day.
+ *
+ *  The sheet is written as a handful of lines, each covering a stretch of days: one for the
+ *  first day, one for every ordinary סליחות morning, one for עשי"ת. This turns that back into
+ *  the days themselves, which is what the congregation's "what is on next" needs.
+ *
+ *  Only the mornings. The מנחה and מעריב of these days are ordinary and are on the Weekday
+ *  chart, which is where they stay: this stands in for the שחרית alone.
+ *
+ *  Named for what is being davened rather than for the line it came off. סליחות is a prayer
+ *  added to שחרית, and offering "שחרית 6:40" on a morning the whole point of which is the
+ *  סליחות says the lesser half of it. The first day is the exception in both directions: its
+ *  סליחות are the night before, at 12:55 after מוצ"ש, and its morning has none, so the night
+ *  is offered as סליחות and the morning as שחרית.
+ *
+ *  ערב ר"ה, צום גדליה and ערב יו"כ have lines on this sheet too and are deliberately not
+ *  here: each of those days is on a sheet of its own, whole, and posters/day.js hands the
+ *  day over to it rather than piecing it together from two. */
+function slichosMornings(hebrewYearNum) {
+  const rh = roshHashanaSerial(hebrewYearNum);
+  const erev = rh - 1;
+  const start = slichosStart(hebrewYearNum);
+  const tzom = tzomGedaliaDay(rh);
+  const out = [];
+  /** A line's times for one particular day: the same list the sheet prints, with the first
+   *  מנין five minutes earlier on the mornings there is קריאת התורה, which is the note the
+   *  sheet carries in brackets rather than a second line. */
+  const timesOn = (row, serial) => {
+    const times = parseTimes(row.times);
+    if (row.earlier && times.length && KRIAS_HATORAH.some((d) => d.dow === excelWeekday(serial))) {
+      times[0] = { ...times[0], text: row.earlier };
+    }
+    return times;
+  };
+
+  // The first night and the first morning, both on the Sunday: 12:55 is after midnight, so
+  // it belongs to the day the sheet calls יום א' rather than to the Shabbos behind it.
+  out.push({ serial: start, name: SLICHOS_TEXT.title, night: true, from: 'סליחות מוצ"ש',
+    times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
+  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, from: "שחרית יום א' (no סליחות)",
+    times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
+
+  // Every סליחות morning after it, up to but not including ערב ר"ה, which has its own sheet.
+  const daily = rowNamed('סליחות');
+  for (let d = start + 1; d < erev; d++) {
+    if (excelWeekday(d) === DOW_SHABBOS) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, from: daily.label, times: timesOn(daily, d) });
+  }
+
+  // עשי"ת: 3 to 8 תשרי, less Shabbos and less צום גדליה. The same range posterDays works out
+  // for the line's own bracket, so the two cannot name different days.
+  const aseres = rowNamed('עשי"ת');
+  for (let n = 3; n <= 8; n++) {
+    const d = rh + n - 1;
+    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
+    out.push({ serial: d, name: SLICHOS_TEXT.title, from: aseres.label, times: timesOn(aseres, d) });
+  }
+  return out;
+}
+
+/** The mornings of one week that the סליחות sheet, rather than the Weekday chart, decides.
+ *
+ *  A week card and the week on one sheet both print the שחרית out of Settings, which is the
+ *  ordinary morning. Through this season it is not the ordinary morning: from the first
+ *  סליחות to יום כיפור the shul opens earlier and on a different list, and that list was on the
+ *  סליחות sheet and nowhere else. So the week of ר"ה was telling the congregation 7:00 when the
+ *  shul was opening at 6:40.
+ *
+ *  One line per schedule, which is the rule the card already keeps for ר"ח and בה"ב: the days
+ *  of the week that run the same list read as one line naming them all. That splits what the
+ *  sheet writes as one line and a bracket, "6:40 ... (יום ב' וה' 6:35)", into the two lists it
+ *  means, and it has to: the card counts the times in a line to decide where to break it, and
+ *  the 6:35 inside that bracket counted as one, so the break landed inside the bracket and put
+ *  a slash in it. Two plain lines cannot be misread and cannot be mis-broken.
+ *
+ *  ערב ר"ה, צום גדליה and ערב יו"כ are not here, and neither is the first night's 12:55. The
+ *  three days have sheets of their own, whole, and the 12:55 is a night rather than a morning.
+ *  slichosMornings leaves the days out and marks the night; this drops the night.
+ *
+ *  Both years are asked, because a week in אלול belongs to the ר"ה coming and a week in תשרי to
+ *  the one just gone. */
+function slichosWeekLines(shabbosSerial, settings) {
+  const year = hebrewDateExtended(shabbosSerial, settings?.useGregorianBefore1582).year;
+  const mornings = new Map();
+  for (const y of [year, year + 1]) {
+    for (const m of slichosMornings(y)) if (!m.night) mornings.set(m.serial, m);
+  }
+  /** A list of times back as the card and the sheet write a cell: <u> for למטה, the stars
+   *  kept. Also what one schedule is told from another by, so it is the whole of the key. */
+  const asCell = (times) => times
+    .map((t) => (t.underlined ? `<u>${t.text}</u>` : t.text) + t.mark)
+    .join(', ');
+  const groups = new Map();
+  for (let offset = 6; offset >= 1; offset -= 1) {
+    const serial = shabbosSerial - offset;
+    const m = mornings.get(serial);
+    if (!m) continue;
+    const html = asCell(m.times);
+    const key = `${m.name}|${html}`;
+    if (!groups.has(key)) groups.set(key, { name: m.name, html, days: [] });
+    groups.get(key).days.push(DAY_NAMES[6 - offset]);
+  }
+  return [...groups.values()].map((g) => ({ name: g.name, day: g.days.join(', '), html: g.html }));
+}
+
+/** One line's times, split into the pieces the poster draws.
+ *
+ *  Reads the same notation a chart cell uses, so a row above can be written the way the
+ *  board writes it: <u> for למטה, a trailing * for בעזרת נשים and ** for באולם השמחות.
+ *  The marks come off the text and become flags, so the view decides how to draw them and
+ *  the foot can count which ones are actually on the sheet. */
+function parseTimes(str) {
+  return String(str ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const underlined = /^<u>.*<\/u>\**$/.test(part);
+      const bare = part.replace(/<\/?u>/g, '');
+      const stars = (bare.match(/\*+$/) || [''])[0];
+      const text = bare.slice(0, bare.length - stars.length);
+      /* A trace beside the text, so the calculations page can say what these are: times the
+         shul sets by hand on the sheet, not worked out from the sun. Every poster's typed
+         times come through here, so one place answers for all of them.
+
+         Attached rather than replacing anything, so every existing reader is untouched. The
+         am flag is not guessed: a board is a 12 hour clock with no meridiem on it, so both
+         readings format to the same string, and the trace is only ever asked for that. */
+      const trace = /^\d{1,2}:\d{2}$/.test(text)
+        ? fixedTime(text, { label: 'typed into the sheet as the shul hangs it' })
+        : null;
+      return { text, underlined, mark: stars, trace };
+    });
+}
+
+/** The finished poster for one Hebrew year.
+ *
+ *  The year is the one whose ר"ה this sheet is for, which is the year written on it. The
+ *  סליחות at the top of it are the last days of the year before. */
+function buildSlichosPoster(hebrewYearNum) {
+  if (!hebrewYearNum) return null;
+  const days = posterDays(hebrewYearNum);
+  const rows = SLICHOS_ROWS.map((row) => {
+    const note = row.days ? kriasHatorahNote(days[row.days], row.earlier) : '';
+    const times = parseTimes(row.times);
+    const noteTimes = note ? [{ text: row.earlier, trace: fixedTime(row.earlier, {
+      label: 'the earlier morning time set for the Torah-reading days named on this line',
+    }).onlyWhen(true, note) }] : [];
+    if (note) times[0].explanation = `The first minyan runs at ${row.earlier} on the Torah-reading days named on this line: ${note}`;
+    return { label: row.label, times, note, noteTimes };
+  });
+  const all = rows.flatMap((r) => r.times);
+
+  // Only the marks that are actually on this poster get explained, same as שבת שובה. The
+  // two star notes share a line and sit in the order the printed chart's footer has them.
+  //
+  // Each line carries the direction it has to be set in, because they do not agree. The
+  // underline line is an English sentence with Hebrew in it and is left to right; the star
+  // line is Hebrew and is right to left, and setting it the other way puts the star on the
+  // far side of the phrase instead of against the word it belongs to. Same split as the
+  // week card's legend in week-view.js, and the same as the printed chart's own footer.
+  const stars = [];
+  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
+  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
+  return {
+    hebrewYear: hebrewYearNum,
+    rows,
+    days,
+    // The days this sheet actually covers, as Excel serials: the first סליחות morning
+    // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
+    // years, since סליחות are the end of one and ערב יו"כ the start of the next.
+    span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
+    legend: [
+      all.some((t) => t.underlined)
+        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
+      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
+    ].filter(Boolean),
+  };
+}
+
+// ==== posters/special-shacharis.js ====
+/** The seasonal chart's special morning list, retaining its room marks and traces. */
+function specialShacharisLines() {
+  return WEEKDAY_SHACHARIS_SPECIAL.split('\n').map(line =>
+    parseTimes(line.replace(/\s+/g, ',')).map(time => {
+      let trace = fixedTime(time.text, { am: true, label: 'the seasonal chart\'s special Shacharis schedule' });
+      if (time.underlined) trace = trace.underline();
+      if (time.mark) trace = trace.mark(time.mark);
+      return { text: trace.plain(), underlined: Boolean(trace.flags.underlined), mark: trace.flags.mark || '', trace };
+    }));
+}
+
+const RC_BEFORE_NETZ_MINUTES = 25;
+
+/** One schedule for the whole weekday portion of a Rosh Chodesh. The later
+ * sunrise governs both dates, and rounding up never crosses the earliest start. */
+function roshChodeshSchedule(serial, settings) {
+  const at = hebrewDateExtended(serial, settings.useGregorianBefore1582);
+  if (![1, 30].includes(at.dayOfMonth)) return null;
+  const before = hebrewDateExtended(serial - 1, settings.useGregorianBefore1582);
+  const first = at.dayOfMonth === 30 ? serial : before.dayOfMonth === 30 ? serial - 1 : serial;
+  const last = at.dayOfMonth === 30 ? serial + 1 : serial;
+  const month = hebrewDateExtended(last, settings.useGregorianBefore1582).month;
+  if (month === 7) return null;
+  const days = Array.from({ length: last - first + 1 }, (_, i) => first + i)
+    .filter(day => excelWeekday(day) !== 7);
+  if (!days.length) return null;
+  const latest = days.reduce((a, b) => sunriseElev(dateFromSerial(b), settings) > sunriseElev(dateFromSerial(a), settings) ? b : a);
+  const earliest = zman('נץ', sunriseElev(dateFromSerial(latest), settings),
+    `Latest sunrise on the weekday Rosh Chodesh dates: ${days.map(day => dateFromSerial(day).toISOString().slice(0, 10)).join(', ')}`)
+    .minus(RC_BEFORE_NETZ_MINUTES, 'The first two Rosh Chodesh minyanim cannot start earlier than 25 minutes before netz')
+    .ceil('Round up to a whole minute so the start never precedes netz minus 25 minutes');
+  let index = 0;
+  const lines = specialShacharisLines().map(line => line.map(cell => {
+    if (index++ >= 2) return cell;
+    const trace = cell.trace.laterOf(earliest, 'Keep the standing time unless netz minus 25 minutes is later');
+    return { ...cell, text: trace.plain(), trace };
+  }));
+  return { days, month, title: `ר"ח ${JEWISH_MONTHS_HE[month - 1]}`, lines,
+    html: lines.map(line => line.map(cell => `${cell.underlined ? `<u>${cell.text}</u>` : cell.text}${cell.mark}`).join(' ')).join('\n') };
+}
+
 // ==== posters/chanukah.js ====
 // The חנוכה sheet: eight days of שחרית, the weekday מנחה and מעריב, and the Erev Shabbos and
 // (where one falls inside the eight days) Sunday מנחה menus that go with them.
@@ -4352,6 +4728,7 @@ function minyanList() {
 // The afternoon and evening never print a single star at all, so their own old ** already
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
+
 
 
 
@@ -4393,12 +4770,9 @@ const CH_VASIKIN_BEFORE_NETZ = 25;
  *  that dropped away starting תשפ״ב and never came back, so they are not part of this rule. */
 const CH_REGULAR_SHIFT_MINUTES = 10;
 
-/** Rosh Chodesh's own floor: the ותיקין minyan is never more than 20 minutes earlier than
- *  Rosh Chodesh's own 7:00 (the schedule's own second line, unmoved - see chanukahShacharisDay),
- *  the same shape the everyday board's own floor is, asked for directly after a year (תשצ"ג)
- *  where נץ minus 25 alone printed 6:37, 23 minutes ahead of the 7:00 beside it. Its own number
- *  rather than CH_REGULAR_SHIFT_MINUTES's ten: a Rosh Chodesh morning already opens earlier than
- *  an ordinary one by design, and the floor asked for is wider, not the same one moved over. */
+/** The historical 6:40 Rosh Chodesh baseline, retained only for the candidate
+ * average that ordinary Chanukah rows already use. Posted Rosh Chodesh rows use
+ * roshChodeshSchedule and are never averaged below their latest weekday floor. */
 const CH_RC_FLOOR_MINUTES = 20;
 
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
@@ -4515,18 +4889,9 @@ function chanukahMaariv(hebrewYear, settings) {
   return [early, ...regular, main, ...late];
 }
 
-/** One day of the morning: the ותיקין time first, then either the everyday board's own two
- *  lines (shifted ten minutes on the first) or, on Rosh Chodesh, the Rosh Chodesh schedule
- *  unmoved, including its own middle 8:00.
- *
- *  Both kinds of day carry a floor: a non-Rosh-Chodesh morning is never earlier than the
- *  everyday board's own first minyan (7:00) moved ten minutes earlier, and a Rosh Chodesh
- *  morning is never more than CH_RC_FLOOR_MINUTES (20) earlier than Rosh Chodesh's own 7:00 -
- *  נץ minus 25 only when that is the later of the two either way. Confirmed against a year
- *  (תשפ״ז) where נץ falls early enough that נץ minus 25 alone would print a non-Rosh-Chodesh
- *  morning earlier than 6:50, which the sheet does not do, and a year (תשצ"ג) where the same
- *  thing happened to Rosh Chodesh's own morning - 6:37, 23 minutes ahead of the 7:00 beside
- *  it - which asked for its own floor rather than none at all. */
+/** Ordinary Chanukah mornings keep their ten-minute shift and first-minyan floor.
+ * Rosh Chodesh uses its shared schedule: both early minyanim must clear the latest
+ * weekday netz minus 25 minutes, rounded upward, while later times keep their rooms. */
 function chanukahShacharisDay(serial, settings) {
   const netz = Z.sunriseElev(dateFromSerial(serial), settings);
   const rchLabel = hasRoshChodesh(serial, settings);
@@ -4538,33 +4903,15 @@ function chanukahShacharisDay(serial, settings) {
   const vasikinNetz = zman('נץ', netz, 'on this day of חנוכה')
     .minus(CH_VASIKIN_BEFORE_NETZ, 'the ותיקין minyan is timed this far before נץ every day of חנוכה')
     .round('to the closer minute');
-  const vasikin = isRoshChodesh
-    ? vasikinNetz.laterOf(
-      clockTime(7, 0, "Rosh Chodesh's own second morning minyan, unmoved").minus(CH_RC_FLOOR_MINUTES,
-        `${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00, the floor its own first minyan does not cross`),
-      `the ותיקין minyan is never more than ${CH_RC_FLOOR_MINUTES} minutes earlier than Rosh Chodesh's own 7:00`)
-    : vasikinNetz.laterOf(
-      before10(7, 0, "the everyday board's own first morning minyan"),
-      'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
-  /* Whether נץ is actually why this day's ותיקין prints when it does, asked for directly:
-     a day the floor wins is a day the shul's own everyday minyan (or Rosh Chodesh's own) is
-     on the board same as any other, and נץ had nothing to do with the printed time - naming
-     it there is a fact nobody asked for beside a time that needed no explaining. Read off
-     vasikin's own last step rather than compared again here, so this can never disagree with
-     which candidate laterOf actually kept - true for either kind of day now that both carry
-     a floor to have won instead of נץ. */
-  const netzBinding = vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
+  const rcSchedule = isRoshChodesh ? roshChodeshSchedule(serial, settings) : null;
+  const vasikin = rcSchedule ? rcSchedule.lines[0][0].trace : vasikinNetz.laterOf(
+    before10(7, 0, "the everyday board's own first morning minyan"),
+    'the ותיקין minyan is never earlier than the everyday board\'s own first minyan moved ten minutes earlier');
+  const netzBinding = isRoshChodesh ? vasikin.value > T(6, 40)
+    : vasikin.steps[vasikin.steps.length - 1]?.took === 'this';
 
   const lines = isRoshChodesh
-    ? [
-      vasikin,
-      clockTime(7, 0, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(7, 15, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
-      clockTime(7, 35, "the everyday board's own Rosh Chodesh morning, unmoved").mark('**'),
-      clockTime(8, 0, "the Rosh Chodesh schedule's own 8:00, unmoved"),
-      clockTime(8, 20, "the everyday board's own Rosh Chodesh morning, unmoved").mark('*'),
-      clockTime(8, 40, "the everyday board's own Rosh Chodesh morning, unmoved").underline(),
-    ]
+    ? rcSchedule.lines.flat().map(cell => cell.trace)
     : [
       vasikin,
       before10(7, 20, "the everyday board's own second morning minyan").mark('*'),
@@ -4733,8 +5080,16 @@ function combineShacharisRows(days) {
   const allPushed = days.length > 0 && days.every((d) => d.netzBinding);
   const shared = allPushed ? averageBetween(days) : undefined;
   const row = (group, label) => {
-    const cells = group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
-    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin: chanukahVasikinBetween(group, shared, allPushed ? days : undefined) };
+    const cells = group[0].isRoshChodesh ? group[0].lines.map(toCell)
+      : group[0].lines.map((_, k) => mergedCell(group.map((d) => d.lines[k])));
+    const vasikin = chanukahVasikinBetween(group, shared, allPushed ? days : undefined);
+    // Rosh Chodesh has a strict earliest start, so its posted row uses the latest
+    // weekday sunrise rather than Chanukah's ordinary-day average.
+    if (group[0].isRoshChodesh) {
+      vasikin.time = cells[0].text;
+      vasikin.trace = group[0].lines[0];
+    }
+    return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin };
   };
   const rows = [];
   if (other.length) rows.push(row(other, `יום ${dayList(other)}`));
@@ -5536,340 +5891,6 @@ function nineHours(date, settings) {
   return {
     gra: gra + 9 * (graEnd - gra) / 12,
     mga: mga + 9 * (mgaEnd - mga) / 12,
-  };
-}
-
-// ==== posters/slichos.js ====
-// The סליחות poster: the yomim noraim minyan schedule the shul hangs before ר"ה.
-//
-// The times on it are the shul's own minyan slots and are not on the zmanim board, so
-// unlike the שבת שובה poster there is no cell to read them out of. They are the table
-// below. What is worked out here is the part that was wrong every few years when this was
-// a Word file: which days each line actually covers.
-//
-// Two lines carry a note that the first מנין is five minutes earlier on the days there is
-// קריאת התורה, because the davening runs longer. On the hand-made posters that note was
-// typed as "יום ב' וה'" or "יום ב'" and left alone the next year, and the days it names
-// change with the day ר"ה falls on. So it is computed.
-//
-// The marks are the boards' marks, not the old poster's. The Word posters used * for
-// בעזרת נשים, ** for למטה and *** for אולם השמחות; the app writes plain for the main בית
-// מדרש, an underline for למטה, * for בעזרת נשים and ** for אולם השמחות. Everything below
-// is written in the app's system, so somebody holding the poster and the chart is reading
-// one set of marks.
-
-
-
-/** Excel WEEKDAY numbering, which is what excelWeekday returns: 1 is Sunday. */
-const DOW_SUNDAY = 1;
-const DOW_MONDAY = 2;
-const DOW_THURSDAY = 5;
-const DOW_SHABBOS = 7;
-
-/** The days the Torah is read at shacharis, which is why those mornings start earlier.
- *  Named in the order the note says them. */
-const KRIAS_HATORAH = [
-  { dow: DOW_MONDAY, he: "יום ב'", both: "יום ב'" },
-  { dow: DOW_THURSDAY, he: "יום ה'", both: "וה'" },
-];
-
-/** ר"ה of a Hebrew year, as an Excel serial. roshHashana() takes the year with the 3761
- *  taken off it, which is how the workbook's own defined name is written. */
-const roshHashanaSerial = (hebrewYearNum) => roshHashana(hebrewYearNum - 3761);
-
-/** The first morning of סליחות.
- *
- *  They begin on a Sunday (the מוצ"ש before it is the first night), and if the Sunday
- *  before ר"ה would leave fewer than four days they begin the Sunday before that. Which
- *  is why the run is four days in some years and nine in others. */
-function slichosStart(hebrewYearNum) {
-  const erev = roshHashanaSerial(hebrewYearNum) - 1; // 29 אלול
-  let start = erev - (excelWeekday(erev) - DOW_SUNDAY); // the Sunday on or before it
-  if (erev - start + 1 < 4) start -= 7;
-  return start;
-}
-
-/** צום גדליה: 3 תשרי, pushed to the 4th when the 3rd is Shabbos. Returned as a day of
- *  תשרי rather than a serial, since that is how the days around it are counted here. */
-function tzomGedaliaDay(rh) {
-  return excelWeekday(rh + 2) === DOW_SHABBOS ? 4 : 3;
-}
-
-/** The mornings each of the two multi-day lines covers, as Excel weekdays.
- *
- *  סליחות is every סליחות morning after that first Sunday, up to but not including ערב ר"ה,
- *  which has a line of its own. עשי"ת is 3 to 8 תשרי, less Shabbos and less צום גדליה,
- *  which also have their own lines, and less ערב יו"כ on the 9th.
- *
- *  Both skip Shabbos, which has no weekday shacharis to print. */
-function posterDays(hebrewYearNum) {
-  const rh = roshHashanaSerial(hebrewYearNum);
-  const erev = rh - 1;
-  const start = slichosStart(hebrewYearNum);
-
-  const slichos = [];
-  for (let d = start + 1; d < erev; d++) if (excelWeekday(d) !== DOW_SHABBOS) slichos.push(excelWeekday(d));
-
-  const tzom = tzomGedaliaDay(rh);
-  /* The days themselves as well as which weekday each is. The whole-occasion sheet places the
-     עשי"ת block by the first of them, and working that out a second time somewhere else is a
-     second walk that can disagree with this one about which mornings the block covers. */
-  const aseresDays = [];
-  for (let n = 3; n <= 8; n++) {
-    const d = rh + n - 1;
-    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    aseresDays.push(d);
-  }
-  return { slichos, aseres: aseresDays.map(excelWeekday), aseresDays };
-}
-
-/** The note in brackets at the end of a line: which of יום ב' and יום ה' fall inside it,
- *  and what time the first מנין is on them.
- *
- *  Nothing at all if neither falls in the range, which does happen: the four-day סליחות of
- *  a year ר"ה is on Thursday runs Sunday to Wednesday and never reaches a Thursday, and the
- *  עשי"ת of a year ר"ה is on Shabbos runs Tuesday to Friday and never reaches a Monday. */
-function kriasHatorahNote(days, time) {
-  if (!time) return '';
-  const hit = KRIAS_HATORAH.filter((d) => days.includes(d.dow));
-  if (!hit.length) return '';
-  // "יום ב' וה'" when both, and each on its own reads as itself.
-  const named = hit.length === 2 ? `${hit[0].both} ${hit[1].both}` : hit[0].he;
-  return `(${named} ${time})`;
-}
-
-/** The poster, line by line, in the order it is hung.
- *
- *  `times` is written the way a chart cell is: a plain time is the main בית מדרש, <u> is
- *  למטה, a trailing * is בעזרת נשים and ** is באולם השמחות. `earlier` is the five-minutes-
- *  earlier first מנין on a קריאת התורה morning, and `days` says which range decides which
- *  of those mornings the line actually has.
- *
- *  Here rather than in settings, the same as the שבת שובה wording: these are the shul's
- *  fixed מנין slots and they have not moved in the posters we have. The year's worth of
- *  it that does change is computed above. */
-const SLICHOS_ROWS = [
-  { label: 'דרשה מאת הרב שליט"א', times: '12:30' },
-  { label: 'סליחות מוצ"ש', times: '12:55' },
-  { label: "שחרית יום א' (no סליחות)", times: '7:00, 7:20*, <u>7:35</u>, 8:00, 8:20*, <u>8:40</u>' },
-  { label: 'סליחות', times: '6:40, 7:00*, <u>7:15</u>, 7:35**, 8:00, 8:30*', earlier: '6:35', days: 'slichos' },
-  { elsewhere: true, label: 'ערב ר"ה', times: '6:30, <u>7:10</u>' },
-  { elsewhere: true, label: 'צום גדליה', times: '6:20, 6:40*, <u>7:00</u>, 7:35**, 8:00' },
-  { moved: true, label: 'עשי"ת', times: '6:25, 6:45*, <u>7:00</u>, 7:35**, 8:00, 8:30*', earlier: '6:20', days: 'aseres' },
-  { elsewhere: true, label: 'ערב יו"כ', times: '7:00, 7:20*, <u>7:35</u>, 8:00**, 8:20' },
-];
-
-/** The lines of this sheet that are a whole day somewhere else.
- *
- *  On the סליחות sheet itself they belong. It is hung on its own, and a sheet that ran from
- *  the first סליחות to ערב יו"כ and then said nothing about the three days in the middle of
- *  that stretch would be a sheet with holes in it.
- *
- *  On the sheet that carries every poster at once they do not: ערב ראש השנה, צום גדליה and
- *  ערב יום כיפור each have a block of their own further down it, with the same מנינים and the
- *  rest of the day besides, so listing them up here says the same times twice.
- *
- *  Derived from the table rather than written out beside it, so rewording a row's label
- *  cannot leave this pointing at a line that no longer exists. */
-const SLICHOS_ELSEWHERE = SLICHOS_ROWS.filter((r) => r.elsewhere).map((r) => r.label);
-
-/** The line of this sheet that is a block of its own on the all-on-one sheet.
- *
- *  עשי"ת is a stretch of ordinary mornings rather than a day, so here it is one line among
- *  the rest. On the sheet that carries every poster at once it is a block, placed between the
- *  two days it runs between: see renderOnePagePoster. */
-const SLICHOS_MOVED = SLICHOS_ROWS.filter((r) => r.moved).map((r) => r.label);
-
-const SLICHOS_TEXT = {
-  title: 'סליחות',
-  // What the first day's morning is called on the congregation's "what is on next". סליחות
-  // is a prayer added to שחרית, so every other morning in the season is offered under that
-  // name; the first day has none, its סליחות having been said the night before, and its
-  // morning is a plain שחרית on a schedule of its own.
-  shacharis: 'שחרית',
-};
-
-/** The label of a row in SLICHOS_ROWS, so a caller can pick one out without matching on
- *  wording that may be reworded. */
-const rowNamed = (label) => SLICHOS_ROWS.find((r) => r.label === label);
-
-/** The morning schedule of every day in the סליחות season, day by day.
- *
- *  The sheet is written as a handful of lines, each covering a stretch of days: one for the
- *  first day, one for every ordinary סליחות morning, one for עשי"ת. This turns that back into
- *  the days themselves, which is what the congregation's "what is on next" needs.
- *
- *  Only the mornings. The מנחה and מעריב of these days are ordinary and are on the Weekday
- *  chart, which is where they stay: this stands in for the שחרית alone.
- *
- *  Named for what is being davened rather than for the line it came off. סליחות is a prayer
- *  added to שחרית, and offering "שחרית 6:40" on a morning the whole point of which is the
- *  סליחות says the lesser half of it. The first day is the exception in both directions: its
- *  סליחות are the night before, at 12:55 after מוצ"ש, and its morning has none, so the night
- *  is offered as סליחות and the morning as שחרית.
- *
- *  ערב ר"ה, צום גדליה and ערב יו"כ have lines on this sheet too and are deliberately not
- *  here: each of those days is on a sheet of its own, whole, and posters/day.js hands the
- *  day over to it rather than piecing it together from two. */
-function slichosMornings(hebrewYearNum) {
-  const rh = roshHashanaSerial(hebrewYearNum);
-  const erev = rh - 1;
-  const start = slichosStart(hebrewYearNum);
-  const tzom = tzomGedaliaDay(rh);
-  const out = [];
-  /** A line's times for one particular day: the same list the sheet prints, with the first
-   *  מנין five minutes earlier on the mornings there is קריאת התורה, which is the note the
-   *  sheet carries in brackets rather than a second line. */
-  const timesOn = (row, serial) => {
-    const times = parseTimes(row.times);
-    if (row.earlier && times.length && KRIAS_HATORAH.some((d) => d.dow === excelWeekday(serial))) {
-      times[0] = { ...times[0], text: row.earlier };
-    }
-    return times;
-  };
-
-  // The first night and the first morning, both on the Sunday: 12:55 is after midnight, so
-  // it belongs to the day the sheet calls יום א' rather than to the Shabbos behind it.
-  out.push({ serial: start, name: SLICHOS_TEXT.title, night: true, from: 'סליחות מוצ"ש',
-    times: parseTimes(rowNamed('סליחות מוצ"ש').times) });
-  out.push({ serial: start, name: SLICHOS_TEXT.shacharis, from: "שחרית יום א' (no סליחות)",
-    times: parseTimes(rowNamed("שחרית יום א' (no סליחות)").times) });
-
-  // Every סליחות morning after it, up to but not including ערב ר"ה, which has its own sheet.
-  const daily = rowNamed('סליחות');
-  for (let d = start + 1; d < erev; d++) {
-    if (excelWeekday(d) === DOW_SHABBOS) continue;
-    out.push({ serial: d, name: SLICHOS_TEXT.title, from: daily.label, times: timesOn(daily, d) });
-  }
-
-  // עשי"ת: 3 to 8 תשרי, less Shabbos and less צום גדליה. The same range posterDays works out
-  // for the line's own bracket, so the two cannot name different days.
-  const aseres = rowNamed('עשי"ת');
-  for (let n = 3; n <= 8; n++) {
-    const d = rh + n - 1;
-    if (excelWeekday(d) === DOW_SHABBOS || n === tzom) continue;
-    out.push({ serial: d, name: SLICHOS_TEXT.title, from: aseres.label, times: timesOn(aseres, d) });
-  }
-  return out;
-}
-
-/** The mornings of one week that the סליחות sheet, rather than the Weekday chart, decides.
- *
- *  A week card and the week on one sheet both print the שחרית out of Settings, which is the
- *  ordinary morning. Through this season it is not the ordinary morning: from the first
- *  סליחות to יום כיפור the shul opens earlier and on a different list, and that list was on the
- *  סליחות sheet and nowhere else. So the week of ר"ה was telling the congregation 7:00 when the
- *  shul was opening at 6:40.
- *
- *  One line per schedule, which is the rule the card already keeps for ר"ח and בה"ב: the days
- *  of the week that run the same list read as one line naming them all. That splits what the
- *  sheet writes as one line and a bracket, "6:40 ... (יום ב' וה' 6:35)", into the two lists it
- *  means, and it has to: the card counts the times in a line to decide where to break it, and
- *  the 6:35 inside that bracket counted as one, so the break landed inside the bracket and put
- *  a slash in it. Two plain lines cannot be misread and cannot be mis-broken.
- *
- *  ערב ר"ה, צום גדליה and ערב יו"כ are not here, and neither is the first night's 12:55. The
- *  three days have sheets of their own, whole, and the 12:55 is a night rather than a morning.
- *  slichosMornings leaves the days out and marks the night; this drops the night.
- *
- *  Both years are asked, because a week in אלול belongs to the ר"ה coming and a week in תשרי to
- *  the one just gone. */
-function slichosWeekLines(shabbosSerial, settings) {
-  const year = hebrewDateExtended(shabbosSerial, settings?.useGregorianBefore1582).year;
-  const mornings = new Map();
-  for (const y of [year, year + 1]) {
-    for (const m of slichosMornings(y)) if (!m.night) mornings.set(m.serial, m);
-  }
-  /** A list of times back as the card and the sheet write a cell: <u> for למטה, the stars
-   *  kept. Also what one schedule is told from another by, so it is the whole of the key. */
-  const asCell = (times) => times
-    .map((t) => (t.underlined ? `<u>${t.text}</u>` : t.text) + t.mark)
-    .join(', ');
-  const groups = new Map();
-  for (let offset = 6; offset >= 1; offset -= 1) {
-    const serial = shabbosSerial - offset;
-    const m = mornings.get(serial);
-    if (!m) continue;
-    const html = asCell(m.times);
-    const key = `${m.name}|${html}`;
-    if (!groups.has(key)) groups.set(key, { name: m.name, html, days: [] });
-    groups.get(key).days.push(DAY_NAMES[6 - offset]);
-  }
-  return [...groups.values()].map((g) => ({ name: g.name, day: g.days.join(', '), html: g.html }));
-}
-
-/** One line's times, split into the pieces the poster draws.
- *
- *  Reads the same notation a chart cell uses, so a row above can be written the way the
- *  board writes it: <u> for למטה, a trailing * for בעזרת נשים and ** for באולם השמחות.
- *  The marks come off the text and become flags, so the view decides how to draw them and
- *  the foot can count which ones are actually on the sheet. */
-function parseTimes(str) {
-  return String(str ?? '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const underlined = /^<u>.*<\/u>\**$/.test(part);
-      const bare = part.replace(/<\/?u>/g, '');
-      const stars = (bare.match(/\*+$/) || [''])[0];
-      const text = bare.slice(0, bare.length - stars.length);
-      /* A trace beside the text, so the calculations page can say what these are: times the
-         shul sets by hand on the sheet, not worked out from the sun. Every poster's typed
-         times come through here, so one place answers for all of them.
-
-         Attached rather than replacing anything, so every existing reader is untouched. The
-         am flag is not guessed: a board is a 12 hour clock with no meridiem on it, so both
-         readings format to the same string, and the trace is only ever asked for that. */
-      const trace = /^\d{1,2}:\d{2}$/.test(text)
-        ? fixedTime(text, { label: 'typed into the sheet as the shul hangs it' })
-        : null;
-      return { text, underlined, mark: stars, trace };
-    });
-}
-
-/** The finished poster for one Hebrew year.
- *
- *  The year is the one whose ר"ה this sheet is for, which is the year written on it. The
- *  סליחות at the top of it are the last days of the year before. */
-function buildSlichosPoster(hebrewYearNum) {
-  if (!hebrewYearNum) return null;
-  const days = posterDays(hebrewYearNum);
-  const rows = SLICHOS_ROWS.map((row) => {
-    const note = row.days ? kriasHatorahNote(days[row.days], row.earlier) : '';
-    const times = parseTimes(row.times);
-    const noteTimes = note ? [{ text: row.earlier, trace: fixedTime(row.earlier, {
-      label: 'the earlier morning time set for the Torah-reading days named on this line',
-    }).onlyWhen(true, note) }] : [];
-    if (note) times[0].explanation = `The first minyan runs at ${row.earlier} on the Torah-reading days named on this line: ${note}`;
-    return { label: row.label, times, note, noteTimes };
-  });
-  const all = rows.flatMap((r) => r.times);
-
-  // Only the marks that are actually on this poster get explained, same as שבת שובה. The
-  // two star notes share a line and sit in the order the printed chart's footer has them.
-  //
-  // Each line carries the direction it has to be set in, because they do not agree. The
-  // underline line is an English sentence with Hebrew in it and is left to right; the star
-  // line is Hebrew and is right to left, and setting it the other way puts the star on the
-  // far side of the phrase instead of against the word it belongs to. Same split as the
-  // week card's legend in week-view.js, and the same as the printed chart's own footer.
-  const stars = [];
-  if (all.some((t) => t.mark === '*')) stars.push('*בעזרת נשים');
-  if (all.some((t) => t.mark === '**')) stars.push('**באולם השמחות');
-  return {
-    hebrewYear: hebrewYearNum,
-    rows,
-    days,
-    // The days this sheet actually covers, as Excel serials: the first סליחות morning
-    // through ערב יו"כ, which is the last line on it. The two ends fall in different Hebrew
-    // years, since סליחות are the end of one and ערב יו"כ the start of the next.
-    span: { from: slichosStart(hebrewYearNum), to: roshHashanaSerial(hebrewYearNum) + 8 },
-    legend: [
-      all.some((t) => t.underlined)
-        ? { dir: 'ltr', text: 'All underlined מנינים will be בבית מדרש למטה' } : null,
-      stars.length ? { dir: 'rtl', text: stars.join(' ') } : null,
-    ].filter(Boolean),
   };
 }
 
@@ -9896,25 +9917,27 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     ? pageWeeks.flatMap((w) => chanukahDaysThroughFriday(w.serial, settings))
     : [];
 
+  const roshChodeshBlocks = [];
+  if (isWeekday) {
+    const chanukahSet = new Set(chanukahPageDays);
+    for (const week of pageWeeks) for (let offset = 6; offset >= 1; offset--) {
+      const serial = week.serial - offset;
+      if (!hasRoshChodesh(serial, settings) || chanukahSet.has(serial)) continue;
+      const schedule = roshChodeshSchedule(serial, settings);
+      const block = roshChodeshBlocks.find(block => block.html === schedule.html);
+      if (block) {
+        if (!block.titles.includes(schedule.title)) block.titles.push(schedule.title);
+        block.traces.push(...schedule.lines.flat().map(cell => cell.trace));
+      } else roshChodeshBlocks.push({ html: schedule.html, titles: [schedule.title],
+        traces: schedule.lines.flat().map(cell => cell.trace) });
+    }
+  }
   const panelHtml = (() => {
     if (!isWeekday) return '';
     const kinds = specialShacharisKinds(pageWeeks.map((w) => w.serial), settings);
-    /* ר"ח טבת always falls entirely inside חנוכה's own eight days, so where it is the
-       *only* ר"ח on the page, the standing "ר"ח ובה"ב" block would only repeat what the
-       חנוכה-aware block below already says. Suppressed only then: a page that also holds
-       some other ר"ח (שבט's, say) still gets the standing block for that one, since this
-       page's Rosh Chodesh days are not all חנוכה's. */
-    if (kinds.roshChodesh && chanukahPageDays.length) {
-      const chanukahSet = new Set(chanukahPageDays);
-      const otherRoshChodesh = pageWeeks.some((w) => {
-        for (let offset = 6; offset >= 1; offset -= 1) {
-          const serial = w.serial - offset;
-          if (hasRoshChodesh(serial, settings) && !chanukahSet.has(serial)) return true;
-        }
-        return false;
-      });
-      if (!otherRoshChodesh) kinds.roshChodesh = false;
-    }
+    // Rosh Chodesh now has dated, sunrise-aware blocks of its own. BHB and fast
+    // mornings keep their standing schedule; Teves remains in the Chanukah block.
+    kinds.roshChodesh = false;
     const heading = specialShacharisHeading(kinds);
     const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
     const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
@@ -9925,11 +9948,13 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
       + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
     const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
-    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + chanukahHtml;
+    const rcHtml = roshChodeshBlocks.map(block => `\n\n<u>${escText(block.titles.join(' · '))}</u>\n${block.html}`).join('');
+    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + rcHtml + chanukahHtml;
   })();
   const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
   const panelTraces = isWeekday ? [
     ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...roshChodeshBlocks.flatMap(block => block.traces),
     ...[...new Set(chanukahPageDays.map(serial => chanukahYearFor(serial, settings)))].flatMap(year =>
       chanukahPostedShacharisRows(year, settings).map(row => row.vasikin.trace)),
     ...chanukahPageDays.flatMap(serial => {
@@ -10233,18 +10258,6 @@ function nl2br(str) {
     .split(SMALL_START).join('<span class="cell-small">')
     .split(SMALL_END).join('</span>');
   return smalled.replace(/\n/g, '<br>');
-}
-
-// ==== posters/special-shacharis.js ====
-/** The seasonal chart's special morning list, retaining its room marks and traces. */
-function specialShacharisLines() {
-  return WEEKDAY_SHACHARIS_SPECIAL.split('\n').map(line =>
-    parseTimes(line.replace(/\s+/g, ',')).map(time => {
-      let trace = fixedTime(time.text, { am: true, label: 'the seasonal chart\'s special Shacharis schedule' });
-      if (time.underlined) trace = trace.underline();
-      if (time.mark) trace = trace.mark(time.mark);
-      return { text: trace.plain(), underlined: Boolean(trace.flags.underlined), mark: trace.flags.mark || '', trace };
-    }));
 }
 
 // ==== posters/asarabteves.js ====
@@ -11453,6 +11466,7 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -11641,6 +11655,14 @@ function weekdayMornings(shabbosSerial, settings, everyday, special) {
   const fasts = days.filter((d) => d.fast);
   const rest = days.filter((d) => !d.fast);
   const others = rest.length && special ? rest : null;
+  const otherGroups = [];
+  for (const day of others || []) {
+    const serial = shabbosSerial - 6 + DAY_NAMES.indexOf(day.day.split(', ')[0]);
+    const html = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings).html : special;
+    const group = otherGroups.find(group => group.html === html);
+    if (group) group.days.push(day);
+    else otherGroups.push({ days: [day], html });
+  }
 
   const covered = new Set();
   const mark = (list) => { for (const d of list) for (const name of d.split(', ')) covered.add(name); };
@@ -11656,6 +11678,7 @@ function weekdayMornings(shabbosSerial, settings, everyday, special) {
     season,
     fasts,
     others,
+    otherGroups,
     everydayStands: DAY_NAMES.slice(0, 6).some((d) => !covered.has(d)),
   };
 }
@@ -11755,6 +11778,7 @@ function rowFor(week, sheet, state, settings) {
 // over, so computing it again here would quietly disagree with the board on the weeks
 // where any of that made a difference. On the days a sheet on the wall speaks for, it is
 // read off that sheet instead, for the same reason again: see candleLightingForDay.
+
 
 
 
@@ -11874,7 +11898,8 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
 function weekdayShacharis(serial, settings) {
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
-  const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
+  const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;
+  const text = rc?.html || (special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS);
   // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
   // carries, so it is turned back into the sentinel form parseCell reads before the times are
   // picked out of it.
@@ -14384,37 +14409,8 @@ function buildSlichosTzomPoster(year, settings) {
 }
 
 // ==== rosh-chodesh-text.js ====
-// The ROSH CHODESH message, as a block of text somebody can paste into a chat.
-//
-// The shul sends one before every ראש חודש, seventeen of them in the history this was built
-// from, and it is one line:
-//
-//   ROSH CHODESH Nissan Shacharis 6:40m, 7:00en, 7:15d, 7:35sh, 8:00m, 8:20en, 8:40d
-//
-// **Every time in it comes off the wall chart**, WEEKDAY_SHACHARIS_SPECIAL, which is the
-// second schedule the chart prints on a ר"ח, a בה"ב and a תענית. Nothing here computes a time and
-// nothing here keeps its own copy of one. That is the rule the whole messages page runs on, and
-// this file broke it twice before the shul caught both:
-//
-//   It carried its own copy of the schedule, and the copy had a 6:50 בעזרת נשים the chart has not
-//   got, so the message announced a מנין the board does not show. A second copy of a schedule
-//   disagrees with the board the moment anybody edits either one, and the board is what people
-//   daven from.
-//
-//   It carried the "(T"T 7:25)" that every one of the seventeen sent messages has. That one is on
-//   no chart at all, so nothing here knows how it is arrived at or what would move it, and a line
-//   that is right until the year it quietly is not is worse than a line that was never there.
-//
-// What this does work out is the calendar, not the clock: which month it is, and the day ראש חודש
-// starts on, which is the thirtieth of the month before wherever that month has one. Those are
-// the parts a person gets wrong, and they are not times.
-//
-// One thing the seventeen show that is deliberately not built. Three of them, in חשון, טבת and
-// שבט, open "6:50m&ns, [Netz 7:15]" instead. Both of those numbers are real: the bracket is
-// sunrise and the מנין is sunrise less twenty five minutes, which is why it reads 6:50 one year
-// and 6:51 the next. It looks like a winter rule and it is not one, because כסלו, in the middle
-// of that stretch, uses the ordinary form. Three examples cannot say which months take it, and in
-// any case neither number is on a chart, so neither is built.
+// Rosh Chodesh messages quote the shared handout rows, including the first two
+// minyanim's netz-minus-25 floor. Room letters come from the same location marks.
 
 
 
@@ -14429,21 +14425,8 @@ const RC_TEXT = {
   spelling: { Av: 'Menachem Av', Cheshvan: 'Mar Cheshvon' },
 };
 
-/** The מנינים, read off the wall chart's own ר"ח schedule.
- *
- *  **`WEEKDAY_SHACHARIS_SPECIAL` in settings.js, which is the cell the chart prints on a ר"ח, a
- *  בה"ב and a תענית.** This carried its own copy of that list for a while and it should not have. The shul
- *  caught it on one time: the copy had a 6:50 בעזרת נשים that the chart has not got, so the message
- *  was announcing a מנין the board does not show. A second copy of a schedule is a schedule that
- *  will disagree with the board the first time somebody edits one of them, and the board is the one
- *  people daven from.
- *
- *  So the letters come off the chart's own marks rather than being typed beside the times:
- *  underlined is d, one star is en, two is sh, unmarked is m (`erevWhereMark`). Change that one
- *  schedule and this message follows it, which is the whole point.
- *
- *  Nothing at all where the chart has no second schedule to print. A message with no times in it is
- *  not one to send, so the caller drops the card rather than sending the heading on its own. */
+/** Read times and rooms from the supplied chart/handout cells. Underlined is d,
+ * one star is en, two is sh, and unmarked is m. An empty schedule has no message. */
 function roshChodeshShacharis(shacharisCell) {
   const times = Array.isArray(shacharisCell) ? shacharisCell : erevTimes(shacharisCell);
   if (!times.length) return '';
@@ -14489,7 +14472,7 @@ function nextRoshChodesh(from, useGregorianBefore1582 = false) {
 /** The message.
  *
  *  @param rc - straight from nextRoshChodesh.
- *  @param shacharisCell - the chart's own ר"ח schedule, WEEKDAY_SHACHARIS_SPECIAL. */
+ *  @param shacharisCell - the shared Rosh Chodesh handout rows. */
 function roshChodeshText(rc, shacharisCell) {
   if (!rc) return '';
   const name = roshChodeshMonthName(rc.month);
@@ -14599,7 +14582,7 @@ function buildRoshChodeshShacharisPoster(year, month, settings) {
     const cells = chanukah
       ? chanukah.cells.map((cell, i) => i === 0
         ? { ...cell, text: chanukah.vasikin.time, trace: chanukah.vasikin.trace, traces: undefined } : cell)
-      : specialShacharisLines().flat();
+      : roshChodeshSchedule(days[0], settings).lines.flat();
     return {
       hebrewYear: year, month,
       title: roshChodeshShacharisTitle(month) + (month === 10 ? ' · חנוכה' : ''),
@@ -19711,11 +19694,11 @@ function weekSpecialShacharis(showing, state, settings) {
   const out = [];
   for (const g of mornings.season) out.push({ label: g.name, html: g.html, days: `(${g.day})` });
   for (const d of mornings.fasts) out.push({ label: name(d), html: TZG_TEXT.morning, days: `(${d.day})` });
-  if (mornings.others) {
+  for (const group of mornings.otherGroups) {
     out.push({
-      label: mornings.others.map((d) => name(d)).join(' · '),
-      html: WEEKDAY_SHACHARIS_SPECIAL,
-      days: `(${[...new Set(mornings.others.map((d) => d.day))].join(', ')})`,
+      label: group.days.map((d) => name(d)).join(' · '),
+      html: group.html,
+      days: `(${[...new Set(group.days.map((d) => d.day))].join(', ')})`,
     });
   }
   return { lines: out, everydayStands: mornings.everydayStands };
@@ -22068,8 +22051,8 @@ function weekCardsHtml(showing, index, state, settings) {
       for (const d of mornings.fasts) {
         groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
       }
-      if (mornings.others) {
-        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: WEEKDAY_SHACHARIS_SPECIAL });
+      for (const group of mornings.otherGroups) {
+        groups.push({ label: group.days.map(dayLabel).join('<br>'), html: group.html });
       }
       parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
     }

@@ -23,7 +23,8 @@
 // charts overlap: the sheet works them off the שבת חורף chart's own columns, so what it hands
 // over is the chart's answer with the two lines the chart has no column for added. Every other
 // day it covers is one the charts do not have.
-import { roshHashana, hebrewDateExtended, specialDaysInWeek } from '../hebrew-calendar.js';
+import { roshHashana, hebrewDateExtended, specialDaysInWeek, hasRoshChodesh } from '../hebrew-calendar.js';
+import { roshChodeshSchedule } from './special-shacharis.js';
 import { buildRoshHashanaPoster } from './roshhashana.js';
 import { buildYomKippurPoster } from './yomkippur.js';
 import { buildTzomGedaliaPoster } from './tzomgedalia.js';
@@ -222,6 +223,14 @@ export function weekdayMornings(shabbosSerial, settings, everyday, special) {
   const fasts = days.filter((d) => d.fast);
   const rest = days.filter((d) => !d.fast);
   const others = rest.length && special ? rest : null;
+  const otherGroups = [];
+  for (const day of others || []) {
+    const serial = shabbosSerial - 6 + DAY_NAMES.indexOf(day.day.split(', ')[0]);
+    const html = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings).html : special;
+    const group = otherGroups.find(group => group.html === html);
+    if (group) group.days.push(day);
+    else otherGroups.push({ days: [day], html });
+  }
 
   const covered = new Set();
   const mark = (list) => { for (const d of list) for (const name of d.split(', ')) covered.add(name); };
@@ -237,6 +246,7 @@ export function weekdayMornings(shabbosSerial, settings, everyday, special) {
     season,
     fasts,
     others,
+    otherGroups,
     everydayStands: DAY_NAMES.slice(0, 6).some((d) => !covered.has(d)),
   };
 }

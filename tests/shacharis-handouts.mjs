@@ -21,6 +21,14 @@ const expected = [
   ['8:00', 'בית מדרש'], ['8:20', 'בעזרת נשים'], ['8:40', 'בית מדרש למטה'],
 ];
 const rows = poster => poster.rows.map(row => [row.text, row.room]);
+const expectedRoshChodesh = (poster, options = settings) => {
+  const floor = Math.ceil(Math.max(...poster.days.map(day => sunriseElev(dateFromSerial(day), options) * 1440)) - 25 - 1e-7);
+  return expected.map(([time, room], index) => {
+    const [hour, minute] = time.split(':').map(Number);
+    const start = index < 2 ? Math.max(hour * 60 + minute, floor) : hour * 60 + minute;
+    return [`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`, room];
+  });
+};
 
 test('Asara handouts retain the full poster morning times, rooms and conditional note', () => {
   for (let year = 5784; year <= 5834; year++) {
@@ -118,7 +126,11 @@ test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbo
         assert.deepEqual(poster.rows.slice(1).map(row => row.text), chanukah.cells.slice(1).map(cell => cell.text));
         assert.deepEqual(poster.rows.map(row => row.room), expected.map(row => row[1]));
         assert(poster.title.endsWith(' · חנוכה'));
-      } else assert.deepEqual(rows(poster), expected);
+      }
+      assert.deepEqual(rows(poster), expectedRoshChodesh(poster), 'Both early minyanim obey the latest weekday netz');
+      for (const day of days) for (const row of poster.rows.slice(0, 2)) {
+        assert(row.trace.value * 1440 >= sunriseElev(dateFromSerial(day), settings) * 1440 - 25 - 1e-7);
+      }
     }
     assert.equal(buildRoshChodeshShacharisPoster(year, 7, settings), null, 'Rosh Hashana has its own schedule');
   }
@@ -132,7 +144,7 @@ test('Shevat is omitted when entirely on Shabbos and remains available on weekda
     const poster = buildRoshChodeshShacharisPoster(year, 11, settings);
     assert.equal(poster.title, 'ראש חודש שבט');
     assert(poster.days.every(serial => excelWeekday(serial) !== 7));
-    assert.deepEqual(rows(poster), expected);
+    assert.deepEqual(rows(poster), expectedRoshChodesh(poster));
   }
 });
 
