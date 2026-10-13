@@ -382,6 +382,23 @@ Friday rules, native Letter pages, widest margin, saved styles, pairing and swap
 `tests/asara-bteves.mjs` checks reference years, sunrise and rounding boundaries,
 51 calendar years, rooms and shared schedule output.
 
+Shiva Asar B'Tammuz now has a full Special Schedule under `שבעה עשר בתמוז`.
+`posters/shiva-asar-tammuz.js` uses the same `buildFastDayPoster` as Asara B'Teves,
+evaluated on 17 Tammuz, or Sunday 18 Tammuz when the 17th is Shabbos. Keep the
+standing special Shacharis list and conditional Selichos note. Final Mincha is
+true sunset minus 40 minutes rounded down to five; displayed sunset rounds up
+to a minute; Maariv is true sunset plus 35/50 minutes rounded up, then 10:30.
+The shared early Mincha list respects that day's Mincha Gedola Lechumra: omit
+12:45 when too early, use 1:15/1:20 only when eligible, advance the early
+downstairs 1:35 to the later five-minute time when needed, and retain eligible
+1:50 main and 3:30 downstairs. Never transplant winter times before summer
+Mincha Gedola. Both print designs, public schedules, messages, weekly agenda,
+upcoming minyanim and schedule API read this builder. New design uses the
+existing half-page fast-day layout and pairing; Old design uses the framed full
+page. `tests/shiva-asar-tammuz.mjs` checks 51 years, postponement, offsets and
+shared outputs; `tests/shiva-asar-tammuz-print.cjs` checks native Letter PDFs,
+both designs, margin extremes, pairs and actual message/public schedule output.
+
 Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
 Below the BHB title, name its actual weekdays and upcoming Shabbos parsha. Combine

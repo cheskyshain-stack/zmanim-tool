@@ -2544,8 +2544,8 @@ function sofZmanTfilaGRA(date, settings) {
 const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
 
 /** Asara B'Teves: retain sunset's seconds until the requested final rounding. */
-function asaraLastMinchaTrace(shkia, friday = false) {
-  const base = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+function asaraLastMinchaTrace(shkia, friday = false, title = "Asara B'Teves") {
+  const base = zman('שקיעה', shkia, `on ${title}, at the shul's elevation`);
   return friday
     ? base.minus(25, 'the Friday fast\'s last Mincha is twenty-five minutes before sunset')
       .floor('remove the seconds, without rounding up')
@@ -10292,31 +10292,41 @@ function asaraCell(trace) {
 
 function buildAsaraBTevesPoster(year, settings) {
   if (!year) return null;
-  const serial = asaraBTevesSerial(year), date = dateFromSerial(serial);
+  return buildFastDayPoster(year, settings, asaraBTevesSerial(year), ASARA_TEXT);
+}
+
+/** The same fast-day timing rules, evaluated on the chosen fast's actual date. */
+function buildFastDayPoster(year, settings, serial, labels) {
+  if (!year) return null;
+  const date = dateFromSerial(serial);
   const friday = excelWeekday(serial) === 6;
   const netz = Z.sunriseElev(date, settings), shkia = Z.sunsetElev(date, settings);
-  const rawShkia = zman('שקיעה', shkia, 'on Asara B\'Teves, at the shul\'s elevation');
+  const rawShkia = zman('שקיעה', shkia, `on ${labels.title}, at the shul's elevation`);
   const shkiaTrace = rawShkia.ceil('show sunset at the later whole minute, never before the actual sunset');
   const shacharisLines = specialShacharisLines();
   if (asaraSelichosFirst(netz)) {
     const first = shacharisLines.flat().find(time => time.text === '6:40');
     if (first) {
-      first.timeNote = ASARA_TEXT.selichosFirst;
+      first.timeNote = labels.selichosFirst;
       first.explanation = 'Sunrise is later than 7:05, twenty-five minutes after the 6:40 start. Say Selichos before Shacharis.';
     }
   }
 
-  const last = asaraCell(friday ? fridayLateMinchaTrace(date, settings) : asaraLastMinchaTrace(shkia));
+  const last = asaraCell(friday ? fridayLateMinchaTrace(date, settings) : asaraLastMinchaTrace(shkia, false, labels.title));
+  const gedola = zman('מנחה גדולה לחומרא', Z.minchaGedolaLechumra(date, settings), 'on the fast day, using the configured shul location');
+  const earlyMincha = fixedTime(gedola.value <= 13.25 / 24 ? '1:15' : '1:20')
+    .mark('*').onlyWhen(gedola.value <= (13 + 20 / 60) / 24, 'The 1:15/1:20 minyan must not precede Mincha Gedola Lechumra');
+  const standingMincha = [
+    fixedTime('12:45').underline().onlyWhen(gedola.value <= 12.75 / 24, '12:45 runs only after Mincha Gedola Lechumra'),
+    earlyMincha,
+    fixedTime('1:35').laterOf(gedola.ceilToStep(5, 'Advance to a five-minute time after Mincha Gedola Lechumra'),
+      'The early downstairs Mincha cannot start before Mincha Gedola Lechumra').underline(),
+    fixedTime('1:50').onlyWhen(gedola.value <= (13 + 50 / 60) / 24, '1:50 runs only after Mincha Gedola Lechumra'),
+    fixedTime('3:30').underline().onlyWhen(gedola.value <= 15.5 / 24, '3:30 runs only after Mincha Gedola Lechumra'),
+  ].filter(trace => trace.text()).map(asaraCell);
   const mincha = friday
     ? [...fridayMainMinchaParts(date, settings, serial + 1).times.map(asaraCell), last]
-    : [
-      asaraCell(fixedTime('12:45').underline()),
-      asaraCell(fixedTime('1:15').mark('*')),
-      asaraCell(fixedTime('1:35').underline()),
-      asaraCell(fixedTime('1:50')),
-      asaraCell(fixedTime('3:30').underline()),
-      last,
-    ];
+    : [...standingMincha, last];
   const maariv = friday ? [] : [
     asaraCell(rawShkia.plus(35, 'the first fast-day Maariv is thirty-five minutes after sunset')
       .ceil('never start before the full thirty-five minutes have elapsed')),
@@ -10326,25 +10336,25 @@ function buildAsaraBTevesPoster(year, settings) {
   ];
   const candles = friday ? candleLightingParts(date, settings).times[0] : null;
   const sets = [
-    { calc: 'shacharis', head: ASARA_TEXT.shacharis, lines: shacharisLines },
-    { calc: 'mincha', head: ASARA_TEXT.mincha, lines: [mincha.slice(0, 4), mincha.slice(4)] },
-    ...(candles ? [{ calc: 'candles', note: { label: ASARA_TEXT.candles, text: candles.plain(), trace: candles } }] : []),
-    { calc: 'shkia', note: { label: ASARA_TEXT.shkia, text: shkiaTrace.plain(), trace: shkiaTrace } },
-    ...(maariv.length ? [{ calc: 'maariv', head: ASARA_TEXT.maariv, lines: [maariv] }] : []),
+    { calc: 'shacharis', head: labels.shacharis, lines: shacharisLines },
+    { calc: 'mincha', head: labels.mincha, lines: [mincha.slice(0, 4), mincha.slice(4)].filter(line => line.length) },
+    ...(candles ? [{ calc: 'candles', note: { label: labels.candles, text: candles.plain(), trace: candles } }] : []),
+    { calc: 'shkia', note: { label: labels.shkia, text: shkiaTrace.plain(), trace: shkiaTrace } },
+    ...(maariv.length ? [{ calc: 'maariv', head: labels.maariv, lines: [maariv] }] : []),
   ];
   const M = minyanList();
-  M.list(serial, ASARA_TEXT.shacharis, shacharisLines.flat(), MORNING);
-  M.list(serial, ASARA_TEXT.mincha, mincha, AFTERNOON);
+  M.list(serial, labels.shacharis, shacharisLines.flat(), MORNING);
+  M.list(serial, labels.mincha, mincha, AFTERNOON);
   // The Friday poster matches the reference sheet and has no weekday Maariv block.
   // The phone still needs the ordinary Friday-night Maariv, read from the winter chart.
   const fridayMaariv = friday
     ? buildChorefRow({ serial: serial + 1, specialParsha: '' }, settings).traces.F.map(asaraCell) : [];
-  M.list(serial, ASARA_TEXT.maariv, friday ? fridayMaariv : maariv, AFTERNOON);
-  if (candles) M.zman(serial, ASARA_TEXT.candles, candles.value);
+  M.list(serial, labels.maariv, friday ? fridayMaariv : maariv, AFTERNOON);
+  if (candles) M.zman(serial, labels.candles, candles.value);
   const all = [...shacharisLines.flat(), ...mincha, ...maariv];
   const stars = ['*', '**'].filter(mark => all.some(time => time.mark === mark));
   return {
-    hebrewYear: year, title: friday ? ASARA_TEXT.fridayTitle : ASARA_TEXT.title,
+    hebrewYear: year, title: friday ? labels.fridayTitle : labels.title,
     span: { from: serial, to: serial }, friday, netz, shkia, sets,
     minyanim: M.out, zmanim: M.zmanim,
     legend: [
@@ -11267,6 +11277,20 @@ function buildRoshHashanaPoster(year, settings) {
   };
 }
 
+// ==== posters/shiva-asar-tammuz.js ====
+const TAMMUZ_TEXT = { ...ASARA_TEXT, title: 'שבעה עשר בתמוז', fridayTitle: 'שבעה עשר בתמוז · ערב שבת' };
+
+/** A fast on Shabbos is observed on Sunday, the eighteenth. */
+function shivaAsarTammuzSerial(year) {
+  const date = dateFromHebrew(17, 4, year);
+  return excelWeekday(date) === 7 ? date + 1 : date;
+}
+
+function buildShivaAsarTammuzPoster(year, settings) {
+  if (!year) return null;
+  return buildFastDayPoster(year, settings, shivaAsarTammuzSerial(year), TAMMUZ_TEXT);
+}
+
 // ==== posters/tzomgedalia.js ====
 // The צום גדליה poster: a fast day, so one page holding שחרית, מנחה, שקיעה and מעריב.
 //
@@ -11467,6 +11491,7 @@ function buildTzomGedaliaPoster(year, settings) {
 
 
 
+
 /** How far either side of ר"ה a whole day can be taken over: ערב ר"ה is the day before, and
  *  the last day the סוכות sheet speaks for is שבת בראשית on 24 תשרי, which is 23 days after.
  *  Every day outside that answers in one calendar call and builds nothing, which matters
@@ -11487,11 +11512,19 @@ const SEASON_BEFORE = 16;
  *  candle lighting and the horizon, and a stale sheet would be worse than a slow one. */
 let built = null;
 let asaraBuilt = null;
+let tammuzBuilt = null;
 function asaraFor(year, settings) {
   if (asaraBuilt && asaraBuilt.year === year && asaraBuilt.settings === settings) return asaraBuilt.poster;
   let poster = null;
   try { poster = buildAsaraBTevesPoster(year, settings); } catch { poster = null; }
   asaraBuilt = { year, settings, poster };
+  return poster;
+}
+
+function tammuzFor(year, settings) {
+  if (tammuzBuilt?.year === year && tammuzBuilt.settings === settings) return tammuzBuilt.poster;
+  const poster = buildShivaAsarTammuzPoster(year, settings);
+  tammuzBuilt = { year, settings, poster };
   return poster;
 }
 
@@ -11569,6 +11602,9 @@ function specialMinyanim(serial, settings) {
   const here = hebrew.year;
   if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
     return (asaraFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
+  }
+  if (hebrew.month === 4 && serial === shivaAsarTammuzSerial(here)) {
+    return (tammuzFor(here, settings)?.minyanim || []).slice().sort((a, b) => a.mins - b.mins);
   }
   for (const year of [here, here + 1]) {
     const rh = roshHashana(year - 3761);
@@ -15259,6 +15295,7 @@ function specialPrintPlan(pages, resolve) {
 
 
 
+
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
  *  change when somebody picks a different font for the board. fontStackFor() adds the
@@ -15514,6 +15551,20 @@ const POSTERS = [
         id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
         build: () => ({ poster: buildAsaraBTevesPoster(y, settings) }),
       }));
+    },
+    render: renderAsaraBTevesPoster,
+  },
+  {
+    key: 'shivaasartammuz',
+    label: TAMMUZ_TEXT.title,
+    group: TAMMUZ_TEXT.title,
+    covers: y => `${TAMMUZ_TEXT.title} ${hebrewYear(y)}`,
+    when: built => when(built.span.from, built.span.to),
+    starts: (year, settings) => buildShivaAsarTammuzPoster(year, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map(year => ({ id: String(year), year, label: yearLabel(year), preferred: year === preferred,
+        build: () => ({ poster: buildShivaAsarTammuzPoster(year, settings) }) }));
     },
     render: renderAsaraBTevesPoster,
   },
@@ -16916,7 +16967,7 @@ function renderChanukahPoster(poster, settings) {
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
-const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'slichos', 'tzomgedalia', 'afteryk']);
+const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'shivaasartammuz', 'slichos', 'tzomgedalia', 'afteryk']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
@@ -16978,7 +17029,7 @@ function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
 
 function renderHalfSchedulePoster(poster, key, settings, options = {}) {
   if (key === 'chanukah') return renderHalfChanukahPoster(poster, settings, options);
-  if (key === 'asarabteves') return renderHalfAsaraBTevesPoster(poster, settings, options);
+  if (key === 'asarabteves' || key === 'shivaasartammuz') return renderHalfAsaraBTevesPoster(poster, settings, options);
   if (key === 'tzomgedalia') return renderHalfAsaraBTevesPoster({ ...poster, title: TZG_TEXT.title }, settings, options);
   const sections = key === 'slichos'
     ? poster.rows.map(row => oneSection(row.label, [{ ...row, label: '' }]))
@@ -17226,6 +17277,7 @@ const ONEPAGE_SECTIONS = {
   asarabteves: (p) => [oneSection(p.title, p.sets.map(s => s.note
     ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() }))],
+  shivaasartammuz: (p) => ONEPAGE_SECTIONS.asarabteves(p),
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a

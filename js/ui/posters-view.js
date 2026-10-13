@@ -26,6 +26,7 @@ import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
 import { buildAsaraBTevesPoster, ASARA_TEXT } from '../posters/asarabteves.js';
+import { buildShivaAsarTammuzPoster, TAMMUZ_TEXT } from '../posters/shiva-asar-tammuz.js';
 import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT, shacharisRoomRows, shacharisDayGroups,
   buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, roshChodeshShacharisTitle } from '../posters/shacharis.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
@@ -304,6 +305,20 @@ const POSTERS = [
         id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
         build: () => ({ poster: buildAsaraBTevesPoster(y, settings) }),
       }));
+    },
+    render: renderAsaraBTevesPoster,
+  },
+  {
+    key: 'shivaasartammuz',
+    label: TAMMUZ_TEXT.title,
+    group: TAMMUZ_TEXT.title,
+    covers: y => `${TAMMUZ_TEXT.title} ${hebrewYear(y)}`,
+    when: built => when(built.span.from, built.span.to),
+    starts: (year, settings) => buildShivaAsarTammuzPoster(year, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map(year => ({ id: String(year), year, label: yearLabel(year), preferred: year === preferred,
+        build: () => ({ poster: buildShivaAsarTammuzPoster(year, settings) }) }));
     },
     render: renderAsaraBTevesPoster,
   },
@@ -1706,7 +1721,7 @@ function renderChanukahPoster(poster, settings) {
   return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
 }
 
-const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'slichos', 'tzomgedalia', 'afteryk']);
+const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'shivaasartammuz', 'slichos', 'tzomgedalia', 'afteryk']);
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
@@ -1768,7 +1783,7 @@ function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
 
 function renderHalfSchedulePoster(poster, key, settings, options = {}) {
   if (key === 'chanukah') return renderHalfChanukahPoster(poster, settings, options);
-  if (key === 'asarabteves') return renderHalfAsaraBTevesPoster(poster, settings, options);
+  if (key === 'asarabteves' || key === 'shivaasartammuz') return renderHalfAsaraBTevesPoster(poster, settings, options);
   if (key === 'tzomgedalia') return renderHalfAsaraBTevesPoster({ ...poster, title: TZG_TEXT.title }, settings, options);
   const sections = key === 'slichos'
     ? poster.rows.map(row => oneSection(row.label, [{ ...row, label: '' }]))
@@ -2016,6 +2031,7 @@ const ONEPAGE_SECTIONS = {
   asarabteves: (p) => [oneSection(p.title, p.sets.map(s => s.note
     ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() }))],
+  shivaasartammuz: (p) => ONEPAGE_SECTIONS.asarabteves(p),
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a

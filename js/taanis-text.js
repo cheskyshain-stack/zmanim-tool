@@ -13,10 +13,10 @@
 // the fast, three schedules, and a sign-off. No colons after the three labels, where the weekly
 // message has them after two of its three: both are written the way the shul writes them.
 //
-// צום גדליה and עשרה בטבת read their schedules from their own posters. The Friday
+// צום גדליה, עשרה בטבת and שבעה עשר בתמוז read their schedules from their own posters. The Friday
 // עשרה בטבת sheet also supplies candle lighting, and has no weekday Maariv block.
 //
-// The other public fasts have **the morning and nothing else**: it is the ר"ח / בה"ב / תענית
+// The remaining chart-only fasts have **the morning and nothing else**: it is the ר"ח / בה"ב / תענית
 // schedule out of Settings, which is the second list the wall chart prints and is what those days
 // daven, and their sent messages carry it time for time. Their מנחה and מעריב are on no board at
 // all. A fast afternoon is not the everyday one, as those sent messages show: תענית אסתר runs
@@ -154,6 +154,14 @@ export function tzomGedaliaText(poster) {
 
 /** Every line comes from the new fast-day sheet, including its conditional 6:40 note. */
 export function asaraBTevesText(poster) {
+  return fullFastDayText(poster, "Asara B'Teves");
+}
+
+export function shivaAsarTammuzText(poster) {
+  return fullFastDayText(poster, "Shiva Asar B'Tammuz");
+}
+
+function fullFastDayText(poster, title) {
   if (!poster) return '';
   const morning = (tnBlock(poster, 'shacharis')?.lines || []).flat()
     .map(time => time.text + erevWhereMark(time)
@@ -166,6 +174,6 @@ export function asaraBTevesText(poster) {
     [TN_TEXT.shkia, tnShkia(poster)],
     [TN_TEXT.maariv, tnLine(poster, 'maariv')],
   ].filter(([, times]) => times);
-  return ["Asara B'Teves" + (poster.friday ? ' - Erev Shabbos' : ''),
+  return [title + (poster.friday ? ' - Erev Shabbos' : ''),
     ...rows.map(([label, times]) => `${label} ${times}`), TN_TEXT.signoff].join('\n');
 }
