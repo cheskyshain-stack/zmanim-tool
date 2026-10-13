@@ -14916,16 +14916,10 @@ function specialOccasionChoices(groups, catalog, { selectedKey = null, available
         choices.push(posterChoice(entry, ['roshhashana', 'yomkippur', 'pair', 'vasikinboth'].includes(entry.key) || entry.whole
           ? 'Yom Tov' : 'Other schedules'));
       }
-    } else if (group.name === 'ראש חודש') {
-      for (const entry of entries) {
-        if (!entry.poster?.dated && entry.key !== selectedKey) continue;
-        if (!entry.value && (availableOnly || entry.key !== selectedKey)) continue;
-        choices.push(posterChoice(entry, 'Rosh Chodesh'));
-      }
     } else {
       if (availableOnly && !entries.some(entry => entry.value)) continue;
       choices.push({ value: group.name, name: group.name, group: group.name,
-        category: YOM_TOV.has(group.name) ? 'Yom Tov' : 'Other schedules', from: group.firstStart ?? Infinity });
+        category: group.name === 'ראש חודש' ? 'Rosh Chodesh' : YOM_TOV.has(group.name) ? 'Yom Tov' : 'Other schedules', from: group.firstStart ?? Infinity });
     }
   }
   return choices.sort((a, b) => a.from - b.from);
@@ -18407,13 +18401,13 @@ function renderPosters(container, state, routeChanged, tables) {
   rememberBar();
   const entries = plan.frames.flatMap(frame => [frame.left, frame.right]).filter(Boolean);
   const own = primary?.poster?.own;
-  const collections = SPECIAL_COLLECTIONS.map(collection => ({ ...collection,
+  const collections = SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov').map(collection => ({ ...collection,
     disabled: !specialCollectionEntries(catalog, collection.kind).length }));
   const unavailable = chosenCollection === 'yomtov' ? [...new Set(occasions.filter(choice => choice.category === 'Yom Tov').map(choice => choice.group))]
     .filter(name => !collectionEntries.some(entry => entry.group === name)) : [];
   container.className = `is-sheet-view is-special-schedules${plan.landscape ? ' is-half-letter-print is-half-paired-print' : ''}`;
   container.innerHTML = specialScheduleControls({ year, years, at: years.indexOf(year), preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`,
-    groups: occasions, group, occasionValue: chosenCollection ? `all:${chosenCollection}` : occasion?.value, gAt: occasionAt, current,
+    groups: occasions, group, occasionValue: chosenCollection === 'yomtov' ? 'all:yomtov' : occasion?.value, gAt: occasionAt, current,
     selected: primary?.key, choices: chosenCollection === 'yomtov' ? [] : choices, design: chosenDesign, collections, collection: chosenCollection, unavailable,
     pAt: chosenCollection === 'roshchodesh' ? -1 : pAt, pCount: pageChoices.length, pageCurrent, allMonths: chosenCollection === 'roshchodesh',
     asara: group?.name === 'עשרה בטבת', count: plan.frames.length, landscape: plan.landscape,
@@ -18456,7 +18450,8 @@ function renderPosters(container, state, routeChanged, tables) {
     const collection = SPECIAL_COLLECTIONS.find(collection => collection.value === value);
     if (collection) { selectCollection(collection.kind); return; }
     const choice = occasions.find(choice => choice.value === value);
-    if (choice) toGroup(choice.group, choice.key);
+    if (choice?.group === 'ראש חודש') selectCollection('roshchodesh');
+    else if (choice) toGroup(choice.group, choice.key);
   };
   container.querySelector('#poster-year').addEventListener('change', event => { chosenYear = Number(event.target.value); pendingAddition = null; commit(); });
   for (const [id, offset] of [['poster-year-back', -1], ['poster-year-next', 1]]) container.querySelector('#' + id).addEventListener('click', () => {

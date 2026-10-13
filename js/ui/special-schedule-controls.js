@@ -33,16 +33,10 @@ export function specialOccasionChoices(groups, catalog, { selectedKey = null, av
         choices.push(posterChoice(entry, ['roshhashana', 'yomkippur', 'pair', 'vasikinboth'].includes(entry.key) || entry.whole
           ? 'Yom Tov' : 'Other schedules'));
       }
-    } else if (group.name === 'ראש חודש') {
-      for (const entry of entries) {
-        if (!entry.poster?.dated && entry.key !== selectedKey) continue;
-        if (!entry.value && (availableOnly || entry.key !== selectedKey)) continue;
-        choices.push(posterChoice(entry, 'Rosh Chodesh'));
-      }
     } else {
       if (availableOnly && !entries.some(entry => entry.value)) continue;
       choices.push({ value: group.name, name: group.name, group: group.name,
-        category: YOM_TOV.has(group.name) ? 'Yom Tov' : 'Other schedules', from: group.firstStart ?? Infinity });
+        category: group.name === 'ראש חודש' ? 'Rosh Chodesh' : YOM_TOV.has(group.name) ? 'Yom Tov' : 'Other schedules', from: group.firstStart ?? Infinity });
     }
   }
   return choices.sort((a, b) => a.from - b.from);

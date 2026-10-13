@@ -144,8 +144,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
       const sections = await page.locator('#poster-group optgroup').evaluateAll(groups => groups.map(group => ({ label: group.label, names: [...group.children].map(option => option.textContent) })));
       assert.deepEqual(sections.map(section => section.label), ['Yom Tov', 'Rosh Chodesh', 'Other schedules']);
       assert.deepEqual(sections[0].names, ['All Yom Tov', 'ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
-      assert.equal(sections[1].names[0], 'All Rosh Chodesh');
-      assert(sections[1].names.slice(1).every(name => name.startsWith('ראש חודש ')), 'Rosh Chodesh contains All and its individual months');
+      assert.deepEqual(sections[1].names, ['ראש חודש'], 'The main dropdown has one Rosh Chodesh occasion');
       if (choiceIndex > 0) {
         const title = await page.locator('.poster.is-shacharis .onepage-title').first().innerText();
         assert(title.startsWith(choice), 'The BHB title identifies which Yom Tov it follows');
@@ -223,8 +222,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
     await page.locator('#poster-margin').selectOption('0.35'); await settle();
     const rcMeasured = [];
     for (const year of [5785, 5787, 5790]) {
-      await page.locator('#poster-group').selectOption('poster:roshchodesh8');
+      await page.locator('#poster-group').selectOption('ראש חודש');
       await chooseYear(year);
+      await page.locator('#poster-pick').selectOption('roshchodesh8'); await settle();
       const available = await page.evaluate(async year => {
         const { buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, shacharisDayGroups } = await import('/js/posters/shacharis.js');
         const { loadState } = await import('/js/storage.js');

@@ -76,11 +76,12 @@ plus/minus/Current controls and position/focus during changes.
 The Occasion dropdown has Yom Tov, Rosh Chodesh and Other schedules sections.
 Rosh Hashana and Yom Kippur are direct separate choices; Selichos, Tzom Gedalia,
 Shabbos Shuva and the after-Yom-Kippur page are separate other occasions.
-Rosh Chodesh lists each available month for the selected year directly, including
-both leap-year Adars and omitting Shabbos-only handouts. Keep the Month stepper.
-The main Occasion dropdown also offers **All Yom Tov** and **All Rosh Chodesh**;
-the Month dropdown offers **All Rosh Chodesh** too. They open the matching available
-pages together using the normal multi-page print job. All Yom Tov omits other
+Rosh Chodesh appears once in the main Occasion dropdown and the Add-page Occasion
+picker. Selecting that main occasion opens all available months for the year.
+The separate Month picker offers **All Rosh Chodesh** and each available month,
+including both leap-year Adars and omitting Shabbos-only handouts. Keep its stepper.
+The main Occasion dropdown also offers **All Yom Tov**. These selections open the
+matching available pages using the normal multi-page print job. All Yom Tov omits other
 Yomim Noraim occasions and alternate combined posters. Show unavailable holiday
 groups, including Shavuos, clearly without adding an empty printed page.
 Save the active collection and its `category/yomtov` or `category/roshchodesh`

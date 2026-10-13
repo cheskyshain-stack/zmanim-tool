@@ -22,13 +22,13 @@ const catalog = [
     .map(([month, name, from]) => entry('roshchodesh' + month, 'ראש חודש ' + name, groups[2].name, from, { poster: { dated: true } })),
 ];
 
-test('main holidays and every available Rosh Chodesh open their canonical sources directly', () => {
+test('main holidays stay direct and Rosh Chodesh appears as one occasion', () => {
   const before = JSON.stringify({ groups, catalog });
   const choices = specialOccasionChoices(groups, catalog);
   assert.deepEqual(choices.filter(choice => choice.category === 'Yom Tov').map(choice => choice.name),
     ['ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
-  assert.deepEqual(choices.filter(choice => choice.category === 'Rosh Chodesh').map(choice => [choice.key, choice.group]),
-    ['8', '9', '13', '14'].map(month => ['roshchodesh' + month, 'ראש חודש']));
+  assert.deepEqual(choices.filter(choice => choice.category === 'Rosh Chodesh').map(choice => [choice.value, choice.group]),
+    [['ראש חודש', 'ראש חודש']]);
   assert.deepEqual(choices.filter(choice => choice.category === 'Other schedules').map(choice => choice.key || choice.value),
     ['slichos', 'tzomgedalia', 'shuva', 'afteryk', 'חנוכה']);
   assert.equal(choices.find(choice => choice.key === 'yomkippur').group, 'ראש השנה יום כיפור');
@@ -43,22 +43,23 @@ test('saved paired and whole-occasion pages have a correctly classified selected
   }
   const custom = entry('own:rc', 'Saved Rosh Chodesh schedule', 'ראש חודש', 30, { poster: { own: { id: 'rc' } } });
   const choices = specialOccasionChoices(groups, [...catalog, custom], { selectedKey: custom.key });
-  assert.equal(choices.find(choice => choice.key === custom.key).category, 'Rosh Chodesh');
-  assert.equal(choices.find(choice => choice.key === custom.key).name, custom.label);
+  assert.equal(choices.find(choice => choice.group === custom.group).category, 'Rosh Chodesh');
+  assert.equal(choices.find(choice => choice.group === custom.group).name, 'ראש חודש');
 });
 
-test('missing weekday months are omitted and queued missing pages remain identifiable', () => {
+test('individual and missing months stay out of the main occasion list', () => {
   const choices = specialOccasionChoices(groups, catalog, { selectedKey: 'roshchodesh11' });
-  assert.equal(choices.find(choice => choice.key === 'roshchodesh11').disabled, true);
-  assert(!specialOccasionChoices(groups, catalog, { selectedKey: 'roshchodesh11', availableOnly: true })
-    .some(choice => choice.key === 'roshchodesh11'));
+  assert(!choices.some(choice => choice.key?.startsWith('roshchodesh')));
+  assert.equal(choices.filter(choice => choice.group === 'ראש חודש').length, 1);
+  assert(!specialOccasionChoices(groups, catalog.filter(entry => entry.key === 'roshchodesh11'), { availableOnly: true })
+    .some(choice => choice.group === 'ראש חודש'));
 });
 
 test('addition pickers offer only available sources and preserve safe option labels', () => {
   const choices = specialOccasionChoices(groups, catalog.filter(entry => entry.poster?.dated || entry.key === 'slichos'), { availableOnly: true });
   assert(!choices.some(choice => choice.category === 'Yom Tov'));
-  const html = occasionOptions(choices, 'poster:roshchodesh9');
-  assert(html.includes('label="Rosh Chodesh"')); assert(html.includes('value="poster:roshchodesh9" selected'));
+  const html = occasionOptions(choices, 'ראש חודש');
+  assert(html.includes('label="Rosh Chodesh"')); assert(html.includes('value="ראש חודש" selected'));
   assert(!html.includes('ראש חודש שבט'));
   const custom = occasionOptions([{ name: 'Custom <script>', value: 'one"two', category: 'Other schedules' }]);
   assert(!custom.includes('<script>')); assert(custom.includes('value="one&quot;two"'));
@@ -74,10 +75,11 @@ test('All collections use available original schedules without duplicated or unr
   assert.equal(JSON.stringify(catalog), before);
 });
 
-test('All options lead their own sections and are omitted from single-page addition pickers', () => {
+test('All Yom Tov leads its section while the main list contains one Rosh Chodesh choice', () => {
   const choices = specialOccasionChoices(groups, catalog);
-  const html = occasionOptions(choices, 'all:roshchodesh', SPECIAL_COLLECTIONS);
+  const html = occasionOptions(choices, 'ראש חודש', SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov'));
   assert(html.includes('<optgroup label="Yom Tov"><option value="all:yomtov"'));
-  assert(html.includes('<optgroup label="Rosh Chodesh"><option value="all:roshchodesh" selected'));
-  assert(!occasionOptions(choices, 'poster:roshchodesh8').includes('value="all:'));
+  assert(html.includes('<optgroup label="Rosh Chodesh"><option value="ראש חודש" selected'));
+  assert(!html.includes('value="all:roshchodesh"'));
+  assert(!occasionOptions(choices, 'ראש חודש').includes('value="all:'));
 });
