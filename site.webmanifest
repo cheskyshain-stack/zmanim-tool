@@ -7,8 +7,8 @@
   "scope": "/",
   "display_override": ["standalone"],
   "display": "browser",
-  "background_color": "#f9f6ef",
-  "theme_color": "#101f34",
+  "background_color": "#faf7f0",
+  "theme_color": "#faf7f0",
   "dir": "auto",
   "lang": "he",
   "icons": [

@@ -223,6 +223,14 @@ Collapsing the two into a plain `"display": "standalone"` would take printing aw
 every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
 CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
 be run in a persistent profile or the only answer you get is `in-incognito`.
+The public site's `theme-color` and manifest `theme_color` match its cream page
+background (`#faf7f0`), and the public head declares `color-scheme: light`. Android's
+edge-to-edge navigation buttons can sit over the page; a navy theme with cream content
+asks Chrome for light buttons over a light background. Keep these system color hints
+aligned with the actual page background. The page's navy header remains styled in CSS.
+The public entry heads are copied from `index.html` by `build-offline.py`. Browser
+emulation can verify the hints and light/dark preferences but does not render Android's
+native Home/Back/Recents buttons, so do not claim a device-level visual verification.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache
