@@ -872,6 +872,9 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
    there crisp enough to stand in for a border on its own. */
 .page table { border: 1px solid #d2d2d2; border-top: none; }
 .page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #d2d2d2; border-right: 1px solid #d2d2d2; }
+/* Crowded print jobs trade a little row padding for larger text. */
+.page.is-flexible-chart th, .page.is-flexible-chart td { padding-top: 0.03in; padding-bottom: 0.03in; }
+.page.is-flexible-chart .shacharis-through { padding: 0; }
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
@@ -948,6 +951,7 @@ th {
    does not get this: it is two lines of its own and the room below the name is not asked
    to stretch to fit it. */
 .parsha-cell.parsha-cell-centered { vertical-align: top; }
+.page.is-flexible-chart .parsha-cell-centered { vertical-align: middle; }
 .parsha-cell-name, .parsha-cell-sub { margin-top: 0; }
 /* Without this, .parsha-cell-sub's own line box inherits .parsha-cell's line-height: 1.15
    at the parsha name's own (larger) font-size, and that invisible "strut" measured as

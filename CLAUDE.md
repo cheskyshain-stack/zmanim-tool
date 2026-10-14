@@ -594,10 +594,23 @@ are included in row-height calculations. Measurement temporarily removes screen 
 and the print height cap so genuine overflow stays visible to the fit loop. Refit when
 fonts arrive and before printing. Browser coverage checks chart bounds, different saved
 styles, and identical footer positions in the physical desktop and phone PDFs.
+When a saved print job overflows at its chosen size, try flexible body rows with
+0.03in vertical cell padding before shrinking text. Keep the same weeks and page breaks;
+one tall holiday row can use more space than the others. Keep a parsha name centered
+when its molad note fits below it; otherwise center the compact name/note group together.
+Measure the morning panel across its actual tbody
+instead of multiplying one row's height. Recheck the full chosen size on every fitting
+pass, including before printing, and keep all saved styles untouched. Recover the last
+percentage point between fitting steps when it fits. The approved 5787 winter two-page
+layout prints at 85% rather than about 66%, on four landscape Letter sheets including
+its weekday companion. Ordinary full-size charts retain their equal rows.
+`tests/dense-chart-print.cjs` verifies crowded winter/summer charts, both molad formats,
+split DST headers and an entire season on one page at phone and desktop widths, including
+native PDF page counts, every printed time, panel bounds and aligned footers.
 
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
   All pages must measure 816px high. If they don't, something overflowed.
-- **Every row in a chart is the same height, including the header row.** The header may
+- **Roomy charts use equal rows, including the header row.** The header may
   be taller than the body rows when its text needs it, but never shorter. This is
   `syncHeaderRowHeight` in `js/ui/sheet-view.js` and it took several attempts to get
   right. Sub-pixel spread (under 1px) is rounding and is fine.

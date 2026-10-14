@@ -203,6 +203,7 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
         const body = [...page.querySelectorAll('tbody tr')].map(row => row.getBoundingClientRect().height);
         const headers = [...page.querySelectorAll('thead tr')].map(row => row.getBoundingClientRect().height);
         return { height: box.height, spread: Math.max(...body) - Math.min(...body),
+          flexible: page.classList.contains('is-flexible-chart'),
           headerFits: Math.min(...headers) >= Math.max(...body) - 1,
           equalSections: !page.querySelector('.chart-sections') || Math.max(...rows) - Math.min(...rows) < 1,
           fits: page.querySelector('.page-footer').getBoundingClientRect().bottom <= box.bottom + 1,
@@ -211,8 +212,10 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
       assert.equal(measurements.length, count, label + ': page count');
       measurements.forEach((measurement, index) => {
         assert(Math.abs(measurement.height - 816) <= 2, label + ': sheet height ' + index);
-        assert(measurement.spread < 1, label + ': equal rows ' + index + ' ' + measurement.spread);
-        assert(measurement.headerFits && measurement.equalSections, label + ': header heights ' + index);
+        if (!measurement.flexible) {
+          assert(measurement.spread < 1, label + ': equal rows ' + index + ' ' + measurement.spread);
+          assert(measurement.headerFits && measurement.equalSections, label + ': header heights ' + index);
+        }
         assert(measurement.fits, label + ': footer fits ' + index);
         assert.equal(measurement.label, index % 2 ? 'Weekday' : 'שבת חורף', label + ': print order');
       });
@@ -282,9 +285,12 @@ async function verifyChartFrames(page, count, label, selector = '#pages') {
     await verify(6, 'Compact molad');
     const offsets = await page.locator('.chart-sections .parsha-cell-centered').evaluateAll(cells => cells.map(cell => {
       const td = cell.getBoundingClientRect(), name = cell.querySelector('.parsha-cell-name').getBoundingClientRect();
-      return Math.abs((td.top + td.bottom - name.top - name.bottom) / 2);
+      const sub = cell.querySelector('.parsha-cell-sub').getBoundingClientRect(), style = getComputedStyle(cell);
+      const below = (td.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - name.height) / 2;
+      const group = cell.closest('.is-flexible-chart') && below < sub.height;
+      return { name: cell.innerText, group, offset: Math.abs((td.top + td.bottom - name.top - (group ? sub.bottom : name.bottom)) / 2) };
     }));
-    assert(offsets.length > 0 && offsets.every(offset => offset < 1), 'Compact molad names stay centered');
+    assert(offsets.length > 0 && offsets.every(item => item.offset < 1), 'Compact molad names, or tight name/note groups, stay centered: ' + JSON.stringify(offsets));
     await page.locator('label[for=chart-molad-format-yiddish]').click();
     await settled();
     await verify(6, 'Yiddish molad');
