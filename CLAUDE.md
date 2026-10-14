@@ -431,6 +431,12 @@ beside the written location in the 6:40 row when exact sunrise is later than 7:0
 without rounding sunrise first. Keep the short note on the same baseline as the room,
 in smaller type, separated from the location by a middle dot. Longer notes identifying particular BHB dates wrap within that
 location group, clear of the time at the left.
+Keep every half-page list with written locations in a centered 3.5in-wide block,
+limited to the available width at larger margins. Align all times along the left
+and locations along the right, with tabular numerals. Retain the current text size,
+row spacing, full-width section bands and fixed footer. Apply this to BHB, Rosh
+Chodesh and fast-day morning handouts and the morning portion of the detailed
+fast-day layout, matching the approved closer-column mockup.
 Check each of BHB's three dates separately. If all three qualify, print only
 `סליחות קודם שחרית`. If only some qualify, add their weekdays and upcoming Shabbos
 parsha in parentheses, grouping days in the same week, for example

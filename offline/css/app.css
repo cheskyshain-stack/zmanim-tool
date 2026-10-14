@@ -4333,7 +4333,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin: 0 0 0.14in; text-align: center; font-size: 11pt; line-height: 1.4;
 }
 .shacharis-handout-date > div { font-weight: 700; }
-.poster.is-halfpage .shacharis-handout-row { padding: 0.045in 0.08in; }
+.poster.is-halfpage .shacharis-handout-row {
+  width: min(3.5in, 100%); margin-inline: auto; padding: 0.045in 0.08in;
+}
 .shacharis-handout-run {
   position: relative; display: flex; align-items: baseline; justify-content: space-between;
   gap: 0.1in; padding: 0.06in 0.09in;
@@ -4341,6 +4343,7 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   white-space: nowrap;
 }
 .shacharis-handout-room, .shacharis-handout-time { position: relative; }
+.shacharis-handout-time { font-variant-numeric: tabular-nums; }
 .shacharis-handout-location { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
 .shacharis-handout-room, .shacharis-handout-time { flex: 0 0 auto; }
 .shacharis-handout-room { font-size: 0.85em; }

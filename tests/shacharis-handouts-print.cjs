@@ -96,6 +96,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         const content = [...sheet.querySelectorAll('.page-header,.onepage-title,.onepage-sec-head,.shacharis-handout-date,.shacharis-handout-days,.shacharis-handout-run,.shacharis-handout-note,.poster-legend,.poster-legend > div')]
           .map(el => el.getBoundingClientRect());
         const footer = sheet.querySelector('.poster-legend'), footerBox = footer.getBoundingClientRect();
+        const rows = [...sheet.querySelectorAll('.shacharis-handout-run')];
+        const firstTime = rows[0].querySelector('.shacharis-handout-time').getBoundingClientRect();
+        const firstLocation = rows[0].querySelector('.shacharis-handout-location').getBoundingClientRect();
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
             && c.y >= r.y + parseFloat(cs.paddingTop) - 1 && c.bottom <= r.bottom - parseFloat(cs.paddingBottom) + 1),
@@ -107,6 +110,13 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           datesFit: [...sheet.querySelectorAll('.shacharis-handout-date > div')]
             .every(label => label.scrollWidth <= label.clientWidth + 1),
           typeSize: parseFloat(getComputedStyle(sheet.querySelector('.shacharis-handout-run')).fontSize),
+          centeredColumns: rows.every(row => {
+            const box = row.getBoundingClientRect();
+            const time = row.querySelector('.shacharis-handout-time').getBoundingClientRect();
+            const location = row.querySelector('.shacharis-handout-location').getBoundingClientRect();
+            return Math.abs((box.left + box.right) / 2 - (r.left + r.right) / 2) < 1
+              && Math.abs(time.left - firstTime.left) < 1 && Math.abs(location.right - firstLocation.right) < 1;
+          }),
           rtl: [...sheet.querySelectorAll('.shacharis-handout-run')].every(row =>
             row.querySelector('.shacharis-handout-room').getBoundingClientRect().left >= row.querySelector('.shacharis-handout-time').getBoundingClientRect().right),
           notesBesideRoom: [...sheet.querySelectorAll('.shacharis-handout-note')].every(note => {
@@ -126,6 +136,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert(Math.abs(box.footerTypeSize - 6.5 * 96 / 72) < 0.01, 'Morning handouts retain the approved fixed 6.5pt footer');
         assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
+        assert(box.centeredColumns, 'The narrower list is centered with straight time and location columns');
         assert(box.notesBesideRoom, 'Selichos note is beside the room, clear of the time; short notes remain on one line');
         assert(box.typeSize >= 20, 'Times remain large enough for a morning poster');
         assert(box.paper.includes('letter landscape'));
