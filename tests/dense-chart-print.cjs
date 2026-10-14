@@ -34,6 +34,7 @@ const server = http.createServer((req, res) => {
         { year: 5787, season: 'choref', count: 2, molad: 'compact' },
         { year: 5785, season: 'choref', count: 2, molad: 'yiddish', dst: true },
         { year: 5787, season: 'kayitz', count: 2, molad: 'compact' },
+        { year: 5787, season: 'kayitz', count: 3, molad: 'compact' },
         { year: 5787, season: 'choref', count: 1, molad: 'compact' },
       ]) {
         const original = await page.evaluate(async fixture => {
@@ -65,7 +66,12 @@ const server = http.createServer((req, res) => {
         // The mobile viewport's print fallback zoom is not the physical Letter box.
         const paperZoom = await page.addStyleTag({ content: '#pages .page { zoom: 1 !important; }' });
         const geometry = await page.locator('#pages .page').evaluateAll(pages => pages.map(page => {
-          const box = page.getBoundingClientRect(), tables = [...page.querySelectorAll('table')];
+          const box = page.getBoundingClientRect(), tables = [...page.querySelectorAll('table')], style = getComputedStyle(page);
+          const left = box.left + parseFloat(style.paddingLeft), right = box.right - parseFloat(style.paddingRight);
+          const horizontalFits = tables.every(table => {
+            const rect = table.getBoundingClientRect();
+            return rect.left >= left - .5 && rect.right <= right + .5;
+          });
           const footer = page.querySelector('.page-footer').getBoundingClientRect();
           const fits = tables[0].getBoundingClientRect().top >= page.querySelector('.page-header').getBoundingClientRect().bottom - .5
             && tables.at(-1).getBoundingClientRect().bottom <= footer.top + .5
@@ -84,9 +90,11 @@ const server = http.createServer((req, res) => {
           });
           return { rows: page.querySelectorAll('tbody tr').length, height: box.height,
             font: parseFloat(getComputedStyle(page).getPropertyValue('--sheet-font-size')),
-            fits, panelFits, textFits, times: (page.innerText.match(/\b\d{1,2}:\d{2}\b/g) || []).sort() };
+            fits, panelFits, textFits, horizontalFits,
+            tableWidths: tables.map(table => table.getBoundingClientRect().width), availableWidth: right - left,
+            times: (page.innerText.match(/\b\d{1,2}:\d{2}\b/g) || []).sort() };
         }));
-        assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelFits && p.textFits), JSON.stringify({ fixture, width, geometry: geometry.map(({ times, ...p }) => p) }));
+        assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelFits && p.textFits && p.horizontalFits), JSON.stringify({ fixture, width, geometry: geometry.map(({ times, ...p }) => p) }));
         assert.deepEqual([geometry.filter((_, i) => i % 2 === 0).reduce((sum, p) => sum + p.rows, 0), geometry.filter((_, i) => i % 2).reduce((sum, p) => sum + p.rows, 0)], original.weeks, 'Every original week still appears once');
         if (fixture.year === 5787 && fixture.season === 'choref' && fixture.count === 2)
           assert(geometry.every(p => p.font >= 8.5 - .000001), 'The approved dense chart uses at least 85% of its chosen 10pt size');
