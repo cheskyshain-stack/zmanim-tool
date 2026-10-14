@@ -610,6 +610,13 @@ native PDF page counts, every printed time, panel bounds and aligned footers.
 
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
   All pages must measure 816px high. If they don't, something overflowed.
+- Printing must clear `main:not(.is-sheet-view)`'s 62rem screen width limit as well as
+  `.pages`' screen scrolling overflow. The more specific screen selector otherwise wins
+  over bare `main`, leaving a 992px scrollport that clips the rightmost 16px of the chart
+  inside its margin. PDF text extraction still reports the clipped letters, so check
+  clipping ancestors and actual raster output as well as selectable text coordinates.
+  `tests/chart-print-width.cjs` covers the seasonal admin and public browser at phone and
+  desktop widths, visible right-edge PDF pixels, original type size and printer margins.
 - **Roomy charts use equal rows, including the header row.** The header may
   be taller than the body rows when its text needs it, but never shorter. This is
   `syncHeaderRowHeight` in `js/ui/sheet-view.js` and it took several attempts to get
