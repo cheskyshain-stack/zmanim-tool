@@ -548,6 +548,9 @@ export function renderSheet(container, state, sheet, onChange) {
   // print preview, as the confusing, overlapping-looking extra page this fits (or, failing
   // that, warns about) below.
   //
+  // Try flexible rows and slightly tighter padding before shrinking a crowded job.
+  // A taller holiday row then borrows space from the other rows instead of forcing every
+  // page down to its own minimum font size. Roomy jobs retain their original equal rows.
   // Asked for directly: shrink the text rather than make the admin rearrange weeks. One
   // scale for every page in #pages - both this sheet's own and its companion's, since they
   // print and are read as one job - not a scale per page, so flipping between pages of the
@@ -579,17 +582,38 @@ export function renderSheet(container, state, sheet, onChange) {
     pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
     syncPageHeights(pagesEl);
   };
-  const stillOverflowing = () => pageEls.filter((el) => el.getBoundingClientRect().height > FIT_TOLERANCE + PAGE_HEIGHT_EPSILON);
+  const stillOverflowing = () => pageEls.filter((el) => {
+    if (el.getBoundingClientRect().height > FIT_TOLERANCE + PAGE_HEIGHT_EPSILON) return true;
+    if (!el.classList.contains('is-flexible-chart')) return false;
+    return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
+      const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
+      return content.top < box.top - 0.5 || content.bottom > box.bottom + 0.5
+        || content.left < box.left - 0.5 || content.right > box.right + 0.5;
+    });
+  });
   const fitPaper = () => {
     if (!document.body.contains(pagesEl)) return;
     atPaperSize(pagesEl, () => {
+      pageEls.forEach(el => el.classList.remove('is-flexible-chart'));
       applyFitScale(1);
       let fitScale = 1;
       let overflowPages = stillOverflowing();
+      if (overflowPages.length && !combinedPrint) {
+        pageEls.forEach(el => el.classList.add('is-flexible-chart'));
+        applyFitScale(1);
+        overflowPages = stillOverflowing();
+      }
       while (overflowPages.length && fitScale > FIT_FLOOR) {
         fitScale = Math.max(FIT_FLOOR, fitScale - FIT_STEP);
         applyFitScale(fitScale);
         overflowPages = stillOverflowing();
+      }
+      // Recover the last percentage point between the two-percent fitting steps.
+      if (!overflowPages.length && fitScale < 1 && !combinedPrint) {
+        const finerScale = Math.min(1, fitScale + FIT_STEP / 2);
+        applyFitScale(finerScale);
+        if (stillOverflowing().length) applyFitScale(fitScale);
+        else fitScale = finerScale;
       }
 
       const overflowWarningEl = container.querySelector('#page-overflow-warning');
@@ -818,13 +842,21 @@ function syncHeaderRowHeight(pagesEl) {
         el.style.flex = 'none';
       });
       page.querySelectorAll('tr').forEach(row => { row.style.height = ''; });
-      page.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => { el.style.marginTop = ''; });
+      page.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => {
+        el.style.marginTop = '';
+        el.style.position = '';
+        el.style.top = '';
+      });
+      page.querySelectorAll('.shacharis-panel').forEach(panel => {
+        panel.style.top = '';
+        panel.style.height = '';
+      });
       const style = getComputedStyle(page);
       const paddingTop = header.getBoundingClientRect().top - page.getBoundingClientRect().top;
       const paddingBottom = parseFloat(style.paddingBottom) || 0;
       const headerGap = tables[0].getBoundingClientRect().top - header.getBoundingClientRect().bottom;
       const footerGap = footer.getBoundingClientRect().top - tables.at(-1).getBoundingClientRect().bottom;
-      return { header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap,
+      return { page, header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap,
         top: paddingTop + header.getBoundingClientRect().height + headerGap,
         bottom: 8.5 * 96 - paddingBottom - footer.getBoundingClientRect().height - footerGap };
     });
@@ -832,11 +864,38 @@ function syncHeaderRowHeight(pagesEl) {
     const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
     const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
     const chartHeight = Math.max(0, bottom - top);
-    layouts.forEach(({ header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap }) => {
+    layouts.forEach(({ page, header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap }) => {
       header.style.height = (top - paddingTop - headerGap) + 'px';
       footer.style.height = (8.5 * 96 - bottom - paddingBottom - footerGap) + 'px';
       const borders = tables.map(table => table.getBoundingClientRect().height
         - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+      if (page.classList.contains('is-flexible-chart')) {
+        const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
+        const gap = sections ? tables[1].getBoundingClientRect().top - tables[0].getBoundingClientRect().bottom : 0;
+        const available = Math.max(0, chartHeight - gap * (tables.length - 1));
+        const evenShare = Math.max(0, available - borders.reduce((sum, border) => sum + border, 0)) / rowCount;
+        tables.forEach(table => {
+          const head = table.querySelector('thead tr');
+          if (head) head.style.height = Math.max(evenShare, head.getBoundingClientRect().height) + 'px';
+        });
+        const natural = tables.map(table => table.getBoundingClientRect().height);
+        const extra = Math.max(0, available - natural.reduce((sum, height) => sum + height, 0));
+        // Body rows retain their natural content minimum; the table distributes spare
+        // space without pinning short rows to a height that the tall row must exceed.
+        tables.forEach((table, index) => {
+          table.style.height = (natural[index] + extra * table.rows.length / rowCount) + 'px';
+        });
+        page.querySelectorAll('.shacharis-panel').forEach(panel => {
+          const body = panel.closest('tbody'), cell = panel.parentElement;
+          const box = body.getBoundingClientRect(), anchor = cell.getBoundingClientRect();
+          const inset = box.height / body.rows.length * 0.35;
+          // Flexible rows have different heights, so span their measured column rather
+          // than multiplying the height of whichever row holds the morning panel.
+          panel.style.top = (box.top - anchor.top + inset) + 'px';
+          panel.style.height = Math.max(0, box.height - inset * 2) + 'px';
+        });
+        return;
+      }
       if (sections) {
         const rows = tables.flatMap(table => [...table.rows]);
         const gap = tables[1].getBoundingClientRect().top - tables[0].getBoundingClientRect().bottom;
@@ -903,8 +962,21 @@ function centerMoladNotes(pagesEl) {
     const nameHeight = nameEl.getBoundingClientRect().height;
     const subHeight = subEl.getBoundingClientRect().height;
     const spaceAbove = Math.max(0, (contentHeight - nameHeight) / 2);
-    nameEl.style.marginTop = spaceAbove + 'px';
     const spaceBelow = Math.max(0, contentHeight - spaceAbove - nameHeight);
+    if (td.closest('.is-flexible-chart')) {
+      // Keep the name's own center when the note fits below it. A tight row centers
+      // the group instead of growing solely to reserve empty space above the name.
+      if (spaceBelow < subHeight) return;
+      const nameTop = td.getBoundingClientRect().top + paddingTop + spaceAbove;
+      const subTop = nameTop + nameHeight + (spaceBelow - subHeight) / 2;
+      // Relative offsets do not increase a flexible row's intrinsic height or move
+      // the other rows while their notes are being centered.
+      nameEl.style.top = (nameTop - nameEl.getBoundingClientRect().top) + 'px';
+      subEl.style.top = (subTop - subEl.getBoundingClientRect().top) + 'px';
+      nameEl.style.position = subEl.style.position = 'relative';
+      return;
+    }
+    nameEl.style.marginTop = spaceAbove + 'px';
     subEl.style.marginTop = Math.max(0, (spaceBelow - subHeight) / 2) + 'px';
   });
 }
