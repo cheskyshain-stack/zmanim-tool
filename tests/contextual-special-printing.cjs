@@ -215,7 +215,7 @@ const server = http.createServer((req, res) => {
         await print('separated-pair', 2, true);
         await page.locator('[data-job-action=page]').first().click();
         await page.locator('[data-job-action=all-halves]').click(); await settle();
-        assert.equal(await page.locator('.poster.is-halfpage').count(), 19, 'Bulk handouts include the three new small schedules without duplicating the detailed Asara variant');
+        assert.equal(await page.locator('.poster.is-halfpage').count(), 20, 'Bulk handouts include Shiva Asar B\'Tammuz and the small schedules without duplicating the detailed Asara variant');
         await print('all-half-pages', 10, true);
         await page.locator('[data-job-action=page]').first().click(); await page.locator('[data-job-action=all]').click(); await settle();
         await print('all-available-pages', await page.locator('[data-job-frame]').count(), false);
