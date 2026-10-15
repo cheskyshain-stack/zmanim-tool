@@ -17162,7 +17162,7 @@ function shacharisRowsHtml(rows) {
 
 function shacharisDaysHtml(days, settings) {
   const groups = shacharisDayGroups(days, settings, posterTables);
-  const label = groups.map(group => group.label).join(' ו');
+  const label = groups.map(group => group.label).join(' · ו');
   return `<div class="shacharis-handout-dates" dir="rtl">
     <div class="shacharis-handout-date" data-dates="${days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' ')}"><div lang="he">${escAttr(label)}</div></div>
   </div>`;

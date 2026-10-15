@@ -411,7 +411,8 @@ Separate admin Shacharis-only handouts are available for Asara B'Teves and both 
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
 Below the BHB title, name its actual weekdays and upcoming Shabbos parsha. Combine
 days belonging to the same upcoming Shabbos with a ו, and join all groups into one
-centered header, for example `יום ב' וה' לך לך ויום ב' וירא`, reading chronologically
+centered header with a middle dot and ו between parsha groups, for example
+`יום ב' וה' לך לך · ויום ב' וירא`, reading chronologically
 from right to left. Keep all three BHB days together, rather than spreading the two
 parsha groups across columns. Longer headers may wrap naturally within the full
 width of the handout at wide print margins. Do not print a calendar

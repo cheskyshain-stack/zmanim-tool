@@ -176,7 +176,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           ? choiceIndex === 1 ? ['וירא', 'וירא', 'חיי שרה'] : ['אחרי מות - קדושים', 'אחרי מות - קדושים', 'אמור']
           : choiceIndex === 1 ? ['לך לך', 'לך לך', 'וירא'] : ['בהר', 'בהר', 'בחוקותי'];
         assert.deepEqual(await page.locator('.poster.is-shacharis').first().locator('.shacharis-handout-date > div').allTextContents(),
-          [`יום ב' וה' ${expectedParshas[0]} ויום ב' ${expectedParshas[2]}`],
+          [`יום ב' וה' ${expectedParshas[0]} · ויום ב' ${expectedParshas[2]}`],
           'Each BHB morning has its weekday and upcoming Shabbos parsha on the first line, including combined readings');
         assert(!/[A-Za-z]|\b20\d{2}\b/.test(await page.locator('.shacharis-handout-dates').first().innerText()),
           'Printed BHB dates and parshas are entirely Hebrew');
@@ -248,7 +248,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           .filter(Boolean).sort((a, b) => a.span.from - b.span.from).map(poster => ({ month: poster.month,
             title: poster.title, dayLabel: poster.dayLabel, rows: poster.rows.map(row => [row.room, row.text]),
             dates: [{ dates: poster.days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' '),
-              title: shacharisDayGroups(poster.days, settings, tables).map(group => group.label).join(' ו') }] }));
+              title: shacharisDayGroups(poster.days, settings, tables).map(group => group.label).join(' · ו') }] }));
       }, year);
       assert.deepEqual(await page.locator('#poster-pick option').evaluateAll(options => options.map(option => option.value)),
         ['all:roshchodesh', ...available.map(poster => 'roshchodesh' + poster.month)], 'All and the weekday months appear in date order');
