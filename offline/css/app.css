@@ -1831,6 +1831,16 @@ kbd {
    the arc and the softer gold in the dividers are the colours that were in it. */
 /* Keep public content and native page controls light under dark device preferences. */
 html:has(body.is-luach) { color-scheme:only light; }
+.luach-system-area { display:none; }
+@media screen {
+  html.has-system-area { --luach-safe-top:env(safe-area-inset-top, 0px); scroll-padding-bottom:env(safe-area-inset-bottom, 0px); }
+  html.has-system-area body.is-luach { padding-bottom:env(safe-area-inset-bottom, 0px); }
+  html.has-system-area .luach-system-area {
+    display:block; position:fixed; left:0; bottom:0; width:100vw;
+    height:env(safe-area-inset-bottom, 0px); background:#142b46;
+    pointer-events:none; z-index:10000;
+  }
+}
 body.is-luach {
   --luach-navy: #162a43;
   --luach-navy-deep: #101f34;
@@ -5073,7 +5083,7 @@ body.is-locked { overflow: hidden; }
   html:has(body.is-luach) { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: 110px; }
   body.is-luach .luach-bar { pointer-events: none; touch-action: pan-y; }
   body.is-luach .luach-bar a, body.is-luach .luach-bar button { pointer-events: auto; }
-  body.is-luach .luach-cap-photo { top: clamp(10px, calc(3.2px + 1.25vw), 16px); height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
+  body.is-luach .luach-cap-photo { top: calc(clamp(10px, calc(3.2px + 1.25vw), 16px) + var(--luach-safe-top, 0px)); height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
   body.is-luach .luach-bar::after { pointer-events: none; }
 }
 
@@ -5668,10 +5678,10 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
 
 /* All public pages share the homepage's straight navy cap and thin gold edge. */
 @media screen {
- body.is-luach { --luach-cap-height:64px; --luach-arc:0px; }
+ body.is-luach { --luach-cap-height:calc(64px + var(--luach-safe-top, 0px)); --luach-arc:0px; }
  body.is-luach .luach-bar {
   height:var(--luach-cap-height); min-height:0; padding:0 20px; margin:0; background:#142b46;
-  border-bottom:2px solid #cbb681; align-items:center;
+  border-bottom:2px solid #cbb681; align-items:center; padding-top:var(--luach-safe-top, 0px);
  }
  body.is-luach .luach-bar::after { display:none; }
  body.is-luach .luach-bar::before { inset:0; }
@@ -5682,7 +5692,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  body.is-luach:has(main:is(.is-home,.is-give)) {
   --luach-navy:#142b46; --luach-ink:#142b46; --luach-cream:#faf7f0;
  }
- body.is-luach main:is(.is-home,.is-give) { display:block; min-height:100dvh; padding:93px 18px 27px; }
+ body.is-luach main:is(.is-home,.is-give) { display:block; min-height:100dvh; padding:calc(93px + var(--luach-safe-top, 0px)) 18px 27px; }
  .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
  body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
  .luach-home-bar-name,.luach-home-bar-nav { display:none; }
@@ -5728,7 +5738,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-calculation-credit { margin:16px 0 0; font:400 12px/1.65 Arial,sans-serif; color:#64707c; }
  .luach-calculation-credit a { color:#576674; text-underline-offset:3px; }
  .is-home .luach-site-footer { max-width:560px; }
- body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:90px; padding-bottom:24px; }
+ body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:24px; }
  .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; margin:0 auto; text-align:left; }
  .is-give .luach-give-page > * { flex-shrink:0; }
  .is-give .luach-give-page:has(.luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width:48rem; }
@@ -5802,12 +5812,12 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-give-frame { margin-inline:-15px; }
 }
 @media screen and (min-width:760px) {
- body.is-luach { --luach-cap-height:78px; }
+ body.is-luach { --luach-cap-height:calc(78px + var(--luach-safe-top, 0px)); }
  .is-home .luach-cap-photo { display:none; }
  .is-home .luach-home-bar-name { display:block; font:600 14px Georgia,serif; color:#fff; }
  .is-home .luach-home-bar-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
  .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
- body.is-luach main.is-home { padding:119px 28px 28px; }
+ body.is-luach main.is-home { padding:calc(119px + var(--luach-safe-top, 0px)) 28px 28px; }
  main.is-home .luach-masthead { width:100%; max-width:620px; margin:0 auto 30px; padding:12px 20px 0; }
  .is-home .luach-masthead-name { width:100%; margin:0; }
  .is-home .luach-approved-name { max-width:580px !important; }
@@ -5830,7 +5840,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-item { min-height:106px; padding:22px 25px; border-radius:15px; }
  .is-home .luach-item-title { font-size:27px; }
  .is-home .luach-site-footer { max-width:840px; margin-top:46px; padding-top:25px; }
- body.is-luach main.is-give { padding-top:112px; }
+ body.is-luach main.is-give { padding-top:calc(112px + var(--luach-safe-top, 0px)); }
  .is-give .luach-give-head-block { margin-bottom:25px; }
  .luach-payment-tab { font-size:14px; }
  .luach-payment-panel { padding:22px 24px 15px; min-height:367px; }
