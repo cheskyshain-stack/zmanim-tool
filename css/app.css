@@ -5684,7 +5684,6 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
  body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
  .luach-home-bar-name,.luach-home-bar-nav { display:none; }
- .luach-home-kicker { display:none; }
  .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
  .is-home .luach-approved-name text { font-size:32px; }
  .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David CLM","David Libre",serif !important; }
@@ -5808,11 +5807,6 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
  body.is-luach main.is-home { padding:119px 28px 28px; }
  main.is-home .luach-masthead { width:100%; max-width:620px; margin:0 auto 30px; padding:12px 20px 0; }
- .is-home .luach-home-kicker {
-  display:flex; justify-content:center; align-items:center; gap:14px; margin:0 0 24px;
-  color:#88713d; font:600 10px/1.4 Arial,sans-serif; letter-spacing:2.2px;
- }
- .is-home .luach-home-kicker::before,.is-home .luach-home-kicker::after { content:""; width:42px; height:1px; background:#c3ad77; }
  .is-home .luach-masthead-name { width:100%; margin:0; }
  .is-home .luach-approved-name { max-width:580px !important; }
  .is-home .luach-approved-name text { fill:#142b46; font-size:37px; }
