@@ -22,6 +22,7 @@ import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.
 import { shulNow, dateFromSerial } from './zmanim/solar.js';
 import { loadTables } from './data-loader.js';
 import { hasParsha } from './hebrew-calendar.js';
+import { wireInstalledSystemBars } from './ui/system-bars.js';
 
 const main = document.getElementById('main');
 /** Which week /week/ is currently showing, moved by Previous/This week/Next - see
@@ -1275,6 +1276,7 @@ function wireNav(published) {
 
 
 (async () => {
+  wireInstalledSystemBars();
   watchForStaleTab();
   let published;
   try {

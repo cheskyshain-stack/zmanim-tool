@@ -228,11 +228,20 @@ the cream page (`#faf7f0`). Keep the public head's `color-scheme: light` declara
 and the public root's `color-scheme: only light`. The user confirmed that a navy
 browser theme hides the bottom Home/Back/Recents buttons on their Android phone,
 even with both light color-scheme declarations. These page settings do not separately
-control the system bars. Keep the working cream browser theme and the navy website
-header in CSS; do not repeat the navy browser-theme change as a contrast fix.
+control the system bars. Keep cream as the static browser/manifest theme. For the
+installed Android app only, `js/ui/system-bars.js` opts into `viewport-fit=cover` and
+paints the real bottom safe area navy. It requests the navy theme only while that
+area has a nonzero measured height, giving white system buttons a matching background.
+If no bottom inset is exposed, retain cream. Observe inset changes and keep the area
+outside route content so navigation does not remove it. Reserve scroll space below
+content, respect the top inset, and omit the area from print. Ordinary browser tabs,
+desktop and iOS retain their existing layout. Do not request navy over cream content
+again without the measured, painted safe area.
 The public entry heads are copied from `index.html` by `build-offline.py`. Browser
 emulation can verify the hints and light/dark preferences but does not render Android's
 native Home/Back/Recents buttons, so do not claim a device-level visual verification.
+`tests/installed-system-bars.cjs` uses Chromium safe-area overrides to check the
+painted area, fallback, rotation, page navigation, footer clearance and print behavior.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache
