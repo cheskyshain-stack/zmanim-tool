@@ -23,3 +23,30 @@ export function wireInstalledSystemBars() {
   window.addEventListener('pageshow', update);
   update();
 }
+
+/** Read only browser/display information, on the user's Copy details press.
+ *  No settings, storage, payment data, network requests or device identifiers. */
+export function systemBarsReport() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+  probe.setAttribute('aria-hidden', 'true');
+  document.body.append(probe);
+  const style = getComputedStyle(probe);
+  const insets = { top: style.paddingTop, right: style.paddingRight, bottom: style.paddingBottom, left: style.paddingLeft };
+  probe.remove();
+  const area = document.querySelector('.luach-system-area');
+  const box = area?.getBoundingClientRect();
+  return JSON.stringify({
+    check: 'app-display-2026-10-18',
+    browser: navigator.userAgent,
+    platform: navigator.userAgentData?.platform || navigator.platform,
+    modes: Object.fromEntries(['browser', 'standalone', 'minimal-ui', 'fullscreen'].map(mode => [mode, matchMedia(`(display-mode: ${mode})`).matches])),
+    viewport: document.querySelector('meta[name="viewport"]')?.content,
+    theme: document.querySelector('meta[name="theme-color"]')?.content,
+    safeArea: insets,
+    systemArea: box ? { height: box.height, top: box.top, bottom: box.bottom, color: getComputedStyle(area).backgroundColor } : null,
+    pageSize: { width: innerWidth, height: innerHeight },
+    screenSize: { width: screen.width, height: screen.height, ratio: devicePixelRatio },
+    visualViewport: window.visualViewport ? { height: visualViewport.height, offsetTop: visualViewport.offsetTop, scale: visualViewport.scale } : null,
+  }, null, 2);
+}

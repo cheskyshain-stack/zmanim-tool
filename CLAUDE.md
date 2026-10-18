@@ -242,6 +242,13 @@ emulation can verify the hints and light/dark preferences but does not render An
 native Home/Back/Recents buttons, so do not claim a device-level visual verification.
 `tests/installed-system-bars.cjs` uses Chromium safe-area overrides to check the
 painted area, fallback, rotation, page navigation, footer clearance and print behavior.
+The user's full Samsung screenshot still shows cream system bars with readable bottom
+buttons. Do not infer the browser, installed display mode or inset values from that
+picture. A temporary Android-only **Check app display** disclosure in the home footer
+copies browser/display measurements on request, without collecting storage, settings
+or payment data and without sending a report anywhere. Use the user's copied report
+to select the next fix, then remove this temporary control. The screen colors remain
+unchanged while gathering that evidence.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache

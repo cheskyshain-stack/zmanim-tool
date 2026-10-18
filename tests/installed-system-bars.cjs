@@ -41,6 +41,7 @@ const server = http.createServer((req, res) => {
           if (query === '(display-mode: standalone)') Object.defineProperty(result, 'matches', { value: Boolean(installed) });
           return result;
         };
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedDisplayReport = text; } } });
       }, fixture);
       if (!process.env.SYSTEM_BARS_ORIGIN) await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
       const page = await context.newPage();
@@ -56,6 +57,22 @@ const server = http.createServer((req, res) => {
       await assert.doesNotReject(() => page.waitForFunction(expected => document.querySelector('meta[name="theme-color"]').content === expected, enabled && fixture.bottom > 0 ? '#142b46' : '#faf7f0'));
       assert.equal(await page.locator('.luach-system-area').count(), enabled ? 1 : 0, fixture.name);
       assert.equal((await page.locator('meta[name="viewport"]').getAttribute('content')).includes('viewport-fit=cover'), Boolean(enabled));
+      const check = page.locator('.luach-display-check');
+      assert.equal(await check.count(), fixture.android ? 1 : 0, 'Temporary display check is Android only');
+      if (fixture.android) {
+        await check.locator('summary').click();
+        await check.getByRole('button', { name: 'Copy details', exact: true }).click();
+        await page.waitForFunction(() => window.copiedDisplayReport);
+        const report = JSON.parse(await page.evaluate(() => window.copiedDisplayReport));
+        assert.equal(report.check, 'app-display-2026-10-18');
+        assert.equal(report.modes.standalone, fixture.installed);
+        assert.equal(report.safeArea.bottom, fixture.bottom + 'px');
+        assert.equal(report.theme, enabled && fixture.bottom > 0 ? '#142b46' : '#faf7f0');
+        assert.equal(report.systemArea?.height ?? null, enabled ? fixture.bottom : null);
+        assert.equal(report.browser, await page.evaluate(() => navigator.userAgent));
+        assert.deepEqual(Object.keys(report).sort(), ['check', 'browser', 'platform', 'modes', 'viewport', 'theme', 'safeArea', 'systemArea', 'pageSize', 'screenSize', 'visualViewport'].sort());
+        await check.locator('summary').click();
+      }
       if (fixture.name === 'android-app') {
         const geometry = await page.locator('.luach-system-area').evaluate(element => {
           const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
