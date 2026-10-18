@@ -223,13 +223,13 @@ Collapsing the two into a plain `"display": "standalone"` would take printing aw
 every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
 CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
 be run in a persistent profile or the only answer you get is `in-incognito`.
-The public site's `theme-color` and manifest `theme_color` use the header's navy
-(`#142b46`), as requested for the top browser bar. Keep the public head's separate
-`color-scheme: light` declaration, the public root's `color-scheme: only light`,
-and the manifest's cream `background_color`
-(`#faf7f0`); the page content and its native controls remain light. Android's
-edge-to-edge Home/Back/Recents buttons can sit over the page, and the browser controls
-their final colors. Do not switch the content to a dark color scheme to match the top.
+The public site's `theme-color`, manifest `theme_color` and `background_color` match
+the cream page (`#faf7f0`). Keep the public head's `color-scheme: light` declaration
+and the public root's `color-scheme: only light`. The user confirmed that a navy
+browser theme hides the bottom Home/Back/Recents buttons on their Android phone,
+even with both light color-scheme declarations. These page settings do not separately
+control the system bars. Keep the working cream browser theme and the navy website
+header in CSS; do not repeat the navy browser-theme change as a contrast fix.
 The public entry heads are copied from `index.html` by `build-offline.py`. Browser
 emulation can verify the hints and light/dark preferences but does not render Android's
 native Home/Back/Recents buttons, so do not claim a device-level visual verification.
