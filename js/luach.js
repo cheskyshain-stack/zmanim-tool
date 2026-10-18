@@ -536,7 +536,6 @@ function homeHtml(published) {
       </a>
     </nav>
     </div>
-    <figure class="luach-home-picture"><img src="/assets/shul-1400.jpg" width="1400" height="821" alt="Bais Medrash of Lakewood Commons" loading="lazy"><figcaption lang="he" dir="rtl">קהל לב מנחם · Lakewood Commons</figcaption></figure>
     </div>
     ${siteFooterHtml(s)}`;
 }
