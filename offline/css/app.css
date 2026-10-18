@@ -1829,7 +1829,7 @@ kbd {
    printed boards and are deliberately untouched, on screen and on paper alike. */
 /* Sampled off the design rather than picked by eye: the navy, the parchment, the gold on
    the arc and the softer gold in the dividers are the colours that were in it. */
-/* The navy browser bar is independent of the public page's light native controls. */
+/* Keep public content and native page controls light under dark device preferences. */
 html:has(body.is-luach) { color-scheme:only light; }
 body.is-luach {
   --luach-navy: #162a43;
