@@ -1832,11 +1832,6 @@ kbd {
 /* Keep public content and native page controls light under dark device preferences. */
 html:has(body.is-luach) { color-scheme:only light; }
 .luach-system-area { display:none; }
-.luach-display-check { margin-top:14px; font:400 12px/1.5 Arial,sans-serif; color:#64707c; }
-.luach-display-check summary { display:inline-flex; align-items:center; min-height:44px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
-.luach-display-check p { margin:8px 0; }
-.luach-display-check button { min-height:44px; padding:8px 14px; background:#fff; color:#142b46; border:1px solid #c9b681; border-radius:8px; font:inherit; }
-.luach-display-check summary:focus-visible { outline:2px solid #142b46; outline-offset:3px; }
 @media screen {
   html.has-system-area { --luach-safe-top:env(safe-area-inset-top, 0px); scroll-padding-bottom:env(safe-area-inset-bottom, 0px); }
   html.has-system-area body.is-luach { padding-bottom:env(safe-area-inset-bottom, 0px); }

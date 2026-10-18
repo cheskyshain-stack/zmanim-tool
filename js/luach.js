@@ -22,7 +22,7 @@ import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.
 import { shulNow, dateFromSerial } from './zmanim/solar.js';
 import { loadTables } from './data-loader.js';
 import { hasParsha } from './hebrew-calendar.js';
-import { wireInstalledSystemBars, systemBarsReport } from './ui/system-bars.js';
+import { wireInstalledSystemBars } from './ui/system-bars.js';
 
 const main = document.getElementById('main');
 /** Which week /week/ is currently showing, moved by Previous/This week/Next - see
@@ -770,14 +770,6 @@ function renderHome(published) {
   // Home and Donate use the approved compact design; charts keep their own layout.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
-  // Temporary Android support check. The report stays local until the user copies it.
-  if (navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent)) {
-    const check = document.createElement('details');
-    check.className = 'luach-display-check no-print';
-    check.innerHTML = '<summary>Check app display</summary><p>Copy these details to help troubleshoot the app’s colors.</p><button type="button">Copy details</button>';
-    main.querySelector('.luach-site-footer').append(check);
-    wireCopyButton(check.querySelector('button'), systemBarsReport);
-  }
   refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
   // The card is drawn here as well as by the ticker, so the row is asked here too rather

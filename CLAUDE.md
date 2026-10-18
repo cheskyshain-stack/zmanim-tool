@@ -223,32 +223,40 @@ Collapsing the two into a plain `"display": "standalone"` would take printing aw
 every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
 CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
 be run in a persistent profile or the only answer you get is `in-incognito`.
-The public site's `theme-color`, manifest `theme_color` and `background_color` match
-the cream page (`#faf7f0`). Keep the public head's `color-scheme: light` declaration
-and the public root's `color-scheme: only light`. The user confirmed that a navy
-browser theme hides the bottom Home/Back/Recents buttons on their Android phone,
-even with both light color-scheme declarations. These page settings do not separately
-control the system bars. Keep cream as the static browser/manifest theme. For the
-installed Android app only, `js/ui/system-bars.js` opts into `viewport-fit=cover` and
-paints the real bottom safe area navy. It requests the navy theme only while that
-area has a nonzero measured height, giving white system buttons a matching background.
-If no bottom inset is exposed, retain cream. Observe inset changes and keep the area
-outside route content so navigation does not remove it. Reserve scroll space below
-content, respect the top inset, and omit the area from print. Ordinary browser tabs,
-desktop and iOS retain their existing layout. Do not request navy over cream content
-again without the measured, painted safe area.
+The public HTML `theme-color` remains cream (`#faf7f0`) for browser tabs and older
+installed app copies. The manifest `theme_color` is navy (`#142b46`), with the cream
+`background_color` retained. Keep the public head's `color-scheme: light` and the
+public root's `color-scheme: only light` for page controls.
+The user's actual Chrome 155 reports confirm Android standalone mode, a 384 x 750
+fitted viewport inside a 384 x 832 screen, and zero safe-area insets even with
+`viewport-fit=cover`. Do not guess a bottom strip from the combined screen-height gap.
+Chrome's fitted installed-app navigation bar uses the saved manifest theme, while
+the page's theme can change before that installed metadata updates. An early navy
+page-only change hid the bottom buttons on this phone.
+`js/ui/system-bars.js` now waits for the updated manifest launch URL,
+`/?app-theme=navy-v1`, before requesting navy in a fitted installed Android app.
+Chrome updates `start_url` and `theme_color` together. Keep the manifest `id: "/"`
+stable. Remove the launch parameter from the visible URL before it can be shared,
+and remember it in sessionStorage across page navigation/reloads. A browser tab must
+never set that installed-app marker. Do not ask an old app to open that versioned URL
+manually, since that would bypass the native-theme update safeguard.
+Older installed copies retain cream until Chrome refreshes their app metadata. If
+an actual bottom inset is exposed, its measured navy background can also permit
+navy; observe inset changes, reserve footer clearance, respect the top inset, and
+omit this area from print. Do not force edge-to-edge to try to expose native bars.
+Regular browser tabs, desktop and iOS retain their existing layout.
 The public entry heads are copied from `index.html` by `build-offline.py`. Browser
 emulation can verify the hints and light/dark preferences but does not render Android's
 native Home/Back/Recents buttons, so do not claim a device-level visual verification.
-`tests/installed-system-bars.cjs` uses Chromium safe-area overrides to check the
-painted area, fallback, rotation, page navigation, footer clearance and print behavior.
-The user's full Samsung screenshot still shows cream system bars with readable bottom
-buttons. Do not infer the browser, installed display mode or inset values from that
-picture. A temporary Android-only **Check app display** disclosure in the home footer
-copies browser/display measurements on request, without collecting storage, settings
-or payment data and without sending a report anywhere. Use the user's copied report
-to select the next fix, then remove this temporary control. The screen colors remain
-unchanged while gathering that evidence.
+`tests/installed-system-bars.cjs` checks old/new installed app launches, the browser
+case, blocked storage, session continuity, safe-area fallback/painting, rotation,
+footer clearance and print. The temporary Check app display control has been removed.
+Chrome's installed manifest refresh can take a day and waits for the app to close;
+the documented manual update uses `chrome://webapks` while charging on WiFi.
+Reference: https://web.dev/articles/manifest-updates#updates_on_chrome_for_android
+Chromium implementation: `WebappIntentDataProvider.ColorProviderImpl.getNavigationBarColor`
+and `BaseCustomTabActivity.updateNavigationBarColor` use the installed theme for
+the fitted system bar. Do not claim native button verification from desktop tests.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache

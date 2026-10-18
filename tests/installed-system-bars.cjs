@@ -26,6 +26,9 @@ const server = http.createServer((req, res) => {
       { name: 'desktop-app', installed: true, bottom: 48 },
       { name: 'iphone', iphone: true, installed: true, bottom: 34 },
       { name: 'no-inset', android: true, installed: true, bottom: 0 },
+      { name: 'updated-app', android: true, installed: true, bottom: 0, navyLaunch: true },
+      { name: 'updated-app-no-storage', android: true, installed: true, bottom: 0, navyLaunch: true, noStorage: true },
+      { name: 'browser-launch-link', android: true, installed: false, bottom: 0, navyLaunch: true },
       { name: 'android-app', android: true, installed: true, bottom: 48, top: 24 },
     ]) {
       const context = await browser.newContext({
@@ -33,7 +36,7 @@ const server = http.createServer((req, res) => {
         isMobile: Boolean(fixture.android || fixture.iphone), reducedMotion: 'reduce',
         userAgent: fixture.android ? 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/154.0.0.0 Mobile Safari/537.36' : fixture.iphone ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1' : undefined,
       });
-      await context.addInitScript(({ installed }) => {
+      await context.addInitScript(({ installed, noStorage }) => {
         localStorage.setItem('zmanim-nocount', '1');
         const original = window.matchMedia.bind(window);
         window.matchMedia = query => {
@@ -41,7 +44,7 @@ const server = http.createServer((req, res) => {
           if (query === '(display-mode: standalone)') Object.defineProperty(result, 'matches', { value: Boolean(installed) });
           return result;
         };
-        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedDisplayReport = text; } } });
+        if (noStorage) Object.defineProperty(window, 'sessionStorage', { get() { throw new DOMException('Storage blocked', 'SecurityError'); } });
       }, fixture);
       if (!process.env.SYSTEM_BARS_ORIGIN) await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
       const page = await context.newPage();
@@ -49,29 +52,40 @@ const server = http.createServer((req, res) => {
       await page.clock.setFixedTime(new Date('2026-10-18T03:45:00Z'));
       const cdp = await context.newCDPSession(page);
       await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { bottom: fixture.bottom, top: fixture.top || 0 } });
-      await page.goto(origin + '/?count=off');
+      await page.goto(origin + '/?count=off' + (fixture.navyLaunch ? '&app-theme=navy-v1' : ''));
       await page.locator('.luach-menu').waitFor();
+      if (fixture.name === 'android-browser') {
+        const result = await cdp.send('Page.getAppManifest');
+        assert(!result.errors.some(error => error.critical), 'Chrome accepts the updated app manifest');
+        const manifest = JSON.parse(result.data);
+        assert.equal(manifest.id, '/', 'App identity is stable');
+        assert.equal(manifest.start_url, '/?app-theme=navy-v1');
+        assert.equal(manifest.theme_color, '#142b46', 'Native saved bars and launch version update in the same manifest');
+        assert.equal(manifest.display, 'browser', 'Keep iPhone printing');
+        assert.deepEqual(manifest.display_override, ['standalone']);
+      }
       if (await page.locator('.luach-announce-close').isVisible().catch(() => false)) await page.locator('.luach-announce-close').click();
       const enabled = fixture.android && fixture.installed;
       const theme = page.locator('meta[name="theme-color"]');
-      await assert.doesNotReject(() => page.waitForFunction(expected => document.querySelector('meta[name="theme-color"]').content === expected, enabled && fixture.bottom > 0 ? '#142b46' : '#faf7f0'));
+      const expected = enabled && (fixture.bottom > 0 || fixture.navyLaunch) ? '#142b46' : '#faf7f0';
+      await assert.doesNotReject(() => page.waitForFunction(expected => document.querySelector('meta[name="theme-color"]').content === expected, expected));
       assert.equal(await page.locator('.luach-system-area').count(), enabled ? 1 : 0, fixture.name);
-      assert.equal((await page.locator('meta[name="viewport"]').getAttribute('content')).includes('viewport-fit=cover'), Boolean(enabled));
-      const check = page.locator('.luach-display-check');
-      assert.equal(await check.count(), fixture.android ? 1 : 0, 'Temporary display check is Android only');
-      if (fixture.android) {
-        await check.locator('summary').click();
-        await check.getByRole('button', { name: 'Copy details', exact: true }).click();
-        await page.waitForFunction(() => window.copiedDisplayReport);
-        const report = JSON.parse(await page.evaluate(() => window.copiedDisplayReport));
-        assert.equal(report.check, 'app-display-2026-10-18');
-        assert.equal(report.modes.standalone, fixture.installed);
-        assert.equal(report.safeArea.bottom, fixture.bottom + 'px');
-        assert.equal(report.theme, enabled && fixture.bottom > 0 ? '#142b46' : '#faf7f0');
-        assert.equal(report.systemArea?.height ?? null, enabled ? fixture.bottom : null);
-        assert.equal(report.browser, await page.evaluate(() => navigator.userAgent));
-        assert.deepEqual(Object.keys(report).sort(), ['check', 'browser', 'platform', 'modes', 'viewport', 'theme', 'safeArea', 'systemArea', 'pageSize', 'screenSize', 'visualViewport'].sort());
-        await check.locator('summary').click();
+      assert.equal((await page.locator('meta[name="viewport"]').getAttribute('content')).includes('viewport-fit=cover'), false, 'Keep the fitted native bars');
+      assert.equal(await page.locator('.luach-display-check').count(), 0, 'Temporary check is removed');
+      assert.equal(new URL(page.url()).searchParams.has('app-theme'), false, 'Launch marker does not enter shared URLs');
+      if (fixture.name === 'updated-app') {
+        assert.equal(await page.locator('body').evaluate(element => getComputedStyle(element).paddingBottom), '0px', 'No guessed bottom strip');
+        await page.reload();
+        await page.locator('.luach-menu').waitFor();
+        assert.equal(await theme.getAttribute('content'), '#142b46', 'The installed theme survives a reload without the launch parameter');
+        await page.locator('.luach-menu a[href="/donate/"]').click();
+        await page.getByRole('tab', { name: 'Card · ACH', exact: true }).waitFor();
+        await page.reload();
+        await page.getByRole('tab', { name: 'Card · ACH', exact: true }).waitFor();
+        assert.equal(await theme.getAttribute('content'), '#142b46', 'The installed theme survives direct route reloads');
+      }
+      if (fixture.name === 'browser-launch-link') {
+        assert.equal(await page.evaluate(() => sessionStorage.getItem('zmanim-installed-theme')), null, 'A browser link cannot mark the app as updated');
       }
       if (fixture.name === 'android-app') {
         const geometry = await page.locator('.luach-system-area').evaluate(element => {
