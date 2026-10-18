@@ -772,6 +772,12 @@ Export/Import in Settings moves it between devices.
 
 ## Screen layout
 
+- The homepage's desktop layout starts at the existing 760px breakpoint. Use the
+  approved centered name and thin gold LAKEWOOD COMMONS detail, an 840px next-minyan
+  card, and side-by-side Zmanim and Donate links. Hide the header photo on desktop
+  and omit the unused large homepage picture. Keep the existing phone layout below
+  760px, including its small header photo, Hebrew name, minyan type and stacked links.
+  Keep both single and paired minyan/candle-lighting cards working at the breakpoint.
 - Donation payment methods use one tabbed panel, with Card · ACH selected initially
   and all five funds visible. DAF shows its providers and the only Copy EIN button.
   Keep the condensed nonprofit information and plain EIN inside the contact footer

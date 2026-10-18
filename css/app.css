@@ -5684,13 +5684,13 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
  body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
  .luach-home-bar-name,.luach-home-bar-nav { display:none; }
+ .luach-home-kicker { display:none; }
  .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
  .is-home .luach-approved-name text { font-size:32px; }
  .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David CLM","David Libre",serif !important; }
  .luach-home-date { min-height:1.5em; margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
  .luach-home-layout { max-width:560px; margin:0 auto; }
  .is-home .luach-home { display:block; flex:none; max-width:none; margin:0; }
- .luach-home-picture { display:none; }
  .is-home .luach-next {
   background:#fff; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:16px;
   padding:16px 0; margin:0 0 20px; gap:0; box-shadow:0 2px 8px #142b4603;
@@ -5802,24 +5802,38 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
 }
 @media screen and (min-width:760px) {
  body.is-luach { --luach-cap-height:78px; }
+ .is-home .luach-cap-photo { display:none; }
  .is-home .luach-home-bar-name { display:block; font:600 14px Georgia,serif; color:#fff; }
  .is-home .luach-home-bar-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
  .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
- body.is-luach main.is-home { padding:142px 32px 27px; }
- .is-home .luach-masthead { margin:0 auto 32px; }
- .is-home .luach-masthead .luach-place { font-size:25px !important; }
- .luach-home-date { font-size:13px; }
- .luach-home-layout { max-width:1050px; display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:46px; align-items:center; }
- .luach-home-picture { display:block; margin:0; }
- .luach-home-picture img { display:block; width:100%; height:auto; border-radius:16px; box-shadow:0 4px 16px #142b460d; }
- .luach-home-picture figcaption { margin-top:13px; text-align:center; color:#64707c; font:400 14px Georgia,"Frank Ruhl Libre",serif; }
- .is-home .luach-next { padding:20px 0; margin-bottom:18px; }
+ body.is-luach main.is-home { padding:119px 28px 28px; }
+ main.is-home .luach-masthead { width:100%; max-width:620px; margin:0 auto 30px; padding:12px 20px 0; }
+ .is-home .luach-home-kicker {
+  display:flex; justify-content:center; align-items:center; gap:14px; margin:0 0 24px;
+  color:#88713d; font:600 10px/1.4 Arial,sans-serif; letter-spacing:2.2px;
+ }
+ .is-home .luach-home-kicker::before,.is-home .luach-home-kicker::after { content:""; width:42px; height:1px; background:#c3ad77; }
+ .is-home .luach-masthead-name { width:100%; margin:0; }
+ .is-home .luach-approved-name { max-width:580px !important; }
+ .is-home .luach-approved-name text { fill:#142b46; font-size:37px; }
+ .is-home .luach-masthead .luach-place { color:#142b46; margin-top:13px; font-size:29px !important; }
+ .is-home .luach-home-date { margin-top:18px; color:#64707c; font-size:12px; }
+ .luach-home-layout { display:block; max-width:840px; margin:0 auto; }
+ .is-home .luach-home { max-width:840px; margin:0 auto; }
+ .is-home .luach-next { padding:25px 18px; margin-bottom:18px; border-radius:15px; box-shadow:0 4px 16px #142b4605; }
+ .is-home .luach-next-time { font-size:42px; }
+ .is-home .luach-next-time small { font-size:.55em; }
+ .is-home .luach-next-what { font-size:29px; }
+ .is-home .luach-next-when { margin-top:8px; font-size:13px; }
+ .is-home .luach-next-head { font:700 10px/1.4 Arial,sans-serif; letter-spacing:1.6px; margin-bottom:7px; }
  .is-home .luach-next.is-paired .luach-next-head { font-size:11px; }
  .is-home .luach-next.is-paired .luach-next-time { font-size:39px; }
  .is-home .luach-next.is-paired .luach-next-what { font-size:25px; }
  .is-home .luach-next.is-paired .luach-next-when { font-size:13px; }
- .is-home .luach-item { padding:20px 23px; min-height:84px; }
- .is-home .luach-site-footer { max-width:1080px; margin-top:70px; padding-top:27px; }
+ .is-home .luach-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+ .is-home .luach-item { min-height:106px; padding:22px 25px; border-radius:15px; }
+ .is-home .luach-item-title { font-size:27px; }
+ .is-home .luach-site-footer { max-width:840px; margin-top:46px; padding-top:25px; }
  body.is-luach main.is-give { padding-top:112px; }
  .is-give .luach-give-head-block { margin-bottom:25px; }
  .luach-payment-tab { font-size:14px; }
