@@ -99,6 +99,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         const rows = [...sheet.querySelectorAll('.shacharis-handout-run')];
         const firstTime = rows[0].querySelector('.shacharis-handout-time').getBoundingClientRect();
         const firstLocation = rows[0].querySelector('.shacharis-handout-location').getBoundingClientRect();
+        const title = sheet.querySelector('.onepage-title');
+        const titleBox = title.getBoundingClientRect();
+        const datesBox = sheet.querySelector('.shacharis-handout-dates').getBoundingClientRect();
         return { x: r.x, y: r.y, width: r.width, height: r.height,
           inside: content.every(c => c.x >= r.x + parseFloat(cs.paddingLeft) - 1 && c.right <= r.right - parseFloat(cs.paddingRight) + 1
             && c.y >= r.y + parseFloat(cs.paddingTop) - 1 && c.bottom <= r.bottom - parseFloat(cs.paddingBottom) + 1),
@@ -109,6 +112,9 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
           footerTypeSize: parseFloat(getComputedStyle(footer).fontSize),
           datesFit: [...sheet.querySelectorAll('.shacharis-handout-date > div')]
             .every(label => label.scrollWidth <= label.clientWidth + 1),
+          behabTitleAboveDays: !title.textContent.includes('בה"ב') ||
+            (title.parentElement.classList.contains('halfpage-content') && datesBox.top >= titleBox.bottom
+              && datesBox.top - titleBox.bottom < 8 && parseFloat(getComputedStyle(title).borderBottomWidth) === 0),
           typeSize: parseFloat(getComputedStyle(sheet.querySelector('.shacharis-handout-run')).fontSize),
           centeredColumns: rows.every(row => {
             const box = row.getBoundingClientRect();
@@ -135,6 +141,7 @@ const pdfPages = pdf => (pdf.toString('latin1').match(/\/Type \/Page\b/g) || [])
         assert(box.footerAtBottom && box.footerClear && box.footerRule, 'Ruled footer sits at the bottom, clear of the schedule: ' + JSON.stringify(box));
         assert(Math.abs(box.footerTypeSize - 6.5 * 96 / 72) < 0.01, 'Morning handouts retain the approved fixed 6.5pt footer');
         assert(box.datesFit, 'Each weekday and parsha fits within its own date column');
+        assert(box.behabTitleAboveDays, 'The BHB title and year sit directly above the weekday/parsha line without a separating rule');
         assert(box.rtl, 'Hebrew room on the right, its time on the left');
         assert(box.centeredColumns, 'The narrower list is centered with straight time and location columns');
         assert(box.notesBesideRoom, 'Selichos note is beside the room, clear of the time; short notes remain on one line');

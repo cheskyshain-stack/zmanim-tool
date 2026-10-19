@@ -1725,9 +1725,10 @@ const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'shivaasartammuz',
 const halfPageSection = (title, rows) => `<section class="onepage-sec">
   <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
-  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
-  const body = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', titleWithDates = false, standalone = false, asaraShacharis = 'compact' } = {}) {
+  const heading = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>`;
+  const schedule = `${titleWithDates ? heading : ''}${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
+  const body = `${titleWithDates ? '' : heading}
     ${shacharis ? `<div class="halfpage-content">${schedule}</div>` : schedule}`;
   // Put the shul's name and street address on separate lines on the morning handouts.
   const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
@@ -1817,7 +1818,9 @@ function renderShacharisHandout(poster, settings, options = {}) {
   const rows = shacharisRowsHtml(poster.rows);
   const days = poster.dayLabel && !poster.showDates ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
   const dates = poster.showDates ? shacharisDaysHtml(poster.days, settings) : '';
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates, ...options });
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), {
+    shacharis: true, dates, titleWithDates: Object.values(BEHAB_SHACHARIS_TEXT).includes(poster.title), ...options,
+  });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
