@@ -9408,6 +9408,52 @@ function syncPageHeights(pagesEl) {
   syncHeaderRowHeight(pagesEl);
 }
 
+/** Fit the actual paper before scaling its screen preview. Capture the chosen sizes
+ * once so font loading, redraws and beforeprint never shrink an already fitted chart. */
+function chartPaperFitter(pagesEl, { height = 8.5, combined = false } = {}) {
+  const pageEls = [...pagesEl.querySelectorAll('.page')];
+  const baseFontSizePt = pageEls.map(el => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
+  const floor = 0.1, step = 0.02, paperHeight = height * 96;
+  const applyScale = scale => {
+    pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
+    syncPageHeights(pagesEl);
+  };
+  const overflowing = () => pageEls.filter(el => {
+    if (el.getBoundingClientRect().height > paperHeight + PAGE_HEIGHT_EPSILON) return true;
+    if (!el.classList.contains('is-flexible-chart')) return false;
+    return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
+      const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
+      return content.top < box.top - 0.5 || content.bottom > box.bottom + 0.5
+        || content.left < box.left - 0.5 || content.right > box.right + 0.5;
+    });
+  });
+  return () => {
+    if (!document.body.contains(pagesEl)) return;
+    return atPaperSize(pagesEl, () => {
+      pageEls.forEach(el => el.classList.remove('is-flexible-chart'));
+      applyScale(1);
+      let scale = 1, overflowPages = overflowing();
+      if (overflowPages.length && !combined) {
+        pageEls.forEach(el => el.classList.add('is-flexible-chart'));
+        applyScale(1);
+        overflowPages = overflowing();
+      }
+      while (overflowPages.length && scale > floor) {
+        scale = Math.max(floor, scale - step);
+        applyScale(scale);
+        overflowPages = overflowing();
+      }
+      if (!overflowPages.length && scale < 1 && !combined) {
+        const finerScale = Math.min(1, scale + step / 2);
+        applyScale(finerScale);
+        if (overflowing().length) applyScale(scale);
+        else scale = finerScale;
+      }
+      return { scale, overflowPages };
+    });
+  };
+}
+
 function renderSheet(container, state, sheet, onChange) {
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
   if (!sheet.style.accentColor) sheet.style.accentColor = state.settings.sheetStyle.accentColor || DEFAULT_ACCENT_COLOR; // sheets saved before this control existed
@@ -9551,47 +9597,14 @@ function renderSheet(container, state, sheet, onChange) {
   // - shrinking the text buys room, not an unconditional guarantee for any combination of
   // weeks on any page count.
   const pageEls = [...pagesEl.querySelectorAll('.page')];
-  const baseFontSizePt = pageEls.map((el) => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
-  const FIT_FLOOR = 0.1;
-  const FIT_STEP = 0.02;
   const FIT_TOLERANCE = printSize.height * 96;
-  const applyFitScale = (scale) => {
-    pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
-    syncPageHeights(pagesEl);
-  };
-  const stillOverflowing = () => pageEls.filter((el) => {
-    if (el.getBoundingClientRect().height > FIT_TOLERANCE + PAGE_HEIGHT_EPSILON) return true;
-    if (!el.classList.contains('is-flexible-chart')) return false;
-    return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
-      const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
-      return content.top < box.top - 0.5 || content.bottom > box.bottom + 0.5
-        || content.left < box.left - 0.5 || content.right > box.right + 0.5;
-    });
-  });
+  const fitPages = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
   const fitPaper = () => {
     if (!document.body.contains(pagesEl)) return;
     atPaperSize(pagesEl, () => {
-      pageEls.forEach(el => el.classList.remove('is-flexible-chart'));
-      applyFitScale(1);
-      let fitScale = 1;
-      let overflowPages = stillOverflowing();
-      if (overflowPages.length && !combinedPrint) {
-        pageEls.forEach(el => el.classList.add('is-flexible-chart'));
-        applyFitScale(1);
-        overflowPages = stillOverflowing();
-      }
-      while (overflowPages.length && fitScale > FIT_FLOOR) {
-        fitScale = Math.max(FIT_FLOOR, fitScale - FIT_STEP);
-        applyFitScale(fitScale);
-        overflowPages = stillOverflowing();
-      }
-      // Recover the last percentage point between the two-percent fitting steps.
-      if (!overflowPages.length && fitScale < 1 && !combinedPrint) {
-        const finerScale = Math.min(1, fitScale + FIT_STEP / 2);
-        applyFitScale(finerScale);
-        if (stillOverflowing().length) applyFitScale(fitScale);
-        else fitScale = finerScale;
-      }
+      const result = fitPages();
+      let fitScale = result.scale;
+      const overflowPages = result.overflowPages;
 
       const overflowWarningEl = container.querySelector('#page-overflow-warning');
       if (overflowPages.length) {
@@ -12511,14 +12524,16 @@ function spreadLabel(spread) {
  *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
  *  the next frame for anything else that settles late. Every pass starts by clearing what
  *  the last one set, so re-running it is not cumulative. */
-function fitChartToWindow(pagesEl) {
+let browserBeforePrintHandler;
+function fitChartToWindow(pagesEl, printSize, combinedPrint) {
   const fit = pagesEl.parentElement;
+  const fitPaper = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
   const apply = () => keepPosition(pagesEl.parentElement, () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
     if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
-    syncPageHeights(pagesEl);
+    fitPaper();
     const available = fit ? fit.clientWidth : pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
@@ -12537,6 +12552,9 @@ function fitChartToWindow(pagesEl) {
   requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
   window.addEventListener('resize', apply);
+  if (browserBeforePrintHandler) window.removeEventListener('beforeprint', browserBeforePrintHandler);
+  browserBeforePrintHandler = fitPaper;
+  window.addEventListener('beforeprint', browserBeforePrintHandler);
 }
 
 /** @param {object} opts
@@ -12598,7 +12616,7 @@ function renderChartBrowser(container, state, opts = {}) {
       : buildSheetPages(spread.sheet, state, { readOnly: true });
     const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    fitChartToWindow(pagesEl);
+    fitChartToWindow(pagesEl, printSize, combinedPrint);
     container.querySelector('#chart-print-layout').addEventListener('change', event => {
       rememberChartPrintLayout(event.target.value);
       printLayout = chartPrintLayout();
