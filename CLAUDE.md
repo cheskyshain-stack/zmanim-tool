@@ -437,7 +437,8 @@ Separate admin Shacharis-only handouts are available for Asara B'Teves and both 
 rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
 Place the BHB title and Hebrew year directly above its actual weekdays and upcoming
 Shabbos parsha, together in the centered schedule block above שחרית. Keep the
-letterhead's rule at the top rather than a rule between those two heading lines. Combine
+letterhead's rule at the top rather than a rule between those two heading lines.
+The BHB שחרית section heading matches the title's fixed 18pt size. Combine
 days belonging to the same upcoming Shabbos with a ו, and join all groups into one
 centered header with a middle dot and ו between parsha groups, for example
 `יום ב' וה' לך לך · ויום ב' וירא`, reading chronologically
