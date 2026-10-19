@@ -3589,7 +3589,7 @@ function rememberChartPrintLayout(value) {
 }
 
 function chartPrintLayoutHtml(value, canCombine = true) {
-  return '<span class="chart-print-layout no-print">Separate pages · Letter<input id="chart-print-layout" type="hidden" value="separate"></span>';
+  return '<input id="chart-print-layout" class="chart-print-layout no-print" type="hidden" value="separate">';
 }
 
 // ==== ui/combined-chart-print.js ====
