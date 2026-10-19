@@ -125,9 +125,10 @@ old pairings, location styles, sets and duplicate copies. Skip Shabbos-only Rosh
 Chodesh selections in a standalone handout when stepping to a new year; explicitly
 queued unavailable pages must be resolved before printing.
 
-Seasonal charts and saved charts use **Separate pages · Letter**. Together on Letter
-and 11 x 17 choices are removed; old remembered combined values fall back to separate
-pages without changing stored charts. Weekly schedule cards keep their own layout
+Seasonal charts and saved charts print on separate Letter pages without a visible
+paper/layout label above Print. Together on Letter and 11 x 17 choices are removed;
+old remembered combined values fall back to separate pages without changing stored
+charts. Weekly schedule cards keep their own layout
 options. Keep the fractional-measurement correction below.
 
 Current browser checks: `tests/contextual-special-printing.cjs` covers the new controls,
