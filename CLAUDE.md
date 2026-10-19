@@ -289,6 +289,8 @@ by its matching weekday page 1, and so on. Each physical chart is 1056 by 816px
 Molad note and explanation attribute. Keep print controls and screen scaling off
 paper. Previously stored combined-layout preferences must not restore those removed
 choices. The legacy combined renderer remains internal; no live chart picker uses it.
+Chart location underlines use a text-relative 0.1em offset so they stay close to the
+digits when a crowded chart shrinks. Keep each location underline continuous.
 
 When fitting chart height, ignore DOMRect differences smaller than 1/256 CSS pixel.
 Fractional screen placement can
