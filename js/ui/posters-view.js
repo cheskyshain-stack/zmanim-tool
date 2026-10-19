@@ -2681,7 +2681,8 @@ function recallBar() {
     chosenHalfPagePairs = normalizeHalfPagePairs(saved.halfPagePairs,
       POSTERS.filter(poster => poster.handout || HALF_PAGE_POSTERS.has(poster.key)).map(poster => poster.key));
     if (typeof saved.advanced === 'boolean') printSettingsOpen = saved.advanced;
-    if (Number.isFinite(saved.margin)) {
+    // Adopt the requested narrower default once, then retain later custom margins.
+    if (saved.marginDefault === OP_PAD && Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
       chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
     }
@@ -2698,7 +2699,7 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
-      margin: chosenMargin, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
+      margin: chosenMargin, marginDefault: OP_PAD, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
       workflow: chosenWorkflow, setSelection: chosenSetSelection, halfPagePairs: chosenHalfPagePairs, advanced: printSettingsOpen,
       asaraShacharis: chosenAsaraShacharis,
       design: chosenDesign, printPages: chosenPrintPages, collection: chosenCollection,
@@ -2726,21 +2727,13 @@ let chosenBreak = 'even';
 /* The white the one-page sheet leaves round itself, in inches, and what the stepper in the
    bar walks through.
  *
- * 0.35 is the shipped answer and the one "Original" goes back to. It was 0.5in, and the sheet
- * came off the printer looking as though it had an inch round it: measured on the print file,
- * the 0.5in was 0.55in top and foot and 0.50in each side, exactly what was set, and what is
- * added after that is the printer's own unprintable border, 0.16in to 0.25in on most machines
- * and out of reach from here.
- *
- * Which is the whole reason this is a control rather than a number. How much of that border a
- * machine takes is a fact about the machine, so the person standing at it is the one who can
- * see the answer. The floor is 0.15in, which is inside most printers' border and will be
- * clipped on them: that is the point of being able to try it. The ceiling is where it started
- * out from before any of this.
+ * 0.15in on all four sides is the requested default and what "Original" restores.
+ * Existing saved print setups adopt it once through marginDefault. The control
+ * still allows wider margins, which remain remembered after that migration.
  *
  * Remembered with the rest of the bar, so a shul that has found its number keeps it. Only the
  * poster's one-page sheet reads it; the week's own sheet keeps the CSS default. */
-const OP_PAD = 0.35;
+const OP_PAD = 0.15;
 const OP_PAD_MIN = 0.15;
 const OP_PAD_MAX = 0.75;
 const OP_PAD_STEP = 0.05;

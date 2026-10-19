@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
         localStorage.setItem('zmanim-nocount', '1');
         const year = Number((new URLSearchParams(location.search).get('headings') || '5787').split('-')[0]);
         localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse(`${year - 3761}-10-19T12:00:00Z`) }));
-        if (!localStorage.getItem('zmanim-poster-bar-v1')) localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, sheet: 'asarabteves', group: 'עשרה בטבת', workflow: 'single' }));
+        if (!localStorage.getItem('zmanim-poster-bar-v1')) localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, sheet: 'asarabteves', group: 'עשרה בטבת', workflow: 'single', margin: 0.75 }));
       });
       if (!process.env.SPECIAL_JOB_ORIGIN) await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
       const page = await context.newPage();
@@ -55,6 +55,7 @@ const server = http.createServer((req, res) => {
               && parseFloat(getComputedStyle(title).fontSize) === 24
               && [...poster.querySelectorAll('.onepage-sec-head:not(.is-day-heading)')].every(head => getComputedStyle(head).fontSize === getComputedStyle(title).fontSize);
             return { width: poster.offsetWidth, height: poster.offsetHeight,
+              padding: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map(key => parseFloat(getComputedStyle(poster)[key])),
               titleWithSchedule,
               footerClear: !poster.classList.contains('is-halfpage') ||
                 poster.querySelector('.halfpage-body').offsetTop + poster.querySelector('.halfpage-body').offsetHeight <= footer.offsetTop - 5,
@@ -67,6 +68,8 @@ const server = http.createServer((req, res) => {
           return { width: box.width, height: box.height, posters };
         }));
         assert.equal(geometry.length, count, label + ': physical frame count');
+        if (label === 'asara-regular-new') assert(geometry.every(frame => frame.posters.every(poster => poster.padding.every(value => Math.abs(value - 14.4) < 0.1))),
+          'The new compact default has 0.15in margins on all four sides');
         assert(geometry.every(frame => frame.posters.every(poster => poster.within && !poster.overflows && poster.footerClear)), label + ': every poster fits its paper frame with the schedule clear of the footer');
         assert(geometry.every(frame => frame.posters.every(poster => poster.titleWithSchedule)), label + ': half-page titles sit with their day/schedule group and match section heading sizes');
         assert(geometry.every(frame => frame.posters.every(poster => !poster.half
@@ -89,6 +92,9 @@ const server = http.createServer((req, res) => {
       };
       await page.goto(origin + '/admin/#posters/asarabteves'); await page.locator('#poster-design-new').waitFor({ state: 'attached' }); await settle();
       assert(await page.locator('#poster-design-new').isChecked(), 'New design is the default even with older saved controls');
+      assert.equal(await page.locator('#poster-margin').inputValue(), '0.15', 'An older remembered wide margin adopts the requested narrower default');
+      await page.reload(); await settle();
+      assert.equal(await page.locator('#poster-margin').inputValue(), '0.15', 'The narrower default survives refresh');
       assert.equal(await page.locator('#poster-own-new,#poster-workflow-label,#poster-set-layout-label,.special-half-pairs').count(), 0, 'Custom creation and separate print-workflow settings are removed');
       const positions = await page.locator('#poster-year-label,#poster-group-label,#poster-design-label').evaluateAll(labels => labels.map(label => label.getBoundingClientRect().top));
       assert(positions[0] < positions[1] && positions[1] < positions[2], 'Year, Occasion, Design order');
@@ -124,7 +130,9 @@ const server = http.createServer((req, res) => {
       await radio('poster-asara-option', 'locations');
       await page.locator('.special-print-settings summary').click();
       await page.locator('#poster-margin').selectOption('0.75'); await settle();
-      await page.locator('#poster-year').selectOption('5789'); await settle();
+      await page.locator('#poster-year').selectOption('5785'); await settle();
+      assert.match(await page.locator('.poster.is-asara-detailed .shacharis-handout-date').first().innerText(), /יום ו'/,
+        'The Friday fixture is an actual Friday fast day');
       await print('friday-detailed-wide-margin', 3, false);
       if (output) await page.screenshot({ path: path.join(output, `${width}-controls.png`), fullPage: true });
       await noOverflow();
@@ -132,7 +140,7 @@ const server = http.createServer((req, res) => {
       for (const year of [5787, 5804]) for (const margin of [0.15, 0.75]) {
         await page.clock.setFixedTime(new Date(`${year - 3761}-10-19T12:00:00Z`));
         await page.evaluate(({ year, margin }) => localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({
-          year, margin, design: 'new', sheet: 'chanukah',
+          year, margin, marginDefault: 0.15, design: 'new', sheet: 'chanukah',
           printPages: [{ id: 'chanukah-headings', left: 'chanukah', right: '' }],
         })), { year, margin });
         await page.goto(origin + `/admin/?headings=${year}-${margin}#posters/chanukah`); await settle();

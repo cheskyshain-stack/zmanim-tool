@@ -554,6 +554,10 @@ screens; physical sheets are calculated from the selected designs and placements
 
 Half-page schedules center their title, dates and schedule together between the letterhead rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
+Compact special-schedule printing now defaults to 0.15in margins on all four sides,
+including top and bottom. Adopt this default once for older remembered print setups
+through `zmanim-poster-bar-v1.marginDefault`, retaining the rest of each saved job.
+Later custom margin selections still persist, and Original restores 0.15in.
 Rosh Chodesh and fast-day morning handouts use BHB's grouped Hebrew weekday and
 upcoming Shabbos parsha before the Shacharis section, without a date/month subline.
 Center one week's label and give separate weeks equal-width columns. For example,
