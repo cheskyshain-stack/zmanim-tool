@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
       }
       await open('2026-10-18T16:00:00Z');
       const card = cards().first(), body = card.locator('textarea');
-      assert.equal(await body.inputValue(), 'Tomorrow Behab\n6:40m (Selichos before Shacharis), 7:00en, 7:15d, 7:35sh\n8:00m, 8:20en, 8:40d');
+      assert.equal(await body.inputValue(), 'Tomorrow Behab\n6:40m (Selichos before Shacharis), 7:00en, 7:15d, 7:35sh\nThe following will NOT be saying Selichos\n8:00m, 8:20en, 8:40d');
       assert.match(await card.locator('.tx-date').innerText(), /Oct 18, 2026/);
       assert.match(await card.locator('.tx-when').innerText(), /After Sukkos/);
       await body.fill((await body.inputValue()) + '\nTest addition');

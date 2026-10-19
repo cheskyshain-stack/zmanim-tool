@@ -11,7 +11,7 @@ export function behabText(poster, day, today = null) {
   const early = list(poster.rows.slice(0, 4), true);
   const later = list(poster.rows.slice(4));
   return [`${today === day ? 'Today' : 'Tomorrow'} Behab`, early,
-    ...(later ? [later] : [])].join('\n');
+    ...(later ? ['The following will NOT be saying Selichos', later] : [])].join('\n');
 }
 
 /** Both annual rounds use the handout's own calendar dates. A single card covers
