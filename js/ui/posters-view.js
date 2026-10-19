@@ -1722,14 +1722,13 @@ function renderChanukahPoster(poster, settings) {
 }
 
 const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'shivaasartammuz', 'slichos', 'tzomgedalia', 'afteryk']);
-const halfPageSection = (title, rows) => `<section class="onepage-sec">
-  <h3 class="onepage-sec-head" lang="he">${escAttr(title)}</h3>${rows}</section>`;
+const halfPageSection = (title, rows, { dayHeading = false } = {}) => `<section class="onepage-sec">
+  <h3 class="onepage-sec-head${dayHeading ? ' is-day-heading' : ''}" lang="he">${escAttr(title)}</h3>${rows}</section>`;
 
-function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', titleWithDates = false, standalone = false, asaraShacharis = 'compact' } = {}) {
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
   const heading = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>`;
-  const schedule = `${titleWithDates ? heading : ''}${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
-  const body = `${titleWithDates ? '' : heading}
-    ${shacharis ? `<div class="halfpage-content">${schedule}</div>` : schedule}`;
+  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
+  const body = `<div class="halfpage-content">${heading}${schedule}</div>`;
   // Put the shul's name and street address on separate lines on the morning handouts.
   const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
   const legend = shacharis ? (address ? [{ dir: 'ltr', text: address }] : [])
@@ -1755,7 +1754,7 @@ function renderHalfChanukahPoster(poster, settings, options = {}) {
 
 function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
   const detailed = options.asaraShacharis === 'locations';
-  const sections = [shacharisDaysHtml([poster.span.from], settings)];
+  const sections = [];
   let notes = [];
   for (const s of poster.sets) {
     if (s.note) {
@@ -1779,7 +1778,9 @@ function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
     ...(stars.length ? [{ dir: 'rtl', text: stars.map(mark => mark === '*' ? '*בעזרת נשים' : '**באולם השמחות').join(' ') }] : []),
   ] : poster.legend;
   const content = detailed ? `<div class="asara-detailed-sections">${sections.join('')}</div>` : sections.join('');
-  return halfPageShell({ ...poster, legend }, settings, poster.title, content, { asara: true, ...options });
+  return halfPageShell({ ...poster, legend }, settings, poster.title, content, {
+    asara: true, dates: shacharisDaysHtml([poster.span.from], settings), ...options,
+  });
 }
 
 function renderHalfSchedulePoster(poster, key, settings, options = {}) {
@@ -1790,7 +1791,7 @@ function renderHalfSchedulePoster(poster, key, settings, options = {}) {
     ? poster.rows.map(row => oneSection(row.label, [{ ...row, label: '' }]))
     : ['shacharis', 'mincha', 'maariv'].map(tefillah => oneSection(YK_TEXT.afterBig[tefillah], [{ label: '', times: poster.after[tefillah] }]));
   return halfPageShell(poster, settings, key === 'slichos' ? SLICHOS_TEXT.title : YK_TEXT.afterHeading,
-    sections.map(section => halfPageSection(section.title, section.rows.map(onePageRows).join(''))).join(''), { small: true, ...options });
+    sections.map(section => halfPageSection(section.title, section.rows.map(onePageRows).join(''), { dayHeading: key === 'slichos' })).join(''), { small: true, ...options });
 }
 
 function shacharisRowsHtml(rows) {
@@ -1818,9 +1819,7 @@ function renderShacharisHandout(poster, settings, options = {}) {
   const rows = shacharisRowsHtml(poster.rows);
   const days = poster.dayLabel && !poster.showDates ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
   const dates = poster.showDates ? shacharisDaysHtml(poster.days, settings) : '';
-  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), {
-    shacharis: true, dates, titleWithDates: Object.values(BEHAB_SHACHARIS_TEXT).includes(poster.title), ...options,
-  });
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates, ...options });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -2879,7 +2878,7 @@ function fitHalfPage(container) {
     sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
     const legend = sheet.querySelector('.poster-legend');
-    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad', '--asara-morning-pad']) {
+    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad', '--asara-morning-pad', '--asara-section-gap']) {
       sheet.style.removeProperty(property);
     }
     const fits = () => {
@@ -2888,12 +2887,14 @@ function fitHalfPage(container) {
       const limit = rect.bottom - parseFloat(cs.paddingBottom);
       const body = sheet.querySelector('.halfpage-body');
       const content = body.querySelector('.asara-detailed-sections') || body;
+      const heading = sheet.querySelector('.onepage-title');
       const inside = [...sheet.querySelectorAll('.shacharis-handout-run')].every(row => {
         const r = row.getBoundingClientRect();
         return r.left >= rect.left + parseFloat(cs.paddingLeft) - 0.5
           && r.right <= rect.right - parseFloat(cs.paddingRight) + 0.5;
       });
       return (!legend || legend.getBoundingClientRect().bottom <= limit + 0.5)
+        && heading.offsetTop >= sheet.querySelector('.page-header').offsetTop + sheet.querySelector('.page-header').offsetHeight - 0.5
         && content.getBoundingClientRect().top >= body.getBoundingClientRect().top - 0.5
         && content.getBoundingClientRect().bottom <= (legend ? legend.getBoundingClientRect().top - 6 : limit + 0.5)
         && inside && sheet.scrollWidth <= sheet.clientWidth && sheet.scrollHeight <= sheet.clientHeight;
@@ -2911,10 +2912,14 @@ function fitHalfPage(container) {
         sheet.style.setProperty('--asara-morning-pad', `${padding}in`);
         if (fits()) break;
       }
+      if (!fits()) for (const gap of [0.14, 0.12, 0.1, 0.08]) {
+        sheet.style.setProperty('--asara-section-gap', `${gap}in`);
+        if (fits()) break;
+      }
     }
     // Large print margins can need less row padding even at the minimum type size.
     if (sheet.querySelector('.halfpage-body.is-chanukah,.halfpage-body.is-small-schedule') && !fits()) {
-      for (const padding of [0.055, 0.045, 0.035, 0.025]) {
+      for (const padding of [0.055, 0.045, 0.035, 0.025, 0.015, 0.01]) {
         sheet.style.setProperty('--halfpage-row-pad', `${padding}in`);
         if (fits()) break;
       }
@@ -2922,7 +2927,7 @@ function fitHalfPage(container) {
         sheet.style.setProperty('--halfpage-line-gap', `${gap}in`);
         if (fits()) break;
       }
-      if (!fits()) for (const gap of [0.12, 0.1, 0.08]) {
+      if (!fits()) for (const gap of [0.12, 0.1, 0.08, 0.06, 0.04]) {
         sheet.style.setProperty('--halfpage-section-gap', `${gap}in`);
         if (fits()) break;
       }
