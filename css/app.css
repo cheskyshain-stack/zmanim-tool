@@ -668,6 +668,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .form-grid .secondary-btn { background: var(--accent-soft); color: var(--accent-dark); border: 1px solid var(--border); margin-left: 0.5rem; }
 .form-grid .secondary-btn:hover { background: var(--border); }
 
+.saved-tables { container: saved-copies / inline-size; }
 .saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
 /* nowrap because a wrapped row is unreadable here: the buttons broke onto a second line,
    "Hebrew year" split across two, and a timestamp wrapped mid-date. The Sheet column is
@@ -678,6 +679,10 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .saved-list tr:last-child td { border-bottom: none; }
 .saved-list tbody tr:hover td { background: var(--accent-soft); }
 .saved-list button { margin-right: 0.4rem; }
+.saved-page-splits { display: grid; gap: 0.2rem; min-width: 0; }
+.saved-page-split { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; font-variant-numeric: tabular-nums; }
+.saved-page-split [dir=ltr] { white-space: normal; }
+.saved-split-label { flex: none; color: var(--muted); font-size: var(--fs-xs); }
 
 .sheet-toolbar {
   display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap;
@@ -726,6 +731,9 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   .style-toolbar { flex-direction: column; align-items: stretch; gap: 0.75rem; }
   .style-toolbar label { justify-content: space-between; }
   .style-toolbar button { margin-left: 0; }
+}
+
+@container saved-copies (max-width: 70rem) {
   .saved-list, .saved-list thead, .saved-list tbody { display: block; width: 100%; }
   .saved-list tr { display: block; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); }
   .saved-list thead { display: none; }

@@ -248,7 +248,7 @@ function paint() {
   setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
-  // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
+  // a column next to the sidebar. Saved sheets gets a wider one: it's a seven-column table,
   // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
   main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
