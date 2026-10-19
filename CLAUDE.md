@@ -662,6 +662,11 @@ its weekday companion. Ordinary full-size charts retain their equal rows.
 `tests/dense-chart-print.cjs` verifies crowded winter/summer charts, both molad formats,
 split DST headers and an entire season on one page at phone and desktop widths, including
 native PDF page counts, every printed time, panel bounds and aligned footers.
+The public and admin seasonal chart browsers use the same `chartPaperFitter` as saved
+charts before fitting the preview to the window, after fonts load, and before printing.
+Screen scaling alone can hide a footer that spills over the next printed header.
+`tests/chart-browser-fit.cjs` checks crowded and roomy winter/summer pairs at phone and
+desktop widths, retaining every time and exactly two physical sheets with aligned footers.
 
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
   All pages must measure 816px high. If they don't, something overflowed.

@@ -12,7 +12,7 @@
 import { resolveSettings } from '../settings.js';
 import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
-import { buildSheetPages, buildCombinedChartPages, syncPageHeights } from './sheet-view.js';
+import { buildSheetPages, buildCombinedChartPages, chartPaperFitter } from './sheet-view.js';
 import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
 import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
@@ -167,14 +167,16 @@ export function spreadLabel(spread) {
  *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
  *  the next frame for anything else that settles late. Every pass starts by clearing what
  *  the last one set, so re-running it is not cumulative. */
-function fitChartToWindow(pagesEl) {
+let browserBeforePrintHandler;
+function fitChartToWindow(pagesEl, printSize, combinedPrint) {
   const fit = pagesEl.parentElement;
+  const fitPaper = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
   const apply = () => keepPosition(pagesEl.parentElement, () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
     if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
-    syncPageHeights(pagesEl);
+    fitPaper();
     const available = fit ? fit.clientWidth : pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
@@ -193,6 +195,9 @@ function fitChartToWindow(pagesEl) {
   requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
   window.addEventListener('resize', apply);
+  if (browserBeforePrintHandler) window.removeEventListener('beforeprint', browserBeforePrintHandler);
+  browserBeforePrintHandler = fitPaper;
+  window.addEventListener('beforeprint', browserBeforePrintHandler);
 }
 
 /** @param {object} opts
@@ -254,7 +259,7 @@ export function renderChartBrowser(container, state, opts = {}) {
       : buildSheetPages(spread.sheet, state, { readOnly: true });
     const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    fitChartToWindow(pagesEl);
+    fitChartToWindow(pagesEl, printSize, combinedPrint);
     container.querySelector('#chart-print-layout').addEventListener('change', event => {
       rememberChartPrintLayout(event.target.value);
       printLayout = chartPrintLayout();
