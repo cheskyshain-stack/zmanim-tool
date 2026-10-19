@@ -136,7 +136,7 @@ export function installZmanimReferences(main, host) {
     const source = cell?.closest('[data-zmanim-reference]');
     const context = source && zmanimReferenceContexts.get(source.dataset.zmanimReference);
     if (!context) return;
-    const season = cell.dataset.season, key = cell.dataset.col;
+    const season = cell.dataset.season, key = cell.dataset.sourceCol || cell.dataset.col;
     const fridayKeys = season === 'kayitz' ? ['F', 'G', 'H', 'I', 'J', 'K', 'L'] : ['F', 'G', 'H', 'I'];
     selectedContext = referenceSignature(context);
     if (season !== 'weekday') selectedDay = Number(cell.dataset.serial) - (fridayKeys.includes(key) ? 1 : 0);

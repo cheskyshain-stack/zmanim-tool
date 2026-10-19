@@ -32,6 +32,7 @@ const server = http.createServer((req, res) => {
       for (const fixture of [
         { season: 'choref', count: 3, index: 0 },
         { season: 'choref', count: 2, index: 1 },
+        { season: 'choref', count: 1, index: 0 },
         { season: 'kayitz', count: 2, index: 0 },
       ]) {
         const original = await page.evaluate(async fixture => {
@@ -55,6 +56,8 @@ const server = http.createServer((req, res) => {
         }, fixture);
         await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        assert.equal(await page.locator('.pages .page.is-full-season').count(), fixture.count === 1 ? 2 : 0);
+        assert.equal(await page.locator('.pages col[data-colkey=H-sunset]').count(), fixture.count === 1 ? 1 : 0);
         const before = await page.locator('.pages .page').evaluateAll(pages => pages.map(p => ({
           font: parseFloat(getComputedStyle(p).getPropertyValue('--sheet-font-size')),
           rows: p.querySelectorAll('tbody tr').length,
@@ -81,7 +84,8 @@ const server = http.createServer((req, res) => {
         assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 2, 'The pair prints on exactly two sheets');
         assert((pdf.toString('latin1').match(/\/MediaBox \[[^\]]+\]/g) || []).every(box => box === '/MediaBox [0 0 792 612]'));
         const text = execFileSync('pdftotext', ['-layout', '-', '-'], { input: pdf, encoding: 'utf8' }).split('\f').filter(s => s.trim());
-        assert.deepEqual(text.map(s => (s.match(/\b\d{1,2}:\d{2}\b/g) || []).sort()), before.map(p => p.times), 'Every time stays on its original sheet');
+        const normalized = text.map(s => s.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/(\d)\s*:\s*(\d{2})/g, '$1:$2'));
+        assert.deepEqual(normalized.map(s => (s.match(/\b\d{1,2}:\d{2}\b/g) || []).sort()), before.map(p => p.times), 'Every time stays on its original sheet');
         assert(text.every(s => s.includes('Bais Medrash')), 'Each sheet contains its own address');
         const bounds = execFileSync('pdftotext', ['-bbox', '-', '-'], { input: pdf, encoding: 'utf8' });
         const addresses = [...bounds.matchAll(/<word\b[^>]*yMin="([\d.]+)"[^>]*>Bais<\/word>/g)].map(m => Number(m[1]));

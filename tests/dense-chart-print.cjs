@@ -103,7 +103,8 @@ const server = http.createServer((req, res) => {
         assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, fixture.count * 2, 'The original physical page count is preserved');
         assert((pdf.toString('latin1').match(/\/MediaBox \[[^\]]+\]/g) || []).every(box => box === '/MediaBox [0 0 792 612]'), 'Each sheet is landscape Letter');
         const texts = execFileSync('pdftotext', ['-layout', '-', '-'], { input: pdf, encoding: 'utf8' }).split('\f').filter(text => text.trim());
-        assert.deepEqual(texts.map(text => (text.match(/\b\d{1,2}:\d{2}\b/g) || []).sort()), geometry.map(p => p.times), 'Every time stays on its original printed page');
+        const normalized = texts.map(text => text.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/(\d)\s*:\s*(\d{2})/g, '$1:$2'));
+        assert.deepEqual(normalized.map(text => (text.match(/\b\d{1,2}:\d{2}\b/g) || []).sort()), geometry.map(p => p.times), 'Every time stays on its original printed page');
         const bounds = execFileSync('pdftotext', ['-bbox', '-', '-'], { input: pdf, encoding: 'utf8' });
         const addresses = [...bounds.matchAll(/<word\b[^>]*yMin="([\d.]+)"[^>]*>Bais<\/word>/g)].map(match => Number(match[1]));
         assert.equal(addresses.length, fixture.count * 2, 'Every physical sheet has its own footer');

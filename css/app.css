@@ -875,6 +875,15 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
 /* Crowded print jobs trade a little row padding for larger text. */
 .page.is-flexible-chart th, .page.is-flexible-chart td { padding-top: 0.03in; padding-bottom: 0.03in; }
 .page.is-flexible-chart .shacharis-through { padding: 0; }
+/* The whole season on one sheet uses one-line menus and tighter spacing. */
+.page.is-full-season.is-flexible-chart th,
+.page.is-full-season.is-flexible-chart td { padding: 0.012in 0.025in; }
+.page.is-full-season .weekday-table tbody tr { height: auto; }
+.page.is-full-season .cell { line-height: 1.2; white-space: nowrap; }
+.page.is-full-season .parsha-cell { font-size: calc(var(--sheet-font-size) + 1pt); }
+.page.is-full-season th { font-size: calc(var(--sheet-font-size) + 1pt); line-height: 1.1; }
+.page.is-full-season .shacharis-through { padding: 0; }
+.page.is-full-season .shacharis-panel { left: 12%; right: 12%; padding: 0.1in 0.05in; }
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
