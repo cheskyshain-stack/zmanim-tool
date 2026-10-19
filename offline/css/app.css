@@ -1004,6 +1004,7 @@ td.ruled .cell { background: var(--ruled); }
    Serif for Times New Roman, whose ע does not reach the line, so it has to be checked in the
    font that actually ships (see HEBREW_STAND_IN in sheet-view.js). */
 .ul, u { text-decoration: underline; text-underline-offset: 2px; text-decoration-skip-ink: none; }
+.page .ul, .page u { text-underline-offset: 0.1em; }
 /* smallText() (format.js): the stricter/alternate reading set smaller than the one a cell
    leads with - פלג under its מנחה in the early קיץ columns, מ"א beside גר"א in ס"ז קר"ש.
    Same idea as .head-room on a heading, a size of its own rather than borrowed from there,
