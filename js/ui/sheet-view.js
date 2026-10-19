@@ -11,7 +11,7 @@ import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay, chanuk
 import { roshChodeshSchedule } from '../posters/rosh-chodesh-schedule.js';
 import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang, escText, escAttr, useStraightHebrewQuotes } from '../util.js';
+import { hebrewLang, escText, escAttr, useStraightHebrewQuotes, SLASH } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
@@ -115,13 +115,14 @@ export function fontStackFor(fontFamily) {
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-export function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, splitSpringDst = false } = {}) {
+export function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, splitSpringDst = false, compactFullSeason = true } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
   const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
+  const fullSeason = compactFullSeason && split.length === 1 && split[0].weeks.length === wks.length && wks.length > 0;
   return split.map(({ weeks: pw, effectiveSeason }, i) => {
     const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
     /* The congregation's copy quotes what the shul has announced: see js/announced.js.
@@ -142,9 +143,9 @@ export function buildSheetPages(sheet, state, { readOnly = false, showMolad = fa
     // must stay with the same minyan when its three unused Plag columns are hidden.
     const winterColumns = springStart > 0
       ? CHOREF_COLUMNS.map(column => column.key === 'I' ? { ...column, key: 'L' } : column) : columns;
-    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
+    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad, fullSeason });
     if (springStart > 0) {
-      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad });
+      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad, fullSeason });
       const sections = document.createElement('div');
       sections.className = 'chart-sections';
       const winterTable = el.querySelector('table');
@@ -165,8 +166,8 @@ export function buildSheetPages(sheet, state, { readOnly = false, showMolad = fa
  * explanation attributes. A weekday-only holiday row keeps an empty Shabbos side. */
 export function buildCombinedChartPages(shabbos, weekday, state, options = {}) {
   if (!shabbos || !weekday) return [];
-  const primaryPages = buildSheetPages(shabbos, state, options);
-  const weekdayPages = buildSheetPages(weekday, state, options);
+  const primaryPages = buildSheetPages(shabbos, state, { ...options, compactFullSeason: false });
+  const weekdayPages = buildSheetPages(weekday, state, { ...options, compactFullSeason: false });
   const settings = resolveSettings(state.settings);
   const fallbackColumns = shabbos.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
   return Array.from({ length: Math.max(primaryPages.length, weekdayPages.length) }, (_, index) => {
@@ -443,6 +444,20 @@ export function chartPaperFitter(pagesEl, { height = 8.5, combined = false } = {
   };
   const overflowing = () => pageEls.filter(el => {
     if (el.getBoundingClientRect().height > paperHeight + PAGE_HEIGHT_EPSILON) return true;
+    if (el.classList.contains('is-full-season')) {
+      const page = el.getBoundingClientRect(), style = getComputedStyle(el);
+      const left = page.left + parseFloat(style.paddingLeft), right = page.right - parseFloat(style.paddingRight);
+      if ([...el.querySelectorAll('table')].some(table => {
+        const box = table.getBoundingClientRect();
+        return box.left < left - 0.5 || box.right > right + 0.5;
+      })) return true;
+      if ([...el.querySelectorAll('.cell,th,.parsha-cell')].some(cell => {
+        const range = document.createRange(); range.selectNodeContents(cell);
+        const box = cell.closest('td,th').getBoundingClientRect();
+        return [...range.getClientRects()].some(ink => ink.width > 0.1
+          && (ink.left < box.left - 0.5 || ink.right > box.right + 0.5));
+      })) return true;
+    }
     if (!el.classList.contains('is-flexible-chart')) return false;
     return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
       const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
@@ -1003,13 +1018,16 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, effectiveSeason, { announced = false, showMolad = false } = {}) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, effectiveSeason, { announced = false, showMolad = false, fullSeason = false } = {}) {
   const page = document.createElement('div');
-  page.className = 'page';
+  page.className = 'page' + (fullSeason ? ' is-full-season' : '');
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
   const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
-  const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
+  const sunsetColumn = { key: 'H-sunset', header: 'שקיעה' };
+  const printColumns = fullSeason ? columns.flatMap(c => c.key === 'H'
+    ? isEnglish ? [c, sunsetColumn] : [sunsetColumn, c] : [c]) : columns;
+  const orderedColumns = isEnglish ? printColumns : rtlOrdered(printColumns);
   const isWeekday = effectiveSeason === 'weekday';
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
@@ -1112,6 +1130,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // as a real קיץ sheet would for these weeks.
       const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
+      const candleHtml = fullSeason && !isWeekday
+        ? overriddenKeys.has('H') ? row.H ?? '' : nl2br(row.printOverrides?.H ?? row.H ?? '') : '';
+      const candleParts = fullSeason && !isWeekday ? fullSeasonCandleParts(candleHtml) : null;
       const cellHtml = (c) => {
         /* שחרית on the Weekday chart: one cell a row, like every other column, and the
            schedule on a panel laid over them.
@@ -1155,6 +1176,12 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
           const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
           const html = overridden ? value : nl2br(value);
           return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
+        }
+        if (fullSeason && (c.key === 'H' || c.key === 'H-sunset')) {
+          const sunset = c.key === 'H-sunset';
+          const html = candleParts ? candleParts[sunset ? 1 : 0] : sunset ? '' : candleHtml;
+          const flagged = overriddenKeys.has('H') ? 'overridden' : appliedColumns.has('H') ? 'ruled' : '';
+          return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-source-col="H" data-season="${effectiveSeason}"${chartExplanationAttrs(row, 'H', c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`, { value: html })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
         // Saved overrides already hold real HTML, possibly with manual <u> underlining;
@@ -1313,8 +1340,46 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
     highlight.insertAdjacentHTML('afterbegin', '<svg class="chanukah-highlight-fill" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect width="1" height="1"/></svg>');
   });
   useStraightHebrewQuotes(page);
+  if (fullSeason) singleLineSeasonCells(page);
 
   return page;
+}
+
+// Split only the recognized candle/sunset pair. Unusual saved edits stay together
+// in their original cell, retaining all their wording and formatting.
+function fullSeasonCandleParts(html) {
+  const root = document.createElement('div'); root.innerHTML = html;
+  const br = root.querySelector('br');
+  if (!br || !/^\s*\d{1,2}:\d{2}\s*שקיעה\s*\d{1,2}:\d{2}\s*$/.test(root.textContent)) return null;
+  const before = document.createRange(); before.selectNodeContents(root); before.setEndBefore(br);
+  const after = document.createRange(); after.selectNodeContents(root); after.setStartAfter(br);
+  const candle = document.createElement('div'), sunset = document.createElement('div');
+  candle.append(before.cloneContents()); sunset.append(after.cloneContents());
+  if (!/^\s*\d{1,2}:\d{2}\s*$/.test(candle.textContent)
+    || !/^\s*שקיעה\s*\d{1,2}:\d{2}\s*$/.test(sunset.textContent)) return null;
+  const walker = document.createTreeWalker(sunset, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) if (walker.currentNode.textContent.includes('שקיעה')) {
+    walker.currentNode.textContent = walker.currentNode.textContent.replace('שקיעה', '').trimStart();
+    break;
+  }
+  return [candle.innerHTML, sunset.innerHTML];
+}
+
+function singleLineSeasonCells(page) {
+  for (const cell of page.querySelectorAll('.cell')) {
+    if (cell.querySelector('.tisha-evening-grid')) continue;
+    cell.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode(SLASH)));
+    // Keep rich text and calculation attributes while flattening normal editor blocks.
+    for (const block of [...cell.querySelectorAll('div,p')].reverse()) {
+      if (block.previousSibling?.textContent.trim() && !/\/\s*$/.test(block.previousSibling.textContent)) block.before(document.createTextNode(SLASH));
+      if (block.nextSibling?.textContent.trim() && !/^\s*\//.test(block.nextSibling.textContent)) block.after(document.createTextNode(SLASH));
+      const inline = document.createElement('span');
+      for (const attr of block.attributes) inline.setAttribute(attr.name, attr.value);
+      inline.style.display = 'inline'; inline.append(...block.childNodes); block.replaceWith(inline);
+    }
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) walker.currentNode.textContent = walker.currentNode.textContent.replace(/\r?\n/g, SLASH);
+  }
 }
 
 /** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed

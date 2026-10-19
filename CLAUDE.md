@@ -669,6 +669,13 @@ charts before fitting the preview to the window, after fonts load, and before pr
 Screen scaling alone can hide a footer that spills over the next printed header.
 `tests/chart-browser-fit.cjs` checks crowded and roomy winter/summer pairs at phone and
 desktop widths, retaining every time and exactly two physical sheets with aligned footers.
+Only charts whose entire season is assigned to one page use one-line time menus,
+tighter spacing and a separate Friday שקיעה column beside candle lighting. Keep their
+saved styles and times intact, and fit both text width and paper height. Unrecognized
+candle-lighting edits retain their complete content in the original cell. Multi-page
+seasonal charts retain their existing layout. `tests/full-season-chart-print.cjs`
+checks both languages, Molad formats, DST sections, saved edits, real page-count controls,
+reopening, calculation/date controls, and native two-sheet Letter PDFs on phone/desktop.
 
 - A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
   All pages must measure 816px high. If they don't, something overflowed.
