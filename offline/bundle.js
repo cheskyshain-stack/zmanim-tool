@@ -18971,6 +18971,11 @@ function renderProgram(container, platform = detectPlatform()) {
 const NEW_FOLDER = '__new__';
 const NO_FOLDER = '__none__';
 
+function savedPageSplit(sheet, label) {
+  const counts = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).map((weeks) => weeks.length);
+  return `<div class="saved-page-split"><span class="saved-split-label">${label}</span><span dir="ltr">${counts.join(' / ')}</span></div>`;
+}
+
 /** Pairs each Shabbos sheet with the Weekday chart generated alongside it.
  *
  *  They're two sheets because they're two printed charts with different columns, but
@@ -19014,6 +19019,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
           }<span class="live-chip" data-live-for="${escAttr(s.id)}" hidden>Live</span></td>
           <td data-label="Hebrew year">${escAttr(s.hebrewYear)}</td>
           <td data-label="Weeks">${s.weeks.length}${companion ? ` <span class="hint">+ ${companion.weeks.length}</span>` : ''}</td>
+          <td data-label="Weeks per page"><div class="saved-page-splits">${savedPageSplit(s, s.season === 'weekday' ? 'Weekday' : 'Shabbos')}${companion ? savedPageSplit(companion, 'Weekday') : ''}</div></td>
           <td data-label="Created">${created(s.createdAt)}</td>
           <td data-label="Folder">
             <select class="folder-select" title="Move this sheet to a folder">
@@ -19037,12 +19043,12 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
       .join('');
 
   const tableHtml = (list) => `<table class="saved-list"><thead><tr>
-      <th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Created</th><th>Folder</th><th></th>
+      <th>Sheet</th><th>Hebrew year</th><th>Weeks</th><th>Weeks per page</th><th>Created</th><th>Folder</th><th></th>
     </tr></thead><tbody>${rowsHtml(list)}</tbody></table>`;
 
   container.innerHTML = `
     <h2>Saved sheets</h2>
-    <p class="hint">Every sheet you've generated. Open one to adjust its print layout or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both.</p>
+    <p class="hint">Every sheet you've generated. Open one to adjust its print layout or print it, lock it so it can't be deleted, or file it into a folder to keep the list tidy. A folder appears as soon as a sheet is put in one and goes away when the last sheet leaves it. A Shabbos sheet and the Weekday chart made with it count as one entry. Open either from the same row, and locking, filing or deleting covers both. Weeks per page shows each chart's split in page order.</p>
     ${
       // The row's own Publish button puts one season up and nothing else. This goes to the
       // publishing panel, which is the place that shows what the congregation is looking
@@ -19052,7 +19058,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
         ? `<div class="actions"><button type="button" id="saved-publishing">Publishing${getPublishToken() ? '' : ' (no token set)'}</button></div>`
         : ''
     }
-    ${
+    <div class="saved-tables">${
       state.sheets.length
         ? `
       ${unfiled.length ? tableHtml(unfiled) : ''}
@@ -19066,7 +19072,7 @@ function renderSavedSheets(container, state, onOpen, onDelete, onChange, onOpenP
         )
         .join('')}`
         : '<p class="hint">No saved sheets yet. Use Generate to create one.</p>'
-    }
+    }</div>
   `;
 
   // Which of these the congregation is actually looking at. Asked of the repository
@@ -23707,7 +23713,7 @@ function paint() {
   setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
-  // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
+  // a column next to the sidebar. Saved sheets gets a wider one: it's a seven-column table,
   // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
   main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
