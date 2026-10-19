@@ -361,7 +361,9 @@ at full size and refit when fonts arrive; a phone's preview zoom must not reach 
 If a large margin leaves too little room at the minimum type size, tighten the
 compact Chanukah row padding, then extra line and section gaps, enough to keep all
 menus and the footer within the margin. Retain at least 9.5pt times, including years
-with two distinct Sunday menus at the largest margin.
+with two distinct Sunday menus at the largest margin. Outer row padding may reach
+0.01in and extra section gaps 0.04in only when needed to fit those dense pages with the fixed 18pt headings;
+retain the time lines' leading and verify clearance above the footer rule.
 Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
 onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
 `tests/contextual-special-printing.cjs` checks native half-page and mixed-job
@@ -407,9 +409,9 @@ by the original compact Mincha, sunset and Maariv. Friday retains its own Mincha
 candle lighting and sunset and does not gain a weekday Maariv section. Use subtle row
 rules only in this detailed morning section. Preserve every later location mark and
 limit the footer's star key to marks actually used by Mincha/Maariv. Center the full
-weekday/parsha and tefillah group between the fixed title and 6.5pt regular footer.
+title, weekday/parsha and tefillah group between the fixed letterhead and 6.5pt regular footer.
 At wide margins, reduce afternoon row padding if the minimum type size still needs
-room, then detailed morning outer padding only when needed. Keep the inner room/time
+room, then detailed morning outer padding and extra section gaps only when needed. Keep the inner room/time
 spacing and font sizes. Verify the full permitted 0.75in margin, not only 0.5in.
 `tests/contextual-special-printing.cjs` checks the variants, original times/marks,
 Friday rules, native Letter pages, widest margin, saved styles, pairing and swaps.
@@ -438,7 +440,11 @@ rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed
 Place the BHB title and Hebrew year directly above its actual weekdays and upcoming
 Shabbos parsha, together in the centered schedule block above שחרית. Keep the
 letterhead's rule at the top rather than a rule between those two heading lines.
-The BHB שחרית section heading matches the title's fixed 18pt size. Combine
+All similar half-page schedules use this title placement and fixed 18pt size for
+both the title and tefillah section headings, including Chanukah, Rosh Chodesh, fast days
+and after Yom Kippur. Selichos also groups its title with the schedule, retaining
+the smaller day/date headings. Keep each occasion's existing day labels and times.
+Chanukah retains its day groups within each section. Combine
 days belonging to the same upcoming Shabbos with a ו, and join all groups into one
 centered header with a middle dot and ו between parsha groups, for example
 `יום ב' וה' לך לך · ויום ב' וירא`, reading chronologically
@@ -546,7 +552,7 @@ half-Letter classes when leaving the screen. Controls and existing custom editor
 stay off paper. Pages are added beside their preview instead of on separate setup
 screens; physical sheets are calculated from the selected designs and placements.
 
-Morning handouts center their dates and schedule together between the title rule and
+Half-page schedules center their title, dates and schedule together between the letterhead rule and
 the footer rule. Keep the header and footer fixed and retain the existing row spacing.
 Rosh Chodesh and fast-day morning handouts use BHB's grouped Hebrew weekday and
 upcoming Shabbos parsha before the Shacharis section, without a date/month subline.

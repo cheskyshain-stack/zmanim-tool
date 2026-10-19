@@ -24,11 +24,13 @@ const server = http.createServer((req, res) => {
       const context = await browser.newContext({ viewport: { width, height: 1000 } });
       await context.addInitScript(() => {
         localStorage.setItem('zmanim-nocount', '1');
-        localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
+        const year = Number((new URLSearchParams(location.search).get('headings') || '5787').split('-')[0]);
+        localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.parse(`${year - 3761}-10-19T12:00:00Z`) }));
         if (!localStorage.getItem('zmanim-poster-bar-v1')) localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, sheet: 'asarabteves', group: 'עשרה בטבת', workflow: 'single' }));
       });
       if (!process.env.SPECIAL_JOB_ORIGIN) await context.route('**/*', route => route.request().url().startsWith(origin + '/') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
       const page = await context.newPage();
+      await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));
       page.on('pageerror', error => errors.push(error.message));
       const settle = async () => {
         await page.locator('.poster,.page').first().waitFor({ state: 'attached' });
@@ -44,7 +46,18 @@ const server = http.createServer((req, res) => {
           const posters = [...frame.querySelectorAll('.poster')].map(poster => {
             const rect = poster.getBoundingClientRect();
             const footer = poster.querySelector('.poster-legend');
+            const title = poster.querySelector('.onepage-title');
+            const next = title?.nextElementSibling;
+            const titleWithSchedule = !poster.classList.contains('is-halfpage') ||
+              title?.parentElement.classList.contains('halfpage-content')
+              && next.offsetTop >= title.offsetTop + title.offsetHeight - 1
+              && next.offsetTop - title.offsetTop - title.offsetHeight < 8
+              && parseFloat(getComputedStyle(title).fontSize) === 24
+              && [...poster.querySelectorAll('.onepage-sec-head:not(.is-day-heading)')].every(head => getComputedStyle(head).fontSize === getComputedStyle(title).fontSize);
             return { width: poster.offsetWidth, height: poster.offsetHeight,
+              titleWithSchedule,
+              footerClear: !poster.classList.contains('is-halfpage') ||
+                poster.querySelector('.halfpage-body').offsetTop + poster.querySelector('.halfpage-body').offsetHeight <= footer.offsetTop - 5,
               footerSize: footer ? parseFloat(getComputedStyle(footer).fontSize) : null,
               footerWeight: footer ? getComputedStyle(footer).fontWeight : null,
               half: poster.classList.contains('is-halfpage'),
@@ -54,7 +67,8 @@ const server = http.createServer((req, res) => {
           return { width: box.width, height: box.height, posters };
         }));
         assert.equal(geometry.length, count, label + ': physical frame count');
-        assert(geometry.every(frame => frame.posters.every(poster => poster.within && !poster.overflows)), label + ': every poster fits its paper frame');
+        assert(geometry.every(frame => frame.posters.every(poster => poster.within && !poster.overflows && poster.footerClear)), label + ': every poster fits its paper frame with the schedule clear of the footer');
+        assert(geometry.every(frame => frame.posters.every(poster => poster.titleWithSchedule)), label + ': half-page titles sit with their day/schedule group and match section heading sizes');
         assert(geometry.every(frame => frame.posters.every(poster => !poster.half
           || Math.abs(poster.footerSize - 6.5 * 96 / 72) < 0.01 && poster.footerWeight === '400')), 'Half-page footers retain fixed regular 6.5pt type');
         const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
@@ -114,6 +128,23 @@ const server = http.createServer((req, res) => {
       await print('friday-detailed-wide-margin', 3, false);
       if (output) await page.screenshot({ path: path.join(output, `${width}-controls.png`), fullPage: true });
       await noOverflow();
+
+      for (const year of [5787, 5804]) for (const margin of [0.15, 0.75]) {
+        await page.clock.setFixedTime(new Date(`${year - 3761}-10-19T12:00:00Z`));
+        await page.evaluate(({ year, margin }) => localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({
+          year, margin, design: 'new', sheet: 'chanukah',
+          printPages: [{ id: 'chanukah-headings', left: 'chanukah', right: '' }],
+        })), { year, margin });
+        await page.goto(origin + `/admin/?headings=${year}-${margin}#posters/chanukah`); await settle();
+        assert.equal(await page.locator('#poster-year').inputValue(), String(year), 'The dense fixture uses its actual Hebrew year');
+        assert(await page.locator('.onepage-times').evaluateAll(nodes => nodes.every(node => parseFloat(getComputedStyle(node).fontSize) >= 9.5 * 96 / 72 - 0.01)),
+          'Dense Chanukah schedules keep at least 9.5pt times alongside the fixed 18pt headings');
+        await print(`chanukah-${year}-${margin}-headings`, 1, true);
+        if (output && width === 1440 && year === 5787 && margin === 0.15) {
+          await page.locator('.poster').screenshot({ path: path.join(output, 'chanukah-headings.png') });
+        }
+      }
+      await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));
 
       // Paired schedules must also honor New = compact, including old saved selections.
       for (const year of [5785, 5787, 5790]) for (const key of ['pair', 'slichostzom', 'yomkippur']) {
