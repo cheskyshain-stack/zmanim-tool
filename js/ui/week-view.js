@@ -882,6 +882,10 @@ function fitLinesToPage(container) {
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
     if (card.matches('.is-shabbos-print, .is-weekday-card')) {
+      // Both heights must include the card's preview zoom. A season run inherits that
+      // zoom from its wrapper; comparing painted text with clientHeight enlarged every
+      // phone-printed card past the bottom of its list.
+      const paintedRoom = box.getBoundingClientRect().height;
       // Fit height while keeping both ruled lists at the full printable width.
       const measure = (scale) => {
         card.style.setProperty('--fit-scale', scale.toFixed(4));
@@ -892,7 +896,7 @@ function fitLinesToPage(container) {
       let high = growCapFor(card);
       for (let i = 0; i < 14; i++) {
         const mid = (low + high) / 2;
-        if (measure(mid) <= room * 0.98) low = mid;
+        if (measure(mid) <= paintedRoom * 0.98) low = mid;
         else high = mid;
       }
       measure(low);
@@ -1253,9 +1257,13 @@ function fitPagesToWindow(container) {
     wrap.style.removeProperty('--page-zoom');
     const available = wrap.clientWidth;
     const pageWidth = card.getBoundingClientRect().width;
-    if (!available || !pageWidth || pageWidth <= available) return;
-    wrap.style.setProperty('--page-zoom', (available / pageWidth).toFixed(4));
-    wrap.classList.add('is-scaled');
+    if (!available || !pageWidth) return;
+    if (pageWidth > available) {
+      wrap.style.setProperty('--page-zoom', (available / pageWidth).toFixed(4));
+      wrap.classList.add('is-scaled');
+    }
+    // Preview zoom can wrap a row differently, so fit the page at its final size too.
+    fitLinesToPage(container);
   };
   apply();
   if (fitPagesHandler) window.removeEventListener('resize', fitPagesHandler);

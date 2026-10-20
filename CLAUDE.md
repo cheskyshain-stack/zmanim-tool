@@ -131,6 +131,14 @@ old remembered combined values fall back to separate pages without changing stor
 charts. Weekly schedule cards keep their own layout
 options. Keep the fractional-measurement correction below.
 
+Weekly card fitting compares text and available height in the same painted coordinates,
+including the preview zoom inherited by a full-season run. Refit after preview zoom
+changes. Do not compare a zoomed `getBoundingClientRect` with an unzoomed
+`clientHeight`: that enlarges phone printouts
+until their final rows are clipped. `tests/weekly-season-print.cjs` covers the actual
+53-page winter job and summer runs at phone and desktop widths, including native PDFs
+with every clock, room underline and footer retained.
+
 Current browser checks: `tests/contextual-special-printing.cjs` covers the new controls,
 all Asara choices, fallbacks, additions, pairing, bulk jobs, migration, existing custom
 sheets, fixed footers and actual PDF geometry. `tests/shacharis-handouts-print.cjs`
