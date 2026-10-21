@@ -185,7 +185,7 @@ ROUTES = {
         "heading": "Donate",
         "blurb": (
             "Ways to support Bais Medrash of Lakewood Commons: by card, ACH or donor advised fund. "
-            "DAF providers include The Donors Fund, Pledger, OJC and Matbia. Tax ID 26-4527675."
+            "DAF providers include The Donors Fund, Pledger, OJC, Matbia and iMaaser. Tax ID 26-4527675."
         ),
     },
 }

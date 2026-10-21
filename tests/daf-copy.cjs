@@ -70,21 +70,37 @@ const server = http.createServer((req, res) => {
       assert.equal(await copy.innerText(), 'Copy EIN');
       assert((await copy.boundingBox()).height >= 44);
       const providers = page.locator('.luach-daf-provider');
-      assert.equal(await providers.count(), 4);
+      assert.equal(await providers.count(), 5);
+      assert.deepEqual(await providers.locator('img').evaluateAll(images => images.map(img => img.alt)),
+        ['The Donors Fund', 'Pledger', 'OJC Fund', 'Matbia', 'iMaaser']);
+      assert.equal(await page.getByRole('link', { name: 'iMaaser', exact: true }).getAttribute('href'), 'https://app.imaaser.org/donor/login');
+      assert.equal(await providers.locator('svg[aria-hidden="true"]').count(), 5);
       await page.waitForFunction(() => [...document.querySelectorAll('.luach-daf-provider img')].every(img => img.complete && img.naturalWidth > 0));
       for (const link of await providers.all()) {
         assert.equal(await link.getAttribute('target'), '_blank');
         assert.equal(await link.getAttribute('data-tax-id'), '26-4527675');
       }
+      const rows = await providers.evaluateAll(links => links.map(link => {
+        const row = link.getBoundingClientRect(), logo = link.querySelector('img').getBoundingClientRect();
+        const arrow = link.querySelector('svg').getBoundingClientRect();
+        return { left: row.left, top: row.top, width: row.width, height: row.height,
+          contentsFit: logo.left >= row.left && logo.right <= arrow.left - 16 && arrow.right <= row.right };
+      }));
+      assert(rows.every(row => row.height >= 72 && Math.abs(row.width - rows[0].width) < 1 && row.contentsFit));
+      assert(rows.every((row, index) => !index || row.top >= rows[index - 1].top + rows[index - 1].height));
       const dafLayout = await measure();
       assert(!dafLayout.overflow);
-      assert.equal(dafLayout.paymentHeight, cardLayout.paymentHeight);
-      assert.equal(dafLayout.footerTop, cardLayout.footerTop);
+      assert(dafLayout.paymentHeight > cardLayout.paymentHeight, 'The five-row provider list has room for every choice');
+      assert(dafLayout.footerTop >= cardLayout.footerTop, 'The footer follows the complete provider list');
+      assert(Math.abs(dafLayout.footerGap - 24) < 2);
       if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'donation-live-design-daf.png'), fullPage: true });
       await page.evaluate(() => {
         window.copyWrites = [];
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.copyWrites.push(text) } });
       });
+      await page.getByRole('link', { name: 'iMaaser', exact: true }).evaluate(link => link.addEventListener('click', event => event.preventDefault(), { once: true }));
+      await page.getByRole('link', { name: 'iMaaser', exact: true }).click();
+      await page.waitForFunction(() => window.copyWrites.length === 1);
       await copy.click();
       await page.waitForFunction(() => document.querySelector('.luach-copy-btn').textContent === 'Copied');
       await copy.click();
