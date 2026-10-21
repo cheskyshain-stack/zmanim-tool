@@ -395,9 +395,14 @@ const DONATE = {
       blurb: 'Donor Advised Fund',
       icon: 'shul',
       iconImage: '/assets/daf-providers-transparent.png',
-      // Keep the providers' original artwork locally so their tiles do not depend on
-      // another host loading. OJC's high-resolution portal mark remains a PNG.
-      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"/assets/daf-donors-fund.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"/assets/daf-pledger.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"/assets/daf-matbia.svg"}],
+      // Local provider artwork keeps the complete list available without another host.
+      providers: [
+        { name: 'The Donors Fund', url: 'https://www.thedonorsfund.org/portal/sign-in', logo: '/assets/daf-donors-fund.svg' },
+        { name: 'Pledger', url: 'https://pledgercharitable.org/', logo: '/assets/daf-pledger.svg' },
+        { name: 'OJC Fund', url: 'https://portal.ojcfund.org/Account/Login', logo: '/assets/daf-ojc.png' },
+        { name: 'Matbia', url: 'https://app.matbia.org/welcomebox', logo: '/assets/daf-matbia.svg' },
+        { name: 'iMaaser', url: 'https://app.imaaser.org/donor/login', logo: '/assets/daf-imaaser.svg' },
+      ],
       how: 'Search using the shul\u2019s EIN.',
       copy: { label: 'EIN', value: SHUL_TAX_ID, buttonLabel: 'Copy EIN' },
       taxId: SHUL_TAX_ID,
@@ -931,7 +936,7 @@ function donateWayHtml(way, index) {
         <button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}" aria-live="polite">${escAttr(way.copy.buttonLabel || 'Copy')}</button>
       </div>`
     : '';
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"><svg class="luach-daf-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>`).join('');
   const accounts = (way.accounts || []).map(donateAccountHtml).join('');
   const heading = accounts ? 'Choose a fund' : providers ? 'Choose a provider' : `Give with ${way.title}`;
   const intro = way.how || way.blurb;

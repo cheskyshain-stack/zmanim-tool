@@ -848,7 +848,13 @@ Export/Import in Settings moves it between devices.
   760px, including its small header photo, Hebrew name, minyan type and stacked links.
   Keep both single and paired minyan/candle-lighting cards working at the breakpoint.
 - Donation payment methods use one tabbed panel, with Card · ACH selected initially
-  and all five funds visible. DAF shows its providers and the only Copy EIN button.
+  and all five funds visible. DAF shows five matching full-width provider rows in this
+  order: The Donors Fund, Pledger, OJC Fund, Matbia and iMaaser. Use their local original
+  logos at the approved sizes, with a gold arrow and quiet dividers. iMaaser links to
+  `https://app.imaaser.org/donor/login`. DAF has the only Copy EIN button; clicking any
+  provider also copies the shul's EIN once per visit. Keep the complete row clickable
+  and open provider accounts in a separate tab. `tests/daf-copy.cjs` covers the layout,
+  link order, clipboard, keyboard and fund form lifecycle on phones and desktop.
   Keep the condensed nonprofit information and plain EIN inside the contact footer
   at the bottom. The footer follows expanded forms and uses spare height above it
   when the page is short. Switching methods preserves entered payment forms.
