@@ -19,7 +19,7 @@ import { weekdayMornings } from '../posters/day.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInWeek,
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis,
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
@@ -1399,78 +1399,43 @@ function weekCardsHtml(showing, index, state, settings) {
        posters/day.js, which the One sheet asks the same question of: the two draw this block
        and were deciding separately what was on it. */
     const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
-    const parts = [...WEEKDAY_COLUMNS]
-      .reverse()
-      // The everyday שחרית comes off a week where every morning already has a line of its
-      // own: see weekdayMornings. Filtered rather than left out of the map, so the columns
-      // beside it keep their order.
-      .filter((c) => c.key !== 'E' || mornings.everydayStands)
-      // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
-      // nothing, or the card reads as though the minyan does not exist rather than as
-      // though the time is not set yet.
-      // isHtml only for an override (already real HTML) and for שחרית (rich text out of
-      // Settings). A computed value still carries the underline sentinels, which
-      // weekNl2br has to turn into real <u> elements.
-      .map((c) =>
-        c.key === 'E'
-          ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
-          // Through announced.js as well: see the same call in upcoming.js. A block is one
-          // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true, '', chartExplanationAttrs(wdRow, c.key, c.header, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }))
-      );
-
-    // The second שחרית schedule, only on weeks that actually have one of those days,
-    // labelled with which day it is rather than the chart's catch-all heading. It goes
-    // directly after the everyday schedule, not before it: most of the week still runs
-    // on the regular times, so those are what should be read first.
-    /* The יומים נוראים season, which decides the morning outright rather than adding a day to
-       it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
-       and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
-       through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
-       below keep. Spliced in at the same place they are, so the day that is not the general
-       rule reads first: those splice after these and so end up above them, which puts a fast
-       ahead of the season line covering the rest of its week. */
-    const season = mornings.season;
-    if (season.length) {
-      // Under the everyday line where there is one, and at the head of the block where there
-      // is not: splice(1) would put it after מנחה on a week whose שחרית has come off.
-      const at = mornings.everydayStands ? 1 : 0;
-      parts.splice(at, 0, ...season.map((g) => line(
-        '',
-        htmlLines(g.html),
-        true, false,
+    // The shared schedules keep matching days together. Order each morning block by
+    // its first actual weekday, including ordinary mornings that start later in a week.
+    const morningParts = [];
+    const addMorning = (days, html) => morningParts.push({
+      firstDay: Math.min(...days.split(', ').map(day => DAY_NAMES.indexOf(day))), html,
+    });
+    if (mornings.everydayStands) {
+      addMorning(mornings.everydayDays.join(', '), line('שחרית', htmlLines(WEEKDAY_SHACHARIS), true, false, '', true));
+    }
+    for (const g of mornings.season) {
+      addMorning(g.day, line(
+        '', htmlLines(g.html), true, false,
         `${weekEsc(g.name)}<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(g.day))})</span>`,
         true
-      )));
+      ));
     }
+    // A fast morning keeps the name and times from its own sheet. Rosh Chodesh and
+    // BHB retain their shared schedules and the individual day labels within a group.
+    const dayLabel = (d) =>
+      `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
+      + `<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(d.day))})</span>`;
+    for (const d of mornings.fasts) {
+      addMorning(d.day, line('', htmlLines(TZG_TEXT.morning), true, false, dayLabel(d), true));
+    }
+    for (const group of mornings.otherGroups) {
+      addMorning(group.days.map(d => d.day).join(', '),
+        line('', htmlLines(group.html), true, false, group.days.map(dayLabel).join('<br>'), true));
+    }
+    morningParts.sort((a, b) => a.firstDay - b.firstDay);
 
-    const special = specialDaysInWeek(showing, settings);
-    if (special.length) {
-      const at = mornings.everydayStands ? 1 : 0;
-      // The day names go on their own line, in their own direction. Run together with
-      // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
-      // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
-      /* The word in front of the day's name is what is davened at it: a fast morning is
-         called סליחות, off the same constant its own sheet is headed with, so the card and
-         the sheet on the wall cannot end up calling one morning two things. ר"ח and בה"ב
-         have no סליחות and stay שחרית. */
-      const dayLabel = (d) =>
-        `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
-        + `<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(d.day))})</span>`;
-      /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
-         list and read as one line naming both, which is what this has always done, and צום
-         גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
-         The fast first, since it is the one that is not the general rule. */
-      const groups = [];
-      for (const d of mornings.fasts) {
-        groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
-      }
-      for (const group of mornings.otherGroups) {
-        groups.push({ label: group.days.map(dayLabel).join('<br>'), html: group.html });
-      }
-      parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
-    }
-    weekdayLines = parts.join('');
+    // Mincha and Maariv follow the mornings, with saved edits and explanation traces.
+    // Empty entries stay visible when their schedule has not been set yet.
+    const parts = [...WEEKDAY_COLUMNS].reverse().filter(c => c.key !== 'E').map(c =>
+      line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true, '',
+        chartExplanationAttrs(wdRow, c.key, c.header, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }))
+    );
+    weekdayLines = [...morningParts.map(part => part.html), ...parts].join('');
   }
 
   const cardTitle = weekTitle(showing, index, state, settings);
