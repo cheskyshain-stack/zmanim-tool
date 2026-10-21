@@ -139,6 +139,13 @@ until their final rows are clipped. `tests/weekly-season-print.cjs` covers the a
 53-page winter job and summer runs at phone and desktop widths, including native PDFs
 with every clock, room underline and footer retained.
 
+Weekly printed morning groups appear in order of their first weekday, with matching
+schedules still grouped together. Sort ordinary, Selichos, fast, Chanukah and Rosh
+Chodesh blocks by the earliest day they actually cover, including ordinary mornings
+that start after a holiday. `weekdayMornings.everydayDays` supplies those ordinary days.
+`tests/weekly-morning-order.cjs` checks separate and combined cards, chronological
+holiday weeks, all clocks and the native PDFs at phone and desktop widths.
+
 Current browser checks: `tests/contextual-special-printing.cjs` covers the new controls,
 all Asara choices, fallbacks, additions, pairing, bulk jobs, migration, existing custom
 sheets, fixed footers and actual PDF geometry. `tests/shacharis-handouts-print.cjs`

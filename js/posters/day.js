@@ -260,11 +260,13 @@ export function weekdayMornings(shabbosSerial, settings, everyday, special) {
   for (let offset = 6; offset >= 1; offset -= 1) {
     if (specialMinyanim(shabbosSerial - offset, settings).length) covered.add(DAY_NAMES[6 - offset]);
   }
+  const everydayDays = DAY_NAMES.slice(0, 6).filter((d) => !covered.has(d));
   return {
     season,
     fasts,
     others,
     otherGroups,
-    everydayStands: DAY_NAMES.slice(0, 6).some((d) => !covered.has(d)),
+    everydayDays,
+    everydayStands: everydayDays.length > 0,
   };
 }
