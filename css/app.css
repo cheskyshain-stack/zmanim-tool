@@ -5848,8 +5848,8 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-approved-name text { fill:#142b46; font-size:37px; }
  .is-home .luach-masthead .luach-place { color:#142b46; margin-top:13px; font-size:29px !important; }
  .is-home .luach-home-date { margin-top:18px; color:#64707c; font-size:12px; }
- .luach-home-layout { display:block; max-width:840px; margin:0 auto; }
- .is-home .luach-home { max-width:840px; margin:0 auto; }
+ .luach-home-layout { display:block; max-width:640px; margin:0 auto; }
+ .is-home .luach-home { max-width:640px; margin:0 auto; }
  .is-home .luach-next { padding:25px 18px; margin-bottom:18px; border-radius:15px; box-shadow:0 4px 16px #142b4605; }
  .is-home .luach-next-time { font-size:42px; }
  .is-home .luach-next-time small { font-size:.55em; }
@@ -5863,7 +5863,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
  .is-home .luach-item { min-height:106px; padding:22px 25px; border-radius:15px; }
  .is-home .luach-item-title { font-size:27px; }
- .is-home .luach-site-footer { max-width:840px; margin-top:46px; padding-top:25px; }
+ .is-home .luach-site-footer { max-width:640px; margin-top:46px; padding-top:25px; }
  body.is-luach main.is-give { padding-top:calc(112px + var(--luach-safe-top, 0px)); }
  .is-give .luach-give-head-block { margin-bottom:25px; }
  .luach-payment-tab { font-size:14px; }
