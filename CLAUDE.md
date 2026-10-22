@@ -851,6 +851,12 @@ Export/Import in Settings moves it between devices.
   phone layout below 760px, including its small header photo, Hebrew name, minyan type
   and stacked links.
   Keep both single and paired minyan/candle-lighting cards working at the breakpoint.
+  After changing the next-minyan layout, run `node tests/home-next-layout.cjs` against
+  a fresh build. It uses the actual renderer and fitter with distinct name/room/clock
+  combinations and candle-lighting pairings from the automatic seven-year schedule
+  window, plus countdown wording and clock boundaries. It checks visible text bounds,
+  overlaps, retained text, paired row alignment and the divider at responsive widths.
+  Longer descriptions may wrap and increase card height; do not clip them to 88px.
 - Donation payment methods use one tabbed panel, with Card · ACH selected initially
   and all five funds visible. DAF shows five matching full-width provider rows in this
   order: The Donors Fund, Pledger, OJC Fund, Matbia and iMaaser. Use their local original
