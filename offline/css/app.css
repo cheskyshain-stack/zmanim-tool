@@ -5778,16 +5778,16 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-copy-value { color:#142b46; font-size:14px; font-weight:700; }
  .is-give .luach-copy .luach-copy-btn { min-height:44px; padding:0 11px; background:#fff; border:1px solid #e1ded5; border-radius:8px; font:400 12px Arial,sans-serif; }
  .is-give .luach-daf-providers { display:flex; flex-direction:column; gap:0; margin:15px 0 0; border:1px solid #e5e2da; border-radius:12px; overflow:hidden; }
- .is-give .luach-daf-provider { flex-direction:row; justify-content:space-between; gap:20px; min-height:72px; padding:12px 16px; border:0; border-bottom:1px solid #eae7df; border-radius:0; }
+ .is-give .luach-daf-provider { flex-direction:row; justify-content:space-between; gap:20px; min-height:56px; padding:10px 14px; border:0; border-bottom:1px solid #eae7df; border-radius:0; }
  .is-give .luach-daf-provider:last-child { border-bottom:0; }
  .is-give .luach-daf-provider:hover { background:#faf8f3; }
  .is-give .luach-daf-provider:focus-visible { outline:2px solid var(--luach-ink); outline-offset:-3px; }
- .is-give .luach-daf-provider img { width:var(--provider-logo-width,140px); height:44px; max-height:44px; max-width:calc(100% - 40px); object-fit:contain; object-position:left center; }
- .is-give .luach-daf-provider img[alt="The Donors Fund"] { --provider-logo-width:206px; }
- .is-give .luach-daf-provider img[alt="Pledger"] { --provider-logo-width:145px; }
- .is-give .luach-daf-provider img[alt="OJC Fund"] { --provider-logo-width:94px; }
- .is-give .luach-daf-provider img[alt="Matbia"] { --provider-logo-width:128px; }
- .is-give .luach-daf-provider img[alt="iMaaser"] { --provider-logo-width:130px; }
+ .is-give .luach-daf-provider img { width:var(--provider-logo-width,140px); height:34px; max-height:34px; max-width:calc(100% - 40px); object-fit:contain; object-position:left center; }
+ .is-give .luach-daf-provider img[alt="The Donors Fund"] { --provider-logo-width:160px; }
+ .is-give .luach-daf-provider img[alt="Pledger"] { --provider-logo-width:112px; }
+ .is-give .luach-daf-provider img[alt="OJC Fund"] { --provider-logo-width:73px; }
+ .is-give .luach-daf-provider img[alt="Matbia"] { --provider-logo-width:99px; }
+ .is-give .luach-daf-provider img[alt="iMaaser"] { --provider-logo-width:100px; }
  .luach-daf-arrow { flex:none; display:block; width:18px; height:18px; color:#987b3e; }
  .luach-give-accounts { margin-top:13px; }
  .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #eeeae1; }
