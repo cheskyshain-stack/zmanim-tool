@@ -842,8 +842,10 @@ Export/Import in Settings moves it between devices.
 ## Screen layout
 
 - The homepage's desktop layout starts at the existing 760px breakpoint. Use the
-  approved centered Hebrew name without a label above it, a 640px next-minyan card,
-  and side-by-side Zmanim and Donate links. Show the small 54px by 35px header photo
+  approved centered Hebrew name without a label above it, a 640px content column,
+  and side-by-side Zmanim and Donate links. Keep the desktop next-minyan card compact
+  and centered: 480px for one card, 560px when paired with candle lighting, with 14px
+  vertical padding. Show the small 54px by 35px header photo
   at the top left on desktop, and omit the large homepage picture. Keep the existing
   phone layout below 760px, including its small header photo, Hebrew name, minyan type
   and stacked links.
