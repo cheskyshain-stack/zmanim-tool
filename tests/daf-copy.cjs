@@ -86,7 +86,7 @@ const server = http.createServer((req, res) => {
         return { left: row.left, top: row.top, width: row.width, height: row.height,
           contentsFit: logo.left >= row.left && logo.right <= arrow.left - 16 && arrow.right <= row.right };
       }));
-      assert(rows.every(row => row.height >= 72 && Math.abs(row.width - rows[0].width) < 1 && row.contentsFit));
+      assert(rows.every(row => row.height >= 44 && row.height <= 57 && Math.abs(row.width - rows[0].width) < 1 && row.contentsFit));
       assert(rows.every((row, index) => !index || row.top >= rows[index - 1].top + rows[index - 1].height));
       const dafLayout = await measure();
       assert(!dafLayout.overflow);
