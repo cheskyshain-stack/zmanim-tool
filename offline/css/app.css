@@ -5850,14 +5850,14 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-home-date { margin-top:18px; color:#64707c; font-size:12px; }
  .luach-home-layout { display:block; max-width:640px; margin:0 auto; }
  .is-home .luach-home { max-width:640px; margin:0 auto; }
- .is-home .luach-next { max-width:480px; padding:14px 18px; margin:0 auto 18px; border-radius:15px; box-shadow:0 4px 16px #142b4605; }
- .is-home .luach-next-time { font-size:36px; }
+ .is-home .luach-next { max-width:480px; padding:6px 18px; margin:0 auto 18px; border-radius:15px; box-shadow:0 4px 16px #142b4605; }
+ .is-home .luach-next-time { font-size:36px; line-height:1.1; }
  .is-home .luach-next-time small { font-size:.55em; }
  .is-home .luach-next-what { font-size:26px; }
- .is-home .luach-next-when { margin-top:6px; font-size:13px; }
- .is-home .luach-next-head { font:700 10px/1.4 Arial,sans-serif; letter-spacing:1.6px; margin-bottom:5px; }
- .is-home .luach-next.is-paired { max-width:560px; gap:6px 0; }
- .is-home .luach-next.is-paired .luach-next-box { row-gap:6px; }
+ .is-home .luach-next-when { margin-top:2px; font-size:13px; line-height:1.3; }
+ .is-home .luach-next-head { font:700 10px/1.2 Arial,sans-serif; letter-spacing:1.6px; margin-bottom:2px; }
+ .is-home .luach-next.is-paired { max-width:560px; gap:3px 0; }
+ .is-home .luach-next.is-paired .luach-next-box { row-gap:3px; }
  .is-home .luach-next.is-paired .luach-next-head { font-size:11px; }
  .is-home .luach-next.is-paired .luach-next-time { font-size:34px; }
  .is-home .luach-next.is-paired .luach-next-what { font-size:22px; }
