@@ -36,6 +36,8 @@ const server = http.createServer((req, res) => {
         { year: 5787, season: 'kayitz', molad: 'compact' },
         { year: 5787, season: 'choref', molad: 'compact', edits: true },
         { year: 5787, season: 'kayitz', molad: 'off', language: 'en' },
+        { year: 5787, season: 'choref', molad: 'compact', split: true, language: 'en' },
+        { year: 5787, season: 'kayitz', molad: 'off', savedWidth: 320 },
       ]) {
         const baseline = await page.evaluate(async fixture => {
           const { loadTables } = await import('/js/data-loader.js');
@@ -49,6 +51,7 @@ const server = http.createServer((req, res) => {
           sheet.pageSizes = [sheet.weeks.length]; companion.pageSizes = [companion.weeks.length];
           sheet.style.splitSpringDst = Boolean(fixture.split);
           sheet.columnWidths = {}; companion.columnWidths = {};
+          if (fixture.savedWidth) sheet.columnWidths.L = fixture.savedWidth;
           if (fixture.edits) {
             sheet.overrides[sheet.weeks[0].serial] = { H: '<u>6:11</u><br>שקיעה <b>6:29</b>', C: '<u>1:23</u><br><b>4:56</b><div>דרשה 5:01</div>' };
             sheet.overrides[sheet.weeks[1].serial] = { H: '<b>6:12</b><br>חשוב<br>שקיעה 6:30' };
@@ -106,6 +109,28 @@ const server = http.createServer((req, res) => {
           return { height:box.height, font:parseFloat(style.getPropertyValue('--sheet-font-size')), clipping, panelsFit,
             footer:footer.bottom-box.top, fits:last.bottom <= footer.top + .5 && footer.bottom <= box.bottom - parseFloat(style.paddingBottom) + .5 };
         }));
+        const fridayColumns = await page.locator('#pages .page').first().locator('table').evaluateAll(tables => tables.map(table => {
+          const keys = [...table.querySelectorAll('colgroup col')].map(col => col.dataset.colkey);
+          const visualOrder = keys.map((key, index) => ({ key, left: table.tHead.rows[0].cells[index].getBoundingClientRect().left }))
+            .sort((a, b) => b.left - a.left).map(column => column.key);
+          const position = keys.findIndex(key => key === 'L' || key === 'I' && !keys.includes('L'));
+          const cells = [...table.rows].map(row => row.cells[position]);
+          const ink = Math.max(...cells.map(cell => {
+            const range = document.createRange(); range.selectNodeContents(cell.querySelector('.cell') || cell);
+            return range.getBoundingClientRect().width;
+          }));
+          const style = getComputedStyle(cells[0]);
+          const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+          const column = table.querySelectorAll('colgroup col')[position];
+          return { visualOrder, width: cells[0].getBoundingClientRect().width, ink, padding, preferred: column.style.width };
+        }));
+        for (const column of fridayColumns) {
+          const order = column.visualOrder;
+          assert.equal(order.indexOf('H-sunset'), order.indexOf('G') + 1, 'Sunset follows Friday Mincha/Maariv');
+          assert.equal(order.indexOf('F'), order.indexOf('H-sunset') + 1, 'Friday Maariv follows sunset');
+          if (fixture.savedWidth) assert.equal(column.preferred, fixture.savedWidth + 'px', 'Honor the explicitly saved Friday Mincha width');
+          else assert(column.width <= column.ink + column.padding + 2, 'Friday Mincha fits its longest line without spare table width: ' + JSON.stringify(column));
+        }
         assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelsFit && !p.clipping.length), JSON.stringify({ width, fixture, geometry }));
         if (fixture.year === 5787 && fixture.season === 'choref' && fixture.split)
           assert(geometry.every(p => p.font >= 6.5), 'The reviewed full-season layout retains substantially larger type');
@@ -118,13 +143,13 @@ const server = http.createServer((req, res) => {
         assert.deepEqual(normalized.map(s => (s.match(/\d{1,2}:\d{2}/g)||[]).sort()), baseline.original.map(p => p.times), 'Every time is present on its own physical sheet');
         assert(texts.every(s=>s.includes('Bais Medrash')));
         assert.equal(await page.evaluate(() => JSON.stringify(fullSeasonFixture.state)), baseline.saved, 'Fitting does not change saved styles, rules, overrides or page sizes');
-        const name = `${width}-${fixture.season}-${fixture.year}-${fixture.molad}${fixture.split?'-split':''}${fixture.edits?'-edits':''}${fixture.language?'-en':''}`;
+        const name = `${width}-${fixture.season}-${fixture.year}-${fixture.molad}${fixture.split?'-split':''}${fixture.edits?'-edits':''}${fixture.language?'-en':''}${fixture.savedWidth?'-saved-width':''}`;
         if (output) fs.writeFileSync(path.join(output,name+'.pdf'),pdf);
         await page.emulateMedia({ media:'screen' });
         if (output) await page.locator('#pages').screenshot({ path:path.join(output,name+'.png') });
         await page.evaluate(() => fullSeasonFixture.redraw());
         assert.deepEqual(await page.locator('#pages .page').evaluateAll(pages=>pages.map(p=>parseFloat(getComputedStyle(p).getPropertyValue('--sheet-font-size')))),geometry.map(p=>p.font));
-        checks.push({ width, fixture, geometry });
+        checks.push({ width, fixture, geometry, fridayColumns });
       }
       // Exercise the actual page-count control, storage and reopening from Saved.
       await page.goto(origin+'/admin/#generate');

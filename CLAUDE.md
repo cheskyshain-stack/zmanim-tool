@@ -685,7 +685,10 @@ Screen scaling alone can hide a footer that spills over the next printed header.
 `tests/chart-browser-fit.cjs` checks crowded and roomy winter/summer pairs at phone and
 desktop widths, retaining every time and exactly two physical sheets with aligned footers.
 Only charts whose entire season is assigned to one page use one-line time menus,
-tighter spacing and a separate Friday שקיעה column beside candle lighting. Keep their
+tighter spacing and a separate Friday שקיעה column between מנחה מעריב and מעריב,
+following the Friday reading order in both languages and DST sections. Size the
+מנחה ערב שבת column to its longest line plus cell padding instead of giving it a
+proportional share of spare width; retain explicitly saved column widths. Keep their
 saved styles and times intact, and fit both text width and paper height. Unrecognized
 candle-lighting edits retain their complete content in the original cell. Multi-page
 seasonal charts retain their existing layout. `tests/full-season-chart-print.cjs`
