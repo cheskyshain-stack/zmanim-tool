@@ -690,6 +690,12 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   padding: 0.7rem 1rem; box-shadow: var(--shadow-sm);
 }
 .sheet-toolbar .hint { flex-basis: 100%; margin: 0.15rem 0 0; }
+.chart-settings-help { flex-basis: 100%; min-width: 0; }
+.chart-settings-help > summary {
+  color: var(--muted); font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; min-height: 2.75rem; padding: 0.5rem 0; box-sizing: border-box;
+}
+.chart-settings-help > .hint { margin: 0.5rem 0 0; }
 .sheet-toolbar button { background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong); }
 .sheet-toolbar button:hover { background: var(--accent-soft); }
 .sheet-toolbar #print-btn { background: var(--ui-accent); color: white; border: none; }

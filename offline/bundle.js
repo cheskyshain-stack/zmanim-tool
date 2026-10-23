@@ -9029,7 +9029,7 @@ function chartMarginControl(key, label, value, original) {
 }
 
 /** A fixed, made-up molad - Tuesday afternoon, 23 minutes and 7 chalakim after 4 - shown
- *  beside the Molad format switch so the two sentences can be compared without opening a
+ *  in the settings explanation so the two sentences can be compared without opening a
  *  מברכים week to see one. Not read from any real month (the spec that asked for this is
  *  explicit: a formatting example, not an actual value), chosen because it exercises both
  *  a nonzero minutes part and a nonzero חלקים part at once, which is the only shape that
@@ -9519,8 +9519,7 @@ function renderSheet(container, state, sheet, onChange) {
           ${winterSheet ? `<div class="poster-bar-switch">${switchHtml('chart-dst-headers', 'Spring clock change', [
             { value: 'one', label: 'One header', on: !winterSheet.style.splitSpringDst },
             { value: 'separate', label: 'Separate headers', on: Boolean(winterSheet.style.splitSpringDst) },
-          ])}</div>
-          <p class="hint">Separate headers keeps winter columns above the clock change and starts summer columns below it, on the same page. Applies to this print layout.</p>` : ''}
+          ])}</div>` : ''}
           <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
             { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
             { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
@@ -9529,17 +9528,21 @@ function renderSheet(container, state, sheet, onChange) {
             { value: 'off', label: 'Off', on: !state.settings.showMolad },
             { value: 'on', label: 'On', on: Boolean(state.settings.showMolad) },
           ])}</div>
-          <div class="poster-bar-switch">${switchHtml('chart-molad-format', 'Molad format', [
+          ${state.settings.showMolad ? `<div class="poster-bar-switch">${switchHtml('chart-molad-format', 'Molad format', [
             { value: 'compact', label: 'Compact Hebrew', on: state.settings.moladFormat !== 'yiddish' },
             { value: 'yiddish', label: 'Yiddish', on: state.settings.moladFormat === 'yiddish' },
-          ])}</div>
-          <p class="hint">Padding applies to this chart. Ink, Molad and Molad format apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. None of the three ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
-          <p class="hint" id="molad-format-example">${moladFormatExample(state.settings.moladFormat === 'yiddish' ? 'yiddish' : 'compact')} (a formatting example, not an actual month's molad)</p>
+          ])}</div>` : ''}
+          <details id="chart-settings-help" class="chart-settings-help">
+            <summary>Explain settings</summary>
+            ${winterSheet ? '<p class="hint">Separate headers keeps winter columns above the clock change and starts summer columns below it, on the same page. Applies to this print layout.</p>' : ''}
+            <p class="hint">Padding applies to this chart. Ink, Molad and Molad format apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. None of the three ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+            ${state.settings.showMolad ? `<p class="hint" id="molad-format-example">${moladFormatExample(state.settings.moladFormat === 'yiddish' ? 'yiddish' : 'compact')} (a formatting example, not an actual month's molad)</p>` : ''}
+            <p id="page-fit-notice" class="hint" hidden></p>
+          </details>
         </div>
       </div>
     </div>
     <div id="page-overflow-warning" class="error no-print" hidden></div>
-    <p id="page-fit-notice" class="hint no-print" hidden></p>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
