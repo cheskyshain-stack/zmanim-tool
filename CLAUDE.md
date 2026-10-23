@@ -638,6 +638,12 @@ shrink-to-fit loop makes room for the extra header. Keep the summer cell keys an
 on a mixed page, including `L` for the winter section's Erev Shabbos menu, so changing
 the header layout cannot move or lose a saved override. Browser coverage is in
 `tests/dst-print-layout.cjs`.
+In the saved chart's print controls, show **Molad format** only while Molad is on.
+Keep the selected format when switching Molad off and on. Put explanatory copy,
+the format example and the shrink-to-fit notice inside the initially closed
+**Explain settings** disclosure. Show the example only with Molad on. Preserve the
+disclosure's open state, control focus and scroll position during settings redraws.
+Actual print-overflow errors stay visible outside the disclosure.
 Measure and shrink the full-size pages before applying Fit to screen. Measuring a
 phone's zoomed preview hid the overflow and put page 5's address on page 6. Browser
 coverage must start on a phone viewport and check footer placement in the actual PDF.
