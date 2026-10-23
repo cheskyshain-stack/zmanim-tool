@@ -846,6 +846,9 @@ Export/Import in Settings moves it between devices.
   and side-by-side Zmanim and Donate links. Keep the desktop next-minyan card compact
   and centered: 480px for one card, 560px when paired with candle lighting, with 6px
   vertical padding and tight gaps between text rows. Keep the current text sizes.
+  The combined desktop Zmanim/Donate row matches the next-minyan card's outer edges,
+  using 480px normally and 560px while the candle-lighting pair is present. Keep the
+  two links side by side, with room for their complete titles and descriptions.
   Show the small 54px by 35px header photo
   at the top left on desktop, and omit the large homepage picture. Keep the existing
   phone layout below 760px, including its small header photo, Hebrew name, minyan type
@@ -855,7 +858,8 @@ Export/Import in Settings moves it between devices.
   a fresh build. It uses the actual renderer and fitter with distinct name/room/clock
   combinations and candle-lighting pairings from the automatic seven-year schedule
   window, plus countdown wording and clock boundaries. It checks visible text bounds,
-  overlaps, retained text, paired row alignment and the divider at responsive widths.
+  overlaps, retained text, paired row alignment, navigation bounds and the divider
+  at responsive widths.
   Longer descriptions may wrap and increase card height; do not clip them to 88px.
 - Donation payment methods use one tabbed panel, with Card · ACH selected initially
   and all five funds visible. DAF shows five matching full-width provider rows in this
