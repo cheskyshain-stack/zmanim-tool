@@ -5862,8 +5862,9 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-next.is-paired .luach-next-time { font-size:34px; }
  .is-home .luach-next.is-paired .luach-next-what { font-size:22px; }
  .is-home .luach-next.is-paired .luach-next-when { font-size:13px; }
- .is-home .luach-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
- .is-home .luach-item { min-height:106px; padding:22px 25px; border-radius:15px; }
+ .is-home .luach-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; width:100%; max-width:480px; margin:0 auto; }
+ .is-home .luach-home:has(.luach-next.is-paired) .luach-menu { max-width:560px; }
+ .is-home .luach-item { min-height:106px; padding:16px 18px; gap:12px; border-radius:15px; }
  .is-home .luach-item-title { font-size:27px; }
  .is-home .luach-site-footer { max-width:640px; margin-top:46px; padding-top:25px; }
  body.is-luach main.is-give { padding-top:calc(112px + var(--luach-safe-top, 0px)); }

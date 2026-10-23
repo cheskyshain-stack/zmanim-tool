@@ -195,6 +195,22 @@ async function fixtures() {
                 if (alignment.every(item => item[key] !== null) && Math.abs(alignment[0][key] - alignment[1][key]) > 1) problems.push('paired ' + key + ' rows misaligned');
               }
             }
+            const navigation = document.querySelector('.luach-menu');
+            if (innerWidth >= 760 && card) {
+              const menu = box(navigation), above = box(card);
+              if (Math.abs(menu.left - above.left) > 1 || Math.abs(menu.right - above.right) > 1) problems.push('navigation edges do not match the card');
+            }
+            for (const link of navigation.querySelectorAll('a')) {
+              const bounds = box(link), icon = box(link.querySelector('.luach-item-icon')), arrow = box(link.querySelector('.luach-item-go'));
+              for (const text of link.querySelectorAll('.luach-item-title,.luach-item-description')) {
+                const range = document.createRange();
+                range.selectNodeContents(text);
+                for (const r of range.getClientRects()) {
+                  if (r.left < bounds.left - 1 || r.right > bounds.right + 1 || r.top < bounds.top - 1 || r.bottom > bounds.bottom + 1) problems.push('navigation text outside its button');
+                  if (overlaps(r, icon) || overlaps(r, arrow)) problems.push('navigation icon overlaps text');
+                }
+              }
+            }
             if (problems.length) failures.push({ id: fixture.id, kind: fixture.kind, items: fixture.items, problems: [...new Set(problems)] });
           }
           return { failures, tallest };
