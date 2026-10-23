@@ -891,7 +891,21 @@ th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: mid
 .page.is-full-season .parsha-cell { font-size: calc(var(--sheet-font-size) + 1pt); }
 .page.is-full-season th { font-size: calc(var(--sheet-font-size) + 1pt); line-height: 1.1; }
 .page.is-full-season .shacharis-through { padding: 0; }
-.page.is-full-season .shacharis-panel { left: 12%; right: 12%; padding: 0.1in 0.05in; }
+.page.is-full-season { --full-season-cell-padding: 0.05in; }
+.page.is-full-season.is-flexible-chart { --full-season-cell-padding: 0.025in; }
+.page.is-full-season th { white-space: pre; }
+.page.is-full-season .parsha-cell { min-width: 0; }
+.page.is-full-season .shacharis-panel {
+  left: calc(var(--full-season-column-space, 0px) / 2);
+  right: calc(var(--full-season-column-space, 0px) / 2);
+  padding: 0.1in var(--full-season-cell-padding);
+}
+/* Intrinsic column measurement happens at paper size on every font fitting pass. */
+.page.is-full-season table.is-measuring-columns { width: max-content !important; table-layout: auto !important; }
+.page.is-full-season .is-measuring-columns col { width: auto !important; }
+.page.is-full-season .is-measuring-columns .shacharis-panel {
+  position: static; width: max-content; height: auto !important;
+}
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.

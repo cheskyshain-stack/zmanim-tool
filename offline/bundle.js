@@ -9832,6 +9832,34 @@ function atPaperSize(pagesEl, measure) {
   }
 }
 
+function sizeFullSeasonColumns(page) {
+  if (!page.classList.contains('is-full-season')) return;
+  const pageStyle = getComputedStyle(page);
+  const available = page.getBoundingClientRect().width
+    - parseFloat(pageStyle.paddingLeft) - parseFloat(pageStyle.paddingRight)
+    - parseFloat(pageStyle.borderLeftWidth) - parseFloat(pageStyle.borderRightWidth);
+  page.querySelectorAll('table').forEach(table => {
+    // Measure the browser's intrinsic widths with no saved widths, percentage shares
+    // or spare table space. Explicit header lines and the morning panel count too.
+    table.classList.add('is-measuring-columns');
+    const columns = [...table.querySelectorAll('colgroup col')];
+    const minimums = [...table.tHead.rows[0].cells].map(cell => cell.getBoundingClientRect().width);
+    const border = table.getBoundingClientRect().width - minimums.reduce((sum, width) => sum + width, 0);
+    table.classList.remove('is-measuring-columns');
+    const widths = minimums.map((width, index) => Math.max(width, Number(columns[index].dataset.savedWidth) || 0));
+    const automatic = columns.filter(column => !column.dataset.savedWidth).length;
+    const required = widths.reduce((sum, width) => sum + width, 0) + border;
+    const extra = automatic ? Math.max(0, available - required) / automatic : 0;
+    table.style.setProperty('--full-season-column-space', extra + 'px');
+    table.style.tableLayout = 'fixed';
+    // Preserve real overflow so the paper fitter can reduce the font when necessary.
+    table.style.width = Math.max(available, required) + 'px';
+    columns.forEach((column, index) => {
+      column.style.width = (widths[index] + (column.dataset.savedWidth ? 0 : extra)) + 'px';
+    });
+  });
+}
+
 /** Reserve one chart area for the whole print job. Header/footer text and saved
  *  margins can differ between the two sheets, so use the space every page can hold.
  *  Rows share that height, with a taller header only where its content needs it. */
@@ -9856,6 +9884,7 @@ function syncHeaderRowHeight(pagesEl) {
         panel.style.top = '';
         panel.style.height = '';
       });
+      sizeFullSeasonColumns(page);
       const style = getComputedStyle(page);
       const paddingTop = header.getBoundingClientRect().top - page.getBoundingClientRect().top;
       const paddingBottom = parseFloat(style.paddingBottom) || 0;
@@ -10008,14 +10037,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const printColumns = splitSunset ? columns.flatMap(c => c.key === 'G' ? [sunsetColumn, c] : [c]) : columns;
   const orderedColumns = isEnglish ? printColumns : rtlOrdered(printColumns);
   const isWeekday = effectiveSeason === 'weekday';
-  const fridayMinchaKey = fullSeason ? columns.find(c => c.header === 'מנחה\nערב שבת')?.key : null;
-
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
   const colgroup = '<colgroup>' + colDefs.map((key) => {
-    // A minimal preferred width lets nowrap times set this column's natural minimum,
-    // instead of receiving a proportional share of the table's spare width.
-    const width = sheet.columnWidths[key] ? Number(sheet.columnWidths[key]) || 0 : key === fridayMinchaKey ? 1 : null;
-    return `<col data-colkey="${key}"${width !== null ? ` style="width:${width}px"` : ''}>`;
+    const width = Number(sheet.columnWidths[key]) || 0;
+    return `<col data-colkey="${key}"${width > 0 ? ` style="width:${width}px"${fullSeason ? ` data-saved-width="${width}"` : ''}` : ''}>`;
   }).join('') + '</colgroup>';
 
   const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerHtml(c))}</th>`).join('');

@@ -109,27 +109,60 @@ const server = http.createServer((req, res) => {
           return { height:box.height, font:parseFloat(style.getPropertyValue('--sheet-font-size')), clipping, panelsFit,
             footer:footer.bottom-box.top, fits:last.bottom <= footer.top + .5 && footer.bottom <= box.bottom - parseFloat(style.paddingBottom) + .5 };
         }));
-        const fridayColumns = await page.locator('#pages .page').first().locator('table').evaluateAll(tables => tables.map(table => {
+        const columnLayouts = await page.locator('#pages .page table').evaluateAll(tables => tables.map(table => {
           const keys = [...table.querySelectorAll('colgroup col')].map(col => col.dataset.colkey);
           const visualOrder = keys.map((key, index) => ({ key, left: table.tHead.rows[0].cells[index].getBoundingClientRect().left }))
             .sort((a, b) => b.left - a.left).map(column => column.key);
-          const position = keys.findIndex(key => key === 'L' || key === 'I' && !keys.includes('L'));
-          const cells = [...table.rows].map(row => row.cells[position]);
-          const ink = Math.max(...cells.map(cell => {
-            const range = document.createRange(); range.selectNodeContents(cell.querySelector('.cell') || cell);
-            return range.getBoundingClientRect().width;
-          }));
-          const style = getComputedStyle(cells[0]);
-          const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-          const column = table.querySelectorAll('colgroup col')[position];
-          return { visualOrder, width: cells[0].getBoundingClientRect().width, ink, padding, preferred: column.style.width };
+          // Read actual text fragments, excluding stretched block-element boxes.
+          const lineWidth = cell => {
+            const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT), lines = [], fragments = [];
+            while (walker.nextNode()) {
+              if (!walker.currentNode.textContent.trim()) continue;
+              const range = document.createRange(); range.selectNodeContents(walker.currentNode);
+              fragments.push(...range.getClientRects());
+            }
+            // Inline badges have their own padding in addition to their text.
+            cell.querySelectorAll('.new-minyan-tag,.chanukah-tag').forEach(badge => fragments.push(badge.getBoundingClientRect()));
+            for (const rect of fragments) {
+              if (rect.width < .1 || rect.height < .1) continue;
+              let line = lines.find(line => Math.abs(line.middle - (rect.top + rect.bottom) / 2) < Math.min(line.height, rect.height) / 2);
+              if (!line) lines.push(line = { middle: (rect.top + rect.bottom) / 2, height: rect.height, left: rect.left, right: rect.right });
+              line.left = Math.min(line.left, rect.left); line.right = Math.max(line.right, rect.right);
+            }
+            return Math.max(0, ...lines.map(line => line.right - line.left));
+          };
+          const columns = keys.map((key, index) => {
+            const cells = [...table.rows].map(row => row.cells[index]);
+            const column = table.querySelectorAll('colgroup col')[index];
+            const ink = Math.max(...cells.map(lineWidth));
+            const width = cells[0].getBoundingClientRect().width;
+            const panel = cells.map(cell => cell.querySelector('.shacharis-panel')).find(Boolean);
+            const panelStyle = panel && getComputedStyle(panel);
+            const panelMinimum = panel && panel.firstElementChild.getBoundingClientRect().width
+              + parseFloat(panelStyle.paddingLeft) + parseFloat(panelStyle.paddingRight)
+              + parseFloat(panelStyle.borderLeftWidth) + parseFloat(panelStyle.borderRightWidth) + 1;
+            return { key, width, ink, space: width - (panelMinimum || ink), saved: Number(column.dataset.savedWidth) || 0,
+              panelGap: panel ? width - panel.getBoundingClientRect().width : null };
+          });
+          return { weekday: table.classList.contains('weekday-table'), visualOrder, columns,
+            extra: parseFloat(table.style.getPropertyValue('--full-season-column-space')) };
         }));
-        for (const column of fridayColumns) {
-          const order = column.visualOrder;
-          assert.equal(order.indexOf('H-sunset'), order.indexOf('G') + 1, 'Sunset follows Friday Mincha/Maariv');
-          assert.equal(order.indexOf('F'), order.indexOf('H-sunset') + 1, 'Friday Maariv follows sunset');
-          if (fixture.savedWidth) assert.equal(column.preferred, fixture.savedWidth + 'px', 'Honor the explicitly saved Friday Mincha width');
-          else assert(column.width <= column.ink + column.padding + 2, 'Friday Mincha fits its longest line without spare table width: ' + JSON.stringify(column));
+        for (const table of columnLayouts) {
+          const order = table.visualOrder;
+          if (!table.weekday) {
+            assert.equal(order.indexOf('H-sunset'), order.indexOf('G') + 1, 'Sunset follows Friday Mincha/Maariv');
+            assert.equal(order.indexOf('F'), order.indexOf('H-sunset') + 1, 'Friday Maariv follows sunset');
+          }
+          // The panel includes its own border/padding; compare its outer gap separately.
+          const ordinary = table.columns.filter(column => !column.saved && !(table.weekday && column.key === 'E'));
+          const spaces = ordinary.map(column => column.space);
+          assert(Math.max(...spaces) - Math.min(...spaces) < 2,
+            'Every automatic column gets the same space beyond its longest content: ' + JSON.stringify(table));
+          if (table.weekday)
+            assert(Math.abs(table.columns.find(column => column.key === 'E').panelGap - table.extra) < 1.1,
+              'The morning panel receives the same extra outer space as the other columns');
+          if (fixture.savedWidth && !table.weekday)
+            assert(Math.abs(table.columns.find(column => column.key === 'L').width - fixture.savedWidth) < .1, 'Honor the explicitly saved Friday Mincha width within browser rounding');
         }
         assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelsFit && !p.clipping.length), JSON.stringify({ width, fixture, geometry }));
         if (fixture.year === 5787 && fixture.season === 'choref' && fixture.split)
@@ -149,7 +182,7 @@ const server = http.createServer((req, res) => {
         if (output) await page.locator('#pages').screenshot({ path:path.join(output,name+'.png') });
         await page.evaluate(() => fullSeasonFixture.redraw());
         assert.deepEqual(await page.locator('#pages .page').evaluateAll(pages=>pages.map(p=>parseFloat(getComputedStyle(p).getPropertyValue('--sheet-font-size')))),geometry.map(p=>p.font));
-        checks.push({ width, fixture, geometry, fridayColumns });
+        checks.push({ width, fixture, geometry, columnLayouts });
       }
       // Exercise the actual page-count control, storage and reopening from Saved.
       await page.goto(origin+'/admin/#generate');
