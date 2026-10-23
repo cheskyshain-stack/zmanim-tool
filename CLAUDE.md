@@ -686,9 +686,12 @@ Screen scaling alone can hide a footer that spills over the next printed header.
 desktop widths, retaining every time and exactly two physical sheets with aligned footers.
 Only charts whose entire season is assigned to one page use one-line time menus,
 tighter spacing and a separate Friday שקיעה column between מנחה מעריב and מעריב,
-following the Friday reading order in both languages and DST sections. Size the
-מנחה ערב שבת column to its longest line plus cell padding instead of giving it a
-proportional share of spare width; retain explicitly saved column widths. Keep their
+following the Friday reading order in both languages and DST sections. Measure every
+column's longest content at the current fitted font size, then divide spare width
+equally among automatic columns on both Shabbos and Weekday charts. Include explicit
+header lines, parsha notes and the morning panel in those intrinsic measurements;
+remove the ordinary parsha width floor and percentage-based morning panel inset only
+for these full-season pages. Retain explicitly saved column widths. Keep their
 saved styles and times intact, and fit both text width and paper height. Unrecognized
 candle-lighting edits retain their complete content in the original cell. Multi-page
 seasonal charts retain their existing layout. `tests/full-season-chart-print.cjs`
