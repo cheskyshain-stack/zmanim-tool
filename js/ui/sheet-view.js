@@ -458,11 +458,14 @@ export function chartPaperFitter(pagesEl, { height = 8.5, combined = false } = {
           && (ink.left < box.left - 0.5 || ink.right > box.right + 0.5));
       })) return true;
     }
-    if (!el.classList.contains('is-flexible-chart')) return false;
+    if (!el.classList.contains('is-flexible-chart') && !el.classList.contains('is-full-season')) return false;
     return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
       const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
-      return content.top < box.top - 0.5 || content.bottom > box.bottom + 0.5
-        || content.left < box.left - 0.5 || content.right > box.right + 0.5;
+      const style = getComputedStyle(panel);
+      const inset = side => el.classList.contains('is-full-season')
+        ? parseFloat(style['padding' + side]) + parseFloat(style['border' + side + 'Width']) : 0;
+      return content.top < box.top + inset('Top') - 0.5 || content.bottom > box.bottom - inset('Bottom') + 0.5
+        || content.left < box.left + inset('Left') - 0.5 || content.right > box.right - inset('Right') + 0.5;
     });
   });
   return () => {
