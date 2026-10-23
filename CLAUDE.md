@@ -692,8 +692,11 @@ equally among automatic columns on both Shabbos and Weekday charts. Include expl
 header lines, parsha notes and the morning panel in those intrinsic measurements;
 remove the ordinary parsha width floor and percentage-based morning panel inset only
 for these full-season pages. Retain explicitly saved column widths. Keep their
-saved styles and times intact, and fit both text width and paper height. Unrecognized
-candle-lighting edits retain their complete content in the original cell. Multi-page
+saved styles and times intact, and fit both text width and paper height. Full-season
+cell spacing must never consume its padding to fit: keep at least 0.04in
+at each side, 0.02in above/below body content and 0.03in above/below headers, including
+flexible fitting. Reserve the morning panel's actual inner padding when checking fit.
+Unrecognized candle-lighting edits retain their complete content in the original cell. Multi-page
 seasonal charts retain their existing layout. `tests/full-season-chart-print.cjs`
 checks both languages, Molad formats, DST sections, saved edits, real page-count controls,
 reopening, calculation/date controls, and native two-sheet Letter PDFs on phone/desktop.

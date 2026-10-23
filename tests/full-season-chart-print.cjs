@@ -38,6 +38,8 @@ const server = http.createServer((req, res) => {
         { year: 5787, season: 'kayitz', molad: 'off', language: 'en' },
         { year: 5787, season: 'choref', molad: 'compact', split: true, language: 'en' },
         { year: 5787, season: 'kayitz', molad: 'off', savedWidth: 320 },
+        { year: 5787, season: 'choref', molad: 'compact', split: true, fontSize: 9 },
+        { year: 5787, season: 'choref', molad: 'compact', split: true, fontSize: 14 },
       ]) {
         const baseline = await page.evaluate(async fixture => {
           const { loadTables } = await import('/js/data-loader.js');
@@ -50,6 +52,7 @@ const server = http.createServer((req, res) => {
           const companion = state.sheets.find(s => s.linkedSheetId === sheet.id);
           sheet.pageSizes = [sheet.weeks.length]; companion.pageSizes = [companion.weeks.length];
           sheet.style.splitSpringDst = Boolean(fixture.split);
+          if (fixture.fontSize) sheet.style.fontSizePt = companion.style.fontSizePt = fixture.fontSize;
           sheet.columnWidths = {}; companion.columnWidths = {};
           if (fixture.savedWidth) sheet.columnWidths.L = fixture.savedWidth;
           if (fixture.edits) {
@@ -104,9 +107,22 @@ const server = http.createServer((req, res) => {
           }).map(c => c.textContent);
           const panelsFit = [...p.querySelectorAll('.shacharis-panel')].every(panel => {
             const rect = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
-            return content.left >= rect.left - .5 && content.right <= rect.right + .5 && content.top >= rect.top - .5 && content.bottom <= rect.bottom + .5;
+            const style = getComputedStyle(panel);
+            const inset = side => parseFloat(style['padding' + side]) + parseFloat(style['border' + side + 'Width']);
+            return content.left >= rect.left + inset('Left') - .5 && content.right <= rect.right - inset('Right') + .5
+              && content.top >= rect.top + inset('Top') - .5 && content.bottom <= rect.bottom - inset('Bottom') + .5;
           });
-          return { height:box.height, font:parseFloat(style.getPropertyValue('--sheet-font-size')), clipping, panelsFit,
+          const padded = [...p.querySelectorAll('th,td:not(.shacharis-through)')].every(cell => {
+            const style = getComputedStyle(cell), vertical = cell.tagName === 'TH' ? 2.87 : 1.91;
+            if (parseFloat(style.paddingLeft) < 3.83 || parseFloat(style.paddingRight) < 3.83
+              || parseFloat(style.paddingTop) < vertical || parseFloat(style.paddingBottom) < vertical) return false;
+            const content = cell.querySelector('.cell');
+            if (!content) return true;
+            const box = cell.getBoundingClientRect(), ink = content.getBoundingClientRect();
+            return ink.left >= box.left + 3.33 && ink.right <= box.right - 3.33
+              && ink.top >= box.top + 1.41 && ink.bottom <= box.bottom - 1.41;
+          });
+          return { height:box.height, font:parseFloat(style.getPropertyValue('--sheet-font-size')), clipping, panelsFit, padded,
             footer:footer.bottom-box.top, fits:last.bottom <= footer.top + .5 && footer.bottom <= box.bottom - parseFloat(style.paddingBottom) + .5 };
         }));
         const columnLayouts = await page.locator('#pages .page table').evaluateAll(tables => tables.map(table => {
@@ -164,7 +180,7 @@ const server = http.createServer((req, res) => {
           if (fixture.savedWidth && !table.weekday)
             assert(Math.abs(table.columns.find(column => column.key === 'L').width - fixture.savedWidth) < .1, 'Honor the explicitly saved Friday Mincha width within browser rounding');
         }
-        assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelsFit && !p.clipping.length), JSON.stringify({ width, fixture, geometry }));
+        assert(geometry.every(p => p.height <= 816.004 && p.fits && p.panelsFit && p.padded && !p.clipping.length), JSON.stringify({ width, fixture, geometry }));
         if (fixture.year === 5787 && fixture.season === 'choref' && fixture.split)
           assert(geometry.every(p => p.font >= 6.5), 'The reviewed full-season layout retains substantially larger type');
         await paperZoom.evaluate(node => node.remove());
@@ -176,7 +192,7 @@ const server = http.createServer((req, res) => {
         assert.deepEqual(normalized.map(s => (s.match(/\d{1,2}:\d{2}/g)||[]).sort()), baseline.original.map(p => p.times), 'Every time is present on its own physical sheet');
         assert(texts.every(s=>s.includes('Bais Medrash')));
         assert.equal(await page.evaluate(() => JSON.stringify(fullSeasonFixture.state)), baseline.saved, 'Fitting does not change saved styles, rules, overrides or page sizes');
-        const name = `${width}-${fixture.season}-${fixture.year}-${fixture.molad}${fixture.split?'-split':''}${fixture.edits?'-edits':''}${fixture.language?'-en':''}${fixture.savedWidth?'-saved-width':''}`;
+        const name = `${width}-${fixture.season}-${fixture.year}-${fixture.molad}${fixture.split?'-split':''}${fixture.edits?'-edits':''}${fixture.language?'-en':''}${fixture.savedWidth?'-saved-width':''}${fixture.fontSize?'-font'+fixture.fontSize:''}`;
         if (output) fs.writeFileSync(path.join(output,name+'.pdf'),pdf);
         await page.emulateMedia({ media:'screen' });
         if (output) await page.locator('#pages').screenshot({ path:path.join(output,name+'.png') });
