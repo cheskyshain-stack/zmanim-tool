@@ -1025,13 +1025,21 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   const dir = isEnglish ? 'ltr' : 'rtl';
   const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
   const sunsetColumn = { key: 'H-sunset', header: 'שקיעה' };
-  const printColumns = fullSeason ? columns.flatMap(c => c.key === 'H'
-    ? isEnglish ? [c, sunsetColumn] : [sunsetColumn, c] : [c]) : columns;
+  // The canonical columns run opposite the Friday reading order. Inserting before G
+  // puts sunset after Mincha/Maariv and before Maariv in both table directions.
+  const splitSunset = fullSeason && columns.some(c => c.key === 'H');
+  const printColumns = splitSunset ? columns.flatMap(c => c.key === 'G' ? [sunsetColumn, c] : [c]) : columns;
   const orderedColumns = isEnglish ? printColumns : rtlOrdered(printColumns);
   const isWeekday = effectiveSeason === 'weekday';
+  const fridayMinchaKey = fullSeason ? columns.find(c => c.header === 'מנחה\nערב שבת')?.key : null;
 
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
-  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${Number(sheet.columnWidths[key]) || 0}px"` : ''}>`).join('') + '</colgroup>';
+  const colgroup = '<colgroup>' + colDefs.map((key) => {
+    // A minimal preferred width lets nowrap times set this column's natural minimum,
+    // instead of receiving a proportional share of the table's spare width.
+    const width = sheet.columnWidths[key] ? Number(sheet.columnWidths[key]) || 0 : key === fridayMinchaKey ? 1 : null;
+    return `<col data-colkey="${key}"${width !== null ? ` style="width:${width}px"` : ''}>`;
+  }).join('') + '</colgroup>';
 
   const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerHtml(c))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
