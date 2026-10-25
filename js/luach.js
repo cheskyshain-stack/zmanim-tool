@@ -23,6 +23,10 @@ import { shulNow, dateFromSerial } from './zmanim/solar.js';
 import { loadTables } from './data-loader.js';
 import { hasParsha } from './hebrew-calendar.js';
 import { wireInstalledSystemBars } from './ui/system-bars.js';
+import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
+import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
+
+enableWebsitePreview(location.search);
 
 const main = document.getElementById('main');
 /** Which week /week/ is currently showing, moved by Previous/This week/Next - see
@@ -455,7 +459,7 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
 const SHOW_NEXT_MINYAN = true;
 function nextUpState(published, settings) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  const now = new Date();
+  const now = websiteNow();
   // A chart that cannot be read must not take the page down with it: the menu below is
   // the point of this screen and it works whether or not this card has anything to say.
   const safely = (fn) => { try { return fn(); } catch { return null; } };
@@ -550,7 +554,7 @@ function homeHtml(published) {
 async function refreshHomeDate(settings) {
   const label = main.querySelector('.luach-home-date');
   if (!label) return;
-  const { serial } = shulNow(new Date(), settings);
+  const { serial } = shulNow(websiteNow(), settings);
   const date = dateFromSerial(serial);
   const text = new Intl.DateTimeFormat('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
@@ -710,6 +714,7 @@ function announcedChartId() {
   try { return localStorage.getItem(CHART_ANNOUNCE_KEY); } catch { return null; }
 }
 function markChartAnnounced(id) {
+  if (isWebsitePreview()) return;
   try { localStorage.setItem(CHART_ANNOUNCE_KEY, id); } catch { /* no localStorage, no pop-up either */ }
 }
 
@@ -741,7 +746,7 @@ function chartAnnouncement(published) {
     const at = spreadIndexForNow(spreads, state, settings);
     const spread = spreads[at];
     const start = Math.min(...spread.serials);
-    const today = shulNow(new Date(), settings).serial;
+    const today = shulNow(websiteNow(), settings).serial;
     if (today > start + CHART_EARLY_DAYS) return null;
     return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}` };
   } catch {
@@ -1218,7 +1223,8 @@ function route(published, { preserveWeekShowing = false } = {}) {
   // than pushState, so the back button still goes back where it came from rather than
   // to the same page written the other way.
   if (location.protocol.startsWith('http') && location.hash) {
-    history.replaceState(null, '', where ? `/${where}/` : '/');
+    const path = where ? `/${where}/` : '/';
+    history.replaceState(null, '', isWebsitePreview() ? websitePreviewURL(new URL(path, location.href)).href : path);
   }
   stampPage(where);
   // Every ordinary way of arriving here - a menu tap, back, forward, a #week link from
@@ -1245,6 +1251,7 @@ function wireNav(published) {
     if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
     const a = ev.target.closest && ev.target.closest('a[href]');
     if (!a || a.target || a.hasAttribute('download')) return;
+    if (a.dataset.websiteLive) return;
     let url;
     try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
     if (url.origin !== location.origin) return;
@@ -1254,7 +1261,8 @@ function wireNav(published) {
     if (first !== '' && !ROUTES.includes(first)) return;
     ev.preventDefault();
     if (url.pathname === location.pathname) return;
-    history.pushState(null, '', url.pathname);
+    const destination = isWebsitePreview() ? websitePreviewURL(url) : url;
+    history.pushState(null, '', url.pathname + (isWebsitePreview() ? destination.search : ''));
     // The reader has already left for a new page - the address now says so - so a stale
     // tab reloads right here rather than rendering the old script's idea of that page.
     // See watchForStaleTab: this is one of the moments nothing is ever interrupted.
@@ -1308,6 +1316,7 @@ function wireNav(published) {
     home.append(retry);
     return;
   }
+  installWebsitePreviewBanner(resolveSettings(published.settings).timezone.id, ROUTES);
   wireNav(published);
   // Consumed once, before the first render: the other end of a stale-tab reload (see
   // watchForStaleTab) names the week /week/ had open and the scroll position to put back,

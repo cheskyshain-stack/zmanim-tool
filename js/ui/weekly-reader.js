@@ -1,3 +1,4 @@
+import { websiteNow } from '../website-clock.js';
 import { currentOnePageSheets } from './posters-view.js';
 import { weeklyAgenda, agendaDayKind } from './weekly-agenda.js';
 import { minyanimForDay, clock, candleLightingForDay } from '../upcoming.js';
@@ -266,7 +267,7 @@ function readerCellHtml(row) {
     .replace(/((?:\s|&nbsp;)*)<\/u>/g, '</u>$1');
 }
 
-export function remainingReaderDays(data, showing, settings, now = new Date()) {
+export function remainingReaderDays(data, showing, settings, now = websiteNow()) {
   const today = shulNow(now, settings).serial;
   return {
     regular: data.regular.filter(d => d.serial >= today),
@@ -317,12 +318,12 @@ export function weeklyAgendaData(showing,index,state,settings) {
  *  a week that has something on it rather than draw an empty one and tell the reader to press
  *  Next. Built the same way and out of the same call, so the two cannot come to different
  *  answers about the same week. */
-export function readerWeekHasTimes(showing, index, state, settings, now = new Date()) {
+export function readerWeekHasTimes(showing, index, state, settings, now = websiteNow()) {
   const agenda = weeklyAgenda(weeklyAgendaData(showing, index, state, settings), showing, state, settings, now);
   return agenda.sections.length > 0 || agenda.notices.length > 0;
 }
 
-export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
+export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = websiteNow() }) {
   const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);

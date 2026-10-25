@@ -12,6 +12,7 @@ import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { renderTraffic } from './ui/traffic-view.js';
 import { renderStatus } from './ui/status-view.js';
+import { renderWebsitePreview } from './ui/website-preview-view.js';
 import { renderAdminHome, ADMIN_NAV_SECTIONS, ADMIN_TAB_LABELS } from './ui/admin-home.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
@@ -25,6 +26,7 @@ let tables = null;
 let currentTab = 'home';
 let adminStarted = false;
 let currentSheetId = null;
+let disposeWebsitePreview = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
@@ -59,7 +61,7 @@ const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 installZmanimReferences(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
-const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'program', 'guide'];
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'preview', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
@@ -245,6 +247,8 @@ function render() {
 }
 
 function paint() {
+  disposeWebsitePreview?.();
+  disposeWebsitePreview = null;
   setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
@@ -275,6 +279,8 @@ function paint() {
   }
   if (currentTab === 'home') {
     renderAdminHome(main, openTab);
+  } else if (currentTab === 'preview') {
+    disposeWebsitePreview = renderWebsitePreview(main);
   } else if (currentTab === 'settings') {
     renderSettings(
       main,

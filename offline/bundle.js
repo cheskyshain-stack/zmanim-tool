@@ -3087,6 +3087,62 @@ function defaultSeasonAndYear(settings) {
   return currentSeason === 'choref' ? { season: 'kayitz', hebrewYear: currentYear } : { season: 'choref', hebrewYear: currentYear + 1 };
 }
 
+// ==== website-clock.js ====
+// Only the public entry enables this clock, in its own document. Admin and ordinary
+// visitors keep real time; choosing a preview never changes shared settings or Date.
+const WEBSITE_PREVIEW_PARAM = 'website-preview';
+let websitePreviewMillis = null;
+
+function enableWebsitePreview(search) {
+  const value = new URLSearchParams(search).get(WEBSITE_PREVIEW_PARAM);
+  websitePreviewMillis = null;
+  if (!value || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value)) return false;
+  const instant = new Date(value);
+  const canonical = value.includes('.') ? value : value.replace('Z', '.000Z');
+  if (!Number.isFinite(instant.getTime()) || instant.toISOString() !== canonical
+    || instant.getUTCFullYear() < 1900 || instant.getUTCFullYear() > 2199) return false;
+  websitePreviewMillis = instant.getTime();
+  return true;
+}
+
+const isWebsitePreview = () => websitePreviewMillis !== null;
+const websiteNow = () => websitePreviewMillis === null ? new Date() : new Date(websitePreviewMillis);
+
+function websiteLocalFields(instant, zone) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(instant);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return { date: `${values.year}-${values.month}-${values.day}`,
+    time: `${String(Number(values.hour) % 24).padStart(2, '0')}:${values.minute}`, second: values.second };
+}
+
+/** Convert the shul's wall clock using IANA offsets on both sides of a transition.
+ * Reject nonexistent spring times; use the first occurrence of a repeated fall time. */
+function websitePreviewInstant(date, time, zone) {
+  if (!/^\d{4}-\d\d-\d\d$/.test(date) || !/^\d\d:\d\d$/.test(time)) throw new Error('Choose a valid date and time.');
+  const [year, month, day] = date.split('-').map(Number), [hour, minute] = time.split(':').map(Number);
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  if (year < 1900 || year > 2199 || hour > 23 || minute > 59
+    || new Date(wall).toISOString().slice(0, 16) !== `${date}T${time}`) throw new Error('Choose a valid date between 1900 and 2199.');
+  const candidates = new Set();
+  for (const delta of [-36, 0, 36]) {
+    const sample = wall + delta * 3600000;
+    const at = websiteLocalFields(new Date(sample), zone);
+    const offset = Date.parse(`${at.date}T${at.time}:${at.second}Z`) - sample;
+    const candidate = wall - offset;
+    const local = websiteLocalFields(new Date(candidate), zone);
+    if (local.date === date && local.time === time) candidates.add(candidate);
+  }
+  if (!candidates.size) throw new Error('That time does not occur when the clocks move forward. Choose another time.');
+  return { instant: new Date(Math.min(...candidates)), repeated: candidates.size > 1 };
+}
+
+function websitePreviewURL(url, instant = websiteNow()) {
+  const result = new URL(url);
+  result.searchParams.set(WEBSITE_PREVIEW_PARAM, instant.toISOString());
+  return result;
+}
+
 // ==== publish.js ====
 // Publishing a season for the congregation.
 //
@@ -3181,7 +3237,7 @@ function withoutRetiredDrasha(data) {
 
 /** Reads what is currently published, or null when nothing is. A 404 is the normal state
  *  before the first publish, not an error worth shouting about. */
-async function loadPublished({ automatic = false } = {}) {
+async function loadPublished({ automatic = false, now = websiteNow() } = {}) {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) throw new Error('Schedule download failed: ' + res.status);
@@ -3204,7 +3260,7 @@ async function loadPublished({ automatic = false } = {}) {
     }
     if (!data || !Array.isArray(data.sheets)) throw new Error('Invalid schedule data');
     const clean = withoutRetiredDrasha(data);
-    return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
+    return automatic ? buildAutomaticCharts(clean, await loadTables(), now) : clean;
   } catch (err) {
     if (err?.message === 'blocked') throw err;
     throw err;
@@ -3512,6 +3568,7 @@ const ADMIN_TAB_LABELS = {
   home: 'Admin home', week: 'Weekly schedules', charts: 'Seasonal charts',
   generate: 'Print layouts', saved: 'Saved copies', posters: 'Special schedules',
   status: 'Website schedule status', traffic: 'Site statistics',
+  preview: 'Website preview',
   settings: 'Schedule settings',
   guide: 'Help & instructions', program: 'Offline program',
 };
@@ -3523,6 +3580,7 @@ const ADMIN_NAV_SECTIONS = [
     { tab: 'posters', icon: 'posters', description: 'View and print Yom Tov, fast day, and other special schedules.' },
   ] },
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
+    { tab: 'preview', icon: 'site', description: 'Choose a date and time to see how the congregation website will look.' },
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
     { href: '/seats/', label: 'Seats', icon: 'generate', description: 'Arrange tables, assign names, and print the shul seating plan.' },
@@ -3678,7 +3736,7 @@ function wireCombinedChartPrint() {
  *  than Lakewood does. Nothing has called it without both since the fallback was written,
  *  so there was nothing left for it to protect. */
 function currentSerial(serials, settings, endsAt) {
-  const { serial: today, mins } = shulNow(new Date(), settings);
+  const { serial: today, mins } = shulNow(websiteNow(), settings);
   const over = (s) => s < today || (s === today && mins >= endsAt(s));
   const ahead = serials.filter((s) => !over(s));
   return ahead.length ? Math.min(...ahead) : Math.max(...serials);
@@ -15566,7 +15624,7 @@ const POSTER_FONT = 'Times New Roman';
  *  `now` reads through shulNow rather than excelSerial's own UTC day, so a visitor (or this
  *  admin's own browser) checking between roughly 7pm and midnight Eastern still gets the
  *  shul's own today, not tomorrow's UTC date. */
-function nextYomimNoraim(settings, now = new Date()) {
+function nextYomimNoraim(settings, now = websiteNow()) {
   const serial = shulNow(now, settings).serial;
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
@@ -15590,7 +15648,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = hebrewDateExtended(shulNow(new Date(), resolveSettings(state.settings)).serial).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), resolveSettings(state.settings)).serial).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -16366,7 +16424,7 @@ const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 function onePageOccasionSpans(state, settings) {
-  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -16400,8 +16458,8 @@ function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-function currentOnePageSheets(state, settings, { on = shulNow(new Date(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
+function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
@@ -18642,7 +18700,7 @@ function renderPosters(container, state, routeChanged, tables) {
     .sort((a, b) => (a.firstStart ?? Infinity) - (b.firstStart ?? Infinity));
   const catalog = specialPageCatalog(groups, state, settings, year), byKey = new Map(catalog.map(entry => [entry.key, entry]));
   const resolve = key => resolveSpecialPage(byKey.get(key), settings, year);
-  const current = currentSchedule(groups, state, settings, year, shulNow(new Date(), settings).serial);
+  const current = currentSchedule(groups, state, settings, year, shulNow(websiteNow(), settings).serial);
   chosenPrintPages = normalizePrintPages(chosenPrintPages, catalog.map(entry => entry.key));
   const collectionEntries = chosenCollection ? specialCollectionEntries(catalog, chosenCollection) : [];
   if (chosenCollection) {
@@ -18679,7 +18737,7 @@ function renderPosters(container, state, routeChanged, tables) {
   const choices = catalog.filter(entry => entry.group === group?.name && !entry.locations && (!entry.poster?.dated || entry.value || entry.key === selectedKey));
   const primary = selectedEntry || choices.find(entry => entry.value) || choices[0];
   const pageChoices = choices.filter(entry => entry.value), pAt = pageChoices.findIndex(entry => entry.key === primary?.key);
-  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(new Date(), settings).serial, { includeExtra: true })?.key
+  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(websiteNow(), settings).serial, { includeExtra: true })?.key
     || pageChoices[0]?.key;
   const occasions = specialOccasionChoices(groups, catalog, { selectedKey: primary?.key });
   const occasion = (primary?.key && occasions.find(choice => choice.key === primary.key))
@@ -20712,7 +20770,7 @@ function readerCellHtml(row) {
     .replace(/((?:\s|&nbsp;)*)<\/u>/g, '</u>$1');
 }
 
-function remainingReaderDays(data, showing, settings, now = new Date()) {
+function remainingReaderDays(data, showing, settings, now = websiteNow()) {
   const today = shulNow(now, settings).serial;
   return {
     regular: data.regular.filter(d => d.serial >= today),
@@ -20763,12 +20821,12 @@ function weeklyAgendaData(showing,index,state,settings) {
  *  a week that has something on it rather than draw an empty one and tell the reader to press
  *  Next. Built the same way and out of the same call, so the two cannot come to different
  *  answers about the same week. */
-function readerWeekHasTimes(showing, index, state, settings, now = new Date()) {
+function readerWeekHasTimes(showing, index, state, settings, now = websiteNow()) {
   const agenda = weeklyAgenda(weeklyAgendaData(showing, index, state, settings), showing, state, settings, now);
   return agenda.sections.length > 0 || agenda.notices.length > 0;
 }
 
-function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
+function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = websiteNow() }) {
   const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);
@@ -20991,7 +21049,7 @@ const CARD_ORDER_KEY = 'zmanim-week-card-order';
  *  asks what time it is here. */
 function autoCardOrder(state, settings) {
   try {
-    const { serial, mins } = shulNow(new Date(), settings);
+    const { serial, mins } = shulNow(websiteNow(), settings);
     const day = dateFromSerial(serial).getUTCDay();
     if (day === 5) return 'shabbos';
     // On Shabbos itself it stays the שבת card until the card is spent, the same moment the
@@ -21114,7 +21172,7 @@ const LUACH_SKIP_MAX = 3;
  *  default is the first week with something left on it rather than simply the first that is
  *  not in the past), pulled out so the admin's status panel can ask it directly. A second
  *  reader of the one answer, not a second way of working it out. */
-function currentReaderWeek(state, settings, now = new Date()) {
+function currentReaderWeek(state, settings, now = websiteNow()) {
   const index = readerWeekIndex(state);
   const today = shulNow(now, settings).serial;
   const serials = [...index.keys()].filter((s) => s >= today).sort((a, b) => a - b);
@@ -22404,7 +22462,7 @@ function renderWeek(container, state, onSerialChange, serial = null, opts = {}) 
   const settings = resolveSettings(state.settings);
   const index = luach ? readerWeekIndex(state) : weekIndex(state);
   const allSerials = [...index.keys()].sort((a, b) => a - b);
-  const today = luach ? shulNow(new Date(), settings).serial : null;
+  const today = luach ? shulNow(websiteNow(), settings).serial : null;
   const availableSerials = luach ? allSerials.filter(s => s >= today) : allSerials;
   let serials = availableSerials;
 
@@ -23513,6 +23571,100 @@ function drawTraffic(container, options) {
     });
 }
 
+// ==== ui/website-preview-view.js ====
+const WEBSITE_PREVIEW_SELECTION = 'zmanim-website-preview-selection';
+const WEBSITE_PREVIEW_PAGES = [['/', 'Home'], ['/week/', 'Zmanim'], ['/chart/', 'Charts'], ['/schedules/', 'Special schedules'], ['/donate/', 'Donate']];
+
+function renderWebsitePreview(container) {
+  let disposed = false, observer = null, previewMessageListener = null, expectedInstant = '';
+  const draw = async () => {
+    container.innerHTML = '<h2>Website preview</h2><p class="hint" role="status">Loading the published website settings...</p>';
+    try {
+      const published = await loadPublished();
+      if (disposed || !container.isConnected) return;
+      const zone = resolveSettings(published.settings).timezone.id;
+      const zoneLabel = zone === 'America/New_York' ? 'New York' : zone.replaceAll('_', ' ');
+      let selected = { ...websiteLocalFields(new Date(), zone), page: '/', screen: 'auto' };
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(WEBSITE_PREVIEW_SELECTION));
+        if (saved && WEBSITE_PREVIEW_PAGES.some(([path]) => path === saved.page) && ['auto', 'phone', 'desktop'].includes(saved.screen)) {
+          websitePreviewInstant(saved.date, saved.time, zone); selected = saved;
+        }
+      } catch { /* A missing or invalid previous selection starts at the real current time. */ }
+      container.innerHTML = `<div class="website-preview-view">
+        <h2>Website preview</h2>
+        <p class="hint">See the published congregation website at a chosen date and time. This does not change the live site.</p>
+        <form id="website-preview-form" class="website-preview-controls">
+          <label>Date<input id="website-preview-date" type="date" min="1900-01-01" max="2199-12-31" required></label>
+          <label>Time (${escAttr(zoneLabel)})<input id="website-preview-time" type="time" required></label>
+          <label>Page<select id="website-preview-page">${WEBSITE_PREVIEW_PAGES.map(([path, name]) => `<option value="${path}">${name}</option>`).join('')}</select></label>
+          <label>Screen<select id="website-preview-screen"><option value="auto">Fit available width</option><option value="phone">Phone</option><option value="desktop">Desktop</option></select></label>
+          <div class="website-preview-actions"><button type="submit" class="btn-primary">Show preview</button><button type="button" id="website-preview-today">Today</button><a id="website-preview-open" target="_blank" rel="noopener">Open in new tab</a></div>
+          <p class="hint" id="website-preview-note" role="status" hidden></p>
+        </form>
+        <div class="website-preview-canvas"><div class="website-preview-device"><iframe id="website-preview-frame" title="Congregation website preview"></iframe></div></div>
+      </div>`;
+      const form = container.querySelector('form'), date = form.querySelector('#website-preview-date'), time = form.querySelector('#website-preview-time');
+      const page = form.querySelector('#website-preview-page'), screen = form.querySelector('#website-preview-screen');
+      const note = form.querySelector('#website-preview-note'), open = form.querySelector('#website-preview-open');
+      const canvas = container.querySelector('.website-preview-canvas'), device = container.querySelector('.website-preview-device'), frame = container.querySelector('iframe');
+      date.value = selected.date; time.value = selected.time; page.value = selected.page; screen.value = selected.screen;
+      const size = () => {
+        const available = canvas.clientWidth;
+        const width = screen.value === 'phone' ? 390 : screen.value === 'desktop' ? 1200 : available;
+        const height = screen.value === 'phone' ? 780 : 800;
+        const scale = Math.min(1, available / width);
+        frame.style.width = width + 'px'; frame.style.height = height + 'px'; frame.style.transform = `scale(${scale})`;
+        device.style.width = width * scale + 'px'; device.style.height = height * scale + 'px';
+      };
+      const show = () => {
+        if (!form.reportValidity()) return;
+        try {
+          const at = websitePreviewInstant(date.value, time.value, zone);
+          const url = websitePreviewURL(new URL(page.value, location.origin), at.instant).href;
+          open.href = url;
+          expectedInstant = at.instant.toISOString();
+          let currentURL = frame.getAttribute('src');
+          try { currentURL = frame.contentWindow.location.href; } catch { /* A failed frame can be opened again. */ }
+          if (currentURL !== url) frame.src = url;
+          selected = { date: date.value, time: time.value, page: page.value, screen: screen.value };
+          try { sessionStorage.setItem(WEBSITE_PREVIEW_SELECTION, JSON.stringify(selected)); } catch { /* Preview still works without storage. */ }
+          note.textContent = at.repeated ? 'This time occurs twice when the clocks change. The preview uses its first occurrence.' : '';
+          note.hidden = !at.repeated; note.classList.remove('error'); size();
+        } catch (error) {
+          note.textContent = error.message; note.hidden = false; note.classList.add('error');
+        }
+      };
+      form.addEventListener('submit', event => { event.preventDefault(); show(); });
+      [date, time, page, screen].forEach(field => field.addEventListener('change', show));
+      form.querySelector('#website-preview-today').addEventListener('click', () => {
+        const now = websiteLocalFields(new Date(), zone); date.value = now.date; time.value = now.time; show();
+      });
+      previewMessageListener = event => {
+        if (disposed || event.origin !== location.origin || event.source !== frame.contentWindow
+          || event.data?.type !== 'zmanim-website-preview-location' || typeof event.data.url !== 'string') return;
+        try {
+          const url = new URL(event.data.url);
+          if (url.origin !== location.origin || url.searchParams.get(WEBSITE_PREVIEW_PARAM) !== expectedInstant
+            || !WEBSITE_PREVIEW_PAGES.some(([path]) => path === url.pathname)) return;
+          page.value = url.pathname; open.href = url.href;
+          selected.page = url.pathname;
+          try { sessionStorage.setItem(WEBSITE_PREVIEW_SELECTION, JSON.stringify(selected)); } catch { /* No remembered selection. */ }
+        } catch { /* Ignore unrelated or malformed frame messages. */ }
+      };
+      window.addEventListener('message', previewMessageListener);
+      observer = new ResizeObserver(size); observer.observe(canvas); show();
+    } catch {
+      if (disposed) return;
+      container.innerHTML = '<h2>Website preview</h2><p class="error">The published website settings could not be loaded.</p><button type="button" id="website-preview-retry">Try again</button>';
+      container.querySelector('button').addEventListener('click', draw);
+    }
+  };
+  if (!/^https?:$/.test(location.protocol)) container.innerHTML = '<h2>Website preview</h2><p>Website previews are available in the online admin.</p>';
+  else draw();
+  return () => { disposed = true; observer?.disconnect(); if (previewMessageListener) window.removeEventListener('message', previewMessageListener); };
+}
+
 // ==== namespace shims for `import * as X` ====
 const Z = { sunrise, sunset, sunriseElev, sunsetElev, solarNoon, dstLocal, minchaGedola, minchaGedola30MinAfterChatzos, minchaGedolaLechumra, minchaGedolaMGA16_1, minchaKetana, samuchLeminchaKetana, plagHamincha, plagHaminchaCustom, sofZmanShmaGRA, sofZmanShmaMGA72, sofZmanTfilaGRA, alos16_1, misheyakir10_2, tzais50, tzais60, tzais72, tzaisGeonim8_5, tzais16_1, alos72 };
 
@@ -23522,6 +23674,7 @@ let tables = null;
 let currentTab = 'home';
 let adminStarted = false;
 let currentSheetId = null;
+let disposeWebsitePreview = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
@@ -23556,7 +23709,7 @@ const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 installZmanimReferences(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
-const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'program', 'guide'];
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'preview', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
@@ -23742,6 +23895,8 @@ function render() {
 }
 
 function paint() {
+  disposeWebsitePreview?.();
+  disposeWebsitePreview = null;
   setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
@@ -23772,6 +23927,8 @@ function paint() {
   }
   if (currentTab === 'home') {
     renderAdminHome(main, openTab);
+  } else if (currentTab === 'preview') {
+    disposeWebsitePreview = renderWebsitePreview(main);
   } else if (currentTab === 'settings') {
     renderSettings(
       main,

@@ -23,13 +23,15 @@ function adminShellFixture({ open = true, hash = '' } = {}) {
     document: { addEventListener() {}, getElementById(id) { return id === 'main' ? main : nav; }, querySelector() { return element(); }, createElement: element },
     window: { scrollY: 0, scrollTo() {}, addEventListener(name, fn) { listeners.set(name, fn); }, dispatchEvent(event) { calls.push(event.type); } },
     loadState: () => ({ sheets: [], settings: {} }), saveState() {}, wireSecretDoor() {},
+    installTimeExplanations() {}, installZmanimReferences() {}, setPrintPage() {}, keepPosition: (_, draw) => draw(),
     loadTables: async () => { calls.push('loadTables'); return {}; }, showDataError() {},
     isOpen: () => open, renderLock: (_, callback) => { unlock = callback; calls.push('lock'); },
     buildAutomaticCharts: () => ({}), posterRoute: () => posterParts, setPosterRoute: parts => { posterParts = parts; },
   };
-  for (const name of ['AdminHome', 'Settings', 'Generate', 'SavedSheets', 'Sheet', 'Guide', 'Program', 'Posters', 'Calculations', 'Week', 'ChartBrowser', 'Traffic', 'Status']) {
+  for (const name of ['AdminHome', 'WebsitePreview', 'Settings', 'Generate', 'SavedSheets', 'Sheet', 'Guide', 'Program', 'Posters', 'Calculations', 'Week', 'ChartBrowser', 'Traffic', 'Status']) {
     scope[`render${name}`] = () => calls.push(`render${name}`);
   }
+  scope.renderWebsitePreview = () => { calls.push('renderWebsitePreview'); return () => calls.push('disposeWebsitePreview'); };
   const context = vm.createContext(scope);
   vm.runInContext(adminShellSource.replace(/^import .*;\r?\n/gm, '')
     + '\nglobalThis.adminShell = { openTab, readRoute, current: () => currentTab };', context);
@@ -85,4 +87,14 @@ test('special-schedule deep links preserve their selected schedule and page', as
   assert.equal(f.scope.current(), 'posters');
   assert.equal(Array.from(f.posterParts()).join('/'), 'sukkos/2');
   assert(f.calls.includes('renderPosters'));
+});
+
+test('website preview has its own admin route and is disposed when leaving', async () => {
+  const f = adminShellFixture({ hash: '#preview' });
+  await f.ready();
+  assert(f.calls.includes('renderWebsitePreview'));
+  assert.match(f.nav.innerHTML, /href="#preview"/);
+  f.scope.openTab('home');
+  assert(f.calls.includes('disposeWebsitePreview'));
+  assert.equal(f.scope.current(), 'home');
 });

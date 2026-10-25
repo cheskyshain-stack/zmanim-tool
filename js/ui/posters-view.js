@@ -1,3 +1,4 @@
+import { websiteNow } from '../website-clock.js';
 import { safeHeaderImage } from '../security.js';
 import { keepPosition } from './keep-position.js';
 // Posters: the sheets the shul hangs that are not the zmanim board.
@@ -68,7 +69,7 @@ const POSTER_FONT = 'Times New Roman';
  *  `now` reads through shulNow rather than excelSerial's own UTC day, so a visitor (or this
  *  admin's own browser) checking between roughly 7pm and midnight Eastern still gets the
  *  shul's own today, not tomorrow's UTC date. */
-export function nextYomimNoraim(settings, now = new Date()) {
+export function nextYomimNoraim(settings, now = websiteNow()) {
   const serial = shulNow(now, settings).serial;
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
@@ -92,7 +93,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = hebrewDateExtended(shulNow(new Date(), resolveSettings(state.settings)).serial).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), resolveSettings(state.settings)).serial).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -868,7 +869,7 @@ export const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 export function onePageOccasionSpans(state, settings) {
-  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -902,8 +903,8 @@ export function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-export function currentOnePageSheets(state, settings, { on = shulNow(new Date(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = hebrewDateExtended(shulNow(new Date(), settings).serial).year;
+export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
@@ -3144,7 +3145,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     .sort((a, b) => (a.firstStart ?? Infinity) - (b.firstStart ?? Infinity));
   const catalog = specialPageCatalog(groups, state, settings, year), byKey = new Map(catalog.map(entry => [entry.key, entry]));
   const resolve = key => resolveSpecialPage(byKey.get(key), settings, year);
-  const current = currentSchedule(groups, state, settings, year, shulNow(new Date(), settings).serial);
+  const current = currentSchedule(groups, state, settings, year, shulNow(websiteNow(), settings).serial);
   chosenPrintPages = normalizePrintPages(chosenPrintPages, catalog.map(entry => entry.key));
   const collectionEntries = chosenCollection ? specialCollectionEntries(catalog, chosenCollection) : [];
   if (chosenCollection) {
@@ -3181,7 +3182,7 @@ export function renderPosters(container, state, routeChanged, tables) {
   const choices = catalog.filter(entry => entry.group === group?.name && !entry.locations && (!entry.poster?.dated || entry.value || entry.key === selectedKey));
   const primary = selectedEntry || choices.find(entry => entry.value) || choices[0];
   const pageChoices = choices.filter(entry => entry.value), pAt = pageChoices.findIndex(entry => entry.key === primary?.key);
-  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(new Date(), settings).serial, { includeExtra: true })?.key
+  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(websiteNow(), settings).serial, { includeExtra: true })?.key
     || pageChoices[0]?.key;
   const occasions = specialOccasionChoices(groups, catalog, { selectedKey: primary?.key });
   const occasion = (primary?.key && occasions.find(choice => choice.key === primary.key))
