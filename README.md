@@ -8,12 +8,24 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
 Its PIN is separate from the existing admin PIN. It starts with columns of 8, 9,
-9, and 8 tables, with the extra middle tables at the back. Seat counts start unset.
+9, and 8 tables, with the extra middle tables at the back. Tables start with five
+seats, except A7, A8, D7, and D8, which have three. Width follows seat count, using
+five seats as the standard size. Table labels appear above the table surfaces.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
+Click a seat and type a name, choose a suggested existing person, or copy and paste
+a name into a separate seat for a child. Copying creates a separate person record
+and keeps the original assignment. Choosing an already seated suggestion moves
+that person. Enter saves; Tab saves and advances. Undo and Redo also support
+Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
+The first row touches the front wall, A1 through A6 touch the left wall, and a
+central bimah is included. A walkway separates rows 6 and 7, with an entrance in
+each side wall. Two doors at the back, between A/B and C/D, are marked usually closed.
 Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
-dragging or keyboard arrows. Width, depth, and position can also be entered.
+dragging a table label or room object, or using keyboard arrows. Width, depth,
+and position can also be entered. The page scrolls normally over the sidebar
+and tables; touch dragging is limited to labels and room objects.
 
 Seats saves its own versioned plans in `lakewood-commons-seats-v1`, separately from
 schedule settings. Nothing uploads to a server. Download a backup to move plans
@@ -22,6 +34,10 @@ can reverse edits and imports. Letter landscape and 17 x 11 inch printing suppor
 black-and-white or color; match the selected paper size in the browser print dialog.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
+Older plans migrate to the revised room layout while retaining names and existing
+seat counts, except the four explicitly three-seat rear tables. Any excess names
+return to the waiting list. The browser keeps the original pre-update JSON in
+`lakewood-commons-seats-v1-before-room-v2` before changes are saved.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates

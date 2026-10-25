@@ -36,7 +36,9 @@ const server = http.createServer((req,res) => {
     assert.equal(starting.plans[0].tables.length, 34);
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
     assert.equal(await page.locator('.room-stage .table-item').count(), 34);
-    assert.equal(await page.locator('#seat-count').inputValue(), '');
+    assert.equal(await page.locator('#seat-count').inputValue(), '5');
+    assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
+    assert.equal(await page.locator('.room-stage [data-door]').count(),4);
     assert.ok(starting.plans[0].tables.find(t=>t.id==='B9').y > starting.plans[0].tables.find(t=>t.id==='A8').y);
     await page.locator('#bulk-settings summary').click();
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
@@ -55,16 +57,18 @@ const server = http.createServer((req,res) => {
     assert.equal(current.tables.find(t=>t.id==='A2').seats[1], current.people.find(p=>p.name==='Yosef Cohen').id);
     for (const [index,name] of [[0,'Moshe Levi'],[1,'דוד כהן'],[2,'Rabbi Shmuel Alexander Friedman']]) {
       await page.locator('.room-stage [data-table="A1"][data-seat="' + index + '"]').click();
-      await page.locator('#seat-dialog').waitFor({state:'visible'});
-      const person = (await state()).plans[0].people.find(p=>p.name===name);
-      await page.locator('#assignment-person').selectOption(person.id);
-      await page.getByRole('button',{name:'Save seat',exact:true}).click();
+      await page.locator('#seat-name-input').fill(name);
+      await page.locator('#seat-name-input').press('Enter');
     }
-    assert.equal(await page.locator('.fit-warning').count(),1,'Long names should trigger a visible fit warning');
+
     await page.getByRole('button',{name:'Edit layout',exact:true}).click();
     await page.locator('#selected-item').selectOption('A1');
-    await page.locator('#item-height').fill('60'); await page.locator('#item-height').blur();
-    const boxes = await page.locator('.room-stage .seat-name').evaluateAll(nodes => nodes.map(node => {
+    await page.locator('#auto-size').uncheck();
+    await page.locator('#item-width').fill('60');await page.locator('#item-width').blur();
+    assert.equal(await page.locator('.fit-warning').count(),1,'Crowded names should trigger a fit warning');
+    await page.locator('#auto-size').check();
+    await page.locator('#item-height').fill('48'); await page.locator('#item-height').blur();
+    const boxes = await page.locator('.room-stage .table-item .seat-name').evaluateAll(nodes => nodes.map(node => {
       const a=node.getBoundingClientRect(), b=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect();
       return {name:node.textContent, fits:a.left>=b.left-.5&&a.right<=b.right+.5&&a.top>=b.top-.5&&a.bottom<=b.bottom+.5};
     }));
@@ -86,17 +90,46 @@ const server = http.createServer((req,res) => {
     await page.getByRole('button',{name:'Edit layout',exact:true}).click();
     await page.getByRole('button',{name:'+ Pillar',exact:true}).click();
     await page.getByRole('button',{name:'+ Sefarim cabinet',exact:true}).click();
-    current = (await state()).plans[0]; assert.deepEqual(current.objects.map(o=>o.type), ['pillar','cabinet']);
-    const cabinetId = current.objects[1].id, cabinetX=current.objects[1].x;
+    current = (await state()).plans[0]; assert.deepEqual(current.objects.map(o=>o.type), ['bimah','pillar','cabinet']);
+    const cabinetId = current.objects[2].id, cabinetX=current.objects[2].x;
     await page.locator('[data-item="'+cabinetId+'"]').focus(); await page.keyboard.press('ArrowRight');
-    assert.equal((await state()).plans[0].objects[1].x, cabinetX+8);
+    assert.equal((await state()).plans[0].objects[2].x, cabinetX+8);
     await page.getByRole('button',{name:'Undo',exact:true}).click();
-    assert.equal((await state()).plans[0].objects[1].x, cabinetX);
+    assert.equal((await state()).plans[0].objects[2].x, cabinetX);
+    await page.getByRole('button',{name:'Redo',exact:true}).click();
+    assert.equal((await state()).plans[0].objects[2].x,cabinetX+8);
+    await page.keyboard.press('Control+z');
+    assert.equal((await state()).plans[0].objects[2].x,cabinetX);
+    // Copy into a separate seat, keeping the original person in place.
+    const source=page.locator('.room-stage [data-table="A2"][data-seat="1"]');
+    await source.click();await page.getByRole('button',{name:'Copy name',exact:true}).click();
+    await page.locator('.room-stage [data-table="B2"][data-seat="0"]').click();
+    await page.getByRole('button',{name:'Paste name',exact:true}).click();
+    current=(await state()).plans[0];
+    const dadId=current.tables.find(t=>t.id==='A2').seats[1],childId=current.tables.find(t=>t.id==='B2').seats[0];
+    assert.notEqual(dadId,childId);assert.equal(current.people.find(p=>p.id===childId).name,'Yosef Cohen');
+    await page.keyboard.press('Control+z');assert.equal((await state()).plans[0].tables.find(t=>t.id==='B2').seats[0],null);
+    await page.keyboard.press('Control+Shift+z');assert.equal((await state()).plans[0].tables.find(t=>t.id==='B2').seats[0],childId);
+    await page.keyboard.press('Control+z');
+    await source.focus();await page.keyboard.press('Control+c');
+    await page.locator('.room-stage [data-table="B2"][data-seat="0"]').focus();await page.keyboard.press('Control+v');
+    assert.equal((await state()).plans[0].people.length,7);
+    await page.keyboard.press('Control+z');assert.equal((await state()).plans[0].people.length,6);
+    // New names are entered directly, and keyboard suggestions reuse uploaded people.
+    await page.locator('.room-stage [data-table="B2"][data-seat="0"]').focus();
+    await page.keyboard.type('New Family');await page.locator('#seat-name-input').press('Enter');
+    assert.equal((await state()).plans[0].people.length,7);
+    assert.equal((await state()).plans[0].people.at(-1).name,'New Family');
+    await page.keyboard.press('Control+z');assert.equal((await state()).plans[0].people.length,6);
+    await page.locator('.room-stage [data-table="B2"][data-seat="0"]').click();
+    await page.locator('#seat-name-input').fill('Yaakov');await page.locator('#seat-name-input').press('ArrowDown');await page.locator('#seat-name-input').press('Enter');
+    current=(await state()).plans[0];assert.equal(current.tables.find(t=>t.id==='B2').seats[0],current.people.find(p=>p.name==='Yaakov Miller').id);
+    assert.equal(current.people.length,6);await page.keyboard.press('Control+z');
     // A real pointer drag, not just the numeric controls.
-    const table=page.locator('.room-stage [data-item="A1"] .table-label'), box=await table.boundingBox();
+    const table=page.locator('.room-stage [data-item="A1"] .table-label');await table.scrollIntoViewIfNeeded();const box=await table.boundingBox();
     await page.mouse.move(box.x+box.width/2,box.y+box.height/2); await page.mouse.down();
     await page.mouse.move(box.x+box.width/2+16,box.y+box.height/2+8,{steps:5}); await page.mouse.up();
-    assert.ok((await state()).plans[0].tables.find(t=>t.id==='A1').x > 60);
+    assert.ok((await state()).plans[0].tables.find(t=>t.id==='A1').x > 17);
     await page.getByRole('button',{name:'Undo',exact:true}).click();
     await page.locator('#selected-item').selectOption('A1');
     await page.locator('#seat-count').fill('1'); await page.locator('#seat-count').blur();
@@ -114,6 +147,12 @@ const server = http.createServer((req,res) => {
     await page.getByText('Backup restored as additional plans. Your existing plans were kept.').waitFor();
     assert.equal((await state()).plans.length,3);
     await page.locator('#plan-select').selectOption(originalPlan);
+    const panel=await page.locator('.seats-panel').boundingBox();
+    await page.mouse.move(panel.x+50,Math.min(800,panel.y+180));await page.mouse.wheel(0,450);await page.waitForTimeout(150);
+    assert.ok(await page.evaluate(()=>scrollY>100),'Wheel over sidebar should scroll the page');
+    assert.equal(await page.locator('.seats-panel').evaluate(node=>node.scrollTop),0);
+    const labels=await page.locator('.room-stage .table-label').evaluateAll(nodes=>nodes.map(node=>({label:node.textContent,outside:node.getBoundingClientRect().bottom<=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect().top+1})));
+    assert.ok(labels.every(label=>label.outside),JSON.stringify(labels));
     const saved=await state();
     for (const width of [1440,760,375]) {
       await page.setViewportSize({width,height:1000});
@@ -155,8 +194,31 @@ const server = http.createServer((req,res) => {
     await blockedPage.locator('#plan-files summary').click();
     const blockedDownload=blockedPage.waitForEvent('download'); await blockedPage.getByRole('button',{name:'Download backup',exact:true}).click();
     assert.equal((await blockedDownload).suggestedFilename(),'seats-backup.json'); await blocked.close();
+    const legacy=JSON.parse(JSON.stringify(starting));delete legacy.plans[0].layoutVersion;legacy.plans[0].objects=[];
+    legacy.plans[0].people=[{id:'legacy-parent',name:'Existing parent'},{id:'legacy-child',name:'Existing child'}];
+    for(const table of legacy.plans[0].tables){const row=Number(table.id.slice(1));delete table.autoSize;delete table.anchor;table.x={A:60,B:340,C:645,D:925}[table.column];table.y=130+(row-1)*76;table.width=215;table.count=null;table.seats=[];}
+    Object.assign(legacy.plans[0].tables.find(t=>t.id==='A1'),{count:5,seats:['legacy-parent',null,null,null,null]});
+    Object.assign(legacy.plans[0].tables.find(t=>t.id==='A7'),{count:5,seats:[null,null,null,null,'legacy-child']});
+    const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
+    const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('#seat-count').waitFor();
+    await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
+    const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
+    assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v2'),storageKey),JSON.stringify(legacy));await migration.close();
+    const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
+    await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
+    const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
+    const touchBox=await touchPage.locator('.room-stage [data-table="A4"][data-seat="2"] .seat-area').boundingBox();
+    const cdp=await touch.newCDPSession(touchPage);
+    const touchX=Math.round(touchBox.x+touchBox.width/2),touchY=Math.round(touchBox.y+touchBox.height/2);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchX,y:touchY}]});
+    for(let step=1;step<=15;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchX,y:touchY-step*15}]});await touchPage.waitForTimeout(20);}
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touchPage.waitForTimeout(150);
+    assert.ok(await touchPage.evaluate(()=>scrollY>100),'Touch swipe over a table should scroll the page');
+    assert.equal(await touchPage.locator('.room-stage [data-item="A1"]').getAttribute('transform'),'translate(17 70)');
+    assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);await touch.close();
     assert.deepEqual(posts,[]); assert.deepEqual(errors,[]); assert.deepEqual(badResponses,[]);
-    console.log('PASS: PIN, exact 34-table layout, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, undo, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
+    console.log('PASS: PIN, exact 34-table layout, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, direct typing, suggestions, copy/paste, undo/redo, migration, wheel/touch scrolling, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
     console.log('Artifacts: '+output);
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
