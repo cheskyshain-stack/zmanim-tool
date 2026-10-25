@@ -86,7 +86,8 @@ test('configured elevation and location are used and Shabbos does not set a week
     assert(poster.days.every(day => excelWeekday(day) !== 7));
     const limit = Math.ceil(Math.max(...poster.days.map(day => sunriseElev(dateFromSerial(day), options) * 1440)) - 25 - 1e-7);
     const sharedChanukah = month === 10 && buildChanukahPoster(year, options).days.every(day => day.netzBinding);
-    if (!sharedChanukah) assert.equal(minutes(poster.rows[0].text), Math.max(400, limit));
+    if (year === 5787 && month === 10) assert.equal(poster.rows[0].text, '6:43', 'Honor the confirmed printed Chanukah 5787 first minyan');
+    else if (!sharedChanukah) assert.equal(minutes(poster.rows[0].text), Math.max(400, limit));
     assert.equal(minutes(poster.rows[1].text), Math.max(420, limit));
   }
 });

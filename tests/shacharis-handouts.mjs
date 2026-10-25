@@ -132,9 +132,12 @@ test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbo
         assert.deepEqual(poster.rows.map(row => row.room), expected.map(row => row[1]));
         assert(poster.title.endsWith(' · חנוכה'));
       }
-      assert.deepEqual(rows(poster), expectedRoshChodesh(poster), 'The weekday limits and shared Chanukah average agree');
+      const expectedRows = expectedRoshChodesh(poster);
+      const printedChanukah = year === 5787 && month === 10;
+      if (printedChanukah) expectedRows[0][0] = '6:43';
+      assert.deepEqual(rows(poster), expectedRows, 'The weekday limits, shared Chanukah average and confirmed printed exception agree');
       const sharedChanukah = month === 10 && buildChanukahPoster(year, settings).days.every(day => day.netzBinding);
-      for (const day of days) for (const row of poster.rows.slice(sharedChanukah ? 1 : 0, 2)) {
+      for (const day of days) for (const row of poster.rows.slice(sharedChanukah || printedChanukah ? 1 : 0, 2)) {
         assert(row.trace.value * 1440 >= sunriseElev(dateFromSerial(day), settings) * 1440 - 25 - 1e-7);
       }
     }

@@ -523,6 +523,12 @@ Chanukah exception to the first Rosh Chodesh minyan's latest-day floor. Keep
 the second Rosh Chodesh minyan's limit and all later times/room marks. Otherwise
 Teves retains its latest-weekday first-minyan floor. The shared posted provider
 quotes the complete Chanukah row, including on partial weeks and split charts.
+For Rosh Chodesh during Chanukah 5787 only (December 10 and 11, 2026), the user
+confirmed that the first minyan was already printed as **6:43**, so retain that fixed
+announced time instead of the calculated 6:44 in every view and explanation. Keep
+ordinary Chanukah at 6:50, the second and later minyanim, the underlying sunrise
+calculation, later occasions and other years unchanged. Scope this exception to the
+event dates, so archived sheets agree with the paper and future Chanukah stays calculated.
 `tests/chanukah-shared-average.mjs` covers 51 years, daily views and the screenshot
 year 5788, where both first rows print 6:53. The base calculation stays separate
 in `special-shacharis.js` so building the posted Chanukah rows cannot recurse.
