@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName } from '../js/seats/model.js';
+import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront } from '../js/seats/model.js';
 import { seatsParseDelimited, seatsNamesFromRows, seatsCsvCell } from '../js/seats/import.js';
 
-test('34-table starting layout has the extra middle tables at the back and five-seat tables with three-seat rear tables', () => {
+test('34-table starting layout has the extra middle tables at the back and the specified four-seat and three-seat tables', () => {
   const state = seatsCreateState(), plan = state.plans[0];
   assert.equal(plan.tables.length, 34);
   assert.deepEqual(['A','B','C','D'].map(col => plan.tables.filter(table => table.column === col).length), [8,9,9,8]);
   assert.ok(plan.tables.find(table => table.id === 'B9').y > plan.tables.find(table => table.id === 'A8').y);
   assert.ok(plan.tables.find(table => table.id === 'C9').y > plan.tables.find(table => table.id === 'D8').y);
-  assert.equal(plan.tables.reduce((sum, table) => sum + table.count, 0), 162);
+  assert.equal(plan.tables.reduce((sum, table) => sum + table.count, 0), 158);
   assert.ok(['A7','A8','D7','D8'].every(id => plan.tables.find(table => table.id === id).count === 3));
-  assert.ok(plan.tables.filter(table => !['A7','A8','D7','D8'].includes(table.id)).every(table => table.count === 5));
+  assert.ok(plan.tables.filter(table => !['A7','A8','D7','D8','B2','C2','B6','C6'].includes(table.id)).every(table => table.count === 5));
   assert.ok(plan.tables.filter(table => table.column === 'A' && Number(table.id.slice(1)) <= 6).every(table => table.x === 17));
   assert.ok(plan.tables.filter(table => table.id.endsWith('1')).every(table => table.y === 70));
   assert.ok(plan.tables.find(table=>table.id==='B7').y - plan.tables.find(table=>table.id==='B6').y >= 150);
@@ -91,8 +91,48 @@ test('legacy layout migration retains people and assignments, returning excess r
   seatsAddNames(plan,['Existing parent','Existing child']);
   const [dad,child]=plan.people.map(person=>person.id);
   seatsAssign(plan,'A1',0,dad);seatsAssign(plan,'A7',4,child);
-  assert.equal(seatsUpgradePlan(plan),1);assert.equal(plan.layoutVersion,2);
+  assert.equal(seatsUpgradePlan(plan),1);assert.equal(plan.layoutVersion,3);
   assert.equal(plan.tables[0].seats[0],dad);assert.equal(plan.people.length,2);
   assert.equal(plan.tables.find(table=>table.id==='A7').count,3);assert.ok(!seatsAssigned(plan).has(child));
   assert.equal(seatsUpgradePlan(plan),0);assert.equal(plan.objects.filter(object=>object.type==='bimah').length,1);
+});
+
+
+test('front tables touch and the opposite-facing rav station fits between Aron Kodesh and C1', () => {
+  const plan=seatsCreateState().plans[0],byId=id=>plan.tables.find(table=>table.id===id);
+  for(const count of [5,6,4]){
+    seatsSetCount(byId('D1'),count,plan);seatsSetCount(byId('C1'),count,plan);
+    const front=seatsFront(plan),rav=plan.objects.find(object=>object.type==='rav');
+    assert.equal(byId('C1').x+byId('C1').width,byId('D1').x);
+    assert.ok(byId('B1').x+byId('B1').width<front.aron.x);
+    assert.ok(front.aron.x+front.aron.width<rav.x);
+    assert.ok(rav.x+rav.width<byId('C1').x);
+    assert.equal(front.aron.y,byId('B1').y);
+  }
+  seatsWriteName(plan,'rav-seat',0,'Rav Cohen');
+  assert.equal(seatsAssigned(plan).size,1);assert.equal(seatsItems(plan).reduce((sum,table)=>sum+table.count,0),157);
+  assert.deepEqual(seatsNormalizeState({version:1,activeId:plan.id,plans:[plan]}).plans[0],plan);
+});
+
+test('rear tables align with the front or the bookcase face and leave continuous walkways', () => {
+  const plan=seatsCreateState().plans[0],byId=id=>plan.tables.find(table=>table.id===id);
+  for(const id of ['A7','A8'])assert.equal(byId(id).x+byId(id).width,byId('A6').x+byId('A6').width);
+  assert.equal(byId('D7').x+byId('D7').width,1183);
+  assert.equal(byId('D8').x+byId('D8').width,1159);
+  const cases=plan.objects.filter(object=>object.type==='cabinet');assert.equal(cases.length,5);
+  assert.ok(cases.filter(object=>object.height>object.width).every(object=>object.y===byId('A8').y));
+  assert.ok(byId('B9').y+byId('B9').height+14<858);
+  assert.ok(cases.filter(object=>object.width>object.height).every(object=>object.y===936));
+  for(const id of ['B2','C2','B6','C6'])assert.equal(byId(id).count,4);
+  const amud=plan.objects.find(object=>object.type==='amud');
+  assert.ok(amud.x>byId('B2').x+byId('B2').width);assert.ok(amud.x+amud.width<byId('C2').x);
+});
+
+test('version 2 layouts migrate without duplicating a bimah or losing named seats', () => {
+  const plan=seatsCreateState().plans[0];plan.layoutVersion=2;plan.objects=plan.objects.filter(object=>object.type==='bimah');
+  seatsSetCount(plan.tables.find(table=>table.id==='B2'),5);seatsAddNames(plan,['Existing name']);
+  seatsAssign(plan,'B2',4,plan.people[0].id);
+  assert.equal(seatsUpgradePlan(plan),1);assert.equal(plan.people.length,1);assert.equal(seatsAssigned(plan).size,0);
+  assert.equal(plan.objects.filter(object=>object.type==='bimah').length,1);
+  assert.equal(plan.objects.filter(object=>object.type==='rav').length,1);assert.equal(plan.layoutVersion,3);
 });

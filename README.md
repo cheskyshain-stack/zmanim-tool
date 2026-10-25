@@ -9,7 +9,8 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
 Its PIN is separate from the existing admin PIN. It starts with columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
-seats, except A7, A8, D7, and D8, which have three. Width follows seat count, using
+seats, except A7, A8, D7, and D8, which have three, and B2, C2, B6, and C6,
+which have four. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
@@ -19,9 +20,16 @@ and keeps the original assignment. Choosing an already seated suggestion moves
 that person. Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
+The rav's separate, assignable chair faces the room across its shtender. It sits
+between the Aron Kodesh and C1; C1 touches D1. An amud stands between B2 and C2.
 The first row touches the front wall, A1 through A6 touch the left wall, and a
 central bimah is included. A walkway separates rows 6 and 7, with an entrance in
-each side wall. Two doors at the back, between A/B and C/D, are marked usually closed.
+each side wall. These are open passages without door leaves or swings. Two doors
+at the back, between A/B and C/D, are marked usually closed. Sefarim bookcases line
+the back wall between and outside those doors, and continue along both side walls
+to the front of row 8. Clear walkways run across the entire back and to the left
+of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 meets the right wall
+and D8 meets the right bookcase face.
 Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
 dragging a table label or room object, or using keyboard arrows. Width, depth,
 and position can also be entered. The page scrolls normally over the sidebar
@@ -35,9 +43,10 @@ black-and-white or color; match the selected paper size in the browser print dia
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
 Older plans migrate to the revised room layout while retaining names and existing
-seat counts, except the four explicitly three-seat rear tables. Any excess names
+seat counts, except the explicitly three-seat and four-seat tables. Any excess names
 return to the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v2` before changes are saved.
+`lakewood-commons-seats-v1-before-room-v3` before changes are saved. The earlier v2
+snapshot is retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates

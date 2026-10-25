@@ -1,6 +1,7 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, seatsItems, seatsFront, seatsSyncFront, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames } from './seats/model.js';
+import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateEditor } from './seats/editor.js';
 import { seatsReadNames, seatsCsvCell } from './seats/import.js';
 
@@ -40,11 +41,11 @@ function seatsStart(root, unlockKey) {
     storedRaw = localStorage.getItem(SEATS_STORAGE_KEY);
     if (storedRaw) {
       state = seatsNormalizeState(JSON.parse(storedRaw));
-      if (state.plans.some(plan => plan.layoutVersion !== 2)) {
-        try { if (!localStorage.getItem(SEATS_STORAGE_KEY + '-before-room-v2')) localStorage.setItem(SEATS_STORAGE_KEY + '-before-room-v2', storedRaw); } catch { /* keep the original until the next save */ }
+      if (state.plans.some(plan => plan.layoutVersion !== SEATS_LAYOUT_VERSION)) {
+        try { if (!localStorage.getItem(SEATS_STORAGE_KEY + '-before-room-v' + SEATS_LAYOUT_VERSION)) localStorage.setItem(SEATS_STORAGE_KEY + '-before-room-v' + SEATS_LAYOUT_VERSION, storedRaw); } catch { /* keep the original until the next save */ }
         let released = 0;
         for (const plan of state.plans) released += seatsUpgradePlan(plan);
-        notice = 'Room layout updated. Existing names were kept.' + (released ? ' ' + released + ' people returned to the waiting list after the back tables changed to three seats.' : '');
+        notice = 'Room layout updated. Existing names were kept.' + (released ? ' ' + released + ' people returned to the waiting list after the updated seat counts.' : '');
       }
     }
   } catch {
@@ -55,6 +56,7 @@ function seatsStart(root, unlockKey) {
   }
   const plan = () => state.plans.find(item => item.id === state.activeId);
   const item = () => [...plan().tables, ...plan().objects].find(entry => entry.id === selected);
+  const itemBottom = entry => SEATS_BOUNDS.bottom - (entry.type ? 0 : 14);
   const copy = value => JSON.parse(JSON.stringify(value));
   const number = (value, min, max) => Math.max(min, Math.min(max, Math.round(Number(value) || min)));
   const html = value => escText(value);
@@ -117,8 +119,8 @@ function seatsStart(root, unlockKey) {
     if (line) lines.push(line);
     return lines;
   }
-  function nameText(name, x, y, width, height, tableId) {
-    let font = 13, lines = [], fits = false;
+  function nameText(name, x, y, width, height, tableId, maxFont = 13) {
+    let font = maxFont, lines = [], fits = false;
     for (; font >= 8; font -= 0.5) {
       lines = wrapped(name, font, width - 6);
       const wholeWords = name.split(/\s+/).every(word => measure.measureText(word).width <= width - 6);
@@ -139,7 +141,7 @@ function seatsStart(root, unlockKey) {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
       const seats = Array.from({ length: count }, (_, index) => {
         const name = people.get(table.seats[index]);
-        return `<g class="table-seat${name ? ' assigned' : ''}" ${interactive ? `data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
+        return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
           <rect class="seat-area" x="${svgNumber(index * width + 1)}" y="2" width="${svgNumber(Math.max(1, width - 2))}" height="${table.height - 4}"/>
           ${name ? nameText(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="empty-seat" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${index + 1}</text>`}
           <path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>
@@ -153,23 +155,15 @@ function seatsStart(root, unlockKey) {
     }).join('');
     const objects = current.objects.map(object => {
       const attributes = interactive ? `id="room-item-${attr(object.id)}" data-item="${attr(object.id)}" role="button" tabindex="0" aria-label="${attr(object.label)}"` : '';
-      const shelves = object.type === 'cabinet' ? Array.from({ length: Math.max(1, Math.floor(object.height / 22)) }, (_, index) => `<path d="M3 ${10 + index * 22} h${object.width - 6}" class="shelf-line"/>`).join('') : '';
-      return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object drag-handle${interactive && selected === object.id ? ' selected' : ''}">
-        ${object.type === 'label' ? '' : `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>`}${shelves}
-        ${nameText(object.label, object.width / 2, 0, object.width, object.height, object.label)}
-      </g>`;
+      let art;
+      if (object.type === 'cabinet') art = seatsCabinetArt(object, nameText);
+      else if (object.type === 'rav') art = seatsRavArt(object, people, nameText, interactive);
+      else art = `${object.type === 'label' ? '' : `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>`}${object.type === 'amud' ? `<path class="amud-top" d="M4 12 L${object.width / 2} 6 L${object.width - 4} 12 M${object.width / 2} 6 V16"/>` : ''}${nameText(object.label, object.width / 2, object.type === 'amud' ? 16 : 0, object.width, object.type === 'amud' ? object.height - 16 : object.height, object.label)}`;
+      return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object${object.type === 'rav' ? ' rav-station' : ' drag-handle'}${interactive && selected === object.id ? ' selected' : ''}">${art}</g>`;
     }).join('');
     return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}" viewBox="0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern></defs>
-      <path class="room-boundary" d="M17 536 V70 H1183 V536 M1183 598 V864 H17 V598"/>
-      <rect class="aron" x="520" y="23" width="160" height="40"/>
-      <text class="aron-label" x="600" y="49" text-anchor="middle">ARON KODESH</text>
-      <g class="walkway" aria-label="Walkway between rows 6 and 7"><path d="M18 536 H1182 M18 598 H1182"/><text x="600" y="572" text-anchor="middle">WALKWAY</text></g>
-      <g class="room-door" data-door="left-entrance"><path class="door-leaf" d="M17 536 H79"/><path class="door-swing" d="M17 598 A62 62 0 0 0 79 536"/><text x="91" y="572">Entrance</text></g>
-      <g class="room-door" data-door="right-entrance"><path class="door-leaf" d="M1183 536 H1121"/><path class="door-swing" d="M1183 598 A62 62 0 0 1 1121 536"/><text x="1109" y="572" text-anchor="end">Entrance</text></g>
-      <g class="room-door closed-door" data-door="back-left"><path class="door-gap" d="M241 864 H291"/><path class="door-leaf" d="M241 864 H291 M241 860 V868 M291 860 V868"/><text x="266" y="885" text-anchor="middle">Door · usually closed</text></g>
-      <g class="room-door closed-door" data-door="back-right"><path class="door-gap" d="M909 864 H959"/><path class="door-leaf" d="M909 864 H959 M909 860 V868 M959 860 V868"/><text x="934" y="885" text-anchor="middle">Door · usually closed</text></g>
-      ${objects}${tables}<text class="entrance-label" x="600" y="885" text-anchor="middle">BACK</text>
+      ${seatsRoomFeatures(current)}${objects}${tables}
     </svg>`;
   }
   function tableOptions() {
@@ -181,14 +175,14 @@ function seatsStart(root, unlockKey) {
       <label for="selected-item">Selected ${entry?.type ? 'object' : 'table'}</label><select id="selected-item">${tableOptions()}</select>
       ${entry ? `<label for="item-label">Label</label><input id="item-label" value="${attr(entry.label)}" maxlength="80">
         ${isTable ? `<label for="seat-count">Seats at this table</label><input id="seat-count" type="number" min="0" max="16" step="1" placeholder="Not set yet" value="${entry.count ?? ''}"><label class="check-label"><input id="auto-size" type="checkbox" ${entry.autoSize !== false ? 'checked' : ''}> Size table from seat count</label><p class="field-note">Five seats is the standard size. Chairs face the Aron Kodesh.</p>` : ''}
-        <div class="field-pair"><div><label for="item-width">Width</label><input id="item-width" type="number" min="${isTable ? 60 : 20}" max="1100" value="${entry.width}" ${isTable && entry.autoSize !== false ? 'disabled' : ''}></div><div><label for="item-height">Depth</label><input id="item-height" type="number" min="${isTable ? 40 : 20}" max="600" value="${entry.height}"></div></div>
-        <details class="position-details"><summary>Position &amp; remove</summary><div class="field-pair"><div><label for="item-x">Left</label><input id="item-x" type="number" value="${entry.x}" min="17" max="${SEATS_BOUNDS.right - entry.width}"></div><div><label for="item-y">Top</label><input id="item-y" type="number" value="${entry.y}" min="70" max="${SEATS_BOUNDS.bottom - entry.height}"></div></div><button type="button" class="danger" data-action="remove-item">Remove ${isTable ? 'table' : 'object'}</button></details>` : ''}
+        <div class="field-pair"><div><label for="item-width">Width</label><input id="item-width" type="number" min="${isTable ? 60 : entry.type === 'rav' ? 30 : 20}" max="1100" value="${entry.width}" ${isTable && entry.autoSize !== false ? 'disabled' : ''}></div><div><label for="item-height">Depth</label><input id="item-height" type="number" min="${isTable ? 40 : entry.type === 'rav' ? 70 : 20}" max="600" value="${entry.height}"></div></div>
+        <details class="position-details"><summary>Position &amp; remove</summary><div class="field-pair"><div><label for="item-x">Left</label><input id="item-x" type="number" value="${entry.x}" min="17" max="${SEATS_BOUNDS.right - entry.width}"></div><div><label for="item-y">Top</label><input id="item-y" type="number" value="${entry.y}" min="70" max="${itemBottom(entry) - entry.height}"></div></div><button type="button" class="danger" data-action="remove-item">Remove ${isTable ? 'table' : 'object'}</button></details>` : ''}
       <details id="bulk-settings"><summary>Set seats for a column or all tables</summary><label for="bulk-target">Apply to</label><select id="bulk-target"><option value="all">All tables</option>${['A', 'B', 'C', 'D'].map(column => `<option>${column}</option>`).join('')}</select><label for="bulk-count">Seats per table</label><input id="bulk-count" type="number" min="0" max="16" step="1" placeholder="Enter a number"><button type="button" data-action="apply-count">Apply seat count</button></details>
-      <div class="room-tools"><h3>Add to room</h3><div class="tool-grid"><button type="button" data-add="table">+ Table</button><button type="button" data-add="pillar">+ Pillar</button><button type="button" data-add="cabinet">+ Sefarim cabinet</button><button type="button" data-add="bimah">+ Bimah</button><button type="button" data-add="label">+ Label</button></div></div>
+      <div class="room-tools"><h3>Add to room</h3><div class="tool-grid"><button type="button" data-add="table">+ Table</button><button type="button" data-add="pillar">+ Pillar</button><button type="button" data-add="cabinet">+ Sefarim cabinet</button><button type="button" data-add="bimah">+ Bimah</button><button type="button" data-add="amud">+ Amud</button><button type="button" data-add="label">+ Label</button></div></div>
       <p class="field-note">Drag a table label or room object to move it. Scroll anywhere on a table. Arrow keys move a focused item.</p>`;
   }
   function locationOf(personId) {
-    for (const table of plan().tables) {
+    for (const table of seatsItems(plan())) {
       const index = table.seats.indexOf(personId);
       if (index >= 0) return table.label + ' · Seat ' + (index + 1);
     }
@@ -200,7 +194,7 @@ function seatsStart(root, unlockKey) {
     return people.length ? people.map(person => `<div class="person-row${selectedPerson === person.id ? ' active' : ''}"><button type="button" class="person-name" data-person="${attr(person.id)}" aria-pressed="${selectedPerson === person.id}"><bdi>${html(person.name)}</bdi><small>${html(locationOf(person.id))}</small></button><button type="button" class="person-edit" data-edit-person="${attr(person.id)}" aria-label="${attr('Edit ' + person.name)}">✎</button></div>`).join('') : `<p class="empty-list">${plan().people.length ? 'No matching people.' : 'Add names below or upload a list.'}</p>`;
   }
   function peoplePanel() {
-    const assigned = seatsAssigned(plan()), table = plan().tables.find(entry => entry.id === selected);
+    const assigned = seatsAssigned(plan()), table = seatsItems(plan()).find(entry => entry.id === selected);
     return `<h2>People</h2><p class="people-summary">${plan().people.length - assigned.size} waiting for a seat</p><label class="sr-only" for="people-search">Search names</label><input id="people-search" type="search" placeholder="Search names..." value="${attr(search)}"><label class="check-label"><input id="show-assigned" type="checkbox" ${showAssigned ? 'checked' : ''}> Include seated people</label><div id="people-list" class="people-list">${peopleList()}</div>
       <p class="field-note">Click any seat and type. Choose an existing name from the suggestions, or enter a new name.</p>
       <details id="manual-names"><summary>Add names</summary><label for="new-names">One name per line</label><textarea id="new-names" rows="4" placeholder="English or Hebrew names"></textarea><button type="button" data-action="add-names">Add names</button></details>
@@ -211,7 +205,7 @@ function seatsStart(root, unlockKey) {
     if (!plan().people.some(person => person.id === selectedPerson)) selectedPerson = null;
     overflowTables = new Set();
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
-    const capacity = current.tables.reduce((total, table) => total + (table.count ?? 0), 0);
+    const capacity = seatsItems(current).reduce((total, table) => total + (table.count ?? 0), 0);
     const room = diagram(), printRoom = diagram(false);
     document.title = 'Seats | ' + current.name;
     document.body.classList.toggle('seats-layout-mode', mode === 'layout');
@@ -225,7 +219,7 @@ function seatsStart(root, unlockKey) {
       <div class="top-actions"><button type="button" data-action="save">Save plan</button><button type="button" class="primary" data-action="print">Print / PDF</button><button type="button" class="text-button" data-action="lock">Lock</button></div></section>
       <section class="seats-controls no-print"><div class="mode-tabs" role="group" aria-label="Planner mode"><button type="button" data-mode="layout" aria-pressed="${mode === 'layout'}">Edit layout</button><button type="button" data-mode="people" aria-pressed="${mode === 'people'}">Assign names</button></div><div class="print-settings"><label>Print size <select id="paper-size"><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
-      <div class="seats-workspace no-print"><aside class="seats-panel">${mode === 'layout' ? layoutPanel() : peoplePanel()}<div class="upload-area"><button type="button" data-action="upload-names" ${importing ? 'disabled' : ''}>↑ ${importing ? 'Reading names...' : 'Upload names'}</button><p class="field-note">Excel, CSV, or text. Names stay in this browser.</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="new-plan">New plan from this layout</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. The other tables start with 5 seats.</p><p>Click a seat and start typing a name. Suggestions show existing people. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Plans save on this device. Download a backup to move them to another computer or keep a spare copy.</p><p>Print uses the selected paper size. Choose the same size in your printer settings, turn off browser headers and footers, or select Save as PDF.</p></details></aside>
+      <div class="seats-workspace no-print"><aside class="seats-panel">${mode === 'layout' ? layoutPanel() : peoplePanel()}<div class="upload-area"><button type="button" data-action="upload-names" ${importing ? 'disabled' : ''}>↑ ${importing ? 'Reading names...' : 'Upload names'}</button><p class="field-note">Excel, CSV, or text. Names stay in this browser.</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="new-plan">New plan from this layout</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. B2, C2, B6, and C6 have 4 seats. Other tables start with 5 seats. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Suggestions show existing people. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Plans save on this device. Download a backup to move them to another computer or keep a spare copy.</p><p>Print uses the selected paper size. Choose the same size in your printer settings, turn off browser headers and footers, or select Save as PDF.</p></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p><div class="canvas-buttons"><button type="button" data-action="undo" ${history.length ? '' : 'disabled'}>Undo</button><button type="button" data-action="redo" ${future.length ? '' : 'disabled'}>Redo</button><button type="button" data-action="fit" aria-label="Fit room on screen">Fit</button><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
@@ -237,7 +231,7 @@ function seatsStart(root, unlockKey) {
       <section id="seats-print" class="seats-print"><header><h1>${html(current.name)}</h1><p>Bais Medrash of Lakewood Commons<br>${capacity} seats · ${assigned.size} assigned</p></header>${printRoom}</section>`;
   }
   function openSeat(tableId, index) {
-    const table = plan().tables.find(entry => entry.id === tableId);
+    const table = seatsItems(plan()).find(entry => entry.id === tableId);
     if (!table || index >= (table.count ?? 0)) return;
     if (selectedPerson) {
       const person = plan().people.find(entry => entry.id === selectedPerson);
@@ -249,17 +243,19 @@ function seatsStart(root, unlockKey) {
 
   function addObject(type) {
     if (type === 'table' && plan().tables.length >= 200) return alertMessage('A plan can contain up to 200 tables.');
-    if (type !== 'table' && plan().objects.length >= 100) return alertMessage('A plan can contain up to 100 room objects.');
+    if (type !== 'table' && plan().objects.length >= 200) return alertMessage('A plan can contain up to 200 room objects.');
     change(() => {
       const id = seatsUid(); selected = id;
       if (type === 'table') plan().tables.push({ id, label: 'T' + (plan().tables.length + 1), column: '', x: 490, y: 400, width: 215, height: 48, count: 5, seats: Array(5).fill(null), autoSize: true, anchor: 'center' });
       else {
-        const defaults = { pillar: ['Pillar', 36, 36], cabinet: ['Sefarim cabinet', 65, 160], bimah: ['Bimah', 110, 100], label: ['Label', 150, 40] }[type];
+        const defaults = { pillar: ['Pillar', 36, 36], cabinet: ['Sefarim cabinet', 65, 160], bimah: ['Bimah', 110, 100], amud: ['Amud', 64, 48], label: ['Label', 150, 40] }[type];
         const object = { id, type, label: defaults[0], x: 550, y: 400, width: defaults[1], height: defaults[2] };
         const occupied = [...plan().tables.map(table => ({ ...table, height: table.height + 14 })), ...plan().objects,
-          { x: 17, y: 536, width: 1166, height: 62 }];
+          { x: 17, y: 536, width: 1166, height: 62 }, { x: 41, y: 858, width: 1118, height: 78 },
+          { x: 41, y: 598, width: 62, height: 260 }, { x: 968, y: 598, width: 62, height: 260 },
+          { ...seatsFront(plan()).aron }];
         let found = false;
-        for (let y = 130; y <= 850 - object.height && !found; y += 10) {
+        for (let y = 130; y <= SEATS_BOUNDS.bottom - object.height && !found; y += 10) {
           for (let x = 30; x <= 1170 - object.width; x += 10) {
             if (occupied.every(box => x + object.width + 7 <= box.x || x >= box.x + box.width + 7 || y + object.height + 7 <= box.y || y >= box.y + box.height + 7)) {
               object.x = x; object.y = y; found = true; break;
@@ -284,7 +280,7 @@ function seatsStart(root, unlockKey) {
       editor.flush();
       if (state.plans.length >= 30) return alertMessage('You can keep up to 30 plans in this browser.');
       const name = window.prompt('Name for the new plan'); if (!name?.trim()) return;
-      change(() => { const next = copy(plan()); next.id = seatsUid(); next.name = name.trim().slice(0, 80); next.people = []; next.tables.forEach(table => { table.seats = table.seats.map(() => null); }); state.plans.push(next); state.activeId = next.id; selectedPerson = null; }, 'New plan created with this layout and empty seats.');
+      change(() => { const next = copy(plan()); next.id = seatsUid(); next.name = name.trim().slice(0, 80); next.people = []; seatsItems(next).forEach(table => { table.seats = table.seats.map(() => null); }); state.plans.push(next); state.activeId = next.id; selectedPerson = null; }, 'New plan created with this layout and empty seats.');
     },
     backup: () => { editor.flush(); download('seats-backup.json', JSON.stringify(state, null, 2), 'application/json'); },
     restore: () => { editor.flush(); root.querySelector('#backup-file').click(); },
@@ -294,7 +290,7 @@ function seatsStart(root, unlockKey) {
       editor.flush();
       const rows = [['Name', 'Table', 'Seat']];
       for (const person of [...plan().people].sort((a, b) => a.name.localeCompare(b.name))) {
-        const table = plan().tables.find(entry => entry.seats.includes(person.id));
+        const table = seatsItems(plan()).find(entry => entry.seats.includes(person.id));
         rows.push([person.name, table?.label || 'Unassigned', table ? table.seats.indexOf(person.id) + 1 : '']);
       }
       download('seats-list.csv', '\uFEFF' + rows.map(row => row.map(seatsCsvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
@@ -303,7 +299,7 @@ function seatsStart(root, unlockKey) {
     'apply-count': () => {
       const value = root.querySelector('#bulk-count').value, target = root.querySelector('#bulk-target').value;
       if (value === '') return alertMessage('Enter a seat count first.');
-      change(() => { const tables = plan().tables.filter(table => target === 'all' || table.column === target); let removed = 0; tables.forEach(table => { removed += seatsSetCount(table, value); }); notice = 'Updated ' + tables.length + ' tables.' + (removed ? ' ' + removed + ' people returned to the waiting list.' : ''); });
+      change(() => { const tables = plan().tables.filter(table => target === 'all' || table.column === target); let removed = 0; tables.forEach(table => { removed += seatsSetCount(table, value, plan()); }); notice = 'Updated ' + tables.length + ' tables.' + (removed ? ' ' + removed + ' people returned to the waiting list.' : ''); });
     },
     'remove-item': () => { const entry = item(); if (entry) change(() => { plan().tables = plan().tables.filter(table => table.id !== selected); plan().objects = plan().objects.filter(object => object.id !== selected); selected = ''; }, 'Removed. Assigned people remain on the waiting list. Undo restores the item.'); },
     'download-recovery': () => download('seats-stored-recovery.txt', storedRaw || '', 'text/plain'),
@@ -320,7 +316,7 @@ function seatsStart(root, unlockKey) {
       const person = plan().people.find(entry => entry.id === button.dataset.editPerson);
       const name = window.prompt('Edit name. Leave blank to remove this person.', person.name);
       if (name === null) return;
-      change(() => { if (name.trim()) person.name = name.trim().slice(0, 160); else { plan().people = plan().people.filter(entry => entry.id !== person.id); plan().tables.forEach(table => { table.seats = table.seats.map(id => id === person.id ? null : id); }); } }, 'Name updated.'); return;
+      change(() => { if (name.trim()) person.name = name.trim().slice(0, 160); else { plan().people = plan().people.filter(entry => entry.id !== person.id); seatsItems(plan()).forEach(table => { table.seats = table.seats.map(id => id === person.id ? null : id); }); } }, 'Name updated.'); return;
     }
     if (button?.hasAttribute('data-open-seat')) return openSeat(button.dataset.table, Number(button.dataset.openSeat));
     const seat = event.target.closest('.table-seat[data-seat]');
@@ -340,15 +336,16 @@ function seatsStart(root, unlockKey) {
     if (id === 'plan-select') { editor.flush(); state.activeId = control.value; selected = ''; selectedPerson = null; notice = ''; save(); renderInPlace(); return; }
     if (id === 'paper-size' || id === 'print-color') return change(() => { if (id === 'paper-size') plan().paper = control.value; else plan().monochrome = control.value === 'mono'; });
     if (id === 'show-assigned') { showAssigned = control.checked; renderInPlace(); return; }
-    if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count); });
-    if (id === 'seat-count') return change(() => { const removed = seatsSetCount(item(), control.value); if (removed) notice = removed + ' people returned to the waiting list.'; });
+    if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count, plan()); });
+    if (id === 'seat-count') return change(() => { const removed = seatsSetCount(item(), control.value, plan()); if (removed) notice = removed + ' people returned to the waiting list.'; });
     if (id.startsWith('item-')) return change(() => {
       const entry = item(); if (!entry) return;
       if (id === 'item-label') { if (control.value.trim()) entry.label = control.value.trim().slice(0, 80); }
-      if (id === 'item-width') entry.width = number(control.value, entry.type ? 20 : 60, SEATS_BOUNDS.right - entry.x);
-      if (id === 'item-height') entry.height = number(control.value, entry.type ? 20 : 40, SEATS_BOUNDS.bottom - entry.y);
+      if (id === 'item-width') entry.width = number(control.value, entry.type === 'rav' ? 30 : entry.type ? 20 : 60, SEATS_BOUNDS.right - entry.x);
+      if (id === 'item-height') entry.height = number(control.value, entry.type === 'rav' ? 70 : entry.type ? 20 : 40, itemBottom(entry) - entry.y);
       if (id === 'item-x') entry.x = number(control.value, SEATS_BOUNDS.left, SEATS_BOUNDS.right - entry.width);
-      if (id === 'item-y') entry.y = number(control.value, SEATS_BOUNDS.top, SEATS_BOUNDS.bottom - entry.height);
+      if (id === 'item-y') entry.y = number(control.value, SEATS_BOUNDS.top, itemBottom(entry) - entry.height);
+      if (['B1','C1','D1'].includes(entry.id)) seatsSyncFront(plan());
     });
     if (id === 'names-file' && control.files[0]) {
       const targetId = plan().id; importing = true; renderInPlace();
@@ -380,7 +377,7 @@ function seatsStart(root, unlockKey) {
     if (mode !== 'layout' || !entryNode || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault(); selected = entryNode.dataset.item;
     const delta = event.shiftKey ? 1 : 8;
-    change(() => { const entry = item(); entry.x = number(entry.x + (event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0), SEATS_BOUNDS.left, SEATS_BOUNDS.right - entry.width); entry.y = number(entry.y + (event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0), SEATS_BOUNDS.top, SEATS_BOUNDS.bottom - entry.height); });
+    change(() => { const entry = item(); entry.x = number(entry.x + (event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0), SEATS_BOUNDS.left, SEATS_BOUNDS.right - entry.width); entry.y = number(entry.y + (event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0), SEATS_BOUNDS.top, itemBottom(entry) - entry.height); });
   });
   root.addEventListener('pointerdown', event => {
     const handle = event.target.closest('.drag-handle'), node = handle?.closest('[data-item]');
@@ -399,7 +396,7 @@ function seatsStart(root, unlockKey) {
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true; selected = drag.entry.id;
     drag.entry.x = number(drag.x + dx, SEATS_BOUNDS.left, SEATS_BOUNDS.right - drag.entry.width);
-    drag.entry.y = number(drag.y + dy, SEATS_BOUNDS.top, SEATS_BOUNDS.bottom - drag.entry.height);
+    drag.entry.y = number(drag.y + dy, SEATS_BOUNDS.top, itemBottom(drag.entry) - drag.entry.height);
     drag.node.setAttribute('transform', 'translate(' + drag.entry.x + ' ' + drag.entry.y + ')');
   });
   function endDrag(event) {

@@ -39,10 +39,23 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('#seat-count').inputValue(), '5');
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
     assert.equal(await page.locator('.room-stage [data-door]').count(),4);
+    assert.equal(await page.locator('.room-stage [data-kind="open"]').count(),2);
+    assert.equal(await page.locator('.room-stage .room-opening path').count(),0);
+    assert.equal(await page.locator('.room-stage [data-walkway]').count(),4);
+    assert.equal(starting.plans[0].objects.filter(object=>object.type==='cabinet').length,5);
+    const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.equal(c1.x+c1.width,d1.x);
+    for(const id of ['B2','C2','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
+    await page.screenshot({path:path.join(output,'default-room.png'),fullPage:true});
+    await page.locator('.room-stage [data-table="rav-seat"][data-seat="0"]').click();
+    await page.locator('#seat-name-input').fill('Rav Cohen');await page.locator('#seat-name-input').press('Enter');
+    assert.equal((await state()).plans[0].objects.find(object=>object.type==='rav').seats.filter(Boolean).length,1);
+    assert.equal(await page.locator('.room-stage .rav-seat').getAttribute('data-facing'),'south');
+    await page.keyboard.press('Control+z');await page.locator('#selected-item').selectOption('A1');
     assert.ok(starting.plans[0].tables.find(t=>t.id==='B9').y > starting.plans[0].tables.find(t=>t.id==='A8').y);
     await page.locator('#bulk-settings summary').click();
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
     assert.ok((await state()).plans[0].tables.every(table => table.count === 4));
+    const joined=(await state()).plans[0],joinedC=joined.tables.find(t=>t.id==='C1'),joinedD=joined.tables.find(t=>t.id==='D1');assert.equal(joinedC.x+joinedC.width,joinedD.x);
     const csv = '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\nדוד כהן\r\nRabbi Shmuel Alexander Friedman\r\nYosef Cohen\r\n';
     await page.locator('#names-file').setInputFiles({name:'names.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
     await page.getByText('4 names added; 1 duplicates skipped.').waitFor();
@@ -90,16 +103,16 @@ const server = http.createServer((req,res) => {
     await page.getByRole('button',{name:'Edit layout',exact:true}).click();
     await page.getByRole('button',{name:'+ Pillar',exact:true}).click();
     await page.getByRole('button',{name:'+ Sefarim cabinet',exact:true}).click();
-    current = (await state()).plans[0]; assert.deepEqual(current.objects.map(o=>o.type), ['bimah','pillar','cabinet']);
-    const cabinetId = current.objects[2].id, cabinetX=current.objects[2].x;
+    current = (await state()).plans[0]; assert.deepEqual(current.objects.slice(-2).map(o=>o.type), ['pillar','cabinet']);
+    const cabinetId = current.objects.at(-1).id, cabinetX=current.objects.at(-1).x;
     await page.locator('[data-item="'+cabinetId+'"]').focus(); await page.keyboard.press('ArrowRight');
-    assert.equal((await state()).plans[0].objects[2].x, cabinetX+8);
+    assert.equal((await state()).plans[0].objects.find(object=>object.id===cabinetId).x, cabinetX+8);
     await page.getByRole('button',{name:'Undo',exact:true}).click();
-    assert.equal((await state()).plans[0].objects[2].x, cabinetX);
+    assert.equal((await state()).plans[0].objects.find(object=>object.id===cabinetId).x, cabinetX);
     await page.getByRole('button',{name:'Redo',exact:true}).click();
-    assert.equal((await state()).plans[0].objects[2].x,cabinetX+8);
+    assert.equal((await state()).plans[0].objects.find(object=>object.id===cabinetId).x,cabinetX+8);
     await page.keyboard.press('Control+z');
-    assert.equal((await state()).plans[0].objects[2].x,cabinetX);
+    assert.equal((await state()).plans[0].objects.find(object=>object.id===cabinetId).x,cabinetX);
     // Copy into a separate seat, keeping the original person in place.
     const source=page.locator('.room-stage [data-table="A2"][data-seat="1"]');
     await source.click();await page.getByRole('button',{name:'Copy name',exact:true}).click();
@@ -155,7 +168,7 @@ const server = http.createServer((req,res) => {
     const countBox=await page.locator('#seat-count').boundingBox(),countBeforeWheel=await page.locator('#seat-count').inputValue();
     await page.mouse.move(countBox.x+30,countBox.y+15);await page.mouse.wheel(0,400);await page.waitForTimeout(150);
     assert.equal(await page.locator('#seat-count').inputValue(),countBeforeWheel,'Scrolling must not change a focused seat count');
-    const labels=await page.locator('.room-stage .table-label').evaluateAll(nodes=>nodes.map(node=>({label:node.textContent,outside:node.getBoundingClientRect().bottom<=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect().top+1})));
+    const labels=await page.locator('.room-stage .table-item .table-label').evaluateAll(nodes=>nodes.map(node=>({label:node.textContent,outside:node.getBoundingClientRect().bottom<=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect().top+1})));
     assert.ok(labels.every(label=>label.outside),JSON.stringify(labels));
     const saved=await state();
     for (const width of [1440,760,375]) {
@@ -208,7 +221,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v2'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v3'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
