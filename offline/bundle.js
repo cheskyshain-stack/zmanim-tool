@@ -3525,6 +3525,7 @@ const ADMIN_NAV_SECTIONS = [
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
+    { href: '/seats/', label: 'Seats', icon: 'generate', description: 'Arrange tables, assign names, and print the shul seating plan.' },
     { tab: 'status', icon: 'status', description: 'Check which schedules are showing on the website and when they change.' },
     { tab: 'traffic', icon: 'traffic', description: 'Review website views, visits, traffic sources, and admin activity for the same date range.' },
   ] },
