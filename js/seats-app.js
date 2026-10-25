@@ -331,6 +331,9 @@ function seatsStart(root, unlockKey) {
   root.addEventListener('input', event => {
     if (event.target.id === 'people-search') { search = event.target.value; root.querySelector('#people-list').innerHTML = peopleList(); }
   });
+  root.addEventListener('wheel', () => {
+    if (document.activeElement?.matches('input[type="number"]')) document.activeElement.blur();
+  }, { passive: true, capture: true });
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
     if (id === 'selected-item') { selected = control.value; renderInPlace(); return; }

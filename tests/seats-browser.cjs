@@ -151,6 +151,10 @@ const server = http.createServer((req,res) => {
     await page.mouse.move(panel.x+50,Math.min(800,panel.y+180));await page.mouse.wheel(0,450);await page.waitForTimeout(150);
     assert.ok(await page.evaluate(()=>scrollY>100),'Wheel over sidebar should scroll the page');
     assert.equal(await page.locator('.seats-panel').evaluate(node=>node.scrollTop),0);
+    await page.locator('#seat-count').scrollIntoViewIfNeeded();await page.locator('#seat-count').focus();
+    const countBox=await page.locator('#seat-count').boundingBox(),countBeforeWheel=await page.locator('#seat-count').inputValue();
+    await page.mouse.move(countBox.x+30,countBox.y+15);await page.mouse.wheel(0,400);await page.waitForTimeout(150);
+    assert.equal(await page.locator('#seat-count').inputValue(),countBeforeWheel,'Scrolling must not change a focused seat count');
     const labels=await page.locator('.room-stage .table-label').evaluateAll(nodes=>nodes.map(node=>({label:node.textContent,outside:node.getBoundingClientRect().bottom<=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect().top+1})));
     assert.ok(labels.every(label=>label.outside),JSON.stringify(labels));
     const saved=await state();
