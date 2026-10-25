@@ -41,7 +41,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .print-settings select{width:auto;min-height:34px;font-size:12px;background:#fff;color:var(--seats-navy);padding:6px 25px 6px 9px}
 .seats-workspace{display:grid;grid-template-columns:270px minmax(0,1fr);gap:15px;align-items:start}
 .seats-panel,.seats-canvas{background:#fff;border:1px solid var(--seats-border);border-radius:9px;min-width:0}
-.seats-panel{padding:18px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;scrollbar-width:thin}
+.seats-panel{padding:18px;position:static;overflow:visible}
 .seats-panel label{display:block;font-size:12px;font-weight:600;margin:11px 0 4px}
 .seats-panel h2{margin-bottom:12px}
 .field-note{font-size:11px;line-height:1.5;color:var(--seats-muted);margin:7px 0 10px}
@@ -66,7 +66,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .canvas-buttons button{font-size:11px;padding:4px 8px;min-height:29px}
 .canvas-buttons [data-action=zoom-in],.canvas-buttons [data-action=zoom-out]{font-size:19px;width:29px;padding:0}
 .setup-hint{font-size:11px;margin:0 17px 7px;color:var(--seats-muted)}
-.room-scroll{overflow:auto;overscroll-behavior:contain;min-width:0;background:#fff}
+.room-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;overscroll-behavior-y:auto;min-width:0;background:#fff;touch-action:pan-x pan-y}
 .room-stage{min-width:100%;max-width:none}
 .room-diagram{display:block;width:100%;height:auto;color:#23354a;--seat-fill:#edf3f7;--table-fill:#fbf5e8;--object-fill:#f1f3f4}
 .room-diagram.monochrome{color:#111;--seat-fill:#fff;--table-fill:#fff;--object-fill:#fff}
@@ -85,12 +85,35 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .chair-marker{fill:none;stroke:currentColor;stroke-width:.9;pointer-events:none}
 .pending-seats{font:11px Arial,sans-serif;fill:#777;pointer-events:none}
 .room-item{cursor:pointer}
-.seats-layout-mode .room-item{cursor:grab;touch-action:none}
-.seats-layout-mode .room-item:active{cursor:grabbing}
+.seats-layout-mode .drag-handle{cursor:grab;touch-action:none}
+.seats-layout-mode .drag-handle:active{cursor:grabbing}
 .room-item.selected>.table-surface,.room-item.selected>.object-surface{stroke:#2a67a0;stroke-width:2.5;stroke-dasharray:6 3}
 .room-item:focus-visible,.table-seat:focus-visible{outline:0}
 .room-item:focus-visible>.table-surface,.room-item:focus-visible>.object-surface,.table-seat:focus-visible .seat-area{stroke:#2a67a0;stroke-width:3}
 .table-seat:hover .seat-area{fill:#e7edf3}
+.table-seat.is-active .seat-area{stroke:#2a67a0;stroke-width:2;fill:#eef4fa}
+.walkway path{fill:none;stroke:#aaa;stroke-width:.8;stroke-dasharray:6 6}
+.walkway text{fill:#666;font:11px Arial,sans-serif;letter-spacing:2px}
+.room-door path{fill:none;stroke:currentColor;stroke-width:1.2}
+.room-door .door-swing{stroke-dasharray:3 3;stroke-width:.7}
+.room-door .door-gap{stroke:#fff;stroke-width:7}
+.room-door text{fill:currentColor;font:11px Arial,sans-serif}
+.seat-editor{position:fixed;z-index:1000;width:340px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;background:#fff;border:1px solid #8296a9;border-top:3px solid var(--seats-gold);border-radius:7px;padding:15px;box-shadow:0 5px 22px rgb(20 43 70 / 18%)}
+.seat-editor[hidden]{display:none}
+.seat-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.seat-editor-heading h2{font-size:18px;margin:0}
+.seat-editor-heading button{border:0;font-size:20px;padding:2px 8px;min-height:28px}
+.seat-editor label{display:block;font-size:12px;margin-bottom:5px;font-weight:600}
+.seat-editor input{font-size:16px}
+.seat-editor p{font-size:11px;color:var(--seats-muted);line-height:1.5;margin:10px 0}
+.seat-editor small{font-size:10px;color:var(--seats-muted)}
+.seat-editor-actions{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.seat-editor-actions button{font-size:11px;padding:7px 8px}
+.seat-suggestions{max-height:170px;overflow:auto}
+.seat-suggestions:empty{display:none}
+.seat-suggestions button{display:block;text-align:left;width:100%;border:0;border-bottom:1px solid #e1e5e9;border-radius:0;font-size:13px;font-weight:400;padding:8px}
+.seat-suggestions small{display:block;margin-top:2px}
+.seat-suggestions button[aria-selected=true]{background:#e9f1f8}
 .object-surface{stroke:currentColor;stroke-width:1.4}
 .object-surface:not([fill]){fill:var(--object-fill)}
 .shelf-line{stroke:currentColor;stroke-width:.6;fill:none}
