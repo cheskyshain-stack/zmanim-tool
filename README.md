@@ -6,6 +6,27 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 ## Development
 
+The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
+Its PIN is separate from the existing admin PIN. It starts with columns of 8, 9,
+9, and 8 tables, with the extra middle tables at the back. Seat counts start unset.
+Set counts individually or by column, then add people manually or import the first
+worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
+Names are drawn inside the tables; small chairs are on one side facing the Aron.
+Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
+dragging or keyboard arrows. Width, depth, and position can also be entered.
+
+Seats saves its own versioned plans in `lakewood-commons-seats-v1`, separately from
+schedule settings. Nothing uploads to a server. Download a backup to move plans
+between devices. Restore adds plans instead of replacing current ones, and Undo
+can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
+black-and-white or color; match the selected paper size in the browser print dialog.
+The build stamps `seats/index.html` and includes it in `dist/`, outside public
+routing and the sitemap, with `noindex` and a robots exclusion.
+
+Verify the tool with `node --test tests/seats-model.mjs` and
+`node tests/seats-browser.cjs` after building `dist/`. The browser check generates
+actual one-page Letter and Tabloid PDFs and checks their sizes and names.
+
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
 ported from `Lakewood Commons Zmanim tables.xlsx`.
 

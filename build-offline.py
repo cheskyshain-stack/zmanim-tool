@@ -982,7 +982,7 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "offline"]
 DIST_FILES = ["index.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
@@ -1110,6 +1110,9 @@ def main():
     # modules. Its own entry, since it is a much smaller program than the admin.
     stamp_css_versions(ROOT / "texts" / "index.html", "../")
     stamp_js_versions(ROOT / "texts" / "index.html", "../", "texts-app.js")
+    # Seats is a separate browser-local tool, with its own PIN and no public route.
+    stamp_css_versions(ROOT / "seats" / "index.html", "../")
+    stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain
