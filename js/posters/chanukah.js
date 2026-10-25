@@ -66,6 +66,15 @@ const CH_REGULAR_SHIFT_MINUTES = 10;
  * the shared Chanukah average when all weekday candidates are pushed by netz. */
 const CH_RC_FLOOR_MINUTES = 20;
 
+/** The shul already printed 6:43 for Rosh Chodesh during Chanukah 5787.
+ * Keep that announced time on both dates, without changing sunrise calculations,
+ * ordinary Chanukah mornings, later Rosh Chodesh dates or any other year. */
+function printedChanukahFirstMinyan(serial) {
+  if (serial < dateFromHebrew(30, 9, 5787) || serial > dateFromHebrew(1, 10, 5787)) return null;
+  return clockTime(6, 43,
+    'The shul confirmed the already printed 6:43 first minyan for Rosh Chodesh during Chanukah 5787, December 10 and 11, 2026 only');
+}
+
 /** The weekday afternoon's own fixed slots, off `js/sheets/weekday.js`'s own `minchaParts`:
  *  1:00, 1:15 or 1:20, and 1:35 or 1:40, each weighed against the latest מנחה גדולה לחומרא
  *  reaches across the relevant week, exactly the way the everyday board decides them, in the
@@ -211,6 +220,9 @@ export function chanukahShacharisDay(serial, settings) {
       clockTime(8, 20, "the everyday board's own morning minyan, unmoved").mark('*'),
       clockTime(8, 40, "the everyday board's own morning minyan, unmoved").underline(),
     ];
+
+  const printedFirst = printedChanukahFirstMinyan(serial);
+  if (printedFirst) lines[0] = printedFirst;
 
   return { serial, isRoshChodesh, netz, netzBinding, lines };
 }
@@ -379,6 +391,11 @@ export function combineShacharisRows(days) {
     if (group[0].isRoshChodesh && !allPushed) {
       vasikin.time = cells[0].text;
       vasikin.trace = group[0].lines[0];
+    }
+    const printedFirst = printedChanukahFirstMinyan(group[0].serial);
+    if (printedFirst) {
+      vasikin.time = printedFirst.plain();
+      vasikin.trace = printedFirst;
     }
     cells[0] = toCell(vasikin.trace);
     return { label, cells, isRoshChodesh: group[0].isRoshChodesh, vasikin };
