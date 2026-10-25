@@ -117,6 +117,13 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .object-surface{stroke:currentColor;stroke-width:1.4}
 .object-surface:not([fill]){fill:var(--object-fill)}
 .shelf-line{stroke:currentColor;stroke-width:.6;fill:none}
+.cabinet-label-bg{fill:#fff;stroke:none}
+.room-opening text{fill:currentColor;font:11px Arial,sans-serif}
+.rear-side-walkway text{font-size:10px;letter-spacing:1px}
+.station-frame{fill:none;stroke:none}
+.rav-chair,.amud-top{fill:none;stroke:currentColor;stroke-width:1.4}
+.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2}
+.rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2;stroke-dasharray:6 3}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
 .storage-warning,.fit-warning{padding:12px 15px;border:1px solid #d7b881;border-radius:5px;background:#fff8e9;font-size:12px;margin-bottom:12px;color:#6f4c17}

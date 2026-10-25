@@ -1,5 +1,5 @@
 import { escAttr, escText } from '../util.js';
-import { seatsWriteName } from './model.js';
+import { seatsWriteName, seatsItems } from './model.js';
 
 export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify }) {
   const card = document.createElement('section');
@@ -8,7 +8,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
   let active = null, copied = '', suggestions = [], highlight = -1;
   const text = value => escText(value), attr = value => escAttr(value);
   const personAt = (tableId, index) => {
-    const plan = getPlan(), table = plan.tables.find(entry => entry.id === tableId);
+    const plan = getPlan(), table = seatsItems(plan).find(entry => entry.id === tableId);
     return plan.people.find(person => person.id === table?.seats[index]);
   };
   function position() {
@@ -33,14 +33,14 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
     const ok = commit(() => seatsWriteName(getPlan(), target.tableId, target.index, name, { personId, duplicate }), 'Seat saved.');
     if (!ok) return;
     if (next) {
-      const seats = getPlan().tables.flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
+      const seats = seatsItems(getPlan()).flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
       const index = seats.findIndex(seat => seat.tableId === target.tableId && seat.index === target.index);
       const destination = seats[(index + next + seats.length) % seats.length];
       if (destination) open(destination.tableId, destination.index);
     } else seatNode(target.tableId, target.index)?.focus({ preventScroll: true });
   }
   function location(person) {
-    for (const table of getPlan().tables) {
+    for (const table of seatsItems(getPlan())) {
       const index = table.seats.indexOf(person.id);
       if (index >= 0) return table.label + ' · Seat ' + (index + 1) + ' · move here';
     }
@@ -57,7 +57,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
   }
   function open(tableId, index, initial) {
     if (active) save();
-    const table = getPlan().tables.find(entry => entry.id === tableId);
+    const table = seatsItems(getPlan()).find(entry => entry.id === tableId);
     if (!table || index < 0 || index >= (table.count ?? 0)) return;
     onSelect(tableId);
     active = { tableId, index };

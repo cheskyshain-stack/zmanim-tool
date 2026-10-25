@@ -1,10 +1,62 @@
 export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
-export const SEATS_ROOM = { width: 1200, height: 900 };
-export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 850 };
+export const SEATS_ROOM = { width: 1200, height: 1000 };
+export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 43;
+export const SEATS_LAYOUT_VERSION = 3;
+export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B6', 'C6'];
+
+export function seatsItems(plan) {
+  return [...plan.tables, ...plan.objects.filter(object => object.type === 'rav')];
+}
+
+export function seatsFront(plan) {
+  const b1 = plan.tables.find(table => table.id === 'B1');
+  const c1 = plan.tables.find(table => table.id === 'C1');
+  const left = b1 ? b1.x + b1.width : 515, right = c1?.x ?? 753;
+  const gap = Math.max(90, right - left);
+  const aronWidth = Math.min(122, Math.max(50, Math.round(gap * 0.52)));
+  const ravWidth = Math.min(56, Math.max(30, Math.round(gap * 0.24)));
+  const spacing = (gap - aronWidth - ravWidth) / 3;
+  return { aron: { x: left + spacing, y: 70, width: aronWidth, height: 48 },
+    rav: { x: left + 2 * spacing + aronWidth, y: 70, width: ravWidth, height: 70 } };
+}
+
+export function seatsSyncFront(plan) {
+  const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
+  if (c1 && d1) { c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y; }
+  const rav = plan.objects.find(object => object.type === 'rav');
+  if (rav) Object.assign(rav, seatsFront(plan).rav);
+}
+
+export function seatsSyncRear(plan) {
+  const a6 = plan.tables.find(table => table.id === 'A6');
+  for (const id of ['A7', 'A8', 'D7', 'D8']) {
+    const table = plan.tables.find(entry => entry.id === id);
+    if (!table) continue;
+    table.anchor = 'right';
+    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : 232) : id === 'D8' ? 1159 : 1183;
+    table.x = edge - table.width;
+  }
+}
+
+function seatsRearLayout(plan) {
+  seatsSyncRear(plan);
+  const fixtures = [
+    { id: 'rear-case-left', type: 'cabinet', label: 'Back sefarim (left)', x: 17, y: 936, width: 216, height: 24 },
+    { id: 'rear-case-center', type: 'cabinet', label: 'Back sefarim (center)', x: 299, y: 936, width: 602, height: 24 },
+    { id: 'rear-case-right', type: 'cabinet', label: 'Back sefarim (right)', x: 967, y: 936, width: 216, height: 24 },
+    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: 706, width: 24, height: 230 },
+    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: 706, width: 24, height: 230 },
+    { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
+    { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 148, width: 64, height: 48 },
+  ];
+  for (const fixture of fixtures) if (!plan.objects.some(object => object.id === fixture.id)) plan.objects.push(fixture);
+  seatsSyncFront(plan);
+}
 
 function seatsDefaultTable(column, row) {
-  const count = (column === 'A' || column === 'D') && row > 6 ? 3 : 5;
+  const count = (column === 'A' || column === 'D') && (row === 7 || row === 8) ? 3
+    : SEATS_FOUR_SEAT_TABLES.includes(column + row) ? 4 : 5;
   const anchor = column === 'A' && row <= 6 ? 'left' : column === 'D' && row <= 6 ? 'right' : 'center';
   const width = count * SEATS_SEAT_WIDTH;
   const center = { A: 124.5, B: 407.5, C: 792.5, D: 1075.5 }[column];
@@ -15,23 +67,34 @@ function seatsDefaultTable(column, row) {
 }
 
 export function seatsUpgradePlan(plan) {
-  if (plan.layoutVersion === 2) return 0;
+  if (plan.layoutVersion === SEATS_LAYOUT_VERSION) return 0;
   let released = 0;
-  for (const table of plan.tables) {
-    const match = /^([ABCD])([1-9])$/.exec(table.id);
-    if (!match || table.column !== match[1]) continue;
-    const fresh = seatsDefaultTable(match[1], Number(match[2]));
-    const count = fresh.count === 3 ? 3 : table.count ?? 5;
-    const assignments = table.seats;
-    released += assignments.slice(count).filter(Boolean).length;
-    Object.assign(table, fresh, { label: table.label, count, seats: Array.from({ length: count }, (_, i) => assignments[i] || null) });
-    seatsSetCount(table, count);
+  if ((plan.layoutVersion ?? 1) < 2) {
+    for (const table of plan.tables) {
+      const match = /^([ABCD])([1-9])$/.exec(table.id);
+      if (!match || table.column !== match[1]) continue;
+      const fresh = seatsDefaultTable(match[1], Number(match[2]));
+      const count = fresh.count === 3 ? 3 : table.count ?? fresh.count;
+      const assignments = table.seats;
+      released += assignments.slice(count).filter(Boolean).length;
+      Object.assign(table, fresh, { label: table.label, count, seats: Array.from({ length: count }, (_, i) => assignments[i] || null) });
+      seatsSetCount(table, count);
+    }
   }
   const bimah = plan.objects.find(object => object.type === 'bimah');
   const position = { x: 548, y: 420, width: 104, height: 90 };
-  if (bimah) Object.assign(bimah, position);
-  else plan.objects.push({ id: seatsUid(), type: 'bimah', label: 'Bimah', ...position });
-  plan.layoutVersion = 2;
+  if (bimah && (plan.layoutVersion ?? 1) < 2) Object.assign(bimah, position);
+  else if (!bimah) plan.objects.push({ id: seatsUid(), type: 'bimah', label: 'Bimah', ...position });
+  for (const id of SEATS_FOUR_SEAT_TABLES) {
+    const table = plan.tables.find(entry => entry.id === id);
+    if (table) released += seatsSetCount(table, 4);
+  }
+  for (const id of ['A7', 'A8', 'D7', 'D8']) {
+    const table = plan.tables.find(entry => entry.id === id);
+    if (table) released += seatsSetCount(table, 3);
+  }
+  seatsRearLayout(plan);
+  plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
 
@@ -45,9 +108,11 @@ export function seatsCreatePlan(name = 'Main shul') {
     const rows = col === 0 || col === 3 ? 8 : 9;
     for (let row = 1; row <= rows; row++) tables.push(seatsDefaultTable(column, row));
   });
-  return { id: seatsUid(), name, layoutVersion: 2, tables,
+  const plan = { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION, tables,
     objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 420, width: 104, height: 90 }],
     people: [], paper: 'letter', monochrome: true };
+  seatsRearLayout(plan);
+  return plan;
 }
 
 export function seatsCreateState() {
@@ -55,7 +120,7 @@ export function seatsCreateState() {
   return { version: 1, activeId: plan.id, plans: [plan] };
 }
 
-export function seatsSetCount(table, value) {
+export function seatsSetCount(table, value, plan = null) {
   const count = value === '' || value === null ? null : Number(value);
   if (count !== null && (!Number.isInteger(count) || count < 0 || count > 16)) {
     throw new Error('Choose a whole number from 0 to 16 seats.');
@@ -70,11 +135,13 @@ export function seatsSetCount(table, value) {
     else if (table.anchor !== 'left') table.x += (previous - table.width) / 2;
     table.x = Math.max(SEATS_BOUNDS.left, Math.min(SEATS_BOUNDS.right - table.width, table.x));
   }
+  if (plan?.layoutVersion === SEATS_LAYOUT_VERSION && ['B1', 'C1', 'D1'].includes(table.id)) seatsSyncFront(plan);
+  if (plan?.layoutVersion === SEATS_LAYOUT_VERSION && ['A6', 'A7', 'A8', 'D7', 'D8'].includes(table.id)) seatsSyncRear(plan);
   return removed;
 }
 
 export function seatsWriteName(plan, tableId, index, text, { duplicate = false, personId = null } = {}) {
-  const table = plan.tables.find(entry => entry.id === tableId);
+  const table = seatsItems(plan).find(entry => entry.id === tableId);
   if (!table || index < 0 || index >= (table.count ?? 0)) throw new Error('Choose a seat first.');
   const name = String(text).replace(/\s+/g, ' ').trim();
   if (!name) { seatsAssign(plan, tableId, index, null); return null; }
@@ -97,18 +164,18 @@ export function seatsWriteName(plan, tableId, index, text, { duplicate = false, 
 }
 
 export function seatsAssign(plan, tableId, index, personId) {
-  const table = plan.tables.find(item => item.id === tableId);
+  const table = seatsItems(plan).find(item => item.id === tableId);
   if (!table || !Number.isInteger(index) || index < 0 || index >= (table.count ?? 0)) {
     throw new Error('Choose a seat inside a table first.');
   }
   if (personId !== null && !plan.people.some(person => person.id === personId)) throw new Error('Choose a person first.');
   // Moving someone frees their previous seat, and a displaced person stays on the list.
-  for (const item of plan.tables) item.seats = item.seats.map(id => id === personId ? null : id);
+  for (const item of seatsItems(plan)) item.seats = item.seats.map(id => id === personId ? null : id);
   table.seats[index] = personId;
 }
 
 export function seatsAssigned(plan) {
-  return new Set(plan.tables.flatMap(table => table.seats).filter(Boolean));
+  return new Set(seatsItems(plan).flatMap(table => table.seats).filter(Boolean));
 }
 
 export function seatsAddNames(plan, names) {
@@ -155,16 +222,16 @@ export function seatsNormalizeState(input) {
       peopleIds.add(pid);
       return { id: pid, name: str(person.name, 160, 'name') };
     });
-    const box = item => {
+    const box = (item, table = false) => {
       const oid = str(item.id, 100, 'object ID');
       if (objectIds.has(oid)) fail('duplicate object ID.');
       objectIds.add(oid);
-      const width = num(item.width, 20, 1166), height = num(item.height, 20, 780);
+      const width = num(item.width, 20, 1166), height = num(item.height, 20, 890);
       return { id: oid, label: str(item.label, 80, 'label'),
-        x: num(item.x, SEATS_BOUNDS.left, SEATS_BOUNDS.right - width), y: num(item.y, SEATS_BOUNDS.top, SEATS_BOUNDS.bottom - height), width, height };
+        x: num(item.x, SEATS_BOUNDS.left, SEATS_BOUNDS.right - width), y: num(item.y, SEATS_BOUNDS.top, SEATS_BOUNDS.bottom - height - (table ? 14 : 0)), width, height };
     };
     const tables = list(raw.tables, 200, 'tables').map(table => {
-      const base = box(table);
+      const base = box(table, true);
       if (base.width < 60 || base.height < 40) fail('table too small.');
       if (table.count !== null && (!Number.isInteger(table.count) || table.count < 0 || table.count > 16)) fail('invalid seat count.');
       const seats = list(table.seats, 16, 'seats');
@@ -178,11 +245,21 @@ export function seatsNormalizeState(input) {
         anchor: ['left', 'right'].includes(table.anchor) ? table.anchor : 'center', autoSize: table.autoSize !== false,
         count: table.count, seats: [...seats] };
     });
-    const objects = list(raw.objects, 100, 'room objects').map(item => {
-      if (!['pillar', 'cabinet', 'bimah', 'label'].includes(item.type)) fail('unknown room object.');
-      return { ...box(item), type: item.type };
+    const objects = list(raw.objects, 200, 'room objects').map(item => {
+      if (!['pillar', 'cabinet', 'bimah', 'label', 'rav', 'amud'].includes(item.type)) fail('unknown room object.');
+      const base = { ...box(item), type: item.type };
+      if (item.type !== 'rav') return base;
+      if (base.width < 30 || base.height < 70) fail('rav station too small.');
+      const seats = list(item.seats, 1, 'rav seat');
+      if (seats.length !== 1) fail('invalid rav seat.');
+      const person = seats[0];
+      if (person !== null) {
+        if (!peopleIds.has(person) || assignments.has(person)) fail('missing or repeated seat assignment.');
+        assignments.add(person);
+      }
+      return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: raw.layoutVersion === 2 ? 2 : 1, people, tables, objects,
+    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');
