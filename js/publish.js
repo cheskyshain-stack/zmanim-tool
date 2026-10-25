@@ -1,3 +1,4 @@
+import { websiteNow } from './website-clock.js';
 import { loadTables } from './data-loader.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 import { computeSeasonWeeks, computeWeekdayWeeks, nextAvailableYearFor } from './sheets/weeks.js';
@@ -98,7 +99,7 @@ function withoutRetiredDrasha(data) {
 
 /** Reads what is currently published, or null when nothing is. A 404 is the normal state
  *  before the first publish, not an error worth shouting about. */
-export async function loadPublished({ automatic = false } = {}) {
+export async function loadPublished({ automatic = false, now = websiteNow() } = {}) {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) throw new Error('Schedule download failed: ' + res.status);
@@ -121,7 +122,7 @@ export async function loadPublished({ automatic = false } = {}) {
     }
     if (!data || !Array.isArray(data.sheets)) throw new Error('Invalid schedule data');
     const clean = withoutRetiredDrasha(data);
-    return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
+    return automatic ? buildAutomaticCharts(clean, await loadTables(), now) : clean;
   } catch (err) {
     if (err?.message === 'blocked') throw err;
     throw err;

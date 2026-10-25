@@ -682,6 +682,7 @@ def stamp_analytics(page: Path, *, admin=False):
         "function(){try{"
         f'if(location.hostname!=="{host}")return;'
         f'var p=new URLSearchParams(location.search),k="{ANALYTICS_OPT_OUT}";'
+        'if(p.has("website-preview"))return;'
         f'if(p.has("{ANALYTICS_OPT_PARAM}")){{'
         f'var off=p.get("{ANALYTICS_OPT_PARAM}")!=="on";'
         "try{off?localStorage.setItem(k,'1'):localStorage.removeItem(k);"

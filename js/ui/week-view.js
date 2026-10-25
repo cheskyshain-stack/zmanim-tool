@@ -1,3 +1,4 @@
+import { websiteNow } from '../website-clock.js';
 import { safeHeaderImage, sanitizeRichText } from '../security.js';
 import { renderWeeklyReader, readerWeekIndex, readerWeekHasTimes } from './weekly-reader.js';
 // One week on its own page, for the congregation to read rather than for printing a
@@ -82,7 +83,7 @@ const CARD_ORDER_KEY = 'zmanim-week-card-order';
  *  asks what time it is here. */
 function autoCardOrder(state, settings) {
   try {
-    const { serial, mins } = shulNow(new Date(), settings);
+    const { serial, mins } = shulNow(websiteNow(), settings);
     const day = dateFromSerial(serial).getUTCDay();
     if (day === 5) return 'shabbos';
     // On Shabbos itself it stays the שבת card until the card is spent, the same moment the
@@ -205,7 +206,7 @@ const LUACH_SKIP_MAX = 3;
  *  default is the first week with something left on it rather than simply the first that is
  *  not in the past), pulled out so the admin's status panel can ask it directly. A second
  *  reader of the one answer, not a second way of working it out. */
-export function currentReaderWeek(state, settings, now = new Date()) {
+export function currentReaderWeek(state, settings, now = websiteNow()) {
   const index = readerWeekIndex(state);
   const today = shulNow(now, settings).serial;
   const serials = [...index.keys()].filter((s) => s >= today).sort((a, b) => a - b);
@@ -1495,7 +1496,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const settings = resolveSettings(state.settings);
   const index = luach ? readerWeekIndex(state) : weekIndex(state);
   const allSerials = [...index.keys()].sort((a, b) => a - b);
-  const today = luach ? shulNow(new Date(), settings).serial : null;
+  const today = luach ? shulNow(websiteNow(), settings).serial : null;
   const availableSerials = luach ? allSerials.filter(s => s >= today) : allSerials;
   let serials = availableSerials;
 

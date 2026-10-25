@@ -1,3 +1,4 @@
+import { websiteNow } from '../website-clock.js';
 // Small pieces of navigation that more than one view needs.
 //
 // Their own module because they are all the two views share: with them inside week-view
@@ -27,7 +28,7 @@ import { shulNow } from '../zmanim/solar.js';
  *  than Lakewood does. Nothing has called it without both since the fallback was written,
  *  so there was nothing left for it to protect. */
 export function currentSerial(serials, settings, endsAt) {
-  const { serial: today, mins } = shulNow(new Date(), settings);
+  const { serial: today, mins } = shulNow(websiteNow(), settings);
   const over = (s) => s < today || (s === today && mins >= endsAt(s));
   const ahead = serials.filter((s) => !over(s));
   return ahead.length ? Math.min(...ahead) : Math.max(...serials);

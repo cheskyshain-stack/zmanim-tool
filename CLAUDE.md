@@ -922,6 +922,20 @@ Export/Import in Settings moves it between devices.
 
 ## Public schedule API
 
+Admin **Website preview** (`/admin/#preview`) embeds the real congregation pages with
+a date/time chosen in the published shul timezone. Use `websiteNow` only for the public
+document's schedule clock; `luach.js` enables it from the validated `website-preview`
+UTC URL parameter. Never replace global Date, change published settings, or save a
+preview clock into shared storage. Carry the parameter through public navigation and
+new-tab links. Render a clear nonprinted preview banner, preserve footer clearance,
+omit preview visits from analytics and avoid marking chart announcements as seen.
+Automatic charts must be generated around the chosen year. Real visitors and the
+parent admin retain real time. The admin screen's own remembered form selection is
+session-only; dispose its frame observer/message listener when leaving the tab.
+Reject nonexistent DST times and identify repeated times. `tests/website-clock.mjs`
+checks date/time conversion; browser checks must compare preview pages to ordinary
+pages running at the same date/time, including year boundaries and public route changes.
+
 `/api/schedule.json` returns only ten calendar dates: today and the following nine
 days in the shared settings' timezone (`America/New_York` for this shul). It is a
 read-only public JSON feed with no date/range query parameters. Serialize an explicit

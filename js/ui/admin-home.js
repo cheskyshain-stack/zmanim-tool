@@ -3,6 +3,7 @@ export const ADMIN_TAB_LABELS = {
   home: 'Admin home', week: 'Weekly schedules', charts: 'Seasonal charts',
   generate: 'Print layouts', saved: 'Saved copies', posters: 'Special schedules',
   status: 'Website schedule status', traffic: 'Site statistics',
+  preview: 'Website preview',
   settings: 'Schedule settings',
   guide: 'Help & instructions', program: 'Offline program',
 };
@@ -14,6 +15,7 @@ export const ADMIN_NAV_SECTIONS = [
     { tab: 'posters', icon: 'posters', description: 'View and print Yom Tov, fast day, and other special schedules.' },
   ] },
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
+    { tab: 'preview', icon: 'site', description: 'Choose a date and time to see how the congregation website will look.' },
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
     { href: '/seats/', label: 'Seats', icon: 'generate', description: 'Arrange tables, assign names, and print the shul seating plan.' },
