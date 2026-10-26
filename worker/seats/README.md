@@ -64,14 +64,35 @@ Deploy and verify the Worker before enabling that endpoint on the website.
 ## Verify locally
 
 ```sh
-node --test tests/seats-sharing-model.mjs tests/seats-model.mjs
+node --test tests/seats-sharing-model.mjs tests/seats-model.mjs tests/seats-records.mjs
 python build-offline.py
 node scripts/build-schedule-api.mjs
 SEATS_WRANGLER_BIN=/path/to/wrangler node tests/seats-sharing.cjs
 ```
 
 The browser test uses fresh random ports, a local Workerd runtime, isolated
-temporary storage and two Chromium contexts. All test names are synthetic.
+temporary storage and three Chromium contexts. All test names are synthetic.
 It checks server PIN protection, presence, simultaneous assignments, draft text,
 Undo/Redo, offline reconnection, reload persistence, desktop and phone layouts.
 The existing Seats browser and actual PDF print checks must also pass.
+
+Chart dates and change history require the updated Worker. The activation workflow
+has a service_only input to deploy and verify the Worker from a prepared branch
+without publishing the website. Its normal run still connects and publishes the
+site after the service check. The service uses the existing Durable Object and
+keeps existing chart keys and revisions. Each accepted update writes the chart and
+an append-only history entry together. GET /api/plans/:id/history returns 50 entries
+at a time with a nextBefore cursor. Retries do not add duplicate history entries.
+Older records retain their last known editor and time; unknown creation dates and
+unrecorded earlier changes are not invented. GET /api/info reports support for dates
+and history after sign-in.
+
+The same PIN-protected service stores reusable name files at /api/name-lists.
+Uploads normalize and deduplicate up to 2,000 names, retain their file ID across
+retries, and record the uploading organizer and date. GET lists active files;
+GET /api/name-lists/:id reads a file; DELETE removes it from the shared folder.
+DELETE /api/plans/:id removes a shared chart. Deletion markers prevent old clients
+and retried uploads from recreating removed files. Watched clients keep the latest
+local chart copy when the shared file is deleted. All mutations require the server
+session and the existing allowed origin. API feature verification now includes
+sharedNameFiles and deleteFiles as well as changeHistory.

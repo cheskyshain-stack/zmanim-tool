@@ -1689,14 +1689,14 @@ const LEGACY_ACCENT_COLORS = ['#54595f', '#c9ced5'];
 
 const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
-  // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
+  // Printed header: assets/shul-240.jpg + assets/logo-text.png (the shul's
   // actual logo, pulled straight from the workbook) plus this editable text -
   // headerSubtitle under the logo, headerRabbiLine on the opposite side.
   headerSubtitle: 'ליקוואוד קאמענס',
   headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
   // Custom header photo (top-left of the printed page), as a cropped data: URL saved
   // via the image-crop tool in Settings - null means "use the bundled default",
-  // assets/logo-building-icon.png (see sheet-view.js).
+  // assets/shul-240.jpg (see sheet-view.js).
   headerIconImage: null,
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
@@ -1791,7 +1791,7 @@ function sanitizeRichText(value) {
 /** The cropper saves raster data URLs. No remote URLs or SVG from a backup. */
 function safeHeaderImage(value) {
   return typeof value === 'string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(value)
-    ? value : 'assets/logo-building-icon.png';
+    ? value : 'assets/shul-240.jpg';
 }
 
 function backupObject(value) {
@@ -3414,7 +3414,7 @@ function applySeeds(state) {
   // colon so no dash of that kind is left anywhere in the app, including names already
   // saved in a browser.
   for (const rule of state.rules) {
-    if (rule.name?.includes('—')) rule.name = rule.name.replace(/\s*—\s*/g, ': ');
+    if (rule.name?.includes('\u2014')) rule.name = rule.name.replace(/\s*\u2014\s*/g, ': ');
   }
   state.seeded = seeded;
   return state;
@@ -19302,7 +19302,7 @@ function created(iso) {
 //   onSave(dataUrl | null) - called with a new cropped data: URL, or null if the user
 //   removed the custom photo to go back to the bundled default.
 function renderImageCropper(container, currentDataUrl, onSave) {
-  // Matches assets/logo-building-icon.png's own aspect ratio, so a freshly cropped
+  // Matches assets/shul-240.jpg's own aspect ratio, so a freshly cropped
   // photo sits in the header the same shape as the default did.
   const ASPECT = 155 / 90;
   const VIEW_W = 240;
@@ -19315,7 +19315,7 @@ function renderImageCropper(container, currentDataUrl, onSave) {
       <div class="crop-current-row">
         <img class="crop-current" src="${safeHeaderImage(currentDataUrl)}" alt="Current header photo">
         <div>
-          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
+          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/shul-240.jpg)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
           ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove (use default)</button>' : ''}
         </div>

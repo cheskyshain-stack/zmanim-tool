@@ -124,14 +124,14 @@ export const LEGACY_ACCENT_COLORS = ['#54595f', '#c9ced5'];
 
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
-  // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
+  // Printed header: assets/shul-240.jpg + assets/logo-text.png (the shul's
   // actual logo, pulled straight from the workbook) plus this editable text -
   // headerSubtitle under the logo, headerRabbiLine on the opposite side.
   headerSubtitle: 'ליקוואוד קאמענס',
   headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
   // Custom header photo (top-left of the printed page), as a cropped data: URL saved
   // via the image-crop tool in Settings - null means "use the bundled default",
-  // assets/logo-building-icon.png (see sheet-view.js).
+  // assets/shul-240.jpg (see sheet-view.js).
   headerIconImage: null,
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.

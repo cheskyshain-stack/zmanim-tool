@@ -1,16 +1,20 @@
 import { seatsSharedApply, seatsSharedPlan } from '../../js/seats/shared-model.js';
+import { seatsDescribeChanges, seatsRecordMetadata } from '../../js/seats/activity.js';
+import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
 
 const SEATS_SHARED_SESSION_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
 const seatsWorkerHash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const seatsWorkerJson = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const seatsWorkerId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,100}$/.test(value);
+const seatsHistoryKey = (id, revision) => 'history:' + id + ':' + String(revision).padStart(12, '0');
+const seatsLegacyHistory = record => ({ revision: record.revision, at: record.updatedAt, by: record.updatedBy, details: ['Last saved change before change history was enabled. Earlier changes were not recorded.'] });
 
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin'), allowed = env.ALLOWED_ORIGIN || 'https://baismedrashoflakewoodcommons.org';
     if (origin !== allowed) return seatsWorkerJson({ error: 'Open shared plans from the Seats website.' }, 403);
-    const cors = { 'Access-Control-Allow-Origin': allowed, 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type', 'Vary': 'Origin' };
+    const cors = { 'Access-Control-Allow-Origin': allowed, 'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type', 'Vary': 'Origin' };
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     try {
       const response = await env.SEATS_WORKSPACE.get(env.SEATS_WORKSPACE.idFromName('lakewood-commons')).fetch(request);
@@ -76,9 +80,39 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true });
+    if (url.pathname === '/api/name-lists' && request.method === 'GET') {
+      const records = await this.ctx.storage.list({ prefix: 'names:' });
+      return seatsWorkerJson({ files: [...records.values()].filter(record => !record.deletedAt).map(({ id, name, names, createdAt, createdBy }) => ({ id, name, count: names.length, createdAt, createdBy })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+    }
+    if (url.pathname === '/api/name-lists' && request.method === 'POST') {
+      try {
+        const body = await this.body(request); if (!seatsWorkerId(body.id)) throw new Error('Invalid file ID.');
+        const contents = seatsNormalizeNameFile(body);
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'names:' + body.id, existing = await this.ctx.storage.get(key);
+          if (existing) return existing.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(existing);
+          const records = await this.ctx.storage.list({ prefix: 'names:' });
+          if ([...records.values()].filter(record => !record.deletedAt).length >= 50) return seatsWorkerJson({ error: 'There are already 50 name files. Delete an older file before uploading another.' }, 409);
+          const record = { id: body.id, ...contents, createdAt: new Date().toISOString(), createdBy: session.name };
+          await this.ctx.storage.put(key, record); this.broadcast({ type: 'name-lists-changed' });
+          return seatsWorkerJson(record, 201);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
+    const nameFile = /^\/api\/name-lists\/([A-Za-z0-9_-]{8,100})$/.exec(url.pathname);
+    if (nameFile && ['GET', 'DELETE'].includes(request.method)) {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
+        if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
+        if (request.method === 'GET') return record.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(record);
+        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); this.broadcast({ type: 'name-lists-changed' }); }
+        return seatsWorkerJson({ deleted: true });
+      });
+    }
     if (url.pathname === '/api/plans' && request.method === 'GET') {
       const records = await this.ctx.storage.list({ prefix: 'plan:' });
-      return seatsWorkerJson({ plans: [...records.values()].map(record => ({ id: record.plan.id, name: record.plan.name, revision: record.revision, updatedAt: record.updatedAt, updatedBy: record.updatedBy })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
+      return seatsWorkerJson({ plans: [...records.values()].filter(record => !record.deletedAt).map(record => ({ id: record.plan.id, name: record.plan.name, revision: record.revision, ...seatsRecordMetadata(record) })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
     }
     if (url.pathname === '/api/plans' && request.method === 'POST') {
       try {
@@ -87,20 +121,46 @@ export class SeatsWorkspace {
         const plan = seatsSharedPlan({ ...body.plan, id: body.id });
         return await this.ctx.blockConcurrencyWhile(async () => {
           const key = 'plan:' + plan.id, existing = await this.ctx.storage.get(key);
-          if (existing) return seatsWorkerJson(existing);
+          if (existing) return existing.deletedAt ? seatsWorkerJson({ error: 'That chart was deleted.' }, 410) : seatsWorkerJson(existing);
           const plans = await this.ctx.storage.list({ prefix: 'plan:' });
-          if (plans.size >= 30) return seatsWorkerJson({ error: 'There are already 30 shared plans.' }, 409);
-          const record = { plan, revision: 1, updatedAt: new Date().toISOString(), updatedBy: session.name, operations: [] };
-          await this.ctx.storage.put(key, record);
+          if ([...plans.values()].filter(record => !record.deletedAt).length >= 30) return seatsWorkerJson({ error: 'There are already 30 shared charts. Delete an older chart before saving another.' }, 409);
+          const now = new Date().toISOString();
+          const record = { plan, revision: 1, createdAt: now, createdBy: session.name, updatedAt: now, updatedBy: session.name, operations: [], historyFromRevision: 1 };
+          await this.ctx.storage.put({ [key]: record, [seatsHistoryKey(plan.id, 1)]: { revision: 1, at: now, by: session.name, details: ['Saved chart to the site'] } });
           this.broadcast({ type: 'plans-changed' });
           return seatsWorkerJson(record, 201);
         });
       } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
     }
+    const history = /^\/api\/plans\/([A-Za-z0-9_-]{8,100})\/history$/.exec(url.pathname);
+    if (history && request.method === 'GET') {
+      const record = await this.ctx.storage.get('plan:' + history[1]);
+      if (!record || record.deletedAt) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+      const rawBefore = url.searchParams.get('before'), before = rawBefore === null ? null : Number(rawBefore);
+      if (before !== null && (!Number.isSafeInteger(before) || before < 1)) return seatsWorkerJson({ error: 'Invalid history page.' }, 400);
+      const prefix = 'history:' + history[1] + ':';
+      const rows = await this.ctx.storage.list({ prefix, reverse: true, limit: 51, ...(before === null ? {} : { end: seatsHistoryKey(history[1], before) }) });
+      const entries = [...rows.values()];
+      if (!record.historyFromRevision && !entries.length && (before === null || record.revision < before)) entries.push(seatsLegacyHistory(record));
+      return seatsWorkerJson({ entries: entries.slice(0, 50), nextBefore: entries.length > 50 ? entries[49].revision : null, ...seatsRecordMetadata(record) });
+    }
     const match = /^\/api\/plans\/([A-Za-z0-9_-]{8,100})$/.exec(url.pathname);
     if (match && request.method === 'GET') {
       const record = await this.ctx.storage.get('plan:' + match[1]);
-      return record ? seatsWorkerJson(record) : seatsWorkerJson({ error: 'That shared plan was not found.' }, 404);
+      if (!record) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+      return record.deletedAt ? seatsWorkerJson({ error: 'That shared chart was deleted.' }, 410) : seatsWorkerJson({ ...record, ...seatsRecordMetadata(record) });
+    }
+    if (match && request.method === 'DELETE') {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const key = 'plan:' + match[1], record = await this.ctx.storage.get(key);
+        if (!record) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+        if (!record.deletedAt) {
+          const now = new Date().toISOString(), next = { ...record, ...seatsRecordMetadata(record), deletedAt: now, deletedBy: session.name, revision: record.revision + 1, updatedAt: now, updatedBy: session.name, historyFromRevision: record.historyFromRevision || record.revision };
+          await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(match[1], record.revision)]: seatsLegacyHistory(record) } : {}), [seatsHistoryKey(match[1], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Deleted chart from the website'] } });
+          this.broadcast({ type: 'plan-deleted', id: match[1] }); this.broadcast({ type: 'plans-changed' });
+        }
+        return seatsWorkerJson({ deleted: true });
+      });
     }
     return seatsWorkerJson({ error: 'Not found.' }, 404);
   }
@@ -128,7 +188,8 @@ export class SeatsWorkspace {
         for (const id of message.ids) {
           if (!seatsWorkerId(id)) continue;
           const record = await this.ctx.storage.get('plan:' + id);
-          if (record) this.send(socket, { type: 'snapshot', ...record });
+          if (record?.deletedAt) this.send(socket, { type: 'plan-deleted', id });
+          else if (record) this.send(socket, { type: 'snapshot', ...record });
         }
         return;
       }
@@ -144,6 +205,7 @@ export class SeatsWorkspace {
       await this.ctx.blockConcurrencyWhile(async () => {
         const key = 'plan:' + message.planId, record = await this.ctx.storage.get(key);
         if (!record) throw new Error('That shared plan was not found.');
+        if (record.deletedAt) { this.send(socket, { type: 'plan-deleted', id: message.planId }); return; }
         if (record.operations.includes(message.operationId)) { this.send(socket, { type: 'snapshot', ...record, operationId: message.operationId, clientId: meta.clientId }); return; }
         try {
           for (const change of message.changes || []) {
@@ -157,8 +219,11 @@ export class SeatsWorkspace {
             if (busy) throw new Error(busy.name + ' is editing that seat.');
           }
           const plan = seatsSharedApply(record.plan, message.changes);
-          const next = { plan, revision: record.revision + 1, updatedAt: new Date().toISOString(), updatedBy: meta.name, operations: [...record.operations, message.operationId].slice(-200) };
-          await this.ctx.storage.put(key, next);
+          if (JSON.stringify(plan) === JSON.stringify(record.plan)) { this.send(socket, { type: 'snapshot', ...record, operationId: message.operationId, clientId: meta.clientId }); return; }
+          const now = new Date().toISOString();
+          const next = { ...record, ...seatsRecordMetadata(record), plan, revision: record.revision + 1, updatedAt: now, updatedBy: meta.name, operations: [...record.operations, message.operationId].slice(-200), historyFromRevision: record.historyFromRevision || record.revision };
+          await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(plan.id, record.revision)]: seatsLegacyHistory(record) } : {}),
+            [seatsHistoryKey(plan.id, next.revision)]: { revision: next.revision, at: now, by: meta.name, details: seatsDescribeChanges(record.plan, plan, message.changes) } });
           this.broadcast({ type: 'snapshot', ...next, operationId: message.operationId, clientId: meta.clientId });
         } catch (error) {
           this.send(socket, { type: 'conflict', ...record, operationId: message.operationId, error: error.message });

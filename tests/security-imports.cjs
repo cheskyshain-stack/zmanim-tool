@@ -17,7 +17,7 @@ const server = http.createServer((req, res) => {
 });
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const browser = await chromium.launch({channel:'chrome',headless:true});
+  const browser = await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',args:['--no-sandbox']});
   try {
     const context = await browser.newContext();
     const origin = 'http://127.0.0.1:' + server.address().port;
@@ -71,7 +71,7 @@ const server = http.createServer((req, res) => {
       }
       const formatted='<span class="big"><u>7:35</u></span><br><bdi dir="rtl">שחרית</bdi>';
       check(sanitizeRichText(formatted)===formatted,'formatting lost');
-      check(safeHeaderImage(attr)==='/assets/logo-building-icon.png','unsafe image URL');
+      check(safeHeaderImage(attr)==='/assets/shul-240.jpg','unsafe image URL');
       const photo='data:image/png;base64,iVBORw0KGgo=';
       check(safeHeaderImage(photo)===photo,'raster photo lost');
       for (const bad of [null,{}, {settings:{latitude:attr},sheets:[]},{settings:{},sheets:'bad'}, {settings:{},sheets:[],rules:[{id:'x',name:'x',value:'',condition:{parsha:attack}}]}, JSON.parse('{"settings":{},"sheets":[],"__proto__":{}}')]) {
@@ -83,7 +83,7 @@ const server = http.createServer((req, res) => {
       check(withOwn.own.length===1,'custom posters lost on restore');
       renderOwnEditor(host,own,[],{onChange(){},onDelete(){}});
       check(!host.querySelector('[onpointerover]'),'poster attribute injection');
-      const sheet={id:attr,season:attack,hebrewYear:attack,createdAt:'2026-01-01',weeks:[],overrides:{'46000':{B:attack+formatted}},columnWidths:{B:100}};
+      const sheet={id:attr,season:attack,hebrewYear:attack,createdAt:'2026-01-01',weeks:[],pageSizes:[],overrides:{'46000':{B:attack+formatted}},columnWidths:{B:100}};
       const single=importSheetFromText(JSON.stringify({type:'zmanim-sheet',sheet}));
       check(single.id!==sheet.id && single.overrides['46000'].B===formatted,'single sheet not cleaned');
       check(mergeRow({},sheet,46000).row.B===formatted,'render defense failed');

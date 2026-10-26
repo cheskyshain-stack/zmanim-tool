@@ -27,7 +27,7 @@ export function sanitizeRichText(value) {
 /** The cropper saves raster data URLs. No remote URLs or SVG from a backup. */
 export function safeHeaderImage(value) {
   return typeof value === 'string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(value)
-    ? value : '/assets/logo-building-icon.png';
+    ? value : '/assets/shul-240.jpg';
 }
 
 function backupObject(value) {

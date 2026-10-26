@@ -8,7 +8,7 @@ import { safeHeaderImage } from '../security.js';
 //   onSave(dataUrl | null) - called with a new cropped data: URL, or null if the user
 //   removed the custom photo to go back to the bundled default.
 export function renderImageCropper(container, currentDataUrl, onSave) {
-  // Matches assets/logo-building-icon.png's own aspect ratio, so a freshly cropped
+  // Matches assets/shul-240.jpg's own aspect ratio, so a freshly cropped
   // photo sits in the header the same shape as the default did.
   const ASPECT = 155 / 90;
   const VIEW_W = 240;
@@ -21,7 +21,7 @@ export function renderImageCropper(container, currentDataUrl, onSave) {
       <div class="crop-current-row">
         <img class="crop-current" src="${safeHeaderImage(currentDataUrl)}" alt="Current header photo">
         <div>
-          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/logo-building-icon.png)'}</div>
+          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/shul-240.jpg)'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
           ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove (use default)</button>' : ''}
         </div>

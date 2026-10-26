@@ -2,6 +2,11 @@ name: Activate shared seating plans
 
 on:
   workflow_dispatch:
+    inputs:
+      service_only:
+        description: Deploy the shared chart service without publishing the website
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -9,19 +14,18 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ inputs.service_only && 'seats-service' || 'pages' }}
   cancel-in-progress: false
 
 jobs:
-  activate:
+  service:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+    outputs:
+      endpoint: ${{ steps.deploy.outputs.endpoint }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -29,10 +33,11 @@ jobs:
         with:
           python-version: '3.11'
       - name: Verify shared plan merging and site rules
-        run: node --test tests/seats-sharing-model.mjs tests/seats-model.mjs tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
+        run: node --test tests/seats-sharing-model.mjs tests/seats-records.mjs tests/seats-model.mjs tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
       - name: Install the tested deployment tool
         run: npm install --prefix "$RUNNER_TEMP/seats-deploy" --no-package-lock --no-audit --no-fund wrangler@4.152.0
       - name: Deploy the shared seating service
+        id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_SEND_METRICS: 'false'
@@ -49,6 +54,7 @@ jobs:
           const endpoint=log.match(/https:\/\/zmanim-seats\.[a-z0-9-]+\.workers\.dev\b/)?.[0];
           if(!endpoint)throw new Error('The deployment did not return a workers.dev URL. Check the account subdomain before enabling shared plans.');
           fs.appendFileSync(process.env.GITHUB_ENV,'SEATS_API_URL='+endpoint+'\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'endpoint='+endpoint+'\n');
           JS
       - name: Verify the live service before enabling it
         run: |
@@ -61,11 +67,36 @@ jobs:
           assert.equal(login.status,200,'The Seats PIN must open a server session.');
           const session=await login.json();
           assert.equal(typeof session.token,'string');
+          const info=await fetch(process.env.SEATS_API_URL+'/api/info',{headers:{...headers,Authorization:'Bearer '+session.token}});
+          assert.equal(info.status,200,'The deployed service must support chart dates and history.');
+          const features=await info.json();
+          assert.equal(features.changeHistory,true);
+          assert.equal(features.sharedNameFiles,true);
+          assert.equal(features.deleteFiles,true);
           const plans=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:{...headers,Authorization:'Bearer '+session.token}});
           assert.equal(plans.status,200,'Authenticated plan storage must be available.');
           assert.ok(Array.isArray((await plans.json()).plans));
           console.log('Verified server PIN protection and authenticated storage.');
           JS
+  publish:
+    if: ${{ !inputs.service_only }}
+    needs: service
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    env:
+      SEATS_API_URL: ${{ needs.service.outputs.endpoint }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Record the service URL
         run: |
           git pull --ff-only origin main
