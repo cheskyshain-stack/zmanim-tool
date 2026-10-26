@@ -92,11 +92,52 @@ const server=http.createServer((req,res)=>{
    await ready(popup,'/week/');assert(await popup.locator('.website-preview-banner').isVisible());
    await popup.clock.setFixedTime(new Date(real));await popup.getByRole('link',{name:'Exit preview',exact:true}).click();
    await ready(popup,'/week/');assert(!new URL(popup.url()).searchParams.has('website-preview'));assert.equal(await popup.locator('.website-preview-banner').count(),0);await popup.close();
+   const previousDay=page.getByRole('button',{name:'Previous day',exact:true}),nextDay=page.getByRole('button',{name:'Next day',exact:true});
+   const embedded=await (await page.locator('#website-preview-frame').elementHandle()).contentFrame();
+   const waitForDate=async(expected,route)=>{
+    assert.equal(await date.inputValue(),expected);assert.equal(await time.inputValue(),'06:42');
+    await page.waitForFunction(({expected,route})=>{
+     const url=new URL(document.querySelector('iframe').contentWindow.location.href);
+     return url.pathname===route&&url.searchParams.get('website-preview')===expected+'T11:42:00.000Z';
+    },{expected,route});
+    await ready(embedded,route);
+   };
+   for(const [route]of routes){
+    await page.locator('#website-preview-page').selectOption(route);await ready(embedded,route);
+    await nextDay.scrollIntoViewIfNeeded();
+    const before=await nextDay.boundingBox();
+    await nextDay.click();await waitForDate('2026-12-11',route);
+    assert.match(await page.locator('#website-preview-day').innerText(),/Fri, Dec 11, 2026/);
+    // The real homepage announcement legitimately moves focus into its modal.
+    if(!await frame.locator('dialog[open]').count())assert.equal(await nextDay.evaluate(node=>node===document.activeElement),true,'Date step keeps button focus on '+route);
+    assert(Math.abs((await nextDay.boundingBox()).y-before.y)<1,'Date step keeps the outer scroll position');
+    await previousDay.click();await waitForDate('2026-12-10',route);
+    checks.push({width,dayButtons:route});
+   }
+   const navBox=await page.locator('.website-preview-date-nav').boundingBox(),canvasBox=await page.locator('.website-preview-canvas').boundingBox();
+   assert(canvasBox.y>=navBox.y+navBox.height&&canvasBox.y-navBox.y-navBox.height<=12,'Day buttons sit immediately above the preview');
+   for(const button of [previousDay,nextDay]){const box=await button.boundingBox();assert(box.width>=44&&box.height>=44,'Day buttons have touch-sized targets');}
+   await page.locator('#website-preview-page').selectOption('/');await ready(embedded,'/');
+   for(const [start,next]of [['2026-12-31','2027-01-01'],['2028-02-28','2028-02-29'],['2028-02-29','2028-03-01']]){
+    await date.fill(start);await page.getByRole('button',{name:'Show preview',exact:true}).click();
+    await nextDay.click();assert.equal(await date.inputValue(),next);assert.equal(await time.inputValue(),'06:42');
+    await previousDay.click();assert.equal(await date.inputValue(),start);
+   }
+   await time.fill('03:30');
+   for(const [start,next,hours]of [['2027-03-13','2027-03-14',23],['2027-11-06','2027-11-07',25]]){
+    await date.fill(start);await page.getByRole('button',{name:'Show preview',exact:true}).click();
+    const oldInstant=new URL(await open.getAttribute('href')).searchParams.get('website-preview');
+    await nextDay.click();assert.equal(await date.inputValue(),next);assert.equal(await time.inputValue(),'03:30');
+    const newInstant=new URL(await open.getAttribute('href')).searchParams.get('website-preview');
+    assert.equal((Date.parse(newInstant)-Date.parse(oldInstant))/3600000,hours,'Day steps preserve local time across DST');
+   }
+   if(output)await page.screenshot({path:path.join(output,width+'-day-buttons.png'),fullPage:true});
    const previous=await page.locator('iframe').getAttribute('src');
-   await date.fill('2027-03-14');await time.fill('02:30');await page.getByRole('button',{name:'Show preview',exact:true}).click();
+   await date.fill('2027-03-14');await page.getByRole('button',{name:'Show preview',exact:true}).click();
+   const validBeforeGap=await page.locator('iframe').getAttribute('src');
+   await time.fill('02:30');await page.getByRole('button',{name:'Show preview',exact:true}).click();
    assert.match(await page.locator('#website-preview-note').innerText(),/does not occur/);
-   // Date edits may have previewed the valid old time before the invalid time was entered.
-   assert.notEqual(new URL(await page.locator('iframe').getAttribute('src')).searchParams.get('website-preview'),'2027-03-14T07:30:00.000Z');
+   assert.equal(await page.locator('iframe').getAttribute('src'),validBeforeGap,'An invalid local time keeps the last valid preview');
    await page.locator('#website-preview-today').click();assert.equal(await date.inputValue(),'2026-10-25');assert.equal(await time.inputValue(),'08:00');
    await page.locator('#website-preview-screen').selectOption('desktop');assert.equal(await frame.locator('body').evaluate(()=>innerWidth),1200);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
