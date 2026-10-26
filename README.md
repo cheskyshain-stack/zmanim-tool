@@ -61,8 +61,9 @@ Name files stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
-between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. D1 leaves room
-for an inward-opening door in the right wall. The Aron Kodesh stays centered on
+between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. D1 keeps the
+same small gap from the right wall as the other front tables. A plain opening
+beside it has no door leaf or swing. The Aron Kodesh stays centered on
 the front wall, independently of table movement and resizing. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
 when extra seats are requested. An amud stands between B2 and C2.
@@ -121,6 +122,8 @@ routing and the sitemap, with `noindex` and a robots exclusion.
 The current room update keeps the compatible stored layout version 12. Old joined
 C1/D1 tables identify charts that need the new seat counts and front-door clearance.
 Standard side bookcases and the original bimah also receive their revised positions.
+The earlier door-swing inset at D1 returns to the normal small wall gap, with
+custom seat counts and sizes retained.
 C1's displaced fifth-seat name stays in the waiting list; added seats are empty.
 Updates to a shared chart are emitted as ordinary count/geometry changes after its
 server snapshot is registered, preserving online assignments and edit history.
@@ -146,7 +149,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-front-door-2026-10-26` before changes are saved.
+`lakewood-commons-seats-v1-before-room-right-opening-2026-10-26` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 

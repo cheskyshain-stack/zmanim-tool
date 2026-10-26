@@ -6,10 +6,10 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'front-door-2026-10-26';
+export const SEATS_ROOM_UPDATE = 'right-opening-2026-10-26';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
-export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 64 };
+export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 8 };
 export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
 export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B2', 'C2', 'B6', 'C6'];
@@ -89,6 +89,11 @@ function seatsOldBimah(plan) {
 function seatsJoinedFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
   return Boolean(c1 && d1 && Math.abs(c1.x + c1.width - d1.x) < .001);
+}
+function seatsOldFrontInset(plan) {
+  const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
+  return c1 && d1 && Math.abs(d1.y - 78) < .001 && Math.abs(d1.x + d1.width - 1119) < .001
+    && Math.abs(d1.x - c1.x - c1.width - SEATS_FRONT_TABLE_GAP) < .001 ? d1 : null;
 }
 
 export function seatsSyncAisleTables(plan) {
@@ -253,13 +258,14 @@ function seatsSeparateTables(plan) {
 export function seatsNeedsUpgrade(plan) {
   if (plan.layoutVersion !== SEATS_LAYOUT_VERSION) return true;
   // Earlier 7:30 layouts always joined these two tables. The new gap marks the update on every device.
-  return seatsJoinedFront(plan) || seatsOldSideCases(plan).length > 0 || Boolean(seatsOldBimah(plan));
+  return seatsJoinedFront(plan) || seatsOldSideCases(plan).length > 0 || Boolean(seatsOldBimah(plan)) || Boolean(seatsOldFrontInset(plan));
 }
 
 export function seatsUpgradePlan(plan) {
   if (!seatsNeedsUpgrade(plan)) return 0;
   const previousVersion = plan.layoutVersion ?? 1;
   const updateCounts = previousVersion !== SEATS_LAYOUT_VERSION || seatsJoinedFront(plan);
+  const inset = seatsOldFrontInset(plan);
   let released = 0;
   if (previousVersion === 3) {
     seatsSyncAisleTables(plan);
@@ -320,6 +326,7 @@ export function seatsUpgradePlan(plan) {
   }
   const bimah = seatsOldBimah(plan); if (bimah) bimah.y = 488;
   for (const { column, cabinet } of seatsOldSideCases(plan)) { cabinet.y = seatsSideCaseTop(plan, column); cabinet.height = 936 - cabinet.y; }
+  if (inset) inset.x = SEATS_BOUNDS.right - SEATS_FRONT_RIGHT_DOOR.clearance - inset.width;
   seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
