@@ -3,7 +3,7 @@ import { seatsFront, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGH
 
 export function seatsRoomFeatures(plan) {
   const cross = SEATS_CROSS_WALKWAY;
-  const door = SEATS_FRONT_RIGHT_DOOR, doorWidth = door.bottom - door.top;
+  const door = SEATS_FRONT_RIGHT_DOOR;
   const { aron } = seatsFront(plan), font = Math.min(15, (aron.width - 8) / 4.5);
   const a = plan.tables.filter(table => ['A7', 'A8'].includes(table.id));
   const d = plan.tables.filter(table => ['D7', 'D8'].includes(table.id));
@@ -11,12 +11,12 @@ export function seatsRoomFeatures(plan) {
   const dRight = d.length ? Math.min(...d.map(table => table.x)) : 1030;
   const dLeft = plan.tables.find(table => table.id === 'D6')?.x ?? 968;
   const side = (id, left, right) => right - left < 24 ? '' : `<g class="walkway rear-side-walkway" data-walkway="${id}"><path d="M${left} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y} M${right} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y}"/></g>`;
-  return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
+  return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${door.top} M1183 ${door.bottom} V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
     <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/><text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text></g>
     <g class="walkway" data-walkway="cross" aria-label="Walkway between rows 6 and 7"><path d="M18 ${cross.top} H1182 M18 ${cross.bottom} H1182"/></g>
     <g class="room-opening" data-door="left-entrance" data-kind="open" aria-label="Left entrance"></g>
     <g class="room-opening" data-door="right-entrance" data-kind="open" aria-label="Right entrance"></g>
-    <g class="room-door" data-door="front-right" data-kind="open" aria-label="Front right door"><path class="door-gap" d="M1183 ${door.top} V${door.bottom}"/><path class="door-leaf" d="M1183 ${door.top} H${1183 - doorWidth}"/><path class="door-swing" d="M1183 ${door.bottom} A${doorWidth} ${doorWidth} 0 0 1 ${1183 - doorWidth} ${door.top}"/></g>
+    <g class="room-opening" data-door="front-right" data-kind="open" aria-label="Front right opening"></g>
     ${side('rear-left', 41, aRight)}${side('rear-right', dLeft, dRight)}
     <g class="walkway rear-walkway" data-walkway="back" aria-label="Walkway across the back of the room"><path d="M41 ${SEATS_BACK_WALKWAY_Y} H1159 M41 936 H1159"/></g>
     <g class="room-door closed-door" data-door="back-left" data-kind="closed" aria-label="Back left door"><path class="door-gap" d="M241 960 H291"/><path class="door-leaf" d="M241 960 H291 M241 956 V964 M291 956 V964"/></g>

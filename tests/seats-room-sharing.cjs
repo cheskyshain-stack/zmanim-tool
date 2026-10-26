@@ -43,7 +43,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     for (const [id, count] of Object.entries({ C1: 4, A8: 4, B5: 5, C5: 5, D7: 5, D8: 5 })) assert.equal(get(id).count, count, id);
     assert.equal(seatsItems(plan).reduce((sum, entry) => sum + (entry.count || 0), 0), 163);
     assert.ok(Math.abs(get('D1').x - get('C1').x - get('C1').width - 8) < .001, 'C1 and D1 have the requested gap');
-    assert.ok(Math.abs(get('D1').x + get('D1').width - 1119) < .001, 'The front-right door keeps its clearance');
+    assert.ok(Math.abs(get('D1').x + get('D1').width - 1175) < .001, 'D1 keeps the same small wall gap as the other front tables');
     assert.equal(plan.objects.find(object => object.type === 'bimah').y, 488);
     for (const id of ['rear-case-side-left', 'rear-case-side-right']) { const cabinet = plan.objects.find(object => object.id === id); assert.equal(cabinet.y, 798); assert.equal(cabinet.height, 138); }
     assert.ok(plan.people.some(person => person.id === displaced), 'The removed fifth seat does not remove its name');

@@ -53,12 +53,15 @@ const server = http.createServer((req,res) => {
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
     assert.equal(await page.locator('.room-stage [data-door]').count(),5);
     assert.equal(await page.locator('.room-stage [data-kind="open"]').count(),3);
-    assert.equal(await page.locator('.room-stage [data-door="front-right"] .door-swing').count(),1);
+    assert.equal(await page.locator('.room-stage [data-door="front-right"] .door-leaf,.room-stage [data-door="front-right"] .door-swing').count(),0);
+    assert.equal(await page.locator('.room-stage [data-door="front-right"]').getAttribute('class'),'room-opening');
+    assert.equal(await page.locator('.room-stage .room-boundary').evaluate(path=>path.isPointInStroke(new DOMPoint(1183,102))),false,'The front-right opening is an actual break in the wall');
+    assert.equal(await page.locator('.room-stage .room-boundary').evaluate(path=>path.isPointInStroke(new DOMPoint(1183,150))),true,'The right wall resumes behind the opening');
     assert.equal(await page.locator('.room-stage .room-opening path').count(),0);
     assert.equal(await page.locator('.room-stage [data-walkway]').count(),3);
     assert.equal(await page.locator('.room-stage [data-walkway="cross"],.room-stage [data-walkway="back"]').count(),2);
     assert.equal(starting.plans[0].objects.filter(object=>object.type==='cabinet').length,5);
-    const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.ok(Math.abs(d1.x-c1.x-c1.width-8)<.0001);assert.ok(d1.x+d1.width<=1119.0001);
+    const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.ok(Math.abs(d1.x-c1.x-c1.width-8)<.0001);assert.ok(d1.x+d1.width<=1175.0001);
     for(const id of ['C1','A8','B2','C2','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,240);
@@ -402,7 +405,7 @@ const server = http.createServer((req,res) => {
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.match(upgraded.plans[0].name,/^Seating plan - /);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-right-opening-2026-10-26'),storageKey),JSON.stringify(legacy));await migration.close();
     const version11=structuredClone(starting),prior=version11.plans[0];prior.layoutVersion=11;
     for(const table of prior.tables){const row=Number(table.id.slice(1));table.y=row>=7?640+(row-7)*88:70+(row-1)*88;if(table.column==='A')table.x-=8;if(table.column==='D')table.x+=8;if(table.column==='B'&&row>1)table.x-=8/3;if(table.column==='C')table.x+=row===1?8:8/3;}
     for(const cabinet of prior.objects.filter(object=>object.id.startsWith('rear-case-side-'))){cabinet.y=728;cabinet.height=208;}
@@ -417,7 +420,7 @@ const server = http.createServer((req,res) => {
     assert.equal(byId('A8').y,736);assert.equal(byId('B9').y,824);assert.equal(byId('A3').height,48);
     const retainedNames=await savedPage.locator('.room-stage .seat-name').evaluateAll(nodes=>nodes.map(node=>[...node.querySelectorAll('tspan')].map(span=>span.textContent).join(' ')));
     assert.equal(retainedNames.filter(name=>name==='Existing Cohen').length,2);
-    assert.equal(await savedPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(version11));
+    assert.equal(await savedPage.evaluate(key=>localStorage.getItem(key+'-before-room-right-opening-2026-10-26'),storageKey),JSON.stringify(version11));
     await savedMigration.close();
     const previous12=structuredClone(starting),oldRoom=previous12.plans[0],oldTable=id=>oldRoom.tables.find(table=>table.id===id);
     for(const [id,count,x] of [['C1',5,695],['B5',4,328+1/3],['C5',4,679+2/3],['D7',3,1007],['D8',3,1007],['A8',3,121],['D1',5,935]])Object.assign(oldTable(id),{count,width:count*48,x,seats:Array(count).fill(null)});
@@ -431,7 +434,7 @@ const server = http.createServer((req,res) => {
     assert.equal(updatedRoom.layoutVersion,12);assert.equal(updatedRoom.tables.find(table=>table.id==='C1').count,4);
     assert.deepEqual(updatedRoom.people,oldRoom.people);assert.equal(updatedRoom.tables.find(table=>table.id==='A1').seats[0],'kept-front');
     assert.ok(updatedRoom.tables.every(table=>!table.seats.includes('waiting-c1')));assert.ok(await currentPage.locator('[data-person="waiting-c1"]').isVisible());
-    assert.equal(await currentPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(previous12));
+    assert.equal(await currentPage.evaluate(key=>localStorage.getItem(key+'-before-room-right-opening-2026-10-26'),storageKey),JSON.stringify(previous12));
     await currentPage.reload();await openDevice(currentPage);assert.deepEqual(await currentPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),updated12,'The current shared-format room migration runs once');await currentMigration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
