@@ -48,6 +48,9 @@ right bookcase face as their right edge. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 Built-in cabinet labels and walkway, entrance, and door labels are hidden on screen
 and in print; their shapes remain visible.
+Rows 7, 8 and 9 have the same 30-unit gap between table surfaces as the ordinary
+front rows. The rear walkway is deeper, and side bookcases still reach the front
+of row 8.
 Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
 dragging a table label or room object, or using keyboard arrows. Width, depth,
 and position can also be entered. The page scrolls normally over the sidebar
@@ -64,7 +67,9 @@ lettering proportions and narrow margins. Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Version 6 plans rebalance the B/C column positions while retaining names, seat
+Version 7 plans move rows 8 and 9 forward to match the normal table gaps, retaining
+names, counts, table sizes and horizontal positions. Version 6 plans also
+rebalance the B/C column positions while retaining names, seat
 counts, table sizes, and the outer columns. Plans from version 5 or earlier also
 widen automatic tables and reduce B5/C5 to four seats, retaining
 all names. Anyone in those removed fifth seats returns to the waiting list. Manual
@@ -74,7 +79,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v7` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-v8` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
