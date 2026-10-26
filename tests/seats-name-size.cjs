@@ -45,7 +45,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       page.on('request',request=>{if(request.url().includes('/api/')&&!['GET','OPTIONS'].includes(request.method())&&!request.url().endsWith('/api/session'))writes.push(request.url());});
       page.on('websocket',socket=>socket.on('framesent',event=>{try{if(JSON.parse(event.payload).type==='patch')patches.push('patch');}catch{}}));
       await context.addInitScript(state=>{if(!localStorage.getItem('lakewood-commons-seats-v1'))localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(state));},sample);
-      await page.goto(origin+'/seats/');await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.goto(origin+'/seats/?count=off');await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card').click();await page.evaluate(()=>document.fonts.ready);
       const before=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));
       const inspect=async selector=>page.locator(selector).evaluate(stage=>{
