@@ -2,8 +2,14 @@ export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 48;
-export const SEATS_LAYOUT_VERSION = 6;
+export const SEATS_LAYOUT_VERSION = 7;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
+const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
+const SEATS_COLUMN_GAP = (SEATS_BOUNDS.right - SEATS_BOUNDS.left - SEATS_STANDARD_WIDTH * 4) / 3;
+const SEATS_COLUMN_CENTERS = { A: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH / 2,
+  B: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH * 1.5 + SEATS_COLUMN_GAP,
+  C: SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 1.5 - SEATS_COLUMN_GAP,
+  D: SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH / 2 };
 const SEATS_BACK_CABINETS = [
   { id: 'rear-case-left', type: 'cabinet', label: 'Back sefarim (left)', x: 17, y: 936, width: 204, height: 24 },
   { id: 'rear-case-center', type: 'cabinet', label: 'Back sefarim (center)', x: 311, y: 936, width: 578, height: 24 },
@@ -21,7 +27,7 @@ export function seatsItems(plan) {
 export function seatsFront(plan) {
   const b1 = plan.tables.find(table => table.id === 'B1');
   const c1 = plan.tables.find(table => table.id === 'C1');
-  const left = b1 ? b1.x + b1.width : 407.5 + SEATS_SEAT_WIDTH * 2.5, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_SEAT_WIDTH * 10;
+  const left = b1 ? b1.x + b1.width : SEATS_COLUMN_CENTERS.B + SEATS_STANDARD_WIDTH / 2, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
   const gap = Math.max(72, right - left);
   const aronWidth = Math.min(122, Math.max(40, Math.round(gap * 0.52)));
   const ravWidth = Math.min(56, Math.max(30, Math.round(gap * 0.24)));
@@ -33,6 +39,8 @@ export function seatsFront(plan) {
 export function seatsSyncFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
   if (c1 && d1) { c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y; }
+  const b1 = plan.tables.find(table => table.id === 'B1');
+  if (b1 && c1 && c1.x - b1.x - b1.width < 80) b1.x = Math.max(SEATS_BOUNDS.left, c1.x - 80 - b1.width);
   const rav = plan.objects.find(object => object.type === 'rav');
   if (rav) Object.assign(rav, seatsFront(plan).rav);
 }
@@ -53,8 +61,27 @@ export function seatsSyncAisleTables(plan) {
     const table = plan.tables.find(entry => entry.id === id), neighbor = plan.tables.find(entry => entry.id === reference);
     if (!table) continue;
     table.anchor = id[0] === 'B' ? 'left' : 'right';
-    table.x = table.anchor === 'left' ? neighbor?.x ?? 407.5 - SEATS_SEAT_WIDTH * 2.5 : (neighbor ? neighbor.x + neighbor.width : 792.5 + SEATS_SEAT_WIDTH * 2.5) - table.width;
+    table.x = table.anchor === 'left' ? neighbor?.x ?? SEATS_COLUMN_CENTERS.B - SEATS_STANDARD_WIDTH / 2 : (neighbor ? neighbor.x + neighbor.width : SEATS_COLUMN_CENTERS.C + SEATS_STANDARD_WIDTH / 2) - table.width;
   }
+}
+
+function seatsBalanceColumns(plan) {
+  const reference = column => plan.tables.find(table => table.id === column + '3')
+    || plan.tables.find(table => table.column === column && table.id !== column + '1');
+  const a = reference('A'), b = reference('B'), c = reference('C'), d = reference('D');
+  const left = a ? a.x + a.width : SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH;
+  const right = d?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH;
+  const bWidth = b?.width ?? SEATS_STANDARD_WIDTH, cWidth = c?.width ?? SEATS_STANDARD_WIDTH;
+  const gap = Math.max(0, (right - left - bWidth - cWidth) / 3);
+  for (const [column, anchor, center] of [['B', b, left + gap + bWidth / 2], ['C', c, right - gap - cWidth / 2]]) {
+    if (!anchor) continue;
+    const shift = center - anchor.x - anchor.width / 2;
+    if (Math.abs(shift) < 0.0000001) continue;
+    for (const table of plan.tables) if (table.column === column && table.id !== 'C1') {
+      table.x = Math.max(SEATS_BOUNDS.left, Math.min(SEATS_BOUNDS.right - table.width, table.x + shift));
+    }
+  }
+  seatsSyncFront(plan);
 }
 
 function seatsRearLayout(plan) {
@@ -75,7 +102,7 @@ function seatsDefaultTable(column, row) {
     : SEATS_FOUR_SEAT_TABLES.includes(column + row) ? 4 : 5;
   const anchor = column === 'A' && row <= 6 ? 'left' : column === 'D' && row <= 6 ? 'right' : 'center';
   const width = count * SEATS_SEAT_WIDTH;
-  const center = { A: 124.5, B: 407.5, C: 792.5, D: 1075.5 }[column];
+  const center = SEATS_COLUMN_CENTERS[column];
   return { id: column + row, label: column + row, column, anchor, autoSize: true,
     x: anchor === 'left' ? 17 : anchor === 'right' ? 1183 - width : center - width / 2,
     y: row === 7 ? 598 : 70 + (row - 1) * 78 + (row > 6 ? 90 : 0),
@@ -126,12 +153,15 @@ export function seatsUpgradePlan(plan) {
       if (existing) Object.assign(existing, { x: cabinet.x, y: cabinet.y, width: cabinet.width, height: cabinet.height });
     }
   }
-  for (const id of ['B5', 'C5']) {
-    const table = plan.tables.find(entry => entry.id === id);
-    if (table) released += seatsSetCount(table, 4);
+  if (previousVersion < 6) {
+    for (const id of ['B5', 'C5']) {
+      const table = plan.tables.find(entry => entry.id === id);
+      if (table) released += seatsSetCount(table, 4);
+    }
+    for (const table of plan.tables) if (table.autoSize !== false) seatsSetCount(table, table.count);
+    seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   }
-  for (const table of plan.tables) if (table.autoSize !== false) seatsSetCount(table, table.count);
-  seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
+  seatsBalanceColumns(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -306,7 +336,7 @@ export function seatsNormalizeState(input) {
       }
       return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');

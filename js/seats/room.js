@@ -38,7 +38,7 @@ export function seatsCabinetArt(object, drawName) {
 export function seatsRavArt(object, people, drawName, interactive, printScale = 1) {
   const name = people.get(object.seats[0]), center = object.width / 2;
   const size = Math.min(object.width - 2, object.height - 30), width = size / printScale;
-  const top = object.height - size, nameHeight = size - 4;
+  const top = 30, nameHeight = size - 4;
   const attributes = interactive ? `id="seat-${escAttr(object.id)}-0" data-seat="0" data-table="${escAttr(object.id)}" role="button" tabindex="0" aria-label="${escAttr(object.label + ': ' + (name || 'empty'))}"` : '';
   return `<rect class="station-frame" width="${object.width}" height="${object.height}"/>
     <g class="drag-handle"><rect x="0" y="-18" width="${object.width}" height="16" fill="transparent"/><text class="table-label" x="${center}" y="-5" text-anchor="middle">${escText(object.label)}</text></g>
