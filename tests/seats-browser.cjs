@@ -51,15 +51,28 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.title(),'Seats | 7:30 מנין');
     assert.ok(await page.locator('#people-search').isVisible(),'Names should open directly');
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
-    assert.equal(await page.locator('.room-stage [data-door]').count(),4);
-    assert.equal(await page.locator('.room-stage [data-kind="open"]').count(),2);
+    assert.equal(await page.locator('.room-stage [data-door]').count(),5);
+    assert.equal(await page.locator('.room-stage [data-kind="open"]').count(),3);
+    assert.equal(await page.locator('.room-stage [data-door="front-right"] .door-swing').count(),1);
     assert.equal(await page.locator('.room-stage .room-opening path').count(),0);
-    assert.equal(await page.locator('.room-stage [data-walkway]').count(),4);
+    assert.equal(await page.locator('.room-stage [data-walkway]').count(),3);
+    assert.equal(await page.locator('.room-stage [data-walkway="cross"],.room-stage [data-walkway="back"]').count(),2);
     assert.equal(starting.plans[0].objects.filter(object=>object.type==='cabinet').length,5);
-    const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.equal(c1.x+c1.width,d1.x);
-    for(const id of ['B2','C2','B5','C5','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
+    const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.ok(Math.abs(d1.x-c1.x-c1.width-8)<.0001);assert.ok(d1.x+d1.width<=1119.0001);
+    for(const id of ['C1','A8','B2','C2','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
-    assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,192);
+    assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,240);
+    for(const id of ['B5','C5','D7','D8'])assert.equal(starting.plans[0].tables.find(table=>table.id===id).count,5);
+    assert.equal(starting.plans[0].tables.reduce((sum,table)=>sum+table.count,0)+1,163);
+    assert.equal(starting.plans[0].objects.find(object=>object.type==='bimah').y,488);
+    for(const [tableId,cabinetId] of [['A8','rear-case-side-left'],['D8','rear-case-side-right']]){
+      const gap=await page.locator('.room-stage').evaluate((stage,{tableId,cabinetId})=>{
+        const chairs=[...stage.querySelectorAll('[data-item="'+tableId+'"] .chair-marker')].map(node=>node.getBoundingClientRect().bottom);
+        const cabinet=stage.querySelector('[data-item="'+cabinetId+'"] .object-surface').getBoundingClientRect();
+        return cabinet.top-Math.max(...chairs);
+      },{tableId,cabinetId});
+      assert.ok(gap>0,'The side cabinet starts behind all '+tableId+' chairs');
+    }
     await assertAronCentered();
     const aisleGaps=await page.locator('.room-stage').evaluate(stage=>{
       const row=['A3','B3','C3','D3'].map(id=>stage.querySelector('[data-item="'+id+'"] .table-surface').getBoundingClientRect());
@@ -90,7 +103,7 @@ const server = http.createServer((req,res) => {
     await page.mouse.move(backBox.x+backBox.width/2+30,backBox.y+backBox.height/2-30,{steps:5});await page.mouse.up();
     assert.deepEqual((await state()).plans[0].objects.find(object=>object.id==='rear-case-center'),backBefore,'Back cabinets must remain fixed under keyboard and pointer movement');
     await page.locator('#layout-item').selectOption('A1');
-    await page.locator('.room-stage [data-table="rav-seat"][data-seat="0"]').click();
+    await page.locator('.room-stage [data-table="rav-seat"][data-seat="0"] .seat-area').click();
     await page.locator('#seat-name-input').fill('Rav Cohen');await page.locator('#seat-name-input').press('Enter');
     assert.equal((await state()).plans[0].objects.find(object=>object.type==='rav').seats.filter(Boolean).length,1);
     assert.equal(await page.locator('.room-stage .rav-seat').getAttribute('data-facing'),'south');
@@ -104,7 +117,7 @@ const server = http.createServer((req,res) => {
     await page.locator('#bulk-settings summary').click();
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
     assert.ok((await state()).plans[0].tables.every(table => table.count === 4));
-    const joined=(await state()).plans[0],joinedC=joined.tables.find(t=>t.id==='C1'),joinedD=joined.tables.find(t=>t.id==='D1');assert.equal(joinedC.x+joinedC.width,joinedD.x);
+    const joined=(await state()).plans[0],joinedC=joined.tables.find(t=>t.id==='C1'),joinedD=joined.tables.find(t=>t.id==='D1');assert.ok(Math.abs(joinedD.x-joinedC.x-joinedC.width-8)<.0001);
     await closeRoom();
     const csv = '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\nדוד כהן\r\nRabbi Shmuel Alexander Friedlander\r\nYosef Cohen\r\n';
     await page.locator('#names-file').setInputFiles({name:'names.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
@@ -389,7 +402,7 @@ const server = http.createServer((req,res) => {
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v12'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(legacy));await migration.close();
     const version11=structuredClone(starting),prior=version11.plans[0];prior.layoutVersion=11;
     for(const table of prior.tables){const row=Number(table.id.slice(1));table.y=row>=7?640+(row-7)*88:70+(row-1)*88;if(table.column==='A')table.x-=8;if(table.column==='D')table.x+=8;if(table.column==='B'&&row>1)table.x-=8/3;if(table.column==='C')table.x+=row===1?8:8/3;}
     for(const cabinet of prior.objects.filter(object=>object.id.startsWith('rear-case-side-'))){cabinet.y=728;cabinet.height=208;}
@@ -404,8 +417,22 @@ const server = http.createServer((req,res) => {
     assert.equal(byId('A8').y,736);assert.equal(byId('B9').y,824);assert.equal(byId('A3').height,48);
     const retainedNames=await savedPage.locator('.room-stage .seat-name').evaluateAll(nodes=>nodes.map(node=>[...node.querySelectorAll('tspan')].map(span=>span.textContent).join(' ')));
     assert.equal(retainedNames.filter(name=>name==='Existing Cohen').length,2);
-    assert.equal(await savedPage.evaluate(key=>localStorage.getItem(key+'-before-room-v12'),storageKey),JSON.stringify(version11));
+    assert.equal(await savedPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(version11));
     await savedMigration.close();
+    const previous12=structuredClone(starting),oldRoom=previous12.plans[0],oldTable=id=>oldRoom.tables.find(table=>table.id===id);
+    for(const [id,count,x] of [['C1',5,695],['B5',4,328+1/3],['C5',4,679+2/3],['D7',3,1007],['D8',3,1007],['A8',3,121],['D1',5,935]])Object.assign(oldTable(id),{count,width:count*48,x,seats:Array(count).fill(null)});
+    for(const cabinet of oldRoom.objects.filter(object=>object.id.startsWith('rear-case-side-')))Object.assign(cabinet,{y:728,height:208});
+    oldRoom.objects.find(object=>object.type==='bimah').y=452;
+    oldRoom.people=[{id:'kept-front',name:'Retained Front Person'},{id:'waiting-c1',name:'Retained Fifth Person'}];
+    oldTable('A1').seats[0]='kept-front';oldTable('C1').seats[4]='waiting-c1';
+    const currentMigration=await browser.newContext();await currentMigration.addInitScript(({key,state})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(state));},{key:storageKey,state:previous12});
+    const currentPage=await currentMigration.newPage();await currentPage.goto(origin+'/seats/');await openDevice(currentPage);await currentPage.locator('.room-stage .table-item').first().waitFor();
+    const updated12=await currentPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),updatedRoom=updated12.plans[0];
+    assert.equal(updatedRoom.layoutVersion,12);assert.equal(updatedRoom.tables.find(table=>table.id==='C1').count,4);
+    assert.deepEqual(updatedRoom.people,oldRoom.people);assert.equal(updatedRoom.tables.find(table=>table.id==='A1').seats[0],'kept-front');
+    assert.ok(updatedRoom.tables.every(table=>!table.seats.includes('waiting-c1')));assert.ok(await currentPage.locator('[data-person="waiting-c1"]').isVisible());
+    assert.equal(await currentPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(previous12));
+    await currentPage.reload();await openDevice(currentPage);assert.deepEqual(await currentPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),updated12,'The current shared-format room migration runs once');await currentMigration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await createChart(touchPage);await touchPage.locator('.room-stage .table-item').first().waitFor();
